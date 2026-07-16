@@ -8,12 +8,12 @@ sys.path.insert(0, "/root/empire_os")
 
 DB = "/root/empire_os/empire_os.db"
 
-# tier -> (base_payout floor USD, fee_rate). Conservative real rates.
+# tier -> (base_payout floor USD, fee_rate). Real market rates.
 TIER_RATES = {
-    "bronze": (9.0, 0.9),
-    "silver": (12.0, 1.0),
-    "gold":   (18.0, 1.0),
-    "platinum": (25.0, 1.0),
+    "bronze": (15.0, 1.0),
+    "silver": (25.0, 1.0),
+    "gold":   (45.0, 1.0),
+    "platinum": (90.0, 1.0),
 }
 DEFAULT_TIER = "silver"
 

@@ -1446,8 +1446,8 @@ PRODUCT_CATALOG = {
     "strike_pack": "Tiered emergency lead burst for a niche/metro event.",
     "ai_closer": "Tiered MRR: AI closes your leads, settles in USDC.",
 }
-PRODUCT_PRICES = {"satellite_wastage": 49.0, "warehouse_asset": 39.0,
-                  "strike_pack": 99.0, "ai_closer": 149.0}
+PRODUCT_PRICES = {"satellite_wastage": 99.0, "warehouse_asset": 79.0,
+                  "strike_pack": 199.0, "ai_closer": 299.0}
 
 
 def ensure_products_table():
@@ -1463,9 +1463,15 @@ def ensure_products_table():
             tier1_usdc REAL,
             tier2_usdc REAL,
             tier3_usdc REAL,
+            tier4_usdc REAL,
             active INTEGER DEFAULT 1,
             created_at TEXT
         )""")
+        # migrate: add tier4 if missing (idempotent)
+        try:
+            backend.execute("ALTER TABLE si_products ADD COLUMN tier4_usdc REAL")
+        except Exception:
+            pass
         backend.commit()
     except Exception:
         pass
@@ -1494,6 +1500,97 @@ def a2a_catalog():
     """What's for sale, machine-readable (static + GitHub-sourced)."""
     cat, _ = load_product_catalog()
     return {"vault": VAULT, "products": cat, "settlement": "solana_usdc"}
+
+
+@app.get("/v1/products/pricing")
+def products_pricing():
+    """Full tiered pricing + one-time white-label setup fees (USDC/mo)."""
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+    ensure_products_table()
+    # load static specs for PRODUCT_PRICES SKUs (not in DB)
+    import os as _os
+    specs = {}
+    sf = "/root/empire_os/empire_os/data/sku_specs.json"
+    if _os.path.exists(sf):
+        try:
+            specs = json.loads(open(sf).read())
+        except Exception:
+            specs = {}
+    rows = backend.execute(
+        "SELECT sku, name, tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, "
+        "setup_fee_usdc, active, features, benefits, deliverables "
+        "FROM si_products WHERE active=1").fetchall()
+    out = {}
+    for sku, name, t1, t2, t3, t4, sfee, act, feats, bens, dels in rows:
+        sp = specs.get(sku, {})
+        out[sku] = {
+            "name": name,
+            "tiers": {
+                "T1": float(t1 or 0), "T2": float(t2 or 0),
+                "T3": float(t3 or 0), "T4_titanium": float(t4 or 0),
+            },
+            "setup_fee_usdc": float(sfee or 0),
+            "whitelabel": float(sfee or 0) > 0,
+            "features": json.loads(feats) if feats else sp.get("features", []),
+            "benefits": json.loads(bens) if bens else sp.get("benefits", []),
+            "deliverables": json.loads(dels) if dels else sp.get("deliverables", []),
+        }
+    # include PRODUCT_PRICES SKUs (not in DB)
+    for sku, price in PRODUCT_PRICES.items():
+        if sku not in out:
+            sp = specs.get(sku, {})
+            out[sku] = {"name": sku, "tiers": {"T1": price, "T2": price * 2.5,
+                        "T3": price * 5, "T4_titanium": price * 10},
+                        "setup_fee_usdc": 0.0, "whitelabel": False,
+                        "features": sp.get("features", []),
+                        "benefits": sp.get("benefits", []),
+                        "deliverables": sp.get("deliverables", [])}
+    return {"vault": VAULT, "settlement": "solana_usdc", "pricing": out}
+
+
+@app.get("/v1/products/{sku}")
+def product_detail(sku: str):
+    """Full spec: tiers, setup fee, features, benefits, deliverables."""
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+    ensure_products_table()
+    import os as _os
+    specs = {}
+    sf = "/root/empire_os/empire_os/data/sku_specs.json"
+    if _os.path.exists(sf):
+        try:
+            specs = json.loads(open(sf).read())
+        except Exception:
+            pass
+    row = backend.execute(
+        "SELECT name, tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, "
+        "setup_fee_usdc, description, features, benefits, deliverables "
+        "FROM si_products WHERE sku=? AND active=1", (sku,)).fetchone()
+    if row:
+        sp = specs.get(sku, {})
+        return {"sku": sku, "name": row[0],
+                "tiers": {"T1": float(row[1] or 0), "T2": float(row[2] or 0),
+                          "T3": float(row[3] or 0), "T4_titanium": float(row[4] or 0)},
+                "setup_fee_usdc": float(row[5] or 0),
+                "whitelabel": float(row[5] or 0) > 0,
+                "description": row[6],
+                "features": json.loads(row[7]) if row[7] else sp.get("features", []),
+                "benefits": json.loads(row[8]) if row[8] else sp.get("benefits", []),
+                "deliverables": json.loads(row[9]) if row[9] else sp.get("deliverables", []),
+                "vault": VAULT, "settlement": "solana_usdc"}
+    # PRODUCT_PRICES SKU
+    if sku in PRODUCT_PRICES:
+        sp = specs.get(sku, {})
+        price = PRODUCT_PRICES[sku]
+        return {"sku": sku, "name": sku,
+                "tiers": {"T1": price, "T2": price * 2.5, "T3": price * 5,
+                          "T4_titanium": price * 10},
+                "setup_fee_usdc": 0.0, "whitelabel": False,
+                "features": sp.get("features", []), "benefits": sp.get("benefits", []),
+                "deliverables": sp.get("deliverables", []),
+                "vault": VAULT, "settlement": "solana_usdc"}
+    raise HTTPException(404, "sku not found")
 
 
 @app.post("/v1/a2a/negotiate")
@@ -1528,8 +1625,9 @@ def a2a_negotiate(req: dict):
         # dynamic: look up SKU in si_products (GitHub-sourced or static)
         _, prices = load_product_catalog()
         row = backend.execute(
-            "SELECT sku, tier1_usdc, tier2_usdc, tier3_usdc FROM si_products "
-            "WHERE sku = ? AND active=1", (product,)).fetchone()
+            "SELECT sku, tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, "
+            "setup_fee_usdc FROM si_products WHERE sku = ? AND active=1",
+            (product,)).fetchone()
         price = float(row[1]) if row else prices.get(product)
         if price:
             quote = {
@@ -1538,7 +1636,10 @@ def a2a_negotiate(req: dict):
                     "t1": float(row[1]) if row else price,
                     "t2": float(row[2]) if row else price * 2,
                     "t3": float(row[3]) if row else price * 5,
+                    "t4_titanium": float(row[4]) if row else price * 10,
                 },
+                "setup_fee_usdc": float(row[5]) if row else 0.0,
+                "whitelabel": bool(row and float(row[5] or 0) > 0),
                 "memo": f"SKU_{product.upper()}",
             }
 
@@ -1581,14 +1682,17 @@ def product_register(req: dict):
     backend.execute(
         "INSERT OR REPLACE INTO si_products "
         "(sku, name, repo_url, license, description, b2b_angle, "
-        "tier1_usdc, tier2_usdc, tier3_usdc, active, created_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,1,?)",
+        "tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, setup_fee_usdc, "
+        "active, created_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?)",
         (sku, req.get("name", sku), req.get("repo_url", ""),
          req.get("license", ""), req.get("description", ""),
          req.get("b2b_angle", ""),
          float(req.get("tier1_usdc", 0) or 0),
          float(req.get("tier2_usdc", 0) or 0),
          float(req.get("tier3_usdc", 0) or 0),
+         float(req.get("tier4_usdc", 0) or 0),
+         float(req.get("setup_fee_usdc", 0) or 0),
          datetime.now(timezone.utc).isoformat()))
     backend.commit()
     return {"ok": True, "sku": sku,
@@ -3625,7 +3729,7 @@ def idle_watch_report(req: dict):
             "AND plan=? AND status IN ('active','paid')",
             (tenant, "sku_satellite_idle_watch")).fetchone()
         tier = int(row[0]) if row and row[0] else 1
-    tier = min(max(tier, 1), 3)
+    tier = min(max(tier, 1), 4)
     # run on-demand scan (reuse idle_asset_sniper logic; skip Supabase)
     try:
         import importlib.util as _iu
@@ -3659,6 +3763,13 @@ def idle_watch_report(req: dict):
     else:
         body = {"tier": "T3", "total_opportunities": len(finds),
                 "opportunities": finds, "kill_alerts": kills}
+    if tier == 4:
+        # TITANIUM — full feed + kills + dedicated real-time monitoring flag
+        body = {"tier": "T4 (titanium)", "total_opportunities": len(finds),
+                "opportunities": finds, "kill_alerts": kills,
+                "dedicated_monitoring": True,
+                "api_webhook_ready": True,
+                "priority_support": True}
     body["sku"] = "satellite_idle_watch"
     body["generated_at"] = datetime.now(timezone.utc).isoformat()
     if note:
@@ -3690,7 +3801,7 @@ def warehouse_asset_report(req: dict):
             "AND plan=? AND status IN ('active','paid')",
             (tenant, "sku_warehouse_asset")).fetchone()
         tier = int(row[0]) if row and row[0] else 1
-    tier = min(max(tier, 1), 3)
+    tier = min(max(tier, 1), 4)
     try:
         import importlib.util as _iu
         spec = _iu.spec_from_file_location(
@@ -3725,6 +3836,12 @@ def warehouse_asset_report(req: dict):
     else:
         body = {"tier": "T3", "total_opportunities": len(finds),
                 "opportunities": finds, "kill_alerts": kills}
+    if tier == 4:
+        body = {"tier": "T4 (titanium)", "total_opportunities": len(finds),
+                "opportunities": finds, "kill_alerts": kills,
+                "dedicated_monitoring": True,
+                "api_webhook_ready": True,
+                "priority_support": True}
     body["sku"] = "warehouse_asset"
     body["generated_at"] = datetime.now(timezone.utc).isoformat()
     if note:
@@ -3757,8 +3874,8 @@ def leads_engine_discover(req: dict):
             "AND plan=? AND status IN ('active','paid')",
             (tenant, "sku_empire_leads_engine")).fetchone()
         tier = int(row[0]) if row and row[0] else 1
-    tier = min(max(tier, 1), 3)
-    cap = {1: 5, 2: 15, 3: 50}[tier]
+    tier = min(max(tier, 1), 4)
+    cap = {1: 5, 2: 15, 3: 50, 4: 200}[tier]
     try:
         import sys as _sys
         _sys.path.insert(0, "/root/empire-leads")
@@ -3789,6 +3906,8 @@ def leads_engine_discover(req: dict):
                                 "leads": len(leads)}) + "\n")
     except Exception:
         pass
+    if tier == 4:
+        _titanium_upgrade(body)
     return {"ok": True, "result": body}
 
 
@@ -3810,6 +3929,15 @@ def _audit_jsonl(sku: str, tenant: str, summary: dict):
         pass
 
 
+def _titanium_upgrade(body: dict):
+    """Add titanium (T4) premium flags to any SKU delivery body."""
+    body["tier"] = "T4 (titanium)"
+    body["dedicated_monitoring"] = True
+    body["api_webhook_ready"] = True
+    body["priority_support"] = True
+    return body
+
+
 @app.post("/v1/skillspector/audit")
 def skillspector_audit(req: dict):
     """B2B: buyer with active sku_skillspector_audit gets a real NVIDIA/GPU/
@@ -3820,7 +3948,7 @@ def skillspector_audit(req: dict):
         raise HTTPException(400, "tenant required")
     if not has_active_sku(tenant, "skillspector_audit"):
         raise HTTPException(402, "no active skillspector_audit subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "skillspector_audit"), 1), 3)
+    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "skillspector_audit"), 1), 4)
     import subprocess
     findings = []
     # real local checks
@@ -3855,6 +3983,10 @@ def skillspector_audit(req: dict):
         body = {"tier": "T2", "findings": findings[:10], "recommendation": rec}
     else:
         body = {"tier": "T3", "findings": findings, "recommendation": rec}
+    if tier == 4:
+        body = {"tier": "T4 (titanium)", "findings": findings,
+                "recommendation": rec, "dedicated_monitoring": True,
+                "api_webhook_ready": True, "priority_support": True}
     body["sku"] = "skillspector_audit"
     body["generated_at"] = datetime.now(timezone.utc).isoformat()
     _audit_jsonl("skillspector_audit", tenant,
@@ -3872,7 +4004,7 @@ def opencut_studio(req: dict):
         raise HTTPException(400, "tenant required")
     if not has_active_sku(tenant, "opencut_studio"):
         raise HTTPException(402, "no active opencut_studio subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "opencut_studio"), 1), 3)
+    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "opencut_studio"), 1), 4)
     repo = "https://github.com/opencut-app/opencut"
     info = {
         "repo": repo, "license": "custom (permissive)",
@@ -3889,6 +4021,8 @@ def opencut_studio(req: dict):
     info["tier"] = f"T{tier}"
     info["generated_at"] = datetime.now(timezone.utc).isoformat()
     _audit_jsonl("opencut_studio", tenant, {"tier": tier})
+    if tier == 4:
+        _titanium_upgrade(info)
     return {"ok": True, "result": info}
 
 
@@ -3902,7 +4036,7 @@ def empire_templates_list(req: dict):
         raise HTTPException(400, "tenant required")
     if not has_active_sku(tenant, "empire_templates"):
         raise HTTPException(402, "no active empire_templates subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "empire_templates"), 1), 3)
+    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "empire_templates"), 1), 4)
     import os as _os
     root = "/root/empire-os-templates-repo"
     def walk(d, depth=0, maxd=3):
@@ -3924,6 +4058,8 @@ def empire_templates_list(req: dict):
             "tree": tree if tier >= 2 else [t["name"] for t in tree]}
     body["generated_at"] = datetime.now(timezone.utc).isoformat()
     _audit_jsonl("empire_templates", tenant, {"tier": tier, "items": len(tree)})
+    if tier == 4:
+        _titanium_upgrade(body)
     return {"ok": True, "result": body}
 
 
@@ -3936,7 +4072,7 @@ def hermes_framework(req: dict):
         raise HTTPException(400, "tenant required")
     if not has_active_sku(tenant, "hermes_framework"):
         raise HTTPException(402, "no active hermes_framework subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "hermes_framework"), 1), 3)
+    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "hermes_framework"), 1), 4)
     caps = ["CLI agent core", "messaging gateway (Telegram/Discord/Slack)",
             "TUI + Electron desktop", "memory + skills system",
             "subagent delegation", "scheduled jobs", "terminal + browser control"]
@@ -3945,6 +4081,8 @@ def hermes_framework(req: dict):
             "white_label": tier >= 2,
             "generated_at": datetime.now(timezone.utc).isoformat()}
     _audit_jsonl("hermes_framework", tenant, {"tier": tier})
+    if tier == 4:
+        _titanium_upgrade(info)
     return {"ok": True, "result": info}
 
 
@@ -3956,8 +4094,8 @@ def lead_lane_access(req: dict):
         raise HTTPException(400, "tenant required")
     if not has_active_sku(tenant, "lead_lane"):
         raise HTTPException(402, "no active lead_lane subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "lead_lane"), 1), 3)
-    cap = {1: 3, 2: 10, 3: 50}[tier]
+    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "lead_lane"), 1), 4)
+    cap = {1: 3, 2: 10, 3: 50, 4: 200}[tier]
     lanes = []
     try:
         rows = backend.execute(
@@ -3971,6 +4109,8 @@ def lead_lane_access(req: dict):
             "open_lanes": lanes, "count": len(lanes),
             "generated_at": datetime.now(timezone.utc).isoformat()}
     _audit_jsonl("lead_lane", tenant, {"tier": tier, "lanes": len(lanes)})
+    if tier == 4:
+        _titanium_upgrade(body)
     return {"ok": True, "result": body}
 
 
@@ -3983,7 +4123,7 @@ def satellite_wastage_report(req: dict):
         raise HTTPException(400, "tenant required")
     if not has_active_sku(tenant, "satellite_wastage"):
         raise HTTPException(402, "no active satellite_wastage subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "satellite_wastage"), 1), 3)
+    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "satellite_wastage"), 1), 4)
     try:
         import importlib.util as _iu
         spec = _iu.spec_from_file_location(
@@ -4011,6 +4151,8 @@ def satellite_wastage_report(req: dict):
     if note:
         body["note"] = note
     _audit_jsonl("satellite_wastage", tenant, {"tier": tier, "total": len(finds)})
+    if tier == 4:
+        _titanium_upgrade(body)
     return {"ok": True, "report": body}
 
 
@@ -4030,6 +4172,8 @@ def marketingskills_access(req: dict):
             "provision_on": "repo cloned + /v1/products/register",
             "generated_at": datetime.now(timezone.utc).isoformat()}
     _audit_jsonl("marketingskills", tenant, {"status": status})
+    if tier == 4:
+        _titanium_upgrade(body)
     return {"ok": True, "result": body}
 
 
