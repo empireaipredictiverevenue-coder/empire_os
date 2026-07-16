@@ -1,0 +1,19 @@
+{
+  "name": "satellite-agent",
+  "script": "/root/venv/bin/python3",
+  "args": "-m empire_os.satellite_service",
+  "cwd": "/root/empire_os",
+  "env": {
+    "SATELLITE_POLL_INTERVAL": "600",
+    "GOOGLE_API_KEY": "",
+    "EMPIRE_HUB_URL": "http://10.218.155.218:8080",
+    "CACHE_DIR": "/root/.empire/satellite_cache"
+  },
+  "instances": 1,
+  "autorestart": true,
+  "watch": false,
+  "max_memory_restart": "500M",
+  "log_date_format": "YYYY-MM-DD HH:mm:ss Z",
+  "error_file": "/root/.pm2/logs/satellite-agent-error.log",
+  "out_file": "/root/.pm2/logs/satellite-agent-out.log"
+}

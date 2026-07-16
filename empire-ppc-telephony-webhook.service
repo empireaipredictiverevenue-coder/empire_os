@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire OS Telephony Webhook Sidecar (9100 -> hub ledger)
+After=network.target empire-hub-8081.service
+Requires=empire-hub-8081.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/empire_os
+EnvironmentFile=/root/empire_os/.env
+ExecStart=/root/venv/bin/python3 -m uvicorn empire_os.telephony_webhook:app --host 0.0.0.0 --port 9100
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

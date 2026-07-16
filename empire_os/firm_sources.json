@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-14",
+  "notes": "Firm-discovery source list. Decoupled from code so we can add sources without redeploys. Each entry is one canned query against one provider. Providers are called serially with backoff; the agent deduplicates into si_firm_candidates by (name, address).",
+
+  "verticals": {
+    "roofing": {
+      "label": "Roofing contractors (residential + storm-damage)",
+      "rationale": "Best ROI for the existing Texas-flood PPL + the leading mass-tort lead category. Year-round demand, emergency spike after hail/wind/flood.",
+      "overpass_queries": [
+        {
+          "id": "osm_roofing_tx",
+          "label": "Texas roofing contractors via OSM",
+          "endpoint": "https://overpass-api.de/api/interpreter",
+          "query": "[out:json][timeout:60];area[\"ISO3166-1\"=\"US\"][\"admin_level\"=\"2\"]->.us;area[\"ISO3166-1\"=\"US\"][\"admin_level\"=\"4\"][\"name\"=\"Texas\"]->.tx;(node[\"craft\"=\"roofer\"](area.tx);way[\"craft\"=\"roofer\"](area.tx););out body center;>;out skel qt;",
+          "expected_per_run": "80-250 nodes, varies",
+          "fair_use_limit_req_per_hour": 4
+        }
+      ],
+      "state_boards": [
+        {
+          "id": "tdi_roofing_list",
+          "label": "Texas Dept of Insurance - Public Roofing Adjuster / Contractor listings",
+          "url": "https://www.tdi.texas.gov/",
+          "note": "TDI does not publish a single CSV; pages exist for registered roofers / public adjusters. Manual scrape of subpages is needed for fuller coverage."
+        },
+        {
+          "id": "texas_no_law",
+          "label": "Texas does NOT require general roofers to be state-licensed. Jurisdiction is municipal. So OSM is the primary free source; supplement with Yelp Fusion when API key available."
+        }
+      ]
+    },
+    "hvac_plumbing": {
+      "label": "HVAC + Plumbing service contractors",
+      "rationale": "Year-round demand, biggest TAM in residential trades. No state licensing aggregator; OSM is primary free source.",
+      "overpass_queries": [
+        {
+          "id": "osm_hvac_tx",
+          "label": "Texas HVAC contractors via OSM",
+          "endpoint": "https://overpass-api.de/api/interpreter",
+          "query": "[out:json][timeout:60];area[\"ISO3166-1\"=\"US\"][\"name\"=\"Texas\"]->.tx;(node[\"craft\"=\"hvac\"](area.tx);node[\"shop\"=\"hvac\"](area.tx);way[\"craft\"=\"hvac\"](area.tx);way[\"shop\"=\"hvac\"](area.tx););out body center;>;out skel qt;",
+          "fair_use_limit_req_per_hour": 4
+        },
+        {
+          "id": "osm_plumber_tx",
+          "label": "Texas plumbers via OSM",
+          "endpoint": "https://overpass-api.de/api/interpreter",
+          "query": "[out:json][timeout:60];area[\"ISO3166-1\"=\"US\"][\"name\"=\"Texas\"]->.tx;(node[\"craft\"=\"plumber\"](area.tx);way[\"craft\"=\"plumber\"](area.tx););out body center;>;out skel qt;",
+          "fair_use_limit_req_per_hour": 4
+        }
+      ],
+      "state_boards": [
+        {
+          "id": "tdi_plumbing_list",
+          "label": "Texas does NOT state-license residential plumbers at the journeyman level. Cities handle it. OSM + county records are primary."
+        }
+      ]
+    },
+    "mass_tort_attorneys": {
+      "label": "Mass-tort plaintiff attorneys (TX + CA)",
+      "rationale": "Different business model: firms pay per signed case ($200-$500 each). Higher per-firm value than leads, fewer firms needed. CA bar has a public CSV; TX State Bar publishes a search portal.",
+      "overpass_queries": [],
+      "state_boards": [
+        {
+          "id": "ca_bar_mass_tort",
+          "label": "California State Bar - Attorneys who list 'Mass Torts' / 'Class Actions' practice areas",
+          "url": "https://www.calbar.ca.gov/Attorneys/Attorney-Listing.aspx",
+          "note": "CA bar has public attorney search. Filter by practice area = mass tort or class action. Search page is reachable, no auth. Listings include firm name, address, phone."
+        },
+        {
+          "id": "tx_bar_mass_tort",
+          "label": "Texas State Bar - Advanced Attorney Search",
+          "url": "https://www.texasbar.com/AM/Template.cfm?Section=Find_A_Lawyer&Template=/CustomSource/MemberSearch/MemberSearchResult.cfm",
+          "note": "TX bar has public attorney search. Firm name + city filters, public listings."
+        }
+      ]
+    }
+  },
+
+  "fair_use_policy": {
+    "overpass_api_de_per_ip_per_hour": 60,
+    "we_sleep_between_queries_seconds": 15,
+    "max_per_run_per_source_seconds": 30,
+    "rotate_user_agent": true,
+    "user_agent": "EmpireOS-firm-finder/1.0 (+operator@empire-ai.co.uk)"
+  }
+}

@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empire CRM — Analytics</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep: #050810;
+  --bg-panel: #0c1320;
+  --bg-card: #111a2e;
+  --bg-hover: #16203a;
+  --border: #1e2d4a;
+  --border-glow: #2a3d5f;
+  --primary: #39ff88;
+  --primary-dim: #1a8044;
+  --primary-glow: rgba(57,255,136,.15);
+  --secondary: #22e3ff;
+  --secondary-dim: #0e6a7a;
+  --text: #e6f1ff;
+  --text-dim: #8892b0;
+  --text-muted: #4a5578;
+  --danger: #ff4473;
+  --warning: #ffaa33;
+  --success: #39ff88;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --shadow: 0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,.5), 0 12px 48px rgba(0,0,0,.4);
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --transition: .2s cubic-bezier(.4,0,.2,1);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: var(--font);
+  background: var(--bg-deep);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Sidebar ── */
+.sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0;
+  width: 240px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  padding: 24px 16px;
+  display: flex; flex-direction: column;
+  z-index: 50;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 36px; padding: 0 4px;
+}
+.logo-icon {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 17px; color: var(--bg-deep);
+  box-shadow: 0 0 20px rgba(57,255,136,.2);
+}
+.logo-text {
+  font-weight: 700; font-size: 17px;
+  background: linear-gradient(135deg, var(--text), var(--primary));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.logo-sub { font-size: 10px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+.nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  font-size: 13px; font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all var(--transition);
+  border: none; background: none; width: 100%; text-align: left;
+  position: relative;
+}
+.nav-item:hover { background: var(--bg-hover); color: var(--text); }
+.nav-item.active {
+  background: var(--primary-glow);
+  color: var(--primary);
+}
+.nav-item.active::before {
+  content: ''; position: absolute; left: -16px; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 20px;
+  background: var(--primary);
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--primary);
+}
+.nav-item .icon { width: 20px; text-align: center; font-size: 15px; opacity: .8; }
+.nav-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+.sidebar-footer {
+  font-size: 10px; color: var(--text-muted); letter-spacing: .5px;
+  padding-top: 16px; border-top: 1px solid var(--border);
+}
+
+/* ── Main Layout ── */
+.main { margin-left: 240px; min-height: 100vh; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(12,19,32,.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 40;
+}
+.topbar h1 { font-size: 18px; font-weight: 600; }
+.topbar h1 span { color: var(--text-dim); font-weight: 400; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.search-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 7px 16px;
+  color: var(--text);
+  font-size: 13px;
+  width: 240px;
+  outline: none;
+  transition: all var(--transition);
+}
+.search-box:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+.search-box::placeholder { color: var(--text-muted); }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--radius);
+  font-size: 12px; font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--transition);
+  text-decoration: none; white-space: nowrap;
+}
+.btn:hover { background: var(--bg-hover); border-color: var(--text-muted); }
+.btn-primary {
+  background: var(--primary); color: var(--bg-deep);
+  border-color: var(--primary); font-weight: 600;
+}
+.btn-primary:hover { background: #4dff9a; box-shadow: 0 0 20px var(--primary-glow); }
+.btn-sm { padding: 5px 10px; font-size: 11px; }
+.btn-ghost { background: transparent; border-color: transparent; }
+.btn-ghost:hover { background: var(--bg-hover); }
+
+/* ── Content ── */
+.content { padding: 24px 32px 48px; }
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── KPI Row ── */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition);
+}
+.kpi-card:hover {
+  border-color: var(--border-glow);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+.kpi-card::after {
+  content: ''; position: absolute; top: 0; right: 0;
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  opacity: .05;
+  transform: translate(20px, -20px);
+}
+.kpi-card.primary::after { background: var(--primary); }
+.kpi-card.cyan::after { background: var(--secondary); }
+.kpi-card.orange::after { background: var(--warning); }
+.kpi-card.pink::after { background: var(--danger); }
+.kpi-card .kpi-label {
+  font-size: 11px; color: var(--text-dim); font-weight: 500;
+  text-transform: uppercase; letter-spacing: .6px;
+  margin-bottom: 4px;
+}
+.kpi-card .kpi-value {
+  font-size: 26px; font-weight: 700;
+  font-family: var(--mono);
+  transition: all .3s;
+}
+.kpi-card .kpi-value.green { color: var(--primary); }
+.kpi-card .kpi-value.cyan { color: var(--secondary); }
+.kpi-card .kpi-value.orange { color: var(--warning); }
+.kpi-card .kpi-value.pink { color: var(--danger); }
+.kpi-card .kpi-sub {
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 2px;
+}
+.kpi-card .kpi-trend {
+  font-size: 11px; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-top: 6px;
+}
+.kpi-trend.up { color: var(--primary); }
+.kpi-trend.down { color: var(--danger); }
+
+/* ── Chart Grid ── */
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.chart-grid .full { grid-column: 1 / -1; }
+.chart-grid .third { grid-column: span 1; }
+@media (max-width: 1100px) {
+  .chart-grid { grid-template-columns: 1fr; }
+  .chart-grid .full { grid-column: 1; }
+}
+
+.chart-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: all var(--transition);
+}
+.chart-panel:hover { border-color: var(--border-glow); }
+.chart-panel .chart-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.chart-panel .chart-title {
+  font-size: 13px; font-weight: 600;
+}
+.chart-panel .chart-sub {
+  font-size: 11px; color: var(--text-dim);
+}
+.chart-panel .chart-badge {
+  font-size: 10px; padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--primary-glow);
+  color: var(--primary);
+  font-weight: 500;
+}
+.chart-panel canvas { max-height: 280px; max-width: 100%; }
+.chart-panel.tall canvas { max-height: 340px; }
+
+/* ── Funnel ── */
+.funnel {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 0 20px;
+}
+.funnel-step {
+  width: 100%; display: flex; align-items: center;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  position: relative;
+  transition: all var(--transition);
+}
+.funnel-step:hover {
+  border-color: var(--primary-dim);
+  background: var(--bg-hover);
+}
+.funnel-step .fs-label {
+  font-size: 12px; font-weight: 500; min-width: 80px;
+}
+.funnel-step .fs-bar {
+  height: 8px; border-radius: 4px;
+  background: var(--primary);
+  transition: width .6s ease;
+  min-width: 2px;
+}
+.funnel-step .fs-count {
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 600;
+  margin-left: auto; padding-left: 12px;
+  white-space: nowrap;
+}
+.funnel-step .fs-pct {
+  font-size: 11px; color: var(--text-dim);
+  margin-left: 8px; min-width: 40px; text-align: right;
+}
+.funnel-arrow {
+  color: var(--text-muted); font-size: 10px;
+  transform: rotate(90deg); display: inline-block;
+}
+
+/* ── Table ── */
+.data-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  text-align: left; padding: 10px 14px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--bg-hover); }
+.tag {
+  display: inline-block; padding: 2px 8px;
+  border-radius: 4px; font-size: 11px; font-weight: 500;
+}
+.tag-roof_repair { background: rgba(57,255,136,.12); color: var(--primary); }
+.tag-residential_roofing { background: rgba(34,227,255,.12); color: var(--secondary); }
+.tag-roofing { background: rgba(136,146,176,.2); color: var(--text-dim); }
+.badge {
+  display: inline-block; padding: 2px 9px;
+  border-radius: 10px; font-size: 11px; font-weight: 500; white-space: nowrap;
+}
+.badge-raw { background: rgba(74,85,120,.3); color: var(--text-dim); }
+.badge-qualifying { background: rgba(255,170,51,.15); color: var(--warning); }
+.badge-qualified { background: rgba(57,255,136,.12); color: var(--primary); }
+.badge-assigned { background: rgba(34,227,255,.12); color: var(--secondary); }
+.badge-contacted { background: rgba(139,92,246,.15); color: #a78bfa; }
+.badge-converted { background: rgba(5,150,105,.15); color: #34d399; }
+.badge-dead { background: rgba(255,68,115,.1); color: var(--danger); }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab {
+  padding: 10px 20px; font-size: 13px; font-weight: 500;
+  color: var(--text-dim); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition);
+  background: none; border-left: none; border-right: none; border-top: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── Loading / States ── */
+.loading { text-align: center; padding: 60px 20px; color: var(--text-dim); }
+.loading .spinner {
+  width: 28px; height: 28px; border: 2px solid var(--border);
+  border-top-color: var(--primary); border-radius: 50%;
+  animation: spin .7s linear infinite; margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
+.empty-state .big-icon { font-size: 42px; margin-bottom: 10px; }
+.error-state { text-align: center; padding: 20px; color: var(--danger); font-size: 13px; }
+
+/* ── Filters ── */
+.filter-bar {
+  display: flex; gap: 8px; align-items: center;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.filter-bar select, .filter-bar input {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 6px 10px;
+  color: var(--text); font-size: 12px; outline: none;
+}
+.filter-bar select:focus, .filter-bar input:focus { border-color: var(--primary); }
+
+/* ── Modal ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(4px);
+  z-index: 100; align-items: center; justify-content: center;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  width: 90%; max-width: 720px;
+  max-height: 85vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: modalIn .2s ease;
+}
+@keyframes modalIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.modal h2 { font-size: 18px; margin-bottom: 4px; }
+.modal .subtitle { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+.modal-close {
+  float: right; background: none; border: none;
+  color: var(--text-dim); font-size: 22px; cursor: pointer; padding: 4px;
+  line-height: 1; transition: color var(--transition);
+}
+.modal-close:hover { color: var(--text); }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.detail-field label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+.detail-field .val { font-size: 14px; }
+.detail-field .val.empty { color: var(--text-muted); font-style: italic; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .content { padding: 16px; }
+  .kpi-row { grid-template-columns: 1fr 1fr; }
+  .chart-grid { grid-template-columns: 1fr; }
+  .topbar { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+  .search-box { width: 100%; }
+  .detail-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Animated counter ── */
+.countup { display: inline-block; }
+</style>
+</head>
+<body>
+
+<!-- ─── Sidebar ─── -->
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">E</div>
+    <div>
+      <div class="logo-text">Empire CRM</div>
+      <div class="logo-sub">predictive revenue</div>
+    </div>
+  </div>
+  <div class="nav">
+    <button class="nav-item active" data-page="dashboard"><span class="icon">◉</span> Dashboard</button>
+    <button class="nav-item" data-page="leads"><span class="icon">⊞</span> Leads</button>
+    <button class="nav-item" data-page="pipeline"><span class="icon">⇥</span> Pipeline</button>
+    <button class="nav-item" data-page="analytics"><span class="icon">▦</span> Analytics</button>
+    <button class="nav-item" data-page="revenue"><span class="icon">$</span> Revenue</button>
+    <hr class="nav-divider">
+    <button class="nav-item" data-page="enrichment"><span class="icon">◎</span> Enrichment</button>
+    <button class="nav-item" data-page="icp"><span class="icon">🎯</span> ICP</button>
+    <button class="nav-item" data-page="settings"><span class="icon">⚙</span> Settings</button>
+  </div>
+  <div class="sidebar-footer">empire-ai.co.uk · CRM v0.5</div>
+</div>
+
+<!-- ─── Main ─── -->
+<div class="main">
+  <div class="topbar">
+    <h1 id="page-title">Dashboard <span>/ analytics</span></h1>
+    <div class="topbar-right">
+      <input class="search-box" id="global-search" placeholder="Search leads..." onkeydown="if(event.key==='Enter'){navigate('leads');loadLeads();}">
+      <button class="btn btn-primary btn-sm" onclick="navigate('settings')">+ Import</button>
+      <button class="btn btn-sm btn-ghost" onclick="refreshAll()">⟳</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ═══════════ DASHBOARD PAGE ═══════════ -->
+    <div class="page active" id="page-dashboard">
+      <!-- KPI Row -->
+      <div class="kpi-row" id="kpi-row"></div>
+
+      <!-- Chart Grid -->
+      <div class="chart-grid">
+        <div class="chart-panel tall">
+          <div class="chart-header">
+            <div><div class="chart-title">Lead Pipeline Funnel</div><div class="chart-sub">Conversion through stages</div></div>
+            <span class="chart-badge" id="funnel-rate">0% conv.</span>
+          </div>
+          <div id="funnel-viz"></div>
+        </div>
+        <div class="chart-panel tall">
+          <div class="chart-header">
+            <div><div class="chart-title">Lead Trend</div><div class="chart-sub">Last 30 days</div></div>
+            <span class="chart-badge" id="trend-badge">—</span>
+          </div>
+          <canvas id="chart-lead-trend"></canvas>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-header">
+            <div><div class="chart-title">Leads by Status</div><div class="chart-sub">Pipeline distribution</div></div>
+          </div>
+          <canvas id="chart-status-doughnut"></canvas>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-header">
+            <div><div class="chart-title">Lead Quality Tiers</div><div class="chart-sub">Score distribution</div></div>
+          </div>
+          <canvas id="chart-tier-pie"></canvas>
+        </div>
+        <div class="chart-panel full">
+          <div class="chart-header">
+            <div><div class="chart-title">Leads by Niche</div><div class="chart-sub">Vertical breakdown</div></div>
+          </div>
+          <canvas id="chart-niche-bar" style="max-height:220px"></canvas>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-header">
+            <div><div class="chart-title">Enrichment Score Distribution</div><div class="chart-sub">Data completeness</div></div>
+          </div>
+          <canvas id="chart-enrich-bar"></canvas>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-header">
+            <div><div class="chart-title">Omega Score Distribution</div><div class="chart-sub">Lead quality</div></div>
+          </div>
+          <canvas id="chart-omega-bar"></canvas>
+        </div>
+        <div class="chart-panel full">
+          <div class="chart-header">
+            <div><div class="chart-title">Activity Trend</div><div class="chart-sub">Last 14 days</div></div>
+          </div>
+          <canvas id="chart-activity-line" style="max-height:200px"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ LEADS PAGE ═══════════ -->
+    <div class="page" id="page-leads">
+      <div class="filter-bar">
+        <select id="filter-status" onchange="loadLeads()">
+          <option value="">All statuses</option>
+          <option value="raw">Raw</option>
+          <option value="qualifying">Qualifying</option>
+          <option value="qualified">Qualified</option>
+          <option value="assigned">Assigned</option>
+          <option value="contacted">Contacted</option>
+          <option value="converted">Converted</option>
+          <option value="dead">Dead</option>
+        </select>
+        <select id="filter-niche" onchange="loadLeads()">
+          <option value="">All niches</option>
+          <option value="roof_repair">Roof Repair</option>
+          <option value="residential_roofing">Residential Roofing</option>
+          <option value="roofing">Roofing</option>
+        </select>
+        <input type="text" id="filter-query" placeholder="Quick search..." style="width:160px" onkeydown="if(event.key==='Enter')loadLeads()">
+        <button class="btn btn-sm" onclick="loadLeads()">⟳</button>
+        <span style="font-size:12px;color:var(--text-muted);margin-left:auto" id="lead-count"></span>
+      </div>
+      <div class="chart-panel" style="padding:0;overflow:auto">
+        <table class="data-table">
+          <thead><tr>
+            <th>Business</th><th>Niche</th><th>Contact</th><th>Score</th><th>ICP Fit</th><th>Status</th><th>Enrich</th><th></th>
+          </tr></thead>
+          <tbody id="lead-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════ PIPELINE PAGE ═══════════ -->
+    <div class="page" id="page-pipeline">
+      <div class="kpi-row" id="pipe-kpi"></div>
+      <div class="pipeline" id="pipeline-view"></div>
+    </div>
+
+    <!-- ═══════════ ANALYTICS PAGE ═══════════ -->
+    <div class="page" id="page-analytics">
+      <div class="kpi-row" id="analytic-kpi"></div>
+      <div class="chart-grid">
+        <div class="chart-panel full">
+          <div class="chart-header">
+            <div><div class="chart-title">Lead Quality Radar</div><div class="chart-sub">Multi-dimensional scoring</div></div>
+          </div>
+          <canvas id="chart-radar" style="max-height:300px"></canvas>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-header">
+            <div><div class="chart-title">Enrichment Sources</div><div class="chart-sub">Fields found per source</div></div>
+          </div>
+          <canvas id="chart-enrich-sources"></canvas>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-header">
+            <div><div class="chart-title">Metro Distribution</div><div class="chart-sub">Top metros</div></div>
+          </div>
+          <canvas id="chart-metro-bar"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ REVENUE PAGE ═══════════ -->
+    <div class="page" id="page-revenue">
+      <div class="kpi-row" id="rev-kpi"></div>
+      <div class="chart-grid">
+        <div class="chart-panel full">
+          <div class="chart-header">
+            <div><div class="chart-title">Monthly Revenue</div><div class="chart-sub">Last 12 months</div></div>
+          </div>
+          <canvas id="chart-revenue-bar" style="max-height:280px"></canvas>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-header">
+            <div><div class="chart-title">Revenue by Plan</div><div class="chart-sub">Plan breakdown</div></div>
+          </div>
+          <canvas id="chart-revenue-plan"></canvas>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-header">
+            <div><div class="chart-title">Revenue Composition</div><div class="chart-sub">Charges vs PPC</div></div>
+          </div>
+          <canvas id="chart-revenue-composition"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ ENRICHMENT PAGE ═══════════ -->
+    <div class="page" id="page-enrichment">
+      <div class="kpi-row" id="enrich-kpi"></div>
+      <div class="chart-grid">
+        <div class="chart-panel full">
+          <div class="chart-header">
+            <div><div class="chart-title">Enrichment Score Distribution</div><div class="chart-sub">Data quality across lead base</div></div>
+          </div>
+          <canvas id="chart-enrich-dist" style="max-height:260px"></canvas>
+        </div>
+        <div class="chart-panel full" style="padding:0;overflow:auto">
+          <table class="data-table">
+            <thead><tr><th>Source</th><th>Attempts</th><th>Fields Found</th><th>Avg Fields/Run</th></tr></thead>
+            <tbody id="enrich-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-primary btn-sm" onclick="triggerBatchEnrich()">▶ Run Batch Enrichment</button>
+        <span style="font-size:12px;color:var(--text-dim);margin-left:12px" id="enrich-status"></span>
+      </div>
+    </div>
+
+    <!-- ═══════════ ICP PAGE ═══════════ -->
+    <div class="page" id="page-icp">
+      <div class="kpi-row" id="icp-kpi"></div>
+      <div class="chart-grid">
+        <div class="chart-panel full">
+          <div class="chart-header">
+            <div><div class="chart-title">ICP Fit Distribution</div><div class="chart-sub">Leads by ICP tier</div></div>
+          </div>
+          <canvas id="chart-icp-tier" style="max-height:260px"></canvas>
+        </div>
+        <div class="chart-panel full">
+          <div class="chart-header">
+            <div><div class="chart-title">Top ICP Profiles</div><div class="chart-sub">Best matching profiles by tier</div></div>
+          </div>
+          <canvas id="chart-icp-profiles" style="max-height:260px"></canvas>
+        </div>
+        <div class="chart-panel full" style="padding:0;overflow:auto">
+          <table class="data-table">
+            <thead><tr><th>Lead</th><th>Niche</th><th>Best ICP</th><th>Fit Score</th><th>Tier</th><th>Key Matching Criteria</th></tr></thead>
+            <tbody id="icp-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="refreshIcpScores()">⟳ Re-score All Leads</button>
+        <button class="btn btn-sm" onclick="loadIcpProfiles()">View Profiles</button>
+        <span style="font-size:12px;color:var(--text-dim);margin-left:auto;align-self:center" id="icp-status"></span>
+      </div>
+    </div>
+
+    <!-- ═══════════ SETTINGS PAGE ═══════════ -->
+    <div class="page" id="page-settings">
+      <div class="chart-panel">
+        <h3 style="margin-bottom:16px;">Import Leads</h3>
+        <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;">Import all existing lane_leads into the CRM. This is idempotent — safe to re-run.</p>
+        <button class="btn btn-primary" onclick="importLaneLeads()">Import from Lane Leads</button>
+        <span id="import-status" style="font-size:12px;color:var(--text-dim);margin-left:12px;"></span>
+      </div>
+      <div class="chart-panel" style="margin-top:16px;">
+        <h3 style="margin-bottom:8px;">System Status</h3>
+        <div id="sys-info" style="font-size:13px;color:var(--text-dim);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Lead Detail Modal ─── -->
+<div class="modal-overlay" id="lead-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h2 id="modal-name">—</h2>
+    <div class="subtitle" id="modal-subtitle">—</div>
+    <div class="tabs" id="modal-tabs">
+      <button class="tab active" data-modal-tab="details">Details</button>
+      <button class="tab" data-modal-tab="activity">Activity</button>
+    </div>
+    <div class="tab-content active" id="modal-tab-details">
+      <div class="detail-grid" id="modal-details"></div>
+      <div style="margin-top:16px">
+        <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:6px;">Quick Actions</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-sm" onclick="quickStatus('qualifying')">→ Qualifying</button>
+          <button class="btn btn-sm" onclick="quickStatus('qualified')">→ Qualified</button>
+          <button class="btn btn-sm" onclick="quickStatus('contacted')">→ Contacted</button>
+          <button class="btn btn-sm" onclick="quickStatus('dead')">→ Dead</button>
+          <button class="btn btn-sm btn-primary" onclick="quickEnrich()">Enrich Now</button>
+        </div>
+      </div>
+    </div>
+    <div class="tab-content" id="modal-tab-activity">
+      <div id="modal-activity"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Globals ──
+const API = '';
+let currentLeadId = null;
+let chartInstances = {};
+let analyticsData = null;
+let icpAnalyticsData = null;
+
+// ── Navigation ──
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => navigate(btn.dataset.page));
+});
+function navigate(page) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById('page-' + page);
+  if (el) el.classList.add('active');
+  const titles = {
+    dashboard:'Dashboard', leads:'Leads', pipeline:'Pipeline',
+    analytics:'Analytics', revenue:'Revenue', enrichment:'Enrichment',
+    icp:'ICP', settings:'Settings'
+  };
+  document.getElementById('page-title').innerHTML = titles[page] + ' <span>/ ' + page + '</span>';
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'leads') loadLeads();
+  if (page === 'pipeline') loadPipelineView();
+  if (page === 'analytics') loadAnalyticsPage();
+  if (page === 'revenue') loadRevenuePage();
+  if (page === 'enrichment') loadEnrichmentPage();
+  if (page === 'icp') loadIcpPage();
+}
+
+// ── API ──
+async function api(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function apiPost(path, body) {
+  const r = await fetch(API + path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  return r.json();
+}
+
+// ── Color palette ──
+const COLORS = {
+  green: '#39ff88',
+  cyan: '#22e3ff',
+  orange: '#ffaa33',
+  pink: '#ff4473',
+  purple: '#a78bfa',
+  blue: '#3b82f6',
+  teal: '#14b8a6',
+  indigo: '#6366f1',
+  red: '#ef4444',
+  yellow: '#eab308',
+  white: '#e6f1ff',
+  muted: '#4a5578',
+  dim: '#8892b0',
+};
+const COLORS_ARRAY = ['#39ff88','#22e3ff','#ffaa33','#a78bfa','#3b82f6','#14b8a6','#ff4473','#eab308','#6366f1','#ef4444'];
+const COLORS_ARRAY_BG = ['rgba(57,255,136,.15)','rgba(34,227,255,.15)','rgba(255,170,51,.15)','rgba(167,139,250,.15)','rgba(59,130,246,.15)','rgba(20,184,166,.15)','rgba(255,68,115,.15)','rgba(234,179,8,.15)','rgba(99,102,241,.15)','rgba(239,68,68,.15)'];
+const COLORS_ARRAY_BORDER = ['rgba(57,255,136,.6)','rgba(34,227,255,.6)','rgba(255,170,51,.6)','rgba(167,139,250,.6)','rgba(59,130,246,.6)','rgba(20,184,166,.6)','rgba(255,68,115,.6)','rgba(234,179,8,.6)','rgba(99,102,241,.6)','rgba(239,68,68,.6)'];
+
+// ── Chart helpers ──
+function destroyChart(id) {
+  if (chartInstances[id]) {
+    chartInstances[id].destroy();
+    delete chartInstances[id];
+  }
+}
+
+function createChart(id, config) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  Chart.defaults.color = '#8892b0';
+  Chart.defaults.borderColor = '#1e2d4a';
+  Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+  const merged = {
+    ...config,
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { labels: { color: '#8892b0', font: { size: 11 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { backgroundColor: '#0c1320', titleColor: '#e6f1ff', bodyColor: '#8892b0', borderColor: '#1e2d4a', borderWidth: 1, padding: 10, cornerRadius: 8 },
+        ...(config.options?.plugins || {}),
+      },
+      scales: config.options?.scales || undefined,
+      ...(config.options || {}),
+    },
+  };
+  chartInstances[id] = new Chart(ctx, merged);
+}
+
+// ── ═══ DASHBOARD ═══ ──
+async function loadDashboard() {
+  try {
+    const [data, icpData] = await Promise.all([
+      api('/v1/crm/analytics'),
+      api('/v1/crm/icp/analytics').catch(() => null),
+    ]);
+    analyticsData = data;
+    icpAnalyticsData = icpData;
+    renderKPI(data);
+    renderFunnel(data);
+    renderLeadTrend(data);
+    renderStatusDoughnut(data);
+    renderTierPie(data);
+    renderNicheBar(data);
+    renderEnrichBar(data);
+    renderOmegaBar(data);
+    renderActivityLine(data);
+  } catch (e) {
+    console.error('Dashboard load error:', e);
+    document.getElementById('kpi-row').innerHTML = `<div class="error-state">Failed to load dashboard: ${e.message}</div>`;
+  }
+}
+
+function countupEl(el, target, suffix='') {
+  if (!el) return;
+  let current = 0;
+  const step = Math.ceil(target / 30);
+  const interval = setInterval(() => {
+    current += step;
+    if (current >= target) { current = target; clearInterval(interval); }
+    el.textContent = current.toLocaleString() + suffix;
+  }, 30);
+}
+
+function renderKPI(data) {
+  const row = document.getElementById('kpi-row');
+  const qualRate = data.total ? Math.round(data.qualified_leads / data.total * 100) : 0;
+  row.innerHTML = `
+    <div class="kpi-card primary">
+      <div class="kpi-label">Total Leads</div>
+      <div class="kpi-value green"><span class="countup" id="kpi-total">0</span></div>
+      <div class="kpi-sub">${data.by_niche?.length || 0} niches</div>
+    </div>
+    <div class="kpi-card cyan">
+      <div class="kpi-label">Qualified</div>
+      <div class="kpi-value cyan"><span class="countup" id="kpi-qualified">0</span></div>
+      <div class="kpi-sub">${qualRate}% qualification rate</div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-label">Avg Enrichment</div>
+      <div class="kpi-value orange"><span class="countup" id="kpi-enrich">0</span>%</div>
+      <div class="kpi-sub">${data.total_fields_found} total fields found</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Conversion Rate</div>
+      <div class="kpi-value">${data.conversion_rate || 0}%</div>
+      <div class="kpi-sub">Leads with progress</div>
+    </div>
+    <div class="kpi-card pink">
+      <div class="kpi-label">Activities</div>
+      <div class="kpi-value pink"><span id="kpi-activities">${data.total_activities||0}</span></div>
+      <div class="kpi-sub">Total touchpoints</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Active Today</div>
+      <div class="kpi-value" id="kpi-today" style="color:var(--secondary)">—</div>
+      <div class="kpi-sub">Leads created today</div>
+    </div>
+    <div class="kpi-card primary" style="cursor:pointer" onclick="navigate('icp')">
+      <div class="kpi-label">ICP Top Match</div>
+      <div class="kpi-value green" id="kpi-icp-top">—</div>
+      <div class="kpi-sub" id="kpi-icp-sub">View ICP analytics</div>
+    </div>
+  `;
+  setTimeout(() => {
+    countupEl(document.getElementById('kpi-total'), data.total);
+    countupEl(document.getElementById('kpi-qualified'), data.qualified_leads);
+    countupEl(document.getElementById('kpi-enrich'), Math.round(data.avg_enrichment_score || 0));
+  }, 100);
+  // ICP top match
+  if (typeof icpAnalyticsData !== 'undefined' && icpAnalyticsData && icpAnalyticsData.average_fit) {
+    document.getElementById('kpi-icp-top').textContent = icpAnalyticsData.average_fit + '%';
+    document.getElementById('kpi-icp-sub').textContent = `${icpAnalyticsData.tier_breakdown?.C||0} C-tier · ${icpAnalyticsData.tier_breakdown?.D||0} D-tier`;
+  } else {
+    document.getElementById('kpi-icp-top').textContent = '—';
+    document.getElementById('kpi-icp-sub').textContent = 'View ICP analytics';
+  }
+  // Today count
+  const today = new Date().toISOString().slice(0,10);
+  const todayLeads = (data.lead_trend || []).find(d => d.date === today);
+  document.getElementById('kpi-today').textContent = todayLeads ? todayLeads.count : 0;
+  // Funnel rate badge
+  const funnel = data.pipeline_funnel || [];
+  const raw = (funnel.find(s => s.stage==='raw')||{}).count || 1;
+  const conv = (funnel.find(s => s.stage==='converted')||{}).count || 0;
+  document.getElementById('funnel-rate').textContent = Math.round(conv/raw*100) + '% conv.';
+  // Trend badge
+  const trend = data.lead_trend || [];
+  if (trend.length >= 2) {
+    const last = trend[trend.length-1].count;
+    const prev = trend[trend.length-2].count;
+    const dir = last > prev ? '↑' : last < prev ? '↓' : '→';
+    document.getElementById('trend-badge').textContent = dir + ' ' + last + ' today';
+  }
+}
+
+function renderFunnel(data) {
+  const el = document.getElementById('funnel-viz');
+  const funnel = data.pipeline_funnel || [];
+  const maxCount = Math.max(...funnel.map(s => s.count), 1);
+  const stageLabels = {raw:'Raw Import',qualifying:'Qualifying',qualified:'Qualified',assigned:'Assigned',contacted:'Contacted',converted:'Converted',dead:'Disqualified'};
+  const stageColors = {raw:'#4a5578',qualifying:'#ffaa33',qualified:'#39ff88',assigned:'#22e3ff',contacted:'#a78bfa',converted:'#059669',dead:'#ef4444'};
+
+  el.innerHTML = `<div class="funnel">${funnel.map((s, i) => {
+    const pct = s.count / maxCount * 100;
+    const prevPct = i > 0 && funnel[i-1].count > 0 ? Math.round(s.count / funnel[i-1].count * 100) : null;
+    return `<div class="funnel-step">
+      <div class="fs-label">${stageLabels[s.stage]||s.stage}</div>
+      <div style="flex:1;display:flex;align-items:center;gap:8px">
+        <div class="fs-bar" style="width:${Math.max(pct, 2)}%;background:${stageColors[s.stage]||'#39ff88'}"></div>
+      </div>
+      <div class="fs-count">${s.count.toLocaleString()}</div>
+      <div class="fs-pct">${prevPct !== null ? prevPct+'%' : '100%'}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderLeadTrend(data) {
+  const trend = data.lead_trend || [];
+  if (!trend.length) return;
+  createChart('chart-lead-trend', {
+    type: 'line',
+    data: {
+      labels: trend.map(d => d.date.slice(5)),
+      datasets: [{
+        label: 'New Leads',
+        data: trend.map(d => d.count),
+        borderColor: '#39ff88',
+        backgroundColor: 'rgba(57,255,136,.08)',
+        fill: true,
+        tension: .4,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        pointBackgroundColor: '#39ff88',
+        pointBorderColor: '#050810',
+        pointBorderWidth: 2,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: 'rgba(30,45,74,.4)' }, ticks: { precision: 0, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderStatusDoughnut(data) {
+  const statuses = data.by_status || [];
+  const labels = statuses.map(s => s.status);
+  const counts = statuses.map(s => s.cnt);
+  const colors = labels.map(l => {
+    const map = {raw:'#4a5578',qualifying:'#ffaa33',qualified:'#39ff88',assigned:'#22e3ff',contacted:'#a78bfa',converted:'#059669',dead:'#ef4444'};
+    return map[l] || '#8892b0';
+  });
+  createChart('chart-status-doughnut', {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderColor: '#0c1320', borderWidth: 2 }] },
+    options: { cutout: '65%', plugins: { legend: { position: 'bottom' } }, scales: undefined }
+  });
+}
+
+function renderTierPie(data) {
+  // Use status as proxy for tier for now
+  const statuses = data.by_status || [];
+  const labels = statuses.map(s => s.status);
+  const counts = statuses.map(s => s.cnt);
+  const colors = labels.map(l => {
+    const map = {raw:'#4a5578',qualifying:'#ffaa33',qualified:'#39ff88',assigned:'#22e3ff',contacted:'#a78bfa',converted:'#059669',dead:'#ef4444'};
+    return map[l] || '#8892b0';
+  });
+  createChart('chart-tier-pie', {
+    type: 'pie',
+    data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderColor: '#0c1320', borderWidth: 2 }] },
+    options: { plugins: { legend: { position: 'bottom' } }, scales: undefined }
+  });
+}
+
+function renderNicheBar(data) {
+  const niches = data.by_niche || [];
+  if (!niches.length) return;
+  createChart('chart-niche-bar', {
+    type: 'bar',
+    data: {
+      labels: niches.map(n => n.niche.replace(/_/g,' ')),
+      datasets: [{
+        label: 'Leads',
+        data: niches.map(n => n.cnt),
+        backgroundColor: niches.map((_,i) => COLORS_ARRAY_BG[i % COLORS_ARRAY_BG.length]),
+        borderColor: niches.map((_,i) => COLORS_ARRAY_BORDER[i % COLORS_ARRAY_BORDER.length]),
+        borderWidth: 1,
+        borderRadius: 4,
+        barPercentage: .7,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(30,45,74,.4)' }, ticks: { precision: 0, font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderEnrichBar(data) {
+  const buckets = data.enrichment_score_buckets || [];
+  createChart('chart-enrich-bar', {
+    type: 'bar',
+    data: {
+      labels: buckets.map(b => b.range),
+      datasets: [{
+        label: 'Leads',
+        data: buckets.map(b => b.cnt),
+        backgroundColor: ['rgba(74,85,120,.3)','rgba(255,170,51,.15)','rgba(255,170,51,.3)','rgba(57,255,136,.15)','rgba(57,255,136,.3)'],
+        borderColor: ['#4a5578','#ffaa33','#ffaa33','#39ff88','#39ff88'],
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: 'rgba(30,45,74,.4)' }, ticks: { precision: 0, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderOmegaBar(data) {
+  const buckets = data.omega_score_buckets || [];
+  createChart('chart-omega-bar', {
+    type: 'bar',
+    data: {
+      labels: buckets.map(b => b.range),
+      datasets: [{
+        label: 'Leads',
+        data: buckets.map(b => b.cnt),
+        backgroundColor: ['rgba(74,85,120,.3)','rgba(34,227,255,.15)','rgba(34,227,255,.25)','rgba(57,255,136,.15)','rgba(57,255,136,.3)'],
+        borderColor: ['#4a5578','#22e3ff','#22e3ff','#39ff88','#39ff88'],
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: 'rgba(30,45,74,.4)' }, ticks: { precision: 0, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderActivityLine(data) {
+  const trend = data.activity_trend || [];
+  if (!trend.length) return;
+  createChart('chart-activity-line', {
+    type: 'line',
+    data: {
+      labels: trend.map(d => d.day.slice(5)),
+      datasets: [{
+        label: 'Activities',
+        data: trend.map(d => d.cnt),
+        borderColor: '#22e3ff',
+        backgroundColor: 'rgba(34,227,255,.08)',
+        fill: true,
+        tension: .3,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        pointBackgroundColor: '#22e3ff',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: 'rgba(30,45,74,.4)' }, ticks: { precision: 0, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ── ═══ LEADS ═══ ──
+async function loadLeads() {
+  const status = document.getElementById('filter-status').value;
+  const niche = document.getElementById('filter-niche').value;
+  const query = document.getElementById('filter-query').value || document.getElementById('global-search').value;
+  let path = '/v1/crm/leads?limit=100';
+  if (status) path += '&status=' + status;
+  if (niche) path += '&niche=' + niche;
+  if (query) path += '&query=' + encodeURIComponent(query);
+  try {
+    const data = await api(path);
+    const leads = data.leads || [];
+    document.getElementById('lead-count').textContent = (data.total || 0) + ' leads';
+    const body = document.getElementById('lead-table-body');
+    if (!leads.length) {
+      body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="big-icon">📭</div>No leads found</div></td></tr>';
+      return;
+    }
+    const scores = leads.map(l => {
+      let s = 0;
+      if (l.business_name) s += 15;
+      if (l.email) s += 15;
+      if (l.phone) s += 15;
+      if (l.website) s += 10;
+      if (l.license_no) s += 10;
+      if (l.omega_score > 0) s += Math.min(l.omega_score / 10, 20);
+      s += Math.min(l.enrichment_score || 0, 15);
+      s = Math.min(s, 100);
+      const tier = s >= 60 ? 'hot' : s >= 35 ? 'warm' : 'cold';
+      return { score: Math.round(s), tier };
+    });
+    body.innerHTML = leads.map((l, i) => {
+      const s = scores[i] || {};
+      const name = l.business_name || l.contact_name || '—';
+      const contact = [l.email, l.phone].filter(Boolean).join(', ') || '—';
+      const icpFit = l.icp_fit_score != null ? Math.round(l.icp_fit_score) : null;
+      const icpTier = l.icp_tier || '';
+      const icpColor = icpTier==='A'?'var(--primary)':icpTier==='B'?'var(--warning)':icpTier==='C'?'var(--secondary)':icpTier==='D'?'var(--text-dim)':'var(--text-muted)';
+      return `<tr onclick="showLead(${l.id})" style="cursor:pointer">
+        <td><strong>${esc(name)}</strong></td>
+        <td><span class="tag tag-${(l.niche||'other').replace(/[^a-z_]/g,'')}">${esc(l.niche||'—')}</span></td>
+        <td style="font-size:12px;color:var(--text-dim);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(contact)}</td>
+        <td><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:${s.tier==='hot'?'var(--primary)':s.tier==='warm'?'var(--warning)':'var(--text-dim)'}">${s.score||'—'}</span></td>
+        <td>${icpFit !== null ? `<span style="font-family:var(--mono);font-size:13px;font-weight:600;color:${icpColor}">${icpFit}%</span> <span style="font-size:10px;color:${icpColor}">${icpTier}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>'}</td>
+        <td><span class="badge badge-${(l.status||'raw')}">${l.status||'raw'}</span></td>
+        <td style="font-size:12px;font-family:var(--mono)">${Math.round(l.enrichment_score||0)}%</td>
+        <td><button class="btn btn-sm" onclick="event.stopPropagation();showLead(${l.id})">View</button></td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('lead-table-body').innerHTML = `<tr><td colspan="8"><div class="error-state">Error: ${e.message}</div></td></tr>`;
+  }
+}
+
+// ── ═══ PIPELINE ═══ ──
+async function loadPipelineView() {
+  try {
+    const [pipeData, leadsData] = await Promise.all([
+      api('/v1/crm/pipeline'),
+      api('/v1/crm/leads?limit=500'),
+    ]);
+    const stages = pipeData.stages || [];
+    const leads = leadsData.leads || [];
+
+    // KPI
+    const total = stages.reduce((s, st) => s + st.count, 0);
+    document.getElementById('pipe-kpi').innerHTML = stages.map(s => `
+      <div class="kpi-card"><div class="kpi-label">${s.stage}</div><div class="kpi-value" style="color:${s.color}">${s.count}</div></div>
+    `).join('') + `
+      <div class="kpi-card"><div class="kpi-label">Total in Pipeline</div><div class="kpi-value green">${total}</div></div>
+    `;
+
+    const stageNames = ['raw','qualifying','qualified','assigned','contacted','converted','dead'];
+    const labels = {raw:'Raw',qualifying:'Qualifying',qualified:'Qualified',assigned:'Assigned',contacted:'Contacted',converted:'Converted',dead:'Dead'};
+    const colors = {raw:'#6b7280',qualifying:'#f59e0b',qualified:'#10b981',assigned:'#3b82f6',contacted:'#8b5cf6',converted:'#059669',dead:'#ef4444'};
+
+    const container = document.getElementById('pipeline-view');
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+    container.style.gap = '12px';
+
+    container.innerHTML = stageNames.map(sn => {
+      const stageLeads = leads.filter(l => (l.status||'raw') === sn);
+      return `<div class="chart-panel" style="min-height:120px">
+        <h3 style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:${colors[sn]};display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          ${labels[sn]||sn} <span style="background:var(--bg-card);padding:2px 8px;border-radius:10px;font-size:11px;color:var(--text-dim)">${stageLeads.length}</span>
+        </h3>
+        ${stageLeads.slice(0,25).map(l => `
+          <div class="funnel-step" style="margin-bottom:4px;cursor:pointer" onclick="showLead(${l.id})">
+            <div class="fs-label" style="font-size:12px;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.business_name||l.contact_name||'—')}</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${l.icp_fit_score != null ? `<span style="font-size:10px;color:${l.icp_tier==='A'?'var(--primary)':l.icp_tier==='B'?'var(--warning)':l.icp_tier==='C'?'var(--secondary)':'var(--text-muted)'};font-family:var(--mono)">${Math.round(l.icp_fit_score)}% ${l.icp_tier||''}</span>` : ''}
+              <span style="font-size:10px;color:var(--text-muted);font-family:var(--mono)">${Math.round(l.enrichment_score||0)}%</span>
+            </div>
+          </div>
+        `).join('')}
+        ${stageLeads.length > 25 ? `<div style="text-align:center;font-size:11px;color:var(--text-muted);padding:6px">+${stageLeads.length-25} more</div>` : ''}
+        ${stageLeads.length === 0 ? '<div style="font-size:12px;color:var(--text-muted);padding:12px 0;text-align:center">—</div>' : ''}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('pipeline-view').innerHTML = `<div class="error-state">Error: ${e.message}</div>`;
+  }
+}
+
+// ── ═══ ANALYTICS PAGE ═══ ──
+async function loadAnalyticsPage() {
+  try {
+    const data = analyticsData || await api('/v1/crm/analytics');
+    renderAnalyticKPI(data);
+    renderRadar(data);
+    renderEnrichSources(data);
+    renderMetroBar(data);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderAnalyticKPI(data) {
+  document.getElementById('analytic-kpi').innerHTML = `
+    <div class="kpi-card primary"><div class="kpi-label">Total Leads</div><div class="kpi-value green">${data.total||0}</div></div>
+    <div class="kpi-card cyan"><div class="kpi-label">Avg Enrichment</div><div class="kpi-value cyan">${data.avg_enrichment_score||0}%</div></div>
+    <div class="kpi-card orange"><div class="kpi-label">Conversion Rate</div><div class="kpi-value orange">${data.conversion_rate||0}%</div></div>
+    <div class="kpi-card"><div class="kpi-label">Fields Found</div><div class="kpi-value">${(data.total_fields_found||0).toLocaleString()}</div></div>
+  `;
+}
+
+function renderRadar(data) {
+  // Build radar from status-enrichment-conversion dimensions
+  const statuses = data.by_status || [];
+  const labels = ['Data Completeness','Business Presence','Market Fit','Engagement','Enrichment Quality'];
+  // Derive approximate scores
+  const completeness = Math.min(data.avg_enrichment_score || 0, 100);
+  const hasWebsite = 60; // proxy — would be computed from actuals
+  const marketFit = 70;
+  const engagement = Math.min((data.qualified_leads || 0) / Math.max(data.total, 1) * 100, 100);
+  const enrich = data.avg_enrichment_score || 0;
+  createChart('chart-radar', {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Lead Quality',
+        data: [completeness, hasWebsite, marketFit, engagement, enrich],
+        borderColor: '#39ff88',
+        backgroundColor: 'rgba(57,255,136,.08)',
+        borderWidth: 2,
+        pointBackgroundColor: '#39ff88',
+        pointBorderColor: '#050810',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        r: {
+          beginAtZero: true,
+          max: 100,
+          angleLines: { color: 'rgba(30,45,74,.5)' },
+          grid: { color: 'rgba(30,45,74,.3)' },
+          pointLabels: { color: '#8892b0', font: { size: 11 } },
+          ticks: { display: false },
+        }
+      }
+    }
+  });
+}
+
+function renderEnrichSources(data) {
+  const sources = data.enrichment_sources || [];
+  if (!sources.length) return;
+  createChart('chart-enrich-sources', {
+    type: 'bar',
+    data: {
+      labels: sources.map(s => s.source),
+      datasets: [{
+        label: 'Fields Found',
+        data: sources.map(s => s.total_fields || 0),
+        backgroundColor: sources.map((_,i) => COLORS_ARRAY_BG[i % COLORS_ARRAY_BG.length]),
+        borderColor: sources.map((_,i) => COLORS_ARRAY_BORDER[i % COLORS_ARRAY_BORDER.length]),
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(30,45,74,.4)' }, ticks: { precision: 0, font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderMetroBar(data) {
+  const metros = data.by_metro || [];
+  if (!metros.length) return;
+  createChart('chart-metro-bar', {
+    type: 'bar',
+    data: {
+      labels: metros.map(m => m.metro),
+      datasets: [{
+        label: 'Leads',
+        data: metros.map(m => m.cnt),
+        backgroundColor: COLORS_ARRAY_BG,
+        borderColor: COLORS_ARRAY_BORDER,
+        borderWidth: 1,
+        borderRadius: 4,
+        barPercentage: .6,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: 'rgba(30,45,74,.4)' }, ticks: { precision: 0, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ── ═══ REVENUE ═══ ──
+async function loadRevenuePage() {
+  try {
+    const data = await api('/v1/crm/revenue-analytics');
+    const stats = await api('/v1/stats/revenue').catch(()=>({}));
+    renderRevKPI(data, stats);
+    renderRevBar(data);
+    renderRevPlan(data);
+    renderRevComposition(data, stats);
+  } catch (e) {
+    console.error(e);
+    document.getElementById('rev-kpi').innerHTML = `<div class="error-state">Error: ${e.message}</div>`;
+  }
+}
+
+function renderRevKPI(data, stats) {
+  const totalPaid = (stats.total_paid_charges_cents || 0) / 100;
+  const totalPPC = (data.total_ppc_invoiced || 0) / 100;
+  const total = totalPaid + totalPPC;
+  document.getElementById('rev-kpi').innerHTML = `
+    <div class="kpi-card primary"><div class="kpi-label">Total Revenue</div><div class="kpi-value green">$${total.toFixed(2)}</div></div>
+    <div class="kpi-card cyan"><div class="kpi-label">Paid Charges</div><div class="kpi-value cyan">$${totalPaid.toFixed(2)}</div><div class="kpi-sub">${stats.total_paid_charges_count||0} transactions</div></div>
+    <div class="kpi-card orange"><div class="kpi-label">PPC Revenue</div><div class="kpi-value orange">$${totalPPC.toFixed(2)}</div><div class="kpi-sub">${data.total_ppc_count||0} invoices</div></div>
+    <div class="kpi-card"><div class="kpi-label">Active Lanes</div><div class="kpi-value" style="color:var(--secondary)">${data.active_lanes||0}</div></div>
+  `;
+}
+
+function renderRevBar(data) {
+  const monthly = (data.monthly_revenue || []).reverse();
+  if (!monthly.length) return;
+  createChart('chart-revenue-bar', {
+    type: 'bar',
+    data: {
+      labels: monthly.map(m => m.month),
+      datasets: [{
+        label: 'Revenue ($)',
+        data: monthly.map(m => ((m.total_cents||0)/100).toFixed(2)),
+        backgroundColor: monthly.map((_,i) => i === monthly.length-1 ? 'rgba(57,255,136,.3)' : 'rgba(57,255,136,.12)'),
+        borderColor: monthly.map((_,i) => i === monthly.length-1 ? '#39ff88' : 'rgba(57,255,136,.4)'),
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: 'rgba(30,45,74,.4)' }, ticks: { callback: v => '$' + v, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderRevPlan(data) {
+  const plans = data.revenue_by_plan || [];
+  if (!plans.length) return;
+  createChart('chart-revenue-plan', {
+    type: 'doughnut',
+    data: {
+      labels: plans.map(p => p.plan_id || 'unknown'),
+      datasets: [{
+        data: plans.map(p => ((p.total_cents||0)/100).toFixed(2)),
+        backgroundColor: COLORS_ARRAY_BG.slice(0, plans.length),
+        borderColor: '#0c1320',
+        borderWidth: 2,
+      }]
+    },
+    options: { cutout: '60%', plugins: { legend: { position: 'bottom' } }, scales: undefined }
+  });
+}
+
+function renderRevComposition(data, stats) {
+  const charges = (stats.total_paid_charges_cents || 0) / 100;
+  const ppc = (data.total_ppc_invoiced || 0) / 100;
+  createChart('chart-revenue-composition', {
+    type: 'doughnut',
+    data: {
+      labels: ['Paid Charges', 'PPC Invoices'],
+      datasets: [{
+        data: [charges, ppc],
+        backgroundColor: ['rgba(57,255,136,.2)', 'rgba(34,227,255,.2)'],
+        borderColor: ['#39ff88', '#22e3ff'],
+        borderWidth: 2,
+      }]
+    },
+    options: { cutout: '60%', plugins: { legend: { position: 'bottom' } }, scales: undefined }
+  });
+}
+
+// ── ═══ ENRICHMENT PAGE ═══ ──
+async function loadEnrichmentPage() {
+  try {
+    const data = analyticsData || await api('/v1/crm/analytics');
+    const stats = await api('/v1/crm/enrichment-stats').catch(()=>({}));
+    document.getElementById('enrich-kpi').innerHTML = `
+      <div class="kpi-card primary"><div class="kpi-label">Total Leads</div><div class="kpi-value green">${data.total||0}</div></div>
+      <div class="kpi-card cyan"><div class="kpi-label">Above 50%</div><div class="kpi-value cyan">${stats.enriched_above_50||0}</div><div class="kpi-sub">${stats.enrichment_pct||0}% coverage</div></div>
+      <div class="kpi-card orange"><div class="kpi-label">Avg Score</div><div class="kpi-value orange">${data.avg_enrichment_score||0}%</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Fields</div><div class="kpi-value">${(data.total_fields_found||0).toLocaleString()}</div></div>
+    `;
+
+    // Enrichment chart
+    renderEnrichBar(data);
+
+    // Table
+    const sources = data.enrichment_sources || [];
+    document.getElementById('enrich-table-body').innerHTML = sources.length
+      ? sources.map(s => {
+          const avg = s.cnt > 0 ? Math.round((s.total_fields||0) / s.cnt * 10) / 10 : 0;
+          return `<tr><td><strong>${esc(s.source)}</strong></td><td>${s.cnt}</td><td style="font-family:var(--mono)">${s.total_fields||0}</td><td style="font-family:var(--mono)">${avg}</td></tr>`;
+        }).join('')
+      : '<tr><td colspan="4"><div class="empty-state">No enrichment runs yet</div></td></tr>';
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function triggerBatchEnrich() {
+  document.getElementById('enrich-status').textContent = 'Running enrichment pipeline...';
+  try {
+    const r = await apiPost('/v1/crm/leads/batch-enrich');
+    document.getElementById('enrich-status').textContent = `✅ Enriched ${r.enriched||0} leads`;
+    setTimeout(() => { document.getElementById('enrich-status').textContent = ''; loadDashboard(); }, 2000);
+  } catch (e) {
+    document.getElementById('enrich-status').textContent = '❌ Error: ' + e.message;
+  }
+}
+
+// ── ═══ LEAD DETAIL MODAL ═══ ──
+async function showLead(id) {
+  currentLeadId = id;
+  try {
+    const data = await api('/v1/crm/leads/' + id);
+    const l = data.lead || {};
+    document.getElementById('modal-name').textContent = l.business_name || l.contact_name || `Lead #${l.id}`;
+    document.getElementById('modal-subtitle').textContent = `${l.niche||''} · ${l.status||'raw'} · ${Math.round(l.enrichment_score||0)}% enriched`;
+
+    const fields = [
+      {label:'Contact', val:l.contact_name},
+      {label:'Email', val:l.email},
+      {label:'Phone', val:l.phone},
+      {label:'Website', val:l.website},
+      {label:'Niche', val:l.niche},
+      {label:'Status', val:l.status},
+      {label:'Omega Score', val:l.omega_score},
+      {label:'ICP Fit', val: l.icp_fit_score != null ? `${Math.round(l.icp_fit_score)}% — ${l.icp_tier||'?'}` : null},
+      {label:'ICP Profile', val: l.icp_name},
+      {label:'Owner', val:l.owner},
+      {label:'License', val:`${l.license_no||''} ${l.license_state||''}`.trim()},
+      {label:'BBB Rating', val:l.bbb_rating},
+      {label:'Location', val:`${l.city||''} ${l.state||''} ${l.zip||''}`.trim()},
+      {label:'Notes', val:l.notes},
+    ];
+    document.getElementById('modal-details').innerHTML = fields.map(f =>
+      `<div class="detail-field"><label>${f.label}</label><div class="val${f.val?'':' empty'}">${esc(f.val||'—')}</div></div>`
+    ).join('');
+
+    const acts = data.activities || [];
+    document.getElementById('modal-activity').innerHTML = acts.length
+      ? acts.map(a => `<div class="activity-item" style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><strong>${esc(a.act_type)}</strong> ${esc(a.summary)}<div class="meta" style="font-size:11px;color:var(--text-muted)">${a.actor} · ${(a.occurred_at||'').slice(0,19)}</div></div>`).join('')
+      : '<p style="color:var(--text-muted);font-size:13px;">No activity recorded.</p>';
+
+    document.getElementById('lead-modal').classList.add('active');
+  } catch (e) {
+    alert('Error loading lead: ' + e.message);
+  }
+}
+
+function closeModal() { document.getElementById('lead-modal').classList.remove('active'); currentLeadId = null; }
+async function quickStatus(status) {
+  if (!currentLeadId) return;
+  await apiPost('/v1/crm/leads/' + currentLeadId + '/status', {status});
+  showLead(currentLeadId);
+  loadLeads();
+}
+async function quickEnrich() {
+  if (!currentLeadId) return;
+  await apiPost('/v1/crm/leads/' + currentLeadId + '/enrich');
+  showLead(currentLeadId);
+}
+
+// Modal tabs
+document.addEventListener('click', e => {
+  const tab = e.target.closest('[data-modal-tab]');
+  if (!tab) return;
+  document.querySelectorAll('#modal-tabs .tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  document.querySelectorAll('#lead-modal .tab-content').forEach(tc => tc.classList.remove('active'));
+  document.getElementById('modal-tab-' + tab.dataset.modalTab).classList.add('active');
+});
+
+// ── ═══ IMPORT ═══ ──
+async function importLaneLeads() {
+  document.getElementById('import-status').textContent = 'Importing...';
+  try {
+    const r = await apiPost('/v1/crm/import-lane-leads');
+    document.getElementById('import-status').textContent = `✅ Imported ${r.imported}, skipped ${r.skipped}`;
+    setTimeout(() => loadDashboard(), 1000);
+  } catch (e) {
+    document.getElementById('import-status').textContent = '❌ ' + e.message;
+  }
+}
+
+// ── ═══ SYSTEM INFO ═══ ──
+async function loadSysInfo() {
+  try {
+    const data = await api('/v1/crm/analytics');
+    document.getElementById('sys-info').innerHTML = `
+      <div>CRM Status: <span style="color:var(--primary)">Active</span></div>
+      <div>Total Leads: ${data.total || 0}</div>
+      <div>Total Activities: ${data.total_activities || 0}</div>
+      <div>Enrichment Coverage: ${data.avg_enrichment_score || 0}% avg</div>
+      <div>Fields Enriched: ${(data.total_fields_found || 0).toLocaleString()}</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">Empire CRM v0.5 · ${new Date().toISOString().slice(0,10)}</div>
+    `;
+  } catch (e) {
+    document.getElementById('sys-info').textContent = 'Error: ' + e.message;
+  }
+}
+
+}
+}
+
+// ── ═══ ICP PAGE ═══ ──
+async function loadIcpPage() {
+  try {
+    const data = await api('/v1/crm/icp/analytics');
+    renderIcpKPI(data);
+    renderIcpTierChart(data);
+    renderIcpProfileChart(data);
+    renderIcpTable(data);
+  } catch (e) {
+    console.error(e);
+    document.getElementById('icp-kpi').innerHTML = `<div class="error-state">Error: ${e.message}</div>`;
+  }
+}
+
+function renderIcpKPI(data) {
+  const tierLabels = {A:'Perfect', B:'Strong', C:'Partial', D:'Weak', E:'Mismatch'};
+  const tierColors = {A:'#39ff88', B:'#ffaa33', C:'#22e3ff', D:'#8892b0', E:'#4a5578'};
+  document.getElementById('icp-kpi').innerHTML = `
+    <div class="kpi-card primary"><div class="kpi-label">Total Scored</div><div class="kpi-value green">${data.total_scored||0}</div></div>
+    <div class="kpi-card cyan"><div class="kpi-label">Avg Fit Score</div><div class="kpi-value cyan">${data.average_fit||0}%</div></div>
+    <div class="kpi-card orange"><div class="kpi-label">A + B Tier</div><div class="kpi-value orange">${(data.tier_breakdown?.A||0) + (data.tier_breakdown?.B||0)}</div><div class="kpi-sub">High intent</div></div>
+    <div class="kpi-card"><div class="kpi-label">C Tier</div><div class="kpi-value" style="color:${tierColors.C}">${data.tier_breakdown?.C||0}</div><div class="kpi-sub">Partial match</div></div>
+    <div class="kpi-card"><div class="kpi-label">D + E Tier</div><div class="kpi-value" style="color:${tierColors.D}">${(data.tier_breakdown?.D||0) + (data.tier_breakdown?.E||0)}</div><div class="kpi-sub">Weak / mismatch</div></div>
+  `;
+}
+
+function renderIcpTierChart(data) {
+  const tierBreakdown = data.tier_breakdown || {A:0,B:0,C:0,D:0,E:0};
+  const labels = ['A', 'B', 'C', 'D', 'E'];
+  const tierNames = {A:'Perfect', B:'Strong', C:'Partial', D:'Weak', E:'Mismatch'};
+  const colors = ['#39ff88', '#ffaa33', '#22e3ff', '#8892b0', '#4a5578'];
+  const bgColors = ['rgba(57,255,136,.2)', 'rgba(255,170,51,.2)', 'rgba(34,227,255,.2)', 'rgba(136,146,176,.2)', 'rgba(74,85,120,.2)'];
+  
+  createChart('chart-icp-tier', {
+    type: 'doughnut',
+    data: {
+      labels: labels.map(l => l + ' — ' + tierNames[l]),
+      datasets: [{
+        data: labels.map(l => tierBreakdown[l] || 0),
+        backgroundColor: bgColors,
+        borderColor: colors,
+        borderWidth: 2,
+      }]
+    },
+    options: { cutout: '60%', plugins: { legend: { position: 'bottom' } }, scales: undefined }
+  });
+}
+
+function renderIcpProfileChart(data) {
+  const profileBreakdown = data.profile_breakdown || {};
+  if (!Object.keys(profileBreakdown).length) return;
+  
+  // Flatten profile breakdown into tier counts per profile
+  const profiles = Object.entries(profileBreakdown).map(([id, breakdown]) => {
+    const tierSum = (breakdown.A||0) + (breakdown.B||0) + (breakdown.C||0) + (breakdown.D||0) + (breakdown.E||0);
+    return {id, name: breakdown.profile_name || id, total: tierSum, breakdown};
+  }).sort((a, b) => b.total - a.total).slice(0, 8);
+  
+  const tierOrder = ['A', 'B', 'C', 'D', 'E'];
+  const tierColors = {A:'#39ff88', B:'#ffaa33', C:'#22e3ff', D:'#8892b0', E:'#4a5578'};
+  
+  const datasets = tierOrder.map(tier => ({
+    label: tier,
+    data: profiles.map(p => p.breakdown[tier] || 0),
+    backgroundColor: tierColors[tier],
+    borderColor: tierColors[tier],
+    borderWidth: 1,
+  }));
+  
+  createChart('chart-icp-profiles', {
+    type: 'bar',
+    data: {
+      labels: profiles.map(p => p.name),
+      datasets,
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        x: { stacked: true, grid: { color: 'rgba(30,45,74,.4)' }, ticks: { precision: 0, font: { size: 10 } } },
+        y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderIcpTable(data) {
+  const matches = data.top_icp_matches || [];
+  const body = document.getElementById('icp-table-body');
+  if (!matches.length) {
+    body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="big-icon">🎯</div>No high-fit leads yet</div></td></tr>';
+    return;
+  }
+  
+  // Get detailed scores for each lead to show matching criteria
+  body.innerHTML = matches.slice(0, 50).map(m => `
+    <tr style="cursor:pointer" onclick="showLead(${m.lead_id})">
+      <td><strong>${esc(m.business_name)}</strong></td>
+      <td><span class="tag tag-${(m.niche||'other').replace(/[^a-z_]/g,'')}">${esc(m.niche||'—')}</span></td>
+      <td>${esc(m.icp_name)}</td>
+      <td style="font-family:var(--mono);font-weight:600;color:${m.icp_fit_score>=60?'var(--primary)':m.icp_fit_score>=40?'var(--warning)':'var(--text-dim)'}">${m.icp_fit_score}%</td>
+      <td><span class="badge" style="background:${m.icp_tier==='A'?'rgba(57,255,136,.2)':m.icp_tier==='B'?'rgba(255,170,51,.2)':m.icp_tier==='C'?'rgba(34,227,255,.2)':m.icp_tier==='D'?'rgba(136,146,176,.2)':'rgba(74,85,120,.2)'};color:${m.icp_tier==='A'?'var(--primary)':m.icp_tier==='B'?'var(--warning)':m.icp_tier==='C'?'var(--secondary)':m.icp_tier==='D'?'var(--text-dim)':'var(--text-muted)'}">${m.icp_tier}</span></td>
+      <td style="font-size:11px;color:var(--text-dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">View lead for details</td>
+    </tr>
+  `).join('');
+}
+
+async function refreshIcpScores() {
+  document.getElementById('icp-status').textContent = 'Re-scoring all leads...';
+  try {
+    const r = await apiPost('/v1/crm/icp/batch');
+    document.getElementById('icp-status').textContent = `✅ Updated ${r.updated} leads`;
+    setTimeout(() => loadIcpPage(), 1000);
+  } catch (e) {
+    document.getElementById('icp-status').textContent = '❌ Error: ' + e.message;
+  }
+}
+
+async function loadIcpProfiles() {
+  try {
+    const data = await api('/v1/crm/icp/profiles');
+    const profiles = data.profiles || [];
+    let html = '<div style="max-height:400px;overflow:auto">';
+    profiles.forEach(p => {
+      const totalWeight = p.criteria.reduce((s,c) => s + (c.weight||0), 0);
+      html += `
+        <div class="chart-panel" style="margin-bottom:12px">
+          <h4 style="font-size:13px;margin-bottom:4px">${p.icon} ${p.name}</h4>
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">${p.description}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Avenue: ${p.avenue} · Total weight: ${totalWeight} · Niches: ${p.niche_filter.join(', ') || 'All'}</div>
+          <table class="data-table" style="font-size:11px">
+            <thead><tr><th>Field</th><th>Op</th><th>Value</th><th>Weight</th><th>Label</th></tr></thead>
+            <tbody>
+              ${p.criteria.map(c => `
+                <tr><td>${c.field}</td><td>${c.op}</td><td>${c.value!==undefined?JSON.stringify(c.value):'—'}</td><td style="font-family:var(--mono)">${c.weight}</td><td>${c.label}</td></tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+    html += '</div>';
+    
+    document.getElementById('modal-name').textContent = 'ICP Profiles';
+    document.getElementById('modal-subtitle').textContent = `${profiles.length} profiles defined`;
+    document.getElementById('modal-details').innerHTML = html;
+    document.getElementById('modal-activity').innerHTML = '';
+    document.getElementById('lead-modal').classList.add('active');
+  } catch (e) {
+    alert('Error loading profiles: ' + e.message);
+  }
+}
+
+// ── ═══ HELPERS ═══ ──
+function esc(s) {
+  if (!s && s !== 0) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function refreshAll() {
+  location.reload();
+}
+
+// ── ═══ INIT ═══ ──
+loadDashboard();
+loadSysInfo();
+</script>
+</body>
+</html>

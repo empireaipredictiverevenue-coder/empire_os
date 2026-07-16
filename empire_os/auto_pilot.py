@@ -85,6 +85,19 @@ class AutoPilot:
     def run_cycle(self) -> CycleReport:
         """Run one full pipeline cycle."""
         self.cycle += 1
+        # Short-circuit: if the last cycle found nothing across all stages,
+        # skip the hub calls entirely (pipeline is empty — no point
+        # hammering funnel/states and starving other requests).
+        if getattr(self, "_last_empty", False):
+            # one cheap health ping to confirm hub alive; skip if down
+            st, _ = self._http("GET", "/health", {})
+            if st != 200:
+                report = CycleReport(cycle=self.cycle, started_at=datetime.now(timezone.utc).isoformat())
+                report.error = "hub_unreachable"
+                logger.warning("cycle %d: hub unreachable, skipping", self.cycle)
+                return report
+            logger.info("cycle %d: pipeline empty, skipping stage calls", self.cycle)
+            return CycleReport(cycle=self.cycle, started_at=datetime.now(timezone.utc).isoformat())
         report = CycleReport(cycle=self.cycle, started_at=datetime.now(timezone.utc).isoformat())
         try:
             self._stage_match(report)
@@ -96,6 +109,11 @@ class AutoPilot:
         except Exception as e:
             report.error = str(e)
             logger.exception("cycle %d failed: %s", self.cycle, e)
+        # mark emptiness for next cycle
+        self._last_empty = all(
+            getattr(report, k) == 0 for k in
+            ["matched", "drafted", "sent", "replied", "claimed", "settled"]
+        )
 
         # Accumulate totals
         for k in ["matched", "drafted", "sent", "replied", "claimed", "settled"]:

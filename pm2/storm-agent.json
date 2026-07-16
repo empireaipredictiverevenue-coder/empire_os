@@ -1,0 +1,20 @@
+{
+  "name": "storm-agent",
+  "script": "/root/venv/bin/python3",
+  "args": "-m empire_os.storm_service",
+  "cwd": "/root/empire_os",
+  "env": {
+    "NWS_POLL_INTERVAL": "300",
+    "DISCORD_WEBHOOK_URL": "",
+    "TELEGRAM_BOT_TOKEN": "",
+    "TELEGRAM_CHAT_ID": "",
+    "EMPIRE_HUB_URL": "http://10.218.155.218:8080"
+  },
+  "instances": 1,
+  "autorestart": true,
+  "watch": false,
+  "max_memory_restart": "500M",
+  "log_date_format": "YYYY-MM-DD HH:mm:ss Z",
+  "error_file": "/root/.pm2/logs/storm-agent-error.log",
+  "out_file": "/root/.pm2/logs/storm-agent-out.log"
+}

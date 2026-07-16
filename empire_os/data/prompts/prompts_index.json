@@ -1,0 +1,1742 @@
+{
+  "source": "ai-boost/awesome-prompts",
+  "fetched_at": "2026-07-14T01:20:00Z",
+  "total": 347,
+  "prompts": [
+    {
+      "name": "3D_Generative_Artist",
+      "slug": "3d-generative-artist",
+      "path": "/root/empire_os/empire_os/data/prompts/3D_Generative_Artist.txt"
+    },
+    {
+      "name": "5w3h_intent_architect",
+      "slug": "5w3h-intent-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/5w3h_intent_architect.txt"
+    },
+    {
+      "name": "AI_Ethics_Reviewer",
+      "slug": "ai-ethics-reviewer",
+      "path": "/root/empire_os/empire_os/data/prompts/AI_Ethics_Reviewer.txt"
+    },
+    {
+      "name": "Academic_Peer_Reviewer",
+      "slug": "academic-peer-reviewer",
+      "path": "/root/empire_os/empire_os/data/prompts/Academic_Peer_Reviewer.txt"
+    },
+    {
+      "name": "Adaptive_Learning_Designer",
+      "slug": "adaptive-learning-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/Adaptive_Learning_Designer.txt"
+    },
+    {
+      "name": "Agile_Transformation_Lead",
+      "slug": "agile-transformation-lead",
+      "path": "/root/empire_os/empire_os/data/prompts/Agile_Transformation_Lead.txt"
+    },
+    {
+      "name": "AutoGPT",
+      "slug": "autogpt",
+      "path": "/root/empire_os/empire_os/data/prompts/AutoGPT.md"
+    },
+    {
+      "name": "Beauty_DND",
+      "slug": "beauty-dnd",
+      "path": "/root/empire_os/empire_os/data/prompts/Beauty_DND.txt"
+    },
+    {
+      "name": "Cinematography_Prompt_Engineer",
+      "slug": "cinematography-prompt-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/Cinematography_Prompt_Engineer.txt"
+    },
+    {
+      "name": "Clinical_Research_Coordinator",
+      "slug": "clinical-research-coordinator",
+      "path": "/root/empire_os/empire_os/data/prompts/Clinical_Research_Coordinator.txt"
+    },
+    {
+      "name": "Contract_Negotiation_Strategist",
+      "slug": "contract-negotiation-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/Contract_Negotiation_Strategist.txt"
+    },
+    {
+      "name": "Creative_Writing_Coach",
+      "slug": "creative-writing-coach",
+      "path": "/root/empire_os/empire_os/data/prompts/Creative_Writing_Coach.txt"
+    },
+    {
+      "name": "Cross_Cultural_Communication_Designer",
+      "slug": "cross-cultural-communication-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/Cross_Cultural_Communication_Designer.txt"
+    },
+    {
+      "name": "Data_Governance_Architect",
+      "slug": "data-governance-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/Data_Governance_Architect.txt"
+    },
+    {
+      "name": "Data_Platform_Architect",
+      "slug": "data-platform-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/Data_Platform_Architect.txt"
+    },
+    {
+      "name": "Deep_Work_Facilitator",
+      "slug": "deep-work-facilitator",
+      "path": "/root/empire_os/empire_os/data/prompts/Deep_Work_Facilitator.txt"
+    },
+    {
+      "name": "Executive_Operations_Partner",
+      "slug": "executive-operations-partner",
+      "path": "/root/empire_os/empire_os/data/prompts/Executive_Operations_Partner.txt"
+    },
+    {
+      "name": "Game_Economy_Designer",
+      "slug": "game-economy-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/Game_Economy_Designer.txt"
+    },
+    {
+      "name": "Game_Level_Designer",
+      "slug": "game-level-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/Game_Level_Designer.txt"
+    },
+    {
+      "name": "Health_Informatics_Specialist",
+      "slug": "health-informatics-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/Health_Informatics_Specialist.txt"
+    },
+    {
+      "name": "Immersive_Narrative_Designer",
+      "slug": "immersive-narrative-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/Immersive_Narrative_Designer.txt"
+    },
+    {
+      "name": "Knowledge_Base_Architect",
+      "slug": "knowledge-base-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/Knowledge_Base_Architect.txt"
+    },
+    {
+      "name": "LearnOS_PRO",
+      "slug": "learnos-pro",
+      "path": "/root/empire_os/empire_os/data/prompts/LearnOS_PRO.txt"
+    },
+    {
+      "name": "Literature_Professor",
+      "slug": "literature-professor",
+      "path": "/root/empire_os/empire_os/data/prompts/Literature_Professor.md"
+    },
+    {
+      "name": "Localization_Globalization_Strategist",
+      "slug": "localization-globalization-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/Localization_Globalization_Strategist.txt"
+    },
+    {
+      "name": "MLOps_Engineer",
+      "slug": "mlops-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/MLOps_Engineer.txt"
+    },
+    {
+      "name": "Meta MJ",
+      "slug": "meta-mj",
+      "path": "/root/empire_os/empire_os/data/prompts/Meta MJ.md"
+    },
+    {
+      "name": "Mr_Ranedeer",
+      "slug": "mr-ranedeer",
+      "path": "/root/empire_os/empire_os/data/prompts/Mr_Ranedeer.txt"
+    },
+    {
+      "name": "Personal_Knowledge_Assistant",
+      "slug": "personal-knowledge-assistant",
+      "path": "/root/empire_os/empire_os/data/prompts/Personal_Knowledge_Assistant.txt"
+    },
+    {
+      "name": "Project_Recovery_Specialist",
+      "slug": "project-recovery-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/Project_Recovery_Specialist.txt"
+    },
+    {
+      "name": "Prompt Creater",
+      "slug": "prompt-creater",
+      "path": "/root/empire_os/empire_os/data/prompts/Prompt Creater.md"
+    },
+    {
+      "name": "QuickSilver OS",
+      "slug": "quicksilver-os",
+      "path": "/root/empire_os/empire_os/data/prompts/QuickSilver OS.md"
+    },
+    {
+      "name": "Regulatory_Affairs_Specialist",
+      "slug": "regulatory-affairs-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/Regulatory_Affairs_Specialist.txt"
+    },
+    {
+      "name": "SuperPrompt",
+      "slug": "superprompt",
+      "path": "/root/empire_os/empire_os/data/prompts/SuperPrompt.md"
+    },
+    {
+      "name": "Technical_Documentation_Strategist",
+      "slug": "technical-documentation-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/Technical_Documentation_Strategist.txt"
+    },
+    {
+      "name": "Technical_Program_Manager",
+      "slug": "technical-program-manager",
+      "path": "/root/empire_os/empire_os/data/prompts/Technical_Program_Manager.txt"
+    },
+    {
+      "name": "Technical_Translator_Localizer",
+      "slug": "technical-translator-localizer",
+      "path": "/root/empire_os/empire_os/data/prompts/Technical_Translator_Localizer.txt"
+    },
+    {
+      "name": "Vampire The Masquerade Lore Expert",
+      "slug": "vampire-the-masquerade-lore-expert",
+      "path": "/root/empire_os/empire_os/data/prompts/Vampire The Masquerade Lore Expert.md"
+    },
+    {
+      "name": "a2a_agent_protocol_architect",
+      "slug": "a2a-agent-protocol-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/a2a_agent_protocol_architect.txt"
+    },
+    {
+      "name": "a2ui_agent_to_user_interface_architect",
+      "slug": "a2ui-agent-to-user-interface-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/a2ui_agent_to_user_interface_architect.txt"
+    },
+    {
+      "name": "abstract_chain_of_thought_architect",
+      "slug": "abstract-chain-of-thought-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/abstract_chain_of_thought_architect.txt"
+    },
+    {
+      "name": "academic_paper_architect",
+      "slug": "academic-paper-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/academic_paper_architect.txt"
+    },
+    {
+      "name": "accessibility_auditor",
+      "slug": "accessibility-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/accessibility_auditor.txt"
+    },
+    {
+      "name": "adhd_parallel_ideation_skill",
+      "slug": "adhd-parallel-ideation-skill",
+      "path": "/root/empire_os/empire_os/data/prompts/adhd_parallel_ideation_skill.txt"
+    },
+    {
+      "name": "adk_skilltoolset_designer",
+      "slug": "adk-skilltoolset-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/adk_skilltoolset_designer.txt"
+    },
+    {
+      "name": "ag_ui_frontend_architect",
+      "slug": "ag-ui-frontend-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/ag_ui_frontend_architect.txt"
+    },
+    {
+      "name": "agent_atlas_trajectory_auditor",
+      "slug": "agent-atlas-trajectory-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_atlas_trajectory_auditor.txt"
+    },
+    {
+      "name": "agent_context_efficiency_engineer",
+      "slug": "agent-context-efficiency-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_context_efficiency_engineer.txt"
+    },
+    {
+      "name": "agent_cooperation_designer",
+      "slug": "agent-cooperation-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_cooperation_designer.txt"
+    },
+    {
+      "name": "agent_cost_observability_architect",
+      "slug": "agent-cost-observability-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_cost_observability_architect.txt"
+    },
+    {
+      "name": "agent_data_injection_attack_auditor",
+      "slug": "agent-data-injection-attack-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_data_injection_attack_auditor.txt"
+    },
+    {
+      "name": "agent_environment_engineering_architect",
+      "slug": "agent-environment-engineering-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_environment_engineering_architect.txt"
+    },
+    {
+      "name": "agent_eval_designer",
+      "slug": "agent-eval-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_eval_designer.txt"
+    },
+    {
+      "name": "agent_first_language_architect",
+      "slug": "agent-first-language-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_first_language_architect.txt"
+    },
+    {
+      "name": "agent_governance_orchestrator",
+      "slug": "agent-governance-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_governance_orchestrator.txt"
+    },
+    {
+      "name": "agent_harness_designer",
+      "slug": "agent-harness-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_harness_designer.txt"
+    },
+    {
+      "name": "agent_harness_performance_engineer",
+      "slug": "agent-harness-performance-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_harness_performance_engineer.txt"
+    },
+    {
+      "name": "agent_memory_architect",
+      "slug": "agent-memory-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_memory_architect.txt"
+    },
+    {
+      "name": "agent_native_memory_system_architect",
+      "slug": "agent-native-memory-system-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_native_memory_system_architect.txt"
+    },
+    {
+      "name": "agent_permission_auto_mode_architect",
+      "slug": "agent-permission-auto-mode-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_permission_auto_mode_architect.txt"
+    },
+    {
+      "name": "agent_powered_vulnerability_scanner_architect",
+      "slug": "agent-powered-vulnerability-scanner-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_powered_vulnerability_scanner_architect.txt"
+    },
+    {
+      "name": "agent_protocol_advisor",
+      "slug": "agent-protocol-advisor",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_protocol_advisor.txt"
+    },
+    {
+      "name": "agent_red_team_architect",
+      "slug": "agent-red-team-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_red_team_architect.txt"
+    },
+    {
+      "name": "agent_reliability_engineer",
+      "slug": "agent-reliability-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_reliability_engineer.txt"
+    },
+    {
+      "name": "agent_safety_testing_at_scale_architect",
+      "slug": "agent-safety-testing-at-scale-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_safety_testing_at_scale_architect.txt"
+    },
+    {
+      "name": "agent_skill_compositional_risk_auditor",
+      "slug": "agent-skill-compositional-risk-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_skill_compositional_risk_auditor.txt"
+    },
+    {
+      "name": "agent_skill_designer",
+      "slug": "agent-skill-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_skill_designer.txt"
+    },
+    {
+      "name": "agent_skill_effectiveness_auditor",
+      "slug": "agent-skill-effectiveness-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_skill_effectiveness_auditor.txt"
+    },
+    {
+      "name": "agent_skill_optimizer_architect",
+      "slug": "agent-skill-optimizer-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_skill_optimizer_architect.txt"
+    },
+    {
+      "name": "agent_skill_supply_chain_auditor",
+      "slug": "agent-skill-supply-chain-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_skill_supply_chain_auditor.txt"
+    },
+    {
+      "name": "agent_state_hygiene_architect",
+      "slug": "agent-state-hygiene-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_state_hygiene_architect.txt"
+    },
+    {
+      "name": "agent_style_enforcer",
+      "slug": "agent-style-enforcer",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_style_enforcer.txt"
+    },
+    {
+      "name": "agent_tool_engineer",
+      "slug": "agent-tool-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_tool_engineer.txt"
+    },
+    {
+      "name": "agent_trajectory_triage_specialist",
+      "slug": "agent-trajectory-triage-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_trajectory_triage_specialist.txt"
+    },
+    {
+      "name": "agent_virtual_filesystem_architect",
+      "slug": "agent-virtual-filesystem-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_virtual_filesystem_architect.txt"
+    },
+    {
+      "name": "agent_world_model_architect",
+      "slug": "agent-world-model-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agent_world_model_architect.txt"
+    },
+    {
+      "name": "agentatlas_trajectory_eval_architect",
+      "slug": "agentatlas-trajectory-eval-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agentatlas_trajectory_eval_architect.txt"
+    },
+    {
+      "name": "agentic_cad_hardware_designer",
+      "slug": "agentic-cad-hardware-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/agentic_cad_hardware_designer.txt"
+    },
+    {
+      "name": "agentic_code_reasoner",
+      "slug": "agentic-code-reasoner",
+      "path": "/root/empire_os/empire_os/data/prompts/agentic_code_reasoner.txt"
+    },
+    {
+      "name": "agentic_coder",
+      "slug": "agentic-coder",
+      "path": "/root/empire_os/empire_os/data/prompts/agentic_coder.txt"
+    },
+    {
+      "name": "agentic_company_orchestrator",
+      "slug": "agentic-company-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/agentic_company_orchestrator.txt"
+    },
+    {
+      "name": "agentic_context_engineering_architect",
+      "slug": "agentic-context-engineering-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agentic_context_engineering_architect.txt"
+    },
+    {
+      "name": "agentic_deontic_reasoning_architect",
+      "slug": "agentic-deontic-reasoning-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/agentic_deontic_reasoning_architect.txt"
+    },
+    {
+      "name": "agentic_video_editor",
+      "slug": "agentic-video-editor",
+      "path": "/root/empire_os/empire_os/data/prompts/agentic_video_editor.txt"
+    },
+    {
+      "name": "agents_best_practices",
+      "slug": "agents-best-practices",
+      "path": "/root/empire_os/empire_os/data/prompts/agents_best_practices.txt"
+    },
+    {
+      "name": "agents_md_author",
+      "slug": "agents-md-author",
+      "path": "/root/empire_os/empire_os/data/prompts/agents_md_author.txt"
+    },
+    {
+      "name": "ai_co_mathematician",
+      "slug": "ai-co-mathematician",
+      "path": "/root/empire_os/empire_os/data/prompts/ai_co_mathematician.txt"
+    },
+    {
+      "name": "ai_governance_legal_agent",
+      "slug": "ai-governance-legal-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/ai_governance_legal_agent.txt"
+    },
+    {
+      "name": "ai_native_product_architect",
+      "slug": "ai-native-product-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/ai_native_product_architect.txt"
+    },
+    {
+      "name": "analytics_engineer",
+      "slug": "analytics-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/analytics_engineer.txt"
+    },
+    {
+      "name": "andrej_karpathy_coding_guidelines",
+      "slug": "andrej-karpathy-coding-guidelines",
+      "path": "/root/empire_os/empire_os/data/prompts/andrej_karpathy_coding_guidelines.txt"
+    },
+    {
+      "name": "anti_ai_slop_design_architect",
+      "slug": "anti-ai-slop-design-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/anti_ai_slop_design_architect.txt"
+    },
+    {
+      "name": "api_integration_architect",
+      "slug": "api-integration-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/api_integration_architect.txt"
+    },
+    {
+      "name": "auditable_enterprise_llm_agent_harness_architect",
+      "slug": "auditable-enterprise-llm-agent-harness-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/auditable_enterprise_llm_agent_harness_architect.txt"
+    },
+    {
+      "name": "automotive_functional_safety_architect",
+      "slug": "automotive-functional-safety-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/automotive_functional_safety_architect.txt"
+    },
+    {
+      "name": "autonomous_ml_research_agent",
+      "slug": "autonomous-ml-research-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/autonomous_ml_research_agent.txt"
+    },
+    {
+      "name": "autonomous_permission_classifier_architect",
+      "slug": "autonomous-permission-classifier-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/autonomous_permission_classifier_architect.txt"
+    },
+    {
+      "name": "autonomous_software_factory_orchestrator",
+      "slug": "autonomous-software-factory-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/autonomous_software_factory_orchestrator.txt"
+    },
+    {
+      "name": "autonomous_web_agent",
+      "slug": "autonomous-web-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/autonomous_web_agent.txt"
+    },
+    {
+      "name": "bioinformatics_engineer",
+      "slug": "bioinformatics-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/bioinformatics_engineer.txt"
+    },
+    {
+      "name": "book_to_skill_architect",
+      "slug": "book-to-skill-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/book_to_skill_architect.txt"
+    },
+    {
+      "name": "brand_strategist",
+      "slug": "brand-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/brand_strategist.txt"
+    },
+    {
+      "name": "browser_harness_designer",
+      "slug": "browser-harness-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/browser_harness_designer.txt"
+    },
+    {
+      "name": "bug_bounty_methodology_orchestrator",
+      "slug": "bug-bounty-methodology-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/bug_bounty_methodology_orchestrator.txt"
+    },
+    {
+      "name": "career_operations_agent",
+      "slug": "career-operations-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/career_operations_agent.txt"
+    },
+    {
+      "name": "caveman_mode",
+      "slug": "caveman-mode",
+      "path": "/root/empire_os/empire_os/data/prompts/caveman_mode.txt"
+    },
+    {
+      "name": "cfo_financial_strategy",
+      "slug": "cfo-financial-strategy",
+      "path": "/root/empire_os/empire_os/data/prompts/cfo_financial_strategy.txt"
+    },
+    {
+      "name": "chain_of_draft",
+      "slug": "chain-of-draft",
+      "path": "/root/empire_os/empire_os/data/prompts/chain_of_draft.txt"
+    },
+    {
+      "name": "change_management_leader",
+      "slug": "change-management-leader",
+      "path": "/root/empire_os/empire_os/data/prompts/change_management_leader.txt"
+    },
+    {
+      "name": "china_patent_disclosure_architect",
+      "slug": "china-patent-disclosure-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/china_patent_disclosure_architect.txt"
+    },
+    {
+      "name": "china_software_copyright_architect",
+      "slug": "china-software-copyright-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/china_software_copyright_architect.txt"
+    },
+    {
+      "name": "clarification_timing_strategist",
+      "slug": "clarification-timing-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/clarification_timing_strategist.txt"
+    },
+    {
+      "name": "classic_software_engineering_canon",
+      "slug": "classic-software-engineering-canon",
+      "path": "/root/empire_os/empire_os/data/prompts/classic_software_engineering_canon.txt"
+    },
+    {
+      "name": "claude_artifacts_prompt",
+      "slug": "claude-artifacts-prompt",
+      "path": "/root/empire_os/empire_os/data/prompts/claude_artifacts_prompt.md"
+    },
+    {
+      "name": "claude_code_subagent_designer",
+      "slug": "claude-code-subagent-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/claude_code_subagent_designer.txt"
+    },
+    {
+      "name": "cli_anything_harness_designer",
+      "slug": "cli-anything-harness-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/cli_anything_harness_designer.txt"
+    },
+    {
+      "name": "clinical_assistant",
+      "slug": "clinical-assistant",
+      "path": "/root/empire_os/empire_os/data/prompts/clinical_assistant.txt"
+    },
+    {
+      "name": "cloud_architect",
+      "slug": "cloud-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/cloud_architect.txt"
+    },
+    {
+      "name": "code_reviewer_security",
+      "slug": "code-reviewer-security",
+      "path": "/root/empire_os/empire_os/data/prompts/code_reviewer_security.txt"
+    },
+    {
+      "name": "codebase_course_architect",
+      "slug": "codebase-course-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/codebase_course_architect.txt"
+    },
+    {
+      "name": "codebase_knowledge_graph_architect",
+      "slug": "codebase-knowledge-graph-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/codebase_knowledge_graph_architect.txt"
+    },
+    {
+      "name": "coding_agent_system_prompt",
+      "slug": "coding-agent-system-prompt",
+      "path": "/root/empire_os/empire_os/data/prompts/coding_agent_system_prompt.txt"
+    },
+    {
+      "name": "cognitive_distillation_architect",
+      "slug": "cognitive-distillation-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/cognitive_distillation_architect.txt"
+    },
+    {
+      "name": "cognitive_externalization_architect",
+      "slug": "cognitive-externalization-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/cognitive_externalization_architect.txt"
+    },
+    {
+      "name": "community_manager",
+      "slug": "community-manager",
+      "path": "/root/empire_os/empire_os/data/prompts/community_manager.txt"
+    },
+    {
+      "name": "compliance_auditor",
+      "slug": "compliance-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/compliance_auditor.txt"
+    },
+    {
+      "name": "computer_use_operator",
+      "slug": "computer-use-operator",
+      "path": "/root/empire_os/empire_os/data/prompts/computer_use_operator.txt"
+    },
+    {
+      "name": "computer_use_safety_tester",
+      "slug": "computer-use-safety-tester",
+      "path": "/root/empire_os/empire_os/data/prompts/computer_use_safety_tester.txt"
+    },
+    {
+      "name": "constraint_typology_architect",
+      "slug": "constraint-typology-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/constraint_typology_architect.txt"
+    },
+    {
+      "name": "content_calibration_architect",
+      "slug": "content-calibration-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/content_calibration_architect.txt"
+    },
+    {
+      "name": "content_moderator",
+      "slug": "content-moderator",
+      "path": "/root/empire_os/empire_os/data/prompts/content_moderator.txt"
+    },
+    {
+      "name": "context_engineering_maturity_architect",
+      "slug": "context-engineering-maturity-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/context_engineering_maturity_architect.txt"
+    },
+    {
+      "name": "contextnest_verifiable_context_governance_architect",
+      "slug": "contextnest-verifiable-context-governance-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/contextnest_verifiable_context_governance_architect.txt"
+    },
+    {
+      "name": "contextual_integrity_agent_architect",
+      "slug": "contextual-integrity-agent-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/contextual_integrity_agent_architect.txt"
+    },
+    {
+      "name": "continuous_discovery_architect",
+      "slug": "continuous-discovery-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/continuous_discovery_architect.txt"
+    },
+    {
+      "name": "customer_success_strategist",
+      "slug": "customer-success-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/customer_success_strategist.txt"
+    },
+    {
+      "name": "customer_support_agent",
+      "slug": "customer-support-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/customer_support_agent.txt"
+    },
+    {
+      "name": "cybersecurity_skill_architect",
+      "slug": "cybersecurity-skill-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/cybersecurity_skill_architect.txt"
+    },
+    {
+      "name": "data_analysis",
+      "slug": "data-analysis",
+      "path": "/root/empire_os/empire_os/data/prompts/data_analysis.txt"
+    },
+    {
+      "name": "data_analyst",
+      "slug": "data-analyst",
+      "path": "/root/empire_os/empire_os/data/prompts/data_analyst.txt"
+    },
+    {
+      "name": "data_engineer",
+      "slug": "data-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/data_engineer.md"
+    },
+    {
+      "name": "database_schema_designer",
+      "slug": "database-schema-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/database_schema_designer.txt"
+    },
+    {
+      "name": "debugging_agent",
+      "slug": "debugging-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/debugging_agent.txt"
+    },
+    {
+      "name": "deep_research",
+      "slug": "deep-research",
+      "path": "/root/empire_os/empire_os/data/prompts/deep_research.txt"
+    },
+    {
+      "name": "defending_code_security_harness_architect",
+      "slug": "defending-code-security-harness-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/defending_code_security_harness_architect.txt"
+    },
+    {
+      "name": "design_system_spec_architect",
+      "slug": "design-system-spec-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/design_system_spec_architect.txt"
+    },
+    {
+      "name": "developer_advocate",
+      "slug": "developer-advocate",
+      "path": "/root/empire_os/empire_os/data/prompts/developer_advocate.txt"
+    },
+    {
+      "name": "diagnose",
+      "slug": "diagnose",
+      "path": "/root/empire_os/empire_os/data/prompts/diagnose.txt"
+    },
+    {
+      "name": "diffusion_lm_prompt_engineer",
+      "slug": "diffusion-lm-prompt-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/diffusion_lm_prompt_engineer.txt"
+    },
+    {
+      "name": "disclosure_policy_designer",
+      "slug": "disclosure-policy-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/disclosure_policy_designer.txt"
+    },
+    {
+      "name": "divergent_ideation_architect",
+      "slug": "divergent-ideation-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/divergent_ideation_architect.txt"
+    },
+    {
+      "name": "doubt_driven_development",
+      "slug": "doubt-driven-development",
+      "path": "/root/empire_os/empire_os/data/prompts/doubt_driven_development.txt"
+    },
+    {
+      "name": "elastic_context_orchestrator",
+      "slug": "elastic-context-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/elastic_context_orchestrator.txt"
+    },
+    {
+      "name": "embedded_firmware_engineer",
+      "slug": "embedded-firmware-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/embedded_firmware_engineer.txt"
+    },
+    {
+      "name": "embodied_ai_developer",
+      "slug": "embodied-ai-developer",
+      "path": "/root/empire_os/empire_os/data/prompts/embodied_ai_developer.txt"
+    },
+    {
+      "name": "emotion_aware_engineering_partner",
+      "slug": "emotion-aware-engineering-partner",
+      "path": "/root/empire_os/empire_os/data/prompts/emotion_aware_engineering_partner.txt"
+    },
+    {
+      "name": "emotion_aware_research_partner",
+      "slug": "emotion-aware-research-partner",
+      "path": "/root/empire_os/empire_os/data/prompts/emotion_aware_research_partner.txt"
+    },
+    {
+      "name": "empirical_research_architect",
+      "slug": "empirical-research-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/empirical_research_architect.txt"
+    },
+    {
+      "name": "eval_awareness_auditor",
+      "slug": "eval-awareness-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/eval_awareness_auditor.txt"
+    },
+    {
+      "name": "eval_benchmark_architect",
+      "slug": "eval-benchmark-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/eval_benchmark_architect.txt"
+    },
+    {
+      "name": "financial_advisor",
+      "slug": "financial-advisor",
+      "path": "/root/empire_os/empire_os/data/prompts/financial_advisor.txt"
+    },
+    {
+      "name": "financial_operations_compliance_agent",
+      "slug": "financial-operations-compliance-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/financial_operations_compliance_agent.txt"
+    },
+    {
+      "name": "flux_image_gen",
+      "slug": "flux-image-gen",
+      "path": "/root/empire_os/empire_os/data/prompts/flux_image_gen.txt"
+    },
+    {
+      "name": "formal_theorem_proving_architect",
+      "slug": "formal-theorem-proving-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/formal_theorem_proving_architect.txt"
+    },
+    {
+      "name": "frontend_developer",
+      "slug": "frontend-developer",
+      "path": "/root/empire_os/empire_os/data/prompts/frontend_developer.txt"
+    },
+    {
+      "name": "frontend_taste_engineer",
+      "slug": "frontend-taste-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/frontend_taste_engineer.txt"
+    },
+    {
+      "name": "game_ai_designer",
+      "slug": "game-ai-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/game_ai_designer.txt"
+    },
+    {
+      "name": "game_asset_sprite_forge",
+      "slug": "game-asset-sprite-forge",
+      "path": "/root/empire_os/empire_os/data/prompts/game_asset_sprite_forge.txt"
+    },
+    {
+      "name": "game_designer",
+      "slug": "game-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/game_designer.txt"
+    },
+    {
+      "name": "game_studio_multi_agent_orchestrator",
+      "slug": "game-studio-multi-agent-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/game_studio_multi_agent_orchestrator.txt"
+    },
+    {
+      "name": "gemini_cli_prompt_architect",
+      "slug": "gemini-cli-prompt-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/gemini_cli_prompt_architect.txt"
+    },
+    {
+      "name": "generative_audio_prompt_engineer",
+      "slug": "generative-audio-prompt-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/generative_audio_prompt_engineer.txt"
+    },
+    {
+      "name": "generative_image_prompt_engineer",
+      "slug": "generative-image-prompt-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/generative_image_prompt_engineer.txt"
+    },
+    {
+      "name": "generative_ui_architect",
+      "slug": "generative-ui-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/generative_ui_architect.txt"
+    },
+    {
+      "name": "goal_drift_auditor",
+      "slug": "goal-drift-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/goal_drift_auditor.txt"
+    },
+    {
+      "name": "google_workspace_automation_architect",
+      "slug": "google-workspace-automation-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/google_workspace_automation_architect.txt"
+    },
+    {
+      "name": "goose_ai_engineering_agent_operator",
+      "slug": "goose-ai-engineering-agent-operator",
+      "path": "/root/empire_os/empire_os/data/prompts/goose_ai_engineering_agent_operator.txt"
+    },
+    {
+      "name": "grounded_community_researcher",
+      "slug": "grounded-community-researcher",
+      "path": "/root/empire_os/empire_os/data/prompts/grounded_community_researcher.txt"
+    },
+    {
+      "name": "growth_engineering_skill_architect",
+      "slug": "growth-engineering-skill-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/growth_engineering_skill_architect.txt"
+    },
+    {
+      "name": "growth_hacker",
+      "slug": "growth-hacker",
+      "path": "/root/empire_os/empire_os/data/prompts/growth_hacker.txt"
+    },
+    {
+      "name": "headroom_context_compression_architect",
+      "slug": "headroom-context-compression-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/headroom_context_compression_architect.txt"
+    },
+    {
+      "name": "healthcare_ai_architect",
+      "slug": "healthcare-ai-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/healthcare_ai_architect.txt"
+    },
+    {
+      "name": "healthcare_operations_agent",
+      "slug": "healthcare-operations-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/healthcare_operations_agent.txt"
+    },
+    {
+      "name": "hr_talent_development",
+      "slug": "hr-talent-development",
+      "path": "/root/empire_os/empire_os/data/prompts/hr_talent_development.txt"
+    },
+    {
+      "name": "html_anything_publisher",
+      "slug": "html-anything-publisher",
+      "path": "/root/empire_os/empire_os/data/prompts/html_anything_publisher.txt"
+    },
+    {
+      "name": "html_native_video_architect",
+      "slug": "html-native-video-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/html_native_video_architect.txt"
+    },
+    {
+      "name": "html_ppt_studio_designer",
+      "slug": "html-ppt-studio-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/html_ppt_studio_designer.txt"
+    },
+    {
+      "name": "huashu_design",
+      "slug": "huashu-design",
+      "path": "/root/empire_os/empire_os/data/prompts/huashu_design.txt"
+    },
+    {
+      "name": "humanizer",
+      "slug": "humanizer",
+      "path": "/root/empire_os/empire_os/data/prompts/humanizer.txt"
+    },
+    {
+      "name": "hyperagents_designer",
+      "slug": "hyperagents-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/hyperagents_designer.txt"
+    },
+    {
+      "name": "incident_response_commander",
+      "slug": "incident-response-commander",
+      "path": "/root/empire_os/empire_os/data/prompts/incident_response_commander.md"
+    },
+    {
+      "name": "industrial_robotics_architect",
+      "slug": "industrial-robotics-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/industrial_robotics_architect.txt"
+    },
+    {
+      "name": "instruction_bleed_auditor",
+      "slug": "instruction-bleed-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/instruction_bleed_auditor.txt"
+    },
+    {
+      "name": "internal_safety_collapse_auditor",
+      "slug": "internal-safety-collapse-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/internal_safety_collapse_auditor.txt"
+    },
+    {
+      "name": "interruptible_agent_planner",
+      "slug": "interruptible-agent-planner",
+      "path": "/root/empire_os/empire_os/data/prompts/interruptible_agent_planner.txt"
+    },
+    {
+      "name": "investment_banking_associate_agent",
+      "slug": "investment-banking-associate-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/investment_banking_associate_agent.txt"
+    },
+    {
+      "name": "investment_research_analyst",
+      "slug": "investment-research-analyst",
+      "path": "/root/empire_os/empire_os/data/prompts/investment_research_analyst.txt"
+    },
+    {
+      "name": "jetpack_compose_architect",
+      "slug": "jetpack-compose-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/jetpack_compose_architect.txt"
+    },
+    {
+      "name": "journal_adapt_writing_architect",
+      "slug": "journal-adapt-writing-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/journal_adapt_writing_architect.txt"
+    },
+    {
+      "name": "knowledge_management_architect",
+      "slug": "knowledge-management-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/knowledge_management_architect.txt"
+    },
+    {
+      "name": "knowledge_work_plugin_architect",
+      "slug": "knowledge-work-plugin-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/knowledge_work_plugin_architect.txt"
+    },
+    {
+      "name": "kubernetes_specialist",
+      "slug": "kubernetes-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/kubernetes_specialist.txt"
+    },
+    {
+      "name": "lark_automation_architect",
+      "slug": "lark-automation-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/lark_automation_architect.txt"
+    },
+    {
+      "name": "latex_academic_expert",
+      "slug": "latex-academic-expert",
+      "path": "/root/empire_os/empire_os/data/prompts/latex_academic_expert.txt"
+    },
+    {
+      "name": "legal_analyst",
+      "slug": "legal-analyst",
+      "path": "/root/empire_os/empire_os/data/prompts/legal_analyst.txt"
+    },
+    {
+      "name": "llm_architect",
+      "slug": "llm-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/llm_architect.txt"
+    },
+    {
+      "name": "llm_judge_routing_strategist",
+      "slug": "llm-judge-routing-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/llm_judge_routing_strategist.txt"
+    },
+    {
+      "name": "local_first_memory_engineer",
+      "slug": "local-first-memory-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/local_first_memory_engineer.txt"
+    },
+    {
+      "name": "local_first_voice_io_architect",
+      "slug": "local-first-voice-io-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/local_first_voice_io_architect.txt"
+    },
+    {
+      "name": "long_horizon_multimodal_search_agent",
+      "slug": "long-horizon-multimodal-search-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/long_horizon_multimodal_search_agent.txt"
+    },
+    {
+      "name": "lookahead_planning_specialist",
+      "slug": "lookahead-planning-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/lookahead_planning_specialist.txt"
+    },
+    {
+      "name": "loop_engineering_architect",
+      "slug": "loop-engineering-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/loop_engineering_architect.txt"
+    },
+    {
+      "name": "luna_prompt",
+      "slug": "luna-prompt",
+      "path": "/root/empire_os/empire_os/data/prompts/luna_prompt.txt"
+    },
+    {
+      "name": "magazine_web_deck_designer",
+      "slug": "magazine-web-deck-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/magazine_web_deck_designer.txt"
+    },
+    {
+      "name": "managed_agent_architect",
+      "slug": "managed-agent-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/managed_agent_architect.txt"
+    },
+    {
+      "name": "management_talk",
+      "slug": "management-talk",
+      "path": "/root/empire_os/empire_os/data/prompts/management_talk.txt"
+    },
+    {
+      "name": "market_research_strategist",
+      "slug": "market-research-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/market_research_strategist.txt"
+    },
+    {
+      "name": "maspo_joint_prompt_optimizer",
+      "slug": "maspo-joint-prompt-optimizer",
+      "path": "/root/empire_os/empire_os/data/prompts/maspo_joint_prompt_optimizer.txt"
+    },
+    {
+      "name": "mcp_apps_ui_architect",
+      "slug": "mcp-apps-ui-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/mcp_apps_ui_architect.txt"
+    },
+    {
+      "name": "mcp_server_architect",
+      "slug": "mcp-server-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/mcp_server_architect.txt"
+    },
+    {
+      "name": "memory_poisoning_attack_auditor",
+      "slug": "memory-poisoning-attack-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/memory_poisoning_attack_auditor.txt"
+    },
+    {
+      "name": "meta_cognitive_tool_use_specialist",
+      "slug": "meta-cognitive-tool-use-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/meta_cognitive_tool_use_specialist.txt"
+    },
+    {
+      "name": "meta_context_engineering_architect",
+      "slug": "meta-context-engineering-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/meta_context_engineering_architect.txt"
+    },
+    {
+      "name": "meta_prompt",
+      "slug": "meta-prompt",
+      "path": "/root/empire_os/empire_os/data/prompts/meta_prompt.txt"
+    },
+    {
+      "name": "ml_intern_autonomous_ml_engineer",
+      "slug": "ml-intern-autonomous-ml-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/ml_intern_autonomous_ml_engineer.txt"
+    },
+    {
+      "name": "ml_systems_architect",
+      "slug": "ml-systems-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/ml_systems_architect.txt"
+    },
+    {
+      "name": "mobile_app_builder",
+      "slug": "mobile-app-builder",
+      "path": "/root/empire_os/empire_os/data/prompts/mobile_app_builder.txt"
+    },
+    {
+      "name": "multi_agent_communication_designer",
+      "slug": "multi-agent-communication-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/multi_agent_communication_designer.txt"
+    },
+    {
+      "name": "multi_agent_orchestrator",
+      "slug": "multi-agent-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/multi_agent_orchestrator.txt"
+    },
+    {
+      "name": "multi_agent_rag_orchestrator",
+      "slug": "multi-agent-rag-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/multi_agent_rag_orchestrator.txt"
+    },
+    {
+      "name": "multi_agent_topology_selector",
+      "slug": "multi-agent-topology-selector",
+      "path": "/root/empire_os/empire_os/data/prompts/multi_agent_topology_selector.txt"
+    },
+    {
+      "name": "multimodal_agent_designer",
+      "slug": "multimodal-agent-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/multimodal_agent_designer.txt"
+    },
+    {
+      "name": "multimodal_analyst",
+      "slug": "multimodal-analyst",
+      "path": "/root/empire_os/empire_os/data/prompts/multimodal_analyst.txt"
+    },
+    {
+      "name": "native_feel_desktop_architect",
+      "slug": "native-feel-desktop-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/native_feel_desktop_architect.txt"
+    },
+    {
+      "name": "nature_style_scientific_writer",
+      "slug": "nature-style-scientific-writer",
+      "path": "/root/empire_os/empire_os/data/prompts/nature_style_scientific_writer.txt"
+    },
+    {
+      "name": "north_star_system_prompt",
+      "slug": "north-star-system-prompt",
+      "path": "/root/empire_os/empire_os/data/prompts/north_star_system_prompt.txt"
+    },
+    {
+      "name": "notebooklm_research_orchestrator",
+      "slug": "notebooklm-research-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/notebooklm_research_orchestrator.txt"
+    },
+    {
+      "name": "obsidian_vault_operator",
+      "slug": "obsidian-vault-operator",
+      "path": "/root/empire_os/empire_os/data/prompts/obsidian_vault_operator.txt"
+    },
+    {
+      "name": "oh_my_claudecode_multi_agent_orchestrator",
+      "slug": "oh-my-claudecode-multi-agent-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/oh_my_claudecode_multi_agent_orchestrator.txt"
+    },
+    {
+      "name": "on_device_ai_deployment_architect",
+      "slug": "on-device-ai-deployment-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/on_device_ai_deployment_architect.txt"
+    },
+    {
+      "name": "open_deep_research_agent_architect",
+      "slug": "open-deep-research-agent-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/open_deep_research_agent_architect.txt"
+    },
+    {
+      "name": "open_design_orchestrator",
+      "slug": "open-design-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/open_design_orchestrator.txt"
+    },
+    {
+      "name": "openai_codex_cli_prompt_architect",
+      "slug": "openai-codex-cli-prompt-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/openai_codex_cli_prompt_architect.txt"
+    },
+    {
+      "name": "openai_codex_skill_author",
+      "slug": "openai-codex-skill-author",
+      "path": "/root/empire_os/empire_os/data/prompts/openai_codex_skill_author.txt"
+    },
+    {
+      "name": "operations_manager",
+      "slug": "operations-manager",
+      "path": "/root/empire_os/empire_os/data/prompts/operations_manager.txt"
+    },
+    {
+      "name": "opinionated_agent_team_designer",
+      "slug": "opinionated-agent-team-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/opinionated_agent_team_designer.txt"
+    },
+    {
+      "name": "osint_intelligence_analyst",
+      "slug": "osint-intelligence-analyst",
+      "path": "/root/empire_os/empire_os/data/prompts/osint_intelligence_analyst.txt"
+    },
+    {
+      "name": "owasp_secure_application_architect",
+      "slug": "owasp-secure-application-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/owasp_secure_application_architect.txt"
+    },
+    {
+      "name": "paid_advertising_architect",
+      "slug": "paid-advertising-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/paid_advertising_architect.txt"
+    },
+    {
+      "name": "paper_figure_mirror_engineer",
+      "slug": "paper-figure-mirror-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/paper_figure_mirror_engineer.txt"
+    },
+    {
+      "name": "paper_spine_architect",
+      "slug": "paper-spine-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/paper_spine_architect.txt"
+    },
+    {
+      "name": "paper_to_code_research_implementer",
+      "slug": "paper-to-code-research-implementer",
+      "path": "/root/empire_os/empire_os/data/prompts/paper_to_code_research_implementer.txt"
+    },
+    {
+      "name": "parallel_codegen_architect",
+      "slug": "parallel-codegen-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/parallel_codegen_architect.txt"
+    },
+    {
+      "name": "parallel_prompt_learning_strategist",
+      "slug": "parallel-prompt-learning-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/parallel_prompt_learning_strategist.txt"
+    },
+    {
+      "name": "pcb_eda_design_architect",
+      "slug": "pcb-eda-design-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/pcb_eda_design_architect.txt"
+    },
+    {
+      "name": "pdf_translator",
+      "slug": "pdf-translator",
+      "path": "/root/empire_os/empire_os/data/prompts/pdf_translator.txt"
+    },
+    {
+      "name": "performance_profiler",
+      "slug": "performance-profiler",
+      "path": "/root/empire_os/empire_os/data/prompts/performance_profiler.txt"
+    },
+    {
+      "name": "persistent_file_planner",
+      "slug": "persistent-file-planner",
+      "path": "/root/empire_os/empire_os/data/prompts/persistent_file_planner.txt"
+    },
+    {
+      "name": "personal_agent_brain_architect",
+      "slug": "personal-agent-brain-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/personal_agent_brain_architect.txt"
+    },
+    {
+      "name": "plan_execute_safety_architect",
+      "slug": "plan-execute-safety-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/plan_execute_safety_architect.txt"
+    },
+    {
+      "name": "platform_engineer_iac",
+      "slug": "platform-engineer-iac",
+      "path": "/root/empire_os/empire_os/data/prompts/platform_engineer_iac.txt"
+    },
+    {
+      "name": "pragmatic_programmer",
+      "slug": "pragmatic-programmer",
+      "path": "/root/empire_os/empire_os/data/prompts/pragmatic_programmer.txt"
+    },
+    {
+      "name": "proactive_coding_agent_architect",
+      "slug": "proactive-coding-agent-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/proactive_coding_agent_architect.txt"
+    },
+    {
+      "name": "proactive_memory_agent_long_horizon",
+      "slug": "proactive-memory-agent-long-horizon",
+      "path": "/root/empire_os/empire_os/data/prompts/proactive_memory_agent_long_horizon.txt"
+    },
+    {
+      "name": "procedural_knowledge_architect",
+      "slug": "procedural-knowledge-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/procedural_knowledge_architect.txt"
+    },
+    {
+      "name": "product_manager",
+      "slug": "product-manager",
+      "path": "/root/empire_os/empire_os/data/prompts/product_manager.md"
+    },
+    {
+      "name": "productivity_assistant_gtd",
+      "slug": "productivity-assistant-gtd",
+      "path": "/root/empire_os/empire_os/data/prompts/productivity_assistant_gtd.txt"
+    },
+    {
+      "name": "prompt_compression_strategist",
+      "slug": "prompt-compression-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/prompt_compression_strategist.txt"
+    },
+    {
+      "name": "prompt_engineer",
+      "slug": "prompt-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/prompt_engineer.txt"
+    },
+    {
+      "name": "prompt_injection_guardian",
+      "slug": "prompt-injection-guardian",
+      "path": "/root/empire_os/empire_os/data/prompts/prompt_injection_guardian.txt"
+    },
+    {
+      "name": "prompt_master",
+      "slug": "prompt-master",
+      "path": "/root/empire_os/empire_os/data/prompts/prompt_master.txt"
+    },
+    {
+      "name": "proprioceptive_context_dashboard_architect",
+      "slug": "proprioceptive-context-dashboard-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/proprioceptive_context_dashboard_architect.txt"
+    },
+    {
+      "name": "prototype_architect",
+      "slug": "prototype-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/prototype_architect.txt"
+    },
+    {
+      "name": "qa_agent",
+      "slug": "qa-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/qa_agent.txt"
+    },
+    {
+      "name": "quantitative_trading_agent_architect",
+      "slug": "quantitative-trading-agent-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/quantitative_trading_agent_architect.txt"
+    },
+    {
+      "name": "qwen3_coder_next_agentic_architect",
+      "slug": "qwen3-coder-next-agentic-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/qwen3_coder_next_agentic_architect.txt"
+    },
+    {
+      "name": "realtime_voice_agent_architect",
+      "slug": "realtime-voice-agent-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/realtime_voice_agent_architect.txt"
+    },
+    {
+      "name": "reasoning_drift_auditor",
+      "slug": "reasoning-drift-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/reasoning_drift_auditor.txt"
+    },
+    {
+      "name": "reasoning_model_prompting",
+      "slug": "reasoning-model-prompting",
+      "path": "/root/empire_os/empire_os/data/prompts/reasoning_model_prompting.txt"
+    },
+    {
+      "name": "reasoning_primitive_induction_architect",
+      "slug": "reasoning-primitive-induction-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/reasoning_primitive_induction_architect.txt"
+    },
+    {
+      "name": "reasoning_specialist",
+      "slug": "reasoning-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/reasoning_specialist.txt"
+    },
+    {
+      "name": "reasoning_theater_diagnostician",
+      "slug": "reasoning-theater-diagnostician",
+      "path": "/root/empire_os/empire_os/data/prompts/reasoning_theater_diagnostician.txt"
+    },
+    {
+      "name": "recontext_recursive_evidence_replay_architect",
+      "slug": "recontext-recursive-evidence-replay-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/recontext_recursive_evidence_replay_architect.txt"
+    },
+    {
+      "name": "recruitment_strategist",
+      "slug": "recruitment-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/recruitment_strategist.txt"
+    },
+    {
+      "name": "refactoring_coach",
+      "slug": "refactoring-coach",
+      "path": "/root/empire_os/empire_os/data/prompts/refactoring_coach.txt"
+    },
+    {
+      "name": "release_engineer",
+      "slug": "release-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/release_engineer.txt"
+    },
+    {
+      "name": "reprompt_requirements_engineering_prompt_architect",
+      "slug": "reprompt-requirements-engineering-prompt-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/reprompt_requirements_engineering_prompt_architect.txt"
+    },
+    {
+      "name": "research_paper_proofreader",
+      "slug": "research-paper-proofreader",
+      "path": "/root/empire_os/empire_os/data/prompts/research_paper_proofreader.txt"
+    },
+    {
+      "name": "runtime_harness_adaptation_architect",
+      "slug": "runtime-harness-adaptation-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/runtime_harness_adaptation_architect.txt"
+    },
+    {
+      "name": "s_agent_spatial_tool_use_architect",
+      "slug": "s-agent-spatial-tool-use-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/s_agent_spatial_tool_use_architect.txt"
+    },
+    {
+      "name": "sales_strategist",
+      "slug": "sales-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/sales_strategist.txt"
+    },
+    {
+      "name": "sandboxed_prompt_engineer",
+      "slug": "sandboxed-prompt-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/sandboxed_prompt_engineer.txt"
+    },
+    {
+      "name": "scientific_database_orchestrator",
+      "slug": "scientific-database-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/scientific_database_orchestrator.txt"
+    },
+    {
+      "name": "scientific_paper_replication_harness_architect",
+      "slug": "scientific-paper-replication-harness-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/scientific_paper_replication_harness_architect.txt"
+    },
+    {
+      "name": "scrum_master",
+      "slug": "scrum-master",
+      "path": "/root/empire_os/empire_os/data/prompts/scrum_master.txt"
+    },
+    {
+      "name": "security_researcher",
+      "slug": "security-researcher",
+      "path": "/root/empire_os/empire_os/data/prompts/security_researcher.txt"
+    },
+    {
+      "name": "self_distillation_code_strategist",
+      "slug": "self-distillation-code-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/self_distillation_code_strategist.txt"
+    },
+    {
+      "name": "self_improving_agent_architect",
+      "slug": "self-improving-agent-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/self_improving_agent_architect.txt"
+    },
+    {
+      "name": "seo_specialist",
+      "slug": "seo-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/seo_specialist.txt"
+    },
+    {
+      "name": "sepo_self_evolving_prompt_agent",
+      "slug": "sepo-self-evolving-prompt-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/sepo_self_evolving_prompt_agent.txt"
+    },
+    {
+      "name": "shepherd_meta_agent_runtime_architect",
+      "slug": "shepherd-meta-agent-runtime-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/shepherd_meta_agent_runtime_architect.txt"
+    },
+    {
+      "name": "skill_self_evolution_designer",
+      "slug": "skill-self-evolution-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/skill_self_evolution_designer.txt"
+    },
+    {
+      "name": "small_model_coding_agent_architect",
+      "slug": "small-model-coding-agent-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/small_model_coding_agent_architect.txt"
+    },
+    {
+      "name": "social_card_designer",
+      "slug": "social-card-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/social_card_designer.txt"
+    },
+    {
+      "name": "social_video_clipify_architect",
+      "slug": "social-video-clipify-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/social_video_clipify_architect.txt"
+    },
+    {
+      "name": "socratic_tutor",
+      "slug": "socratic-tutor",
+      "path": "/root/empire_os/empire_os/data/prompts/socratic_tutor.txt"
+    },
+    {
+      "name": "solana_blockchain_architect",
+      "slug": "solana-blockchain-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/solana_blockchain_architect.txt"
+    },
+    {
+      "name": "solidity_smart_contract_engineer",
+      "slug": "solidity-smart-contract-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/solidity_smart_contract_engineer.txt"
+    },
+    {
+      "name": "solution_architect",
+      "slug": "solution-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/solution_architect.txt"
+    },
+    {
+      "name": "spec_driven_development_architect",
+      "slug": "spec-driven-development-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/spec_driven_development_architect.txt"
+    },
+    {
+      "name": "sql_assistant",
+      "slug": "sql-assistant",
+      "path": "/root/empire_os/empire_os/data/prompts/sql_assistant.txt"
+    },
+    {
+      "name": "sre",
+      "slug": "sre",
+      "path": "/root/empire_os/empire_os/data/prompts/sre.md"
+    },
+    {
+      "name": "stop_slop",
+      "slug": "stop-slop",
+      "path": "/root/empire_os/empire_os/data/prompts/stop_slop.txt"
+    },
+    {
+      "name": "structured_output_extractor",
+      "slug": "structured-output-extractor",
+      "path": "/root/empire_os/empire_os/data/prompts/structured_output_extractor.txt"
+    },
+    {
+      "name": "structured_schema_instruction_designer",
+      "slug": "structured-schema-instruction-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/structured_schema_instruction_designer.txt"
+    },
+    {
+      "name": "superpowers_agentic_development_framework",
+      "slug": "superpowers-agentic-development-framework",
+      "path": "/root/empire_os/empire_os/data/prompts/superpowers_agentic_development_framework.txt"
+    },
+    {
+      "name": "swiftui_code_reviewer",
+      "slug": "swiftui-code-reviewer",
+      "path": "/root/empire_os/empire_os/data/prompts/swiftui_code_reviewer.txt"
+    },
+    {
+      "name": "symphony_workflow_orchestrator_architect",
+      "slug": "symphony-workflow-orchestrator-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/symphony_workflow_orchestrator_architect.txt"
+    },
+    {
+      "name": "system_design",
+      "slug": "system-design",
+      "path": "/root/empire_os/empire_os/data/prompts/system_design.txt"
+    },
+    {
+      "name": "talk_normal_enabler",
+      "slug": "talk-normal-enabler",
+      "path": "/root/empire_os/empire_os/data/prompts/talk_normal_enabler.txt"
+    },
+    {
+      "name": "tech_debt_auditor",
+      "slug": "tech-debt-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/tech_debt_auditor.txt"
+    },
+    {
+      "name": "technical_diagram_engineer",
+      "slug": "technical-diagram-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/technical_diagram_engineer.txt"
+    },
+    {
+      "name": "technical_writer",
+      "slug": "technical-writer",
+      "path": "/root/empire_os/empire_os/data/prompts/technical_writer.txt"
+    },
+    {
+      "name": "terraform_iac_specialist",
+      "slug": "terraform-iac-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/terraform_iac_specialist.txt"
+    },
+    {
+      "name": "test_strategy_architect",
+      "slug": "test-strategy-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/test_strategy_architect.txt"
+    },
+    {
+      "name": "test_time_compute_scaling_strategist",
+      "slug": "test-time-compute-scaling-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/test_time_compute_scaling_strategist.txt"
+    },
+    {
+      "name": "threat_detection_engineer",
+      "slug": "threat-detection-engineer",
+      "path": "/root/empire_os/empire_os/data/prompts/threat_detection_engineer.txt"
+    },
+    {
+      "name": "tool_schema_architect",
+      "slug": "tool-schema-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/tool_schema_architect.txt"
+    },
+    {
+      "name": "trustworthy_agent_reviewer",
+      "slug": "trustworthy-agent-reviewer",
+      "path": "/root/empire_os/empire_os/data/prompts/trustworthy_agent_reviewer.txt"
+    },
+    {
+      "name": "ui_tars_desktop_agent_operator",
+      "slug": "ui-tars-desktop-agent-operator",
+      "path": "/root/empire_os/empire_os/data/prompts/ui_tars_desktop_agent_operator.txt"
+    },
+    {
+      "name": "unfireable_safety_kernel_architect",
+      "slug": "unfireable-safety-kernel-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/unfireable_safety_kernel_architect.txt"
+    },
+    {
+      "name": "ux_research_specialist",
+      "slug": "ux-research-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/ux_research_specialist.txt"
+    },
+    {
+      "name": "vendor_diverse_multi_agent_designer",
+      "slug": "vendor-diverse-multi-agent-designer",
+      "path": "/root/empire_os/empire_os/data/prompts/vendor_diverse_multi_agent_designer.txt"
+    },
+    {
+      "name": "verification_specialist",
+      "slug": "verification-specialist",
+      "path": "/root/empire_os/empire_os/data/prompts/verification_specialist.txt"
+    },
+    {
+      "name": "verifier_engineering_strategist",
+      "slug": "verifier-engineering-strategist",
+      "path": "/root/empire_os/empire_os/data/prompts/verifier_engineering_strategist.txt"
+    },
+    {
+      "name": "verilog_rtl_architect",
+      "slug": "verilog-rtl-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/verilog_rtl_architect.txt"
+    },
+    {
+      "name": "video_gen_prompting",
+      "slug": "video-gen-prompting",
+      "path": "/root/empire_os/empire_os/data/prompts/video_gen_prompting.txt"
+    },
+    {
+      "name": "web_agent_failure_diagnostician",
+      "slug": "web-agent-failure-diagnostician",
+      "path": "/root/empire_os/empire_os/data/prompts/web_agent_failure_diagnostician.txt"
+    },
+    {
+      "name": "web_quality_auditor",
+      "slug": "web-quality-auditor",
+      "path": "/root/empire_os/empire_os/data/prompts/web_quality_auditor.txt"
+    },
+    {
+      "name": "website_clone_architect",
+      "slug": "website-clone-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/website_clone_architect.txt"
+    },
+    {
+      "name": "webswarm_deep_wide_research_orchestrator",
+      "slug": "webswarm-deep-wide-research-orchestrator",
+      "path": "/root/empire_os/empire_os/data/prompts/webswarm_deep_wide_research_orchestrator.txt"
+    },
+    {
+      "name": "webwright_browser_agent",
+      "slug": "webwright-browser-agent",
+      "path": "/root/empire_os/empire_os/data/prompts/webwright_browser_agent.txt"
+    },
+    {
+      "name": "workspace_isolated_agent_os_architect",
+      "slug": "workspace-isolated-agent-os-architect",
+      "path": "/root/empire_os/empire_os/data/prompts/workspace_isolated_agent_os_architect.txt"
+    },
+    {
+      "name": "✏️All-around Writer (Professional Version)",
+      "slug": "all-around-writer-professional-version",
+      "path": "/root/empire_os/empire_os/data/prompts/✏️All-around Writer (Professional Version).md"
+    },
+    {
+      "name": "👌Academic Assistant Pro",
+      "slug": "academic-assistant-pro",
+      "path": "/root/empire_os/empire_os/data/prompts/👌Academic Assistant Pro.md"
+    },
+    {
+      "name": "💻Professional Coder",
+      "slug": "professional-coder",
+      "path": "/root/empire_os/empire_os/data/prompts/💻Professional Coder.md"
+    },
+    {
+      "name": "📗All-around Teacher",
+      "slug": "all-around-teacher",
+      "path": "/root/empire_os/empire_os/data/prompts/📗All-around Teacher.md"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "lead-filter-agent",
+  "script": "/root/venv/bin/python3",
+  "args": "-m empire_os.lead_filter_service",
+  "cwd": "/root/empire_os",
+  "env": {
+    "FILTER_INTERVAL": "120",
+    "EMPIRE_HUB_URL": "http://10.218.155.218:8080",
+    "TWO_FA_SECRET": "empire-os-default-secret",
+    "TOTP_TTL_SECONDS": "300"
+  },
+  "instances": 1,
+  "autorestart": true,
+  "watch": false,
+  "max_memory_restart": "500M",
+  "log_date_format": "YYYY-MM-DD HH:mm:ss Z",
+  "error_file": "/root/.pm2/logs/lead-filter-error.log",
+  "out_file": "/root/.pm2/logs/lead-filter-out.log"
+}

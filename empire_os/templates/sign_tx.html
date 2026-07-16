@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Empire OS — Sign Batched Payouts</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0b1120;color:#e2e8f0;min-height:100vh;display:flex}
+.container{max-width:720px;margin:auto;padding:2rem;width:100%}
+h1{font-size:1.5rem;font-weight:700;margin-bottom:.25rem;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:#94a3b8;margin-bottom:2rem;font-size:.9rem}
+.card{background:#1e293b;border-radius:12px;padding:1.5rem;border:1px solid #334155;margin-bottom:1rem}
+.card h2{font-size:1rem;color:#94a3b8;margin-bottom:.5rem;font-weight:500}
+.value{font-size:1.75rem;font-weight:700;color:#f1f5f9}
+.value.usdc{color:#34d399}
+.row{display:flex;gap:1rem}
+.row .card{flex:1}
+button{padding:.75rem 1.5rem;border:none;border-radius:8px;font-weight:600;font-size:1rem;cursor:pointer;transition:all .15s}
+button:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:linear-gradient(135deg,#60a5fa,#7c3aed);color:#fff}
+.btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 20px rgba(96,165,250,.3)}
+.btn-secondary{background:#334155;color:#e2e8f0}
+.btn-success{background:#059669;color:#fff}
+.btn-danger{background:#dc2626;color:#fff}
+.status{background:#0f172a;border-radius:8px;padding:1rem;font-family:'SF Mono','Fira Code','Cascadia Code',monospace;font-size:.8rem;line-height:1.5;margin-top:1rem;max-height:200px;overflow-y:auto;white-space:pre-wrap;color:#94a3b8}
+.status.ok{border-left:3px solid #34d399}
+.status.err{border-left:3px solid #ef4444}
+.connected{display:flex;align-items:center;gap:.75rem}
+.dot{width:8px;height:8px;border-radius:50%}
+.dot.green{background:#34d399}
+.dot.red{background:#ef4444}
+.addr{color:#94a3b8;font-family:monospace;font-size:.8rem}
+.actions{display:flex;gap:.75rem;flex-wrap:wrap}
+.batch-progress{color:#60a5fa;font-size:1rem;font-weight:600}
+.batch-progress.complete{color:#34d399}
+.progress-bar{background:#0f172a;border-radius:99px;height:6px;margin:.5rem 0 1rem;overflow:hidden}
+.progress-bar-fill{background:linear-gradient(90deg,#60a5fa,#a78bfa);height:100%;border-radius:99px;transition:width .3s}
+#result{display:none}
+#result.visible{display:block}
+#verify-btn-wrap{display:none;margin-top:1rem}
+code{background:#0f172a;padding:.15em .4em;border-radius:4px;font-size:.85em;color:#e2e8f0}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>⚡ Sign Batched Payouts</h1>
+  <p class="subtitle">Pay $<span id="total-usdc">—</span> across <span id="total-batches">—</span> transactions.</p>
+
+  <div class="row">
+    <div class="card"><h2>Total Payouts</h2><div class="value" id="total-payouts">—</div></div>
+    <div class="card"><h2>Total USDC</h2><div class="value usdc" id="total-usdc-display">—</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Progress</h2>
+    <div class="batch-progress" id="batch-label">Loading...</div>
+    <div class="progress-bar"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    <div class="row">
+      <div class="card"><h2>Signed</h2><div class="value" id="signed-count" style="font-size:1.25rem">0</div></div>
+      <div class="card"><h2>Remaining</h2><div class="value" id="remaining-count" style="font-size:1.25rem">—</div></div>
+    </div>
+  </div>
+
+  <div class="card" id="batch-card">
+    <h2 id="batch-title">Batch 1 / —</h2>
+    <div id="batch-detail">Fetching transactions...</div>
+    <div id="batch-amount" style="font-size:1.5rem;font-weight:700;color:#34d399;margin-top:.5rem"></div>
+  </div>
+
+  <div class="card">
+    <h2>Wallet</h2>
+    <div id="wallet-status">
+      <button id="connect-btn" class="btn-primary" onclick="connect()">🔌 Connect Wallet</button>
+    </div>
+    <div id="wallet-info" class="connected" style="display:none">
+      <span class="dot green"></span>
+      <span id="wallet-name"></span>
+      <span class="addr" id="wallet-addr"></span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="sign-btn" class="btn-primary" disabled onclick="signNext()">
+      ✍️ Sign &amp; Submit Batch 1
+    </button>
+    <button id="skip-btn" class="btn-secondary" onclick="skipBatch()" style="display:none">
+      ⏭ Skip (sign later)
+    </button>
+  </div>
+
+  <div id="result" class="card">
+    <h2>Activity Log</h2>
+    <div id="result-content" class="status"></div>
+  </div>
+
+  <div id="verify-btn-wrap">
+    <button id="verify-btn" class="btn-success" onclick="verifyAll()">✅ Verify All On-Chain</button>
+    <div id="verify-result" class="status" style="margin-top:1rem"></div>
+  </div>
+</div>
+
+<script src="/static/solana-web3.iife.min.js"></script>
+<script>
+const HUB = '';
+let connection = null;
+let publicKey = null;
+let walletProvider = null;
+let batches = [];
+let currentBatch = 0;
+let pendingSignatures = [];
+let allDone = false;
+
+function bytesToBase64(bytes) {
+  // Binary-safe base64 encode. Avoids spread-stack blowup AND UTF-8 mangling.
+  // String.fromCharCode on bytes >= 128 produces code units that btoa interprets
+  // as UTF-8, corrupting the binary data. Build the latin-1 string manually.
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i] & 0xff);
+  return btoa(s);
+}
+
+function base64ToBytesCompat(b64) {
+  // Binary-safe base64 decode for signed transactions.
+  const bin = atob(b64);
+  const b = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+  return b;
+}
+
+async function loadBatches() {
+  try {
+    const resp = await fetch(HUB + '/v1/payouts/batch-tx', {method:'POST'});
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.batch_count === undefined) {
+      document.getElementById('batch-detail').textContent = data.message || 'No pending payouts.';
+      document.getElementById('batch-title').textContent = '📭 Nothing to sign';
+      return;
+    }
+    batches = data.transactions || [];
+    document.getElementById('total-payouts').textContent = data.total_payouts;
+    document.getElementById('total-usdc').textContent = '$' + numberWithCommas(data.total_amount_usdc);
+    document.getElementById('total-usdc-display').textContent = '$' + numberWithCommas(data.total_amount_usdc);
+    document.getElementById('total-batches').textContent = batches.length;
+    document.getElementById('remaining-count').textContent = batches.length;
+    document.getElementById('progress-fill').style.width = '0%';
+    if (batches.length === 0) {
+      document.getElementById('batch-detail').textContent = 'No transactions to sign.';
+      return;
+    }
+    document.getElementById('skip-btn').style.display = batches.length > 1 ? 'inline-block' : 'none';
+    showBatch(0);
+    log('Loaded ' + batches.length + ' batches (' + data.total_payouts + ' payouts, $' + numberWithCommas(data.total_amount_usdc) + ')', 'ok');
+  } catch(e) {
+    document.getElementById('batch-detail').textContent = 'Failed: ' + e.message;
+    log('Failed to load batches: ' + e.message, 'err');
+  }
+}
+
+function showBatch(idx) {
+  if (idx >= batches.length) {
+    document.getElementById('batch-title').textContent = '✅ All Batches Signed!';
+    document.getElementById('batch-detail').textContent = 'All ' + batches.length + ' transactions have been submitted.';
+    document.getElementById('batch-amount').textContent = '';
+    document.getElementById('sign-btn').style.display = 'none';
+    document.getElementById('skip-btn').style.display = 'none';
+    document.getElementById('verify-btn-wrap').style.display = 'block';
+    allDone = true;
+    return;
+  }
+  const b = batches[idx];
+  const usdc = '$' + numberWithCommas(b.amount_usdc);
+  document.getElementById('batch-title').textContent = 'Batch ' + (idx+1) + ' / ' + batches.length;
+  document.getElementById('batch-detail').textContent = b.count + ' payout' + (b.count > 1 ? 's' : '') + ' — ' + b.tx_bytes + ' bytes';
+  document.getElementById('batch-amount').textContent = usdc;
+  document.getElementById('sign-btn').textContent = '✍️ Sign & Submit Batch ' + (idx+1);
+  document.getElementById('sign-btn').disabled = !publicKey;
+  document.getElementById('batch-label').textContent = 'Batch ' + (idx+1) + ' of ' + batches.length;
+  document.getElementById('signed-count').textContent = idx;
+  document.getElementById('remaining-count').textContent = batches.length - idx;
+  document.getElementById('progress-fill').style.width = ((idx / batches.length) * 100) + '%';
+}
+
+function numberWithCommas(x) {
+  return Number(x).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+async function connect() {
+  if (window.solana && window.solana.isPhantom) {
+    walletProvider = window.solana;
+  } else if (window.backpack) {
+    walletProvider = window.backpack;
+  } else if (window.solana) {
+    walletProvider = window.solana;
+  } else {
+    log('No Solana wallet found. Install Phantom.', 'err');
+    return;
+  }
+  try {
+    const resp = await walletProvider.connect({onlyIfTrusted: false});
+    publicKey = resp.publicKey;
+    document.getElementById('connect-btn').style.display = 'none';
+    document.getElementById('wallet-info').style.display = 'flex';
+    document.getElementById('wallet-name').textContent = walletProvider.isPhantom ? '🦊 Phantom' : '🔌 Wallet';
+    document.getElementById('wallet-addr').textContent = publicKey.toBase58().slice(0,8) + '...' + publicKey.toBase58().slice(-4);
+    if (batches.length > 0 && currentBatch < batches.length) {
+      document.getElementById('sign-btn').disabled = false;
+    }
+    log('Connected: ' + publicKey.toBase58(), 'ok');
+  } catch(e) {
+    log('Connection rejected: ' + e.message, 'err');
+  }
+}
+
+async function signNext() {
+  if (!walletProvider || currentBatch >= batches.length) return;
+  const b = batches[currentBatch];
+  document.getElementById('sign-btn').disabled = true;
+  document.getElementById('sign-btn').textContent = '⏳ Signing batch ' + (currentBatch+1) + '...';
+  try {
+    const bytes = base64ToBytesCompat(b.transaction_base64);
+    const tx = solanaWeb3.VersionedTransaction.deserialize(bytes);
+    log('Deserialized batch ' + (currentBatch+1) + ' (' + bytes.length + ' bytes)', 'ok');
+    const signedTx = await walletProvider.signTransaction(tx);
+    const rawTx = signedTx.serialize();
+    // Submit via the hub's server-side RPC — bypasses Phantom dApp browser
+    // blocking client-side RPC calls to external endpoints.
+    const submitB64 = bytesToBase64(rawTx);
+    const submitResp = await fetch('/v1/payouts/submit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({signed_tx_base64: submitB64, batch_index: currentBatch})
+    });
+    const submitData = await submitResp.json();
+    if (!submitData.ok) {
+      throw new Error(JSON.stringify(submitData.error || submitData));
+    }
+    const sig = submitData.signature;
+    pendingSignatures.push(sig);
+    log('✅ Batch ' + (currentBatch+1) + ' submitted: ' + sig.slice(0,20) + '...', 'ok');
+    // Auto-verify on submit so payouts get marked paid without an extra click.
+    try {
+      const vr = await fetch(HUB + '/v1/payouts/verify-batch', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tx_signature: sig})
+      });
+      const vd = await vr.json();
+      if (vd.ok) {
+        log('   → verified & marked paid', 'ok');
+      } else {
+        log('   → verify pending: ' + (vd.message || '...'), '');
+      }
+    } catch(e) {
+      log('   → verify call failed: ' + e.message, 'err');
+    }
+    currentBatch++;
+    showBatch(currentBatch);
+    if (currentBatch < batches.length) {
+      document.getElementById('sign-btn').disabled = false;
+    }
+  } catch(e) {
+    log('❌ Batch ' + (currentBatch+1) + ' failed: ' + e.message, 'err');
+    document.getElementById('sign-btn').disabled = false;
+    document.getElementById('sign-btn').textContent = '✍️ Retry Batch ' + (currentBatch+1);
+  }
+}
+
+function skipBatch() {
+  if (currentBatch >= batches.length) return;
+  log('⏭ Skipped batch ' + (currentBatch+1), '');
+  currentBatch++;
+  showBatch(currentBatch);
+  if (currentBatch < batches.length) {
+    document.getElementById('sign-btn').disabled = false;
+  }
+}
+
+async function verifyAll() {
+  if (pendingSignatures.length === 0) return;
+  document.getElementById('verify-btn').disabled = true;
+  document.getElementById('verify-btn').textContent = '⏳ Verifying...';
+  let ok = 0, fail = 0;
+  for (const sig of pendingSignatures) {
+    try {
+      const r = await fetch(HUB + '/v1/payouts/verify-batch', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tx_signature: sig})
+      });
+      const data = await r.json();
+      if (data.ok) ok++; else fail++;
+      log('Sig ' + sig.slice(0,16) + '... → ' + (data.ok ? '✅ verified' : '⚠️ ' + (data.message || '?')), data.ok ? 'ok' : 'err');
+    } catch(e) {
+      fail++;
+      log('Verify error: ' + e.message, 'err');
+    }
+  }
+  const msg = '✅ ' + ok + ' verified, ⚠️ ' + fail + ' failed';
+  document.getElementById('verify-result').className = 'status ' + (fail === 0 ? 'ok' : 'err');
+  document.getElementById('verify-result').textContent = msg;
+  document.getElementById('verify-btn').textContent = '✅ Done';
+  document.getElementById('batch-label').textContent = '✅ All done!';
+  document.getElementById('batch-label').className = 'batch-progress complete';
+}
+
+function log(msg, type) {
+  const el = document.getElementById('result');
+  el.classList.add('visible');
+  const c = document.getElementById('result-content');
+  c.className = 'status ' + (type || '');
+  // Prepend newest to top
+  const line = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  c.textContent = c.textContent ? line + '\n' + c.textContent : line;
+}
+
+loadBatches();
+</script>
+</body>
+</html>

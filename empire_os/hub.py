@@ -1382,8 +1382,8 @@ def outreach_get(prospect_id: str):
 
 
 @app.get("/v1/outreach/prospects/pending")
-def outreach_pending(metro: str = None, limit: int = 20):
-    """List cold prospects (or by metro) the outreach agent should review."""
+def outreach_pending(metro: str = None, niche: str = None, limit: int = 20):
+    """List cold prospects (or by metro/niche) the outreach agent should review."""
     if not backend:
         raise HTTPException(503, "backend not initialized")
     try:
@@ -1410,7 +1410,9 @@ def outreach_pending(metro: str = None, limit: int = 20):
     """
     if metro:
         q += f" AND metro='{metro}'"
-    q += f" ORDER BY score DESC LIMIT {limit}"
+    if niche:
+        q += f" AND niche='{niche}'"
+    q += f" ORDER BY (email IS NOT NULL AND email != '') DESC, score DESC LIMIT {limit}"
     rows = backend.execute(q).fetchall()
     return {
         "prospects": [
@@ -6294,4 +6296,5 @@ if __name__ == "__main__":
         port=port,
         log_level=log_level,
         reload=bool(os.environ.get("EMPIRE_RELOAD", "0") == "1"),
+        workers=int(os.environ.get("EMPIRE_WORKERS", "2")),
     )

@@ -1,0 +1,21 @@
+{
+  "name": "reddit-sniper-agent",
+  "script": "/root/venv/bin/python3",
+  "args": "-m empire_os.reddit_service",
+  "cwd": "/root/empire_os",
+  "env": {
+    "REDDIT_POLL_INTERVAL": "900",
+    "REDDIT_CLIENT_ID": "",
+    "REDDIT_CLIENT_SECRET": "",
+    "LEAD_SCORE_THRESHOLD": "50",
+    "SCOUT_OUTPUT_PATH": "/root/.empire/scout_output.json",
+    "EMPIRE_HUB_URL": "http://10.218.155.218:8080"
+  },
+  "instances": 1,
+  "autorestart": true,
+  "watch": false,
+  "max_memory_restart": "500M",
+  "log_date_format": "YYYY-MM-DD HH:mm:ss Z",
+  "error_file": "/root/.pm2/logs/reddit-sniper-error.log",
+  "out_file": "/root/.pm2/logs/reddit-sniper-out.log"
+}

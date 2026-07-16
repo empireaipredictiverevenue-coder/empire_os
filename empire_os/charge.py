@@ -1,0 +1,365 @@
+"""
+Charge adapter - processor-agnostic buyer charging.
+
+Processors (in priority order):
+  USDC (Solana) - real money, on-chain reconciliation via memo
+  PayPal       - if PAYPAL_CLIENT_ID + PAYPAL_CLIENT_SECRET are set
+  simulated    - fallback when no creds / no buyer wallet
+
+Stripe was removed from this layer because (a) we have a working
+USDC path that doesn't need a third party, and (b) Stripe-card
+charges require the buyer to have set up a saved card in our Stripe
+Customer object which we don't operate.
+
+Note: payout.py STILL uses Stripe for paying humans/lane-owners
+(via /v1/finance/payout). That pathway is separate from the
+buyer-charge layer you're looking at here.
+
+Returns ChargeResult shape:
+{
+    "charge_id":   "chg_...",
+    "status":      "succeeded" | "simulated" | "failed",
+    "processor":   "usdc" | "paypal" | "simulated",
+    "amount_cents": 1500,
+    "currency":    "USDC" | "USD",
+    "fallback":    bool,
+    "processor_response": <truncated dict>,
+    "pay_url":     <only when usdc>,
+    "memo":        <only when usdc>,
+}
+"""
+from __future__ import annotations
+
+import json
+import os
+import secrets
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+try:
+    from empire_os.crypto_charge import (
+        charge_crypto, get_buyer_wallet as _cc_get_wallet,
+    )
+    _HAS_CRYPTO = True
+except Exception:
+    _HAS_CRYPTO = False
+
+
+DB = "/root/empire_os/empire_os.db"
+HUB = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _post_to_hub(path: str, body: dict) -> bool:
+    """Best-effort POST to hub. Returns True if accepted (2xx)."""
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            f"{HUB}{path}",
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST")
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            return resp.status in (200, 201)
+    except Exception:
+        return False
+
+
+def _get_pm_from_hub(buyer_id: str) -> Optional[dict]:
+    """Fetch buyer's default payment method from the hub (canonical).
+
+    Hub is the source of truth for buyer payment methods. Each
+    container has its own db mirror that's used as a fallback.
+    """
+    try:
+        import urllib.request, urllib.parse
+        url = (f"{HUB}/v1/ppc/buyer_pms?buyer_id="
+               + urllib.parse.quote(buyer_id))
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            pms = json.loads(resp.read().decode()).get("pms", [])
+            for p in pms:
+                if p.get("is_default") and not p.get("deleted_at"):
+                    return p
+            return pms[0] if pms else None
+    except Exception:
+        return None
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+# ── Processor selection ──────────────────────────────────────────────
+
+def _has_paypal() -> bool:
+    return bool(os.environ.get("PAYPAL_CLIENT_ID", "").strip()
+               and os.environ.get("PAYPAL_CLIENT_SECRET", "").strip())
+
+
+def _has_crypto(buyer_id: str = "") -> bool:
+    """USDC-on-Solana is available if (a) Solana deps present and
+    (b) buyer has a wallet stored in si_buyer_payment_methods."""
+    if not _HAS_CRYPTO:
+        return False
+    if not buyer_id:
+        return True  # capability check; will degrade to simulated
+    return bool(_cc_get_wallet(buyer_id))
+
+
+def pick_processor(buyer_id: str = "") -> str:
+    """Priority: crypto (real USDC) > paypal > simulated.
+
+    Crypto wins because (a) the receiver is the vault address we
+    already control, (b) memo-based reconciliation is reliable,
+    (c) it requires no third-party auth.
+
+    Stripe intentionally absent in this build (was removed).
+    """
+    if _has_crypto(buyer_id):
+        return "usdc"
+    if _has_paypal():
+        return "paypal"
+    return "simulated"
+
+
+# ── Buyer payment method retrieval ───────────────────────────────────
+
+def get_default_pm(buyer_id: str) -> Optional[dict]:
+    """Get the buyer's default payment method.
+
+    Hub-first: each container has its own db mirror; hub is canonical.
+    Falls back to local DB if hub unreachable.
+    """
+    # Hub first (canonical)
+    pm = _get_pm_from_hub(buyer_id)
+    if pm:
+        return pm
+    # Local fallback
+    con = sqlite3.connect(DB)
+    con.row_factory = sqlite3.Row
+    row = con.execute(
+        "SELECT * FROM si_buyer_payment_methods "
+        "WHERE buyer_id=? AND is_default=1 AND deleted_at IS NULL "
+        "ORDER BY id DESC LIMIT 1",
+        (buyer_id,)).fetchone()
+    con.close()
+    return dict(row) if row else None
+
+
+def list_payment_methods(buyer_id: str) -> list[dict]:
+    con = sqlite3.connect(DB)
+    con.row_factory = sqlite3.Row
+    rows = con.execute(
+        "SELECT * FROM si_buyer_payment_methods "
+        "WHERE buyer_id=? AND deleted_at IS NULL ORDER BY id DESC",
+        (buyer_id,)).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def add_payment_method(buyer_id: str, processor: str,
+                       customer_ref: str, payment_ref: str = "",
+                       brand: str = "", last4: str = "",
+                       is_default: int = 1) -> int:
+    """Persist a buyer's stored payment method."""
+    con = sqlite3.connect(DB)
+    if is_default:
+        # Clear existing defaults for that buyer/processor
+        con.execute(
+            "UPDATE si_buyer_payment_methods "
+            "SET is_default=0 WHERE buyer_id=? AND processor=?",
+            (buyer_id, processor))
+    cur = con.execute(
+        "INSERT OR IGNORE INTO si_buyer_payment_methods "
+        "(buyer_id, processor, customer_ref, payment_ref, brand, last4,"
+        " is_default, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (buyer_id, processor, customer_ref, payment_ref, brand, last4,
+         is_default, now_iso()))
+    con.commit()
+    new_id = cur.lastrowid
+    con.close()
+    return new_id
+
+
+# ── Charge execution per processor ──────────────────────────────────
+
+def _charge_paypal(customer_ref: str, amount_cents: int,
+                   currency: str, description: str) -> dict:
+    """PayPal billing agreement capture (simulated structure)."""
+    try:
+        import urllib.request, urllib.error, urllib.parse
+        client_id = os.environ["PAYPAL_CLIENT_ID"]
+        secret = os.environ["PAYPAL_CLIENT_SECRET"]
+        base = "https://api-m.paypal.com"  # live; sandbox = api-m.sandbox.paypal.com
+        # Get access token
+        token_req = urllib.request.Request(
+            f"{base}/v1/oauth2/token",
+            data=urllib.parse.urlencode({"grant_type": "client_credentials"})
+                  .encode(),
+            headers={"Accept": "application/json",
+                     "Accept-Language": "en_US"},
+            method="POST")
+        import base64 as _b64
+        auth = _b64.b64encode(f"{client_id}:{secret}".encode()).decode()
+        token_req.add_header("Authorization", f"Basic {auth}")
+        with urllib.request.urlopen(token_req, timeout=10) as r:
+            tok = json.loads(r.read().decode()).get("access_token", "")
+        # Capture from billing agreement
+        cap_req = urllib.request.Request(
+            f"{base}/v1/payments/billing-agreements/{customer_ref}/agreement-execute",
+            data=json.dumps({}).encode(),
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {tok}"},
+            method="POST")
+        with urllib.request.urlopen(cap_req, timeout=10) as r2:
+            return {"ok": True,
+                    "raw": json.loads(r2.read().decode())}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+
+def _charge_stripe_disabled(customer_ref: str, payment_ref: str,
+                            amount_cents: int, currency: str,
+                            description: str) -> dict:
+    """Stripe charge - DISABLED in this build.
+
+    Returns {'ok': False, 'error': 'stripe_disabled'} so any
+    legacy code path that still names 'stripe' silently fails
+    without falling back (operators explicitly chose to remove
+    Stripe from the buyer-charge layer).
+    """
+    return {"ok": False, "error": "stripe_disabled",
+            "note": "Stripe was removed from buyer-charges in this build"}
+
+
+# ── Public charge() — auto-picks + records ─────────────────────────
+
+def charge(buyer_id: str, head: int, reason: str,
+           amount_cents: int, currency: str = "USD",
+           call_id: str = "", lead_id: str = "",
+           force_processor: str = "") -> dict:
+    """Charge a buyer. Auto-picks processor from env / stored PMs.
+
+    Returns ChargeResult. Always writes si_charges row. May call
+    real processor if creds available, else returns
+    status='simulated'.
+    """
+    charge_id = "chg_" + secrets.token_hex(8)
+    pm = get_default_pm(buyer_id)
+    # Pick the credit-rail based on processor. Crypto wins if buyer
+    # has a stored wallet - it actually moves money on-chain.
+    processor = force_processor
+    if not processor:
+        if pm:
+            processor = pm["processor"]
+        else:
+            processor = pick_processor(buyer_id)
+    # Pick the credit-rail based on processor
+    if processor == "usdc":
+        crypto_res = charge_crypto(
+            buyer_id=buyer_id, head=head, reason=reason,
+            amount_usdc=max(1, amount_cents / 100),
+            call_id=call_id, lead_id=lead_id)
+        resp = {"ok": crypto_res.get("status") != "failed",
+                "raw": crypto_res,
+                "pay_url": crypto_res.get("pay_url"),
+                "memo": crypto_res.get("memo"),
+                "matched_tx": crypto_res.get("matched_tx")}
+        status = crypto_res.get("status", "failed")
+    elif processor == "stripe":
+        # Stripe was removed in this build. Force-fail so any
+        # legacy si_buyer_payment_methods rows tagged 'stripe' do
+        # NOT silently fall back to simulated.
+        customer_ref = pm["customer_ref"] if pm else ""
+        payment_ref = pm["payment_ref"] if pm else ""
+        resp = _charge_stripe_disabled(customer_ref, payment_ref,
+                                       amount_cents, currency,
+                                       f"head{head}: {reason}")
+    elif processor == "paypal":
+        customer_ref = pm["customer_ref"] if pm else ""
+        resp = _charge_paypal(customer_ref, amount_cents,
+                              currency, f"head{head}: {reason}")
+    else:  # simulated
+        processor = "simulated"
+        resp = {"ok": True, "simulated": True,
+                "note": "no payment processor configured"}
+
+    if resp.get("ok") and not resp.get("simulated") and processor != "usdc":
+        status = "succeeded"
+    elif resp.get("ok") and processor != "usdc":
+        status = "simulated"
+    elif processor == "usdc":
+        status = resp.get("raw", {}).get("status", status)
+    else:
+        status = "failed"
+        processor = "simulated"
+
+    # Persist
+    con = sqlite3.connect(DB)
+    con.execute(
+        "INSERT INTO si_charges "
+        "(charge_id, buyer_id, processor, customer_ref, payment_ref, "
+        "head, reason, amount_cents, currency, status, "
+        "processor_response, attempt_count, created_at, paid_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+        (charge_id, buyer_id, processor,
+         pm["customer_ref"] if pm else "",
+         pm["payment_ref"] if pm else "",
+         head, reason[:200], amount_cents, currency, status,
+         json.dumps(resp)[:1000],
+         now_iso(),
+         now_iso() if status == "succeeded" else None))
+    con.commit()
+    con.close()
+
+    return {
+        "charge_id": charge_id,
+        "status": status,
+        "processor": processor,
+        "amount_cents": amount_cents,
+        "currency": currency,
+        "fallback": not resp.get("ok") if hasattr(resp, "get") else False,
+        "processor_response": json.dumps(resp)[:500],
+    }
+
+
+# ── Convenience: settle a PPC invoice ──────────────────────────────
+
+def settle_ppc_invoice(invoice_id: str) -> dict:
+    """Mark an existing ppc invoice as paid (after charge succeeds)."""
+    con = sqlite3.connect(DB)
+    con.row_factory = sqlite3.Row
+    row = con.execute(
+        "SELECT * FROM si_ppc_invoices WHERE invoice_id=?",
+        (invoice_id,)).fetchone()
+    if not row:
+        con.close()
+        return {"ok": False, "error": "invoice_not_found"}
+    inv = dict(row)
+    con.execute("UPDATE si_charges SET ledger_id=? WHERE charge_id=?",
+                (invoice_id, inv["charge_id"]))
+    con.execute(
+        "UPDATE si_ppc_invoices SET status='paid', paid_at=? "
+        "WHERE invoice_id=?",
+        (now_iso(), invoice_id))
+    con.commit()
+    con.close()
+    return {"ok": True, "invoice_id": invoice_id, "status": "paid"}
+
+
+# ── CLI / introspection ─────────────────────────────────────────────
+
+if __name__ == "__main__":
+    print("[charge] active processors:")
+    print("  Stripe:    removed from buyer-charges (use /v1/finance/payout for vendor payouts)")
+    print(f"  USDC:      {'yes' if _HAS_CRYPTO else 'no (solana deps missing)'}")
+    print(f"  PayPal:    {'yes' if _has_paypal() else 'no'}")
+    print(f"  Simulated:  "
+          f"{'default' if not (_has_paypal() or _HAS_CRYPTO) else 'fallback'}")
+    print(f"\n[charge] selected for a new invoice: {pick_processor()}")

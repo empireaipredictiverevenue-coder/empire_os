@@ -1,0 +1,680 @@
+{
+  "version": 1,
+  "agents": {
+    "ai-seo-agent": {
+      "role": "ai_seo_agent",
+      "container": "ai-seo-agent",
+      "ip": "10.118.155.42 (eth0)",
+      "log_path": "/root/ai_seo_agent/ai_seo_agent.log",
+      "health_url": null,
+      "depends_on": [],
+      "description": "Auto-discovered ai_seo_agent agent",
+      "registered_at": "2026-07-13T08:38:52.010186+00:00"
+    },
+    "seo-agent": {
+      "role": "seo_agent",
+      "container": "seo-agent",
+      "ip": "10.118.155.228 (eth0)",
+      "log_path": "/root/seo_agent/agent.log",
+      "health_url": null,
+      "depends_on": [],
+      "description": "Auto-discovered seo_agent agent",
+      "registered_at": "2026-07-13T08:38:57.773518+00:00"
+    },
+    "empire-hub": {
+      "role": "hub",
+      "container": "empire-hub",
+      "ip": "10.118.155.218 (eth0)",
+      "log_path": "/root/hub_lanes.log",
+      "health_url": "http://localhost:8081",
+      "depends_on": [],
+      "description": "Empire OS core hub",
+      "registered_at": "2026-07-13T08:39:05.579718+00:00"
+    },
+    "agi-scout": {
+      "role": "agi-scout",
+      "container": "agi-scout",
+      "ip": "10.218.156.63 (eth0)",
+      "log_path": "/var/log/agi-scout.log",
+      "health_url": "http://localhost:9091",
+      "depends_on": [],
+      "description": "AGI market intelligence",
+      "registered_at": "2026-07-13T08:39:05.767253+00:00"
+    },
+    "agi-marketing": {
+      "role": "agi-marketing",
+      "container": "agi-marketing",
+      "ip": "",
+      "log_path": "/var/log/agi-marketing.log",
+      "health_url": "http://localhost:9092",
+      "depends_on": [],
+      "description": "AGI content generation",
+      "registered_at": "2026-07-13T08:39:05.969671+00:00"
+    },
+    "storm-agent": {
+      "role": "storm_agent",
+      "container": "storm-agent",
+      "ip": "10.118.155.65 (eth0)",
+      "log_path": "/root/storm_agent/storm_agent.log",
+      "health_url": null,
+      "depends_on": [],
+      "description": "Storm/weather signal pipeline",
+      "registered_at": "2026-07-13T08:39:06.165767+00:00"
+    },
+    "lead-filter": {
+      "role": "lead_filter",
+      "container": "lead-filter",
+      "ip": "10.118.155.241 (eth0)",
+      "log_path": "/root/lead_filter/lead_filter.log",
+      "health_url": null,
+      "depends_on": [],
+      "description": "Lead qualification",
+      "registered_at": "2026-07-13T08:39:06.361506+00:00"
+    },
+    "reddit-sniper": {
+      "role": "reddit_sniper",
+      "container": "reddit-sniper",
+      "ip": "10.118.155.116 (eth0)",
+      "log_path": "/root/reddit_sniper/reddit_sniper.log",
+      "health_url": null,
+      "depends_on": [],
+      "description": "Reddit lead capture",
+      "registered_at": "2026-07-13T08:39:06.550721+00:00"
+    },
+    "satellite-agent": {
+      "role": "satellite_agent",
+      "container": "satellite-agent",
+      "ip": "10.118.155.27 (eth0)",
+      "log_path": "/root/satellite_agent/satellite_agent.log",
+      "health_url": null,
+      "depends_on": [],
+      "description": "Satellite imagery",
+      "registered_at": "2026-07-13T08:39:06.722181+00:00"
+    },
+    "mesh-agent": {
+      "role": "mesh",
+      "container": "mesh-agent",
+      "ip": "10.118.155.135 (eth0)",
+      "log_path": "/root/mesh/mesh.log",
+      "health_url": "http://localhost:9095/health",
+      "depends_on": [],
+      "description": "mesh agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T08:39:56.515469+00:00"
+    },
+    "business-agent": {
+      "role": "business",
+      "container": "business-agent",
+      "ip": "10.118.155.36 (eth0)",
+      "log_path": "/root/business/business.log",
+      "health_url": "http://localhost:9096/health",
+      "depends_on": [],
+      "description": "business agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T08:40:58.978453+00:00"
+    },
+    "growth-agent": {
+      "role": "growth",
+      "container": "growth-agent",
+      "ip": "10.118.155.154 (eth0)",
+      "log_path": "/root/growth/growth.log",
+      "health_url": "http://localhost:9097/health",
+      "depends_on": [],
+      "description": "growth agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T08:41:20.900411+00:00"
+    },
+    "scheduling-agent": {
+      "role": "scheduling",
+      "container": "scheduling-agent",
+      "ip": "10.118.155.245 (eth0)",
+      "log_path": "/root/scheduling/scheduling.log",
+      "health_url": "http://localhost:9099/health",
+      "depends_on": [],
+      "description": "scheduling agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T08:41:41.649580+00:00"
+    },
+    "engineering-agent": {
+      "role": "engineering",
+      "container": "engineering-agent",
+      "ip": "10.118.155.242 (eth0)",
+      "log_path": "/root/engineering/engineering.log",
+      "health_url": "http://localhost:9098/health",
+      "depends_on": [],
+      "description": "engineering agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T08:41:52.905973+00:00"
+    },
+    "copywriting-agent": {
+      "role": "copywriting",
+      "container": "copywriting-agent",
+      "ip": "10.118.155.232 (eth0)",
+      "log_path": "/root/copywriting/copywriting.log",
+      "health_url": "http://localhost:9100/health",
+      "depends_on": [],
+      "description": "Conversion copy generation",
+      "registered_at": "2026-07-13T08:47:50.942722+00:00"
+    },
+    "email-agent": {
+      "role": "email",
+      "container": "email-agent",
+      "ip": "10.118.155.226 (eth0)",
+      "log_path": "/root/email/email.log",
+      "health_url": "http://localhost:9101/health",
+      "depends_on": [],
+      "description": "Outreach email drafting + queue",
+      "registered_at": "2026-07-13T08:47:59.941112+00:00"
+    },
+    "predictive-agent": {
+      "role": "predictive",
+      "container": "predictive-agent",
+      "ip": "10.118.155.13 (eth0)",
+      "log_path": "/root/predictive/predictive.log",
+      "health_url": "http://localhost:9102/health",
+      "depends_on": [],
+      "description": "Predictive revenue + gap/leak/waste detector",
+      "registered_at": "2026-07-13T08:54:37.252503+00:00"
+    },
+    "design-agent": {
+      "role": "design",
+      "container": "design-agent",
+      "ip": "10.118.155.104 (eth0)",
+      "log_path": "/root/design/design.log",
+      "health_url": "http://localhost:9103/health",
+      "depends_on": [],
+      "description": "Design + UX + visual QA",
+      "registered_at": "2026-07-13T09:03:48.499793+00:00"
+    },
+    "funnel-agent": {
+      "role": "funnel",
+      "container": "funnel-agent",
+      "ip": "10.118.155.110 (eth0)",
+      "log_path": "/root/funnel/funnel.log",
+      "health_url": "http://localhost:9104/health",
+      "depends_on": [],
+      "description": "Funnel state ops + stuck-prospect detection",
+      "registered_at": "2026-07-13T09:03:55.772159+00:00"
+    },
+    "conversion-agent": {
+      "role": "conversion",
+      "container": "conversion-agent",
+      "ip": "10.118.155.80 (eth0)",
+      "log_path": "/root/conversion/conversion.log",
+      "health_url": "http://localhost:9106/health",
+      "depends_on": [],
+      "description": "A/B testing + CRO",
+      "registered_at": "2026-07-13T09:04:27.926458+00:00"
+    },
+    "traffic-agent": {
+      "role": "traffic",
+      "container": "traffic-agent",
+      "ip": "10.118.155.148 (eth0)",
+      "log_path": "/root/traffic/traffic.log",
+      "health_url": "http://localhost:9105/health",
+      "depends_on": [],
+      "description": "Channel ROI + traffic allocation",
+      "registered_at": "2026-07-13T09:04:39.363926+00:00"
+    },
+    "lead-deliverer-agent": {
+      "role": "lead_deliverer",
+      "container": "lead-deliverer-agent",
+      "ip": "10.118.155.237 (eth0)",
+      "log_path": "/root/lead_deliverer/lead_deliverer.log",
+      "health_url": "http://localhost:9107/health",
+      "depends_on": [],
+      "description": "lead_deliverer agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T12:07:43.201693+00:00",
+      "runtime": "host",
+      "note": "Runs on host (not in a container) because it shells out to incus exec to query empire-hub DB. PM2 process: empire-lead-deliverer."
+    },
+    "crawler-agent": {
+      "role": "crawler",
+      "container": "crawler-agent",
+      "ip": "10.118.155.183 (eth0)",
+      "log_path": "/root/crawler/crawler.log",
+      "health_url": "http://localhost:9110/health",
+      "depends_on": [],
+      "description": "crawler agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T15:32:29.603543+00:00"
+    },
+    "outreach-agent": {
+      "role": "outreach",
+      "container": "outreach-agent",
+      "ip": "10.118.155.112 (eth0)",
+      "log_path": "/root/outreach/outreach.log",
+      "health_url": "http://localhost:9120/health",
+      "depends_on": [],
+      "description": "outreach agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T15:42:31.898867+00:00"
+    },
+    "commander-agent": {
+      "role": "commander",
+      "container": "commander-agent",
+      "ip": "10.118.155.155 (eth0)",
+      "log_path": "/root/commander/commander.log",
+      "health_url": "http://localhost:9130/health",
+      "depends_on": [],
+      "description": "commander agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T16:18:42.742111+00:00"
+    },
+    "sim-agent": {
+      "role": "synthetic",
+      "container": "sim-agent",
+      "ip": "10.118.155.9 (eth0)",
+      "log_path": "/root/synthetic/synthetic.log",
+      "health_url": "http://localhost:9140/health",
+      "depends_on": [],
+      "description": "synthetic agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T16:27:11.716814+00:00"
+    },
+    "sales-agent": {
+      "role": "sales",
+      "container": "sales-agent",
+      "ip": "10.118.155.238 (eth0)",
+      "log_path": "/root/sales/sales.log",
+      "health_url": "http://localhost:9150/health",
+      "depends_on": [],
+      "description": "sales agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T17:04:08.894495+00:00"
+    },
+    "marketing-agent": {
+      "role": "marketing",
+      "container": "marketing-agent",
+      "ip": "10.118.155.187 (eth0)",
+      "log_path": "/root/marketing/marketing.log",
+      "health_url": "http://localhost:9160/health",
+      "depends_on": [],
+      "description": "marketing agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T17:07:28.567602+00:00"
+    },
+    "ppc-router": {
+      "role": "ppc",
+      "container": "ppc-router",
+      "ip": "10.118.155.138 (eth0)",
+      "log_path": "/root/ppc/ppc.log",
+      "health_url": "http://localhost:9200/health",
+      "depends_on": [],
+      "description": "ppc agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T21:00:48.576866+00:00"
+    },
+    "data-acq": {
+      "role": "data_acquisition",
+      "container": "data-acq",
+      "ip": "10.118.155.96 (eth0)",
+      "log_path": "/root/data_acquisition/data_acquisition.log",
+      "health_url": "http://localhost:9210/health",
+      "depends_on": [],
+      "description": "data_acquisition agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T21:18:31.973182+00:00"
+    },
+    "b2b-scraper": {
+      "role": "b2b_scraper",
+      "container": "b2b-scraper",
+      "ip": "10.118.155.85 (eth0)",
+      "log_path": "/root/b2b_scraper/b2b_scraper.log",
+      "health_url": "http://localhost:9240/health",
+      "depends_on": [],
+      "description": "b2b_scraper agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T21:48:01.272691+00:00"
+    },
+    "contractor-scraper": {
+      "role": "contractor_scraper",
+      "container": "contractor-scraper",
+      "ip": "10.118.155.92 (eth0)",
+      "log_path": "/root/contractor_scraper/contractor_scraper.log",
+      "health_url": "http://localhost:9250/health",
+      "depends_on": [],
+      "description": "contractor_scraper agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T21:49:16.877889+00:00"
+    },
+    "satellite-strike": {
+      "role": "satellite_strike",
+      "container": "satellite-strike",
+      "ip": "10.118.155.61 (eth0)",
+      "log_path": "/root/satellite_strike/satellite_strike.log",
+      "health_url": "http://localhost:9260/health",
+      "depends_on": [],
+      "description": "satellite_strike agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T21:50:39.613204+00:00"
+    },
+    "supervisor": {
+      "role": "supervisor",
+      "container": "supervisor",
+      "ip": "10.118.155.76 (eth0)",
+      "log_path": "/root/supervisor/supervisor.log",
+      "health_url": "http://localhost:9270/health",
+      "depends_on": [],
+      "description": "supervisor agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T21:55:49.456379+00:00"
+    },
+    "os-upgrade": {
+      "role": "os_upgrade",
+      "container": "os-upgrade",
+      "ip": "10.118.155.132 (eth0)",
+      "log_path": "/root/os_upgrade/os_upgrade.log",
+      "health_url": "http://localhost:9280/health",
+      "depends_on": [],
+      "description": "os_upgrade agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T21:57:28.430678+00:00"
+    },
+    "innovator": {
+      "role": "innovator",
+      "container": "innovator",
+      "ip": "10.118.155.52 (eth0)",
+      "log_path": "/root/innovator/innovator.log",
+      "health_url": "http://localhost:9290/health",
+      "depends_on": [],
+      "description": "innovator agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T21:59:06.381586+00:00"
+    },
+    "legal-compliance": {
+      "role": "legal_compliance",
+      "container": "legal-compliance",
+      "ip": "10.118.155.213 (eth0)",
+      "log_path": "/root/legal_compliance/legal_compliance.log",
+      "health_url": "http://localhost:9310/health",
+      "depends_on": [],
+      "description": "legal_compliance agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T22:01:47.468324+00:00"
+    },
+    "mass-tort": {
+      "role": "mass_tort",
+      "container": "mass-tort",
+      "ip": "10.118.155.143 (eth0)",
+      "log_path": "/root/mass_tort/mass_tort.log",
+      "health_url": "http://localhost:9330/health",
+      "depends_on": [],
+      "description": "mass_tort agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T22:39:46.518979+00:00"
+    },
+    "solana-listener": {
+      "role": "solana_listener",
+      "container": "solana-listener",
+      "ip": "10.118.155.111 (eth0)",
+      "log_path": "/root/solana_listener/solana_listener.log",
+      "health_url": "http://localhost:9340/health",
+      "depends_on": [],
+      "description": "solana_listener agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T23:14:03.211173+00:00"
+    },
+    "keyword-expert": {
+      "role": "keyword_expert",
+      "container": "keyword-expert",
+      "ip": "10.118.155.147 (eth0)",
+      "log_path": "/root/keyword_expert/keyword_expert.log",
+      "health_url": "http://localhost:9350/health",
+      "depends_on": [],
+      "description": "keyword_expert agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T23:31:47.710191+00:00"
+    },
+    "deep-research": {
+      "role": "deep_research",
+      "container": "deep-research",
+      "ip": "10.118.155.141 (eth0)",
+      "log_path": "/root/deep_research/deep_research.log",
+      "health_url": "http://localhost:9360/health",
+      "depends_on": [],
+      "description": "deep_research agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T23:33:41.603014+00:00"
+    },
+    "proposals-engine": {
+      "role": "proposals_engine",
+      "container": "proposals-engine",
+      "ip": "10.118.155.19 (eth0)",
+      "log_path": "/root/proposals_engine/proposals_engine.log",
+      "health_url": "http://localhost:9213/health",
+      "depends_on": [],
+      "description": "proposals_engine agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T23:39:46.633708+00:00"
+    },
+    "media-suite": {
+      "role": "media_suite",
+      "container": "media-suite",
+      "ip": "10.118.155.203 (eth0)",
+      "log_path": "/root/media_suite/media_suite.log",
+      "health_url": "http://localhost:9010/health",
+      "depends_on": [],
+      "description": "media_suite agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T23:47:54.886580+00:00"
+    },
+    "cinematic-lp": {
+      "role": "cinematic_lp",
+      "container": "cinematic-lp",
+      "ip": "10.118.155.217 (eth0)",
+      "log_path": "/root/cinematic_lp/cinematic_lp.log",
+      "health_url": "http://localhost:9436/health",
+      "depends_on": [],
+      "description": "cinematic_lp agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-13T23:49:22.845354+00:00"
+    },
+    "email-expert": {
+      "role": "email_expert",
+      "container": "email-expert",
+      "ip": "10.118.155.251 (eth0)",
+      "log_path": "/root/email_expert/email_expert.log",
+      "health_url": "http://localhost:9370/health",
+      "depends_on": [],
+      "description": "email_expert agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-14T00:03:13.906832+00:00"
+    },
+    "predictive-cloud": {
+      "role": "predictive_cloud",
+      "container": "predictive-cloud",
+      "ip": "10.118.155.114 (eth0)",
+      "log_path": "/root/predictive_cloud/predictive_cloud.log",
+      "health_url": "http://localhost:9380/health",
+      "depends_on": [],
+      "description": "predictive_cloud agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-14T00:09:56.738113+00:00"
+    },
+    "mail-sender": {
+      "role": "mail_sender",
+      "container": "mail-sender",
+      "ip": "10.118.155.102 (eth0)",
+      "log_path": "/root/mail_sender/mail_sender.log",
+      "health_url": "http://localhost:9390/health",
+      "depends_on": [],
+      "description": "mail_sender agent \u2014 auto-provisioned",
+      "registered_at": "2026-07-14T00:28:56.752607+00:00"
+    },
+    "systems-engineer-agent": {
+      "role": "systems_engineer",
+      "container": "systems-engineer-agent",
+      "ip": "",
+      "log_path": "/root/systems_engineer/systems_engineer.log",
+      "health_url": "http://localhost:9101/health",
+      "depends_on": [],
+      "description": "systems_engineer agent - auto-provisioned",
+      "registered_at": "2026-07-14T08:22:53+00:00"
+    },
+    "code-review-agent": {
+      "role": "code_review",
+      "container": "code-review-agent",
+      "ip": "",
+      "log_path": "/root/code_review/code_review.log",
+      "health_url": "http://localhost:9102/health",
+      "depends_on": [],
+      "description": "code_review agent - auto-provisioned",
+      "registered_at": "2026-07-14T08:22:53+00:00"
+    },
+    "security-agent": {
+      "role": "security",
+      "container": "security-agent",
+      "ip": "",
+      "log_path": "/root/security/security.log",
+      "health_url": "http://localhost:9103/health",
+      "depends_on": [],
+      "description": "security agent - auto-provisioned",
+      "registered_at": "2026-07-14T08:22:53+00:00"
+    },
+    "lead-sources-agent": {
+      "role": "lead_sources",
+      "container": "lead-sources-agent",
+      "ip": "",
+      "log_path": "/root/lead_sources/lead_sources.log",
+      "health_url": "http://localhost:9104/health",
+      "depends_on": [],
+      "description": "lead_sources agent - auto-provisioned",
+      "registered_at": "2026-07-14T08:22:53+00:00"
+    },
+    "hermes-gateway": {
+      "role": "hermes_gateway",
+      "container": "hermes-gateway",
+      "ip": "10.118.155.156 (eth0)",
+      "log_path": "/root/hermes_gateway/outbound.jsonl",
+      "health_url": "http://localhost:9100/v1/health",
+      "depends_on": [],
+      "description": "Hermes Gateway \u2014 single ingress for Telegram + Email notifications",
+      "registered_at": "2026-07-14T08:55:25.527095+00:00"
+    },
+    "data-analysis-agent": {
+      "role": "data_analysis",
+      "container": "data-analysis-agent",
+      "ip": "10.118.155.170 (eth0)",
+      "log_path": "/root/data_analysis/data_analysis.log",
+      "health_url": "http://localhost:9105/health",
+      "depends_on": [],
+      "description": "data_analysis agent - auto-provisioned",
+      "registered_at": "2026-07-14T09:18:32+00:00"
+    },
+    "markets-analysis-agent": {
+      "role": "markets_analysis",
+      "container": "markets-analysis-agent",
+      "ip": "10.118.155.108 (eth0)",
+      "log_path": "/root/markets_analysis/markets_analysis.log",
+      "health_url": "http://localhost:9106/health",
+      "depends_on": [],
+      "description": "markets_analysis agent - auto-provisioned",
+      "registered_at": "2026-07-14T09:18:32+00:00"
+    },
+    "lead-handler-agent": {
+      "role": "lead_handler",
+      "container": "lead-handler-agent",
+      "ip": "10.118.155.57 (eth0)",
+      "log_path": "/root/lead_handler/lead_handler.log",
+      "health_url": "http://localhost:9107/health",
+      "depends_on": [],
+      "description": "lead_handler agent - auto-provisioned",
+      "registered_at": "2026-07-14T09:18:32+00:00"
+    },
+    "video-editing-agent": {
+      "role": "video_editing",
+      "container": "video-editing-agent",
+      "ip": "",
+      "log_path": "/root/video_editing/video_editing.log",
+      "health_url": "http://localhost:9108/health",
+      "depends_on": [],
+      "description": "video_editing agent - OpenMontage + OpenCut",
+      "registered_at": "2026-07-14T09:30:25+00:00"
+    },
+    "lead-sniper-agent": {
+      "role": "lead_sniper",
+      "container": "lead-sniper-agent",
+      "ip": "",
+      "log_path": "/root/lead_sniper/lead_sniper.log",
+      "health_url": "http://localhost:9109/health",
+      "depends_on": [],
+      "description": "lead_sniper agent - precision over volume",
+      "registered_at": "2026-07-14T09:44:06+00:00"
+    },
+    "product-research-agent": {
+      "role": "product_research",
+      "container": "product-research-agent",
+      "ip": "",
+      "log_path": "/root/product_research/product_research.log",
+      "health_url": "http://localhost:9110/health",
+      "depends_on": [],
+      "description": "product_research agent - find products + build stores + launch",
+      "registered_at": "2026-07-14T12:11:18+00:00"
+    },
+    "hangout-agent": {
+      "role": "hangout",
+      "container": "hangout-agent",
+      "ip": "10.118.155.14",
+      "log_path": "/root/hangout/hangout.log",
+      "health_url": "http://localhost:9111/health",
+      "depends_on": [],
+      "description": "hangout agent - social layer for the fleet",
+      "registered_at": "2026-07-14T12:38:02.337125+00:00"
+    },
+    "marketplace-agent": {
+      "role": "marketplace",
+      "container": "marketplace-agent",
+      "ip": "",
+      "log_path": "/root/marketplace/marketplace.log",
+      "health_url": "http://localhost:9112/health",
+      "depends_on": [],
+      "description": "marketplace agent - Fiverr for agents",
+      "registered_at": "2026-07-14T12:38:02.337125+00:00"
+    },
+    "keyword-expert-agent": {
+      "role": "keyword_expert",
+      "container": "keyword-expert-agent",
+      "ip": "10.118.155.175",
+      "log_path": "/root/keyword_expert/keyword_expert.log",
+      "health_url": "http://localhost:9113/health",
+      "depends_on": [],
+      "registered_at": "2026-07-14T14:49:26+00:00",
+      "description": "Station 0 of the AGI swarm - pulls Google Trends, emits MarketOpportunityFound events"
+    },
+    "synthetic-analyst-agent": {
+      "role": "synthetic_analyst",
+      "container": "synthetic-analyst-agent",
+      "ip": "10.118.155.31",
+      "log_path": "/root/synthetic_analyst/synthetic_analyst.log",
+      "health_url": "http://localhost:9114/health",
+      "depends_on": [
+        "keyword-expert-agent"
+      ],
+      "registered_at": "2026-07-14T14:49:26+00:00",
+      "description": "Station 1 of the AGI swarm - ingests MOF events, outputs JSON Directives with HITL gate"
+    },
+    "supervisor-agent": {
+      "role": "supervisor",
+      "container": "supervisor-agent",
+      "ip": "",
+      "log_path": "/root/supervisor/supervisor.log",
+      "health_url": "http://localhost:9115/health",
+      "depends_on": [],
+      "description": "supervisor agent - blueprint v4 tier-1",
+      "registered_at": "2026-07-14T16:24:12+00:00"
+    },
+    "innovator-agent": {
+      "role": "innovator",
+      "container": "innovator-agent",
+      "ip": "",
+      "log_path": "/root/innovator/innovator.log",
+      "health_url": "http://localhost:9115/health",
+      "depends_on": [],
+      "description": "innovator agent - blueprint v4 tier-1",
+      "registered_at": "2026-07-14T16:24:12+00:00"
+    },
+    "council-agent": {
+      "role": "council",
+      "container": "council-agent",
+      "ip": "",
+      "log_path": "/root/council/council.log",
+      "health_url": "http://localhost:9115/health",
+      "depends_on": [],
+      "description": "council agent - blueprint v4 tier-1",
+      "registered_at": "2026-07-14T16:24:12+00:00"
+    },
+    "legal-compliance-agent": {
+      "role": "legal_compliance",
+      "container": "legal-compliance-agent",
+      "ip": "",
+      "log_path": "/root/legal_compliance/legal_compliance.log",
+      "health_url": "http://localhost:9115/health",
+      "depends_on": [],
+      "description": "legal_compliance agent - blueprint v4 tier-1",
+      "registered_at": "2026-07-14T16:24:12+00:00"
+    },
+    "finance-agent": {
+      "role": "finance",
+      "container": "finance-agent",
+      "ip": "",
+      "log_path": "/root/finance/finance.log",
+      "health_url": "http://localhost:9115/health",
+      "depends_on": [],
+      "description": "finance agent - blueprint v4 tier-1",
+      "registered_at": "2026-07-14T16:24:12+00:00"
+    }
+  },
+  "last_updated": "2026-07-14T16:24:12+00:00"
+}
