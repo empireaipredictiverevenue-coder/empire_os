@@ -36,7 +36,7 @@ GBRAIN = Path("/root/g-brain")
 OUT_PLAN = FEED / "north_mini_plans.jsonl"
 OUT_LOG = FEED / "north_mini_actions.jsonl"
 TICK = int(os.environ.get("NORTH_MINI_TICK", "1800"))  # 30 min
-MODEL = os.environ.get("NORTH_MINI_MODEL", "cohere/north-mini-code:free")
+MODEL = os.environ.get("NORTH_MINI_MODEL", "tencent/hy3:free")
 CYCLE_CAP = float(os.environ.get("NORTH_MINI_CAP", "40"))  # hard wall (s)
 
 SYSTEM = (
