@@ -24,6 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, "/root/empire_os")
 from empire_os.agent_core import OpenCodeZenClient
+from empire_os.agents.guardrails import scrub_secrets, has_forbidden
 from empire_os.synthetic_agents import SyntheticAgent
 
 ROLE_DIR = Path("/root/code_review")
@@ -104,54 +105,79 @@ class CodeReviewAgent(SyntheticAgent):
 
     def observe(self) -> dict:
         ensure_repos()
-        # Scan Python files modified in last 30 min
+        # Review the WHOLE empire_os codebase (round-robin, 5 files/cycle)
+        # so the free-tier LLM covers everything over time without blowing
+        # rate limits in a single cycle.
         root = Path("/root/empire_os")
-        cutoff = time.time() - 1800
-        candidates = []
+        skip = ("__pycache__", ".pytest_cache", "site-packages",
+                "venv", ".venv", "node_modules", "/.git/")
+        all_py = []
         for p in root.rglob("*.py"):
-            if "__pycache__" in str(p) or ".pytest_cache" in str(p):
+            sp = str(p)
+            if any(s in sp for s in skip):
                 continue
+            all_py.append(sp)
+        all_py.sort()
+
+        # round-robin index persisted to ROLE_DIR
+        idx_file = ROLE_DIR / "scan_index.json"
+        start = 0
+        if idx_file.exists():
             try:
-                m = p.stat().st_mtime
-            except OSError:
-                continue
-            if m < cutoff:
-                continue
-            candidates.append((str(p), m))
+                start = int(idx_file.read_text().strip() or "0") % max(1, len(all_py))
+            except Exception:
+                start = 0
+        n = 5
+        batch = [all_py[(start + i) % len(all_py)] for i in range(min(n, len(all_py)))]
+        idx_file.write_text(str((start + n) % max(1, len(all_py))))
 
-        # Pick up to 5 files per cycle to bound LLM cost
-        candidates.sort(key=lambda x: -x[1])
-        candidates = candidates[:5]
-
+        candidates = [(p, p) for p in batch]
         findings = []
-        for path_str, mtime in candidates:
+        for path_str, _ in candidates:
             path = Path(path_str)
             errs = py_compile_check(path) + import_check(path)
             if errs:
                 findings.append({"file": path_str,
                                  "errors": errs,
-                                 "mtime": mtime})
+                                 "mtime": path.stat().st_mtime})
 
         return {
             "ts": datetime.now(timezone.utc).isoformat(),
             "scanned": [c[0] for c in candidates],
+            "total_files": len(all_py),
             "findings": findings,
             "total_findings": len(findings),
         }
 
     def reason(self, state: dict) -> str:
-        if not state.get("findings"):
-            return json.dumps({"action": "no-op",
-                               "summary": "no new findings"})
-        system = ("You are the Code Review Agent. For each finding, "
-                  "classify severity 1-5 and suggest a one-line fix. "
+        scanned = state.get("scanned", [])
+        if not scanned:
+            return json.dumps({"action": "no-op", "summary": "nothing to scan"})
+        # Compile/import errors take priority (always reported)
+        err_findings = state.get("findings", [])
+        # Always LLM-review the scanned files for quality (whole-codebase
+        # review, not just when something fails to compile).
+        system = ("You are the Code Review Agent for the Empire OS codebase. "
+                  "Review the listed Python files for real bugs, security "
+                  "issues, dead code, and anti-patterns. Ignore style nits. "
+                  "Only report actionable findings. "
                   "JSON: {\"verdicts\": [{\"file\": \"...\", "
                   "\"severity\": 1-5, \"fix\": \"...\"}]}")
-        prompt = json.dumps(state["findings"])
-        return self.llm.chat(messages=[{"role": "user", "content": prompt}],
+        payload = {
+            "scanned": scanned,
+            "compile_errors": err_findings,
+            "total_files_in_codebase": state.get("total_files", len(scanned)),
+        }
+        return self.llm.chat(messages=[{"role": "user",
+                                        "content": json.dumps(payload)}],
                              system=system, temperature=0.2, format="json")
 
     def act(self, decision: str) -> dict:
+        # GUARDRAIL: scrub secrets + block forbidden actions in LLM output
+        decision = scrub_secrets(decision)
+        if has_forbidden(decision):
+            print("[GUARDRAIL][read_only] blocked forbidden action in verdict")
+            decision = json.dumps({"verdicts": [], "blocked": "forbidden_action"})
         path = ROLE_DIR / "findings.jsonl"
         try:
             d = json.loads(decision)
@@ -162,7 +188,7 @@ class CodeReviewAgent(SyntheticAgent):
         record = {"ts": time.time(), "verdicts": verdicts}
         with path.open("a") as f:
             f.write(json.dumps(record) + "\n")
-        return {"summary": f"reviewed {len(verdicts)} file(s)"}
+        return {"summary": f"reviewed {len(verdicts)} verdict(s)"}
 
 
 if __name__ == "__main__":

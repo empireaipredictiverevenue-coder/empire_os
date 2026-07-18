@@ -28,6 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, "/root/empire_os")
 from empire_os.agent_core import OpenRouterClient
+from empire_os.agents.guardrails import scrub_secrets, safe_write
 
 DB = os.environ.get("EMPIRE_DB", "/root/empire_os/empire_os.db")
 FEED = Path("/root/feedback")
@@ -116,12 +117,13 @@ def _last(kind: str) -> dict:
 
 
 def _write(kind: str, doc: dict, state: dict) -> None:
-    OUT_PLAN.parent.mkdir(parents=True, exist_ok=True)
+    # GUARDRAIL: artifact mode — only /root/feedback + /root/g-brain, with
+    # secret scrubbing. safe_write() enforces the path allow-list.
     record = {"ts": _now(), "model": MODEL, "type": kind, "doc": doc,
               "state_sig": {k: state.get(k) for k in
                             ("leads", "charges_sim", "subs", "seats")}}
-    with OUT_PLAN.open("a") as f:
-        f.write(json.dumps(record) + "\n")
+    ok = safe_write(OUT_PLAN, json.dumps(record) + "\n", "artifact",
+                   "north-mini")
     # mirror human-readable into g-brain
     try:
         tgt = {
@@ -132,18 +134,16 @@ def _write(kind: str, doc: dict, state: dict) -> None:
             "projection": GBRAIN / "revenue" / "projections.md",
         }.get(kind)
         if tgt:
-            tgt.parent.mkdir(parents=True, exist_ok=True)
-            with tgt.open("a") as f:
-                f.write(f"\n## {record['ts']}\n{json.dumps(doc, indent=2)}\n")
+            safe_write(tgt, f"\n## {record['ts']}\n{json.dumps(doc, indent=2)}\n",
+                       "artifact", "north-mini")
     except Exception:
         pass
 
 
 def _log_action(action: str, detail: str) -> None:
-    OUT_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with OUT_LOG.open("a") as f:
-        f.write(json.dumps({"ts": _now(), "action": action,
-                            "detail": detail}) + "\n")
+    safe_write(OUT_LOG, json.dumps({"ts": _now(), "action": action,
+                                    "detail": scrub_secrets(detail)}) + "\n",
+               "artifact", "north-mini")
 
 
 def _prompt(kind: str, state: dict) -> str:

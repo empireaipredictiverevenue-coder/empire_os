@@ -524,7 +524,8 @@ class OpenCodeZenClient:
             logger.warning("OpenCodeZenClient: no API key loaded")
 
     def chat(self, messages: list[dict], system: Optional[str] = None,
-             temperature: float = 0.2, max_tokens: int = 800) -> Optional[str]:
+             temperature: float = 0.2, max_tokens: int = 800,
+             format: str = "text") -> Optional[str]:
         if not self.api_key:
             return None
         if system:
