@@ -10,7 +10,7 @@ import logging
 import re
 from datetime import datetime, timezone
 
-from empire_os.lanes import CATEGORIES, METROS, all_sub_niches, state_to_metros
+from empire_os.lanes import CATEGORIES, METROS, all_sub_niches, state_to_metros, STATE_METRO
 
 logger = logging.getLogger("lane-router")
 
@@ -58,7 +58,7 @@ MATCH_KEYWORDS = {
         "sewer line", "toilet repair", "faucet",
     ],
     "residential_roofing": [
-        "roof repair", "roofer", "shingles", "roof leak",
+        "roofing", "roof", "roofer", "roof repair", "shingles", "roof leak",
         "roof replacement", "roofing contractor", "residential roofing",
         "new roof", "roof estimate",
     ],
@@ -252,7 +252,17 @@ def route_lead(backend, prospect_id: str, details: str,
 
     Returns routing result with lane_id, niche match, metro, and seat status.
     """
-    metro = get_primary_metro(state)
+    # Resolve metro: prefer explicit state param, else scan details text
+    # for US state abbreviations (handles "AZ & TX" style multi-state leads).
+    resolved_state = state
+    if not resolved_state:
+        import re as _re
+        _found = _re.findall(r"\b([A-Z]{2})\b", details or "")
+        for _ab in _found:
+            if _ab in STATE_METRO:
+                resolved_state = _ab
+                break
+    metro = get_primary_metro(resolved_state)
     matches = match_niche(details)
 
     if not matches:
