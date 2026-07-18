@@ -135,6 +135,12 @@ def fanout(subqueries: list[str]) -> list[dict]:
 
 def solve(question: str, subqueries: list[str], results: list[dict]) -> str:
     """Solver: synthesize a cited answer from gathered snippets (free LLM)."""
+    if not results:
+        # No sources gathered — honest answer, skip the LLM round-trip
+        # (avoids burning free-tier capacity on an unanswerable query).
+        return ("No web sources were gathered for this question, so I cannot "
+                "synthesize a cited answer. Try again later or check search "
+                "connectivity.")
     ctx = "\n".join(
         f"[{i+1}] ({r.get('query','')}) {r.get('title','')} "
         f"{r.get('url','')}\n   {r.get('snippet','')}"
