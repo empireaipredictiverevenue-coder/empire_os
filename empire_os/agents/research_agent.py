@@ -15,7 +15,6 @@ Run: python3 empire_os/agents/research_agent.py
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import sys
 import threading
@@ -26,15 +25,13 @@ sys.path.insert(0, "/root/empire_os")
 from empire_os.agent_core import OpenRouterClient
 from empire_os.agents.guardrails import scrub_secrets, safe_write
 
-import requests
-
 FEED = Path("/root/feedback")
 OUT = FEED / "research_runs.jsonl"
 MODEL = "cohere/north-mini-code:free"
 TICK = 1800  # 30 min
 DECOMPOSE_TIMEOUT = 40
 SOLVE_TIMEOUT = 60
-SEARCH_TIMEOUT = (4, 8)
+SEARCH_TIMEOUT = (4, 90)  # (min, max) — wigolo cold-start can be slow first call
 MAX_SUBQUERIES = 5
 
 # Questions Empire OS wants answered (edit freely).
@@ -44,8 +41,6 @@ QUESTIONS = [
     "market gap for AI agent marketplaces targeting small business",
 ]
 
-DDG_URL = "https://lite.duckduckgo.com/lite/"
-UA = "Mozilla/5.0 (compatible; EmpireOS/1.0)"
 
 import logging
 log = logging.getLogger("research")
@@ -81,36 +76,49 @@ def decompose(question: str) -> list[str]:
     return [question]
 
 
-def ddg_search(query: str) -> list[dict]:
-    """Keyless DuckDuckGo lite. Returns snippets with title/url/body."""
+def wigolo_search(query: str) -> list[dict]:
+    """Keyless local web search via wigolo MCP CLI (no API key, cached).
+
+    Shells out to `npx wigolo search --json` — replaces the fragile DDG
+    HTML scrape. Returns snippets with query/title/url/snippet.
+    """
     try:
-        resp = requests.post(DDG_URL, data={"q": query},
-                             headers={"User-Agent": UA}, timeout=SEARCH_TIMEOUT)
-        if resp.status_code != 200:
+        proc = subprocess.run(
+            ["npx", "-y", "wigolo@latest", "search", query,
+             "--json", "--max-results", "5", "--no-content"],
+            capture_output=True, text=True, timeout=SEARCH_TIMEOUT[1])
+        if proc.returncode != 0:
             return []
-        html = resp.text
-        # DDG lite: <a rel="nofollow" href="URL" class='result-link'>TITLE</a>
-        # (href precedes class). Capture full anchor tag + inner text.
-        anchors = re.findall(r"<a\s+([^>]*class='result-link'[^>]*)>(.*?)</a>", html, re.S)
-        out = []
-        for attrs, inner in anchors:
-            href = re.search(r'href="([^"]+)"', attrs)
-            title = re.sub(r"<[^>]+>", "", inner).strip()
-            title = title.replace("&#x27;", "'").replace("&amp;", "&").replace("&quot;", '"')
-            out.append({"query": query, "title": title,
-                        "url": href.group(1) if href else "", "snippet": ""})
-        # snippets live in separate <td class='result-snippet'> rows, paired by order
-        snippets = re.findall(r"class='result-snippet'>(.*?)</td>", html, re.S)
-        def clean(s: str) -> str:
-            s = re.sub(r"<[^>]+>", "", s)
-            return s.replace("&#x27;", "'").replace("&amp;", "&").replace("&quot;", '"').strip()
-        for i, sn in enumerate(snippets):
-            if i < len(out):
-                out[i]["snippet"] = clean(sn)
-        return out[:5]
-    except requests.RequestException:
-        return []
-    except Exception:
+        # stdout is a JSON object (possibly prefixed by stray log lines);
+        # extract the first balanced {...} block.
+        out = proc.stdout
+        start = out.find("{")
+        if start == -1:
+            return []
+        depth = 0
+        end = -1
+        for i in range(start, len(out)):
+            if out[i] == "{":
+                depth += 1
+            elif out[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        if end == -1:
+            return []
+        data = json.loads(out[start:end + 1])
+        results = []
+        for r in data.get("results", []):
+            results.append({
+                "query": query,
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "snippet": r.get("excerpt", "") or r.get("snippet", ""),
+            })
+        return results[:5]
+    except (subprocess.SubprocessError, json.JSONDecodeError, KeyError,
+            ValueError, OSError):
         return []
 
 
@@ -120,7 +128,7 @@ def fanout(subqueries: list[str]) -> list[dict]:
     lock = threading.Lock()
 
     def worker(q: str):
-        r = ddg_search(q)
+        r = wigolo_search(q)
         with lock:
             results.extend(r)
 
