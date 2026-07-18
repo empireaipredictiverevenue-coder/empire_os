@@ -63,7 +63,7 @@ AUDIT_LOG = Path("/root/feedback/products.jsonl")
 
 TICK_INTERVAL = 1800  # 30 min
 
-HUB_URL = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 HERMES_GATEWAY_URL = os.environ.get(
     "HERMES_GATEWAY_URL", "http://10.118.155.156:9100")
 

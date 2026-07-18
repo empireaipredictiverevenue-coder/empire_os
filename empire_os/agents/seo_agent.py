@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB  = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 FB   = Path("/root/feedback")
 LOG  = FB / "seo_log.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(4 * 3600)))
@@ -44,7 +44,7 @@ def fetch_via_hub() -> list:
 
 
 def audit(url: str) -> dict:
-    full = f"http://10.118.155.218:8081{url}"
+    full = f"http://127.0.0.1:8000{url}"
     try:
         r = requests.get(full, timeout=8)
         status = r.status_code

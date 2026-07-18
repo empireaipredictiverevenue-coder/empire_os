@@ -45,7 +45,7 @@ from pathlib import Path
 import requests
 
 
-HUB_URL = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 INTERVAL = 60  # seconds — match Swarm Blueprint "every 60 seconds"
 FEEDBACK = Path("/root/feedback")
 OBS_LOG = FEEDBACK / "commander_observations.jsonl"

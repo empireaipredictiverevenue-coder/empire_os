@@ -21,6 +21,18 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+# Load .env (same pattern as charge.py / OllamaClient) so HUB_URL + keys
+# resolve from /root/empire_os/.env at startup. Without this, pm2-launched
+# processes fall back to the hardcoded dead default (127.0.0.1:8000)
+# and every hub call silently times out -> zero outreach sends.
+for _ln in (Path("/root/empire_os/.env").read_text(encoding="utf-8").splitlines()
+            if Path("/root/empire_os/.env").exists() else ()):
+    _ln = _ln.strip()
+    if not _ln or _ln.startswith("#") or "=" not in _ln:
+        continue
+    _k, _, _v = _ln.partition("=")
+    os.environ.setdefault(_k.strip(), _v.strip())
+
 import requests
 
 # Sovereign topology: outbound to Resend / Hunter / hub is on our own network
@@ -29,7 +41,7 @@ _http = requests.Session()
 _http.trust_env = False
 
 RESEND_OWNER = os.environ.get("RESEND_OWNER", "Founder <founder@empire-ai.co.uk>")
-HUB_URL = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 INTERVAL_SECONDS = int(os.environ.get("INTERVAL", "3600"))
 CYCLE_PROSPECT_LIMIT = int(os.environ.get("LIMIT", "20"))
 # sequence spacing in days per step + max step

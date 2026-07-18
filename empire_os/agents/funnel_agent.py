@@ -26,7 +26,7 @@ sys.path.insert(0, "/root/empire_os")
 from empire_os.agent_core import OllamaClient
 from empire_os.synthetic_agents import SyntheticAgent
 
-HUB = "http://10.118.155.218:8081"
+HUB = "http://127.0.0.1:8000"
 TICK_INTERVAL = 300  # 5 min — funnel ops need to be fast
 
 

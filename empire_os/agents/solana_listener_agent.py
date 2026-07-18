@@ -22,12 +22,24 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
+# Load .env (same pattern as charge.py) so HUB_URL + keys resolve from
+# /root/empire_os/.env at startup. Without this, pm2-launched processes
+# fall back to the hardcoded dead default (127.0.0.1:8000) and the
+# /v1/finance/replay call silently times out -> USDC never settles.
+for _ln in (Path("/root/empire_os/.env").read_text(encoding="utf-8").splitlines()
+            if Path("/root/empire_os/.env").exists() else ()):
+    _ln = _ln.strip()
+    if not _ln or _ln.startswith("#") or "=" not in _ln:
+        continue
+    _k, _, _v = _ln.partition("=")
+    os.environ.setdefault(_k.strip(), _v.strip())
+
 # Sovereign topology: RPC + hub are on our own network. Never route through
 # the container's Tor/Privoxy proxy — it breaks Helius RPC and hub calls.
 _session = requests.Session()
 _session.trust_env = False
 
-HUB   = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB   = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 FB    = Path("/root/feedback")
 LOG   = FB / "solana_listener.jsonl"
 SEEN  = FB / "solana_seen.jsonl"   # persistent seen cache

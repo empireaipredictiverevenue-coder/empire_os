@@ -37,7 +37,7 @@ ROLE_DIR = Path("/root/ppc_router")
 ROLE_DIR.mkdir(parents=True, exist_ok=True)
 TICK_INTERVAL = 60  # 1 min
 
-HUB_URL = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 DB_PATH = os.environ.get("DB_PATH", "/root/empire_os/empire_os.db")
 HERMES_GATEWAY_URL = os.environ.get(
     "HERMES_GATEWAY_URL", "http://10.118.155.156:9100"

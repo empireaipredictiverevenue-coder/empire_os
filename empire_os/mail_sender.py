@@ -47,10 +47,43 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_PASS = os.environ.get("SMTP_PASS", "")
 SMTP_TLS = os.environ.get("SMTP_TLS", "1") == "1"
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 FEEDBACK_DIR = Path("/root/feedback")
 POLL_INTERVAL = 30  # seconds between poll cycles
 MAX_PER_CYCLE = 10  # max emails to pull per poll
+
+
+def _direct_mx_send(to: str, subject: str, body: str) -> dict:
+    """Sovereign outbound: resolve recipient MX + deliver straight to :25.
+    No SaaS, no relay creds, no daily quota. Open-source route."""
+    try:
+        import smtplib
+        import socket
+        import dns.resolver  # pip install dnspython
+        domain = to.split("@")[-1].strip().lower()
+        if not domain:
+            return {"ok": False, "error": "no recipient domain"}
+        try:
+            mx = sorted(dns.resolver.resolve(domain, "MX"),
+                       key=lambda r: r.preference)[0].exchange.to_text().rstrip(".")
+        except Exception:
+            mx = domain  # fallback: try the A/AAAA directly
+        from email.mime.text import MIMEText
+        msg = MIMEText(body, _charset="utf-8")
+        msg["Subject"] = subject
+        msg["From"] = FROM_EMAIL
+        msg["To"] = to
+        # 10s connect + 30s overall; some MX are slow/blocked -> fail fast
+        s = smtplib.SMTP(mx, 25, timeout=30)
+        s.ehlo()
+        if s.has_extn("starttls"):
+            s.starttls()
+        s.ehlo()
+        s.sendmail(FROM_EMAIL, [to], msg.as_string())
+        s.quit()
+        return {"ok": True, "msg_id": f"direct:{mx}:{to}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
 
 
 def _smtp_send(to: str, subject: str, body: str) -> dict:
@@ -79,6 +112,8 @@ def _send(to: str, subject: str, body: str) -> dict:
     """Dispatch via the configured backend."""
     if EMAIL_BACKEND == "smtp":
         return _smtp_send(to, subject, body)
+    if EMAIL_BACKEND == "direct":
+        return _direct_mx_send(to, subject, body)
     return _resend_send(to, subject, body)
 
 

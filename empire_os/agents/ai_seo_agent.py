@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB  = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 FB   = Path("/root/feedback")
 LOG  = FB / "ai_seo_log.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(6 * 3600)))
@@ -59,7 +59,7 @@ def get_a_page() -> str:
               "water_damage_remediation", "pest_control",
               "general_contractor"]
     metros = ["NYC", "LAX", "CHI", "BOS", "DFW"]
-    return f"http://10.118.155.218:8081/aeo/{niches[datetime.now().minute % len(niches)]}/{metros[datetime.now().minute % len(metros)]}"
+    return f"http://127.0.0.1:8000/aeo/{niches[datetime.now().minute % len(niches)]}/{metros[datetime.now().minute % len(metros)]}"
 
 
 def enrich_page(url: str) -> dict:

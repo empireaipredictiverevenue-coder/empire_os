@@ -27,7 +27,7 @@ sys.path.insert(0, "/root/empire_os")
 from empire_os.agent_core import OllamaClient
 from empire_os.synthetic_agents import SyntheticAgent
 
-HUB = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 ROLE_DIR = Path("/root/lead_sources")
 ROLE_DIR.mkdir(parents=True, exist_ok=True)
 REPOS_DIR = ROLE_DIR / "repos"

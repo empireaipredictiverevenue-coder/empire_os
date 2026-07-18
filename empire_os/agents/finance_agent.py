@@ -23,7 +23,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 DB  = os.environ.get("HUB_DB_PATH", "/root/empire_os/empire_os.db")
 FB  = Path("/root/feedback")
 LOG = FB / "finance_log.jsonl"
