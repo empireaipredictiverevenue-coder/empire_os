@@ -95,6 +95,7 @@ from empire_os.billing import (
 )
 from empire_os.billing_webhooks import handle_paypal_event, handle_crypto_payment
 from empire_os.payout_batch import PayoutBatchStore, build_payout_batch
+from empire_os.revenue_notify import paid as _rev_paid
 from empire_os.waterfall import build_default_waterfall
 from empire_os.lanes import ensure_schema as ensure_lane_schema, seed_lanes
 from empire_os.lanes import CATEGORIES, METROS, build_lanes, all_sub_niches
@@ -2232,19 +2233,30 @@ def finance_replay(req: dict):
                         "payment_ref = ? WHERE subscription_id = ?",
                         (sig, sub_id))
                     paid_sub = sub_id
-            # try matching invoice by memo id (si_invoice legacy)
+            # try matching invoice by memo id (si_ppc_invoices first, legacy si_invoice)
             if inv_id:
-                row = cnx.execute(
-                    "SELECT invoice_id, amount_cents, status "
-                    "FROM si_invoice WHERE invoice_id = ?",
-                    (inv_id,)).fetchone()
-                if row:
-                    matched_to = f"si_invoice {row[0]}"
-                    cnx.execute(
-                        "UPDATE si_invoice SET status = 'paid', "
-                        "reference = ? WHERE invoice_id = ?",
-                        (sig, inv_id))
-                    paid_inv = inv_id
+                for _tbl in ("si_ppc_invoices", "si_invoice"):
+                    try:
+                        row = cnx.execute(
+                            f"SELECT invoice_id, amount_cents, status "
+                            f"FROM {_tbl} WHERE invoice_id = ?",
+                            (inv_id,)).fetchone()
+                    except Exception:
+                        row = None
+                    if row:
+                        matched_to = f"{_tbl} {row[0]}"
+                        if _tbl == "si_invoice":
+                            cnx.execute(
+                                "UPDATE si_invoice SET status = 'paid', "
+                                "reference = ? WHERE invoice_id = ?",
+                                (sig, inv_id))
+                        else:
+                            cnx.execute(
+                                "UPDATE si_ppc_invoices SET status = 'paid', "
+                                "paid_at = ? WHERE invoice_id = ?",
+                                (datetime.now(timezone.utc).isoformat(), inv_id))
+                        paid_inv = inv_id
+                        break
             # --- pay-per-lead: match OPEN si_ppc_invoices by amount ---
             # incoming amount is in micro-USDC (int); invoice.amount_usdc
             # stored as micro-units too (e.g. 528861 = 0.528861 USDC).
@@ -2295,6 +2307,26 @@ def finance_replay(req: dict):
                         break
             # if force_status paid but nothing matched, still log
             cnx.commit()
+            # --- settlement + MONEY alert when a real invoice got paid ---
+            if paid_inv:
+                try:
+                    inv_row = cnx.execute(
+                        "SELECT invoice_id, amount_cents, amount_usdc, buyer_id "
+                        "FROM si_ppc_invoices WHERE invoice_id = ?",
+                        (paid_inv,)).fetchone()
+                    amt_c = int(inv_row[1]) if inv_row and inv_row[1] else 0
+                    cnx.execute(
+                        "INSERT INTO si_settlements "
+                        "(prospect_id, tenant_id, amount_cents, settled_at, "
+                        "settled_by, notes) VALUES (?,?,?,?,?,?)",
+                        (paid_inv, (inv_row[3] if inv_row and inv_row[3] else ""),
+                         amt_c, datetime.now(timezone.utc).isoformat(),
+                         "solana_listener", f"replay {sig}"))
+                    cnx.commit()
+                    _rev_paid(paid_inv, amt_c / 1e6,
+                              (inv_row[3] if inv_row and inv_row[3] else ""))
+                except Exception as _se:
+                    log("ERROR", "settlement_write_fail", err=str(_se)[:150])
             # simulate vault balance accretion
             cur_row = cnx.execute(
                 "SELECT value FROM app_kv WHERE key = 'vault_balance_usdc'"

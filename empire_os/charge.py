@@ -186,20 +186,24 @@ def _resolve_buyer_email(buyer_id: str) -> str:
     Tables are best-effort: a missing table is treated as 'no email',
     never as an exception that breaks the charge write.
     """
-    for _tbl, _col, _key in (
+    _queries = (
         ("si_buyer_outreach", "email", "prospect_id"),
+        ("si_buyer_outreach", "email", "buyer_id"),
         ("si_buyer_payment_methods", "customer_ref", "buyer_id"),
-    ):
+    )
+    for _tbl, _col, _key in _queries:
         try:
-            con = sqlite3.connect(DB)
-            row = con.execute(
-                f"SELECT {_col} FROM {_tbl} "
-                f"WHERE {_key}=? AND {_col} IS NOT NULL AND {_col} != '' "
-                "ORDER BY id DESC LIMIT 1",
-                (buyer_id,)).fetchone()
-            con.close()
-            if row and row[0]:
-                return row[0]
+            _c = sqlite3.connect(DB)
+            try:
+                _row = _c.execute(
+                    f"SELECT {_col} FROM {_tbl} "
+                    f"WHERE {_key}=? AND {_col} IS NOT NULL AND {_col} != '' "
+                    "LIMIT 1",
+                    (buyer_id,)).fetchone()
+            finally:
+                _c.close()
+            if _row and _row[0]:
+                return _row[0]
         except sqlite3.OperationalError:
             # table absent in this DB — skip, try next source
             continue
