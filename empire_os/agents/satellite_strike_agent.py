@@ -33,7 +33,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB  = os.environ.get("HUB_URL", "http://localhost:8081")
+HUB  = os.environ.get("HUB_URL", "http://localhost:8000")
 FB   = Path("/root/feedback")
 LOG  = FB / "satellite_strike.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(5 * 60)))

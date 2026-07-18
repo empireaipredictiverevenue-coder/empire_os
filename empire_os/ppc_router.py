@@ -39,7 +39,7 @@ FB      = Path("/root/feedback")
 LOG     = FB / "ppc_events.jsonl"
 HIST    = deque(maxlen=400)
 DB      = "/root/empire_os/empire_os.db"
-HUB_URL = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 
 
 def _post_to_hub(path: str, body: dict) -> dict:

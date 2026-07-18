@@ -23,7 +23,7 @@ from typing import Optional
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("empire_telephony_webhook")
 
-HUB_URL = os.getenv("HUB_URL", "http://127.0.0.1:8081").rstrip("/")
+HUB_URL = os.getenv("HUB_URL", "http://127.0.0.1:8000").rstrip("/")
 CRM_API_URL = os.getenv("CRM_API_URL", "")
 CRM_API_KEY = os.getenv("CRM_API_KEY", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")

@@ -15,7 +15,7 @@ import os, sys, time, json, sqlite3, urllib.request, urllib.error
 sys.path.insert(0, "/root/empire_os")
 from empire_os.auto_onboard import TIER_RATES
 
-BASE = "http://127.0.0.1:8081"
+BASE = "http://127.0.0.1:8000"
 DB = "/root/empire_os/empire_os.db"
 INTERVAL = int(os.environ.get("VERIFY_INTERVAL", "300"))  # 5 min
 

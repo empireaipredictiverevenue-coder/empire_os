@@ -66,7 +66,7 @@ if _ENV_PATH.exists():
 sys.path.insert(0, "/root/empire_os")
 
 PORT = int(os.environ.get("PPL_PORT", "9210"))
-HUB = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 DB_PATH = os.environ.get("DB_PATH", "/root/empire_os/empire_os.db")
 DISPATCH_URL = os.environ.get("PPL_DISPATCH_WEBHOOK_URL", "").strip()
 DISPATCH_TEL = os.environ.get("PPL_DISPATCH_TEL", "").strip()

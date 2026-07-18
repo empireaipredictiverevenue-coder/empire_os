@@ -62,7 +62,7 @@ except Exception:
 
 
 DB = "/root/empire_os/empire_os.db"
-HUB = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 
 
 def now_iso() -> str:

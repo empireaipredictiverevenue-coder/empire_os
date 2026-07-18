@@ -13,7 +13,7 @@ from typing import Optional
 
 import requests
 
-HUB = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 FB = Path("/root/feedback")
 LOG = Path("/tmp/carrier_roster_log.jsonl")
 DB = "/root/empire_os/empire_os.db"

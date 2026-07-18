@@ -69,7 +69,7 @@ ALLOWED_DOMAIN = os.environ.get("ALLOWED_SEND_DOMAIN", "empire-ai.co.uk")
 ALERT_FALLBACK_EMAIL = os.environ.get("ALERT_FALLBACK_EMAIL",
                                      "founder@empire-ai.co.uk")
 
-HUB_URL = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 
 app = FastAPI(title="hermes-gateway", version="0.1.0")
 

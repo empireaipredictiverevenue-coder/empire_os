@@ -577,3 +577,23 @@ class OpenCodeZenClient:
                 continue
         return json.dumps({"error": "zen_failed", "detail": last_err[:200]})
 
+    def structured_chat(
+        self,
+        messages: list[dict],
+        system: Optional[str] = None,
+        temperature: float = 0.2,
+    ) -> dict:
+        """Mirror OpenRouterClient.structured_chat: chat then parse JSON.
+
+        agi_scout / agi_marketing / synthetic_intelligence call
+        self.llm.structured_chat(...) — OpenCodeZenClient must provide it
+        or those agents crash with AttributeError (seen in code-review
+        synthetic generation)."""
+        raw = self.chat(messages, system=system, temperature=temperature)
+        if raw is None:
+            return {"error": "zen_no_key"}
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {"error": "parse_failed", "raw": raw}
+

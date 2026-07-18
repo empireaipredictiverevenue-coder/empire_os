@@ -25,7 +25,7 @@ from pathlib import Path
 _http = requests.Session()
 _http.trust_env = False
 
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 LOG_PATH = Path("/root/feedback/buyer_hunter.jsonl")
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 

@@ -31,7 +31,7 @@ import requests
 sys.path.insert(0, "/root/empire_os")
 
 
-HUB_URL = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 LOG = Path("/root/feedback/lane_monitor.jsonl")
 LOG.parent.mkdir(parents=True, exist_ok=True)
 

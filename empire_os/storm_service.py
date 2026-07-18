@@ -49,7 +49,7 @@ class StormService:
         logger.warning("STRIKE: %s in %s (sev=%d)",
                        event.event_type, event.area_description, event.severity)
         # Notify big hub satellite-strike endpoint
-        hub_url = os.environ.get("EMPIRE_HUB_URL", "http://10.118.155.218:8081")
+        hub_url = os.environ.get("EMPIRE_HUB_URL", "http://127.0.0.1:8000")
         if hub_url:
             try:
                 import urllib.request

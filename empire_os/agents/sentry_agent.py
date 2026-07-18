@@ -12,7 +12,7 @@ import os, time, subprocess, sys, json, re
 import empire_os.hermes_gateway as g
 
 POLL = 60
-UNITS = ["empire-hub-8081", "empire-ppc-router", "empire-agent-lead_deliverer",
+UNITS = ["empire-hub-service", "empire-ppc-router", "empire-agent-lead_deliverer",
          "empire-agent-idle_asset", "empire-agent-satellite_strike",
          "empire-agent-solana_listener", "empire-agent-warehouse-report",
          "empire-agent-outreach_runner", "empire-agent-supervisor",

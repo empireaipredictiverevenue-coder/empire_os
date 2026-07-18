@@ -41,7 +41,7 @@ HUB_CONTAINER = "empire-hub"
 DB_PATH = "/root/empire_os/empire_os.db"
 
 LOG_PATH = Path("/root/feedback/lead_deliveries.jsonl")
-HUB = os.environ.get("HUB_URL", "http://localhost:8081")
+HUB = os.environ.get("HUB_URL", "http://localhost:8000")
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 POLL_INTERVAL = 30  # seconds
