@@ -88,17 +88,24 @@ def ddg_search(query: str) -> list[dict]:
                              headers={"User-Agent": UA}, timeout=SEARCH_TIMEOUT)
         if resp.status_code != 200:
             return []
-        # crude parse: DDG lite returns rows of result links + snippets
-        texts = re.findall(r'class="result-link"[^>]*>(.*?)</a>', resp.text, re.S)
-        snippets = re.findall(r'class="result-snippet"[^>]*>(.*?)</td>', resp.text, re.S)
-        links = re.findall(r'class="result-link" href="([^"]+)"', resp.text)
+        html = resp.text
+        # DDG lite uses SINGLE quotes on these classes.
+        titles = re.findall(r"class='result-link'>(.*?)</a>", html, re.S)
+        links = re.findall(r"class='result-link' href=\"([^\"]+)\"", html)
+        snippets = re.findall(r"class='result-snippet'>(.*?)</td>", html, re.S)
+        # strip tags + unescape entities
+        def clean(s: str) -> str:
+            s = re.sub(r"<[^>]+>", "", s)
+            s = s.replace("&#x27;", "'").replace("&amp;", "&").replace("&quot;", '"')
+            return s.strip()
         out = []
-        for i in range(max(len(texts), len(snippets))):
+        n = max(len(titles), len(snippets))
+        for i in range(n):
             out.append({
                 "query": query,
-                "title": re.sub(r"<[^>]+>", "", texts[i]) if i < len(texts) else "",
+                "title": clean(titles[i]) if i < len(titles) else "",
                 "url": links[i] if i < len(links) else "",
-                "snippet": re.sub(r"<[^>]+>", "", snippets[i]) if i < len(snippets) else "",
+                "snippet": clean(snippets[i]) if i < len(snippets) else "",
             })
         return out[:5]
     except requests.RequestException:
