@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, "/root/empire_os")
-from empire_os.agent_core import OllamaClient
+from empire_os.agent_core import OpenCodeZenClient
 from empire_os.synthetic_agents import SyntheticAgent
 
 ROLE_DIR = Path("/root/code_review")
@@ -170,6 +170,7 @@ if __name__ == "__main__":
         name="code-review-agent",
         role="code_review",
         health_url="http://localhost:9102/health",
+        llm=OpenCodeZenClient(model="deepseek-v4-flash-free"),
     )
     print(f"[{datetime.now(timezone.utc).isoformat()}] code-review online — tick {TICK_INTERVAL}s", flush=True)
     failures = 0

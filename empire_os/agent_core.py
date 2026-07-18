@@ -493,3 +493,86 @@ class OpenRouterClient:
         except (json.JSONDecodeError, TypeError):
             return {"error": "parse_failed", "raw": raw}
 
+
+class OpenCodeZenClient:
+    """OpenAI-compatible client for OpenCode Zen (free-tier deepseek etc).
+
+    Base: https://opencode.ai/zen/v1  (chat/completions)
+    Key:  /root/.empire_secrets/opencode_zen.env (OPENCODE_ZEN_API_KEY)
+    Same chat() interface + 429/empty-content backoff as OpenRouterClient.
+    Free tier (deepseek-v4-flash-free) is rate-limited; degrade gracefully.
+    """
+
+    def __init__(self, model: Optional[str] = None,
+                 api_key: Optional[str] = None,
+                 base: Optional[str] = None,
+                 max_retries: int = 5, timeout: int = 45):
+        p = Path("/root/.empire_secrets/opencode_zen.env")
+        env = {}
+        if p.exists():
+            for ln in p.read_text().splitlines():
+                if "=" in ln and not ln.startswith("#"):
+                    k, v = ln.split("=", 1)
+                    env[k.strip()] = v.strip()
+        self.api_key = api_key or env.get("OPENCODE_ZEN_API_KEY")
+        self.base = (base or env.get("OPENCODE_ZEN_BASE")
+                     or "https://opencode.ai/zen/v1") + "/chat/completions"
+        self.model = model or "deepseek-v4-flash-free"
+        self.max_retries = max_retries
+        self.timeout = timeout
+        if not self.api_key:
+            logger.warning("OpenCodeZenClient: no API key loaded")
+
+    def chat(self, messages: list[dict], system: Optional[str] = None,
+             temperature: float = 0.2, max_tokens: int = 800) -> Optional[str]:
+        if not self.api_key:
+            return None
+        if system:
+            messages = [{"role": "system", "content": system}] + messages
+        payload = {"model": self.model, "messages": messages,
+                   "temperature": temperature, "max_tokens": max_tokens}
+        last_err = ""
+        import urllib.request
+        import urllib.error
+        for attempt in range(self.max_retries):
+            req = urllib.request.Request(
+                self.base,
+                data=json.dumps(payload).encode(),
+                headers={"Authorization": f"Bearer {self.api_key}",
+                         "Content-Type": "application/json",
+                         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) "
+                                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                       "Chrome/120.0 Safari/537.36"},
+                method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    data = json.loads(resp.read().decode())
+                choices = data.get("choices") or []
+                content = (choices[0].get("message", {}).get("content")
+                           if choices else "") or ""
+                if not content.strip():
+                    last_err = "empty_content (free-tier capacity shed)"
+                    wait = min(2 ** attempt * 5 + attempt, 120)
+                    logger.warning("Zen %s — retry %ss", last_err, wait)
+                    time.sleep(wait)
+                    continue
+                return content
+            except urllib.error.HTTPError as e:
+                body = e.read().decode() if hasattr(e, "read") else ""
+                last_err = f"HTTP {e.code}: {body[:200]}"
+                if e.code == 429:
+                    wait = min(2 ** attempt * 10 + attempt * 2, 120)
+                    logger.warning("Zen 429 — backoff %ss", wait)
+                    time.sleep(wait)
+                    continue
+                logger.warning("Zen HTTP error: %s", last_err)
+                break
+            except (urllib.error.URLError, OSError, ValueError,
+                    json.JSONDecodeError, KeyError) as e:
+                last_err = f"{type(e).__name__}: {e}"
+                wait = min(2 ** attempt * 4 + attempt, 90)
+                logger.warning("Zen transient %s — retry %ss", last_err, wait)
+                time.sleep(wait)
+                continue
+        return json.dumps({"error": "zen_failed", "detail": last_err[:200]})
+
