@@ -57,6 +57,21 @@ def expand_questions(niche, city=""):
     ]
 
 
+def render_qa_block(question, answer):
+    """Modular Q&A block — semantic HTML + the exact phrasing AI Overviews cite.
+
+    Mirrors Microsoft's AEO guidance: clean question/answer pairs, no fluff.
+    Returns (html_details, faq_jsonld_dict) so the page gets BOTH the visible
+    block AND machine-readable FAQPage schema (what AI search actually pulls).
+    """
+    q = question.replace('"', "&quot;")
+    a = answer.replace("<", "&lt;").replace(">", "&gt;")
+    html = f"<details><summary>{q}</summary><p>{a}</p></details>"
+    jsonld = {"@type": "Question", "name": question,
+              "acceptedAnswer": {"@type": "Answer", "text": answer}}
+    return html, jsonld
+
+
 def render(tenant, niche, city="", tone="sharp", points=None, questions=None, cta="", surface_root=None):
     points = points or []
     questions = questions or expand_questions(niche, city)  # auto-fill if empty
@@ -69,11 +84,24 @@ def render(tenant, niche, city="", tone="sharp", points=None, questions=None, ct
     city_d = city or "your area"
     angle = _TONE_BLURB.get(tone, _TONE_BLURB["sharp"]).format(niche=disp, city=city_d)
 
-    pts_html = "\n".join(f"<li>{p}</li>" for p in points) or "<li>Verified, exclusive leads</li>"
-    q_html = "\n".join(
-        f"<details><summary>{q}</summary><p>{angle}</p></details>" for q in questions
-    ) or f"<details><summary>Who provides the best {disp} leads in {city_d}?</summary><p>{angle}</p></details>"
+    # Build modular Q&A blocks + collect FAQPage JSON-LD
+    qa_html = []
+    faq_items = []
+    for q in questions:
+        # answer = the angle (citation-ready, factual) — one niche per page
+        block, qa = render_qa_block(q, angle)
+        qa_html.append(block)
+        faq_items.append(qa)
+    q_html = "\n".join(qa_html) or (
+        f"<details><summary>Who provides the best {disp} leads in {city_d}?</summary>"
+        f"<p>{angle}</p></details>")
+    faq_jsonld = {
+        "@context": SCHEMA,
+        "@type": "FAQPage",
+        "mainEntity": faq_items,
+    }
 
+    pts_html = "\n".join(f"<li>{p}</li>" for p in points) or "<li>Verified, exclusive leads</li>"
     cta_html = f'<div class="cta"><p>{cta or "Get verified " + disp + " leads — talk to Empire AI."}</p></div>'
 
     html = f"""<!DOCTYPE html>
@@ -98,6 +126,9 @@ def render(tenant, niche, city="", tone="sharp", points=None, questions=None, ct
   "areaServed": {{ "@type": "Place", "name": "{city_d}" }},
   "provider": {{ "@type": "Organization", "name": "Empire AI", "url": "https://empire-ai.co.uk" }}
 }}
+</script>
+<script type="application/ld+json">
+{json.dumps(faq_jsonld, indent=2)}
 </script>
 <style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}

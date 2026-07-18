@@ -116,6 +116,10 @@ def _sample_metrics():
         ac = json.load(open("/root/feedback/aeo_citations.json"))
         metrics["aeo_citation_rate"] = ac.get("citation_rate", 0.0)
         metrics["aeo_assets"] = max(metrics["aeo_assets"], ac.get("cited_count", 0))
+        # Reddit organic citation signal (reddit_monitor.py)
+        rd = ac.get("reddit", {})
+        metrics["reddit_citation_rate"] = rd.get("reddit_citation_rate", 0.0)
+        metrics["reddit_mentions"] = rd.get("mentions", 0)
     except Exception:
         pass
     return metrics
