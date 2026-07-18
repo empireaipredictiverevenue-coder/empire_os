@@ -295,7 +295,7 @@ def charge(buyer_id: str, head: int, reason: str,
 
     Returns ChargeResult. Always writes si_charges row. May call
     real processor if creds available, else returns
-    status='simulated'.
+    status='open' (awaiting on-chain payment).
     """
     charge_id = "chg_" + secrets.token_hex(8)
     pm = get_default_pm(buyer_id)
@@ -312,7 +312,7 @@ def charge(buyer_id: str, head: int, reason: str,
         crypto_res = charge_crypto(
             buyer_id=buyer_id, head=head, reason=reason,
             amount_usdc=max(1, amount_cents / 100),
-            call_id=call_id, lead_id=lead_id)
+            call_id=call_id, lead_id=lead_id, charge_id=charge_id)
         resp = {"ok": crypto_res.get("status") != "failed",
                 "raw": crypto_res,
                 "pay_url": crypto_res.get("pay_url"),

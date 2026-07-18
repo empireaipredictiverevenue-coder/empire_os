@@ -264,7 +264,8 @@ def fetch_vault_recent_inbound(memo_contains: str = "",
 
 def charge_crypto(buyer_id: str, head: int, reason: str,
                   amount_usdc: float,
-                  call_id: str = "", lead_id: str = "") -> dict:
+                  call_id: str = "", lead_id: str = "",
+                  charge_id: str = None) -> dict:
     """Generate a crypto payment request + reconcile if already paid.
 
     Returns ChargeResult-shaped dict (status=open if we
@@ -275,7 +276,7 @@ def charge_crypto(buyer_id: str, head: int, reason: str,
     'simulated' status entirely — see assert_no_simulated().
     """
     invoice_id = "inv_crypto_" + os.urandom(4).hex()
-    charge_id = "chg_crypto_" + os.urandom(4).hex()
+    charge_id = charge_id or ("chg_crypto_" + os.urandom(4).hex())
     memo = f"INV_{invoice_id}"
     # Solana Pay is push-to-vault: the buyer sends USDC/SOL to OUR vault
     # with the memo. A stored buyer wallet is NOT required to generate the
@@ -296,20 +297,10 @@ def charge_crypto(buyer_id: str, head: int, reason: str,
     paid_at = (datetime.fromtimestamp(
         matched["block_time"], tz=timezone.utc).isoformat()
         if matched else None)
-    # Persist locally
+    # Persist locally — invoice artifact only. The si_charges row is
+    # owned by charge() (uniform across all processors), so we do NOT
+    # insert it here (would double-write + collide on charge_id).
     con = sqlite3.connect(DB)
-    con.execute(
-        "INSERT OR IGNORE INTO si_charges "
-        "(charge_id, buyer_id, processor, customer_ref, payment_ref, "
-        "head, reason, amount_cents, currency, status, "
-        "processor_response, attempt_count, created_at, paid_at) "
-        "VALUES (?, ?, 'usdc', ?, ?, ?, ?, ?, 'USDC', ?, ?, 1, ?, ?)",
-        (charge_id, buyer_id, wallet, memo,
-         head, reason[:200], int(amount_usdc * 100),
-         status,
-         json.dumps({"pay_req": pay_req,
-                     "matched_tx": matched})[:500],
-         now_iso(), paid_at))
     con.execute(
         "INSERT OR IGNORE INTO si_ppc_invoices "
         "(invoice_id, charge_id, buyer_id, head, lead_id, call_id, "
