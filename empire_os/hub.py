@@ -3043,7 +3043,8 @@ def buyer_enterprise_intake(req: dict):
     try:
         from empire_os.crm import intake_lead
         import sqlite3
-        cnx = sqlite3.connect("/root/empire_os/empire_os.db")
+        cnx = sqlite3.connect("/root/empire_os/empire_os.db", timeout=30)
+        cnx.execute("PRAGMA busy_timeout=30000")
         try:
             lead_id = intake_lead(
                 cnx,
