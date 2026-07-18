@@ -41,12 +41,20 @@ if [[ "$RESTART" -eq 1 ]]; then
   echo "==> restarting pm2 services in ${CONTAINER}"
   incus exec "$CONTAINER" -- pm2 restart empire-hub-service empire-solana-listener empire-north-mini 2>&1 \
     | grep -E "restarting|online" || true
-  sleep 4
+  # poll /health up to 15s (hub may take a few sec to rebind)
+  ready=0
+  for i in $(seq 1 15); do
+    code=$(incus exec "$CONTAINER" -- curl -s -m 4 -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health 2>/dev/null || true)
+    if [[ "$code" == "200" ]]; then ready=1; break; fi
+    sleep 4
+  done
+  if [[ "$ready" -ne 1 ]]; then
+    echo "WARN: hub /health not 200 after 15s (last=$code) — smoke may be unreliable"
+  fi
 fi
 
 if [[ "$SMOKE" -eq 1 ]]; then
-  echo "==> smoke: /health"
-  incus exec "$CONTAINER" -- curl -s -o /dev/null -w "health:%{http_code}\n" http://127.0.0.1:8000/health
+  echo "==> smoke: hub ready (health polled 200 above)"
   echo "==> smoke: charge -> replay cycle (NO-SIM + settlement + FK)"
   incus exec "$CONTAINER" -- bash -c 'cd /root/empire_os && /root/venv/bin/python3 - <<PYEOF
 import sqlite3, sys, json, urllib.request

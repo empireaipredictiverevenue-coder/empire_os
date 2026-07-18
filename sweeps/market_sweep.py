@@ -28,7 +28,7 @@ from bs4 import BeautifulSoup
 CONTAINER = "empire-hub"
 DB_PATH = "/root/empire_os/empire_os.db"
 # Inside container: direct SQLite. From host: use incus exec.
-DIRECT_DB = "empire-hub" in os.uname().nodename
+DIRECT_DB = os.environ.get("DIRECT_DB") == "1" or ("empire-hub" in os.uname().nodename)
 SOURCE_NAME = "market_sweep"
 REQUEST_TIMEOUT = 15
 
@@ -405,6 +405,60 @@ def _load_env():
         except FileNotFoundError:
             continue
 
+def search_serper(niche, metro, limit):
+    """Search via Serper API (live primary). Returns lead dicts."""
+    _load_env()
+    import json as _json, urllib.request, urllib.parse
+    KEY = os.environ.get("SERPER_KEY", "")
+    if not KEY:
+        return [], 0
+    metro_parts = [p.strip() for p in metro.split(",")]
+    metro_city = metro_parts[0] if metro_parts else metro
+    metro_state = metro_parts[1] if len(metro_parts) > 1 else ""
+    queries = [
+        f"{niche} contractors {metro_city} {metro_state}",
+        f"{niche} {metro_city} {metro_state}",
+        f'{niche} company {metro_city}',
+    ]
+    leads, seen_urls, seen_names, status = [], set(), set(), 0
+    for query in queries:
+        if len(leads) >= limit:
+            break
+        try:
+            req = urllib.request.Request(
+                "https://google.serper.dev/search?q=" + urllib.parse.quote(query),
+                headers={"X-API-KEY": KEY, "Content-Type": "application/json"})
+            resp = urllib.request.urlopen(req, timeout=15)
+            data = _json.loads(resp.read().decode())
+            status = resp.status
+            for r in data.get("organic_results", []):
+                if len(leads) >= limit:
+                    break
+                link = r.get("link", "").strip()
+                title = r.get("title", "").strip()
+                if not link or not title or link in seen_urls:
+                    continue
+                seen_urls.add(link)
+                if is_aggregator(link):
+                    continue
+                name = clean_business_name(title)
+                if not is_valid_contractor_name(name):
+                    continue
+                nk = name.lower().strip()
+                if nk in seen_names:
+                    continue
+                seen_names.add(nk)
+                leads.append({
+                    "business_name": name, "website": link, "phone": "",
+                    "email": "", "street": "", "city": "", "state": "",
+                    "zip": "", "metro": metro, "niche": niche,
+                })
+        except Exception as e:
+            log(f"    [serper err] {str(e)[:50]}")
+            continue
+    return leads, status
+
+
 def search_serply(niche, metro, limit):
     """Search via Serply API, return lead dicts matching pipeline shape."""
     _load_env()
@@ -676,10 +730,18 @@ def run_sweep(niche, metro, limit, dry_run=False):
     source_statuses = []
 
     # Source 1: Serply (primary)
-    results, status = search_serply(niche, metro, limit + 3)
+    # Source 1: Serper (live primary)
+    results, status = search_serper(niche, metro, limit + 3)
     all_leads.extend(results)
-    source_statuses.append(f"Serply={status}")
-    log(f"Serply -> {len(results)} leads (status={status})")
+    source_statuses.append(f"Serper={status}")
+    log(f"Serper -> {len(results)} leads (status={status})")
+
+    # Source 2: Serply (fallback if Serper empty)
+    if len(all_leads) < limit:
+        results, status = search_serply(niche, metro, limit - len(all_leads) + 3)
+        all_leads.extend(results)
+        source_statuses.append(f"Serply={status}")
+        log(f"Serply -> {len(results)} leads (status={status})")
 
     # Source 2: Bing RSS (fallback)
     if len(all_leads) < limit:

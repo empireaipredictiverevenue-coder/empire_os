@@ -190,6 +190,10 @@ def _resolve_buyer_email(buyer_id: str) -> str:
         ("si_buyer_outreach", "email", "prospect_id"),
         ("si_buyer_outreach", "email", "buyer_id"),
         ("si_buyer_payment_methods", "customer_ref", "buyer_id"),
+        # crm_leads is the canonical source for market-sweep prospects;
+        # emails there were previously invisible to the resolver, leaving
+        # valid charges undeliverable (pay_url never reached the buyer).
+        ("crm_leads", "email", "lead_uid"),
     )
     for _tbl, _col, _key in _queries:
         try:
