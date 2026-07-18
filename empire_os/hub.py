@@ -1639,13 +1639,37 @@ def a2a_negotiate(req: dict):
     if not buyer_agent:
         raise HTTPException(400, "buyer_agent required")
 
+    # map generic niche names to lane sub_niche / category
+    NICHE_ALIAS = {
+        "roofing": "residential_roofing",
+        "roof": "residential_roofing",
+        "roofer": "residential_roofing",
+        "hvac": "hvac",
+        "plumbing": "plumbing",
+        "electrical": "electrical",
+        "solar": "solar",
+        "windows": "windows",
+        "flooring": "flooring",
+        "landscaping": "landscaping",
+    }
+    search_niche = NICHE_ALIAS.get(niche.lower(), niche)
+
+    # map city name to airport-code metro used in lanes
+    METRO_ALIAS = {
+        "phoenix": "PHX", "los angeles": "LAX", "dallas": "DFW",
+        "houston": "HOU", "chicago": "CHI", "new york": "NYC",
+        "atlanta": "ATL", "miami": "MIA", "boston": "BOS",
+        "san francisco": "SFO", "washington": "WDC", "philadelphia": "PHL",
+    }
+    search_metro = METRO_ALIAS.get(metro.lower(), metro.upper()[:3])
+
     quote = None
     if product == "lead_lane":
         row = backend.execute(
             "SELECT id, seat_price, category, sub_niche, metro FROM lanes "
             "WHERE (occupied_by IS NULL OR occupied_by = '') "
-            "AND (sub_niche = ? OR category = ?) AND metro = ? LIMIT 1",
-            (niche, niche, metro),
+            "AND (sub_niche = ? OR category = ? OR sub_niche = ?) AND metro = ? LIMIT 1",
+            (search_niche, search_niche, niche, search_metro),
         ).fetchone()
         if row:
             quote = {
