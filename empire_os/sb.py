@@ -47,9 +47,17 @@ def _url(table: str, query: str = "") -> str:
     return f"{SUPABASE_URL}/rest/v1/{_table(table)}{query}"
 
 
+def _configured() -> bool:
+    """Supabase is optional. When unconfigured, all ops no-op gracefully
+    so local SQLite remains the source of truth (fault tolerance)."""
+    return bool(SUPABASE_URL and SUPABASE_KEY)
+
+
 def select(table: str, columns: str = "*", filters: dict | None = None,
            order: str | None = None, limit: int = 1000, offset: int = 0) -> list:
     """SELECT rows. filters = {col: value} -> col=eq.value."""
+    if not _configured():
+        return []
     q = f"?select={columns}"
     if filters:
         for k, v in filters.items():
@@ -63,6 +71,8 @@ def select(table: str, columns: str = "*", filters: dict | None = None,
 
 
 def insert(table: str, row: dict, return_repr: bool = True) -> list:
+    if not _configured():
+        return []
     headers = _headers({"Prefer": "return=representation"} if return_repr else {"Prefer": "return=minimal"})
     data = json.dumps(row).encode()
     req = urllib.request.Request(_url(table), data=data, headers=headers, method="POST")
@@ -72,6 +82,8 @@ def insert(table: str, row: dict, return_repr: bool = True) -> list:
 
 def update(table: str, match: dict, values: dict) -> list:
     """PATCH rows matching `match` (col:val) with `values`."""
+    if not _configured():
+        return []
     q = ""
     for k, v in match.items():
         q += f"&{k}=eq.{v}" if q else f"?{k}=eq.{v}"

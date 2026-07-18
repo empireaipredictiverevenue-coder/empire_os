@@ -168,14 +168,8 @@ class StormPredictor:
 
         if self.telegram_token and self.telegram_chat_id:
             try:
-                tg_url = (
-                    f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
-                )
-                data = urllib.parse.urlencode({
-                    "chat_id": self.telegram_chat_id, "text": msg,
-                }).encode()
-                req = urllib.request.Request(tg_url, data=data)
-                urllib.request.urlopen(req, timeout=5)
+                import empire_os.hermes_gateway as _g
+                _g._telegram_send(msg, revenue=False)
             except Exception as e:
                 logger.debug("Telegram notify failed: %s", e)
 

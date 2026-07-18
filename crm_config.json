@@ -1,0 +1,35 @@
+[
+    {
+        "provider": "hubspot",
+        "api_url": "https://api.hubspot.com",
+        "api_key": "{{HUBSPOT_API_KEY}}",
+        "webhook_secret": "{{HUBSPOT_WEBHOOK_SECRET}}",
+        "tenant_id": "hubspot_corp",
+        "enabled": true,
+        "retry_count": 0,
+        "last_error": null,
+        "next_retry_after": null
+    },
+    {
+        "provider": "salesforce",
+        "api_url": "https://login.salesforce.com",
+        "api_key": "{{SALESFORCE_API_KEY}}",
+        "webhook_secret": "{{SALESFORCE_WEBHOOK_SECRET}}",
+        "tenant_id": "salesforce_corp",
+        "enabled": true,
+        "retry_count": 0,
+        "last_error": null,
+        "next_retry_after": null
+    },
+    {
+        "provider": "gohighlevel",
+        "api_url": "https://api.gohighlevel.com/v1",
+        "api_key": "{{GHL_API_KEY}}",
+        "webhook_secret": "{{GHL_WEBHOOK_SECRET}}",
+        "tenant_id": "local_marketing",
+        "enabled": true,
+        "retry_count": 0,
+        "last_error": null,
+        "next_retry_after": null
+    }
+]

@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-seo-loop (daily 18:00)
+
+[Timer]
+OnCalendar=18:00
+Persistent=true
+Unit=empire-seo-loop.service
+
+[Install]
+WantedBy=timers.target

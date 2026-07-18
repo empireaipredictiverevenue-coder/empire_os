@@ -160,12 +160,54 @@ def check_pm2() -> list[str]:
     return probs
 
 
+def check_revenue_loop() -> list[str]:
+    """Recurrence guard: catch the simulation / dead-router revenue leaks.
+
+    Flags:
+      - ppc-router not online (the charge/settle path dies without it)
+      - any si_charges row stuck in 'simulated'/'open' for >30m with a
+        pay_url that was never delivered -> the $0-revenue root cause.
+        (NO-SIM: a 'simulated' charge past the grace window is a FAILURE,
+        not a benign state.)
+    """
+    probs: list[str] = []
+    # 1) ppc-router liveness
+    try:
+        out = incus_exec("pm2 jlist 2>/dev/null")
+        import json as _json
+        data = _json.loads(out.stdout or "[]")
+        pr = next((p for p in data
+                   if p.get("name") == "empire-ppc-router"), None)
+        if pr and pr.get("pm2_env", {}).get("status") != "online":
+            probs.append("empire-ppc-router NOT online (charge path dead)")
+    except Exception:
+        pass
+    # 2) stale simulated charges (never delivered / never paid)
+    try:
+        q = ("SELECT COUNT(*) FROM si_charges WHERE status IN "
+             "('simulated','open') AND created_at < datetime('now','-30 minutes')")
+        res = incus_exec(
+            f"cd /root/empire_os && python3 -c \""
+            f"from empire_os.funnel import SQLiteBackend;"
+            f"b=SQLiteBackend('empire_os.db');"
+            f"print(b.execute({q!r}).fetchone()[0])\"")
+        stuck = int((res.stdout or "0").strip() or 0)
+        if stuck > 0:
+            probs.append(
+                f"{stuck} charge(s) stuck simulated/open >30m "
+                f"(pay_url never delivered / never settled)")
+    except Exception as e:
+        probs.append(f"revenue_loop_check_error:{e}")
+    return probs
+
+
 def run_once() -> dict:
     results = {
         "syntax_bad": check_syntax(),
         "import_bad": check_imports(),
         "endpoints_dead": check_endpoints(),
         "pm2_probs": check_pm2(),
+        "revenue_loop_probs": check_revenue_loop(),
     }
     failed = any(results[k] for k in results)
     results["ok"] = not failed

@@ -181,11 +181,29 @@ waterfall = None
 AEO_SURFACE_ROOT = os.environ.get("AEO_SURFACE_ROOT", "/srv/aeo")
 
 
+_singleton_lock_fh = None
+
+
+def _acquire_singleton_lock() -> bool:
+    """Return True if THIS process wins the single-owner lock for the heavy
+    background loops (agi_loop + auto_pilot). With multiple uvicorn workers
+    only one may run the loops; the rest stay pure request handlers so
+    endpoints don't get starved by 6-8s agent cycles."""
+    global _singleton_lock_fh
+    import fcntl
+    try:
+        fh = open("/tmp/empire_hub_loops.lock", "w")
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _singleton_lock_fh = fh  # keep ref so lock persists
+        return True
+    except (OSError, BlockingIOError):
+        return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     global backend, scout, revenue_worker, scout_agent
-
     db_path = os.environ.get("EMPIRE_DB_PATH", "empire_os.db")
     logger.info("Connecting to database: %s", db_path)
     backend = SQLiteBackend(db_path)
@@ -275,7 +293,11 @@ async def lifespan(app: FastAPI):
     # Skip during tests to prevent blocking on LLM calls
     from empire_os.ceo import tick as ceo_tick_fn
     global agi_loop
-    if os.environ.get("EMPIRE_OS_TEST_MODE") != "1":
+    _own_loops = _acquire_singleton_lock()
+    if not _own_loops:
+        logger.info("Worker did not win loop lock — request-handler only "
+                    "(agi_loop + auto_pilot skipped)")
+    if _own_loops and os.environ.get("EMPIRE_OS_TEST_MODE") != "1":
         # Wrap CEO tick so the loop can call it as a no-arg method
         class _CeoBriefProxy:
             def __init__(self, fn, b):
@@ -299,7 +321,7 @@ async def lifespan(app: FastAPI):
     # Start the Auto-Pilot — drives the funnel end-to-end every N seconds
     from empire_os.auto_pilot import AutoPilot
     global auto_pilot
-    if os.environ.get("EMPIRE_OS_TEST_MODE") != "1":
+    if _own_loops and os.environ.get("EMPIRE_OS_TEST_MODE") != "1":
         auto_pilot = AutoPilot(
             hub_url=f"http://localhost:{int(os.environ.get('EMPIRE_PORT', '8080'))}",
             match_limit=15,
@@ -366,8 +388,11 @@ async def lifespan(app: FastAPI):
                     logger.exception("watcher cycle failed: %s", e)
                 await asyncio.sleep(300)
 
-        asyncio.create_task(_watcher_loop())
-        logger.info("Watcher loop spawned")
+        if _own_loops:
+            asyncio.create_task(_watcher_loop())
+            logger.info("Watcher loop spawned (owner worker)")
+        else:
+            logger.info("Watcher loop skipped (non-owner worker)")
 
     # Initialize the Waterfall data provider orchestrator
     global waterfall
@@ -1028,6 +1053,7 @@ class BuyerApplyRequest(BaseModel):
     tier: str = "silver"
     webhook_url: str = ""
     min_deposit: float = 0.0
+    source: str = ""
 
 
 class BuyerApplyResponse(BaseModel):
@@ -1061,7 +1087,7 @@ async def buyer_apply(req: BuyerApplyRequest):
             asyncio.to_thread(
                 ao.onboard, req.name.strip(), req.niche.strip().lower(), tier,
                 webhook_url=req.webhook_url, delivery_email=req.email.strip(),
-                min_deposit=req.min_deposit,
+                min_deposit=req.min_deposit, source=req.source,
             ),
             timeout=12.0,
         )
@@ -4921,6 +4947,8 @@ def waterfall_metrics():
 class TelegramPayload(BaseModel):
     token: Optional[str] = None
     chat_id: Optional[str] = None
+    message: Optional[str] = None
+    tag: Optional[str] = None
 
 
 @app.post("/v1/telegram/brief")
@@ -4938,9 +4966,15 @@ def telegram_brief(payload: TelegramPayload):
 
 @app.post("/v1/telegram/alert")
 def telegram_alert(payload: TelegramPayload, message: str = ""):
-    """Send an alert to Telegram."""
+    """Send an alert to Telegram.
+
+    `message` may arrive either as a query param OR in the JSON body
+    (payload.message). Body wins when present. This lets callers POST
+    a structured payload (e.g. payment links) instead of URL-encoding.
+    """
+    text = payload.message or message or "Empire OS alert triggered"
     result = send_alert(
-        message or "Empire OS alert triggered",
+        text,
         token=payload.token,
         chat_id=payload.chat_id,
     )
@@ -5496,12 +5530,12 @@ async def ppc_log_charge(request: Request):
         " head, reason, amount_cents, currency, status, "
         " processor_response, attempt_count, created_at, paid_at)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
-        (cid, body.get("buyer_id", ""), body.get("processor", "simulated"),
+        (cid, body.get("buyer_id", ""), body.get("processor", ""),
          body.get("customer_ref", ""), body.get("payment_ref", ""),
          body.get("head", 0), body.get("reason", "")[:200],
          int(body.get("amount_cents", 0)),
          body.get("currency", "USD"),
-         body.get("status", "simulated"),
+         body.get("status", "failed"),
          json.dumps(body)[:500],
          body.get("created_at") or
          datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),

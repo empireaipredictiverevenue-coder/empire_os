@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-outreach-cycle (every 360m)
+
+[Timer]
+OnCalendar=*-*:00/360
+Persistent=true
+Unit=empire-outreach-cycle.service
+
+[Install]
+WantedBy=timers.target

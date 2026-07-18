@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Buy Leads &amp; Pay Per Call — Empire AI</title>
+<meta property="og:title" content="Buy Exclusive Leads — Pay Only For What Converts">
+<meta property="og:description" content="Roofing, debt, medicare, mortgage, legal, auto leads. Delivered real-time to your inbox or webhook. Priced per lead, billed in USDC on Solana.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://empire-ai.co.uk/buy-leads">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Buy Exclusive Leads — Empire AI">
+<meta name="twitter:description" content="Pay-per-lead + pay-per-call. USDC on Solana. No cards, no KYC.">
 <style>
  body{background:#050810;color:#e6f1ff;font-family:system-ui,sans-serif;margin:0}
  .wrap{max-width:760px;margin:0 auto;padding:48px 20px}
@@ -37,6 +44,7 @@
     <option value="platinum">Platinum — $25/lead</option>
    </select>
    <label>Webhook (optional)</label><input name="webhook_url" placeholder="https://your-crm.com/hook">
+   <input type="hidden" name="source" id="src">
    <button type="submit">Get Matched Leads</button>
   </form>
   <div id="msg" class="note"></div>
@@ -45,6 +53,8 @@
  <script>
  document.getElementById('f').onsubmit = async function(e){
   e.preventDefault();
+  var p = new URLSearchParams(location.search);
+  document.getElementById('src').value = p.get('ref') || 'direct';
   var d = Object.fromEntries(new FormData(e.target));
   var m = document.getElementById('msg');
   var w = document.getElementById('wallet');

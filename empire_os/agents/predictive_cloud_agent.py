@@ -25,7 +25,8 @@ HUB    = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
 DB     = os.environ.get("HUB_DB_PATH", "/root/empire_os/empire_os.db")
 FB     = Path("/root/feedback")
 LOG    = FB / "predictive_cloud.jsonl"
-RESEARCH_PROGRAM = Path("/tmp/repo_AutoReSeArch/program.md")
+RESEARCH_PROGRAM = Path(os.environ.get(
+    "AUTORESEARCH_PROGRAM", "/root/AutoReSeArch/program.md"))
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(6 * 3600)))
 
 

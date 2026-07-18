@@ -172,21 +172,21 @@ class AutoPilot:
                 report.sent += 1
 
     def _stage_reply(self, report: CycleReport):
-        """Simulate replies on sent leads (probabilistic)."""
-        import random
-        _, data = self._http("GET", "/v1/funnel/states?state=outreach_sent&limit=20")
-        leads = data.get("prospects", [])
-        if not leads:
-            return
-        for lead in leads:
-            if random.random() < self.reply_rate:
-                self._http(
-                    "POST",
-                    f"/v1/funnel/{lead['prospect_id']}/transition",
-                    {"to_state": "replied", "actor": "auto-pilot",
-                     "notes": f"simulated reply ({self.reply_rate*100:.0f}% rate)"},
-                )
-                report.replied += 1
+        """Detect REAL replies on sent leads.
+
+        NO SIMULATION. Replies are only registered when a genuine inbound
+        reply is observed (email webhook / inbox poll / a2a signal). The
+        old code fabricated replies via random.random() — that inflated
+        pipeline vanity metrics and fed fake leads into the closer,
+        producing $0 real revenue. Replies now come exclusively from the
+        real reply-detection path (see empire_os.reply_detect / inbox
+        poll); this stage is a no-op placeholder so the cycle report still
+        accounts for replied leads counted elsewhere.
+        """
+        # Replies are detected by the real inbound pipeline, not simulated.
+        # Nothing to do here — report.replied is populated by the reply
+        # detector when an actual response lands.
+        return
 
     def _stage_claim(self, report: CycleReport):
         """Claim replied leads via AGI Closer."""
@@ -202,32 +202,37 @@ class AutoPilot:
                 report.claimed += 1
 
     def _stage_settle(self, report: CycleReport):
-        """Settle claimed leads. Amount is LLM-priced, fee is split, payout recorded."""
-        import random
+        """Settle claimed leads. Amount is LLM-priced, fee is split, payout recorded.
+
+        NO probabilistic gate. Every claimed lead is attempted for
+        settlement — the charge layer (empire_os.charge) already handles
+        failure gracefully (status=failed, no silent simulation). Gating
+        settlement behind random.random() < settle_rate was silently
+        dropping 60% of billable leads and killing revenue.
+        """
         _, data = self._http("GET", "/v1/funnel/states?state=claimed&limit=20")
         leads = data.get("prospects", [])
         if not leads:
             return
         for lead in leads:
-            if random.random() < self.settle_rate:
-                _, priced = self._http(
-                    "POST", "/v1/funnel/price-and-settle",
-                    {"prospect_id": lead["prospect_id"], "settle": True},
+            _, priced = self._http(
+                "POST", "/v1/funnel/price-and-settle",
+                {"prospect_id": lead["prospect_id"], "settle": True},
+            )
+            if priced.get("ok"):
+                amount = priced["amount_cents"]
+                fee = priced.get("fee_cents", 0)
+                self._http(
+                    "POST", "/v1/payouts/create",
+                    {
+                        "settlement_event_id": priced.get("event_id", ""),
+                        "prospect_id": lead["prospect_id"],
+                        "amount_cents": amount,
+                    },
                 )
-                if priced.get("ok"):
-                    amount = priced["amount_cents"]
-                    fee = priced.get("fee_cents", 0)
-                    self._http(
-                        "POST", "/v1/payouts/create",
-                        {
-                            "settlement_event_id": priced.get("event_id", ""),
-                            "prospect_id": lead["prospect_id"],
-                            "amount_cents": amount,
-                        },
-                    )
-                    report.settled += 1
-                    report.revenue_cents += amount
-                    report.fee_cents = report.__dict__.get("fee_cents", 0) + fee
+                report.settled += 1
+                report.revenue_cents += amount
+                report.fee_cents = report.__dict__.get("fee_cents", 0) + fee
 
     def run_forever(self, interval_seconds: int = 120):
         """Continuous loop — runs every N seconds forever."""

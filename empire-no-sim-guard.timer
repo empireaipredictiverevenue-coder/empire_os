@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-no-sim-guard (hourly :00)
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=empire-no-sim-guard.service
+
+[Install]
+WantedBy=timers.target

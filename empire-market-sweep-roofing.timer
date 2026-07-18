@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-market-sweep-roofing (daily 06:00)
+
+[Timer]
+OnCalendar=06:30
+Persistent=true
+Unit=empire-market-sweep-roofing.service
+
+[Install]
+WantedBy=timers.target

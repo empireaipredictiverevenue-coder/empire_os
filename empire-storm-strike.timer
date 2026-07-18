@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-storm-strike (every 120m)
+
+[Timer]
+OnCalendar=*-*:00/120
+Persistent=true
+Unit=empire-storm-strike.service
+
+[Install]
+WantedBy=timers.target

@@ -40,10 +40,46 @@ if _ENV_PATH.exists():
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 FROM_EMAIL = os.environ.get("EMPIRE_FROM", "Empire OS <founder@empire-ai.co.uk>")
+# Pluggable SMTP relay (e.g. ImproveMX free tier) — kills the Resend bill.
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "resend").lower()
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.improvmx.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+SMTP_TLS = os.environ.get("SMTP_TLS", "1") == "1"
 HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FEEDBACK_DIR = Path("/root/feedback")
 POLL_INTERVAL = 30  # seconds between poll cycles
 MAX_PER_CYCLE = 10  # max emails to pull per poll
+
+
+def _smtp_send(to: str, subject: str, body: str) -> dict:
+    """Send one email via an SMTP relay (ImproveMX/Mailgun/etc). $0 if the
+    relay is free. Returns {ok, msg_id?, error?}."""
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
+        return {"ok": False, "error": "SMTP not configured (SMTP_HOST/USER/PASS)"}
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        msg = MIMEText(body, _charset="utf-8")
+        msg["Subject"] = subject
+        msg["From"] = FROM_EMAIL
+        msg["To"] = to
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
+            if SMTP_TLS:
+                s.starttls()
+            s.login(SMTP_USER, SMTP_PASS)
+            s.sendmail(FROM_EMAIL, [to], msg.as_string())
+        return {"ok": True, "msg_id": f"smtp:{to}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+
+def _send(to: str, subject: str, body: str) -> dict:
+    """Dispatch via the configured backend."""
+    if EMAIL_BACKEND == "smtp":
+        return _smtp_send(to, subject, body)
+    return _resend_send(to, subject, body)
 
 
 def _resend_send(to: str, subject: str, body: str) -> dict:
@@ -132,7 +168,7 @@ def send_pending_batch() -> int:
 
         logger.info("sending %d → %s: %s", out_id, to_email, subject[:60])
 
-        result = _resend_send(to_email, subject, body)
+        result = _send(to_email, subject, body)
 
         if result.get("ok"):
             # Mark sent on hub
@@ -143,6 +179,7 @@ def send_pending_batch() -> int:
             status = "sent"
             log_entry = {
                 "id": out_id, "to": to_email, "status": "sent",
+                "backend": EMAIL_BACKEND,
                 "resend_id": result.get("resend_id"),
                 "hub_mark_ok": mark.get("ok", False) if mark else False,
             }

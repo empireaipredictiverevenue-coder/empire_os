@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-csuite-tick (every 2h)
+
+[Timer]
+OnCalendar=*-*:00/120
+Persistent=true
+Unit=empire-csuite-tick.service
+
+[Install]
+WantedBy=timers.target

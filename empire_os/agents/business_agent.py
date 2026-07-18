@@ -41,6 +41,23 @@ class BusinessAgent(SyntheticAgent):
         except Exception as e:
             state["funnel_error"] = str(e)
 
+        # consume Chief-of-Staff task queue (Growth OS loop closure)
+        try:
+            cos = "/root/feedback/cos_tasks.jsonl"
+            tasks = []
+            if os.path.exists(cos):
+                with open(cos) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        t = json.loads(line)
+                        if not t.get("done"):
+                            tasks.append(t)
+            state["cos_tasks"] = tasks[:10]
+        except Exception:
+            state["cos_tasks"] = []
+
         return state
 
     def reason(self, state: dict) -> str:
@@ -59,6 +76,26 @@ class BusinessAgent(SyntheticAgent):
         )
 
     def act(self, decision: str) -> dict:
+        # execute any pending Chief-of-Staff tasks first (loop closure)
+        try:
+            cos = "/root/feedback/cos_tasks.jsonl"
+            if os.path.exists(cos):
+                lines = open(cos).read().splitlines()
+                out = []
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    t = json.loads(line)
+                    if not t.get("done"):
+                        t["done"] = True
+                        t["executed_by"] = "business_agent"
+                        t["executed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                    out.append(json.dumps(t))
+                with open(cos, "w") as f:
+                    f.write("\n".join(out) + "\n")
+        except Exception as e:
+            return {"summary": "cos-exec-error", "error": str(e)}
         try:
             d = json.loads(decision)
             decisions_log = Path("/root/business/decisions.jsonl")

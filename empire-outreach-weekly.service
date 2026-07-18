@@ -1,0 +1,14 @@
+[Unit]
+Description=Empire OS job: empire-outreach-weekly (Mon 09:00)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/.hermes/scripts
+ExecStart=/root/.hermes/scripts/outreach_pipeline_wrapper.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

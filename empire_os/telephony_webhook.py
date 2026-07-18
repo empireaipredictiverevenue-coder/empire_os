@@ -96,7 +96,7 @@ async def forward_to_hub(http_client: httpx.AsyncClient, p: TelephonyWebhookPayl
         "reason": f"telephony {p.status} {p.duration}s",
         "amount_cents": int(p.payout * 100),
         "currency": "USD",
-        "status": "open" if p.payout > 0 else "simulated",
+        "status": "open" if p.payout > 0 else "pending",
         "lead_id": p.lead_id or "",
         "call_id": p.call_sid,
         "metadata": json.dumps({"recording_url": p.recording_url or ""})[:500],

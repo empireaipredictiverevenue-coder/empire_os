@@ -7,12 +7,12 @@ echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Enrichment pipeline start"
 
 # Step 1: Batch enrich up to 50 leads with lowest enrichment scores
 echo "--- Batch enrich ---"
-ENRICH=$(curl -sS --noproxy '*' -X POST http://127.0.0.1:8081/v1/crm/leads/batch-enrich)
+ENRICH=$(curl -sS --noproxy '*' -X POST http://127.0.0.1:8000/v1/crm/leads/batch-enrich)
 echo "$ENRICH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Enriched: {d.get(\"enriched\",\"?\")} leads, errors: {d.get(\"errors\",0)}')" 2>&1 || echo "$ENRICH"
 
 # Step 2: Batch rescore all leads via ICP
 echo "--- ICP Batch rescore ---"
-SCORE=$(curl -sS --noproxy '*' -X POST http://127.0.0.1:8081/v1/crm/icp/batch)
+SCORE=$(curl -sS --noproxy '*' -X POST http://127.0.0.1:8000/v1/crm/icp/batch)
 echo "$SCORE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Scored: {d.get(\"updated\",\"?\")}')" 2>&1 || echo "$SCORE"
 
 # Step 3: Report summary

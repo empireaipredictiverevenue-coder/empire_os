@@ -102,8 +102,25 @@ class SyntheticAgent(Agent):
 
     # ── v2: SOUL + memory + anti-rep + skills ────────────────────
 
+    def _strip_frontmatter(self, md: str) -> str:
+        """Drop YAML frontmatter (--- ... ---) from a SKILL.md so only the
+        body reaches the LLM as a system prompt."""
+        if md.startswith("---"):
+            end = md.find("\n---", 3)
+            if end != -1:
+                return md[end + 4:].lstrip("\n")
+        return md
+
     def _load_soul(self) -> str:
-        """Load souls/<role>_SOUL.md once. Returns "" if not found."""
+        """Load souls/<role>_SOUL.md once. Returns "" if not found.
+
+        Search order (first hit wins):
+          1. live souls/ (role + name)
+          2. /root/{role}/  (legacy)
+          3. skills repos on disk (EmpireHermes/skills, empire-os-templates-repo,
+             OpenMontage) — a SKILL.md whose name maps to this role overrides the
+             drifted local SOUL. Keeps agent prompts versioned in the OSS repos.
+        """
         soul_paths = [
             Path(f"/root/empire_os/empire_os/agents/souls/{self.role}_SOUL.md"),
             Path(f"/root/empire_os/empire_os/agents/souls/{self.name}_SOUL.md"),
@@ -117,6 +134,29 @@ class SyntheticAgent(Agent):
                     return text
                 except Exception as e:
                     logger.warning("could not load soul %s: %s", p, e)
+        # skills-repo fallback: map role -> repo SKILL.md
+        repo_roots = [
+            "/root/EmpireHermes/skills",
+            "/root/empire-os-templates-repo",
+            "/root/OpenMontage/skills",
+        ]
+        role_key = (self.role or self.name or "").lower()
+        for root in repo_roots:
+            r = Path(root)
+            if not r.exists():
+                continue
+            # direct match: <root>/.../<role>_SOUL.md or <role>/SKILL.md
+            for cand in r.rglob(f"{role_key}_SOUL.md"):
+                try:
+                    return cand.read_text()
+                except Exception:
+                    pass
+            for cand in r.rglob("SKILL.md"):
+                if role_key in cand.parent.name.lower() or role_key in cand.parent.parent.name.lower():
+                    try:
+                        return _strip_frontmatter(cand.read_text())
+                    except Exception:
+                        pass
         return ""
 
     def soul_preamble(self) -> str:

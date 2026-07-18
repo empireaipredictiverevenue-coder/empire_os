@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-leads-scan (daily 06:00)
+
+[Timer]
+OnCalendar=06:00
+Persistent=true
+Unit=empire-leads-scan.service
+
+[Install]
+WantedBy=timers.target

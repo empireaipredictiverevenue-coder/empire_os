@@ -359,3 +359,137 @@ class Agent(ABC):
             "cycle": self.context.cycle,
             **self._health_snapshot(),
         }
+
+
+# ── OpenRouter Client (North-mini, free tier) ──────────────────────
+#
+# North-mini = cohere/north-mini-code:free on OpenRouter. It is FREE but
+# OpenRouter RATE-LIMITS the free tier (HTTP 429). This client handles that
+# with exponential backoff + jitter so North-mini can "work freely" on a
+# loop without silently dying. Key is read from
+# /root/.empire_secrets/openrouter.env (600 perms), never hardcoded.
+
+_OPENROUTER_ENV = Path("/root/.empire_secrets/openrouter.env")
+_OPENROUTER_MODELS = {
+    "north-mini": "cohere/north-mini-code:free",
+    "north_mini": "cohere/north-mini-code:free",
+}
+
+
+def _load_openrouter_key() -> str:
+    if _OPENROUTER_ENV.exists():
+        try:
+            for _ln in _OPENROUTER_ENV.read_text().splitlines():
+                _ln = _ln.strip()
+                if _ln.startswith("OPENROUTER_API_KEY="):
+                    return _ln.split("=", 1)[1].strip().strip('"').strip("'")
+        except Exception:
+            pass
+    return os.environ.get("OPENROUTER_API_KEY", "")
+
+
+class OpenRouterClient:
+    """Free-tier OpenRouter client (North-mini). 429-safe via backoff."""
+
+    def __init__(
+        self,
+        model: str = "cohere/north-mini-code:free",
+        timeout: int = 60,
+        max_retries: int = 5,
+    ):
+        self.model = _OPENROUTER_MODELS.get(model, model)
+        self.api_key = _load_openrouter_key()
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.base = "https://openrouter.ai/api/v1/chat/completions"
+
+    def chat(
+        self,
+        messages: list[dict],
+        system: Optional[str] = None,
+        temperature: float = 0.3,
+        max_tokens: int = 2048,
+    ) -> str:
+        """Send a chat request. Returns text, or a JSON error object string
+        on failure (so callers can detect + back off)."""
+        if not self.api_key:
+            return json.dumps({"error": "no_openrouter_key",
+                               "fallback": True})
+        if system:
+            messages = [{"role": "system", "content": system}] + messages
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            # Free tier: identify the app so OpenRouter can attribute.
+            "transforms": ["middle-out"],
+        }
+        import urllib.request
+        import urllib.error
+        last_err = ""
+        for attempt in range(self.max_retries):
+            req = urllib.request.Request(
+                self.base,
+                data=json.dumps(payload).encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                    "HTTP-Referer": "https://empire-ai.co.uk",
+                    "X-Title": "Empire OS North-mini",
+                },
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    raw_bytes = resp.read()
+                data = json.loads(raw_bytes.decode())
+                # Free tier can return HTTP 200 with EMPTY choices (rate-limit
+                # / capacity shed). Treat empty content as a retryable error so
+                # North-mini degrades gracefully instead of writing None.
+                choices = data.get("choices") or []
+                content = (choices[0].get("message", {}).get("content")
+                           if choices else "") or ""
+                if not content.strip():
+                    last_err = "empty_content (free-tier capacity shed)"
+                    wait = min(2 ** attempt * 5 + attempt, 120)
+                    logger.warning("North-mini %s — retry %ss",
+                                  last_err, wait)
+                    time.sleep(wait)
+                    continue
+                return content
+            except urllib.error.HTTPError as e:
+                body = e.read().decode() if hasattr(e, "read") else ""
+                if e.code == 429:
+                    # Rate limited — back off exponentially.
+                    wait = min(2 ** attempt * 5 + attempt, 120)
+                    logger.warning(
+                        "North-mini 429 (rate limit) — backoff %ss "
+                        "(attempt %d/%d)", wait, attempt + 1, self.max_retries)
+                    time.sleep(wait)
+                    last_err = f"429 rate_limit (attempt {attempt+1})"
+                    continue
+                last_err = f"HTTP {e.code}: {body[:200]}"
+                logger.warning("North-mini HTTP error: %s", last_err)
+                break
+            except (urllib.error.URLError, OSError, ValueError,
+                    KeyError, IndexError) as e:
+                # network / JSON / shape errors -> retry or report
+                last_err = f"{type(e).__name__}: {e!r}"[:300]
+                wait = min(2 ** attempt * 5, 120)
+                logger.warning("North-mini transient error: %s — retry %ss",
+                              last_err, wait)
+                time.sleep(wait)
+        return json.dumps({"error": last_err or "unknown", "fallback": True})
+
+    def structured_chat(
+        self,
+        messages: list[dict],
+        system: Optional[str] = None,
+        temperature: float = 0.2,
+    ) -> dict:
+        raw = self.chat(messages, system=system, temperature=temperature)
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {"error": "parse_failed", "raw": raw}
+

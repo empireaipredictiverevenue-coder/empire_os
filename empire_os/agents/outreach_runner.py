@@ -272,9 +272,32 @@ def send_via_resend(to: str, subject: str, body: str, metadata: dict) -> tuple[b
         )
         if r.status_code < 300:
             return True, f"sent {r.status_code}: {r.text[:200]}"
+        # Resend failed (e.g. 401 invalid key) -> try SMTP relay fallback
+        fb = _smtp_fallback(to, subject, body)
+        if fb[0]:
+            return fb
         return False, f"HTTP {r.status_code}: {r.text[:200]}"
     except Exception as e:
+        # network error -> try SMTP relay before giving up
+        fb = _smtp_fallback(to, subject, body)
+        if fb[0]:
+            return fb
         return False, f"request_error: {str(e)[:200]}"
+
+
+def _smtp_fallback(to: str, subject: str, body: str) -> tuple[bool, str]:
+    """Try the configured SMTP relay (Brevo/ImproveMX/etc) when Resend is
+    down/invalid. Returns (ok, info). No-op if SMTP unconfigured."""
+    try:
+        from empire_os import mail_sender as _ms
+        if _ms.EMAIL_BACKEND != "smtp":
+            return False, "smtp_backend_disabled"
+        res = _ms._smtp_send(to, subject, body)
+        if res.get("ok"):
+            return True, f"smtp_sent: {res.get('msg_id', '')}"
+        return False, f"smtp_fail: {res.get('error', '')[:120]}"
+    except Exception as e:
+        return False, f"smtp_error: {str(e)[:120]}"
 
 
 def recent_touched(prospect_id: str) -> bool:

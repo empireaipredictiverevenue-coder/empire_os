@@ -1,0 +1,14 @@
+[Unit]
+Description=Empire OS job: empire-market-sweep-daily (daily 05:00)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/.hermes/scripts
+ExecStart=/root/.hermes/scripts/cron_sweeps.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

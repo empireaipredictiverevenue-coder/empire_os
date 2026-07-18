@@ -1,0 +1,14 @@
+[Unit]
+Description=Empire OS job: empire-market-sweep-roofing (daily 06:00)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/.hermes/scripts
+ExecStart=/root/.hermes/scripts/market_sweep.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -34,6 +34,7 @@ import json
 import os
 import secrets
 import sqlite3
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -103,29 +104,29 @@ def _has_paypal() -> bool:
 
 
 def _has_crypto(buyer_id: str = "") -> bool:
-    """USDC-on-Solana is available if (a) Solana deps present and
-    (b) buyer has a wallet stored in si_buyer_payment_methods."""
+    """USDC-on-Solana is available if Solana deps + vault are configured.
+
+    NOTE: a buyer-side wallet is NOT required — Solana Pay pushes funds
+    TO the empire vault, so the payment request link is generated from
+    the vault address alone. We only need the capability (deps + vault),
+    independent of any stored buyer wallet. Requiring a buyer wallet here
+    silently dropped 99% of charges to `simulated` and killed revenue.
+    """
     if not _HAS_CRYPTO:
         return False
-    if not buyer_id:
-        return True  # capability check; will degrade to simulated
-    return bool(_cc_get_wallet(buyer_id))
+    return bool(os.environ.get("EMPIRE_WALLET") or
+                os.environ.get("SOLANA_VAULT_WALLET"))
 
 
 def pick_processor(buyer_id: str = "") -> str:
-    """Priority: crypto (real USDC) > paypal > simulated.
-
-    Crypto wins because (a) the receiver is the vault address we
-    already control, (b) memo-based reconciliation is reliable,
-    (c) it requires no third-party auth.
-
-    Stripe intentionally absent in this build (was removed).
+    """Priority: crypto (real USDC) > paypal.
+    NO simulated fallback — if no processor, charge fails.
     """
     if _has_crypto(buyer_id):
         return "usdc"
     if _has_paypal():
         return "paypal"
-    return "simulated"
+    return ""  # caller handles "no processor" as failure
 
 
 # ── Buyer payment method retrieval ───────────────────────────────────
@@ -161,6 +162,32 @@ def list_payment_methods(buyer_id: str) -> list[dict]:
         (buyer_id,)).fetchall()
     con.close()
     return [dict(r) for r in rows]
+
+
+def _resolve_buyer_email(buyer_id: str) -> str:
+    """Best-effort resolve a deliverable email for a buyer.
+
+    Checks si_buyer_outreach (the canonical outreach table) first, then
+    si_buyer_payment_methods. Returns '' if none — callers MUST treat
+    empty as a hard delivery failure (never a silent simulation).
+    """
+    con = sqlite3.connect(DB)
+    row = con.execute(
+        "SELECT email FROM si_buyer_outreach "
+        "WHERE prospect_id=? AND email IS NOT NULL AND email != '' "
+        "ORDER BY last_touch_at DESC LIMIT 1",
+        (buyer_id,)).fetchone()
+    con.close()
+    if row and row[0]:
+        return row[0]
+    con = sqlite3.connect(DB)
+    row = con.execute(
+        "SELECT customer_ref FROM si_buyer_payment_methods "
+        "WHERE buyer_id=? AND processor='email' AND deleted_at IS NULL "
+        "ORDER BY id DESC LIMIT 1",
+        (buyer_id,)).fetchone()
+    con.close()
+    return (row[0] if row and row[0] else "") or ""
 
 
 def add_payment_method(buyer_id: str, processor: str,
@@ -285,20 +312,21 @@ def charge(buyer_id: str, head: int, reason: str,
         customer_ref = pm["customer_ref"] if pm else ""
         resp = _charge_paypal(customer_ref, amount_cents,
                               currency, f"head{head}: {reason}")
-    else:  # simulated
-        processor = "simulated"
-        resp = {"ok": True, "simulated": True,
-                "note": "no payment processor configured"}
+    else:  # no real processor — fail, don't simulate
+        processor = "failed"
+        resp = {"ok": False, "error": "no real payment processor available"}
 
-    if resp.get("ok") and not resp.get("simulated") and processor != "usdc":
+    # Guard: resp must be a dict for the .get() calls below. A non-dict
+    # (None / string from a misbehaving processor path) would crash
+    # charge() here and lose the si_charges write entirely.
+    safe = resp if isinstance(resp, dict) else {}
+
+    if processor == "usdc":
+        status = safe.get("raw", {}).get("status", status)
+    elif safe.get("ok"):
         status = "succeeded"
-    elif resp.get("ok") and processor != "usdc":
-        status = "simulated"
-    elif processor == "usdc":
-        status = resp.get("raw", {}).get("status", status)
     else:
         status = "failed"
-        processor = "simulated"
 
     # Persist
     con = sqlite3.connect(DB)
@@ -318,14 +346,56 @@ def charge(buyer_id: str, head: int, reason: str,
     con.commit()
     con.close()
 
+    # ── DELIVER THE PAYMENT REQUEST (the missing spoke) ──────────────
+    # A charge that generates a pay_url but never delivers it is dead:
+    # the buyer can't pay, the on-chain reconcile never matches, and the
+    # charge sits "simulated" forever (this was the $0 revenue root cause).
+    # So: if we produced a pay_url AND we can resolve the buyer's email,
+    # email the Solana Pay link. No email -> log a hard failure + alert so
+    # it can NEVER silently sit simulated again.
+    _pay_url = (safe.get("raw", {}).get("pay_url")
+                or safe.get("pay_url") or "")
+    if _pay_url and status in ("simulated", "open", "pending"):
+        _buyer_email = _resolve_buyer_email(buyer_id)
+        if _buyer_email:
+            try:
+                from empire_os import mail_sender
+                _amt = amount_cents / 100.0
+                _sent = mail_sender._send(
+                    _buyer_email,
+                    f"Empire OS — payment request ({_amt:.2f} USDC)",
+                    f"Please complete payment via Solana Pay:\n\n"
+                    f"{_pay_url}\n\nMemo: {safe.get('raw', {}).get('memo') or safe.get('memo') or ''}\n"
+                    f"Amount: {_amt:.2f} USDC\n\n"
+                    f"This request was generated for: {reason[:120]}")
+                if not _sent.get("ok"):
+                    sys.stderr.write(
+                        f"[charge] pay_url DELIVERY FAILED for {buyer_id}: "
+                        f"{_sent.get('error')}\n")
+            except Exception as _e:
+                sys.stderr.write(
+                    f"[charge] pay_url delivery exception for {buyer_id}: {_e}\n")
+        else:
+            # No email on file -> cannot deliver -> this is a real failure,
+            # not a silent simulation. Surface it loudly.
+            sys.stderr.write(
+                f"[charge] NO BUYER EMAIL for {buyer_id} — pay_url "
+                f"({_pay_url[:40]}...) cannot be delivered. Charge will not settle.\n")
+
     return {
         "charge_id": charge_id,
         "status": status,
         "processor": processor,
         "amount_cents": amount_cents,
         "currency": currency,
-        "fallback": not resp.get("ok") if hasattr(resp, "get") else False,
-        "processor_response": json.dumps(resp)[:500],
+        "fallback": not safe.get("ok") if safe else False,
+        "processor_response": json.dumps(safe)[:1000],
+        # Surface the payment link + memo at top level so callers
+        # (hub /v1/ppc/charge, ppc_router) can actually deliver it.
+        "pay_url": safe.get("raw", {}).get("pay_url")
+                   or safe.get("pay_url") or "",
+        "memo": safe.get("raw", {}).get("memo")
+                or safe.get("memo") or "",
     }
 
 

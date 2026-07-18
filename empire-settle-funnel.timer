@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-settle-funnel (daily 19:00)
+
+[Timer]
+OnCalendar=19:00
+Persistent=true
+Unit=empire-settle-funnel.service
+
+[Install]
+WantedBy=timers.target

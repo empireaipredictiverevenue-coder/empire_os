@@ -1,0 +1,15 @@
+[Unit]
+Description=Empire OS job: empire-outreach-cycle
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+EnvironmentFile=/root/empire_os/.env
+ExecStart=/root/empire_os/venv/bin/python3 /root/empire_os/outreach.py --cycle
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

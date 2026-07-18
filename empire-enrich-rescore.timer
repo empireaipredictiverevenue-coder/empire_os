@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-enrich-rescore (daily 04:00)
+
+[Timer]
+OnCalendar=04:00
+Persistent=true
+Unit=empire-enrich-rescore.service
+
+[Install]
+WantedBy=timers.target

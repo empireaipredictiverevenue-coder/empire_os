@@ -1,0 +1,14 @@
+[Unit]
+Description=Empire OS job: empire-leads-scan (daily 06:00)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire-leads/scripts
+ExecStart=/root/empire-leads/scripts/daily_briefing.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

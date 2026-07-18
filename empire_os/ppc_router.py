@@ -93,6 +93,35 @@ def log(level, msg, **fields):
     print(json.dumps(e), flush=True)
 
 
+def _deliver_pay_link(buyer_id: str, pay_url: str, memo: str,
+                      amount_cents: int) -> None:
+    """Deliver the Solana Pay link to the buyer channel.
+
+    The charge generates pay_url + memo but nothing forwarded it before,
+    so buyers never received the link and never paid. We POST it to the
+    hub's telegram alert endpoint (which reaches the operator/buyer chat)
+    so the payment request is actually sent. Best-effort: a send failure
+    must not break the charge.
+    """
+    if not pay_url:
+        return
+    usd = f"${amount_cents/100:.2f}"
+    text = (
+        f"\U0001F4B0 Empire OS — payment request\n"
+        f"Buyer: {buyer_id}\n"
+        f"Amount: {usd}\n"
+        f"Memo: {memo}\n"
+        f"Pay here: {pay_url}"
+    )
+    try:
+        _post_to_hub("/v1/telegram/alert",
+                     {"message": text, "tag": "payment_request"})
+        log("PAYLINK", "delivered", buyer_id=buyer_id, memo=memo)
+    except Exception as e:
+        log("PAYLINK", "deliver_failed", buyer_id=buyer_id,
+            err=str(e)[:200])
+
+
 def _invoiced(invoice_id: str, amount_cents: int, head: int,
               reason: str, lead_id: str = "", call_id: str = "") -> dict:
     """Persist a billing event + delegate to hub for canonical charge.
@@ -116,11 +145,18 @@ def _invoiced(invoice_id: str, amount_cents: int, head: int,
     })
     if hub_res.get("ok"):
         charge_id = hub_res.get("charge_id", charge_id)
-        status = hub_res.get("status", "simulated")
-        processor = hub_res.get("processor", "simulated")
+        status = hub_res.get("status", "failed")
+        processor = hub_res.get("processor", "")
+        # DELIVER the payment link to the buyer — previously missing,
+        # so buyers never received the Solana Pay URL and never paid.
+        raw = hub_res.get("raw", {}) or {}
+        pay_url = raw.get("pay_url") or hub_res.get("pay_url")
+        memo = raw.get("memo") or hub_res.get("memo")
+        if pay_url:
+            _deliver_pay_link(buyer_id, pay_url, memo or "", amount_cents)
     else:
-        status = "simulated"
-        processor = "simulated"
+        status = "failed"
+        processor = ""
     # 2) Local persist (mirror) for ppc-router's audit trail
     rec = {
         "charge_id": charge_id,
@@ -147,8 +183,7 @@ def _invoiced(invoice_id: str, amount_cents: int, head: int,
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (invoice_id, charge_id, buyer_id, head, lead_id, call_id,
              amount_cents, amount_cents/100,
-             "paid" if status == "succeeded" else
-             "open" if status == "simulated" else "void",
+             "paid" if status == "succeeded" else "void",
              json.dumps({"hub_res": hub_res,
                          "buyer_id": buyer_id,
                          "head": head})[:500],

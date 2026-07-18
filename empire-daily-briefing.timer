@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-daily-briefing (daily 08:00)
+
+[Timer]
+OnCalendar=08:00
+Persistent=true
+Unit=empire-daily-briefing.service
+
+[Install]
+WantedBy=timers.target

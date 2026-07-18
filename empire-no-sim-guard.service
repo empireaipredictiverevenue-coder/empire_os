@@ -1,0 +1,14 @@
+[Unit]
+Description=Empire OS job: empire-no-sim-guard (hourly :00)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/.hermes/scripts
+ExecStart=/root/.hermes/scripts/no_sim_guard.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

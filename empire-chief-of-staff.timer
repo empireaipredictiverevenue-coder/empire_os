@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS job: empire-chief-of-staff (hourly :00)
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=empire-chief-of-staff.service
+
+[Install]
+WantedBy=timers.target

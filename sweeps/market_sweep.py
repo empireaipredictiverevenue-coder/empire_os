@@ -27,8 +27,8 @@ from bs4 import BeautifulSoup
 # ── Config ───────────────────────────────────────────────────────────────────
 CONTAINER = "empire-hub"
 DB_PATH = "/root/empire_os/empire_os.db"
-# Set to True to use direct SQLite (inside container) vs incus exec (from host)
-DIRECT_DB = True if os.path.exists(DB_PATH) or "empire-hub" in os.uname().nodename else False
+# Inside container: direct SQLite. From host: use incus exec.
+DIRECT_DB = "empire-hub" in os.uname().nodename
 SOURCE_NAME = "market_sweep"
 REQUEST_TIMEOUT = 15
 
@@ -391,6 +391,87 @@ def enrich_from_website(lead):
 
 # ── Search Sources ───────────────────────────────────────────────────────────
 
+def _load_env():
+    """Load .env if available."""
+    for p in ["/root/empire_os/.env", "/root/.env"]:
+        try:
+            with open(p) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        os.environ.setdefault(k.strip(), v.strip())
+            return
+        except FileNotFoundError:
+            continue
+
+def search_serply(niche, metro, limit):
+    """Search via Serply API, return lead dicts matching pipeline shape."""
+    _load_env()
+    import json as _json, urllib.request, urllib.parse
+    KEY = os.environ.get("SERPLY_KEY", os.environ.get("SERLY_KEY", ""))
+    if not KEY:
+        return [], 0
+
+    metro_parts = [p.strip() for p in metro.split(",")]
+    metro_city = metro_parts[0] if metro_parts else metro
+    metro_state = metro_parts[1] if len(metro_parts) > 1 else ""
+    queries = [
+        f"{niche} contractors {metro_city} {metro_state}",
+        f"{niche} {metro_city} {metro_state}",
+        f'{niche} company {metro_city}',
+    ]
+
+    leads = []
+    seen_urls = set()
+    seen_names = set()
+    status = 0
+
+    for query in queries:
+        if len(leads) >= limit:
+            break
+        try:
+            req = urllib.request.Request(
+                "https://api.serply.io/v1/search/q=" + urllib.parse.quote(query),
+                headers={"X-API-KEY": KEY, "User-Agent": "EmpireOS/1.0"})
+            resp = urllib.request.urlopen(req, timeout=15)
+            data = _json.loads(resp.read().decode())
+            status = resp.status
+            for r in data.get("results", []):
+                if len(leads) >= limit:
+                    break
+                link = r.get("link", "").strip()
+                title = r.get("title", "").strip()
+                if not link or not title or link in seen_urls:
+                    continue
+                seen_urls.add(link)
+                if is_aggregator(link):
+                    continue
+                name = clean_business_name(title)
+                if not is_valid_contractor_name(name):
+                    continue
+                nk = name.lower().strip()
+                if nk in seen_names:
+                    continue
+                seen_names.add(nk)
+                leads.append({
+                    "business_name": name,
+                    "website": link,
+                    "phone": "",
+                    "email": "",
+                    "street": "",
+                    "city": "",
+                    "state": "",
+                    "zip": "",
+                    "metro": metro,
+                    "niche": niche,
+                })
+        except Exception as e:
+            log(f"    [serply err] {str(e)[:50]}")
+            continue
+
+    return leads, status
+
 def search_duckduckgo_lite(niche, metro, limit):
     """Search DuckDuckGo Lite (no-JS version) for contractor listings."""
     target_metro = metro
@@ -594,11 +675,11 @@ def run_sweep(niche, metro, limit, dry_run=False):
     all_leads = []
     source_statuses = []
 
-    # Source 1: DuckDuckGo Lite (primary)
-    results, status = search_duckduckgo_lite(niche, metro, limit + 3)
+    # Source 1: Serply (primary)
+    results, status = search_serply(niche, metro, limit + 3)
     all_leads.extend(results)
-    source_statuses.append(f"DDG={status}")
-    log(f"DuckDuckGo Lite -> {len(results)} leads (status={status})")
+    source_statuses.append(f"Serply={status}")
+    log(f"Serply -> {len(results)} leads (status={status})")
 
     # Source 2: Bing RSS (fallback)
     if len(all_leads) < limit:

@@ -40,9 +40,9 @@ if env_path.exists():
             k, v = ln.split("=", 1)
             if not os.environ.get(k.strip()):
                 os.environ[k.strip()] = v.strip()
-VAULT = os.environ.get("SOLANA_VAULT_WALLET", "")
-RPC   = os.environ.get("SOLANA_RPC_URL", "")
-USDC_MINT = os.environ.get("USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybafCvkRxb7Yy4dV")
+VAULT = os.environ.get("SOLANA_VAULT_WALLET", "").strip()
+RPC   = os.environ.get("SOLANA_RPC_URL", "").strip()
+USDC_MINT = os.environ.get("USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybafCvkRxb7Yy4dV").strip()
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
 
