@@ -4,6 +4,7 @@ No manual rate-setting. Tier maps to a base_payout floor + fee_rate; seat_corrid
 places them into matching lanes at seat_price = base*fee.
 """
 import sqlite3, sys, uuid
+from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 
 DB = "/root/empire_os/empire_os.db"
@@ -96,19 +97,23 @@ def _log_seat(name, niche, seated, source):
     """Write seat assignment to feedback log."""
     import json, os
     from datetime import datetime, timezone
-    log_dir = Path("/root/feedback")
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / "seat_corridors.jsonl"
-    with log_file.open("a") as f:
-        f.write(json.dumps({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "action": "seat",
-            "buyer_name": name,
-            "buyer_niche": niche,
-            "source": source or "direct",
-            "seated_lanes": seated.get("lanes", []),
-            "seated_count": seated.get("seated", 0),
-        }) + "\n")
+    log_dir = Path("/root/empire_os/feedback")
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "seat_corridors.jsonl"
+        with log_file.open("a") as f:
+            f.write(json.dumps({
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "action": "seat",
+                "buyer_name": name,
+                "buyer_niche": niche,
+                "source": source or "direct",
+                "seated_lanes": seated.get("lanes", []),
+                "seated_count": seated.get("seated", 0),
+            }) + "\n")
+    except Exception as _log_err:
+        # non-fatal: logging must not break onboarding
+        print(f"[auto_onboard] seat log skipped: {_log_err}")
 
 
 def rate_for_tier(tier: str):

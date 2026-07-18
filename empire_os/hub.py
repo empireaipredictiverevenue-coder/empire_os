@@ -1311,6 +1311,7 @@ def outreach_register(req: dict):
                 source TEXT,
                 score INTEGER,
                 url TEXT,
+                seq_step INTEGER DEFAULT 0,
                 first_touch_at TEXT,
                 last_touch_at TEXT,
                 touch_count INTEGER DEFAULT 0,
@@ -1319,6 +1320,11 @@ def outreach_register(req: dict):
                 converted INTEGER DEFAULT 0
             )
         """)
+        # idempotent: add seq_step to pre-existing tables
+        try:
+            backend.execute("ALTER TABLE si_buyer_outreach ADD COLUMN seq_step INTEGER DEFAULT 0")
+        except Exception:
+            pass
         backend.execute("""
             INSERT OR IGNORE INTO si_buyer_outreach
                 (prospect_id, business_name, email, metro, niche,
