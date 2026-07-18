@@ -183,24 +183,27 @@ def _resolve_buyer_email(buyer_id: str) -> str:
     Checks si_buyer_outreach (the canonical outreach table) first, then
     si_buyer_payment_methods. Returns '' if none — callers MUST treat
     empty as a hard delivery failure (never a silent simulation).
+    Tables are best-effort: a missing table is treated as 'no email',
+    never as an exception that breaks the charge write.
     """
-    con = sqlite3.connect(DB)
-    row = con.execute(
-        "SELECT email FROM si_buyer_outreach "
-        "WHERE prospect_id=? AND email IS NOT NULL AND email != '' "
-        "ORDER BY last_touch_at DESC LIMIT 1",
-        (buyer_id,)).fetchone()
-    con.close()
-    if row and row[0]:
-        return row[0]
-    con = sqlite3.connect(DB)
-    row = con.execute(
-        "SELECT customer_ref FROM si_buyer_payment_methods "
-        "WHERE buyer_id=? AND processor='email' AND deleted_at IS NULL "
-        "ORDER BY id DESC LIMIT 1",
-        (buyer_id,)).fetchone()
-    con.close()
-    return (row[0] if row and row[0] else "") or ""
+    for _tbl, _col, _key in (
+        ("si_buyer_outreach", "email", "prospect_id"),
+        ("si_buyer_payment_methods", "customer_ref", "buyer_id"),
+    ):
+        try:
+            con = sqlite3.connect(DB)
+            row = con.execute(
+                f"SELECT {_col} FROM {_tbl} "
+                f"WHERE {_key}=? AND {_col} IS NOT NULL AND {_col} != '' "
+                "ORDER BY id DESC LIMIT 1",
+                (buyer_id,)).fetchone()
+            con.close()
+            if row and row[0]:
+                return row[0]
+        except sqlite3.OperationalError:
+            # table absent in this DB — skip, try next source
+            continue
+    return ""
 
 
 def add_payment_method(buyer_id: str, processor: str,
