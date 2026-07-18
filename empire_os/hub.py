@@ -77,7 +77,7 @@ from empire_os.agi_client import AgiScoutClient, AgiMarketingClient
 from empire_os.agi_sales import AgiSalesAgent
 from empire_os.agi_closer import AgiCloserAgent
 from empire_os.agi_loop import AgiLoop
-from empire_os.agent_core import OllamaClient
+from empire_os.agent_core import OllamaClient, OpenRouterClient
 from empire_os.dashboard import DASHBOARD_HTML, build_dashboard_data
 from empire_os.telegram_bot import send_brief, send_message, send_alert
 from empire_os.waterfall import build_default_waterfall
@@ -248,13 +248,19 @@ async def lifespan(app: FastAPI):
         logger.info("agi-marketing detected at %s", agi_marketing.base_url)
     else:
         logger.info("agi-marketing not reachable")
-    # AGI Sales — runs in-process (no separate container needed)
-    agi_sales = AgiSalesAgent(backend=backend, llm=OllamaClient(timeout=120))
-    logger.info("agi-sales initialized in-process")
+    # AGI Sales — runs in-process (no separate container needed).
+    # Ollama box (10.218.156.211:11434) is down; route through OpenRouter
+    # (tencent/hy3:free — same brain model) so loops run instead of dying.
+    agi_sales = AgiSalesAgent(
+        backend=backend,
+        llm=OpenRouterClient(model="tencent/hy3:free", timeout=120))
+    logger.info("agi-sales initialized in-process (OpenRouter hy3)")
     # AGI Closer — last-mile closer, also in-process
     global agi_closer
-    agi_closer = AgiCloserAgent(backend=backend, llm=OllamaClient(timeout=120))
-    logger.info("agi-closer initialized in-process")
+    agi_closer = AgiCloserAgent(
+        backend=backend,
+        llm=OpenRouterClient(model="tencent/hy3:free", timeout=120))
+    logger.info("agi-closer initialized in-process (OpenRouter hy3)")
 
     # Ensure lane schema + seed 36 lanes
     ensure_lane_schema(backend)
