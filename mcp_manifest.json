@@ -1,0 +1,21 @@
+{
+  "name": "empire-lead-marketplace",
+  "version": "2.0.0",
+  "description": "Empire OS Lead Marketplace MCP — machine-readable supply layer for verified home-services / B2B leads. Agents pull leads by vertical, get USDC settle quotes, and close deals via Empire Vault (Solana USDC, no Stripe/KYC).",
+  "transport": "http",
+  "url": "http://216.128.149.56:9000",
+  "protocol": "jsonrpc-2.0",
+  "auth": "none",
+  "tools": [
+    "search_leads", "settle_quote", "get_pricing", "register_lead_buyer",
+    "detect_triggers", "customer_analysis", "self_influence", "copilot_route",
+    "aeo_monitor", "generate_aeo", "aeo_refresh", "list_business", "verify_business"
+  ],
+  "settlement": {
+    "currency": "USDC",
+    "chain": "solana",
+    "vault": "EmpireVaultUSDCSolana",
+    "endpoint": "POST http://216.128.149.56:8000/v1/a2a/negotiate"
+  },
+  "contact": "founder@empire-ai.co.uk"
+}
