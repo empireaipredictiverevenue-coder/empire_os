@@ -116,6 +116,31 @@ def _last(kind: str) -> dict:
     return {}
 
 
+def _last30days_signals() -> str:
+    """Read latest last30days artifacts for real public signal.
+
+    Returns a compact text block for the agi_intel prompt, or '' if none
+    yet. Reads only /root/feedback/last30days_<topic>.jsonl (per-topic
+    files), skipping the _runs aggregate.
+    """
+    signals = []
+    try:
+        for p in FEED.glob("last30days_*.jsonl"):
+            if p.name == "last30days_runs.jsonl":
+                continue
+            for ln in reversed(p.read_text().splitlines()):
+                if ln.strip():
+                    d = json.loads(ln)
+                    signals.append(f"- {d.get('topic','?')}: {d.get('takeaway','')}")
+                    break  # latest per file only
+    except Exception:
+        pass
+    if not signals:
+        return ""
+    return ("REAL last30days public signals (last 30d, keyless sources):\n"
+            + "\n".join(signals) + "\n")
+
+
 def _write(kind: str, doc: dict, state: dict) -> None:
     # GUARDRAIL: artifact mode — only /root/feedback + /root/g-brain, with
     # secret scrubbing. safe_write() enforces the path allow-list.
@@ -163,9 +188,11 @@ def _prompt(kind: str, state: dict) -> str:
         return base + ("Make ONE management/ops decision to unblock revenue. "
                       "Output management JSON.")
     if kind == "agi_intel":
-        return base + ("Act as AGI market-intel scout. From free public signals "
-                      "(search trends, open datasets, competitor moves) identify ONE "
-                      "market gap + how Empire OS exploits it. Output agi_intel JSON.")
+        sig = _last30days_signals()
+        sig_block = sig if sig else "(no last30days signal captured yet — run empire-last30days first)\n"
+        return base + (f"Act as AGI market-intel scout. From REAL public signals "
+                       f"below (not guesses) identify ONE market gap + how Empire OS "
+                       f"exploits it. Output agi_intel JSON.\n{sig_block}")
     return base + "Produce a revenue projection. Output projection JSON."
 
 

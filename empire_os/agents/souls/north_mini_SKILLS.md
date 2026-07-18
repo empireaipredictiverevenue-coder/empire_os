@@ -18,6 +18,9 @@ JSON (one of the shapes below). Never markdown inside values.
 {"type":"agi_intel","signal":"...","source":"...","gap":"...","opp_for_empire":"...",
  "next_actions":["...","...","..."]}
 
+Note: agi_intel pulls REAL public signal from /root/feedback/last30days_*.jsonl
+(emire-last30days agent output) — ground the gap in those signals, not guesses.
+
 {"type":"projection","projected_mrr_usd":0,"confidence_0_1":0.0,
  "top_leak":"...","next_actions":["...","...","..."]}
 ```
