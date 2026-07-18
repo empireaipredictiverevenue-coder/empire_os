@@ -36,6 +36,26 @@ from pathlib import Path
 from typing import Optional
 
 
+# ── NO-SIM LOCK ──────────────────────────────────────────────────────────
+# The 'simulated' charge status is BANNED. Any code path that would persist
+# a 'simulated' charge is a regression of the $0-revenue silent-drop bug.
+# This guard is the durable backstop: call it before every si_charges write.
+SIMULATED_BANNED = True
+
+
+def assert_no_simulated(status: str) -> None:
+    """Raise if a charge would be persisted with status='simulated'.
+
+    Real charges are 'succeeded'. Unpaid-but-requested are 'open'/'pending'.
+    'simulated' means fake — we never write fake revenue.
+    """
+    if SIMULATED_BANNED and status == "simulated":
+        raise RuntimeError(
+            "NO-SIM LOCK: refusing to persist status='simulated'. "
+            "Use 'open' (awaiting payment) or 'failed', never 'simulated'."
+        )
+
+
 DB = "/root/empire_os/empire_os.db"
 SOLANA_RPC = os.environ.get(
     "SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
@@ -247,8 +267,12 @@ def charge_crypto(buyer_id: str, head: int, reason: str,
                   call_id: str = "", lead_id: str = "") -> dict:
     """Generate a crypto payment request + reconcile if already paid.
 
-    Returns ChargeResult-shaped dict (status=simulated if we
+    Returns ChargeResult-shaped dict (status=open if we
     cannot detect inbound yet, status=succeeded if matched).
+
+    NOTE: status is NEVER 'simulated'. An unmatched charge is 'open'
+    (awaiting on-chain payment), not fake. The NO-SIM lock forbids the
+    'simulated' status entirely — see assert_no_simulated().
     """
     invoice_id = "inv_crypto_" + os.urandom(4).hex()
     charge_id = "chg_crypto_" + os.urandom(4).hex()
@@ -267,7 +291,8 @@ def charge_crypto(buyer_id: str, head: int, reason: str,
         if tx.get("amount", 0) >= amount_usdc * 0.99:
             matched = tx
             break
-    status = "succeeded" if matched else "simulated"
+    status = "succeeded" if matched else "open"
+    assert_no_simulated(status)
     paid_at = (datetime.fromtimestamp(
         matched["block_time"], tz=timezone.utc).isoformat()
         if matched else None)

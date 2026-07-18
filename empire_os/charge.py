@@ -4,7 +4,8 @@ Charge adapter - processor-agnostic buyer charging.
 Processors (in priority order):
   USDC (Solana) - real money, on-chain reconciliation via memo
   PayPal       - if PAYPAL_CLIENT_ID + PAYPAL_CLIENT_SECRET are set
-  simulated    - fallback when no creds / no buyer wallet
+  (no simulated fallback — if no real processor is available the charge
+   FAILS. The NO-SIM lock forbids the 'simulated' status entirely.)
 
 Stripe was removed from this layer because (a) we have a working
 USDC path that doesn't need a third party, and (b) Stripe-card
@@ -18,8 +19,8 @@ buyer-charge layer you're looking at here.
 Returns ChargeResult shape:
 {
     "charge_id":   "chg_...",
-    "status":      "succeeded" | "simulated" | "failed",
-    "processor":   "usdc" | "paypal" | "simulated",
+    "status":      "succeeded" | "open" | "failed",
+    "processor":   "usdc" | "paypal" | "failed",
     "amount_cents": 1500,
     "currency":    "USDC" | "USD",
     "fallback":    bool,
@@ -27,6 +28,14 @@ Returns ChargeResult shape:
     "pay_url":     <only when usdc>,
     "memo":        <only when usdc>,
 }
+
+NO-SIM LOCK
+----------
+The 'simulated' status is BANNED. A charge is either real money
+('succeeded'), awaiting payment ('open'/'pending'), or it failed.
+assert_no_simulated() raises if any code path tries to persist
+'simulated' — this is the durable guard that prevents the $0-revenue
+sim-silent-drop failure from recurring.
 """
 from __future__ import annotations
 
@@ -42,10 +51,14 @@ from typing import Optional
 try:
     from empire_os.crypto_charge import (
         charge_crypto, get_buyer_wallet as _cc_get_wallet,
+        assert_no_simulated,
     )
     _HAS_CRYPTO = True
 except Exception:
     _HAS_CRYPTO = False
+    def assert_no_simulated(status: str) -> None:  # noqa: D401
+        if status == "simulated":
+            raise RuntimeError("NO-SIM LOCK: status='simulated' is banned.")
 
 
 DB = "/root/empire_os/empire_os.db"
@@ -330,6 +343,7 @@ def charge(buyer_id: str, head: int, reason: str,
 
     # Persist
     con = sqlite3.connect(DB)
+    assert_no_simulated(status)  # NO-SIM LOCK — never write fake revenue
     con.execute(
         "INSERT INTO si_charges "
         "(charge_id, buyer_id, processor, customer_ref, payment_ref, "
@@ -349,13 +363,12 @@ def charge(buyer_id: str, head: int, reason: str,
     # ── DELIVER THE PAYMENT REQUEST (the missing spoke) ──────────────
     # A charge that generates a pay_url but never delivers it is dead:
     # the buyer can't pay, the on-chain reconcile never matches, and the
-    # charge sits "simulated" forever (this was the $0 revenue root cause).
-    # So: if we produced a pay_url AND we can resolve the buyer's email,
-    # email the Solana Pay link. No email -> log a hard failure + alert so
-    # it can NEVER silently sit simulated again.
+    # charge sits "open" forever. So: if we produced a pay_url AND we can
+    # resolve the buyer's email, email the Solana Pay link. No email ->
+    # log a hard failure + alert so it can NEVER silently sit open again.
     _pay_url = (safe.get("raw", {}).get("pay_url")
                 or safe.get("pay_url") or "")
-    if _pay_url and status in ("simulated", "open", "pending"):
+    if _pay_url and status in ("open", "pending"):
         _buyer_email = _resolve_buyer_email(buyer_id)
         if _buyer_email:
             try:
