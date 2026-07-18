@@ -7,3 +7,5 @@ __pycache__/
 empire_os.db
 empire_os.db-wal
 empire_os.db-shm
+__pycache__/
+*.pyc
