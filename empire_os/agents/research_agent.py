@@ -89,24 +89,24 @@ def ddg_search(query: str) -> list[dict]:
         if resp.status_code != 200:
             return []
         html = resp.text
-        # DDG lite uses SINGLE quotes on these classes.
-        titles = re.findall(r"class='result-link'>(.*?)</a>", html, re.S)
-        links = re.findall(r"class='result-link' href=\"([^\"]+)\"", html)
+        # DDG lite: <a rel="nofollow" href="URL" class='result-link'>TITLE</a>
+        # (href precedes class). Capture full anchor tag + inner text.
+        anchors = re.findall(r"<a\s+([^>]*class='result-link'[^>]*)>(.*?)</a>", html, re.S)
+        out = []
+        for attrs, inner in anchors:
+            href = re.search(r'href="([^"]+)"', attrs)
+            title = re.sub(r"<[^>]+>", "", inner).strip()
+            title = title.replace("&#x27;", "'").replace("&amp;", "&").replace("&quot;", '"')
+            out.append({"query": query, "title": title,
+                        "url": href.group(1) if href else "", "snippet": ""})
+        # snippets live in separate <td class='result-snippet'> rows, paired by order
         snippets = re.findall(r"class='result-snippet'>(.*?)</td>", html, re.S)
-        # strip tags + unescape entities
         def clean(s: str) -> str:
             s = re.sub(r"<[^>]+>", "", s)
-            s = s.replace("&#x27;", "'").replace("&amp;", "&").replace("&quot;", '"')
-            return s.strip()
-        out = []
-        n = max(len(titles), len(snippets))
-        for i in range(n):
-            out.append({
-                "query": query,
-                "title": clean(titles[i]) if i < len(titles) else "",
-                "url": links[i] if i < len(links) else "",
-                "snippet": clean(snippets[i]) if i < len(snippets) else "",
-            })
+            return s.replace("&#x27;", "'").replace("&amp;", "&").replace("&quot;", '"').strip()
+        for i, sn in enumerate(snippets):
+            if i < len(out):
+                out[i]["snippet"] = clean(sn)
         return out[:5]
     except requests.RequestException:
         return []
