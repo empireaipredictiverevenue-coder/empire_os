@@ -1536,7 +1536,28 @@ async def outreach_webhook(request: Request):
     with open(log_path, "a") as f:
         f.write(json.dumps(event) + "\n")
 
-    return {"received": True, "type": payload.get("source", "outreach_webhook")}
+    # Actually deliver the email via the configured mail backend (Brevo/SMTP),
+    # bypassing Resend's 429 quota. The webhook is the real outbound channel.
+    to = payload.get("to", "")
+    subject = payload.get("subject", "")
+    body = payload.get("body", "")
+    sent_ok = False
+    send_info = ""
+    if to and subject:
+        try:
+            from empire_os import mail_sender as _ms
+            res = _ms._brevo_api_send(to, subject, body)
+            sent_ok = bool(res.get("ok"))
+            send_info = str(res)[:160]
+        except Exception as e:
+            send_info = f"send_error: {str(e)[:120]}"
+    event["delivered"] = sent_ok
+    event["send_info"] = send_info
+    with open(log_path, "a") as f:
+        f.write(json.dumps(event) + "\n")
+
+    return {"received": True, "type": payload.get("source", "outreach_webhook"),
+            "delivered": sent_ok, "send_info": send_info}
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -6479,7 +6500,29 @@ def crm_list(request: Request):
             with open(log_path, "a") as f:
                 f.write(json.dumps(event) + "\n")
 
-            return {"received": True, "type": payload.get("source", "outreach_webhook")}
+            # Actually deliver the email via the configured mail backend
+            # (Brevo/SMTP), bypassing Resend's 429 quota. The webhook is the
+            # real outbound channel, not just a logger.
+            to = payload.get("to", "")
+            subject = payload.get("subject", "")
+            body = payload.get("body", "")
+            sent_ok = False
+            send_info = ""
+            if to and subject:
+                try:
+                    from empire_os import mail_sender as _ms
+                    res = _ms._brevo_api_send(to, subject, body)
+                    sent_ok = bool(res.get("ok"))
+                    send_info = str(res)[:160]
+                except Exception as e:
+                    send_info = f"send_error: {str(e)[:120]}"
+            event["delivered"] = sent_ok
+            event["send_info"] = send_info
+            with open(log_path, "a") as f:
+                f.write(json.dumps(event) + "\n")
+
+            return {"received": True, "type": payload.get("source", "outreach_webhook"),
+                    "delivered": sent_ok, "send_info": send_info}
 
 
         # ─────────────────────────────────────────────────────────────────
@@ -6994,7 +7037,28 @@ async def outreach_webhook(request: Request):
     with open(log_path, "a") as f:
         f.write(json.dumps(event) + "\n")
 
-    return {"received": True, "type": payload.get("source", "outreach_webhook")}
+    # Actually deliver the email via the configured mail backend (Brevo/SMTP),
+    # bypassing Resend's 429 quota. The webhook is the real outbound channel.
+    to = payload.get("to", "")
+    subject = payload.get("subject", "")
+    body = payload.get("body", "")
+    sent_ok = False
+    send_info = ""
+    if to and subject:
+        try:
+            from empire_os import mail_sender as _ms
+            res = _ms._brevo_api_send(to, subject, body)
+            sent_ok = bool(res.get("ok"))
+            send_info = str(res)[:160]
+        except Exception as e:
+            send_info = f"send_error: {str(e)[:120]}"
+    event["delivered"] = sent_ok
+    event["send_info"] = send_info
+    with open(log_path, "a") as f:
+        f.write(json.dumps(event) + "\n")
+
+    return {"received": True, "type": payload.get("source", "outreach_webhook"),
+            "delivered": sent_ok, "send_info": send_info}
 
 
 
@@ -7141,6 +7205,27 @@ async def outreach_webhook(request: Request):
     with open(log_path, "a") as f:
         f.write(json.dumps(event) + "\n")
 
-    return {"received": True, "type": payload.get("source", "outreach_webhook")}
+    # Actually deliver the email via the configured mail backend (Brevo/SMTP),
+    # bypassing Resend's 429 quota. The webhook is the real outbound channel.
+    to = payload.get("to", "")
+    subject = payload.get("subject", "")
+    body = payload.get("body", "")
+    sent_ok = False
+    send_info = ""
+    if to and subject:
+        try:
+            from empire_os import mail_sender as _ms
+            res = _ms._brevo_api_send(to, subject, body)
+            sent_ok = bool(res.get("ok"))
+            send_info = str(res)[:160]
+        except Exception as e:
+            send_info = f"send_error: {str(e)[:120]}"
+    event["delivered"] = sent_ok
+    event["send_info"] = send_info
+    with open(log_path, "a") as f:
+        f.write(json.dumps(event) + "\n")
+
+    return {"received": True, "type": payload.get("source", "outreach_webhook"),
+            "delivered": sent_ok, "send_info": send_info}
 
 

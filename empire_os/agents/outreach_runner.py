@@ -23,7 +23,7 @@ from pathlib import Path
 
 # Load .env (same pattern as charge.py / OllamaClient) so HUB_URL + keys
 # resolve from /root/empire_os/.env at startup. Without this, pm2-launched
-# processes fall back to the hardcoded dead default (127.0.0.1:8000)
+# processes fall back to the hardcoded dead default (127.0.0.1:8081)
 # and every hub call silently times out -> zero outreach sends.
 for _ln in (Path("/root/empire_os/.env").read_text(encoding="utf-8").splitlines()
             if Path("/root/empire_os/.env").exists() else ()):
@@ -41,7 +41,7 @@ _http = requests.Session()
 _http.trust_env = False
 
 RESEND_OWNER = os.environ.get("RESEND_OWNER", "Founder <founder@empire-ai.co.uk>")
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 INTERVAL_SECONDS = int(os.environ.get("INTERVAL", "3600"))
 CYCLE_PROSPECT_LIMIT = int(os.environ.get("LIMIT", "20"))
 # sequence spacing in days per step + max step
@@ -50,7 +50,7 @@ MAX_STEP = 3
 RESEND_OWNER = os.environ.get("RESEND_OWNER", "Founder <founder@empire-ai.co.uk>")
 RESEND_REPLY_TO = os.environ.get("EMPIRE_REPLY_TO", "founder@empire-ai.co.uk")
 ALLOWED_SEND_DOMAIN = os.environ.get("ALLOWED_SEND_DOMAIN", "empire-ai.co.uk")
-LOG_PATH = Path("/root/feedback/outreach_log.jsonl")
+LOG_PATH = Path("/root/empire_os/logs/outreach_log.jsonl")
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -312,6 +312,25 @@ def _smtp_fallback(to: str, subject: str, body: str) -> tuple[bool, str]:
         return False, f"smtp_error: {str(e)[:120]}"
 
 
+def send_via_webhook(to: str, subject: str, body: str, metadata: dict) -> tuple[bool, str]:
+    """Webhook delivery (bypasses email quota entirely). POSTs the nurture
+    payload to LEAD_WEBHOOK. Used when Resend is quota-blocked (429). The
+    webhook receiver logs/forwards the lead contact — no email sent."""
+    wh = os.environ.get("LEAD_WEBHOOK", "")
+    if not wh:
+        return False, "no_lead_webhook"
+    try:
+        r = _http.post(wh, json={
+            "to": to, "subject": subject, "body": body,
+            "metadata": {str(k): str(v) for k, v in metadata.items()},
+            "source": "outreach_webhook"}, timeout=10)
+        if r.status_code < 300:
+            return True, f"webhook_sent {r.status_code}"
+        return False, f"webhook HTTP {r.status_code}: {r.text[:160]}"
+    except Exception as e:
+        return False, f"webhook_error: {str(e)[:160]}"
+
+
 def recent_touched(prospect_id: str) -> bool:
     p = get_prospect(prospect_id)
     if not p.get("known"):
@@ -322,7 +341,7 @@ def recent_touched(prospect_id: str) -> bool:
     return False
 
 
-def process_prospect(p, counters):
+def process_prospect(p, counters, dry_run=False):
     """Process one prospect through the nurture sequence. Returns delta
     (sent_inc, skipped_inc)."""
     sent_inc = 0
@@ -355,14 +374,40 @@ def process_prospect(p, counters):
     sample = find_sample_lead(p.get("niche", ""), p.get("metro", ""))
     sample_id = str(sample["id"]) if sample else ""
     subject, body = draft_email(p, sample, step)
-    ok, info = send_via_resend(
-        email, subject, body,
-        metadata={"source": "outreach", "step": step,
-                  "prospect_id": p.get("prospect_id", ""),
-                  "metro": p.get("metro", ""),
-                  "niche": p.get("niche", ""),
-                  "sample_lead_id": sample_id},
-    )
+    meta = {"source": "outreach", "step": step,
+            "prospect_id": p.get("prospect_id", ""),
+            "metro": p.get("metro", ""),
+            "niche": p.get("niche", ""),
+            "sample_lead_id": sample_id}
+    # DRY_RUN: log what would send, advance sequence, but dispatch nothing.
+    if dry_run:
+        _log("DRYRUN", "would_send", to=email, step=step, subject=subject[:80],
+             metro=p.get("metro"), niche=p.get("niche"))
+        try:
+            _http.post(f"{HUB_URL}/v1/outreach/prospect/touched", json={
+                **p, "sent": True, "sample_lead_id": sample_id,
+                "seq_step": step + 1, "dry_run": True,
+            }, timeout=10)
+        except Exception:
+            pass
+        return 1, 0
+    # Prefer webhook delivery (bypasses Resend 429 quota) when LEAD_WEBHOOK is
+    # set to a *non-empty* URL; otherwise (or on webhook failure) fall back to
+    # Resend -> SMTP. An empty/misconfigured webhook must NOT block delivery.
+    wh = (os.environ.get("LEAD_WEBHOOK") or "").strip()
+    if wh and wh.startswith("http"):
+        ok, info = send_via_webhook(email, subject, body, meta)
+        if ok:
+            try:
+                _http.post(f"{HUB_URL}/v1/outreach/prospect/touched", json={
+                    **p, "sent": ok, "sample_lead_id": sample_id,
+                    "seq_step": step + 1,
+                }, timeout=10)
+            except Exception:
+                pass
+            return (1 if ok else 0), 0
+        # webhook failed (dead/empty) -> fall through to Resend below
+    ok, info = send_via_resend(email, subject, body, meta)
     try:
         _http.post(f"{HUB_URL}/v1/outreach/prospect/touched", json={
             **p, "sent": ok, "sample_lead_id": sample_id,
@@ -382,9 +427,9 @@ def process_prospect(p, counters):
     return (1 if ok else 0), 0
 
 
-def run_cycle():
+def run_cycle(dry_run=False):
     """One nurture cycle — value-first sequence, spaced over days."""
-    _log("INFO", "cycle_start")
+    _log("INFO", "cycle_start", dry_run=dry_run)
 
     metros = ["NYC", "LAX", "CHI", "DFW", "SEA", "BOS", "WDC", "PHX"]
     sent = 0
@@ -406,7 +451,7 @@ def run_cycle():
             if sent >= CYCLE_PROSPECT_LIMIT:
                 break
             processed += 1
-            s, sk = process_prospect(p, None)
+            s, sk = process_prospect(p, None, dry_run)
             sent += s
             skipped += sk
 
@@ -415,7 +460,7 @@ def run_cycle():
         if sent >= CYCLE_PROSPECT_LIMIT:
             break
         processed += 1
-        s, sk = process_prospect(p, None)
+        s, sk = process_prospect(p, None, dry_run)
         sent += s
         skipped += sk
 
@@ -470,12 +515,22 @@ def seed_from_permits_if_empty() -> int:
 
 
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dry-run", action="store_true",
+                    help="log intended sends without dispatching any email")
+    ap.add_argument("--limit", type=int, default=None,
+                    help="override CYCLE_PROSPECT_LIMIT for this run")
+    args = ap.parse_args()
+    if args.limit:
+        CYCLE_PROSPECT_LIMIT = args.limit
     print(f"[{datetime.now(timezone.utc).isoformat()}] outreach-agent starting "
-          f"- interval {INTERVAL_SECONDS}s, limit {CYCLE_PROSPECT_LIMIT}", flush=True)
+          f"- interval {INTERVAL_SECONDS}s, limit {CYCLE_PROSPECT_LIMIT}, "
+          f"dry_run={args.dry_run}", flush=True)
 
     while True:
         try:
-            run_cycle()
+            run_cycle(dry_run=args.dry_run)
         except Exception as e:
             _log("ERROR", "cycle_exception", error=str(e))
         time.sleep(INTERVAL_SECONDS)
