@@ -7360,6 +7360,100 @@ def evaluate_settlements(status: str = "pending"):
             "total_usd": round(sum(i["amount_usd"] for i in items), 2), "items": items}
 
 
+@app.post("/v1/evaluate/lead-sold")
+async def evaluate_lead_sold(req: dict, request: Request):
+    """Auto-bill when a buyer marks a graded lead 'sold' (CRM/webhook trigger).
+
+    Auth: X-API-Key (binds to real tenant). Body: lead_ref (str,required).
+    Fires record_conversion -> charges $0.50 (if grade A/B/C + unbilled)
+    and returns the Solana Pay URL so the buyer settles in USDC.
+    Idempotent per lead_ref (won't double-charge).
+    """
+    from empire_os.agents import evaluation_product as EP
+    key_buyer = EP.resolve_buyer(request.headers.get("x-api-key", ""))
+    buyer = key_buyer or (req.get("buyer") or "").strip()
+    lead_ref = (req.get("lead_ref") or "").strip()
+    if not buyer or not lead_ref:
+        raise HTTPException(400, "X-API-Key + lead_ref required")
+    return {"ok": True, "authed": bool(key_buyer), **EP.record_conversion(buyer, lead_ref)}
+
+
+@app.get("/v1/search")
+def semantic_search(q: str = "", limit: int = 20):
+    """Meaning-based lead catalog search via SQLite FTS5 (no external deps).
+
+    q: free-text query (e.g. 'roof leak Brooklyn urgent').
+    Searches the lead intake text; returns ranked matches.
+    """
+    from empire_os.agents import evaluation_product as EP
+    if not q.strip():
+        return {"ok": True, "q": q, "count": 0, "items": []}
+    c = EP._db()
+    try:
+        c.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS lead_fts USING fts5("
+            "lead_ref, text, tokenize='porter')"
+        )
+        # (re)populate from the real lead catalog (lane_leads: notes+geo+niche)
+        cnt = c.execute("SELECT count(*) FROM lead_fts").fetchone()[0]
+        src = c.execute("SELECT count(*) FROM lane_leads").fetchone()[0]
+        if cnt == 0 or cnt < src:
+            c.execute("DELETE FROM lead_fts")
+            rows = c.execute(
+                "SELECT id, COALESCE(notes,'')||' '||COALESCE(niche,'')||' '||"
+                "COALESCE(sub_niche,'')||' '||COALESCE(metro,'')||' '||"
+                "COALESCE(city,'')||' '||COALESCE(state,'') FROM lane_leads "
+                "WHERE notes IS NOT NULL OR niche IS NOT NULL LIMIT 50000"
+            ).fetchall()
+            c.executemany(
+                "INSERT INTO lead_fts (lead_ref, text) VALUES (?,?)",
+                [(f"lane_{r[0]}", r[1]) for r in rows],
+            )
+            c.commit()
+        res = c.execute(
+            "SELECT lead_ref, text FROM lead_fts WHERE lead_fts MATCH ? "
+            "ORDER BY rank LIMIT ?",
+            (q, limit),
+        ).fetchall()
+    finally:
+        c.close()
+    items = [{"lead_ref": r[0], "snippet": r[1][:200]} for r in res]
+    return {"ok": True, "q": q, "count": len(items), "items": items}
+
+
+@app.get("/v1/evaluate/grades")
+def evaluate_grades(request: Request, buyer: str = None):
+    """Graded leads for a buyer (X-API-Key or ?buyer=). For the dashboard."""
+    from empire_os.agents import evaluation_product as EP
+    key_buyer = EP.resolve_buyer(request.headers.get("x-api-key", ""))
+    who = key_buyer or (buyer or "").strip()
+    if not who:
+        return {"ok": True, "buyer": None, "count": 0, "items": []}
+    c = EP._db()
+    try:
+        rows = c.execute(
+            "SELECT lead_ref, niche, omega, grade, price_usd, billing, status, created_at "
+            "FROM evaluation_ledger WHERE buyer=? ORDER BY id DESC LIMIT 200",
+            (who,),
+        ).fetchall()
+    finally:
+        c.close()
+    keys = ("lead_ref", "niche", "omega", "grade", "price_usd", "billing", "status", "created_at")
+    items = [dict(zip(keys, r)) for r in rows]
+    return {"ok": True, "buyer": who, "count": len(items), "items": items}
+
+
+@app.get("/dashboard")
+def buyer_dashboard(request: Request):
+    """Buyer dashboard shell. Key via ?key=. Data loaded client-side from API."""
+    from fastapi.responses import FileResponse
+    import os as _os
+    p = _os.path.join(_os.path.dirname(__file__), "static", "dashboard.html")
+    if _os.path.exists(p):
+        return FileResponse(p)
+    return {"ok": False, "error": "dashboard.html not found"}
+
+
 @app.get("/evaluate")
 def evaluate_page():
     """Public pricing + live demo page for the Lead-Grade evaluation product."""

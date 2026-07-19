@@ -7,7 +7,7 @@
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0e14;color:#e6e6e6;line-height:1.5;padding:40px 20px}
-  .wrap{max-width:820px;margin:0 auto}
+  .wrap{max-width:860px;margin:0 auto}
   h1{font-size:28px;background:linear-gradient(90deg,#7c5cff,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:6px}
   .sub{color:#9aa0aa;margin-bottom:28px}
   .price{display:flex;gap:16px;flex-wrap:wrap;margin:24px 0}
@@ -17,17 +17,22 @@
   .card ul{margin-top:10px;font-size:13px;color:#b8bfc9;list-style:none}
   .card li{padding:3px 0;border-top:1px solid #232a36}
   code{background:#1d2330;padding:2px 6px;border-radius:4px;font-size:12px;color:#7c5cff}
-  .demo{background:#151a23;border:1px solid #232a36;border-radius:12px;padding:20px;margin-top:20px}
-  textarea{width:100%;height:120px;background:#0b0e14;color:#e6e6e6;border:1px solid #232a36;border-radius:8px;padding:10px;font-family:monospace;font-size:12px}
+  .box{background:#151a23;border:1px solid #232a36;border-radius:12px;padding:20px;margin-top:20px}
+  textarea,input{width:100%;background:#0b0e14;color:#e6e6e6;border:1px solid #232a36;border-radius:8px;padding:10px;font-family:monospace;font-size:12px;margin-top:6px}
+  input{font-family:sans-serif}
   button{margin-top:10px;background:linear-gradient(90deg,#7c5cff,#22d3ee);border:0;color:#fff;padding:10px 18px;border-radius:8px;font-weight:600;cursor:pointer}
-  pre{background:#0b0e14;border:1px solid #232a36;border-radius:8px;padding:12px;margin-top:12px;font-size:12px;overflow:auto;max-height:240px}
+  button.ghost{background:#232a36;color:#cfd6e0}
+  pre{background:#0b0e14;border:1px solid #232a36;border-radius:8px;padding:12px;margin-top:12px;font-size:12px;overflow:auto;max-height:260px;white-space:pre-wrap}
   .api{font-size:13px;color:#9aa0aa;margin-top:24px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:160px}
+  .key{color:#22d3ee;word-break:break-all}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Empire Cortex — Lead-Grade Evaluation</h1>
-  <p class="sub">Real lead scoring via the Omega qualification engine. Grade every lead A/B/C/D <strong>free</strong>. Pay only when a top-grade lead converts.</p>
+  <p class="sub">Real lead scoring via the Omega qualification engine. Grade every lead A/B/C/D <strong>free</strong>. Pay only when a graded lead converts.</p>
 
   <div class="price">
     <div class="card">
@@ -37,41 +42,84 @@
     </div>
     <div class="card">
       <h3>Outcome — Pay on Convert</h3>
-      <div class="big">$0.50<span style="font-size:14px;color:#9aa0aa">/A·B convert</span></div>
-      <ul><li>Charge only when graded A/B converts</li><li>USDC settlement</li><li>Best ROI — you pay for results</li></ul>
+      <div class="big">$0.50<span style="font-size:14px;color:#9aa0aa">/A·B·C convert</span></div>
+      <ul><li>Charge on conversion</li><li>USDC settlement</li><li>Pay for results</li></ul>
     </div>
     <div class="card">
       <h3>Casual — Per Score</h3>
       <div class="big">$0.20<span style="font-size:14px;color:#9aa0aa">/lead</span></div>
-      <ul><li>Opt-in flat rate</li><li>Batch API</li><li>No conversion tracking needed</li></ul>
+      <ul><li>Opt-in flat rate</li><li>Batch API</li><li>No tracking needed</li></ul>
     </div>
   </div>
 
-  <div class="demo">
-    <strong>Try it — paste leads (one JSON per line):</strong>
-    <textarea id="leads">{"ref":"demo1","details":"roof leak repair Queens NY","name":"Joe","phone":"5551234","zip_code":"11368"}
-{"ref":"demo2","details":"solar install Austin TX","name":"Sue","phone":"5559999","zip_code":"78701"}</textarea>
+  <div class="box">
+    <strong>1 · Get your API key (free)</strong>
+    <div class="row">
+      <div><label>Business name</label><input id="bname" placeholder="Acme Roofing"/></div>
+      <div><label>Niche</label><input id="bniche" placeholder="roofing"/></div>
+    </div>
+    <label>USDC wallet (where we settle payouts to you)</label>
+    <input id="bwallet" placeholder="YourSolanaWallet…"/>
+    <button onclick="signup()">Create account + key</button>
+    <pre id="signout">// your api_key appears here</pre>
+  </div>
+
+  <div class="box">
+    <strong>2 · Score leads (paste one JSON per line)</strong>
+    <textarea id="leads">{"ref":"lead1","details":"roof leak repair Queens NY","name":"Joe","phone":"5551234","zip_code":"11368"}
+{"ref":"lead2","details":"solar install Austin TX","name":"Sue","phone":"5559999","zip_code":"78701"}</textarea>
     <button onclick="runDemo()">Score these leads</button>
     <pre id="out">// results appear here</pre>
   </div>
 
+  <div class="box">
+    <strong>3 · Mark a lead "sold" → auto-bill + get pay link</strong>
+    <div class="row">
+      <div><label>API key</label><input id="skey" placeholder="evk_… (from step 1)"/></div>
+      <div><label>Lead ref</label><input id="sref" placeholder="lead1"/></div>
+    </div>
+    <button onclick="markSold()">Lead sold → charge $0.50 + pay link</button>
+    <pre id="soldout">// conversion + Solana Pay URL appears here</pre>
+  </div>
+
   <div class="api">
-    <p><strong>API:</strong> <code>POST /v1/evaluate</code> with <code>{"buyer":"&lt;id&gt;","leads":[...]}</code></p>
-    <p>Returns per-lead <code>omega</code>, <code>tier</code>, <code>grade</code>, <code>price_usd</code>. Ledger: <code>GET /v1/evaluate/ledger?buyer=&lt;id&gt;</code></p>
-    <p>Settlement: billed to <code>evaluation_ledger</code>; collect via the Empire USDC activation chain.</p>
+    <p><strong>API:</strong> <code>POST /v1/evaluate/signup</code> → key · <code>POST /v1/evaluate</code> (header <code>X-API-Key</code>) · <code>POST /v1/evaluate/lead-sold</code> (header <code>X-API-Key</code>, body <code>{"lead_ref":"…"}</code>)</p>
+    <p>Ledger: <code>GET /v1/evaluate/ledger?buyer=&lt;id&gt;</code> · Settlements: <code>GET /v1/evaluate/settlements</code> · Dashboard: <code>/dashboard?key=&lt;api_key&gt;</code></p>
+    <p>Settlement: billed to <code>evaluation_ledger</code>; the buyer pays the returned Solana Pay URL (memo <code>EVAL_&lt;tenant&gt;__&lt;ref&gt;</code>); our listener settles it automatically.</p>
   </div>
 </div>
 <script>
-async function runDemo(){
-  const lines = document.getElementById('leads').value.split('\n').filter(x=>x.trim());
-  const leads = lines.map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(Boolean);
-  const out = document.getElementById('out');
-  out.textContent = 'scoring…';
+const KEY = ()=>document.getElementById('skey').value.trim();
+async function signup(){
+  const out=document.getElementById('signout');
+  out.textContent='creating…';
   try{
-    const r = await fetch('/v1/evaluate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({buyer:'web_demo',leads})});
-    const j = await r.json();
-    out.textContent = JSON.stringify(j,null,2);
-  }catch(e){ out.textContent = 'error: '+e; }
+    const r=await fetch('/v1/evaluate/signup',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:document.getElementById('bname').value,niche:document.getElementById('bniche').value,wallet:document.getElementById('bwallet').value})});
+    const j=await r.json();
+    if(j.ok){document.getElementById('skey').value=j.api_key;}
+    out.textContent=JSON.stringify(j,null,2);
+  }catch(e){out.textContent='error: '+e;}
+}
+async function runDemo(){
+  const lines=document.getElementById('leads').value.split('\n').filter(x=>x.trim());
+  const leads=lines.map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(Boolean);
+  const out=document.getElementById('out'); out.textContent='scoring…';
+  try{
+    const r=await fetch('/v1/evaluate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({buyer:'web_demo',leads})});
+    out.textContent=JSON.stringify(await r.json(),null,2);
+  }catch(e){out.textContent='error: '+e;}
+}
+async function markSold(){
+  const out=document.getElementById('soldout'); out.textContent='billing…';
+  const key=KEY();
+  if(!key){out.textContent='add your API key from step 1 first';return;}
+  try{
+    const r=await fetch('/v1/evaluate/lead-sold',{method:'POST',headers:{'Content-Type':'application/json','X-API-Key':key},
+      body:JSON.stringify({lead_ref:document.getElementById('sref').value.trim()})});
+    out.textContent=JSON.stringify(await r.json(),null,2);
+  }catch(e){out.textContent='error: '+e;}
 }
 </script>
 </body>
