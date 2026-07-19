@@ -58,7 +58,64 @@ def _db():
             created_at TEXT
         )"""
     )
+    c.execute(
+        """CREATE TABLE IF NOT EXISTS evaluation_settlements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            buyer TEXT,
+            lead_ref TEXT,
+            amount_usd REAL,
+            wallet TEXT,
+            status TEXT DEFAULT 'pending',
+            tx_sig TEXT,
+            created_at TEXT
+        )"""
+    )
     return c
+
+
+def _ensure_tenant_cols(c):
+    """si_tenant in some DBs predates api_key/delivery cols the code expects.
+    Add them idempotently so buyer API keys are storable + resolvable."""
+    try:
+        cols = {r[1] for r in c.execute("PRAGMA table_info(si_tenant)").fetchall()}
+    except sqlite3.OperationalError:
+        return  # si_tenant absent (non-hub DB)
+    for col in ("api_key", "delivery_email", "last_delivery_at"):
+        if col not in cols:
+            try:
+                c.execute(f"ALTER TABLE si_tenant ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass
+    c.commit()
+
+
+def resolve_buyer(api_key: str) -> str | None:
+    """Map an X-API-Key header to a real tenant_id. Returns None if unknown."""
+    if not api_key:
+        return None
+    c = _db()
+    try:
+        _ensure_tenant_cols(c)
+        row = c.execute(
+            "SELECT tenant_id FROM si_tenant WHERE api_key=? AND status='active'",
+            (api_key,),
+        ).fetchone()
+        return row[0] if row else None
+    except sqlite3.OperationalError:
+        return None  # si_tenant/api_key not present in this DB
+    finally:
+        c.close()
+
+
+def _buyer_wallet(c, buyer: str) -> str:
+    """Best-effort lookup of a buyer's USDC wallet for settlement."""
+    try:
+        row = c.execute(
+            "SELECT crypto_wallet FROM si_tenant WHERE tenant_id=?", (buyer,)
+        ).fetchone()
+        return row[0] if row and row[0] else ""
+    except sqlite3.OperationalError:
+        return ""
 
 
 def grade_for(omega: float) -> str:
@@ -168,6 +225,14 @@ def record_conversion(buyer: str, lead_ref: str) -> dict:
             "INSERT INTO evaluation_conversions (buyer, lead_ref, charged_usd, created_at) "
             "VALUES (?,?,?,?)",
             (buyer, lead_ref, CONVERT_USD,
+             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+        )
+        # record a pending USDC settlement obligation (real payout rail wires later)
+        wallet = _buyer_wallet(c, buyer)
+        c.execute(
+            "INSERT INTO evaluation_settlements (buyer, lead_ref, amount_usd, wallet, "
+            "status, created_at) VALUES (?,?,?,?,?,?)",
+            (buyer, lead_ref, CONVERT_USD, wallet, "pending",
              time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
         )
         c.commit()

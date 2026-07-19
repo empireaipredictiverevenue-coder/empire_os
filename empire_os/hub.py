@@ -7257,47 +7257,52 @@ async def outreach_webhook(request: Request):
 
 
 @app.post("/v1/evaluate")
-def evaluate(req: dict):
+def evaluate(req: dict, request: Request):
     """Empire Cortex — Lead-Grade Evaluation Product (REAL, HYBRID pricing).
 
-    Body: buyer (str,required) + leads (list) OR lead (dict)
+    Auth: optional X-API-Key header. A valid key binds billing to that real
+      tenant (overrides the `buyer` field). No key = open demo (buyer field used).
+    Body: buyer (str, required if no key) + leads (list) OR lead (dict)
       lead keys: details, name?, phone?, zip_code?, source?, tort_key?, ref?
       mode: 'outcome' (default) = free grading, charges $0.50 only when a
-            graded A/B lead converts; 'per_score' = $0.20/lead scored now.
+            graded A/B/C lead converts; 'per_score' = $0.20/lead scored now.
 
     Scores each lead with the real Omega pipeline (omega_os.qualify_prospect),
-    grades A/B/C/D. Settlement via existing USDC activation chain.
+    grades A/B/C/D. Conversions create pending USDC settlement rows.
     """
-    buyer = (req.get("buyer") or "").strip()
-    if not buyer:
-        raise HTTPException(400, "buyer required")
-    mode = req.get("mode")  # None -> module default (outcome)
     from empire_os.agents import evaluation_product as EP
+    key_buyer = EP.resolve_buyer(request.headers.get("x-api-key", ""))
+    buyer = key_buyer or (req.get("buyer") or "").strip()
+    if not buyer:
+        raise HTTPException(400, "buyer required (or send X-API-Key)")
+    mode = req.get("mode")  # None -> module default (outcome)
     if "leads" in req and isinstance(req["leads"], list):
         if not req["leads"]:
             raise HTTPException(400, "leads list empty")
         result = EP.evaluate_batch(buyer, req["leads"], mode)
-        return {"ok": True, **result}
+        return {"ok": True, "authed": bool(key_buyer), **result}
     lead = req.get("lead")
     if not isinstance(lead, dict):
         raise HTTPException(400, "lead dict or leads list required")
-    return {"ok": True, **EP.evaluate_lead(buyer, lead, mode)}
+    return {"ok": True, "authed": bool(key_buyer), **EP.evaluate_lead(buyer, lead, mode)}
 
 
 @app.post("/v1/evaluate/conversion")
-def evaluate_conversion(req: dict):
-    """HYBRID outcome billing: record that a graded A/B lead converted.
+def evaluate_conversion(req: dict, request: Request):
+    """HYBRID outcome billing: record that a graded A/B/C lead converted.
 
-    Body: buyer (str,required) + lead_ref (str,required)
-    Charges EVAL_CONVERT_USD (default $0.50) if grade was A/B and unbilled.
-    Idempotent per lead_ref. Returns charge record or skip reason.
+    Auth: optional X-API-Key (binds to real tenant, overrides `buyer`).
+    Body: buyer (str) + lead_ref (str,required)
+    Charges EVAL_CONVERT_USD (default $0.50) if grade was A/B/C and unbilled,
+    and writes a pending USDC settlement row. Idempotent per lead_ref.
     """
-    buyer = (req.get("buyer") or "").strip()
+    from empire_os.agents import evaluation_product as EP
+    key_buyer = EP.resolve_buyer(request.headers.get("x-api-key", ""))
+    buyer = key_buyer or (req.get("buyer") or "").strip()
     lead_ref = (req.get("lead_ref") or "").strip()
     if not buyer or not lead_ref:
-        raise HTTPException(400, "buyer + lead_ref required")
-    from empire_os.agents import evaluation_product as EP
-    return {"ok": True, **EP.record_conversion(buyer, lead_ref)}
+        raise HTTPException(400, "buyer + lead_ref required (or send X-API-Key)")
+    return {"ok": True, "authed": bool(key_buyer), **EP.record_conversion(buyer, lead_ref)}
 
 
 @app.get("/v1/evaluate/ledger")
@@ -7305,6 +7310,25 @@ def evaluate_ledger(buyer: str = None):
     """Total billed from the evaluation product (real USD owed/collected)."""
     from empire_os.agents import evaluation_product as EP
     return {"ok": True, "buyer": buyer, "total_usd": EP.ledger_total(buyer)}
+
+
+@app.get("/v1/evaluate/settlements")
+def evaluate_settlements(status: str = "pending"):
+    """Pending/settled USDC obligations from converted leads (real payout queue)."""
+    from empire_os.agents import evaluation_product as EP
+    c = EP._db()
+    try:
+        rows = c.execute(
+            "SELECT buyer, lead_ref, amount_usd, wallet, status, tx_sig, created_at "
+            "FROM evaluation_settlements WHERE status=? ORDER BY id DESC LIMIT 200",
+            (status,),
+        ).fetchall()
+    finally:
+        c.close()
+    keys = ("buyer", "lead_ref", "amount_usd", "wallet", "status", "tx_sig", "created_at")
+    items = [dict(zip(keys, r)) for r in rows]
+    return {"ok": True, "status": status, "count": len(items),
+            "total_usd": round(sum(i["amount_usd"] for i in items), 2), "items": items}
 
 
 @app.get("/evaluate")
