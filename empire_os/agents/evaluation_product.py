@@ -107,6 +107,48 @@ def resolve_buyer(api_key: str) -> str | None:
         c.close()
 
 
+def signup(name: str, niche: str = "", wallet: str = "", email: str = "") -> dict:
+    """Self-serve buyer onboarding: create an si_tenant + issue an API key.
+
+    Returns {tenant_id, api_key}. Idempotent-ish: a repeat name gets a fresh key
+    only if none active exists. Wallet (USDC) is stored for settlement lookups.
+    """
+    import secrets, re
+    name = (name or "").strip()
+    if not name:
+        return {"ok": False, "error": "name required"}
+    tenant_id = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or f"buyer_{int(time.time())}"
+    api_key = "evk_" + secrets.token_urlsafe(24)
+    c = _db()
+    try:
+        _ensure_tenant_cols(c)
+        # ensure crypto_wallet col exists (used by _buyer_wallet)
+        cols = {r[1] for r in c.execute("PRAGMA table_info(si_tenant)").fetchall()}
+        if "crypto_wallet" not in cols:
+            c.execute("ALTER TABLE si_tenant ADD COLUMN crypto_wallet TEXT")
+        existing = c.execute(
+            "SELECT tenant_id, api_key FROM si_tenant WHERE tenant_id=? AND status='active'",
+            (tenant_id,)).fetchone()
+        if existing and existing[1]:
+            return {"ok": True, "tenant_id": existing[0], "api_key": existing[1],
+                    "note": "existing active tenant"}
+        c.execute(
+            "INSERT OR REPLACE INTO si_tenant "
+            "(tenant_id, name, email, plan, billing_cycle, status, api_key, "
+            "crypto_wallet, delivery_email, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (tenant_id, name, email or f"{tenant_id}@eval.local", "eval",
+             "one_off", "active", api_key, wallet, email,
+             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
+        c.commit()
+    except sqlite3.OperationalError as e:
+        return {"ok": False, "error": f"si_tenant unavailable: {e}"}
+    finally:
+        c.close()
+    return {"ok": True, "tenant_id": tenant_id, "api_key": api_key, "niche": niche}
+
+
 def _buyer_wallet(c, buyer: str) -> str:
     """Best-effort lookup of a buyer's USDC wallet for settlement."""
     try:
@@ -238,12 +280,22 @@ def record_conversion(buyer: str, lead_ref: str) -> dict:
         c.commit()
     finally:
         c.close()
+    memo = f"EVAL_{buyer}__{lead_ref}"
+    vault = os.environ.get("SOLANA_VAULT_WALLET", "").strip()
+    pay_url = ""
+    if vault:
+        import urllib.parse
+        pay_url = (f"solana:{vault}?amount={CONVERT_USD}"
+                   f"&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+                   f"&memo={urllib.parse.quote(memo)}&label={urllib.parse.quote(memo)}")
     return {
         "charged": True,
         "buyer": buyer,
         "lead_ref": lead_ref,
         "grade": grade,
         "amount_usd": CONVERT_USD,
+        "pay_memo": memo,
+        "pay_url": pay_url,
     }
 
 

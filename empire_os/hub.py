@@ -2409,6 +2409,21 @@ def finance_replay(req: dict):
                         "WHERE id = ?",
                         (buyer_agent or "a2a", lane_id))
                     paid_lane = lane_id
+            # --- Eval product: EVAL_<buyer>__<lead_ref> settles a converted lead ---
+            if m.startswith("EVAL_"):
+                rest = m.replace("EVAL_", "", 1).strip()
+                ev_buyer, _, ev_ref = rest.partition("__")
+                erow = cnx.execute(
+                    "SELECT id FROM evaluation_settlements "
+                    "WHERE buyer=? AND lead_ref=? AND status='pending' "
+                    "ORDER BY id DESC LIMIT 1",
+                    (ev_buyer, ev_ref)).fetchone()
+                if erow:
+                    cnx.execute(
+                        "UPDATE evaluation_settlements SET status='settled', tx_sig=? "
+                        "WHERE id=?",
+                        (req.get("tx_signature", ""), erow[0]))
+                    matched_to = f"eval settlement {ev_buyer}/{ev_ref}"
             # --- A2A: SKU_ memo activates a product subscription ---
             if m.startswith("SKU_"):
                 sku = m.replace("SKU_", "", 1).strip().lower()
@@ -7303,6 +7318,20 @@ def evaluate_conversion(req: dict, request: Request):
     if not buyer or not lead_ref:
         raise HTTPException(400, "buyer + lead_ref required (or send X-API-Key)")
     return {"ok": True, "authed": bool(key_buyer), **EP.record_conversion(buyer, lead_ref)}
+
+
+@app.post("/v1/evaluate/signup")
+def evaluate_signup(req: dict):
+    """Self-serve buyer onboarding for the eval product. Issues an API key.
+
+    Body: name (str,required) + niche? + wallet? (USDC) + email?
+    Returns {tenant_id, api_key}. Use the key as X-API-Key on /v1/evaluate.
+    """
+    from empire_os.agents import evaluation_product as EP
+    name = (req.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "name required")
+    return EP.signup(name, req.get("niche", ""), req.get("wallet", ""), req.get("email", ""))
 
 
 @app.get("/v1/evaluate/ledger")
