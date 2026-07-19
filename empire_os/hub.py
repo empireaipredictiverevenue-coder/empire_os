@@ -7288,3 +7288,14 @@ def evaluate_ledger(buyer: str = None):
     """Total billed from the evaluation product (real USD owed/collected)."""
     from empire_os.agents import evaluation_product as EP
     return {"ok": True, "buyer": buyer, "total_usd": EP.ledger_total(buyer)}
+
+
+@app.get("/evaluate")
+def evaluate_page():
+    """Public pricing + live demo page for the Lead-Grade evaluation product."""
+    from fastapi.responses import FileResponse
+    import os as _os
+    p = _os.path.join(_os.path.dirname(__file__), "static", "evaluate.html")
+    if _os.path.exists(p):
+        return FileResponse(p)
+    return {"ok": False, "error": "evaluate.html not found"}

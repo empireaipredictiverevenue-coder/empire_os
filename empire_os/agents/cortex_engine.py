@@ -412,6 +412,18 @@ def telegram_alert(msg):
         pass
 
 
+def omega_pass(c):
+    """Guard check: how many leads have been Omega-scored (real qualification
+    throughput). Returns scored count; Cortex alerts if it stalls at 0."""
+    try:
+        scored = c.execute(
+            "SELECT COUNT(*) FROM lane_leads WHERE omega_score IS NOT NULL"
+        ).fetchone()[0]
+    except Exception:
+        scored = 0
+    return {"scored": scored}
+
+
 def main():
     c = _db()
     report = {
