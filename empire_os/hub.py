@@ -2348,7 +2348,7 @@ def finance_replay(req: dict):
             if m.startswith("SEAT_") or m.startswith("SEAT_"):
                 sub_id = m.replace("SEAT_", "", 1).strip()
             if m.startswith("INV_"):
-                inv_id = m.replace("INV_", "", 1).strip()
+                inv_id = "inv_" + m.replace("INV_", "", 1).strip()
             # --- A2A: LANE_ memo seats an open lane ---
             if m.startswith("LANE_"):
                 lane_id = m.replace("LANE_", "", 1).strip()
@@ -2395,7 +2395,7 @@ def finance_replay(req: dict):
                 if row:
                     matched_to = f"si_subscription {row[0]}"
                     cnx.execute(
-                        "UPDATE si_subscription SET status = 'paid', "
+                        "UPDATE si_subscription SET status = 'active', "
                         "payment_ref = ? WHERE subscription_id = ?",
                         (sig, sub_id))
                     paid_sub = sub_id
@@ -2441,7 +2441,28 @@ def finance_replay(req: dict):
                     if diff <= 1:   # 1 micro-USDC tolerance
                         best = iid
                         break
-                if best:
+                # also match signup invoices in si_invoice (amount_cents, status pending)
+                if not best:
+                    cand2 = cnx.execute(
+                        "SELECT invoice_id, amount_cents, status "
+                        "FROM si_invoice WHERE status = 'pending'"
+                    ).fetchall()
+                    for iid, ac, st in cand2:
+                        try:
+                            diff = abs(int(round(float(ac))) * 10000 - amt_micro)
+                        except Exception:
+                            continue
+                        if diff <= 1:
+                            best = iid
+                            break
+                    if best:
+                        matched_to = f"si_invoice {best}"
+                        cnx.execute(
+                            "UPDATE si_invoice SET status = 'paid', "
+                            "paid_at = ?, reference = ? WHERE invoice_id = ?",
+                            (datetime.now(timezone.utc).isoformat(), sig, best))
+                        paid_inv = best
+                if best and not matched_to:
                     matched_to = f"si_ppc_invoices {best}"
                     cnx.execute(
                         "UPDATE si_ppc_invoices SET status = 'paid', "
@@ -2473,6 +2494,17 @@ def finance_replay(req: dict):
                             (sig, sid))
                         paid_sub = sid
                         break
+            # if a signup invoice (si_invoice) was paid, activate its subscription
+            if paid_inv and not paid_sub:
+                srow = cnx.execute(
+                    "SELECT subscription_id FROM si_invoice WHERE invoice_id = ?",
+                    (paid_inv,)).fetchone()
+                if srow and srow[0]:
+                    cnx.execute(
+                        "UPDATE si_subscription SET status = 'active', "
+                        "payment_ref = ? WHERE subscription_id = ?",
+                        (sig, srow[0]))
+                    paid_sub = srow[0]
             # if force_status paid but nothing matched, still log
             cnx.commit()
             # --- settlement + MONEY alert when a real invoice got paid ---
