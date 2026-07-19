@@ -499,6 +499,26 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(Exception)
+async def _unhandled_exc_handler(request: Request, exc: Exception):
+    """Never let an unhandled exception hard-crash a worker or return a raw
+    traceback. Log it, return a clean 500 with a request id so the watchdog
+    + operator can see what broke without the process dying."""
+    import traceback, uuid
+    rid = uuid.uuid4().hex[:12]
+    try:
+        print(f"[HUB-UNHANDLED {rid}] {request.method} {request.url.path}: "
+              f"{exc!r}\n{traceback.format_exc()[-1500:]}", flush=True)
+    except Exception:
+        pass
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=500,
+        content={"ok": False, "error": "internal_error", "ref": rid,
+                 "detail": str(exc)[:200]},
+    )
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Permissive CSP for the wallet page so Phantom's dApp browser doesn't block
     fetch/XHR to remote Solana RPCs (Alchemy, Ankr, public-rpc, mainnet-beta)."""
@@ -1695,7 +1715,8 @@ def load_product_catalog():
 def a2a_catalog():
     """What's for sale, machine-readable (static + GitHub-sourced)."""
     cat, _ = load_product_catalog()
-    return {"vault": VAULT, "products": cat, "settlement": "solana_usdc"}
+    vault = os.environ.get("SOLANA_VAULT_WALLET", "")
+    return {"vault": vault, "products": cat, "settlement": "solana_usdc"}
 
 
 @app.get("/v1/products/pricing")
