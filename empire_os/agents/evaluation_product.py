@@ -76,6 +76,18 @@ def _db():
             created_at TEXT
         )"""
     )
+    # Fee-aware on-chain model: a buyer purchases a CREDIT PACK once on-chain
+    # (>= $10 floor). Each conversion debits 1 credit OFF-CHAIN (no tx). The
+    # chain only sees the single purchase tx -> blockchain fees amortised.
+    c.execute(
+        """CREATE TABLE IF NOT EXISTS evaluation_credits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            buyer TEXT UNIQUE,
+            credits_remaining INTEGER DEFAULT 0,
+            funded_usd REAL DEFAULT 0,
+            updated_at TEXT
+        )"""
+    )
     return c
 
 
@@ -265,6 +277,35 @@ def record_conversion(buyer: str, lead_ref: str) -> dict:
             return {"charged": False, "reason": f"billing={billing} (not outcome)"}
         if status == "billed":
             return {"charged": False, "reason": "already billed"}
+        # Fee-aware path: if buyer holds credits, debit 1 off-chain (no tx).
+        if credit_balance(buyer) > 0:
+            c.execute(
+                "UPDATE evaluation_credits SET credits_remaining=credits_remaining-1, "
+                "updated_at=? WHERE buyer=?",
+                (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), buyer),
+            )
+            c.execute(
+                "UPDATE evaluation_ledger SET price_usd=?, status='billed_credit' WHERE id=?",
+                (CONVERT_USD, lid),
+            )
+            c.execute(
+                "INSERT INTO evaluation_conversions (buyer, lead_ref, charged_usd, created_at) "
+                "VALUES (?,?,?,?)",
+                (buyer, lead_ref, 0.0,
+                 time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+            )
+            c.commit()
+            return {
+                "charged": True,
+                "buyer": buyer,
+                "lead_ref": lead_ref,
+                "grade": grade,
+                "amount_usd": 0.0,
+                "credited": True,
+                "credits_remaining": credit_balance(buyer),
+                "pay_memo": "",
+                "pay_url": "",
+            }
         c.execute(
             "UPDATE evaluation_ledger SET price_usd=?, status='billed' WHERE id=?",
             (CONVERT_USD, lid),
@@ -305,6 +346,99 @@ def record_conversion(buyer: str, lead_ref: str) -> dict:
         "pay_memo": memo,
         "pay_url": pay_url,
     }
+
+
+def credit_balance(buyer: str) -> int:
+    """Remaining fee-aware credits for a buyer (0 if none)."""
+    c = _db()
+    try:
+        row = c.execute(
+            "SELECT credits_remaining FROM evaluation_credits WHERE buyer=?",
+            (buyer,),
+        ).fetchone()
+        return int(row[0]) if row else 0
+    finally:
+        c.close()
+
+
+def buy_pack(buyer: str, usd: float = None) -> dict:
+    """Fee-aware on-chain purchase: ONE Solana Pay tx funds a credit pack.
+
+    Credits = floor(usd / CONVERT_USD) (e.g. $10 -> 20 conversions). The buyer
+    pays once on-chain; conversions then draw down credits OFF-CHAIN, so blockchain
+    fees are amortised across many leads instead of one tx per $0.50.
+    Enforces the $10 minimum deal size.
+    """
+    usd = float(usd or MIN_USD)
+    demand = max(usd, MIN_USD)
+    credits = int(demand // CONVERT_USD)
+    pack_id = f"pack_{int(time.time())}"
+    memo = f"EVALBUY_{buyer}_{pack_id}"
+    c = _db()
+    try:
+        wallet = _buyer_wallet(c, buyer)
+        c.execute(
+            "INSERT INTO evaluation_settlements (buyer, lead_ref, amount_usd, wallet, "
+            "status, created_at) VALUES (?,?,?,?,?,?)",
+            (buyer, memo, demand, wallet, "pending_pack",
+             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+        )
+        c.commit()
+    finally:
+        c.close()
+    vault = os.environ.get("SOLANA_VAULT_WALLET", "").strip()
+    pay_url = ""
+    if vault:
+        import urllib.parse
+        pay_url = (f"solana:{vault}?amount={demand:.2f}"
+                   f"&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+                   f"&memo={urllib.parse.quote(memo)}&label={urllib.parse.quote(memo)}")
+    return {
+        "buyer": buyer,
+        "pack_id": pack_id,
+        "credits": credits,
+        "charge_usd": round(demand, 2),
+        "pay_memo": memo,
+        "pay_url": pay_url,
+    }
+
+
+def _settle_pack(memo: str, tx_sig: str) -> bool:
+    """Replay hook: a EVALBUY_ memo credits the buyer's balance (one on-chain tx)."""
+    if not memo.startswith("EVALBUY_"):
+        return False
+    rest = memo.replace("EVALBUY_", "", 1).strip()
+    buyer, _, pack_id = rest.partition("_")
+    c = _db()
+    try:
+        srow = c.execute(
+            "SELECT amount_usd FROM evaluation_settlements "
+            "WHERE buyer=? AND lead_ref=? AND status='pending_pack' "
+            "ORDER BY id DESC LIMIT 1",
+            (buyer, memo),
+        ).fetchone()
+        if not srow:
+            return False
+        credits = int(float(srow[0]) // CONVERT_USD)
+        c.execute(
+            "INSERT INTO evaluation_credits (buyer, credits_remaining, funded_usd, updated_at) "
+            "VALUES (?,?,?,?) ON CONFLICT(buyer) DO UPDATE SET "
+            "credits_remaining=credits_remaining+?, funded_usd=funded_usd+?, "
+            "updated_at=?",
+            (buyer, credits, float(srow[0]),
+             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             credits, float(srow[0]),
+             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+        )
+        c.execute(
+            "UPDATE evaluation_settlements SET status='settled', tx_sig=? "
+            "WHERE buyer=? AND lead_ref=? AND status='pending_pack'",
+            (tx_sig, buyer, memo),
+        )
+        c.commit()
+        return True
+    finally:
+        c.close()
 
 
 def evaluate_batch(buyer: str, leads: list[dict], mode: str = None) -> dict:

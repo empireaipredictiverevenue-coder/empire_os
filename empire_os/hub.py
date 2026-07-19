@@ -2424,6 +2424,11 @@ def finance_replay(req: dict):
                         "WHERE id=?",
                         (req.get("tx_signature", ""), erow[0]))
                     matched_to = f"eval settlement {ev_buyer}/{ev_ref}"
+            # --- Eval product: EVALBUY_<buyer>_<pack> = one on-chain credit-pack purchase ---
+            if m.startswith("EVALBUY_"):
+                from empire_os.agents.evaluation_product import _settle_pack
+                if _settle_pack(m, req.get("tx_signature", "")):
+                    matched_to = f"eval credit pack {m}"
             # --- A2A: SKU_ memo activates a product subscription ---
             if m.startswith("SKU_"):
                 sku = m.replace("SKU_", "", 1).strip().lower()
@@ -7334,6 +7339,34 @@ def evaluate_signup(req: dict):
     return EP.signup(name, req.get("niche", ""), req.get("wallet", ""), req.get("email", ""))
 
 
+@app.post("/v1/evaluate/buy")
+def evaluate_buy(req: dict, request: Request):
+    """Fee-aware on-chain purchase: ONE Solana Pay tx funds a credit pack.
+
+    Auth: X-API-Key (binds to real tenant). Body: usd? (default $10 floor).
+    Returns {credits, charge_usd, pay_memo, pay_url}. The buyer pays once on
+    chain; conversions then draw down credits OFF-CHAIN (no per-lead tx).
+    Blockchain fees amortised across the whole pack.
+    """
+    from empire_os.agents import evaluation_product as EP
+    key_buyer = EP.resolve_buyer(request.headers.get("x-api-key", ""))
+    buyer = key_buyer or (req.get("buyer") or "").strip()
+    if not buyer:
+        raise HTTPException(400, "X-API-Key required")
+    return {"ok": True, "authed": bool(key_buyer), **EP.buy_pack(buyer, req.get("usd"))}
+
+
+@app.get("/v1/evaluate/credits")
+def evaluate_credits(request: Request, buyer: str = None):
+    """Remaining fee-aware credits for a buyer (surfaced on the dashboard)."""
+    from empire_os.agents import evaluation_product as EP
+    key_buyer = EP.resolve_buyer(request.headers.get("x-api-key", ""))
+    who = key_buyer or (buyer or "").strip()
+    if not who:
+        return {"ok": True, "buyer": None, "credits": 0}
+    return {"ok": True, "buyer": who, "credits": EP.credit_balance(who)}
+
+
 @app.get("/v1/evaluate/ledger")
 def evaluate_ledger(buyer: str = None):
     """Total billed from the evaluation product (real USD owed/collected)."""
@@ -7440,7 +7473,8 @@ def evaluate_grades(request: Request, buyer: str = None):
         c.close()
     keys = ("lead_ref", "niche", "omega", "grade", "price_usd", "billing", "status", "created_at")
     items = [dict(zip(keys, r)) for r in rows]
-    return {"ok": True, "buyer": who, "count": len(items), "items": items}
+    return {"ok": True, "buyer": who, "count": len(items),
+            "credits": EP.credit_balance(who), "items": items}
 
 
 @app.get("/dashboard")

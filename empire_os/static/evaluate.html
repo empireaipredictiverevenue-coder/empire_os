@@ -41,15 +41,20 @@
       <ul><li>Omega 8-dimension score</li><li>A/B/C/D grade</li><li>Always free</li></ul>
     </div>
     <div class="card">
-      <h3>Outcome — Pay on Convert</h3>
-      <div class="big">$0.50<span style="font-size:14px;color:#9aa0aa">/A·B·C convert</span></div>
-      <ul><li>Charge on conversion</li><li>USDC settlement</li><li>Pay for results</li></ul>
+      <h3>Credit Pack — On-Chain</h3>
+      <div class="big">$10<span style="font-size:14px;color:#9aa0aa">/pack (20)</span></div>
+      <ul><li>One USDC tx = 20 conversions</li><li>Fees amortised, not per-lead</li><li>Draw down off-chain</li></ul>
     </div>
     <div class="card">
-      <h3>Casual — Per Score</h3>
-      <div class="big">$0.20<span style="font-size:14px;color:#9aa0aa">/lead</span></div>
-      <ul><li>Opt-in flat rate</li><li>Batch API</li><li>No tracking needed</li></ul>
+      <h3>Legacy — Per Convert</h3>
+      <div class="big">$0.50<span style="font-size:14px;color:#9aa0aa">/A·B·C convert</span></div>
+      <ul><li>Falls back if no pack</li><li>Separate USDC tx each</li><li>$10 min enforced</li></ul>
     </div>
+  </div>
+
+  <div class="box">
+    <strong>0 · Why a credit pack? (blockchain fees)</strong>
+    <p style="font-size:13px;color:#b8bfc9;margin-top:8px">Selling per-lead on-chain means a Solana tx for every $0.50 — fee-friction kills it. Instead you buy ONE on-chain credit pack ($10 = 20 conversions). Each conversion then draws down a credit <em>off-chain</em>. The chain sees a single $10 tx; fees are amortised across 20 leads.</p>
   </div>
 
   <div class="box">
@@ -65,6 +70,17 @@
   </div>
 
   <div class="box">
+    <strong>1b · Buy a credit pack (one on-chain tx)</strong>
+    <p style="font-size:13px;color:#b8bfc9;margin:6px 0">Fund 20 conversions with a single $10 USDC payment. Conversions then auto-debit off-chain — no per-lead fees.</p>
+    <div class="row">
+      <div><label>API key</label><input id="bkey" placeholder="evk_… (from step 1)"/></div>
+      <div><label>Amount USD (min $10)</label><input id="bamt" placeholder="10"/></div>
+    </div>
+    <button onclick="buyPack()">Buy pack → Solana Pay URL</button>
+    <pre id="buyout">// pay URL + credits appear here</pre>
+  </div>
+
+  <div class="box">
     <strong>2 · Score leads (paste one JSON per line)</strong>
     <textarea id="leads">{"ref":"lead1","details":"roof leak repair Queens NY","name":"Joe","phone":"5551234","zip_code":"11368"}
 {"ref":"lead2","details":"solar install Austin TX","name":"Sue","phone":"5559999","zip_code":"78701"}</textarea>
@@ -73,19 +89,20 @@
   </div>
 
   <div class="box">
-    <strong>3 · Mark a lead "sold" → auto-bill + get pay link</strong>
+    <strong>3 · Mark a lead "sold" → auto-debit</strong>
+    <p style="font-size:13px;color:#b8bfc9;margin:6px 0">If you hold credits: debits 1 off-chain (no tx). Otherwise falls back to a $0.50 USDC charge + pay link.</p>
     <div class="row">
       <div><label>API key</label><input id="skey" placeholder="evk_… (from step 1)"/></div>
       <div><label>Lead ref</label><input id="sref" placeholder="lead1"/></div>
     </div>
-    <button onclick="markSold()">Lead sold → charge $0.50 + pay link</button>
-    <pre id="soldout">// conversion + Solana Pay URL appears here</pre>
+    <button onclick="markSold()">Lead sold → debit / charge</button>
+    <pre id="soldout">// conversion + (if no credits) Solana Pay URL appears here</pre>
   </div>
 
   <div class="api">
-    <p><strong>API:</strong> <code>POST /v1/evaluate/signup</code> → key · <code>POST /v1/evaluate</code> (header <code>X-API-Key</code>) · <code>POST /v1/evaluate/lead-sold</code> (header <code>X-API-Key</code>, body <code>{"lead_ref":"…"}</code>)</p>
-    <p>Ledger: <code>GET /v1/evaluate/ledger?buyer=&lt;id&gt;</code> · Settlements: <code>GET /v1/evaluate/settlements</code> · Dashboard: <code>/dashboard?key=&lt;api_key&gt;</code></p>
-    <p>Settlement: billed to <code>evaluation_ledger</code>; the buyer pays the returned Solana Pay URL (memo <code>EVAL_&lt;tenant&gt;__&lt;ref&gt;</code>); our listener settles it automatically.</p>
+    <p><strong>API:</strong> <code>POST /v1/evaluate/signup</code> → key · <code>POST /v1/evaluate</code> (header <code>X-API-Key</code>) · <code>POST /v1/evaluate/buy</code> (header <code>X-API-Key</code>, body <code>{"usd":10}</code> → credit pack) · <code>POST /v1/evaluate/lead-sold</code> (header <code>X-API-Key</code>, body <code>{"lead_ref":"…"}</code>)</p>
+    <p>Wallet: <code>GET /v1/evaluate/credits?key=&lt;api_key&gt;</code> · Ledger: <code>GET /v1/evaluate/ledger?buyer=&lt;id&gt;</code> · Settlements: <code>GET /v1/evaluate/settlements</code> · Dashboard: <code>/dashboard?key=&lt;api_key&gt;</code></p>
+    <p>On-chain purchase: one USDC tx with memo <code>EVALBUY_&lt;tenant&gt;_&lt;pack&gt;</code> credits your balance (our listener settles it automatically). Per-lead fallback memo: <code>EVAL_&lt;tenant&gt;__&lt;ref&gt;</code>.</p>
   </div>
 </div>
 <script>
@@ -108,6 +125,17 @@ async function runDemo(){
   try{
     const r=await fetch('/v1/evaluate',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({buyer:'web_demo',leads})});
+    out.textContent=JSON.stringify(await r.json(),null,2);
+  }catch(e){out.textContent='error: '+e;}
+}
+async function buyPack(){
+  const out=document.getElementById('buyout'); out.textContent='preparing pack…';
+  const key=document.getElementById('bkey').value.trim();
+  const amt=document.getElementById('bamt').value.trim();
+  if(!key){out.textContent='add your API key from step 1 first';return;}
+  try{
+    const r=await fetch('/v1/evaluate/buy',{method:'POST',headers:{'Content-Type':'application/json','X-API-Key':key},
+      body:JSON.stringify(amt?{usd:parseFloat(amt)}:{})});
     out.textContent=JSON.stringify(await r.json(),null,2);
   }catch(e){out.textContent='error: '+e;}
 }

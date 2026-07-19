@@ -32,9 +32,15 @@
 
   <div class="grid">
     <div class="stat"><div class="n" id="s-leads">–</div><div class="l">Leads graded (free)</div></div>
+    <div class="stat"><div class="n" id="s-credits">0</div><div class="l">On-chain credits</div></div>
     <div class="stat"><div class="n" id="s-billed">$0</div><div class="l">Billed (conversions)</div></div>
     <div class="stat"><div class="n" id="s-pending">$0</div><div class="l">Pending settlement</div></div>
     <div class="stat"><div class="n" id="s-settled">$0</div><div class="l">Settled (paid)</div></div>
+  </div>
+
+  <div class="note" id="buybox">
+    <strong>Buy a credit pack (one on-chain tx, fees amortised):</strong>
+    <div style="margin-top:8px"><button onclick="buyPack()">Buy $10 pack → 20 credits</button> <span id="buymsg" style="color:#22d3ee"></span></div>
   </div>
 
   <h3 style="margin:8px 0 6px;color:#cfd6e0">Graded leads</h3>
@@ -50,30 +56,42 @@
 const KEY = new URLSearchParams(location.search).get('key') || '';
 if(!KEY){ document.getElementById('who').textContent='No API key — open ?key=evk_…'; }
 async function load(){
-  const headers = {'X-API-Key':KEY};
-  const [g,s] = await Promise.all([
-    fetch('/v1/evaluate/grades?buyer=x',{headers}).then(r=>r.json()),
-    fetch('/v1/evaluate/settlements?status=all',{headers}).then(r=>r.json()).catch(()=>({items:[]}))
-  ]);
-  document.getElementById('who').innerHTML = KEY ? `Logged in as <code>${KEY.slice(0,18)}…</code>` : 'demo view';
-  const items = g.items||[];
-  document.getElementById('s-leads').textContent = items.length;
-  const billed = items.filter(i=>i.status==='billed').reduce((a,i)=>a+(i.price_usd||0),0);
-  document.getElementById('s-billed').textContent = '$'+billed.toFixed(2);
-  const sitems = s.items||[];
-  const pending = sitems.filter(i=>i.status==='pending').reduce((a,i)=>a+(i.amount_usd||0),0);
-  const settled = sitems.filter(i=>i.status==='settled').reduce((a,i)=>a+(i.amount_usd||0),0);
-  document.getElementById('s-pending').textContent = '$'+pending.toFixed(2);
-  document.getElementById('s-settled').textContent = '$'+settled.toFixed(2);
-  const gb = document.querySelector('#grades tbody'); gb.innerHTML='';
-  items.forEach(i=>{ const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${i.lead_ref}</td><td>${i.niche||''}</td><td>${i.omega}</td>`+
-      `<td class="g-${i.grade}">${i.grade}</td><td>${i.billing}</td><td>${i.status}</td>`; gb.appendChild(tr); });
-  const sb = document.querySelector('#settle tbody'); sb.innerHTML='';
-  sitems.forEach(i=>{ const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${i.lead_ref}</td><td>$${(i.amount_usd||0).toFixed(2)}</td><td>${(i.wallet||'').slice(0,12)}…</td>`+
-      `<td>${i.status}</td><td>${(i.tx_sig||'—')}</td>`; sb.appendChild(tr); });
-  document.getElementById('raw').textContent = JSON.stringify({grades:g,settlements:s},null,2);
+const headers = {'X-API-Key':KEY};
+const [g,s,c] = await Promise.all([
+  fetch('/v1/evaluate/grades',{headers}).then(r=>r.json()),
+  fetch('/v1/evaluate/settlements?status=all',{headers}).then(r=>r.json()).catch(()=>({items:[]})),
+  fetch('/v1/evaluate/credits',{headers}).then(r=>r.json()).catch(()=>({credits:0}))
+]);
+document.getElementById('who').innerHTML = KEY ? `Logged in as <code>${KEY.slice(0,18)}…</code>` : 'demo view';
+const items = g.items||[];
+document.getElementById('s-leads').textContent = items.length;
+document.getElementById('s-credits').textContent = (c.credits||0);
+const billed = items.filter(i=>i.status==='billed'||i.status==='billed_credit').reduce((a,i)=>a+(i.price_usd||0),0);
+document.getElementById('s-billed').textContent = '$'+billed.toFixed(2);
+const sitems = s.items||[];
+const pending = sitems.filter(i=>i.status==='pending'||i.status==='pending_pack').reduce((a,i)=>a+(i.amount_usd||0),0);
+const settled = sitems.filter(i=>i.status==='settled').reduce((a,i)=>a+(i.amount_usd||0),0);
+document.getElementById('s-pending').textContent = '$'+pending.toFixed(2);
+document.getElementById('s-settled').textContent = '$'+settled.toFixed(2);
+const gb = document.querySelector('#grades tbody'); gb.innerHTML='';
+items.forEach(i=>{ const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${i.lead_ref}</td><td>${i.niche||''}</td><td>${i.omega}</td>`+
+    `<td class="g-${i.grade}">${i.grade}</td><td>${i.billing}</td><td>${i.status}</td>`; gb.appendChild(tr); });
+const sb = document.querySelector('#settle tbody'); sb.innerHTML='';
+sitems.forEach(i=>{ const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${i.lead_ref}</td><td>$${(i.amount_usd||0).toFixed(2)}</td><td>${(i.wallet||'').slice(0,12)}…</td>`+
+    `<td>${i.status}</td><td>${(i.tx_sig||'—')}</td>`; sb.appendChild(tr); });
+document.getElementById('raw').textContent = JSON.stringify({grades:g,settlements:s,credits:c},null,2);
+}
+async function buyPack(){
+const msg=document.getElementById('buymsg'); msg.textContent='preparing…';
+try{
+  const r=await fetch('/v1/evaluate/buy',{method:'POST',headers:{'Content-Type':'application/json','X-API-Key':KEY},
+    body:JSON.stringify({usd:10})});
+  const j=await r.json();
+  msg.innerHTML = j.pay_url ? `✓ ${j.credits} credits · <a href="${j.pay_url}" target="_blank">pay ${j.charge_usd}</a>` : JSON.stringify(j);
+  load();
+}catch(e){msg.textContent='error: '+e;}
 }
 if(KEY) load();
 </script>
