@@ -361,10 +361,13 @@ def _log_ppc_invoice(buyer: dict, lead: dict) -> str:
     _log_event("INVOICE_LOGGED", "ppc invoice created",
                invoice_id=iid, amount_usdc=amount_usdc,
                buyer=buyer.get("tenant_id"))
-    # money-only alert: lead billed = revenue event
+    # money-only alert: lead billed = revenue event.
+    # SUPPRESS for demo/test buyers (payment_ref='demo') so test runs
+    # don't spam Telegram — only real money alerts go out.
     try:
-        import empire_os.revenue_notify as _rn
-        _rn.billed(iid, usd, buyer.get("niche", ""))
+        if str(buyer.get("payment_ref", "")).lower() != "demo":
+            import empire_os.revenue_notify as _rn
+            _rn.billed(iid, usd, buyer.get("niche", ""))
     except Exception:
         pass
     # affiliate credit: if lead was referred, pay commission on this invoice

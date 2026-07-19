@@ -240,28 +240,48 @@ async def lifespan(app: FastAPI):
 
     global agi_scout, agi_marketing, agi_sales
     agi_scout = AgiScoutClient()
-    if agi_scout.check_health():
+    def _safe_health(client, name):
+        try:
+            import threading
+            _ok = {}
+            def _run():
+                try: _ok["v"] = client.check_health()
+                except Exception: _ok["v"] = False
+            _t = threading.Thread(target=_run, daemon=True); _t.start(); _t.join(5)
+            return _ok.get("v", False)
+        except Exception:
+            return False
+    if _safe_health(agi_scout, "scout"):
         logger.info("agi-scout detected at %s", agi_scout.base_url)
     else:
         logger.info("agi-scout not reachable")
     agi_marketing = AgiMarketingClient()
-    if agi_marketing.check_health():
+    if _safe_health(agi_marketing, "marketing"):
         logger.info("agi-marketing detected at %s", agi_marketing.base_url)
     else:
         logger.info("agi-marketing not reachable")
     # AGI Sales — runs in-process (no separate container needed).
     # Ollama box (10.218.156.211:11434) is down; route through OpenRouter
     # (tencent/hy3:free — same brain model) so loops run instead of dying.
-    agi_sales = AgiSalesAgent(
-        backend=backend,
-        llm=OpenRouterClient(model="tencent/hy3:free", timeout=120))
-    logger.info("agi-sales initialized in-process (OpenRouter hy3)")
+    # Guarded: a throttle on hy3:free must NOT block hub startup/loop.
+    try:
+        agi_sales = AgiSalesAgent(
+            backend=backend,
+            llm=OpenRouterClient(model="tencent/hy3:free", timeout=8))
+        logger.info("agi-sales initialized in-process (OpenRouter hy3)")
+    except Exception as e:
+        logger.warning("agi-sales init skipped (LLM unreachable): %s", str(e)[:120])
+        agi_sales = None
     # AGI Closer — last-mile closer, also in-process
     global agi_closer
-    agi_closer = AgiCloserAgent(
-        backend=backend,
-        llm=OpenRouterClient(model="tencent/hy3:free", timeout=120))
-    logger.info("agi-closer initialized in-process (OpenRouter hy3)")
+    try:
+        agi_closer = AgiCloserAgent(
+            backend=backend,
+            llm=OpenRouterClient(model="tencent/hy3:free", timeout=8))
+        logger.info("agi-closer initialized in-process (OpenRouter hy3)")
+    except Exception as e:
+        logger.warning("agi-closer init skipped (LLM unreachable): %s", str(e)[:120])
+        agi_closer = None
 
     # Ensure lane schema + seed 36 lanes
     ensure_lane_schema(backend)
@@ -286,6 +306,51 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Could not mount AEO surface: %s", e)
 
+    # Explicit sitemap/robots routes (StaticFiles html=True can miss root files)
+    @app.get("/aeo/sitemap.xml")
+    async def aeo_sitemap():
+        from fastapi.responses import FileResponse
+        p = Path(AEO_SURFACE_ROOT) / "sitemap.xml"
+        if p.exists():
+            return FileResponse(str(p), media_type="application/xml")
+        return Response(status_code=404)
+
+    @app.get("/aeo/robots.txt")
+    async def aeo_robots():
+        from fastapi.responses import FileResponse
+        p = Path(AEO_SURFACE_ROOT) / "robots.txt"
+        if p.exists():
+            return FileResponse(str(p), media_type="text/plain")
+        return Response(status_code=404)
+
+    @app.get("/sitemap.xml")
+    async def root_sitemap():
+        from fastapi.responses import FileResponse
+        p = Path(AEO_SURFACE_ROOT) / "sitemap.xml"
+        if p.exists():
+            return FileResponse(str(p), media_type="application/xml")
+        return Response(status_code=404)
+
+    @app.get("/robots.txt")
+    async def root_robots():
+        from fastapi.responses import FileResponse
+        p = Path(AEO_SURFACE_ROOT) / "robots.txt"
+        if p.exists():
+            return FileResponse(str(p), media_type="text/plain")
+        return Response(status_code=404)
+
+    # Google Search Console ownership verification file (served at domain root)
+    @app.get("/google{blob}.html")
+    async def gsc_verify(blob: str):
+        from fastapi.responses import FileResponse
+        # 'blob' is the part after the literal /google prefix (no '..' allowed)
+        if ".." in blob or "/" in blob:
+            return Response(status_code=404)
+        p = Path(AEO_SURFACE_ROOT) / f"google{blob}.html"
+        if p.exists():
+            return FileResponse(str(p), media_type="text/html")
+        return Response(status_code=404)
+
     # Same-origin static assets (avoids Phantom dApp browser blocking 3rd-party scripts)
     _STATIC_DIR = Path(__file__).parent / "static"
     _STATIC_DIR.mkdir(parents=True, exist_ok=True)
@@ -304,7 +369,7 @@ async def lifespan(app: FastAPI):
     if not _own_loops:
         logger.info("Worker did not win loop lock — request-handler only "
                     "(agi_loop + auto_pilot skipped)")
-    if _own_loops and os.environ.get("EMPIRE_OS_TEST_MODE") != "1":
+    if _own_loops and os.environ.get("EMPIRE_OS_TEST_MODE") != "1" and os.environ.get("EMPIRE_INPROC_AGENTS") == "1":
         # Wrap CEO tick so the loop can call it as a no-arg method
         class _CeoBriefProxy:
             def __init__(self, fn, b):
@@ -328,7 +393,7 @@ async def lifespan(app: FastAPI):
     # Start the Auto-Pilot — drives the funnel end-to-end every N seconds
     from empire_os.auto_pilot import AutoPilot
     global auto_pilot
-    if _own_loops and os.environ.get("EMPIRE_OS_TEST_MODE") != "1":
+    if _own_loops and os.environ.get("EMPIRE_OS_TEST_MODE") != "1" and os.environ.get("EMPIRE_INPROC_AGENTS") == "1":
         auto_pilot = AutoPilot(
             hub_url=f"http://localhost:{int(os.environ.get('EMPIRE_PORT', '8080'))}",
             match_limit=15,
@@ -1059,7 +1124,7 @@ class BuyerApplyRequest(BaseModel):
     email: str
     tier: str = "silver"
     webhook_url: str = ""
-    min_deposit: float = 0.0
+    min_deposit: float = 50.0
     source: str = ""
 
 
@@ -1069,9 +1134,12 @@ class BuyerApplyResponse(BaseModel):
     niche: str
     tier: str
     seat_price_usd: float | None = None
+    per_lead_usdc: float | None = None
     funded: bool | None = None
     tenant_id: str | None = None
     subscription_id: str | None = None
+    pay_to_wallet: str | None = None
+    amount_usdc_due: float | None = None
     payment: dict | None = None
 
 
@@ -1104,11 +1172,15 @@ async def buyer_apply(req: BuyerApplyRequest):
         return BuyerApplyResponse(
             ok=True, buyer=req.name, niche=req.niche, tier=tier,
             seat_price_usd=res.get("seat_price"),
+            per_lead_usdc=res.get("per_lead_usdc"),
             funded=res.get("funded"),
             tenant_id=res.get("tenant_id"),
             subscription_id=res.get("subscription_id"),
-            payment={"asset": "USDC", "network": "Solana", "vault_wallet": vault,
-                     "note": "Fund this wallet to activate collection. Leads bill per delivery."},
+            pay_to_wallet=res.get("pay_to_wallet") or vault,
+            amount_usdc_due=res.get("amount_usdc_due"),
+            payment=res.get("payment") or {
+                "asset": "USDC", "network": "Solana", "vault_wallet": vault,
+                "note": "Fund this wallet to activate collection. Leads bill per delivery."},
         )
     except asyncio.TimeoutError:
         raise HTTPException(504, "onboard timed out — try again")
@@ -1206,6 +1278,38 @@ def resend_webhook_recent(limit: int = 20):
         return {"events": []}
     lines = RESEND_WEBHOOK_LOG.read_text().splitlines()
     return {"events": [json.loads(l) for l in lines[-limit:]]}
+
+
+@app.get("/v1/buyers/status/{subscription_id}")
+def buyer_status(subscription_id: str):
+    """Read-only buyer/subscription status for the public site to poll after
+    apply. Returns status, tier, seated lanes, leads delivered, amount due."""
+    try:
+        import sqlite3 as _sq
+        c = _sq.connect("/root/empire_os/empire_os.db", timeout=10, check_same_thread=False)
+        try:
+            row = c.execute(
+                "SELECT s.status, s.plan, s.price_cents, t.niche, t.webhook_url "
+                "FROM si_subscription s LEFT JOIN si_tenant t ON s.tenant_id=t.tenant_id "
+                "WHERE s.subscription_id=?", (subscription_id,)).fetchone()
+            if not row:
+                return {"ok": False, "found": False}
+            status, plan, price_cents, niche, webhook = row
+            delivered = c.execute(
+                "SELECT COUNT(*) FROM si_outbox WHERE buyer_tenant=?",
+                (subscription_id,)).fetchone()[0]
+            vault = c.execute(
+                "SELECT value FROM app_kv WHERE key='vault_balance_usdc'").fetchone()
+            return {"ok": True, "found": True, "status": status, "tier": (plan or "").replace("lane_", ""),
+                    "niche": niche or "", "price_cents": price_cents,
+                    "amount_usdc_due": round((price_cents or 0)/100.0, 2),
+                    "leads_delivered": delivered,
+                    "has_webhook": bool(webhook),
+                    "vault_usdc": float(vault[0]) if vault else 0.0}
+        finally:
+            c.close()
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:120]}
 
 
 @app.get("/v1/leads/sample")
@@ -1355,7 +1459,7 @@ def outreach_register(req: dict):
 
 @app.post("/v1/outreach/prospect/touched")
 def outreach_touched(req: dict):
-    """Mark prospect as touched (sent / failed)."""
+    """Record a touch (sent/failed) for a prospect in si_buyer_outreach."""
     if not backend:
         raise HTTPException(503, "backend not initialized")
     pid = req.get("prospect_id", "")
@@ -1397,6 +1501,46 @@ def outreach_touched(req: dict):
     except Exception as e:
         raise HTTPException(500, str(e))
 
+
+@app.post("/v1/outreach/webhook")
+async def outreach_webhook(request: Request):
+    """Receive outreach nurture payloads when Resend quota is hit (429).
+
+    Payload from outreach_runner.send_via_webhook:
+      {
+        "to": "email@domain.com",
+        "subject": "...",
+        "body": "...",
+        "metadata": {"source": "outreach", "step": 0, "prospect_id": "...", ...},
+        "source": "outreach_webhook"
+      }
+
+    Logs to /root/feedback/outreach_webhook.jsonl for review/forwarding.
+    """
+    body_bytes = await request.body()
+    try:
+        payload = json.loads(body_bytes.decode())
+    except Exception:
+        raise HTTPException(400, "invalid JSON")
+
+    # Log every webhook event for audit/retry
+    log_path = Path("/root/feedback/outreach_webhook.jsonl")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    event = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "type": payload.get("source", "outreach_webhook"),
+        "to": payload.get("to", ""),
+        "subject": payload.get("subject", ""),
+        "metadata": payload.get("metadata", {}),
+    }
+    with open(log_path, "a") as f:
+        f.write(json.dumps(event) + "\n")
+
+    return {"received": True, "type": payload.get("source", "outreach_webhook")}
+
+
+# ─────────────────────────────────────────────────────────────────
+# A2A SALES MESH — agent-to-agent commerce.
 
 @app.get("/v1/outreach/prospect/{prospect_id}")
 def outreach_get(prospect_id: str):
@@ -1467,16 +1611,8 @@ def outreach_pending(metro: str = None, niche: str = None, limit: int = 20):
     }
 
 
-
 # ─────────────────────────────────────────────────────────────────
 # A2A SALES MESH — agent-to-agent commerce.
-# Other agents (lead exchanges, procurement bots, Empire nodes) post
-# buy-intent; hub matches open inventory and returns a USDC settle
-# instruction. No human in the loop. Same vault as human buyers.
-# Satellite wastage + warehouse asset reports are first-class SKUs.
-# ─────────────────────────────────────────────────────────────────
-
-VAULT = os.environ.get("SOLANA_VAULT_WALLET", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
 
 PRODUCT_CATALOG = {
     "lead_lane": "Exclusive lead lane (niche+metro). Pay-per-lead in USDC.",
@@ -2314,14 +2450,16 @@ def finance_replay(req: dict):
                     paid_inv = best
             # --- buyer activation: match PENDING si_subscription by seat amount ---
             # Real USDC transfers (Trust/TokenPocket) carry no memo. A buyer who
-            # applied is parked as pending_deposit with price_cents set. Match the
-            # incoming deposit (micro-USDC) to the nearest pending seat price.
+            # applied is parked as pending_deposit OR awaiting_payment with
+            # price_cents set. Match the incoming deposit (micro-USDC) to the
+            # nearest pending seat price and flip to active (verified payment).
             if not paid_sub:
                 pend = cnx.execute(
                     "SELECT subscription_id, price_cents, tenant_id "
-                    "FROM si_subscription WHERE status = 'pending_deposit'"
+                    "FROM si_subscription "
+                    "WHERE status IN ('pending_deposit','awaiting_payment')"
                 ).fetchall()
-                for sid, pc, tid in pend:
+                for sid, pc, *rest in pend:
                     try:
                         # price_cents (e.g. 1800) -> micro-USDC (1800*10000)
                         seat_micro = int(round(float(pc))) * 10000
@@ -2520,6 +2658,70 @@ def swarm_ledger():
         else:
             out[s] = {"events": 0, "size_bytes": 0}
     return {"ledger": out, "ts": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/v1/swarm/lane-heat")
+def swarm_lane_heat():
+    """Return lane heat data aggregated from lane_monitor.jsonl and lead_deliveries.jsonl.
+    
+    Returns heat by lane (niche:metro) with delivery counts and lead counts.
+    """
+    import json
+    from collections import Counter
+    from pathlib import Path
+    
+    lane_heat = {}
+    
+    # Aggregate from lane_monitor.jsonl - daily_summary_emitted events have by_niche
+    lane_monitor_path = Path("/root/feedback/lane_monitor.jsonl")
+    if lane_monitor_path.exists():
+        for line in lane_monitor_path.read_text().splitlines():
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+                if entry.get("msg") == "daily_summary_emitted" and entry.get("by_niche"):
+                    for niche, count in entry["by_niche"].items():
+                        if niche and count > 0:
+                            # Try to find metro from lane_monitor data
+                            # The lane_monitor tracks by niche, we need to get metro from leads
+                            pass
+            except Exception:
+                continue
+    
+    # Aggregate from lead_deliveries.jsonl - DELIVERED events have niche, metro
+    lead_deliveries_path = Path("/root/feedback/lead_deliveries.jsonl")
+    if lead_deliveries_path.exists():
+        for line in lead_deliveries_path.read_text().splitlines():
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+                if entry.get("level") == "DELIVERED":
+                    # Try to extract niche and metro from subject or body_preview
+                    subject = entry.get("subject", "")
+                    body = entry.get("body_preview", "")
+                    # Parse from subject like "[Empire OS] New lead: plumbing in LAX"
+                    import re
+                    match = re.search(r"New lead:\s*(\w+)\s+in\s+(\w+)", subject)
+                    if match:
+                        niche = match.group(1).lower()
+                        metro = match.group(2).upper()
+                        lane_key = f"{niche}:{metro}"
+                        lane_heat[lane_key] = lane_heat.get(lane_key, 0) + 1
+            except Exception:
+                continue
+    
+    # Also check lane_leads table if we have backend access
+    # For now, return what we have from JSONL
+    sorted_heat = dict(sorted(lane_heat.items(), key=lambda x: -x[1]))
+    
+    return {
+        "by_lane": sorted_heat,
+        "total_lanes": len(sorted_heat),
+        "total_deliveries": sum(sorted_heat.values()),
+        "ts": datetime.now(timezone.utc).isoformat()
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -2883,6 +3085,7 @@ def outbox_pending(n: int = 10):
             "FROM si_outbox o "
             "WHERE o.status='pending' "
             "AND (o.recipient_kind IS NULL OR o.recipient_kind='buyer' "
+            "     OR o.recipient_kind='prospect' "
             "     OR (o.recipient_kind='owner' "
             "         AND EXISTS (SELECT 1 FROM si_prospect_consent c "
             "                     WHERE c.prospect_id = o.lead_id "
@@ -4397,6 +4600,40 @@ def dashboard_data():
     if not backend:
         raise HTTPException(503, "Engine not initialized")
     return build_dashboard_data(backend)
+
+
+@app.get("/v1/dashboard/buyers")
+def dashboard_buyers():
+    """List buyers (tenants/subscriptions) for the public dashboard table."""
+    try:
+        import sqlite3 as _sq
+        c = _sq.connect("/root/empire_os/empire_os.db", timeout=10, check_same_thread=False)
+        try:
+            rows = c.execute(
+                "SELECT t.name, s.plan, s.status, s.subscription_id, "
+                "(SELECT COUNT(*) FROM si_outbox WHERE buyer_tenant=s.subscription_id) AS delivered "
+                "FROM si_subscription s LEFT JOIN si_tenant t ON s.tenant_id=t.tenant_id "
+                "ORDER BY s.status DESC, delivered DESC LIMIT 100").fetchall()
+            return {"buyers": [{"name": r[0], "tier": (r[1] or "").replace("lane_", ""),
+                                "status": r[2], "subscription_id": r[3], "delivered": r[4]} for r in rows]}
+        finally:
+            c.close()
+    except Exception as e:
+        return {"buyers": [], "error": str(e)[:120]}
+
+
+# --- Public static site (async fallback; bypasses StaticFiles which can reset
+#     under event-loop load from internal agent self-calls) ---
+import os as _os
+_SITE = _os.path.join(_os.path.dirname(__file__), "static", "index.html")
+@app.get("/static/index.html")
+@app.get("/site")
+async def site_index():
+    if not _os.path.exists(_SITE):
+        from fastapi import HTTPException
+        raise HTTPException(404, "site not built")
+    from fastapi.responses import FileResponse
+    return FileResponse(_SITE, media_type="text/html")
 
 
 # --- Decision Queue ---
@@ -6171,14 +6408,50 @@ def crm_list(request: Request):
             limit=int(request.query_params.get("limit", 100)),
             offset=int(request.query_params.get("offset", 0)),
         )
-        return {"ok": True, **data}
+        return {"ok": True, "total": data.get("total", 0), "leads": data.get("leads", [])}
     except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+        raise HTTPException(500, str(e))
 
 
-@app.post("/v1/crm/leads/batch-enrich")
-def crm_batch_enrich_endpoint():
-    """Enrich up to 50 leads with lowest enrichment scores."""
+        @app.post("/v1/outreach/webhook")
+        async def outreach_webhook(request: Request):
+            """Receive outreach nurture payloads when Resend quota is hit (429).
+
+            Payload from outreach_runner.send_via_webhook:
+              {
+                "to": "email@domain.com",
+                "subject": "...",
+                "body": "...",
+                "metadata": {"source": "outreach", "step": 0, "prospect_id": "...", ...},
+                "source": "outreach_webhook"
+              }
+
+            Logs to /root/feedback/outreach_webhook.jsonl for review/forwarding.
+            """
+            body_bytes = await request.body()
+            try:
+                payload = json.loads(body_bytes.decode())
+            except Exception:
+                raise HTTPException(400, "invalid JSON")
+
+            # Log every webhook event for audit/retry
+            log_path = Path("/root/feedback/outreach_webhook.jsonl")
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            event = {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "type": payload.get("source", "outreach_webhook"),
+                "to": payload.get("to", ""),
+                "subject": payload.get("subject", ""),
+                "metadata": payload.get("metadata", {}),
+            }
+            with open(log_path, "a") as f:
+                f.write(json.dumps(event) + "\n")
+
+            return {"received": True, "type": payload.get("source", "outreach_webhook")}
+
+
+        # ─────────────────────────────────────────────────────────────────
+        # A2A SALES MESH — agent-to-agent commerce.
     if not backend:
         raise HTTPException(503, detail="Engine not initialized")
     try:
@@ -6545,3 +6818,297 @@ if __name__ == "__main__":
         reload=bool(os.environ.get("EMPIRE_RELOAD", "0") == "1"),
         workers=int(os.environ.get("EMPIRE_WORKERS", "2")),
     )
+
+# ─────────────────────────────────────────────────────────────────
+# Outreach surface — used by outreach-agent container over HTTP
+# endpoints to read/write si_buyer_outreach.
+# ─────────────────────────────────────────────────────────────────
+
+@app.post("/v1/outreach/prospect/register")
+def outreach_register(req: dict):
+    """Insert or no-op for prospect in si_buyer_outreach."""
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+    try:
+        backend.execute("""
+            CREATE TABLE IF NOT EXISTS si_buyer_outreach (
+                prospect_id TEXT PRIMARY KEY,
+                business_name TEXT,
+                email TEXT,
+                metro TEXT,
+                niche TEXT,
+                phone TEXT,
+                source TEXT,
+                score INTEGER,
+                url TEXT,
+                seq_step INTEGER DEFAULT 0,
+                first_touch_at TEXT,
+                last_touch_at TEXT,
+                touch_count INTEGER DEFAULT 0,
+                reply_state TEXT DEFAULT 'cold',
+                sample_lead_id TEXT,
+                converted INTEGER DEFAULT 0
+            )
+        """)
+        # idempotent: add seq_step to pre-existing tables
+        try:
+            backend.execute("ALTER TABLE si_buyer_outreach ADD COLUMN seq_step INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        backend.execute("""
+            INSERT OR IGNORE INTO si_buyer_outreach
+                (prospect_id, business_name, email, metro, niche,
+                 phone, source, score, url, reply_state)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (
+            req.get("prospect_id", ""),
+            req.get("business_name", ""),
+            req.get("email", ""),
+            req.get("metro", ""),
+            req.get("niche", ""),
+            req.get("phone", ""),
+            req.get("source", ""),
+            int(req.get("score", 0)),
+            req.get("url", ""),
+            "cold",
+        ))
+        if req.get("email"):
+            backend.execute(
+                "UPDATE si_buyer_outreach SET email=? WHERE prospect_id=?",
+                (req.get("email", ""), req.get("prospect_id", "")),
+            )
+        backend.commit()
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/v1/outreach/prospect/touched")
+def outreach_touched(req: dict):
+    """Mark prospect as touched (sent / failed)."""
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+    pid = req.get("prospect_id", "")
+    sent = bool(req.get("sent", False))
+    sample_lead_id = req.get("sample_lead_id", "")
+    seq_step = req.get("seq_step", None)
+    now = datetime.now(timezone.utc).isoformat()
+    state = "contacted" if sent else "outreach_failed"
+    try:
+        if seq_step is not None:
+            backend.execute(
+                """
+                UPDATE si_buyer_outreach
+                SET first_touch_at = COALESCE(first_touch_at, ?),
+                    last_touch_at = ?,
+                    touch_count = COALESCE(touch_count, 0) + 1,
+                    reply_state = ?,
+                    sample_lead_id = COALESCE(NULLIF(?, ''), sample_lead_id),
+                    seq_step = ?
+                WHERE prospect_id = ?
+                """,
+                (now, now, state, sample_lead_id, int(seq_step), pid),
+            )
+        else:
+            backend.execute(
+                """
+                UPDATE si_buyer_outreach
+                SET first_touch_at = COALESCE(first_touch_at, ?),
+                    last_touch_at = ?,
+                    touch_count = COALESCE(touch_count, 0) + 1,
+                    reply_state = ?,
+                    sample_lead_id = COALESCE(NULLIF(?, ''), sample_lead_id)
+                WHERE prospect_id = ?
+                """,
+                (now, now, state, sample_lead_id, pid),
+            )
+        backend.commit()
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/v1/outreach/webhook")
+async def outreach_webhook(request: Request):
+    """Receive outreach nurture payloads when Resend quota is hit (429).
+
+    Payload from outreach_runner.send_via_webhook:
+      {
+        "to": "email@domain.com",
+        "subject": "...",
+        "body": "...",
+        "metadata": {"source": "outreach", "step": 0, "prospect_id": "...", ...},
+        "source": "outreach_webhook"
+      }
+
+    Logs to /root/feedback/outreach_webhook.jsonl for review/forwarding.
+    """
+    body_bytes = await request.body()
+    try:
+        payload = json.loads(body_bytes.decode())
+    except Exception:
+        raise HTTPException(400, "invalid JSON")
+
+    # Log every webhook event for audit/retry
+    log_path = Path("/root/feedback/outreach_webhook.jsonl")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    event = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "type": payload.get("source", "outreach_webhook"),
+        "to": payload.get("to", ""),
+        "subject": payload.get("subject", ""),
+        "metadata": payload.get("metadata", {}),
+    }
+    with open(log_path, "a") as f:
+        f.write(json.dumps(event) + "\n")
+
+    return {"received": True, "type": payload.get("source", "outreach_webhook")}
+
+
+
+# ─────────────────────────────────────────────────────────────────
+# Outreach surface — used by outreach-agent container over HTTP
+# endpoints to read/write si_buyer_outreach.
+# ─────────────────────────────────────────────────────────────────
+
+@app.post("/v1/outreach/prospect/register")
+def outreach_register(req: dict):
+    """Insert or no-op for prospect in si_buyer_outreach."""
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+    try:
+        backend.execute("""
+            CREATE TABLE IF NOT EXISTS si_buyer_outreach (
+                prospect_id TEXT PRIMARY KEY,
+                business_name TEXT,
+                email TEXT,
+                metro TEXT,
+                niche TEXT,
+                phone TEXT,
+                source TEXT,
+                score INTEGER,
+                url TEXT,
+                seq_step INTEGER DEFAULT 0,
+                first_touch_at TEXT,
+                last_touch_at TEXT,
+                touch_count INTEGER DEFAULT 0,
+                reply_state TEXT DEFAULT 'cold',
+                sample_lead_id TEXT,
+                converted INTEGER DEFAULT 0
+            )
+        """)
+        # idempotent: add seq_step to pre-existing tables
+        try:
+            backend.execute("ALTER TABLE si_buyer_outreach ADD COLUMN seq_step INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        backend.execute("""
+            INSERT OR IGNORE INTO si_buyer_outreach
+                (prospect_id, business_name, email, metro, niche,
+                 phone, source, score, url, reply_state)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (
+            req.get("prospect_id", ""),
+            req.get("business_name", ""),
+            req.get("email", ""),
+            req.get("metro", ""),
+            req.get("niche", ""),
+            req.get("phone", ""),
+            req.get("source", ""),
+            int(req.get("score", 0)),
+            req.get("url", ""),
+            "cold",
+        ))
+        if req.get("email"):
+            backend.execute(
+                "UPDATE si_buyer_outreach SET email=? WHERE prospect_id=?",
+                (req.get("email", ""), req.get("prospect_id", "")),
+            )
+        backend.commit()
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/v1/outreach/prospect/touched")
+def outreach_touched(req: dict):
+    """Mark prospect as touched (sent / failed)."""
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+    pid = req.get("prospect_id", "")
+    sent = bool(req.get("sent", False))
+    sample_lead_id = req.get("sample_lead_id", "")
+    seq_step = req.get("seq_step", None)
+    now = datetime.now(timezone.utc).isoformat()
+    state = "contacted" if sent else "outreach_failed"
+    try:
+        if seq_step is not None:
+            backend.execute(
+                """
+                UPDATE si_buyer_outreach
+                SET first_touch_at = COALESCE(first_touch_at, ?),
+                    last_touch_at = ?,
+                    touch_count = COALESCE(touch_count, 0) + 1,
+                    reply_state = ?,
+                    sample_lead_id = COALESCE(NULLIF(?, ''), sample_lead_id),
+                    seq_step = ?
+                WHERE prospect_id = ?
+                """,
+                (now, now, state, sample_lead_id, int(seq_step), pid),
+            )
+        else:
+            backend.execute(
+                """
+                UPDATE si_buyer_outreach
+                SET first_touch_at = COALESCE(first_touch_at, ?),
+                    last_touch_at = ?,
+                    touch_count = COALESCE(touch_count, 0) + 1,
+                    reply_state = ?,
+                    sample_lead_id = COALESCE(NULLIF(?, ''), sample_lead_id)
+                WHERE prospect_id = ?
+                """,
+                (now, now, state, sample_lead_id, pid),
+            )
+        backend.commit()
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/v1/outreach/webhook")
+async def outreach_webhook(request: Request):
+    """Receive outreach nurture payloads when Resend quota is hit (429).
+
+    Payload from outreach_runner.send_via_webhook:
+      {
+        "to": "email@domain.com",
+        "subject": "...",
+        "body": "...",
+        "metadata": {"source": "outreach", "step": 0, "prospect_id": "...", ...},
+        "source": "outreach_webhook"
+      }
+
+    Logs to /root/feedback/outreach_webhook.jsonl for review/forwarding.
+    """
+    body_bytes = await request.body()
+    try:
+        payload = json.loads(body_bytes.decode())
+    except Exception:
+        raise HTTPException(400, "invalid JSON")
+
+    # Log every webhook event for audit/retry
+    log_path = Path("/root/feedback/outreach_webhook.jsonl")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    event = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "type": payload.get("source", "outreach_webhook"),
+        "to": payload.get("to", ""),
+        "subject": payload.get("subject", ""),
+        "metadata": payload.get("metadata", {}),
+    }
+    with open(log_path, "a") as f:
+        f.write(json.dumps(event) + "\n")
+
+    return {"received": True, "type": payload.get("source", "outreach_webhook")}
+
+

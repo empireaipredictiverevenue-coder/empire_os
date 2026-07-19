@@ -32,7 +32,8 @@ def open_invoices():
         "SELECT invoice_id, buyer_id, amount_usdc, created_at FROM si_ppc_invoices "
         "WHERE status='open' AND (last_reminder IS NULL OR "
         "datetime(last_reminder) < datetime('now','-24 hours')) "
-        "AND datetime(created_at) < datetime('now', ?)",
+        "AND datetime(created_at) < datetime('now', ?) "
+        "AND COALESCE(buyer_id,'') NOT LIKE 'demo_%'",
         (f"-{REMINDER_AGE_H} hours",)).fetchall()
     c.close(); return rows
 
@@ -50,10 +51,23 @@ def remind(inv_id, buyer, micro):
     mark_reminded(inv_id)
 
 def digest():
+    # once-per-day gate: only send if no digest sent in last 24h
     c = sqlite3.connect(DB, timeout=15); c.execute("PRAGMA busy_timeout=10000")
+    try:
+        c.execute("CREATE TABLE IF NOT EXISTS _meta (k TEXT PRIMARY KEY, v TEXT)")
+        last = c.execute("SELECT v FROM _meta WHERE k='last_digest'").fetchone()
+        if last and last[0]:
+            import datetime as _dt
+            if (_dt.datetime.now() - _dt.datetime.fromisoformat(last[0])).total_seconds() < 24*3600:
+                c.close(); return  # already sent today
+    except Exception:
+        pass
     open_n = c.execute("SELECT count(*), COALESCE(SUM(amount_usdc),0) FROM si_ppc_invoices WHERE status='open'").fetchone()
     paid_n = c.execute("SELECT count(*), COALESCE(SUM(amount_usdc),0) FROM si_ppc_invoices WHERE status='paid'").fetchone()
-    c.close()
+    import datetime as _dt
+    c.execute("INSERT OR REPLACE INTO _meta (k,v) VALUES ('last_digest', ?)",
+              (_dt.datetime.now().isoformat(),))
+    c.commit(); c.close()
     alert(f"DAILY BILLING DIGEST — open: {open_n[0]} (${open_n[1]/1e6:.2f}) | "
           f"paid: {paid_n[0]} (${paid_n[1]/1e6:.2f}) | vault: {VAULT}")
 
@@ -74,7 +88,6 @@ def main():
     while True:
         try:
             n = collect()
-            digest()  # steady daily visibility every cycle
             print(f"[billing] {n} reminded", flush=True)
         except Exception as e:
             alert(f"billing self-error: {str(e)[:120]}")
