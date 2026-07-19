@@ -34,12 +34,32 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 from empire_os.charge import charge as _do_charge
 
+# Ontology bridge: lead-source niches -> seated lane prefixes that ACTUALLY
+# exist in the lanes table. We only remap where the raw lead niche has no
+# matching lane; where a lane exists (hvac, plumbing, weight_loss, ...) we
+# pass it through so the matcher's prefix logic finds the seated buyer.
+NICHE_MAP = {
+    "roofing": "roof_repair", "roof": "roof_repair",
+    "window": "residential_roofing", "solar": "residential_roofing",
+    "legal": "legal_services", "lawyer": "legal_services",
+    "weight_loss": "weight_loss", "weightloss": "weight_loss",
+    "fitness": "weight_loss", "wellness": "weight_loss",
+    "ozempic": "weight_loss",
+    # hvac, plumbing, electrical, etc. keep their own lane prefix (exists)
+}
+
+
+def normalize_niche(niche: str) -> str:
+    n = (niche or "").lower().strip().replace(" ", "_").replace("-", "_")
+    return NICHE_MAP.get(n, n)
+
+
 PORT    = int(os.environ.get("PPC_PORT", "9200"))
 FB      = Path("/root/feedback")
 LOG     = FB / "ppc_events.jsonl"
 HIST    = deque(maxlen=400)
 DB      = "/root/empire_os/empire_os.db"
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 
 
 def _post_to_hub(path: str, body: dict) -> dict:
@@ -95,35 +115,59 @@ def log(level, msg, **fields):
 
 def _deliver_pay_link(buyer_id: str, pay_url: str, memo: str,
                       amount_cents: int) -> None:
-    """Deliver the Solana Pay link to the buyer channel.
+    """Email the Solana Pay link to the buyer's inbox.
 
     The charge generates pay_url + memo but nothing forwarded it before,
-    so buyers never received the link and never paid. We POST it to the
-    hub's telegram alert endpoint (which reaches the operator/buyer chat)
-    so the payment request is actually sent. Best-effort: a send failure
-    must not break the charge.
+    so buyers never received the link and never paid. We look up the buyer's
+    email in si_tenant and send via mail_sender (Brevo). Falls back to a
+    Telegram operator alert only if no email is on file. Best-effort: a send
+    failure must not break the charge.
     """
     if not pay_url:
         return
     usd = f"${amount_cents/100:.2f}"
-    text = (
-        f"\U0001F4B0 Empire OS — payment request\n"
-        f"Buyer: {buyer_id}\n"
-        f"Amount: {usd}\n"
-        f"Memo: {memo}\n"
-        f"Pay here: {pay_url}"
-    )
+    # Resolve buyer email from si_tenant
+    email = ""
     try:
-        _post_to_hub("/v1/telegram/alert",
-                     {"message": text, "tag": "payment_request"})
-        log("PAYLINK", "delivered", buyer_id=buyer_id, memo=memo)
+        import sqlite3
+        c = sqlite3.connect("/root/empire_os/empire_os.db")
+        row = c.execute("SELECT email FROM si_tenant WHERE tenant_id=?",
+                        (buyer_id,)).fetchone()
+        c.close()
+        email = (row[0] if row else "") or ""
+    except Exception:
+        pass
+    subject = f"Empire OS — your payment link ({usd})"
+    body = (
+        f"Your Empire OS seat is ready.<br><br>"
+        f"Amount due: <b>{usd}</b><br>"
+        f'<a href="{pay_url}">Pay now (USDC on Solana)</a><br><br>'
+        f"<small>Memo: {memo} — include it so we can activate your seat automatically.</small>"
+    )
+    if email and "@" in email and "example" not in email:
+        try:
+            from empire_os import mail_sender as ms
+            r = ms._send(email, subject, body)
+            log("PAYLINK", "emailed" if r.get("ok") else "email_failed",
+                buyer_id=buyer_id, to=email, memo=memo, err=r.get("error", ""))
+            if r.get("ok"):
+                return
+        except Exception as e:
+            log("PAYLINK", "email_exc", buyer_id=buyer_id, err=str(e)[:150])
+    # Fallback: operator Telegram alert (no email on file / send failed)
+    try:
+        _post_to_hub("/v1/telegram/alert", {
+            "message": (f"\U0001F4B0 Pay link (no buyer email)\nBuyer: {buyer_id}\n"
+                        f"Amount: {usd}\nMemo: {memo}\nPay: {pay_url}"),
+            "tag": "payment_request"})
+        log("PAYLINK", "telegram_fallback", buyer_id=buyer_id, memo=memo)
     except Exception as e:
-        log("PAYLINK", "deliver_failed", buyer_id=buyer_id,
-            err=str(e)[:200])
+        log("PAYLINK", "deliver_failed", buyer_id=buyer_id, err=str(e)[:200])
 
 
 def _invoiced(invoice_id: str, amount_cents: int, head: int,
-              reason: str, lead_id: str = "", call_id: str = "") -> dict:
+              reason: str, lead_id: str = "", call_id: str = "",
+              buyer_id: str = "") -> dict:
     """Persist a billing event + delegate to hub for canonical charge.
 
     Two paths:
@@ -135,7 +179,7 @@ def _invoiced(invoice_id: str, amount_cents: int, head: int,
     The buyer_id is derived from lead/call ids. Future: switchboard
     should pass explicit buyer attribution instead.
     """
-    buyer_id = lead_id or call_id or "unattributed"
+    buyer_id = buyer_id or lead_id or call_id or "unattributed"
     charge_id = "chg_" + secrets.token_hex(6)
     # 1) Delegate to hub - it knows the wallet
     hub_res = _post_to_hub("/v1/ppc/charge", {
@@ -213,6 +257,50 @@ def pick_head(lead: dict) -> int:
     return 5
 
 
+def resolve_buyer_per_lead(niche: str, metro: str = "") -> dict:
+    """Map a delivered lead to its seated buyer + that buyer's per-lead rate.
+
+    lane id is 'sub_niche:metro' in the lanes table; occupied_by holds the
+    real tenant_id. We read per_lead_cents from that tenant's subscription
+    (set at onboard). Returns {tenant_id, per_lead_cents} or {} if none.
+    """
+    n = normalize_niche(niche)
+    try:
+        con = sqlite3.connect(DB)
+        con.row_factory = sqlite3.Row
+        # Pass 1: build candidate lane ids (no close inside this loop)
+        cand = []
+        if metro:
+            cand.append(f"{n}:{metro.upper()}")
+        prefixes = [r["pre"] for r in con.execute(
+            "SELECT DISTINCT substr(id,1,instr(id,':')-1) AS pre FROM lanes")]
+        for pre in prefixes:
+            if pre and (pre == n or n in pre or pre in n):
+                if metro:
+                    cand.append(f"{pre}:{metro.upper()}")
+                else:
+                    for m in con.execute(
+                            "SELECT DISTINCT substr(id,instr(id,':')+1) AS m FROM lanes WHERE id LIKE ?",
+                            (f"{pre}:%",)):
+                        cand.append(f"{pre}:{m['m']}")
+        # Pass 2: resolve buyer (separate loop, safe to close after)
+        for lid in cand:
+            row = con.execute("SELECT occupied_by FROM lanes WHERE id=?", (lid,)).fetchone()
+            tid = (row["occupied_by"] if row else None) or ""
+            if not tid or tid == "unattributed":
+                continue
+            sub = con.execute(
+                "SELECT per_lead_cents, status FROM si_subscription WHERE tenant_id=? ORDER BY created_at DESC LIMIT 1",
+                (tid,)).fetchone()
+            if sub and sub["per_lead_cents"]:
+                con.close()
+                return {"tenant_id": tid, "per_lead_cents": int(sub["per_lead_cents"])}
+        con.close()
+    except Exception as e:
+        log("RESOLVE", "buyer_lookup_failed", err=str(e)[:200])
+    return {}
+
+
 class H(BaseHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get("Content-Length", "0"))
@@ -243,6 +331,23 @@ class H(BaseHTTPRequestHandler):
         phone   = body.get("phone", "")
         niche   = body.get("niche", "")
         head    = pick_head(body)
+        # HYBRID PER-LEAD: if a buyer is seated in this lead's lane, bill THAT
+        # buyer their actual per_lead_cents (set at onboard) for the delivery.
+        # Fires for any delivered lead to a seated buyer, head-agnostic.
+        buyer = resolve_buyer_per_lead(niche, body.get("metro", ""))
+        if buyer:
+            amt = buyer["per_lead_cents"]
+            buyer_id = buyer["tenant_id"]
+            inv = "inv_" + secrets.token_hex(6)
+            rec = _invoiced(inv, amt, 3,
+                            f"PPL: lead delivered to seated buyer {buyer_id}",
+                            lead_id=lead_id, buyer_id=buyer_id)
+            out = {"lead_id": lead_id, "head": 3, "buyer_id": buyer_id,
+                   "amount_usdc": amt/100, "invoice_id": inv,
+                   "charge_id": rec["charge_id"]}
+            HIST.appendleft(out)
+            return self.send_json(out, 200)
+        # No seated buyer -> legacy head-based flat billing (fallback)
         if head == 3:
             rules = PRICING["ppl_per_buyer"]
             amt = rules["flat_cents"] * min(3, body.get("buyer_count", 1))

@@ -41,7 +41,7 @@ HUB_CONTAINER = "empire-hub"
 DB_PATH = "/root/empire_os/empire_os.db"
 
 LOG_PATH = Path("/root/feedback/lead_deliveries.jsonl")
-HUB = os.environ.get("HUB_URL", "http://localhost:8000")
+HUB = os.environ.get("HUB_URL", "http://localhost:8081")
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 POLL_INTERVAL = 30  # seconds
@@ -330,9 +330,14 @@ def _log_ppc_invoice(buyer: dict, lead: dict) -> str:
     ppc ledger so solana_listener can collect USDC against it.
     Amount = base_payout * fee_rate (buyer's agreed rate). USDC has 6 decimals."""
     import urllib.request, json, uuid
+    # Prefer the agreed pay-per-lead rate; fall back to base*fee.
+    per_lead = int(buyer.get("per_lead_cents") or 0)
     base = float(buyer.get("base_payout", 0) or 0)
     rate = float(buyer.get("fee_rate", 0) or 0)
-    usd = base * rate if (base and rate) else 0.0
+    if per_lead:
+        usd = per_lead / 100.0
+    else:
+        usd = base * rate if (base and rate) else 0.0
     amount_usdc = int(usd * 1_000_000)  # 6 decimals
     if amount_usdc <= 0:
         return ""  # no billable amount agreed -> skip (NO-SIM: never fake $0)
@@ -468,7 +473,7 @@ def find_matching_buyers(lead: dict = None) -> list:
     """
     rows = _hub_sql("""
         SELECT t.tenant_id, t.name, t.email, t.plan AS tenant_plan,
-               s.subscription_id, s.plan, s.seats
+               s.subscription_id, s.plan, s.seats, s.per_lead_cents
         FROM si_tenant t
         JOIN si_subscription s ON s.tenant_id = t.tenant_id
         WHERE s.status = 'active'
@@ -823,6 +828,7 @@ if __name__ == "__main__":
                                           email=result.get("email_ok"))
                             ld.mark_lead_delivered(lead.get("id"))
                             count += 1
+                        time.sleep(0.2)  # stay under Brevo 10 req/s
                 print("[%s] delivered %d leads" % (
                     datetime.now(timezone.utc).isoformat(), count))
 
