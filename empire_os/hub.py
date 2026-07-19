@@ -7258,29 +7258,46 @@ async def outreach_webhook(request: Request):
 
 @app.post("/v1/evaluate")
 def evaluate(req: dict):
-    """Empire Cortex — Lead-Grade Evaluation Product (REAL, billable).
+    """Empire Cortex — Lead-Grade Evaluation Product (REAL, HYBRID pricing).
 
-    Body (single): buyer (str,required) + lead (dict,required)
+    Body: buyer (str,required) + leads (list) OR lead (dict)
       lead keys: details, name?, phone?, zip_code?, source?, tort_key?, ref?
-    Body (batch): buyer (str,required) + leads (list,required)
+      mode: 'outcome' (default) = free grading, charges $0.50 only when a
+            graded A/B lead converts; 'per_score' = $0.20/lead scored now.
 
     Scores each lead with the real Omega pipeline (omega_os.qualify_prospect),
-    grades A/B/C/D, bills EVAL_PRICE_USD (default 0.50) per lead, records to
-    evaluation_ledger. Settlement via existing USDC activation chain.
+    grades A/B/C/D. Settlement via existing USDC activation chain.
     """
     buyer = (req.get("buyer") or "").strip()
     if not buyer:
         raise HTTPException(400, "buyer required")
+    mode = req.get("mode")  # None -> module default (outcome)
     from empire_os.agents import evaluation_product as EP
     if "leads" in req and isinstance(req["leads"], list):
         if not req["leads"]:
             raise HTTPException(400, "leads list empty")
-        result = EP.evaluate_batch(buyer, req["leads"])
+        result = EP.evaluate_batch(buyer, req["leads"], mode)
         return {"ok": True, **result}
     lead = req.get("lead")
     if not isinstance(lead, dict):
         raise HTTPException(400, "lead dict or leads list required")
-    return {"ok": True, **EP.evaluate_lead(buyer, lead)}
+    return {"ok": True, **EP.evaluate_lead(buyer, lead, mode)}
+
+
+@app.post("/v1/evaluate/conversion")
+def evaluate_conversion(req: dict):
+    """HYBRID outcome billing: record that a graded A/B lead converted.
+
+    Body: buyer (str,required) + lead_ref (str,required)
+    Charges EVAL_CONVERT_USD (default $0.50) if grade was A/B and unbilled.
+    Idempotent per lead_ref. Returns charge record or skip reason.
+    """
+    buyer = (req.get("buyer") or "").strip()
+    lead_ref = (req.get("lead_ref") or "").strip()
+    if not buyer or not lead_ref:
+        raise HTTPException(400, "buyer + lead_ref required")
+    from empire_os.agents import evaluation_product as EP
+    return {"ok": True, **EP.record_conversion(buyer, lead_ref)}
 
 
 @app.get("/v1/evaluate/ledger")

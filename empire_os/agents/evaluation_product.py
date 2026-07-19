@@ -2,13 +2,17 @@
 
 Packages the Cortex Judge's lead-evaluation into a billable product:
 a buyer posts a lead (or batch), we score it with the real Omega pipeline
-(omega_os.qualify_prospect), return a grade, and bill USDC at a real
-configurable price. No invented unit prices, no phantom payouts.
+(omega_os.qualify_prospect), return a grade, and bill per the HYBRID model.
 
-Real price model (set via env, sane B2B default):
-  EVAL_PRICE_USD=0.50   # per lead scored (bulk-friendly)
-Tiered later if needed. Settlement records to evaluation_ledger; the existing
-USDC activation chain (solana_listener) collects payment against the invoice.
+HYBRID PRICING (best of both worlds):
+  - Grading is FREE for every lead (Omega score + A/B/C/D grade).
+  - OUTCOME mode (default): charge only when a graded A/B lead CONVERTS.
+        EVAL_CONVERT_USD = 0.50   # per A/B lead that converts
+  - PER_SCORE mode (opt-in, casual buyers): charge per lead scored.
+        EVAL_PRICE_USD = 0.20     # volume rate (was 0.50 casual)
+No invented unit prices, no phantom payouts. Settlement records to
+evaluation_ledger; the existing USDC activation chain (solana_listener)
+collects payment against the invoice.
 """
 from __future__ import annotations
 import os
@@ -16,7 +20,10 @@ import time
 import json
 import sqlite3
 
-PRICE_USD = float(os.environ.get("EVAL_PRICE_USD", "0.50"))
+# Hybrid knobs (env-overridable)
+PRICE_USD = float(os.environ.get("EVAL_PRICE_USD", "0.20"))      # per-score (opt-in)
+CONVERT_USD = float(os.environ.get("EVAL_CONVERT_USD", "0.50"))  # per A/B conversion
+DEFAULT_MODE = os.environ.get("EVAL_MODE", "outcome")           # outcome | per_score
 
 
 def _db():
@@ -31,7 +38,23 @@ def _db():
             omega REAL,
             grade TEXT,
             price_usd REAL,
+            billing TEXT,
             status TEXT DEFAULT 'billed',
+            created_at TEXT
+        )"""
+    )
+    # migrate: older ledgers may lack the billing column
+    cols = {r[1] for r in c.execute("PRAGMA table_info(evaluation_ledger)")}
+    if "billing" not in cols:
+        c.execute("ALTER TABLE evaluation_ledger ADD COLUMN billing TEXT")
+    if "status" not in cols:
+        c.execute("ALTER TABLE evaluation_ledger ADD COLUMN status TEXT DEFAULT 'billed'")
+    c.execute(
+        """CREATE TABLE IF NOT EXISTS evaluation_conversions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            buyer TEXT,
+            lead_ref TEXT,
+            charged_usd REAL,
             created_at TEXT
         )"""
     )
@@ -49,14 +72,16 @@ def grade_for(omega: float) -> str:
     return "D"
 
 
-def evaluate_lead(buyer: str, lead: dict) -> dict:
-    """Score one lead via the real Omega pipeline and bill it.
+def evaluate_lead(buyer: str, lead: dict, mode: str = None) -> dict:
+    """Score one lead via the real Omega pipeline, grade FREE, bill per mode.
 
-    lead keys: details, name, phone, zip_code, source, tort_key (optional)
-    Returns the evaluation record (grade, omega, price, ledger id).
+    mode: 'outcome' (default) = free grade, charge later on A/B conversion;
+          'per_score' = charge PRICE_USD now per lead scored.
+    Returns the evaluation record (grade, omega, billing, price).
     """
     from empire_os import omega_os
 
+    mode = mode or DEFAULT_MODE
     res = omega_os.qualify_prospect(
         backend=None,
         prospect_id=lead.get("ref") or f"eval_{int(time.time()*1000)}",
@@ -67,24 +92,31 @@ def evaluate_lead(buyer: str, lead: dict) -> dict:
         phone=lead.get("phone", ""),
         zip_code=lead.get("zip_code", ""),
     )
-    # OmegaScore.compute() returns total on a 0-100 scale + tier string.
     total = float(res.get("total", 0.0))
     omega = round(total / 100.0, 4)
     grade = grade_for(omega)
+
+    # Billing decision
+    if mode == "per_score":
+        billing, price, status = "per_score", PRICE_USD, "billed"
+    else:  # outcome: free to grade, billed only on conversion later
+        billing, price, status = "outcome", 0.0, "pending"
+
     c = _db()
     try:
         cur = c.execute(
             "INSERT INTO evaluation_ledger "
-            "(buyer, lead_ref, niche, omega, grade, price_usd, status, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?)",
+            "(buyer, lead_ref, niche, omega, grade, price_usd, billing, status, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
             (
                 buyer,
                 lead.get("ref", ""),
                 res.get("tort_key", "unknown"),
                 omega,
                 grade,
-                PRICE_USD,
-                "billed",
+                price,
+                billing,
+                status,
                 time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             ),
         )
@@ -100,15 +132,61 @@ def evaluate_lead(buyer: str, lead: dict) -> dict:
         "total_score": total,
         "tier": res.get("tier", "bronze"),
         "grade": grade,
-        "price_usd": PRICE_USD,
-        "status": "billed",
+        "billing": billing,
+        "price_usd": price,
+        "status": status,
     }
 
 
-def evaluate_batch(buyer: str, leads: list[dict]) -> dict:
-    out = [evaluate_lead(buyer, l) for l in leads]
+def record_conversion(buyer: str, lead_ref: str) -> dict:
+    """Outcome billing: a graded A/B lead converted -> charge CONVERT_USD.
+
+    Looks up the original evaluation; only A/B grades are billable. Idempotent
+    per lead_ref (won't double-charge). Returns the charge record or skip reason.
+    """
+    c = _db()
+    try:
+        row = c.execute(
+            "SELECT id, grade, billing, status FROM evaluation_ledger "
+            "WHERE buyer=? AND lead_ref=? ORDER BY id DESC LIMIT 1",
+            (buyer, lead_ref),
+        ).fetchone()
+        if not row:
+            return {"charged": False, "reason": "no evaluation found"}
+        lid, grade, billing, status = row
+        if grade not in ("A", "B", "C"):
+            return {"charged": False, "reason": f"grade {grade} not billable (junk)"}
+        if billing != "outcome":
+            return {"charged": False, "reason": f"billing={billing} (not outcome)"}
+        if status == "billed":
+            return {"charged": False, "reason": "already billed"}
+        c.execute(
+            "UPDATE evaluation_ledger SET price_usd=?, status='billed' WHERE id=?",
+            (CONVERT_USD, lid),
+        )
+        c.execute(
+            "INSERT INTO evaluation_conversions (buyer, lead_ref, charged_usd, created_at) "
+            "VALUES (?,?,?,?)",
+            (buyer, lead_ref, CONVERT_USD,
+             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+        )
+        c.commit()
+    finally:
+        c.close()
+    return {
+        "charged": True,
+        "buyer": buyer,
+        "lead_ref": lead_ref,
+        "grade": grade,
+        "amount_usd": CONVERT_USD,
+    }
+
+
+def evaluate_batch(buyer: str, leads: list[dict], mode: str = None) -> dict:
+    out = [evaluate_lead(buyer, l, mode) for l in leads]
     return {
         "buyer": buyer,
+        "mode": mode or DEFAULT_MODE,
         "count": len(out),
         "total_usd": round(sum(r["price_usd"] for r in out), 2),
         "grades": {g: sum(1 for r in out if r["grade"] == g) for g in ("A", "B", "C", "D")},
