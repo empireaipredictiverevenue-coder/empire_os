@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FB   = Path("/root/feedback")
 LOG  = FB / "media_suite_log.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(30)))

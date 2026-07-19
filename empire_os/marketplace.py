@@ -41,20 +41,35 @@ HUB_DB_PATH = "/root/empire_os/empire_os.db"
 
 
 def _hub_sql(query: str, params: tuple = ()) -> list:
-    """Run SQL inside empire-hub and return rows as list of dicts."""
-    script = (
-        "import sqlite3, json, sys\n"
-        "c = sqlite3.connect('%s')\n"
-        "c.row_factory = sqlite3.Row\n"
-        "params = json.loads(sys.argv[1])\n"
-        "cur = c.execute(sys.argv[2], params)\n"
-        "rows = [dict(r) for r in cur.fetchall()]\n"
-        "c.commit() if 'INSERT' in sys.argv[2].upper() or 'UPDATE' in sys.argv[2].upper() else None\n"
-        "c.close()\n"
-        "print(json.dumps(rows, default=str))\n"
-    ) % HUB_DB_PATH
+    """Run SQL inside empire-hub and return rows as list of dicts.
 
+    If the hub DB is reachable directly (we're in empire-hub or a sibling
+    that can read the file), run the query in-process. Otherwise shell out
+    via ``incus exec``. Mirrors the fallback logic in ``_hub_exec``.
+    """
+    if os.path.exists(HUB_DB_PATH):
+        try:
+            import sqlite3 as _sql
+            c = _sql.connect(HUB_DB_PATH)
+            c.row_factory = _sql.Row
+            cur = c.execute(query, params)
+            rows = [dict(r) for r in cur.fetchall()]
+            c.close()
+            return rows
+        except Exception as e:
+            logger.warning("hub_sql local failed: %s", e)
+            return []
     try:
+        script = (
+            "import sqlite3, json, sys\n"
+            "c = sqlite3.connect('%s')\n"
+            "c.row_factory = sqlite3.Row\n"
+            "params = json.loads(sys.argv[1])\n"
+            "cur = c.execute(sys.argv[2], params)\n"
+            "rows = [dict(r) for r in cur.fetchall()]\n"
+            "c.close()\n"
+            "print(json.dumps(rows, default=str))\n"
+        ) % HUB_DB_PATH
         r = subprocess.run(
             ["incus", "exec", HUB_CONTAINER, "--",
              "/root/venv/bin/python3", "-c", script,
@@ -258,6 +273,38 @@ def get_lane_price(niche: str, metro: str, tier: str = "silver") -> int:
         multiplier += 0.30
 
     return int(base * multiplier)
+
+
+def revenue_summary() -> dict:
+    """Aggregate real revenue from settled charges.
+
+    Returns the shape revenue_goals.fleet_summary expects:
+    ``{"paid_mrr_usd": float, ...}``. Falls back to $0 gracefully if the
+    table/column is missing — never raises into the caller.
+    """
+    try:
+        rows = _hub_sql(
+            "SELECT COALESCE(SUM(amount_cents),0) AS paid_cents "
+            "FROM si_charges WHERE status='paid'"
+        )
+        paid_cents = rows[0]["paid_cents"] if rows else 0
+    except Exception:
+        paid_cents = 0
+    # Open (unpaid) test/dry-run charges are intentionally excluded from MRR
+    # but reported separately so the operator sees pending pipeline.
+    try:
+        open_rows = _hub_sql(
+            "SELECT COALESCE(SUM(amount_cents),0) AS open_cents "
+            "FROM si_charges WHERE status='open'"
+        )
+        open_cents = open_rows[0]["open_cents"] if open_rows else 0
+    except Exception:
+        open_cents = 0
+    return {
+        "paid_mrr_usd": round(paid_cents / 100.0, 2),
+        "open_usd": round(open_cents / 100.0, 2),
+        "currency": "USD",
+    }
 
 
 # ─────────────────────────────────────────────────────────────────

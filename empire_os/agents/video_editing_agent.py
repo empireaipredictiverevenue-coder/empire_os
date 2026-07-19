@@ -42,7 +42,7 @@ JOBS_LOG = ROLE_DIR / "jobs.jsonl"
 TICK_INTERVAL = 600  # 10 min
 
 DB_PATH = os.environ.get("DB_PATH", "/root/empire_os/empire_os.db")
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 HERMES_GATEWAY_URL = os.environ.get(
     "HERMES_GATEWAY_URL", "http://10.118.155.156:9100")
 

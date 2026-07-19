@@ -22,10 +22,10 @@ def add_buyer_webhook_support(app: FastAPI, hub_base_url: str = None) -> None:
     
     Args:
         app: FastAPI application instance
-        hub_base_url: Base URL for the Hub (defaults to http://127.0.0.1:8000)
+        hub_base_url: Base URL for the Hub (defaults to http://127.0.0.1:8081)
     """
     if hub_base_url is None:
-        hub_base_url = "http://127.0.0.1:8000"
+        hub_base_url = "http://127.0.0.1:8081"
     
     # Update webhook manager with Hub URL
     webhook_manager.HUB_URL = hub_base_url.rstrip("/")

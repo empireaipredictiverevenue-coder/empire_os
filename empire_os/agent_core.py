@@ -136,16 +136,23 @@ class ApiClient:
         timeout: int = 30,
         api_key: str = "",
     ):
-        self.api_key = api_key or os.environ.get("MINIMAX_API_KEY", "")
-        # When MINIMAX is configured, any passed Ollama URL is ignored
-        if self.api_key and base_url and ("localhost" in base_url or "11434" in base_url or "ollama" in base_url.lower()):
-            base_url = ""
-        self.base_url = (
-            base_url or os.environ.get("LLM_BASE_URL", "https://api.minimax.io/v1")
-        ).rstrip("/")
-        self.model = (
-            model or os.environ.get("LLM_MODEL", "MiniMax-M2.7-highspeed")
-        )
+        # When an OpenRouter key is present, it fully takes over (reachable,
+        # paid+free tiers). MiniMax is only used when OpenRouter is absent.
+        if os.environ.get("OPENROUTER_API_KEY"):
+            self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
+            base_url = base_url or "https://openrouter.ai/api/v1"
+            # Force a known-good OpenRouter model (env LLM_MODEL may point at
+            # MiniMax and be inherited from a systemd Environment= override).
+            model = model or "openai/gpt-4o-mini"
+        else:
+            self.api_key = api_key or os.environ.get("MINIMAX_API_KEY", "")
+            # When MINIMAX is configured, any passed Ollama URL is ignored
+            if self.api_key and base_url and ("localhost" in base_url or "11434" in base_url or "ollama" in base_url.lower()):
+                base_url = ""
+            base_url = base_url or os.environ.get("LLM_BASE_URL", "https://api.minimax.io/v1")
+            model = model or os.environ.get("LLM_MODEL", "MiniMax-M2.7-highspeed")
+        self.base_url = base_url.rstrip("/")
+        self.model = model
         self.timeout = timeout
 
     def _post(self, payload: dict) -> dict:
@@ -186,7 +193,10 @@ class ApiClient:
             "stream": False,
             "temperature": temperature,
         }
-        if format == "json":
+        # Only force JSON mode when NOT on OpenRouter free-tier models, which
+        # reject response_format and return HTTP 400. The structured_chat
+        # stripper already handles JSON-in-text, so we rely on that instead.
+        if format == "json" and "openrouter.ai" not in self.base_url:
             payload["response_format"] = {"type": "json_object"}
 
         result = self._post(payload)
@@ -236,6 +246,41 @@ if os.environ.get("MINIMAX_API_KEY"):
     _ollama_base = OllamaClient
     OllamaClient = ApiClient
     logger.info("MINIMAX_API_KEY detected — agents will use API backend (%s)", os.environ.get("LLM_MODEL", "MiniMax-M2.7-highspeed"))
+
+
+# ── Ollama-dead fallback → OpenRouter ────────────────────────────────
+# The default OllamaClient points at a remote host (ornith-agent:11434)
+# that is often unreachable from this box. If Ollama is down AND we have an
+# OpenRouter key, transparently swap OllamaClient → OpenRouterClient so the
+# observe-reason-act agents (growth, innovator, etc.) keep working without
+# code changes. Uses a capable free model, not the code-only north-mini one.
+
+_OR_FALLBACK_MODEL = os.environ.get("OR_FALLBACK_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
+
+def _ollama_reachable() -> bool:
+    import urllib.request, urllib.error, socket
+    try:
+        req = urllib.request.Request("http://10.218.156.211:11434/api/tags")
+        with urllib.request.urlopen(req, timeout=3):
+            return True
+    except Exception:
+        return False
+
+if not os.environ.get("MINIMAX_API_KEY") and _load_openrouter_key() and not _ollama_reachable():
+    _orig_ollama = OllamaClient
+    class _OllamaToOpenRouter(OllamaClient):
+        """Drop-in OllamaClient replacement backed by OpenRouter."""
+        def __init__(self, base_url=None, model=None, timeout=60, **kw):
+            self._or = OpenRouterClient(model=model or _OR_FALLBACK_MODEL, timeout=timeout)
+            self.model = self._or.model
+            self.timeout = timeout
+        def chat(self, messages, system=None, temperature=0.3, format=None, **kw):
+            return self._or.chat(messages, system=system, temperature=temperature)
+        def structured_chat(self, messages, system=None, temperature=0.2, **kw):
+            return self._or.structured_chat(messages, system=system, temperature=temperature)
+    OllamaClient = _OllamaToOpenRouter
+    logger.info("Ollama unreachable + OpenRouter key present — agents use OpenRouter (%s)", _OR_FALLBACK_MODEL)
+
 
 
 # ── Agent Base Class ─────────────────────────────────────────────────

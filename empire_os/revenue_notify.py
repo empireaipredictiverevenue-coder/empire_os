@@ -35,3 +35,8 @@ def commission(affiliate_id: str, usd: float, lead_id: str = "") -> dict:
 def subscription(tenant: str, usd: float, tier: str = "") -> dict:
     return _send("📅", f"MRR {tenant} ${usd:,.2f}/mo"
                  + (f" [{tier}]" if tier else ""))
+
+
+def loop_stall(msg: str) -> dict:
+    """Money-loop health alert (loop_closure_watchdog)."""
+    return _send("🚨", f"LOOP STALL {msg}")

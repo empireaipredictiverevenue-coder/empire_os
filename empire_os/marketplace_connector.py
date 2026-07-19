@@ -34,7 +34,7 @@ from empire_os.agents.lead_deliverer_agent import (
 )
 
 # Global configuration
-HUB_URL = os.environ.get("HUB_URL", "http://localhost:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://localhost:8081")
 API_SECRET = os.environ.get("API_SECRET_KEY", "default-secret-change-in-production")
 
 class BuyerMarketplaceConnector:

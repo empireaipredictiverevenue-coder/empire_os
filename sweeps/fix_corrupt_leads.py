@@ -81,7 +81,7 @@ def main():
         try:
             q = f"{url}/rest/v1/prospects?id=eq.{lid}&select=niche,address,metro,phone,website,buy_signal_score&limit=1"
             recs = json.load(urllib.request.urlopen(
-                urllib.request.Request(q, headers=H), timeout=20))
+                urllib.request.Request(q, headers=H), timeout=8))
         except Exception as ex:
             continue
         if not recs:
@@ -98,19 +98,12 @@ def main():
         con.execute(
             "UPDATE crm_leads SET niche=?, metro=?, state=?, street=? WHERE lead_uid=?",
             (nic, metro, state, addr, lid))
+        con.commit()  # durable per-row so a kill loses at most one row
         fixed += 1
-        # route if it now has a lane-matching niche
-        if nic:
-            try:
-                route_lead(con, lid, f"niche={nic}|metro={metro}", state=state)
-                rerouted += 1
-            except Exception:
-                pass
-        if fetched % 500 == 0:
-            con.commit()
-            print(f"  fetched {fetched}, fixed {fixed}, rerouted {rerouted}")
+        if fetched % 200 == 0:
+            print(f"  fetched {fetched}, fixed {fixed}", flush=True)
     con.commit()
-    print(f"DONE fetched={fetched} fixed={fixed} rerouted_to_lanes={rerouted}")
+    print(f"DONE fetched={fetched} fixed={fixed} rerouted_to_lanes={rerouted}", flush=True)
 
 if __name__ == "__main__":
     main()

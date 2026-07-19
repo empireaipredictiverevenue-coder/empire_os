@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FB   = Path("/root/feedback")
 LOG  = FB / "b2b_log.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(6 * 3600)))
@@ -51,7 +51,7 @@ def overpass_scan(metro: str, niche: str, limit: int = 10):
 
 def hot_metros():
     try:
-        r = requests.get(f"{HUB}/v1/swarm/ledger", timeout=8).json()
+        r = requests.get(f"{HUB}/v1/swarm/lane-heat", timeout=8).json()
         heat = r.get("by_lane", {}) if isinstance(r, dict) else {}
         return sorted(heat.items(), key=lambda kv: -kv[1])[:10]
     except Exception: return []

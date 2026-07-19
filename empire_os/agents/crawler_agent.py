@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-HOOK_URL = "http://127.0.0.1:8000/internal/cron/crawler-run"
+HOOK_URL = "http://127.0.0.1:8081/internal/cron/crawler-run"
 INTERVAL = 30 * 60  # 30 min — host runs faster direct runs every 6h, this just syncs faster
 
 

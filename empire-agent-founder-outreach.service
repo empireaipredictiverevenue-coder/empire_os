@@ -1,0 +1,17 @@
+[Unit]
+Description=Empire OS founder outreach (enrich + queue prospects to Brevo)
+After=network-online.target empire-hub-8081.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os
+ExecStart=/root/empire_os/run_founder.sh
+Restart=always
+RestartSec=10
+User=root
+StandardOutput=append:/tmp/founder_watch.log
+StandardError=append:/tmp/founder_watch.log
+
+[Install]
+WantedBy=multi-user.target

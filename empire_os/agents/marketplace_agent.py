@@ -51,7 +51,7 @@ WALLETS_PATH = DIR / "wallets.json"
 LEDGER_PATH = DIR / "ledger.jsonl"
 TICK_INTERVAL = 300  # 5 min
 
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 HERMES_GATEWAY_URL = os.environ.get(
     "HERMES_GATEWAY_URL", "http://10.118.155.156:9100")
 USDC_VAULT = os.environ.get("USDC_VAULT",

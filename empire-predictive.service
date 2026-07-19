@@ -1,0 +1,19 @@
+[Unit]
+Description=Empire OS Predictive Agent (revenue/gap/leak/waste detector)
+After=network.target empire-hub-8081.service
+Requires=empire-hub-8081.service
+
+[Service]
+Type=exec
+WorkingDirectory=/root/empire_os
+Environment=PYTHONPATH=/root/empire_os
+Environment=HUB_URL=http://127.0.0.1:8081
+Environment=EMPIRE_HUB_URL=http://127.0.0.1:8081
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/predictive_agent.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

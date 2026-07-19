@@ -18,7 +18,7 @@ for _ln in open("/root/empire_os/.env"):
         os.environ.setdefault(_k.strip(), _v.strip())
 os.environ.update(dict(l.strip().split("=",1) for l in open("/root/empire_os/.env")
     if l.strip() and "=" in l and not l.startswith("#")))
-BASE = "http://127.0.0.1:8000"
+BASE = "http://127.0.0.1:8081"
 fails = []
 
 # 1) hub health (liveness signal; apply-ok is authoritative)

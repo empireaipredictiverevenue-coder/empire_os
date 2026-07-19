@@ -60,7 +60,10 @@ def get_container_pid(container: str) -> str:
 
 
 _INCUS = shutil.which("incus") or "/usr/bin/incus"
-_PM2   = shutil.which("pm2")   or "/usr/local/bin/pm2"
+# NOTE: pm2 is disabled fleet-wide. All empire agents run as systemd units
+# (Restart=always). The supervisor restarts them via `systemctl` only.
+# Do NOT reintroduce pm2 here — it spawned a self-respawning god daemon
+# that hijacked the hub port and caused a restart loop (2026-07-18).
 
 
 def _run(cmd: list, timeout: int = 10) -> bool:
@@ -95,9 +98,12 @@ def restart_role(role: str, container: str, pm2_name: str):
         _run([_INCUS, "start", container])
         time.sleep(8)
         log("EVENT", "container_started", role=role, container=container)
-    _run([_PM2, "restart", pm2_name])
+    # Use systemd (not pm2) to restart local agents. The pm2 god daemon
+    # is disabled; all empire agents run as systemd units now.
+    unit = f"empire-agent-{role.replace('_', '-')}.service"
+    _run(["systemctl", "restart", unit])
     log("EVENT", "agent_restarted", role=role,
-        pm2=pm2_name, restarts_5min=n_recent)
+        unit=unit, restarts_5min=n_recent)
     if n_recent >= MAX_RESTARTS_PER_5MIN:
         log("ALERT", "needs_attention", role=role,
             reason="5_restarts_in_5min", pm2=pm2_name)

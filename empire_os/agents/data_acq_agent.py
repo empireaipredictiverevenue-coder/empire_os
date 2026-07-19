@@ -21,7 +21,7 @@ sys.path.insert(0, "/root/empire_os")
 import requests
 from empire_os.lead_sources import run_all_sources
 
-HUB    = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB    = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FB     = Path("/root/feedback")
 LOG    = FB / "data_acq_log.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(6 * 3600)))

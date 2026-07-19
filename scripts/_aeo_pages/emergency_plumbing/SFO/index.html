@@ -161,5 +161,24 @@ document.getElementById("lead-form").addEventListener("submit", async function(e
 <footer>
 © 2026 Empire AI · San Francisco Bay Area Emergency Plumbing Network · <a href="https://empire-ai.co.uk" style="color:white;">empire-ai.co.uk</a>
 </footer>
+
+<div id="buyer-cta" style="position:fixed;bottom:0;left:0;right:0;z-index:9999;
+  background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:14px 20px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  box-shadow:0 -4px 20px rgba(0,0,0,.3);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <span style="font-weight:600;font-size:1.05em;">💰 Want exclusive <b id="cta-niche">leads</b> in <b id="cta-metro">your metro</b>? Own the lane — no per-lead bidding.</span>
+  <a href="https://empire-ai.co.uk/buy-leads?niche=emergency_plumbing&metro=SFO" style="background:#e94560;color:#fff;padding:11px 26px;border-radius:8px;
+    text-decoration:none;font-weight:700;white-space:nowrap;">Buy the lane →</a>
+</div>
+<script>
+  // replace placeholder with real niche/metro from the page title
+  document.addEventListener('DOMContentLoaded', function(){
+    var m = document.title.match(/in ([A-Za-z .]+?) \|/);
+    if(m) document.getElementById('cta-metro').textContent = m[1].trim();
+    var n = document.title.match(/^([A-Za-z0-9 ]+?) (?:Services|Programs|Contractors) in/);
+    if(n) document.getElementById('cta-niche').textContent = n[1].trim();
+  });
+</script>
+
 </body>
 </html>

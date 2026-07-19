@@ -42,7 +42,7 @@ DIRECTIVES_LOG = WORKDIR / "directives.jsonl"
 APPROVAL_LOG = WORKDIR / "approvals.jsonl"
 TICK_INTERVAL = 300  # 5 min (poll new events often)
 
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 
 
 def poll_events_from_hub(limit: int = 50) -> list[dict]:

@@ -1,0 +1,19 @@
+[Unit]
+Description=Empire OS money-loop closure watchdog (business-loop health)
+After=network-online.target empire-hub-8081.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os
+ExecStart=/root/empire_os/venv/bin/python3 empire_os/agents/loop_closure_watchdog.py
+Restart=always
+RestartSec=10
+User=root
+StandardOutput=append:/tmp/loop_closure.log
+StandardError=append:/tmp/loop_closure.log
+Environment=LOOP_WATCH_TICK=300
+Environment=LOOP_STALE_MIN=180
+
+[Install]
+WantedBy=multi-user.target

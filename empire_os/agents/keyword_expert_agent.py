@@ -37,7 +37,7 @@ NICHES = [
 
 XSSI = chr(93) + chr(41) + chr(125) + chr(39) + chr(10)
 
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 
 
 def _pytrends_pull(niche):

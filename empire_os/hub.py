@@ -7254,3 +7254,37 @@ async def outreach_webhook(request: Request):
             "delivered": sent_ok, "send_info": send_info}
 
 
+
+
+@app.post("/v1/evaluate")
+def evaluate(req: dict):
+    """Empire Cortex — Lead-Grade Evaluation Product (REAL, billable).
+
+    Body (single): buyer (str,required) + lead (dict,required)
+      lead keys: details, name?, phone?, zip_code?, source?, tort_key?, ref?
+    Body (batch): buyer (str,required) + leads (list,required)
+
+    Scores each lead with the real Omega pipeline (omega_os.qualify_prospect),
+    grades A/B/C/D, bills EVAL_PRICE_USD (default 0.50) per lead, records to
+    evaluation_ledger. Settlement via existing USDC activation chain.
+    """
+    buyer = (req.get("buyer") or "").strip()
+    if not buyer:
+        raise HTTPException(400, "buyer required")
+    from empire_os.agents import evaluation_product as EP
+    if "leads" in req and isinstance(req["leads"], list):
+        if not req["leads"]:
+            raise HTTPException(400, "leads list empty")
+        result = EP.evaluate_batch(buyer, req["leads"])
+        return {"ok": True, **result}
+    lead = req.get("lead")
+    if not isinstance(lead, dict):
+        raise HTTPException(400, "lead dict or leads list required")
+    return {"ok": True, **EP.evaluate_lead(buyer, lead)}
+
+
+@app.get("/v1/evaluate/ledger")
+def evaluate_ledger(buyer: str = None):
+    """Total billed from the evaluation product (real USD owed/collected)."""
+    from empire_os.agents import evaluation_product as EP
+    return {"ok": True, "buyer": buyer, "total_usd": EP.ledger_total(buyer)}

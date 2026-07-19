@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 OLLAMA = os.environ.get("OLLAMA_URL", "http://10.218.156.211:11434")
 LLM_MODEL = os.environ.get("LLM_MODEL", "qwen2.5:7b")
 FB   = Path("/root/feedback")

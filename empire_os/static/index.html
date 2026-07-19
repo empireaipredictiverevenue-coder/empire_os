@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Empire OS — Lead Marketplace</title>
+<style>
+  :root{--bg:#0a0e14;--panel:#121821;--line:#1f2933;--txt:#e6edf3;--mut:#7d8da0;
+        --grn:#3fb950;--red:#f85149;--blu:#58a6ff;--gld:#d4a017}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+  header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px}
+  header h1{font-size:17px;letter-spacing:.5px}
+  header .tag{color:var(--gld);font-size:11px;border:1px solid var(--gld);padding:2px 7px;border-radius:3px}
+  nav{display:flex;gap:4px;padding:10px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  nav button{background:transparent;color:var(--mut);border:1px solid transparent;padding:6px 13px;
+             border-radius:4px;cursor:pointer;font:inherit}
+  nav button.on{color:var(--txt);border-color:var(--line);background:var(--panel)}
+  main{padding:22px;max-width:980px;margin:0 auto}
+  .view{display:none}.view.on{display:block}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:16px}
+  h2{font-size:14px;margin-bottom:14px;color:var(--mut);text-transform:uppercase;letter-spacing:1px}
+  label{display:block;font-size:12px;color:var(--mut);margin:12px 0 5px}
+  select,input{width:100%;background:#0d1320;color:var(--txt);border:1px solid var(--line);
+        border-radius:5px;padding:9px 11px;font:inherit}
+  button.act{background:var(--grn);color:#04140a;border:none;padding:11px 18px;border-radius:5px;
+        font:inherit;font-weight:600;cursor:pointer;margin-top:16px}
+  button.act:disabled{opacity:.4;cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--blu);border:1px solid var(--line);padding:9px 14px;
+        border-radius:5px;cursor:pointer;font:inherit}
+  .wallet{background:#0d1320;border:1px solid var(--gld);border-radius:6px;padding:12px;
+        word-break:break-all;color:var(--gld);font-size:13px;margin:10px 0}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .stat{flex:1;min-width:140px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+  .stat .n{font-size:26px;font-weight:700}.stat .l{color:var(--mut);font-size:11px;margin-top:4px}
+  .pill{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+  .pill.pend{background:#3a2d00;color:var(--gld)}.pill.actv{background:#06280f;color:var(--grn)}
+  .pill.miss{background:#3a0d0d;color:var(--red)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:400;font-size:11px;text-transform:uppercase}
+  .msg{margin-top:12px;font-size:13px}.ok{color:var(--grn)}.err{color:var(--red)}
+  .muted{color:var(--mut);font-size:12px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  code{color:var(--blu)}
+  footer{padding:18px 22px;color:var(--mut);font-size:11px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <h1>EMPIRE OS</h1><span class="tag">LEAD MARKETPLACE</span>
+  <span class="muted" style="margin-left:auto" id="hubstate">checking hub…</span>
+</header>
+<nav>
+  <button data-v="apply" class="on">Apply</button>
+  <button data-v="status">My Status</button>
+  <button data-v="dash">Dashboard</button>
+  <button data-v="leads">Live Leads</button>
+</nav>
+<main>
+  <!-- APPLY -->
+  <section class="view on" id="apply">
+    <div class="card">
+      <h2>Buyer Application</h2>
+      <label>Niche / Vertical</label>
+      <select id="niche">
+        <option>roofing</option><option>hvac</option><option>plumbing</option>
+        <option>solar</option><option>landscaping</option><option>construction</option>
+      </select>
+      <label>Tier</label>
+      <select id="tier">
+        <option value="bronze">bronze — $15/seat</option>
+        <option value="silver">silver — $25/seat</option>
+        <option value="gold" selected>gold — $45/seat</option>
+        <option value="platinum">platinum — $90/seat</option>
+      </select>
+      <label>Email</label>
+      <input id="email" placeholder="you@company.com">
+      <label>Webhook URL (where leads get delivered)</label>
+      <input id="webhook" placeholder="https://your-system.com/lead-in">
+      <button class="act" id="applybtn" onclick="apply()">Apply &amp; Get Payment Address</button>
+      <div class="msg" id="applymsg"></div>
+    </div>
+    <div class="card" id="paycard" style="display:none">
+      <h2>Step 2 — Pay to Activate</h2>
+      <p class="muted">Send the exact USDC amount below to the Solana wallet. Leads start flowing on confirmation.</p>
+      <div class="grid2">
+        <div><label>Amount Due (USDC)</label><div class="wallet" id="amt" style="color:var(--txt);border-color:var(--line)"></div></div>
+        <div><label>Your Solana Wallet</label><div class="wallet" id="vault"></div></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="ghost" onclick="copyVault()">Copy Wallet</button>
+        <button class="ghost" onclick="checkStatus()">I Paid — Check</button>
+      </div>
+      <div class="msg" id="paymsg"></div>
+    </div>
+  </section>
+
+  <!-- STATUS -->
+  <section class="view" id="status">
+    <div class="card">
+      <h2>Subscription Status</h2>
+      <label>Subscription ID (from your apply response)</label>
+      <div class="row">
+        <input id="subid" placeholder="sub-xxxxxxxxxx" style="flex:3">
+        <button class="ghost" onclick="checkStatus()">Check</button>
+      </div>
+      <div class="msg" id="statusmsg"></div>
+      <div id="statusbody" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="view" id="dash">
+    <div class="row" id="kpi"></div>
+    <div class="card">
+      <h2>Revenue Funnel</h2>
+      <table id="funnel"><tr><th>Stage</th><th>Count</th></tr></table>
+    </div>
+    <div class="card">
+      <h2>Buyers</h2>
+      <table id="buyers"><tr><th>Name</th><th>Tier</th><th>Status</th><th>Delivered</th></tr></table>
+    </div>
+  </section>
+
+  <!-- LEADS -->
+  <section class="view" id="leads">
+    <div class="card">
+      <h2>Live Lead Sample</h2>
+      <div class="row" style="margin-bottom:12px">
+        <select id="lniche" style="flex:2"><option>roofing</option><option>hvac</option><option>plumbing</option><option>solar</option></select>
+        <select id="lmetro" style="flex:2"><option>Phoenix, AZ</option><option>Houston, TX</option><option>Miami, FL</option><option>Chicago, IL</option></select>
+        <button class="ghost" onclick="loadLead()">Sample</button>
+      </div>
+      <pre id="leadout" class="muted"></pre>
+    </div>
+  </section>
+</main>
+<footer>Empire OS v3 · Leads are the product · Pay in USDC (Solana) · Delivery via webhook</footer>
+
+<script>
+const API=location.origin;
+let curSub=null;
+// nav
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+  b.classList.add('on'); document.getElementById(b.dataset.v).classList.add('on');
+  if(b.dataset.v==='dash') loadDash(); if(b.dataset.v==='status'&&curSub) document.getElementById('subid').value=curSub;
+});
+// hub state
+fetch(API+'/health').then(r=>{document.getElementById('hubstate').textContent='hub: '+r.status;
+  document.getElementById('hubstate').style.color=r.ok?'var(--grn)':'var(--red)';})
+  .catch(()=>{document.getElementById('hubstate').textContent='hub: DOWN';document.getElementById('hubstate').style.color='var(--red)';});
+// apply
+async function apply(){
+  const btn=document.getElementById('applybtn');btn.disabled=true;
+  const body={name:document.getElementById('email').value.split('@')[0]||'Buyer',
+    niche:document.getElementById('niche').value, tier:document.getElementById('tier').value,
+    email:document.getElementById('email').value, webhook_url:document.getElementById('webhook').value};
+  try{
+    const r=await fetch(API+'/v1/buyers/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok){document.getElementById('applymsg').innerHTML='<span class="err">'+JSON.stringify(d)+'</span>';return;}
+    curSub=d.subscription_id;
+    document.getElementById('amt').textContent=(d.amount_usdc_due||0)+' USDC';
+    document.getElementById('vault').textContent=(d.pay_to_wallet||'n/a');
+    document.getElementById('paycard').style.display='block';
+    document.getElementById('applymsg').innerHTML='<span class="ok">Applied ✓ — sub '+d.subscription_id+'</span>';
+    document.getElementById('subid').value=d.subscription_id;
+  }catch(e){document.getElementById('applymsg').innerHTML='<span class="err">'+e+'</span>';}
+  finally{btn.disabled=false;}
+}
+function copyVault(){navigator.clipboard.writeText(document.getElementById('vault').textContent);
+  document.getElementById('paymsg').innerHTML='<span class="ok">wallet copied</span>';}
+// status
+async function checkStatus(){
+  const sid=document.getElementById('subid').value||curSub; if(!sid){document.getElementById('statusmsg').innerHTML='<span class="err">no sub id</span>';return;}
+  const r=await fetch(API+'/v1/buyers/status/'+sid); const d=await r.json();
+  if(!d.found){document.getElementById('statusmsg').innerHTML='<span class="err">not found</span>';return;}
+  const pill=d.status==='active'?'<span class="pill actv">ACTIVE</span>':'<span class="pill pend">PENDING DEPOSIT</span>';
+  document.getElementById('statusbody').innerHTML=
+    '<div class="card" style="margin-top:0"><div class="row">'+
+    '<div><div class="muted">Status</div>'+pill+'</div>'+
+    '<div><div class="muted">Tier</div>'+(d.tier||'-')+'</div>'+
+    '<div><div class="muted">Niche</div>'+(d.niche||'-')+'</div>'+
+    '<div><div class="muted">Leads Delivered</div>'+(d.leads_delivered||0)+'</div>'+
+    '<div><div class="muted">Amount Due</div>'+(d.amount_usdc_due||0)+' USDC</div>'+
+    '</div></div>';
+  document.getElementById('statusmsg').innerHTML=d.status==='active'
+    ? '<span class="ok">✓ Active — leads are being delivered to your webhook</span>'
+    : '<span class="err">Still pending — send '+(d.amount_usdc_due||0)+' USDC to the vault, then re-check</span>';
+}
+// dashboard
+async function loadDash(){
+  try{
+    const [dd,rev,lc]=await Promise.all([
+      fetch(API+'/v1/dashboard/data').then(r=>r.json()),
+      fetch(API+'/v1/stats/revenue').then(r=>r.json()).catch(()=>({})),
+      fetch(API+'/v1/leads/counts').then(r=>r.json()).catch(()=>({}))]);
+    const kpis=[
+      ['Total Leads',(lc&&lc.total)||(dd&&dd.funnel_total)||'?'],
+      ['Active Buyers',(dd&&dd.active_buyers)||'?'],
+      ['Pending Buyers',(dd&&dd.pending_buyers)||'?'],
+      ['Revenue',(((rev&&rev.revenue_cents)||0)/100).toFixed(2)+' USDC'],
+      ['Leads Delivered',(dd&&dd.leads_delivered)||'?']];
+    document.getElementById('kpi').innerHTML=kpis.map(k=>'<div class="stat"><div class="n">'+k[1]+'</div><div class="l">'+k[0]+'</div></div>').join('');
+    if(dd&&dd.funnel){const f=dd.funnel;const rows=Object.entries(f).map(([k,v])=>'<tr><td>'+k+'</td><td>'+v+'</td></tr>').join('');
+      document.getElementById('funnel').innerHTML='<tr><th>Stage</th><th>Count</th></tr>'+rows;}
+  }catch(e){document.getElementById('kpi').innerHTML='<div class="err">dash load failed: '+e+'</div>';}
+  // buyers table
+  try{
+    const r=await fetch(API+'/v1/dashboard/buyers');const d=await r.json();
+    if(d.buyers){document.getElementById('buyers').innerHTML='<tr><th>Name</th><th>Tier</th><th>Status</th><th>Delivered</th></tr>'+
+      d.buyers.map(b=>'<tr><td>'+(b.name||b.tenant_id)+'</td><td>'+(b.tier||'')+'</td><td>'+(b.status==='active'?'<span class="pill actv">ACTIVE</span>':'<span class="pill pend">PEND</span>')+'</td><td>'+(b.delivered||0)+'</td></tr>').join('');}
+    else document.getElementById('buyers').innerHTML='<tr><td colspan=4 class="muted">buyer list endpoint unavailable</td></tr>';
+  }catch(e){}
+}
+// leads
+async function loadLead(){
+  const n=document.getElementById('lniche').value,m=document.getElementById('lmetro').value;
+  const r=await fetch(API+'/v1/leads/sample?niche='+encodeURIComponent(n)+'&metro='+encodeURIComponent(m));
+  const d=await r.json(); document.getElementById('leadout').textContent=JSON.stringify(d,null,2);
+}
+</script>
+</body>
+</html>

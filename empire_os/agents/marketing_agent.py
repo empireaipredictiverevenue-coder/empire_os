@@ -30,7 +30,7 @@ from urllib.parse import urlencode
 import requests
 
 
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FEEDBACK = Path("/root/feedback")
 LOG_PATH = FEEDBACK / "marketing_log.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL", "1800"))  # 30min

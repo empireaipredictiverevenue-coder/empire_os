@@ -19,7 +19,7 @@ sys.path.insert(0, "/root/empire_os")
 from empire_os.agent_core import OllamaClient
 from empire_os.synthetic_agents import SyntheticAgent
 
-HUB = "http://127.0.0.1:8000"
+HUB = "http://127.0.0.1:8081"
 TICK_INTERVAL = 1200  # 20 min
 
 

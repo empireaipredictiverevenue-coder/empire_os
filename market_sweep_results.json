@@ -1,0 +1,1682 @@
+[
+  {
+    "vertical": "mass_tort",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 217,
+    "pain_score": 217,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 80,
+    "pain_score": 80,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 64,
+    "pain_score": 64,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 41,
+    "pain_score": 41,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 49,
+    "pain_score": 49,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 106,
+    "pain_score": 106,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 63,
+    "pain_score": 63,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 72,
+    "pain_score": 72,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 144,
+    "pain_score": 144,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 142,
+    "pain_score": 142,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 281,
+    "pain_score": 281,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 145,
+    "pain_score": 145,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 22,
+    "pain_score": 22,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 30,
+    "pain_score": 30,
+    "status": "swept"
+  },
+  {
+    "vertical": "mass_tort",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 67,
+    "pain_score": 67,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "water_damage",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "fire_damage",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "mold_remediation",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 19,
+    "pain_score": 19,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 6,
+    "pain_score": 6,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 4,
+    "pain_score": 4,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 9,
+    "pain_score": 9,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 8,
+    "pain_score": 8,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 7,
+    "pain_score": 7,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 7,
+    "pain_score": 7,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 17,
+    "pain_score": 17,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 9,
+    "pain_score": 9,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 21,
+    "pain_score": 21,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 21,
+    "pain_score": 21,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 8,
+    "pain_score": 8,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "debt_relief",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 6,
+    "pain_score": 6,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 5,
+    "pain_score": 5,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "legal_services",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 51,
+    "pain_score": 51,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 6,
+    "pain_score": 6,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 5,
+    "pain_score": 5,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 4,
+    "pain_score": 4,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 25,
+    "pain_score": 25,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 9,
+    "pain_score": 9,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 38,
+    "pain_score": 38,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 20,
+    "pain_score": 20,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 4,
+    "pain_score": 4,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "electrical",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 111,
+    "pain_score": 111,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 11,
+    "pain_score": 11,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 20,
+    "pain_score": 20,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 14,
+    "pain_score": 14,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 7,
+    "pain_score": 7,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 13,
+    "pain_score": 13,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 6,
+    "pain_score": 6,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 33,
+    "pain_score": 33,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 9,
+    "pain_score": 9,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 31,
+    "pain_score": 31,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 25,
+    "pain_score": 25,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "hvac",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 5,
+    "pain_score": 5,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 71,
+    "pain_score": 71,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 5,
+    "pain_score": 5,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 13,
+    "pain_score": 13,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 6,
+    "pain_score": 6,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 10,
+    "pain_score": 10,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 13,
+    "pain_score": 13,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 5,
+    "pain_score": 5,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 5,
+    "pain_score": 5,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 25,
+    "pain_score": 25,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 23,
+    "pain_score": 23,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 65,
+    "pain_score": 65,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 24,
+    "pain_score": 24,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 9,
+    "pain_score": 9,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "plumbing",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 8,
+    "pain_score": 8,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 4,
+    "pain_score": 4,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 10,
+    "pain_score": 10,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "pest_control",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "solar",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 55,
+    "pain_score": 55,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 11,
+    "pain_score": 11,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 10,
+    "pain_score": 10,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 4,
+    "pain_score": 4,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 8,
+    "pain_score": 8,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 30,
+    "pain_score": 30,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 12,
+    "pain_score": 12,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 11,
+    "pain_score": 11,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 6,
+    "pain_score": 6,
+    "status": "swept"
+  },
+  {
+    "vertical": "roofing",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 8,
+    "pain_score": 8,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 27,
+    "pain_score": 27,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 5,
+    "pain_score": 5,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 3,
+    "pain_score": 3,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 17,
+    "pain_score": 17,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 10,
+    "pain_score": 10,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 29,
+    "pain_score": 29,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 7,
+    "pain_score": 7,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 4,
+    "pain_score": 4,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "construction",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 1,
+    "pain_score": 1,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "phoenix",
+    "state": "AZ",
+    "leads_found": 34,
+    "pain_score": 34,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "houston",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "dallas",
+    "state": "TX",
+    "leads_found": 6,
+    "pain_score": 6,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "austin",
+    "state": "TX",
+    "leads_found": 4,
+    "pain_score": 4,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "san-antonio",
+    "state": "TX",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "chicago",
+    "state": "IL",
+    "leads_found": 8,
+    "pain_score": 8,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "atlanta",
+    "state": "GA",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "miami",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "denver",
+    "state": "CO",
+    "leads_found": 16,
+    "pain_score": 16,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "los-angeles",
+    "state": "CA",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "new-york",
+    "state": "NY",
+    "leads_found": 9,
+    "pain_score": 9,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "seattle",
+    "state": "WA",
+    "leads_found": 17,
+    "pain_score": 17,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "charlotte",
+    "state": "NC",
+    "leads_found": 2,
+    "pain_score": 2,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "nashville",
+    "state": "TN",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  },
+  {
+    "vertical": "landscaping",
+    "metro": "tampa",
+    "state": "FL",
+    "leads_found": 0,
+    "pain_score": 0,
+    "status": "swept"
+  }
+]

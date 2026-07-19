@@ -34,7 +34,7 @@ from pathlib import Path
 import requests
 
 
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FEEDBACK = Path("/root/feedback")
 FUNNEL_LOG = FEEDBACK / "sales_funnel.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL", "300"))  # 5min

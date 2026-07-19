@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 DB  = os.environ.get("HUB_DB_PATH", "/root/empire_os/empire_os.db")
 FB  = Path("/root/feedback")
 LOG = FB / "legal_compliance.jsonl"

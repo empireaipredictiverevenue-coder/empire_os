@@ -47,7 +47,7 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_PASS = os.environ.get("SMTP_PASS", "")
 SMTP_TLS = os.environ.get("SMTP_TLS", "1") == "1"
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FEEDBACK_DIR = Path("/root/feedback")
 POLL_INTERVAL = 30  # seconds between poll cycles
 MAX_PER_CYCLE = 10  # max emails to pull per poll
@@ -108,13 +108,55 @@ def _smtp_send(to: str, subject: str, body: str) -> dict:
         return {"ok": False, "error": str(e)[:200]}
 
 
+def _real_smtp_cfg() -> bool:
+    """True only if SMTP creds are real (not REPLACE_WITH_ placeholders)."""
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
+        return False
+    for v in (SMTP_USER, SMTP_PASS):
+        if str(v).startswith("REPLACE_WITH_"):
+            return False
+    return True
+
+
 def _send(to: str, subject: str, body: str) -> dict:
-    """Dispatch via the configured backend."""
-    if EMAIL_BACKEND == "smtp":
+    """Dispatch with failover: direct MX -> Resend -> SMTP relay.
+
+    direct MX needs no creds (sovereign delivery). Used first when backend
+    is 'direct' OR when SMTP creds are placeholder/missing. Resend then
+    SMTP relay are the managed fallbacks.
+    """
+    # direct MX first (no creds, sovereign) — but only when backend explicitly
+    # 'direct' AND port 25 reachable. In cloud hosts port 25 is usually
+    # blocked, so we skip fast to avoid 30s hangs.
+    if EMAIL_BACKEND == "direct" and _port25_open():
+        try:
+            r = _direct_mx_send(to, subject, body)
+            if r.get("ok"):
+                return r
+        except Exception as e:
+            r = {"ok": False, "error": f"direct_mx: {e}"}
+    # Brevo API (bypasses SMTP IP block, no port 25 needed)
+    if BREVO_API_KEY:
+        r = _brevo_api_send(to, subject, body)
+        if r.get("ok"):
+            return r
+    # Resend (if key present)
+    if RESEND_API_KEY:
+        r = _resend_send(to, subject, body)
+        if r.get("ok"):
+            return r
+        err = str(r.get("error", ""))
+        if "429" in err or "quota" in err.lower() or "daily" in err.lower():
+            if _real_smtp_cfg():
+                s = _smtp_send(to, subject, body)
+                if s.get("ok"):
+                    s["fallback"] = "smtp"
+                return s
+            return r
+    # SMTP relay (real creds only)
+    if _real_smtp_cfg():
         return _smtp_send(to, subject, body)
-    if EMAIL_BACKEND == "direct":
-        return _direct_mx_send(to, subject, body)
-    return _resend_send(to, subject, body)
+    return r if "r" in dir() else {"ok": False, "error": "no usable backend"}
 
 
 def _resend_send(to: str, subject: str, body: str) -> dict:
@@ -150,6 +192,52 @@ def _resend_send(to: str, subject: str, body: str) -> dict:
         if isinstance(e, urllib.error.HTTPError):
             body_text = e.read().decode()[:200]
         return {"ok": False, "error": str(e), "detail": body_text}
+
+
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+
+
+def _port25_open() -> bool:
+    """Fast probe: can we reach any MX on :25? Cloud hosts usually block it."""
+    import socket
+    try:
+        s = socket.create_connection(("smtp.gmail.com", 25), timeout=4)
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
+def _brevo_api_send(to: str, subject: str, body: str) -> dict:
+    """Send via Brevo REST API (bypasses SMTP IP block on cloud hosts)."""
+    if not BREVO_API_KEY:
+        return {"ok": False, "error": "BREVO_API_KEY not set"}
+    payload = json.dumps({
+        "sender": {"email": FROM_EMAIL.split("<")[-1].rstrip(">") if "<" in FROM_EMAIL else FROM_EMAIL},
+        "to": [{"email": to}],
+        "subject": subject,
+        "textContent": body,
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "api-key": BREVO_API_KEY,
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            mid = result.get("messageId", "")
+            if mid:
+                return {"ok": True, "brevo_id": mid}
+            return {"ok": False, "error": f"no messageId: {result}"}
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
+        detail = ""
+        if isinstance(e, urllib.error.HTTPError):
+            detail = e.read().decode()[:200]
+        return {"ok": False, "error": str(e), "detail": detail}
 
 
 def _hub_get(endpoint: str) -> Optional[dict]:

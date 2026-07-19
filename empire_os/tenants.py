@@ -188,6 +188,11 @@ class Tenant:
     status: str = "active"
     created_at: str = ""
     updated_at: str = ""
+    # Columns added at runtime by auto_onboard.ensure_schema(); declared here
+    # so SELECT * -> Tenant(**dict(row)) never breaks on extra columns.
+    source: str = ""
+    webhook_url: str = ""
+    niche: str = ""
 
 
 @dataclass
@@ -239,7 +244,8 @@ class TenantStore:
 
     def __init__(self, db_path: str = "/root/empire_os.db"):
         self.db_path = db_path
-        self._conn = sqlite3.connect(db_path, check_same_thread=False)
+        from empire_os import db_handler
+        self._conn = db_handler.get_conn()
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(SCHEMA_SQL)
         self._conn.commit()

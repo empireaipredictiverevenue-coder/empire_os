@@ -3,21 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Buy Leads &amp; Pay Per Call — Empire AI</title>
-<meta property="og:title" content="Buy Exclusive Leads — Pay Only For What Converts">
-<meta property="og:description" content="Roofing, debt, medicare, mortgage, legal, auto leads. Delivered real-time to your inbox or webhook. Priced per lead, billed in USDC on Solana.">
+<title>Buy Exclusive Leads — Empire OS</title>
+<meta property="og:title" content="Exclusive Local Leads, Delivered Live — Empire OS">
+<meta property="og:description" content="Roofing, HVAC, water damage, legal & more. Real-time leads to your CRM or inbox. Pay per lead in USDC on Solana. No contracts, no cards.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://empire-ai.co.uk/buy-leads">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Buy Exclusive Leads — Empire AI">
-<meta name="twitter:description" content="Pay-per-lead + pay-per-call. USDC on Solana. No cards, no KYC.">
+<meta name="twitter:title" content="Exclusive Local Leads — Empire OS">
+<meta name="twitter:description" content="Pay per lead. USDC on Solana. No contracts.">
 <style>
  body{background:#050810;color:#e6f1ff;font-family:system-ui,sans-serif;margin:0}
- .wrap{max-width:760px;margin:0 auto;padding:48px 20px}
- h1{color:#39ff88;font-size:2.4rem;margin:0 0 8px}
+ .wrap{max-width:780px;margin:0 auto;padding:48px 20px}
+ h1{color:#39ff88;font-size:2.5rem;line-height:1.1;margin:0 0 10px}
  .cy{color:#22e3ff}
- .sub{color:#9fb3c8;font-size:1.1rem;margin-bottom:28px}
- .card{background:#0b1220;border:1px solid #1c2a3a;border-radius:14px;padding:24px}
+ .sub{color:#9fb3c8;font-size:1.15rem;margin-bottom:24px;line-height:1.5}
+ .stat{display:flex;gap:14px;flex-wrap:wrap;margin:22px 0}
+ .stat div{background:#0b1220;border:1px solid #1c2a3a;border-radius:12px;padding:14px 18px;flex:1;min-width:120px}
+ .stat b{color:#39ff88;font-size:1.5rem;display:block}
+ .stat span{color:#9fb3c8;font-size:.8rem}
+ .card{background:#0b1220;border:1px solid #1c2a3a;border-radius:14px;padding:24px;margin-top:8px}
  label{display:block;margin:12px 0 4px;color:#9fb3c8;font-size:.9rem}
  input,select{width:100%;padding:11px;border-radius:8px;border:1px solid #1c2a3a;background:#050810;color:#e6f1ff;font-size:1rem}
  button{margin-top:20px;width:100%;padding:14px;border:0;border-radius:10px;background:#39ff88;color:#050810;font-weight:700;font-size:1.05rem;cursor:pointer}
@@ -25,12 +29,33 @@
  .note{margin-top:16px;color:#9fb3c8;font-size:.85rem}
  .wallet{margin-top:18px;padding:14px;background:#050810;border-radius:8px;border:1px solid #1c2a3a;font-family:monospace;color:#22e3ff;word-break:break-all}
  .ok{color:#39ff88}.err{color:#ff6b6b}
+ .paybox{margin-top:18px;padding:18px;background:#050810;border:1px solid #39ff88;border-radius:10px}
+ .paybox b{color:#39ff88}
+ .paybox a{color:#22e3ff;word-break:break-all}
+ .tiers{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+ .tier{flex:1;min-width:130px;background:#0b1220;border:1px solid #1c2a3a;border-radius:10px;padding:12px;text-align:center}
+ .tier b{color:#39ff88;font-size:1.25rem}
+ .tier span{color:#9fb3c8;font-size:.8rem;display:block}
 </style>
 </head>
 <body>
 <div class="wrap">
- <h1>Buy Exclusive Leads.<br><span class="cy">Pay Only For What Converts.</span></h1>
- <div class="sub">Roofing, debt, medicare, mortgage, legal, auto, medical claims — delivered to your inbox or webhook in real time. Priced per lead, billed in USDC on Solana.</div>
+ <h1>Exclusive Local Leads.<br><span class="cy">Paid Only When They Convert.</span></h1>
+ <div class="sub">Real homeowners and businesses raising their hand in your niche — roofing, HVAC, water damage, legal, and more. Delivered to your CRM or inbox the moment they're captured. Pay a monthly seat fee, then per delivered lead in USDC on Solana. No contracts. No card. No KYC.</div>
+
+ <div class="stat">
+  <div><b>2,700+</b><span>live leads in network</span></div>
+  <div><b>30+</b><span>metros covered</span></div>
+  <div><b>4 tiers</b><span>$299–$2,399/mo + per lead</span></div>
+ </div>
+
+ <div class="tiers">
+  <div class="tier"><b>$299</b><span>Bronze /mo</span><span>+ $25 / lead</span></div>
+  <div class="tier"><b>$599</b><span>Silver /mo</span><span>+ $49 / lead</span></div>
+  <div class="tier"><b>$1,199</b><span>Gold /mo</span><span>+ $99 / lead</span></div>
+  <div class="tier"><b>$2,399</b><span>Platinum /mo</span><span>+ $199 / lead</span></div>
+ </div>
+
  <div class="card">
   <form id="f">
    <label>Business name</label><input name="name" required placeholder="Apex Roofing Co">
@@ -38,34 +63,42 @@
    <label>Email</label><input name="email" type="email" required placeholder="buyer@company.com">
    <label>Tier</label>
    <select name="tier">
-    <option value="silver">Silver — $12/lead</option>
-    <option value="bronze">Bronze — $9/lead</option>
-    <option value="gold">Gold — $18/lead</option>
-    <option value="platinum">Platinum — $25/lead</option>
+    <option value="bronze">Bronze — $299/mo + $25/lead</option>
+    <option value="silver" selected>Silver — $599/mo + $49/lead</option>
+    <option value="gold">Gold — $1,199/mo + $99/lead</option>
+    <option value="platinum">Platinum — $2,399/mo + $199/lead</option>
    </select>
    <label>Webhook (optional)</label><input name="webhook_url" placeholder="https://your-crm.com/hook">
    <input type="hidden" name="source" id="src">
    <button type="submit">Get Matched Leads</button>
   </form>
   <div id="msg" class="note"></div>
-  <div id="wallet" class="wallet" style="display:none"></div>
+  <div id="pay" class="paybox" style="display:none"></div>
  </div>
- <script>
+ <div class="note">Settlements in USDC on Solana. Fund your seat with the link below to start receiving leads. Cancel anytime — no lock-in.</div>
+</div>
+
+<script>
  document.getElementById('f').onsubmit = async function(e){
   e.preventDefault();
   var p = new URLSearchParams(location.search);
   document.getElementById('src').value = p.get('ref') || 'direct';
   var d = Object.fromEntries(new FormData(e.target));
   var m = document.getElementById('msg');
-  var w = document.getElementById('wallet');
+  var pay = document.getElementById('pay');
+  m.className = 'note'; m.textContent = '';
+  pay.style.display = 'none';
   try {
    var r = await fetch('/v1/buyers/apply', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)});
    var j = await r.json();
    if (j.ok) {
     m.className = 'note ok';
-    m.textContent = 'Seated as ' + j.tier + ' buyer. Fund the vault to start collection.';
-    w.style.display = 'block';
-    w.textContent = 'USDC (Solana) vault: ' + j.payment.vault_wallet;
+    m.textContent = 'Seated as ' + j.tier + ' buyer. Fund your seat to start collection:';
+    var amt = (j.payment && j.payment.amount_usdc) ? j.payment.amount_usdc : j.amount_usdc_due;
+    var url = (j.payment && j.payment.pay_url) ? j.payment.pay_url : '';
+    pay.style.display = 'block';
+    pay.innerHTML = '<b>Fund ' + amt + ' USDC to activate</b><br>' +
+      '<a href="' + url + '" target="_blank">' + url + '</a>';
    } else {
     m.className = 'note err';
     m.textContent = 'Error: ' + (j.detail || 'unknown');
@@ -75,7 +108,6 @@
    m.textContent = 'Network error — try again.';
   }
  };
- </script>
-</div>
+</script>
 </body>
 </html>

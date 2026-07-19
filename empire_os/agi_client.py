@@ -13,8 +13,8 @@ import requests
 
 logger = logging.getLogger("agi-client")
 
-AGI_SCOUT_URL = "http://127.0.0.1:8000/v1/agi/scout"
-AGI_MARKETING_URL = "http://127.0.0.1:8000/v1/agi/marketing"
+AGI_SCOUT_URL = "http://127.0.0.1:8081/v1/agi/scout"
+AGI_MARKETING_URL = "http://127.0.0.1:8081/v1/agi/marketing"
 
 
 class AgiScoutClient:

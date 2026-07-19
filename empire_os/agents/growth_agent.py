@@ -14,7 +14,7 @@ sys.path.insert(0, "/root/empire_os")
 from empire_os.agent_core import OllamaClient
 from empire_os.synthetic_agents import SyntheticAgent
 
-HUB = "http://127.0.0.1:8000"
+HUB = "http://127.0.0.1:8081"
 TICK_INTERVAL = 1800  # 30 min
 
 
@@ -50,13 +50,32 @@ class GrowthAgent(SyntheticAgent):
         except Exception:
             state["lead_niches"] = []
 
+        # ── CRM pipeline (the real growth lever: uncollected revenue) ──
+        try:
+            import sqlite3
+            crm = sqlite3.connect("/root/empire_os/empire_os.db")
+            state["crm_contacts"] = crm.execute(
+                "SELECT COUNT(*) FROM crm_contacts").fetchone()[0]
+            state["crm_deals_awaiting"] = crm.execute(
+                "SELECT COUNT(*), COALESCE(SUM(amount_usdc),0) FROM crm_deals "
+                "WHERE stage='awaiting_payment'").fetchone()
+            state["crm_deals_total"] = crm.execute(
+                "SELECT COUNT(*) FROM crm_deals").fetchone()[0]
+            crm.close()
+        except Exception as e:
+            state["crm_error"] = str(e)
+
         return state
 
     def reason(self, state: dict) -> str:
         system = (
-            "You are the Growth Agent. Find the SINGLE biggest growth "
-            "opportunity from this snapshot. Reply with JSON: "
-            '{"opportunity": "...", "expected_lift": "high|medium|low", "action": "..."}'
+            "You are the Growth Agent for Empire OS, a B2B lead-gen marketplace "
+            "that sells monthly seats + per-lead pricing in USDC. The SINGLE "
+            "biggest growth lever right now is RECOVERING uncollected revenue: "
+            "buyer seats that were minted (awaiting_payment) but never paid. "
+            "Find the highest-ROI play from this snapshot. Reply with JSON: "
+            '{"opportunity": "...", "expected_lift": "high|medium|low", '
+            '"action": "..."}'
         )
         prompt = "Growth state: %s" % json.dumps(state, default=str)[:2000]
         return self.llm.chat(

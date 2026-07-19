@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB   = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB   = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FB    = Path("/root/feedback")
 LOG   = FB / "video_ads_log.jsonl"
 RENDERS = FB / "renders"

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import socket
 import time
@@ -36,14 +37,18 @@ logger = logging.getLogger("enrichment")
 # ── Priority-ordered provider list ──────────────────────────────────
 # Higher priority = runs first. Falls back through the list.
 PRIORITY = [
-    "website_scraper",
-    "bbb_lookup",
-    "whois_lookup",
-    "email_pattern",
-    "google_search",
-    # External (stubs):
+    "website_scraper",   # free: scrape biz site for email/phone
+    "bbb_lookup",        # free: BBB rating/years
+    "whois_lookup",      # free: domain RDAP
+    "email_pattern",     # free: guess info@domain
+    "google_search",      # free: SERP scrape phone/site
+    "ddg_search",        # free: DuckDuckGo HTML SERP email scrape (no key)
+    "bing_search",       # free: Bing SERP email scrape (no key)
+    # External (verify-only, free tiers):
+    "hunter",            # Hunter.io verified emails (HUNTER_API_KEY, 25/mo)
+    # "prospeo",          # Prospeo API fully deprecated (all endpoints 404)
+    # "apollo",           # Apollo free plan 403s all search APIs (paid only)
     # "clearbit",
-    # "hunter",
     # "people_data_labs",
     # "google_places",
 ]
@@ -260,6 +265,181 @@ def google_search(lead: dict) -> dict:
     return result
 
 
+def hunter(domain: str = "", email_or_domain: str = "") -> dict:
+    """Hunter.io email finder/verifier (free tier: 25 requests/mo).
+    Reads HUNTER_API_KEY from env. Verified emails only — no guessing.
+    Falls back silently if no key / quota exhausted.
+    """
+    result = {}
+    key = os.environ.get("HUNTER_API_KEY", "")
+    if not key:
+        return result
+    d = domain or _safe_domain(email_or_domain)
+    if not d:
+        return result
+    try:
+        r = requests.get(
+            "https://api.hunter.io/v2/domain-search",
+            params={"domain": d, "api_key": key, "limit": 1},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            data = r.json().get("data", {})
+            ems = data.get("emails") or []
+            if ems:
+                e = ems[0].get("value", "")
+                if e and "@" in e:
+                    result["email"] = e
+                    if ems[0].get("phone") and not result.get("phone"):
+                        result["phone"] = ems[0]["phone"]
+        # 401/403/429 -> key bad or quota gone; return empty, don't crash
+    except Exception:
+        pass
+    return result
+
+
+def apollo(domain: str = "", email_or_domain: str = "") -> dict:
+    """Apollo.io email finder (free tier: 100 requests/mo, no card).
+    Reads APOLLO_API_KEY from env. Returns verified work emails.
+    Falls back silently if no key / quota exhausted.
+    """
+    result = {}
+    key = os.environ.get("APOLLO_API_KEY", "")
+    if not key:
+        return result
+    d = domain or _safe_domain(email_or_domain)
+    if not d:
+        return result
+    try:
+        # Apollo org people search by domain
+        r = requests.post(
+            "https://api.apollo.io/v1/mixed_people/search",
+            headers={"Content-Type": "application/json", "X-Api-Key": key},
+            json={"q_organization_domains": [d], "page": 1, "per_page": 5},
+            timeout=15,
+        )
+        if r.status_code == 200:
+            data = r.json().get("people", []) or []
+            for p in data:
+                e = p.get("email") or p.get("personal_emails", [None])[0] if p.get("personal_emails") else None
+                if not e and p.get("email"):
+                    e = p["email"]
+                if e and "@" in e and "users" not in e and "apollo" not in e:
+                    result["email"] = e
+                    # grab a phone if present
+                    phone = p.get("phone") or p.get("sanitized_phone")
+                    if phone and not result.get("phone"):
+                        result["phone"] = phone
+                    break
+        # 401/403/429 -> key bad or quota gone; return empty, don't crash
+    except Exception:
+        pass
+    return result
+
+
+def prospeo(domain: str = "", email_or_domain: str = "") -> dict:
+    """Prospeo.io email finder (free tier: 50 requests/mo, no card).
+    Reads PROSPEO_API_KEY from env. Returns verified work emails.
+    Falls back silently if no key / quota exhausted.
+    """
+    result = {}
+    key = os.environ.get("PROSPEO_API_KEY", "")
+    if not key:
+        return result
+    d = domain or _safe_domain(email_or_domain)
+    if not d:
+        return result
+    try:
+        r = requests.post(
+            "https://api.prospeo.io/api/v1/domain-search",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={"domain": d, "limit": 1},
+            timeout=15,
+        )
+        if r.status_code == 200:
+            data = r.json().get("data", {}) or {}
+            ems = data.get("emails") or data.get("results") or []
+            if ems:
+                e = ems[0].get("email") or ems[0].get("value") or (ems[0] if isinstance(ems[0], str) else "")
+                if e and "@" in e:
+                    result["email"] = e
+        # 401/403/429 -> key bad or quota gone; return empty, don't crash
+    except Exception:
+        pass
+    return result
+
+
+def _extract_emails(text: str, domain: str = "") -> list:
+    """Extract plausible business emails from raw HTML/text."""
+    if not text:
+        return []
+    found = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
+    out = []
+    for e in found:
+        el = e.lower()
+        if el.endswith((".png", ".jpg", ".gif", ".svg", ".webp")):
+            continue
+        if "example" in el or "invalid" in el or "sentry" in el:
+            continue
+        if domain and domain not in el:
+            continue  # only keep domain-matching emails
+        if el not in out:
+            out.append(el)
+    return out
+
+
+def ddg_search(lead: dict) -> dict:
+    """DuckDuckGo HTML SERP scrape for business email (free, no key).
+    DuckDuckGo's html endpoint blocks bots less than Google.
+    """
+    result = {}
+    name = lead.get("business_name", "") or ""
+    domain = _safe_domain(lead.get("website", ""))
+    if not name and not domain:
+        return result
+    q = f"{name} {domain}" if domain else name
+    try:
+        r = requests.get(
+            "https://html.duckduckgo.com/html/",
+            params={"q": f'{q} email contact'},
+            headers={"User-Agent": USER_AGENT},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            ems = _extract_emails(r.text, domain)
+            if ems:
+                result["email"] = ems[0]
+    except Exception:
+        pass
+    return result
+
+
+def bing_search(lead: dict) -> dict:
+    """Bing SERP scrape for business email (free, no key).
+    Bing rate-limits less aggressively than Google for HTML scraping.
+    """
+    result = {}
+    name = lead.get("business_name", "") or ""
+    domain = _safe_domain(lead.get("website", ""))
+    if not name and not domain:
+        return result
+    q = f"{name} {domain}" if domain else name
+    try:
+        r = requests.get(
+            "https://www.bing.com/search",
+            params={"q": f'{q} email contact'},
+            headers={"User-Agent": USER_AGENT},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            ems = _extract_emails(r.text, domain)
+            if ems:
+                result["email"] = ems[0]
+    except Exception:
+        pass
+    return result
+
+
 # ── Waterfall Engine ────────────────────────────────────────────────
 
 
@@ -429,3 +609,79 @@ def get_enrichment_stats(backend) -> dict:
         "avg_enrichment_score": round(avg_score, 1) if avg_score else 0,
         "by_source": by_source,
     }
+
+
+def enrich_prospects(backend, limit: int = 200, only_missing_email: bool = True) -> dict:
+    """Run the enrichment waterfall over si_buyer_outreach (real prospects).
+
+    The 29k prospects in si_buyer_outreach are the actual scraper output.
+    enrich_lead/batch_enrich only touch crm_leads (a sliver). This fills
+    emails/phones there so the outreach mailer has real addresses to send to.
+
+    Returns {processed, enriched, failed}.
+    """
+    q = "SELECT rowid, * FROM si_buyer_outreach"
+    if only_missing_email:
+        q += " WHERE (email IS NULL OR email = '' OR email LIKE '%@example%' OR email LIKE '%invalid%')"
+    q += f" ORDER BY rowid ASC LIMIT {int(limit)}"
+    rows = backend.execute(q).fetchall()
+    processed = enriched = 0
+    for row in rows:
+        lead = dict(row)
+        rid = lead.get("rowid") or lead.get("id")
+        if not rid:
+            continue
+        # normalise url -> website so providers (_safe_domain) can use it
+        url = lead.get("url", "") or ""
+        if url and not url.startswith("skus:"):
+            lead["website"] = url
+        else:
+            # derive a guess domain from business_name (website_scraper does this too)
+            name = (lead.get("business_name") or "").lower().replace(" ", "").replace(".", "")
+            if name:
+                lead["website"] = f"https://{name}.com"
+        processed += 1
+        found = {}
+        for prov in PRIORITY:
+            fn = globals().get(prov)
+            if not fn:
+                continue
+            try:
+                res = fn(lead)
+            except Exception:
+                continue
+            if not res:
+                continue
+            for k, v in res.items():
+                if k not in found and (not lead.get(k)):
+                    found[k] = v
+            if found:
+                lead.update(found)
+        if not found:
+            continue
+        # guard: reject implausible guessed emails (junk name->domain guesses)
+        em = found.get("email", "")
+        if em:
+            dom = em.split("@")[-1].lower()
+            bad = ("&" in em or " " in em or len(dom) > 40
+                   or dom.count(".") == 0 or dom.startswith("www.")
+                   or any(ch in dom for ch in "&'\" \x00"))
+            if bad:
+                found.pop("email", None)
+        setters = []
+        params = []
+        fmap = {"email": "email", "phone": "phone", "website": "url",
+                "business_name": "business_name", "city": "metro", "state": "metro"}
+        for src, col in fmap.items():
+            if src in found:
+                setters.append(f"{col} = ?")
+                params.append(found[src])
+        if setters:
+            params.append(rid)
+            backend.execute(
+                f"UPDATE si_buyer_outreach SET {', '.join(setters)} WHERE rowid = ?",
+                tuple(params),
+            )
+            backend.commit()
+            enriched += 1
+    return {"processed": processed, "enriched": enriched, "failed": processed - enriched}

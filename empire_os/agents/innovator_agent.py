@@ -16,62 +16,67 @@ PROP_LOG = FB / "innovator_proposals.jsonl"
 ASSESS_LOG = FB / "innovator_assessments.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(7 * 24 * 3600)))
 
-PROPOSALS = [
-    {
-        "name": "Empire Global Matchmaker",
-        "category": "ai_product",
-        "tier": "diamond",
-        "build_cost_hours": 32,
-        "infra_cost_usdc_monthly": 60,
-        "expected_revenue_usdc_monthly": 4500,
-        "scores": {"market": 4, "defensibility": 4, "build": 4,
-                   "infra_cost": 5, "fy_money": 4},
-        "ship_action": {
-            "kind": "create_lane",
-            "args": {"niche": "global_matchmaker",
-                     "metro": "GLOBAL",
-                     "rate_per_call_cents": 1500,
-                     "rate_per_seat_cents": 200000,
-                     "ranking_method": "ai_ranked",
-                     "scrapes": True},
-        },
-    },
-    {
-        "name": "Empire Niche Autopilot AI",
-        "category": "lead_source",
-        "tier": "silver",
-        "build_cost_hours": 14,
-        "infra_cost_usdc_monthly": 18,
-        "expected_revenue_usdc_monthly": 1100,
-        "scores": {"market": 5, "defensibility": 3, "build": 5,
-                   "infra_cost": 5, "fy_money": 3},
-        "ship_action": {
-            "kind": "create_source",
-            "args": {"name": "niche_autopilot",
-                     "queries": ["roof replacement quote",
-                                "hvac service near me",
-                                "kitchen remodel permit"],
-                     "source_kind": "search_query_mining",
-                     "license": "free"},
-        },
-    },
-    {
-        "name": "Empire AI Seller Suite",
-        "category": "ops",
-        "tier": "empire",
-        "build_cost_hours": 80,
-        "infra_cost_usdc_monthly": 120,
-        "expected_revenue_usdc_monthly": 6500,
-        "scores": {"market": 4, "defensibility": 5, "build": 2,
-                   "infra_cost": 4, "fy_money": 5},
-        "ship_action": {
-            "kind": "create_endpoint",
-            "args": {"path": "/v1/buyers/onboarding/dashboard",
-                     "method": "GET",
-                     "delivers": "AI seller dashboard for enterprise tier"},
-        },
-    },
-]
+def derive_proposals():
+    """Build innovation proposals from LIVE CRM + stack state (not a
+    hardcoded list). Targets real gaps: uncollected revenue, untapped
+    prospects, monetizable AEO surface."""
+    import sqlite3, urllib.request
+    props = []
+    try:
+        crm = sqlite3.connect("/root/empire_os/empire_os.db")
+        awaiting_n, awaiting_usd = crm.execute(
+            "SELECT COUNT(*), COALESCE(SUM(amount_usdc),0) FROM crm_deals "
+            "WHERE stage='awaiting_payment'").fetchone()
+        contacts = crm.execute("SELECT COUNT(*) FROM crm_contacts").fetchone()[0]
+        crm.close()
+    except Exception:
+        awaiting_n, awaiting_usd, contacts = 0, 0, 0
+    try:
+        pages = len(json.loads(urllib.request.urlopen(
+            "http://127.0.0.1:8081/v1/aeo/pages", timeout=10).read()).get("pages", []))
+    except Exception:
+        pages = 0
+
+    if awaiting_n > 0:
+        props.append({
+            "name": "Stuck-Deal Recovery Engine",
+            "category": "ops", "tier": "gold",
+            "build_cost_hours": 12, "infra_cost_usdc_monthly": 10,
+            "expected_revenue_usdc_monthly": int(awaiting_usd * 0.15),
+            "scores": {"market": 5, "defensibility": 3, "build": 5,
+                       "infra_cost": 5, "fy_money": 5},
+            "ship_action": {"kind": "create_endpoint",
+                            "args": {"path": "/v1/recovery/sequence",
+                                     "method": "POST",
+                                     "delivers": "3-touch USDC pay-link recovery on awaiting deals"}},
+            "rationale": f"{awaiting_n} seats awaiting payment = ${awaiting_usd:,.0f} uncollected",
+        })
+    if contacts > 0:
+        props.append({
+            "name": "AEO Page Pro (Done-For-You SEO)",
+            "category": "ai_product", "tier": "silver",
+            "build_cost_hours": 20, "infra_cost_usdc_monthly": 15,
+            "expected_revenue_usdc_monthly": contacts * 8,
+            "scores": {"market": 4, "defensibility": 4, "build": 4,
+                       "infra_cost": 5, "fy_money": 4},
+            "ship_action": {"kind": "create_lane",
+                            "args": {"niche": "aeo_page_pro", "metro": "USA",
+                                     "rate_per_seat_cents": 4900, "scrapes": False}},
+            "rationale": f"{contacts} prospects + {pages} live AEO pages to upsell",
+        })
+    if pages > 0:
+        props.append({
+            "name": "Lead-to-Page Converter",
+            "category": "lead_source", "tier": "bronze",
+            "build_cost_hours": 8, "infra_cost_usdc_monthly": 5,
+            "expected_revenue_usdc_monthly": pages * 2,
+            "scores": {"market": 4, "defensibility": 3, "build": 5,
+                       "infra_cost": 5, "fy_money": 3},
+            "ship_action": {"kind": "create_source",
+                            "args": {"name": "page_signup", "source_kind": "aeo_cta", "license": "free"}},
+            "rationale": f"{pages} AEO pages generating buyer intent to capture",
+        })
+    return props
 
 
 def avg(scores: dict) -> float:
@@ -91,7 +96,7 @@ def log(level, msg, **fields):
 
 def cycle():
     out = []
-    for p in PROPOSALS:
+    for p in derive_proposals():
         a = avg(p["scores"])
         decision = "ship" if a >= 3.5 else "park"
         record = {

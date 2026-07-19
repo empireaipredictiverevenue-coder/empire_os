@@ -48,7 +48,7 @@ from pathlib import Path
 import requests
 
 
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FEEDBACK = Path("/root/feedback")
 RECS_LOG = FEEDBACK / "synthetic_recommendations.jsonl"
 SPIKE_LOG = FEEDBACK / "efficiency_spike.jsonl"

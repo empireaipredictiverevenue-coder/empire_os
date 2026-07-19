@@ -36,7 +36,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Global state
 WEBHOOK_PORT = int(os.getenv("MARKETPLACE_WEBHOOK_PORT", "8090"))
-HUB_URL = os.getenv("HUB_URL", "http://127.0.0.1:8000").rstrip("/")
+HUB_URL = os.getenv("HUB_URL", "http://127.0.0.1:8081").rstrip("/")
 CRM_CONFIG = os.getenv("CRM_CONFIG_PATH", "/root/empire_os/crm_config.json")
 DEAD_LETTER_QUEUE = Path("/root/feedback/dead_letter_queue.jsonl")
 DELIVERY_LOG = Path("/root/feedback/webhook_deliveries.jsonl")

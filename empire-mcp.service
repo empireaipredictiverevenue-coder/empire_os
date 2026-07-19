@@ -1,0 +1,18 @@
+[Unit]
+Description=Empire OS MCP Server (A2A + AEO)
+After=network.target empire-hub-8081.service
+Requires=empire-hub-8081.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os
+Environment=PYTHONPATH=/root/empire_os
+Environment=MCP_TRANSPORT=streamable-http
+Environment=MCP_HOST=0.0.0.0
+Environment=MCP_PORT=8082
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/empire_mcp.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

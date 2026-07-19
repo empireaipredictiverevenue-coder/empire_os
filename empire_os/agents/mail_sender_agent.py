@@ -29,7 +29,7 @@ if env_path.exists():
             if not os.environ.get(k.strip()):
                 os.environ[k.strip()] = v.strip()
 
-HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 RESEND_API = os.environ.get("RESEND_API_KEY",
                             "")
 FROM_EMAIL = os.environ.get("EMPIRE_FROM",

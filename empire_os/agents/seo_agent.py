@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
+HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FB   = Path("/root/feedback")
 LOG  = FB / "seo_log.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(4 * 3600)))
@@ -44,7 +44,7 @@ def fetch_via_hub() -> list:
 
 
 def audit(url: str) -> dict:
-    full = f"http://127.0.0.1:8000{url}"
+    full = f"http://127.0.0.1:8081{url}"
     try:
         r = requests.get(full, timeout=8)
         status = r.status_code
@@ -63,6 +63,26 @@ def audit(url: str) -> dict:
         "links_total": html.count("<a href") - html.count('<a href="#"'),
         "audited_at":  datetime.now(timezone.utc).isoformat(),
     }
+
+
+def push_fix_blueprint(niche, issues):
+    """Surface a weak AEO page to Cortex as an aeo:fix blueprint (active loop)."""
+    try:
+        import sqlite3, json as _j, time as _t
+        db = os.environ.get("EMPIRE_DB", "/root/empire_os/empire_os.db")
+        c = sqlite3.connect(db)
+        bid = f"aeo_fix_{niche}_{int(_t.time())}"
+        c.execute(
+            "INSERT INTO cortex_blueprints "
+            "(blueprint_id, campaign_type, visual_dna, script_dna, niche, created_at) "
+            "VALUES (?, 'aeo:fix', '{}', ?, ?, ?)",
+            (bid, _j.dumps({"niche": niche, "issues": issues,
+                            "status": "pending"}), niche,
+             datetime.now(timezone.utc).isoformat()))
+        c.commit()
+        c.close()
+    except Exception as e:
+        log("WARN", "fix_blueprint_fail", err=str(e)[:120])
 
 
 def cycle():
@@ -87,6 +107,17 @@ def cycle():
                    for r in results) // max(len(results), 1)
     issues = sum(max(r.get("img_missing_alt", 0), 0)
                  for r in results)
+    # emit Cortex fix-blueprints for pages with on-page problems
+    for r in results:
+        niche = r.get("url", "").split("/")[2] if "/aeo/" in r.get("url", "") else None
+        if not niche:
+            continue
+        page_issues = {k: r.get(k) for k in
+                       ("img_missing_alt", "h2_count", "title_count", "h1_count")
+                       if r.get(k)}
+        if r.get("img_missing_alt", 0) or r.get("title_count", 0) == 0 \
+           or r.get("h2_count", 0) == 0:
+            push_fix_blueprint(niche, page_issues)
     log("CYCLE", "seo_done",
         scanned=len(results), avg_size=avg_size,
         titles_found=sum(1 for r in results if r.get("title_count")),

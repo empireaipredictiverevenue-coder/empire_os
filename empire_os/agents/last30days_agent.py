@@ -69,24 +69,40 @@ def run_engine(topic: str) -> dict | None:
             # status lines before/after the JSON). Walk from the last '{'
             # using a brace counter so we grab the complete final object.
             out = proc.stdout
-            start = out.rfind("{")
-            if start == -1:
-                log.warning("no JSON in engine output attempt=%s", attempt)
-                continue
-            depth = 0
-            end = -1
-            for i in range(start, len(out)):
+            # The engine prints log lines + possibly multiple JSON objects.
+            # The REAL payload is the object whose values are candidate
+            # LISTS (source -> [posts]); the trailing object is just
+            # source_status (strings). Collect all balanced top-level objects
+            # and return the one containing a list-valued key.
+            objects = []
+            i = 0
+            while i < len(out):
                 if out[i] == "{":
-                    depth += 1
-                elif out[i] == "}":
-                    depth -= 1
-                    if depth == 0:
-                        end = i
+                    depth = 0
+                    for j in range(i, len(out)):
+                        if out[j] == "{":
+                            depth += 1
+                        elif out[j] == "}":
+                            depth -= 1
+                            if depth == 0:
+                                try:
+                                    obj = json.loads(out[i:j + 1])
+                                    objects.append(obj)
+                                except Exception:
+                                    pass
+                                i = j + 1
+                                break
+                    else:
                         break
-            if end == -1:
-                log.warning("unbalanced JSON attempt=%s", attempt)
-                continue
-            return json.loads(out[start:end + 1])
+                else:
+                    i += 1
+            # prefer the object with a list-valued source key (real candidates)
+            for obj in objects:
+                if isinstance(obj, dict) and any(
+                        isinstance(v, list) for v in obj.values()):
+                    return obj
+            # fallback: last object (status only)
+            return objects[-1] if objects else None
         except subprocess.TimeoutExpired:
             log.warning("engine timeout topic=%s attempt=%s", topic, attempt)
         except json.JSONDecodeError as e:
