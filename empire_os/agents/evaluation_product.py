@@ -6,10 +6,15 @@ a buyer posts a lead (or batch), we score it with the real Omega pipeline
 
 HYBRID PRICING (best of both worlds):
   - Grading is FREE for every lead (Omega score + A/B/C/D grade).
-  - OUTCOME mode (default): charge only when a graded A/B lead CONVERTS.
-        EVAL_CONVERT_USD = 0.50   # per A/B lead that converts
+  - OUTCOME mode (default): charge only when a graded A/B/C lead CONVERTS.
+        EVAL_CONVERT_USD = 0.50   # per A/B/C lead that converts
   - PER_SCORE mode (opt-in, casual buyers): charge per lead scored.
         EVAL_PRICE_USD = 0.20     # volume rate (was 0.50 casual)
+  - MINIMUM DEAL SIZE: a single settlement is only worth it at >= $10.
+        EVAL_MIN_USD = 10.00      # floor on any USDC charge / pay link
+    Below $10 the deal isn't worth the rail + support cost, so the Solana
+    Pay link always demands >= $10 (covers the conversion + future ones,
+    or a buyer prepays the $10 floor to activate).
 No invented unit prices, no phantom payouts. Settlement records to
 evaluation_ledger; the existing USDC activation chain (solana_listener)
 collects payment against the invoice.
@@ -22,8 +27,9 @@ import sqlite3
 
 # Hybrid knobs (env-overridable)
 PRICE_USD = float(os.environ.get("EVAL_PRICE_USD", "0.20"))      # per-score (opt-in)
-CONVERT_USD = float(os.environ.get("EVAL_CONVERT_USD", "0.50"))  # per A/B conversion
+CONVERT_USD = float(os.environ.get("EVAL_CONVERT_USD", "0.50"))  # per A/B/C conversion
 DEFAULT_MODE = os.environ.get("EVAL_MODE", "outcome")           # outcome | per_score
+MIN_USD = float(os.environ.get("EVAL_MIN_USD", "10.00"))         # floor: deal < $10 not worth it
 
 
 def _db():
@@ -283,9 +289,10 @@ def record_conversion(buyer: str, lead_ref: str) -> dict:
     memo = f"EVAL_{buyer}__{lead_ref}"
     vault = os.environ.get("SOLANA_VAULT_WALLET", "").strip()
     pay_url = ""
+    demand = max(CONVERT_USD, MIN_USD)   # enforce $10 floor: deal < $10 not worth it
     if vault:
         import urllib.parse
-        pay_url = (f"solana:{vault}?amount={CONVERT_USD}"
+        pay_url = (f"solana:{vault}?amount={demand:.2f}"
                    f"&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
                    f"&memo={urllib.parse.quote(memo)}&label={urllib.parse.quote(memo)}")
     return {
@@ -294,6 +301,7 @@ def record_conversion(buyer: str, lead_ref: str) -> dict:
         "lead_ref": lead_ref,
         "grade": grade,
         "amount_usd": CONVERT_USD,
+        "demand_usd": round(demand, 2),
         "pay_memo": memo,
         "pay_url": pay_url,
     }
