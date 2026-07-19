@@ -2366,8 +2366,12 @@ def finance_replay(req: dict):
             sub_id = None
             inv_id = None
             m = memo
-            if m.startswith("SEAT_") or m.startswith("SEAT_"):
-                sub_id = m.replace("SEAT_", "", 1).strip()
+            if m.startswith("SEAT_"):
+                # signup-seat emits memo "SEAT_<id>" where <id> is the
+                # subscription id with the "sub-" prefix stripped. Re-add it
+                # so the DB lookup matches si_subscription.subscription_id.
+                _id = m.replace("SEAT_", "", 1).strip()
+                sub_id = _id if _id.startswith("sub-") else f"sub-{_id}"
             if m.startswith("INV_"):
                 inv_id = "inv_" + m.replace("INV_", "", 1).strip()
             # --- A2A: LANE_ memo seats an open lane ---

@@ -24,7 +24,7 @@ import requests
 
 # Load .env (same pattern as charge.py) so HUB_URL + keys resolve from
 # /root/empire_os/.env at startup. Without this, pm2-launched processes
-# fall back to the hardcoded dead default (127.0.0.1:8000) and the
+# fall back to the hardcoded dead default (127.0.0.1:8081) and the
 # /v1/finance/replay call silently times out -> USDC never settles.
 for _ln in (Path("/root/empire_os/.env").read_text(encoding="utf-8").splitlines()
             if Path("/root/empire_os/.env").exists() else ()):
@@ -39,8 +39,8 @@ for _ln in (Path("/root/empire_os/.env").read_text(encoding="utf-8").splitlines(
 _session = requests.Session()
 _session.trust_env = False
 
-HUB   = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
-FB    = Path("/root/feedback")
+HUB   = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+FB    = Path("/root/empire_os/logs")
 LOG   = FB / "solana_listener.jsonl"
 SEEN  = FB / "solana_seen.jsonl"   # persistent seen cache
 INTERVAL = int(os.environ.get("INTERVAL_SEC", "30"))
@@ -148,6 +148,35 @@ def save_balance(b: float):
     STATE.write_text(str(b))
 
 
+def get_memo_for_signature(sig: str) -> str:
+    """Extract a Memo-program instruction from a confirmed tx, if present.
+    Returns the memo string, or '' if none / RPC fails.
+    Handles both the MemoSq4... program and a parsed memo field."""
+    if not RPC or not sig:
+        return ""
+    try:
+        r = _session.post(RPC, json={
+            "jsonrpc": "2.0", "id": 1, "method": "getTransaction",
+            "params": [sig, {"encoding": "jsonParsed"}],
+        }, timeout=10).json()
+        tx = r.get("result")
+        if not tx:
+            return ""
+        # 1) explicit Memo program instruction
+        MEMO_PROG = "MemoSq4gqABAXKb96qnH8TysB5mtg3MFrjGZRiTtEf"
+        for ix in tx.get("transaction", {}).get("message", {}).get("instructions", []):
+            if ix.get("programId") == MEMO_PROG:
+                return (ix.get("parsed") or ix.get("data", "")).strip()
+        # 2) parsed memo in account data (Helius-style)
+        for ix in tx.get("transaction", {}).get("message", {}).get("instructions", []):
+            if isinstance(ix.get("parsed"), dict) and "memo" in ix["parsed"]:
+                return str(ix["parsed"]["memo"]).strip()
+        return ""
+    except Exception as e:
+        log("ERROR", "memo_fetch_fail", err=str(e)[:150])
+        return ""
+
+
 def detect_incoming():
     """Detect new incoming USDC by balance delta (no getTransaction needed)."""
     cur = vault_usdc_balance()
@@ -159,12 +188,21 @@ def detect_incoming():
     delta_micro = int(round(delta * 1_000_000))  # micro-USDC to match si_ppc_invoices
     log("INFO", "usdc_incoming", amount_usdc=delta_micro,
         prev=prev, now=cur, ata=VAULT)
+    # Extract the on-chain memo from the most recent tx that hit the vault,
+    # so replay can match SEAT_/INV_/LANE_ memos (not just amount).
+    memo = ""
+    try:
+        sigs = recent_signatures(limit=5)
+        if sigs:
+            memo = get_memo_for_signature(sigs[0]["signature"])
+    except Exception as e:
+        log("WARN", "memo_lookup_skip", err=str(e)[:120])
     replay_body = {
         "amount_usdc": delta_micro,   # micro-units, matches invoice schema
-        "memo": "",
+        "memo": memo,
         "wallet_from": "solana_listener",
-        "tx_signature": "balance-diff",
-        "note": "detected via ATA balance delta (no on-chain memo)",
+        "tx_signature": sigs[0]["signature"] if sigs else "balance-diff",
+        "note": "detected via ATA balance delta + on-chain memo",
     }
     try:
         rr = _session.post(f"{HUB}/v1/finance/replay",
