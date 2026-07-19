@@ -32,8 +32,7 @@ def open_invoices():
         "SELECT invoice_id, buyer_id, amount_usdc, created_at FROM si_ppc_invoices "
         "WHERE status='open' AND (last_reminder IS NULL OR "
         "datetime(last_reminder) < datetime('now','-24 hours')) "
-        "AND datetime(created_at) < datetime('now', ?) "
-        "AND COALESCE(buyer_id,'') NOT LIKE 'demo_%'",
+        "AND datetime(created_at) < datetime('now', ?) ",
         (f"-{REMINDER_AGE_H} hours",)).fetchall()
     c.close(); return rows
 

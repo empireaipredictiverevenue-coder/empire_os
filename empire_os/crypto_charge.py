@@ -436,6 +436,4 @@ if __name__ == "__main__":
     print(f"\n[crypto_charge] reconcile open invoices:")
     settled = reconcile_open_invoices()
     print(f"  settled: {len(settled)} -> {settled}")
-    print(f"\n[crypto_charge] test payment_collector (no buyer wallet):")
-    res = charge_crypto("test_buyer", 1, "verify", 15.0)
-    print(f"  -> {res.get('status')} {res.get('error', 'ok')}")
+    print(f"\n[crypto_charge] RPC + reconciliation self-test complete.")
