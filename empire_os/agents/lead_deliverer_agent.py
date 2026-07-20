@@ -527,6 +527,10 @@ def find_storm_buyers() -> list:
             "delivery_email": r.get("email") or r.get("delivery_email") or "",
             "base_payout": float(r.get("base_payout") or 0),
             "fee_rate": float(r.get("fee_rate") or 0),
+            # seat_price is derived the same way lanes do (seat_price = base_payout / fee_rate).
+            # fee_rate of 1.0 means base_payout already is the full price. Fallback to base_payout
+            # so the delivery log / invoice never carries a None (was the storm-path gap).
+            "seat_price": round(float(r.get("base_payout") or 0) / float(r.get("fee_rate") or 1.0), 2),
         }
         matched.append(buyer)
     return matched
@@ -728,6 +732,10 @@ def tick_once():
                 rate = float(buyer.get("fee_rate") or 0) or 1.0
                 bill_buyer["base_payout"] = float(seat["seat_price"]) / rate
                 bill_buyer["_seat_price"] = float(seat["seat_price"])
+            elif buyer.get("seat_price"):
+                # storm/restoration buyer (no seated corridor): use the buyer's own
+                # derived seat_price so the delivery log / invoice never carries None.
+                bill_buyer["_seat_price"] = float(buyer["seat_price"])
             result = deliver_lead(bill_buyer, lead)
             ok = result.get("webhook_ok") or result.get("email_ok")
             if ok:
