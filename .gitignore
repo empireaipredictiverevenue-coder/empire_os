@@ -8,3 +8,6 @@ __pycache__/
 # Archived/fabricated content (preserved data, not active code)
 .archive/
 
+anthropic-skills/
+claude-code/
+superpowers/
