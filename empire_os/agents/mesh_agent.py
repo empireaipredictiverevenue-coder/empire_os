@@ -31,7 +31,7 @@ class MeshAgent(SyntheticAgent):
     """
 
     def __init__(self, *a, rule_mode=False, **k):
-        super().__init__(*a, **k)
+        super().__init__(*a, **k, disable_llm=rule_mode)
         self.rule_mode = rule_mode
         if rule_mode:
             self.llm = None  # no Ollama needed
@@ -46,11 +46,22 @@ class MeshAgent(SyntheticAgent):
             container = info.get("container", name)
             url = info.get("health_url")
             running = self._is_running(container)
+            if not running:
+                # Blueprint agent whose container was never provisioned/started.
+                # Not "unhealthy" — just not deployed yet. Don't try to restart it.
+                health_snapshot[name] = {
+                    "role": info.get("role", "?"),
+                    "running": False,
+                    "healthy": False,
+                    "not_provisioned": True,
+                }
+                continue
             healthy = False
-            if url and running:
+            if url:
                 try:
                     r = urllib.request.urlopen(url, timeout=3)
-                    healthy = "online" in r.read().decode().lower() or "{" in r.read().decode()
+                    body = r.read().decode().lower()
+                    healthy = "online" in body or "{" in body
                 except Exception:
                     pass
             health_snapshot[name] = {
@@ -99,18 +110,22 @@ class MeshAgent(SyntheticAgent):
     def rule_reason(self, state: dict) -> str:
         """Rule-based: name the bottleneck agent (per SOUL principle 3)."""
         unhealthy = {k: v for k, v in state["health"].items()
-                     if not v.get("healthy") and not v.get("running")}
+                     if v.get("running") and not v.get("healthy")}
         blocked = {k: v for k, v in state["health"].items()
                    if v.get("harness_status") == "BLOCKED"}
+        not_provisioned = [k for k, v in state["health"].items()
+                           if v.get("not_provisioned")]
         if unhealthy:
             name = next(iter(unhealthy))
-            return f"restart|target={name}|why={name} not running/healthy"
+            return f"restart|target={name}|why={name} running but not healthy"
         if blocked:
             name = next(iter(blocked))
             return f"warn|target={name}|why={name} BLOCKED (needs Ollama for LLM mode)"
         if state["hub_leads"] == 0:
             return "warn|target=hub|why=hub reports 0 leads — sweep/pipeline stalled"
-        return "noop|target=none|why=fleet healthy, no action needed"
+        np = len(not_provisioned)
+        return (f"noop|target=none|why=fleet healthy; "
+                f"{np} blueprint agents not yet provisioned (expected)")
 
     def reason(self, state: dict) -> str:
         if self.rule_mode or self.llm is None:

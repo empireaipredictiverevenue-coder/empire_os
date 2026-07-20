@@ -68,16 +68,20 @@ class SyntheticAgent(Agent):
         role: str = "agent",
         llm_url: str = "http://10.218.156.211:11434",
         llm_model: str = "llama3.2:3b",
+        disable_llm: bool = False,
         memory_limit: int = DEFAULT_MEMORY_LIMIT,
         anti_rep_window: int = DEFAULT_ANTI_REP_WINDOW,
         skills_limit: int = DEFAULT_SKILLS_LIMIT,
         **kwargs,
     ):
-        if llm is None:
+        # Rule-based mode: never connect to Ollama (dead host = wasted cycles + spam).
+        if disable_llm or llm is False:
+            llm = False
+        elif llm is None:
             llm = OllamaClient(base_url=llm_url, model=llm_model, timeout=180)
         super().__init__(name=name, llm=llm, backend=backend, **kwargs)
         self.role = role
-        self.syn = SyntheticIntelligence(llm=self.llm, n_synthetic=3)
+        self.syn = SyntheticIntelligence(llm=self.llm, n_synthetic=3) if self.llm else None
 
         log_path = Path(f"/root/{role}/{role}.log")
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -339,7 +343,7 @@ class SyntheticAgent(Agent):
                 decision_dict = json.loads(decision)
             except Exception:
                 pass
-            examples = self.syn.augment(state, decision_dict)
+            examples = self.syn.augment(state, decision_dict) if self.syn else []
             self._log("learn: %d synthetic examples generated" % len(examples))
             return {
                 "examples": [

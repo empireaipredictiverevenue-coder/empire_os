@@ -309,7 +309,9 @@ class Agent(ABC):
         **kwargs,
     ):
         self.name = name
-        self.llm = llm or OllamaClient()
+        # Rule-based mode passes llm=False/None deliberately — do NOT spin up a
+        # dead OllamaClient (wasted cycles + 'No route to host' / 402 spam).
+        self.llm = None if llm is False else (llm or OllamaClient())
         self.backend = backend
         self.context = AgentContext()
         self.config = kwargs
