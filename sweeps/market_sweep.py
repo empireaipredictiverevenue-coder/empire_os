@@ -37,43 +37,73 @@ REQUEST_TIMEOUT = 30
 # Vertical -> OSM tag(s) that map to that pay-per-call niche.
 # Tags verified to exist in OpenStreetMap (probe 2026-07-18). Each entry is a
 # list of `key=value` Overpass expressions; a business matching ANY is kept.
+# Expanded 2026-07-20 to cover ALL 42 lanes niches (was 14) so --all sweeps
+# every niche x every metro.
 VERTICAL_TAGS = {
-    "roofing":            ['craft=roofer'],
+    # --- home services / restoration ---
+    "residential_roofing": ['craft=roofer'],
+    "roof_repair":        ['craft=roofer'],
+    "commercial_roofing": ['craft=roofer'],
     "hvac":               ['craft=hvac'],
     "plumbing":           ['craft=plumber'],
-    "solar":              ['energy=solar', 'shop=solar'],
-    "landscaping":        ['craft=gardener', 'craft=landscape', 'craft=tree_planting'],
-    "construction":       ['office=construction_company', 'office=contractor'],
     "electrical":         ['craft=electrician'],
-    "pest_control":       ['craft=pest_control', 'shop=pest_control'],
     "water_damage":       ['craft=water_damage_restoration', 'emergency=water_damage'],
     "fire_damage":        ['craft=fire_damage_restoration', 'emergency=fire_damage'],
     "mold_remediation":   ['craft=mold_remediation'],
-    "mass_tort":          ['office=lawyer', 'office=attorney', 'lawyer=practice'],
+    "disaster_restoration": ['craft=water_damage_restoration', 'craft=fire_damage_restoration', 'office=contractor'],
+    "storm_damage":       ['craft=roofer', 'craft=water_damage_restoration'],
+    "sewage_cleanup":     ['craft=plumber'],
+    # --- legal / mass tort ---
+    "camp_lejeune":       ['office=lawyer', 'office=attorney'],
+    "roundup":            ['office=lawyer', 'office=attorney'],
+    "paraquat":           ['office=lawyer', 'office=attorney'],
+    "afff":               ['office=lawyer', 'office=attorney'],
+    "zantac":             ['office=lawyer', 'office=attorney'],
     "legal_services":     ['office=lawyer', 'office=attorney', 'office=notary'],
+    # --- medical / health ---
+    "ozempic":            ['amenity=clinic', 'healthcare=doctor'],
+    "addiction":          ['office=therapist', 'healthcare=psychotherapist'],
+    "hormone_therapy":    ['amenity=clinic', 'healthcare=doctor'],
+    "weight_loss":        ['amenity=clinic', 'healthcare=doctor'],
+    "pt_rehab":           ['healthcare=physiotherapist'],
+    "dental":             ['amenity=dentist'],
+    "vision":             ['shop=optician'],
+    # --- financial ---
+    "tax_prep":           ['office=accountant', 'office=tax_advisor'],
+    "accounting":         ['office=accountant'],
+    "mortgage":           ['office=financial_advisor', 'office=mortgage_broker'],
+    "insurance":          ['office=insurance'],
+    "investing":          ['office=financial_advisor'],
     "debt_relief":        ['office=financial_advisor', 'office=debt_counseling', 'financial_advice=debt_relief'],
+    # --- real estate / biz services ---
+    "real_estate":        ['office=estate_agent'],
+    "consulting":         ['office=consulting'],
+    "marketing":          ['office=advertising', 'office=marketing'],
+    "staffing":           ['office=employment_agency'],
+    "managed_it":         ['shop=computer', 'office=it'],
+    "cybersecurity":      ['office=it'],
+    "cloud":              ['office=it'],
+    "software_dev":       ['office=it'],
+    "ai_automation":      ['office=consulting', 'office=it'],
+    "web_dev":            ['shop=computer'],
+    "data_analytics":     ['office=consulting'],
 }
 
-# US metros: friendly slug -> ("City, ST" label, lat, lon)
+# US metros — aligned to the 11 AEO metros (slug -> ("City, ST" label, lat, lon))
 METROS = {
-    "phoenix":     ("Phoenix, AZ",   33.448376, -112.074036),
-    "houston":     ("Houston, TX",   29.763284,  -95.363271),
-    "dallas":      ("Dallas, TX",    32.776672,  -96.796888),
-    "austin":      ("Austin, TX",    30.267153,  -97.743057),
-    "san-antonio": ("San Antonio, TX", 29.424122, -98.493628),
-    "chicago":     ("Chicago, IL",   41.878113,  -87.629799),
-    "atlanta":     ("Atlanta, GA",   33.749001,  -84.387978),
-    "miami":       ("Miami, FL",     25.761680,  -80.191790),
-    "denver":      ("Denver, CO",    39.739235, -104.990250),
-    "los-angeles": ("Los Angeles, CA", 34.052235, -118.243683),
-    "new-york":    ("New York, NY",  40.712776,  -74.005974),
-    "seattle":     ("Seattle, WA",   47.606209, -122.332069),
-    "charlotte":   ("Charlotte, NC", 35.227087,  -80.843127),
-    "nashville":   ("Nashville, TN", 36.162664,  -86.781602),
-    "tampa":       ("Tampa, FL",     27.950575,  -82.457177),
-    # Special slug used only for smoke testing — points at Phoenix (roofing-rich)
-    # so the test reliably returns real businesses instead of an empty set.
-    "test":        ("Test, AZ",     33.448376, -112.074036),
+    "NYC": ("New York, NY",    40.712776,  -74.005974),
+    "LAX": ("Los Angeles, CA", 34.052235, -118.243683),
+    "CHI": ("Chicago, IL",     41.878113,  -87.629799),
+    "DFW": ("Dallas, TX",      32.776672,  -96.796888),
+    "HOU": ("Houston, TX",     29.763284,  -95.363271),
+    "WDC": ("Washington, DC",  38.907192,  -77.036871),
+    "PHL": ("Philadelphia, PA",39.952583,  -75.165222),
+    "ATL": ("Atlanta, GA",     33.749001,  -84.387978),
+    "MIA": ("Miami, FL",       25.761680,  -80.191790),
+    "BOS": ("Boston, MA",      42.360083,  -71.058880),
+    "SFO": ("San Francisco, CA",37.774929, -122.419418),
+    # Special slug used only for smoke testing — points at NYC (roofing-rich)
+    "test": ("Test, NY",       40.712776,  -74.005974),
 }
 
 
