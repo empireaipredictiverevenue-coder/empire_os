@@ -44,7 +44,7 @@ if _ENV_PATH.exists():
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from fastapi.staticfiles import StaticFiles
@@ -7082,6 +7082,45 @@ def crm_icp_refresh_route(lead_id: int):
         return update_lead_icp_score(backend, lead_id)
     except Exception as e:
         raise HTTPException(500, detail=str(e)[:500])
+
+
+# --- Founder seat onboarding (Astryx page + pay API) ---
+@app.get("/api/founder-pay")
+def founder_pay_route(email: str = "founder@empireos.ai"):
+    """Mint a founder-discount USDC pay link + QR for a seated buyer."""
+    try:
+        import empire_os.seat_payment_onboarding as spo
+        pay_url, _memo, _vault = spo.mint_pay_url(
+            "Founder", "founding-buyer", email, tier="silver"
+        )
+        if not pay_url:
+            raise HTTPException(502, detail="pay link mint failed")
+        qr = spo._qr_png(pay_url)
+        # truthful price: parse the actual minted amount from the Solana Pay URI
+        amt = 0.0
+        import re
+        m = re.search(r"amount=([0-9.]+)", pay_url)
+        if m:
+            amt = float(m.group(1))
+        return {
+            "pay_url": pay_url,
+            "qr_data_url": f"data:image/png;base64,{qr}",
+            "price_usd": amt,
+            "deadline": spo.FOUNDER_DEADLINE,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, detail=str(e)[:300])
+
+
+@app.get("/founder-onboard")
+def founder_onboard_page_route():
+    """Serve the Astryx-built founder onboarding page."""
+    p = Path(__file__).parent / "static" / "founder-onboard" / "index.html"
+    if p.exists():
+        return FileResponse(str(p), media_type="text/html")
+    raise HTTPException(404, detail="founder-onboard page not built")
 
 
 # --- Direct execution ---

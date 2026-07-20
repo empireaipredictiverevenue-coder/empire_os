@@ -24,7 +24,8 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 
 SECRETS_ENV = Path("/root/.empire_secrets/social.env")
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
+           "https://www.googleapis.com/auth/youtube.readonly"]
 
 
 def _load_secrets() -> dict:
@@ -40,40 +41,70 @@ def _load_secrets() -> dict:
 
 
 def get_auth_url(client_id: str = "", client_secret: str = "") -> str:
-    """Return the OAuth consent URL (operator opens this to get a code)."""
-    from google_auth_oauthlib.flow import Flow
+    """Return the OAuth consent URL (operator opens this to get a code).
+
+    Uses the plain client_secret flow (NO PKCE) so the returned code can be
+    exchanged server-side without a code_verifier.
+    """
     if not client_id or not client_secret:
         s = _load_secrets()
         client_id = client_id or s.get("YOUTUBE_CLIENT_ID", "")
         client_secret = client_secret or s.get("YOUTUBE_CLIENT_SECRET", "")
     if not client_id:
         return "ERROR: set YOUTUBE_CLIENT_ID + YOUTUBE_CLIENT_SECRET in social.env first"
-    flow = Flow.from_client_config(
-        {"installed": {"client_id": client_id,
-                       "client_secret": client_secret,
-                       "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob"],
-                       "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                       "token_uri": "https://oauth2.googleapis.com/token"}},
-        scopes=SCOPES)
-    flow.redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
-    return flow.authorization_url(prompt="consent")[0]
+    from urllib.parse import urlencode
+    params = {
+        "response_type": "code",
+        "client_id": client_id,
+        "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+        "scope": " ".join(SCOPES),
+        "prompt": "consent",
+        "access_type": "offline",
+    }
+    return "https://accounts.google.com/o/oauth2/auth?" + urlencode(params)
 
 
 def exchange(code: str) -> str:
     """Exchange an auth code for a refresh token. Print + return it."""
-    from google_auth_oauthlib.flow import Flow
+    import requests
     s = _load_secrets()
-    flow = Flow.from_client_config(
-        {"installed": {"client_id": s.get("YOUTUBE_CLIENT_ID", ""),
-                       "client_secret": s.get("YOUTUBE_CLIENT_SECRET", ""),
-                       "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob"],
-                       "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                       "token_uri": "https://oauth2.googleapis.com/token"}},
-        scopes=SCOPES)
-    flow.redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
-    flow.fetch_token(code=code)
-    rt = flow.credentials.refresh_token
+    data = {
+        "code": code,
+        "client_id": s.get("YOUTUBE_CLIENT_ID", ""),
+        "client_secret": s.get("YOUTUBE_CLIENT_SECRET", ""),
+        "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+        "grant_type": "authorization_code",
+    }
+    r = requests.post("https://oauth2.googleapis.com/token", data=data, timeout=30)
+    j = r.json()
+    rt = j.get("refresh_token")
+    if not rt:
+        return f"ERROR no refresh_token: {j}"
     return f"Add this to social.env:\nYOUTUBE_REFRESH_TOKEN={rt}"
+
+
+def exchange_and_save(code: str) -> dict:
+    """Exchange code AND write refresh token into social.env automatically."""
+    import requests
+    s = _load_secrets()
+    data = {
+        "code": code,
+        "client_id": s.get("YOUTUBE_CLIENT_ID", ""),
+        "client_secret": s.get("YOUTUBE_CLIENT_SECRET", ""),
+        "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+        "grant_type": "authorization_code",
+    }
+    r = requests.post("https://oauth2.googleapis.com/token", data=data, timeout=30)
+    j = r.json()
+    rt = j.get("refresh_token")
+    if not rt:
+        return {"ok": False, "error": f"no refresh_token in response: {j}"}
+    lines = SECRETS_ENV.read_text().splitlines() if SECRETS_ENV.exists() else []
+    kept = [ln for ln in lines if not ln.strip().startswith("YOUTUBE_REFRESH_TOKEN=")]
+    kept.append(f"YOUTUBE_REFRESH_TOKEN={rt}")
+    SECRETS_ENV.write_text("\n".join(kept) + "\n")
+    os.chmod(SECRETS_ENV, 0o600)
+    return {"ok": True, "saved": str(SECRETS_ENV), "refresh_token_len": len(rt)}
 
 
 def _build_creds(secrets: dict):
@@ -88,7 +119,11 @@ def _build_creds(secrets: dict):
 
 
 def publish_youtube(item: dict, secrets: dict | None = None) -> dict:
-    """Upload item['video'] to YouTube. Live only if all creds present."""
+    """Upload item['video'] to YouTube. Live only if all creds present.
+
+    Guard-rail: defaults to PRIVATE (YOUTUBE_DEFAULT_PRIVACY env, else
+    'private'). Set YOUTUBE_DEFAULT_PRIVACY=public only after review.
+    """
     secrets = secrets or _load_secrets()
     need = ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN"]
     missing = [k for k in need if not secrets.get(k)]
@@ -96,6 +131,9 @@ def publish_youtube(item: dict, secrets: dict | None = None) -> dict:
         return {"ok": False, "status": "draft_only",
                 "reason": f"missing YouTube creds: {missing}",
                 "note": "video queued; run get_auth_url + exchange to go live"}
+    privacy = secrets.get("YOUTUBE_DEFAULT_PRIVACY", "private").lower()
+    if privacy not in ("public", "private", "unlisted"):
+        privacy = "private"
     try:
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaFileUpload
@@ -110,14 +148,26 @@ def publish_youtube(item: dict, secrets: dict | None = None) -> dict:
                 "tags": [h.lstrip("#") for h in script.get("hashtags", [])][:10],
                 "categoryId": "28",  # Science & Technology
             },
-            "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False},
+            "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False},
         }
         media = MediaFileUpload(item["video"], chunksize=-1, resumable=True,
                                 mimetype="video/mp4")
         req = yt.videos().insert(part="snippet,status", body=body, media_body=media)
         resp = req.execute()
-        return {"ok": True, "status": "published",
-                "video_id": resp["id"],
-                "url": f"https://youtu.be/{resp['id']}"}
+        video_id = resp["id"]
+        # attach custom thumbnail if rendered
+        thumb_path = item.get("thumbnail")
+        if thumb_path and Path(thumb_path).exists():
+            try:
+                yt.thumbnails().set(
+                    videoId=video_id,
+                    media_body=MediaFileUpload(thumb_path, mimetype="image/jpeg")
+                ).execute()
+            except Exception as te:
+                # thumbnail is best-effort; don't fail the upload
+                print(f"[youtube] thumbnail set failed: {te}")
+        return {"ok": True, "status": "published", "privacy": privacy,
+                "video_id": video_id,
+                "url": f"https://youtu.be/{video_id}"}
     except Exception as e:
         return {"ok": False, "status": "error", "error": str(e)[:300]}

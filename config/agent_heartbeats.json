@@ -1,0 +1,282 @@
+{
+  "seat_payment_onboarding": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:08:58.517428+00:00"
+  },
+  "founder_outreach": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:08:58.517772+00:00"
+  },
+  "settlement_gateway": {
+    "status": "REGISTERED",
+    "detail": "no live entrypoint \u2014 available as department skill",
+    "ts": "2026-07-20T11:08:58.526329+00:00"
+  },
+  "solana_listener": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:08:58.526683+00:00"
+  },
+  "revenue_reasoner": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:08:58.527186+00:00"
+  },
+  "eval_connect_sweeps": {
+    "status": "FAIL",
+    "detail": "OperationalError: no such column: id",
+    "ts": "2026-07-20T11:08:58.529788+00:00"
+  },
+  "build_buy_page": {
+    "status": "REGISTERED",
+    "detail": "no live entrypoint \u2014 available as department skill",
+    "ts": "2026-07-20T11:08:58.540183+00:00"
+  },
+  "migrate_prospects": {
+    "status": "FAIL",
+    "detail": "FileNotFoundError: [Errno 2] No such file or directory: '/root/empire_os/prospects_migrate.csv'",
+    "ts": "2026-07-20T11:09:13.441061+00:00"
+  },
+  "advertising_agent": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.445931+00:00"
+  },
+  "outreach": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.446580+00:00"
+  },
+  "cold_outreach_worker": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.447201+00:00"
+  },
+  "campaigns": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.447668+00:00"
+  },
+  "run_market_sweeps": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.448184+00:00"
+  },
+  "host_b2b_hunter": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.448666+00:00"
+  },
+  "search_api_leads": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.449202+00:00"
+  },
+  "reddit_monitor": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.449707+00:00"
+  },
+  "behavior_engine": {
+    "status": "OK",
+    "detail": "ran main in 0.02s",
+    "ts": "2026-07-20T11:09:13.469287+00:00"
+  },
+  "predictive_revenue": {
+    "status": "OK",
+    "detail": "ran forecast in 0.00s",
+    "ts": "2026-07-20T11:09:13.472608+00:00"
+  },
+  "deep_research_agent": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.473291+00:00"
+  },
+  "scout_agent": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.474135+00:00"
+  },
+  "customer_analysis": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.474586+00:00"
+  },
+  "relationship_engine": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.475089+00:00"
+  },
+  "influence_engine": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.475679+00:00"
+  },
+  "okf_tracker": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.476358+00:00"
+  },
+  "habit_memory": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.476842+00:00"
+  },
+  "leadership_council": {
+    "status": "OK",
+    "detail": "ran run in 0.01s",
+    "ts": "2026-07-20T11:09:13.485527+00:00"
+  },
+  "chief_of_staff": {
+    "status": "BLOCKED",
+    "detail": "needs Ollama reachable (networking phase)",
+    "ts": "2026-07-20T11:09:13.486244+00:00"
+  },
+  "ceo_agent": {
+    "status": "BLOCKED",
+    "detail": "needs Ollama reachable (networking phase)",
+    "ts": "2026-07-20T11:09:13.487158+00:00"
+  },
+  "cto": {
+    "status": "BLOCKED",
+    "detail": "needs Ollama reachable (networking phase)",
+    "ts": "2026-07-20T11:09:13.487786+00:00"
+  },
+  "agent_copilot": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.488502+00:00"
+  },
+  "agent_harness": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.489220+00:00"
+  },
+  "mesh_agent": {
+    "status": "BLOCKED",
+    "detail": "needs Ollama reachable (networking phase)",
+    "ts": "2026-07-20T11:09:13.489917+00:00"
+  },
+  "cortex_health_watchdog": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.490643+00:00"
+  },
+  "aeo_generator": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.491401+00:00"
+  },
+  "aeo_checker": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.492236+00:00"
+  },
+  "aeo_monitor": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.492819+00:00"
+  },
+  "aeo_refresh": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.493433+00:00"
+  },
+  "local_spinner": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.493903+00:00"
+  },
+  "vertical_feed": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.494589+00:00"
+  },
+  "build_product_docs": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.495239+00:00"
+  },
+  "publish_products": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.495973+00:00"
+  },
+  "enrich_products": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.496719+00:00"
+  },
+  "biz_scraper": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.497532+00:00"
+  },
+  "industrial_sniper": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.498368+00:00"
+  },
+  "empire_lead_crawler": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.499217+00:00"
+  },
+  "captcha_farm": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.500049+00:00"
+  },
+  "verify_business": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.500886+00:00"
+  },
+  "verify_prospects": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.501470+00:00"
+  },
+  "crm_pool": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.502102+00:00"
+  },
+  "supabase_lead_activation": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.502653+00:00"
+  },
+  "mcp_lead_server": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.503386+00:00"
+  },
+  "agi_agent_service": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.503933+00:00"
+  },
+  "synthetic_service": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.504672+00:00"
+  },
+  "business_dir": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.505558+00:00"
+  },
+  "storm_strike": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.506432+00:00"
+  },
+  "satellite_strike": {
+    "status": "SERVICE",
+    "detail": "long-running/side-effecting \u2014 launched separately",
+    "ts": "2026-07-20T11:09:13.507344+00:00"
+  }
+}

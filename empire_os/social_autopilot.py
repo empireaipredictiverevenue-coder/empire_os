@@ -244,8 +244,19 @@ def run_cycle(platform: str = "youtube", post: bool = True) -> dict:
         "status": "draft",
     }
     syn.queue_item(item)
-    # PUBLISH + AEO ONLY IF ALL GUARDS PASS (never ship hallucinated copy)
-    if passed:
+    # PUBLISH + AEO ONLY IF ALL GUARDS PASS (script) AND VIDEO QC JUDGE SHIPS
+    qc = {"verdict": "SKIP", "weighted": None, "reasons": ["qc not run"]}
+    video_ok = passed
+    if passed and render.get("out"):
+        try:
+            from empire_os import video_qc
+            qc = video_qc.judge(render["out"])
+            if qc["verdict"] != "SHIP":
+                video_ok = False
+        except Exception as e:
+            qc = {"verdict": "ERROR", "reasons": [f"qc: {e}"]}
+            video_ok = False
+    if video_ok:
         pub = (yt.publish_youtube(
             {**item, "video": render["out"],
              "script": {**script, "title": meta["title"],
@@ -254,10 +265,12 @@ def run_cycle(platform: str = "youtube", post: bool = True) -> dict:
             if post else {"status": "queued"})
         aeo = sync_aeo(script, cortex, meta)
     else:
-        pub = {"status": "HELD_REVIEW", "reason": "guard rail violation"}
-        aeo = {"ok": False, "reason": "held: guards failed"}
-    return {"ok": passed, "niche": niche, "track": cortex["track"],
-            "critic": critic_log, "video": render["out"],
+        reason = "guard rail violation" if not passed else f"video QC HOLD: {qc['reasons']}"
+        pub = {"status": "HELD_REVIEW", "reason": reason}
+        aeo = {"ok": False, "reason": "held: " + reason}
+    return {"ok": video_ok, "niche": niche, "track": cortex["track"],
+            "critic": critic_log, "qc": qc["verdict"], "qc_reasons": qc["reasons"],
+            "video": render["out"],
             "thumbnail": th.get("out"), "publish": pub.get("status"),
             "aeo": aeo.get("ok"), "url": pub.get("url")}
 

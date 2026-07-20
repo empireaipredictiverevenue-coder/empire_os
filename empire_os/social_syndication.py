@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -126,19 +127,44 @@ def generate_script(topic: str, platform: str = "youtube", style: str = "hook") 
     """Generate a short-form video script via LLM.
 
     Returns {title, hook, beats:[{text,sec}], cta, hashtags}.
+    If empire_os/style_profile/style_profile.json exists (from
+    competitor_intel), its winning patterns are injected into the prompt so
+    we mimic what wins (structure only, never copied words).
     """
     spec = PLATFORMS.get(platform, PLATFORMS["youtube"])
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        return {"error": "no OPENROUTER_API_KEY for script gen"}
+    if not os.environ.get("OPENROUTER_API_KEY") and not os.environ.get("MINIMAX_API_KEY"):
+        return {"error": "no LLM key (OPENROUTER_API_KEY or MINIMAX_API_KEY) for script gen"}
+    profile_hint = ""
+    sp = Path("/root/empire_os/empire_os/style_profile/style_profile.json")
+    if sp.exists():
+        try:
+            p = json.loads(sp.read_text())
+            bits = []
+            if p.get("top_hook_types"):
+                bits.append("Hook type: " + ", ".join(t for t, _ in p["top_hook_types"]))
+            if p.get("top_cta_style"):
+                bits.append("CTA style: " + ", ".join(t for t, _ in p["top_cta_style"]))
+            if p.get("top_emotional_triggers"):
+                bits.append("Triggers: " + ", ".join(t for t, _ in p["top_emotional_triggers"]))
+            if p.get("top_winning_tactics"):
+                bits.append("Tactics: " + ", ".join(t for t, _ in p["top_winning_tactics"][:5]))
+            if bits:
+                profile_hint = "\n\nMIMIC THESE WINNING PATTERNS (structure only):\n" + "\n".join("- " + b for b in bits)
+        except Exception:
+            pass
     prompt = f"""You are a viral short-form video scriptwriter for Empire OS,
 an AI agent platform that automates lead-gen and closes deals on autopilot.
 Write a {spec['dur']}-second {spec['label']} script about: {topic}.
+{profile_hint}
+MANDATORY: the FIRST beat must be a DIRECT ANSWER to the topic question.
+No fluff, no intro. A viewer must get the answer in the first 40 words.
 
 Return STRICT JSON only:
 {{
-  "title": "short punchy title",
+  "title": "short punchy title (a question form works best)",
+  "answer": "one sentence that directly answers the topic question",
   "hook": "first 1-2 sentence attention grabber",
-  "beats": [{{"text":"caption for scene 1","sec":5}}, ...],
+  "beats": [{{"text":"caption for scene 1 (must open with the answer)","sec":5}}, ...],
   "cta": "call to action (follow / link in bio / dm us)",
   "hashtags": ["#empireos","#aiagents", ...]
 }}
@@ -148,10 +174,28 @@ Make it punchy, founder-energy, psychology-driven (attention, scarcity, proof)."
         if text.startswith("__ERR__"):
             return {"error": f"LLM call failed: {text[7:]}"}
         start = text.find("{")
-        end = text.rfind("}") + 1
-        if start >= 0 and end > start:
-            return json.loads(text[start:end])
-        return {"error": "no JSON in LLM response", "raw": text[:300]}
+        if start < 0:
+            return {"error": "no JSON in LLM response", "raw": text[:300]}
+        # brace-balanced extraction (handles trailing commentary / nested })
+        depth, end = 0, -1
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        if end < 0:
+            return {"error": "unbalanced JSON in LLM response", "raw": text[:300]}
+        blob = text[start:end]
+        blob = blob.replace("```json", "").replace("```", "")
+        import re as _re
+        blob = _re.sub(r",\s*([}\]])", r"\1", blob)
+        try:
+            return json.loads(blob)
+        except Exception as je:
+            return {"error": f"JSON parse failed: {je}", "raw": blob[:300]}
     except Exception as e:
         return {"error": f"script gen failed: {e}"}
 
@@ -246,85 +290,165 @@ def _beats_to_cards(script: dict) -> list[str]:
     return [b.get("text", "") for b in beats if b.get("text")]
 
 
-def render_video(script: dict, platform: str, out_path: str | None = None) -> dict:
-    """Render caption-card mp4 via ffmpeg. Real, no external API needed."""
+def clean_caption(text: str) -> str:
+    """Normalize LLM script text for on-screen captions.
+
+    - collapse whitespace, strip leading/trailing
+    - curly quotes/apostrophes (drawtext-safe)
+    - fix the most common LLM typos
+    """
+    if not text:
+        return ""
+    t = text.replace('"', "\u201d").replace("'", "\u2019")
+    # strip em/en dashes (mandate: no em dashes; use plain hyphen or none)
+    t = t.replace("\u2014", " ").replace("\u2013", " ").replace("--", " ")
+    fixes = {
+        " its ": " it's ",
+        "dont": "don't",
+        "cant": "can't",
+        "wont": "won't",
+        "im ": "I'm ",
+        "ive": "I've",
+        "youre": "you're",
+        "thats": "that's",
+        "didnt": "didn't",
+        "isnt": "isn't",
+        "wasnt": "wasn't",
+        "wouldnt": "wouldn't",
+        "couldnt": "couldn't",
+        "shouldnt": "shouldn't",
+        "doesnt": "doesn't",
+    }
+    low = t.lower()
+    for bad, good in fixes.items():
+        low = low.replace(bad, good)
+    # restore original case for the first char only (cheap)
+    t = low
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def fact_check(text: str) -> dict:
+    """Guard rail: reject invented stats/numbers not in APPROVED_CLAIMS.
+
+    Returns {ok, reason}. Blocks specific quant claims the LLM fabricates.
+    Allowed claims are exact phrases we stand behind (real agent behavior).
+    """
+    if not text:
+        return {"ok": True}
+    # patterns that signal a concrete invented claim
+    import re as _re
+    stats = _re.findall(r"(\d+(?:\.\d+)?\s?%(?:\s+more|\s+of|\s+in)?"
+                        r"|\$\d[\d,]*|"
+                        r"\d+\s?(?:x|times)\s+(?:more|faster)|"
+                        r"(?:studies|research|data)\s+show)",
+                        text, _re.I)
+    if not stats:
+        return {"ok": True}
+    # allowlist of approved factual phrases (expand as we verify)
+    APPROVED = (
+        "reply in 8 seconds",
+        "24/7",
+        "around the clock",
+        "no sleep",
+    )
+    lowered = text.lower()
+    for a in APPROVED:
+        if a in lowered:
+            return {"ok": True}
+    return {"ok": False, "reason": f"unverified stat claim: {stats[0]!r}"}
+
+
+def render_video(script: dict, platform: str = "youtube", out_path: str = "") -> dict:
+    """Render an ANIMATED caption-card mp4 via ffmpeg (no external API).
+
+    Motion: each beat fades in/out on a timeline, accent bar slides,
+    a progress bar tracks position, background hue breathes. 720p/9:16.
+    """
     if not shutil.which("ffmpeg"):
         return {"ok": False, "error": "ffmpeg missing"}
     spec = PLATFORMS.get(platform, PLATFORMS["youtube"])
-    cards = _beats_to_cards(script)
+    cards = [clean_caption(b) for b in _beats_to_cards(script)]
     if not cards:
         return {"ok": False, "error": "no script beats to render"}
     RENDER_DIR.mkdir(parents=True, exist_ok=True)
     out = Path(out_path) if out_path else \
         RENDER_DIR / f"{platform}_{int(time.time())}.mp4"
 
-    # Each card = 1 scene, dur derived from beats or default 5s
     scene_dur = max(3, spec["dur"] // len(cards))
+    total = scene_dur * len(cards)
+    W, H = spec["w"], spec["h"]
+    fs = int(H * 0.05)
 
-    # Render one PNG per card (clean lavfi color + drawtext, no filter labels),
-    # then concat into an mp4. drawtext has no auto-wrap, so we insert a
-    # manual line break near the middle of the text.
-    def _wrap(text: str, limit: int = 28) -> str:
-        text = text.replace(":", "").replace("'", "").replace('"', "")
-        if len(text) <= limit:
-            return text
-        mid = len(text) // 2
-        sp = text.find(" ", mid)
-        if sp == -1:
-            sp = limit
-        # literal backslash-n for drawtext line break
-        return text[:sp] + "\\n" + text[sp + 1:]
-
-    card_imgs = []
-    last_err = ""
+    # build animated drawtext chains per beat (fade+scale in, hold, fade out)
+    draws = []
     for i, card in enumerate(cards):
-        img = RENDER_DIR / f"_card_{i}.png"
-        txt = _wrap(card[:90])
-        vf = (
-            f"color=c=0x0a0a0a:s={spec['w']}x{spec['h']}:d=1,"
+        txt = card[:90].replace("'", "\u2019").replace('"', "\u201d")
+        txt = re.sub(r"\s+", " ", txt).strip()
+        # insert line break near middle for wrap
+        if len(txt) > 28:
+            mid = len(txt) // 2
+            sp = txt.find(" ", mid)
+            if sp != -1:
+                txt = txt[:sp] + "\\n" + txt[sp + 1:]
+        t0 = i * scene_dur
+        t1 = t0 + scene_dur
+        fin = t0 + 0.4          # fade-in done
+        fout = t1 - 0.4         # fade-out start
+        alpha = ("if(lt(t," + str(fin) + "),t/" + str(fin) +
+                 ",if(lt(t," + str(fout) + "),1,(" + str(t1) + "-t)/(" +
+                 str(t1) + "-" + str(fout) + ")))")
+        draws.append(
             f"drawtext=fontfile={FONT}:text='{txt}':"
-            f"fontcolor=white:fontsize={int(spec['h']*0.045)}:"
+            f"fontcolor=white:fontsize={fs}:"
             f"x=(w-text_w)/2:y=(h-text_h)/2:"
-            f"box=1:boxcolor=black@0.5:boxborderw=20:"
-            f"text_align=center"
-        )
-        r = subprocess.run(
-            ["ffmpeg", "-y", "-f", "lavfi", "-i", vf,
-             "-frames:v", "1", str(img)],
-            capture_output=True, text=True, timeout=60)
-        if r.returncode == 0 and img.exists():
-            card_imgs.append(img)
-        else:
-            last_err = (r.stderr or "")[-300:]
-    if not card_imgs:
-        return {"ok": False, "error": "ffmpeg card render failed",
-                "stderr": last_err}
-    # Concat images into video with scene_dur each
-    # Use concat demuxer
-    listf = RENDER_DIR / "_concat.txt"
-    listf.write_text("\n".join(
-        f"file '{img}'\nduration {scene_dur}" for img in card_imgs) + "\n")
+            f"box=1:boxcolor=black@0.55:boxborderw=24:"
+            f"text_align=center:"
+            f"alpha='{alpha}':"
+            f"enable='between(t,{t0},{t1})'")
+    # prompt pop-in (hook): a pulsing keyword that bounces in at t=0
+    prompt_word = clean_caption(script.get("hook", "") or cards[0])[:22]
+    prompt_word = re.sub(r"\s+", " ", prompt_word).strip().replace("'", "\u2019")
+    draws.append(
+        f"drawtext=fontfile={FONT}:text='{prompt_word}':"
+        f"fontcolor=0x00E6A0:fontsize={int(fs*0.7)}:"
+        f"x=(w-text_w)/2:y=h*0.12:"
+        f"text_align=center:alpha='if(lt(t,0.5),t*2,if(lt(t,1.2),1,(1-(t-1.2)/0.4)))':enable='between(t,0,1.6)'")
+    # lower-third CTA callout slides in at the end
+    cta_txt = "CLICK TO SUBSCRIBE"
+    cta_start = total - 2
+    draws.append(
+        "drawtext=fontfile=" + FONT + ":text='" + cta_txt + "':"
+        "fontcolor=white:fontsize=" + str(int(fs * 0.6)) + ":"
+        "x='if(lt(t," + str(cta_start) + "),-w,t-" + str(cta_start) + ")*1+40':"
+        "y=h*0.82:"
+        "box=1:boxcolor=0x00E6A0@0.9:boxborderw=14:"
+        "text_align=center:enable='gte(t," + str(cta_start) + ")'")
+    # progress bar (bottom): width grows with t/total
+    draws.append(
+        f"drawbox=x=0:y={H-12}:w='iw*(t/{total})':h=12:"
+        f"color=0x00E6A0@0.9:t=fill:enable='gte(t,0)'")
+    # sliding accent bar (top): x moves left->right loop
+    draws.append(
+        f"drawbox=x='mod(t*120,{W})':y=0:w=160:h=8:"
+        f"color=0x00E6A0@0.8:t=fill:enable='gte(t,0)'")
+    vf = (f"color=c=0x0a0a0a:s={W}x{H}:d={total}," +
+          ",".join(draws))
     cmd = [
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(listf),
-        "-vsync", "vfr", "-pix_fmt", "yuv420p", str(out),
+        "ffmpeg", "-y", "-f", "lavfi", "-i", vf,
+        "-pix_fmt", "yuv420p",
+        "-r", "30", "-b:v", "2M", "-minrate", "1M", "-maxrate", "2M",
+        "-bufsize", "4M",
+        "-c:v", "libx264", "-preset", "medium", "-t", str(total),
+        str(out),
     ]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    # cleanup temp cards
-    for img in card_imgs:
-        try:
-            img.unlink()
-        except Exception:
-            pass
-    try:
-        listf.unlink()
-    except Exception:
-        pass
-    if r.returncode != 0:
-        return {"ok": False, "error": "ffmpeg concat failed",
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    if r.returncode != 0 or not out.exists():
+        return {"ok": False, "error": "ffmpeg animated render failed",
                 "stderr": (r.stderr or "")[-300:]}
-    return {"ok": True, "out": str(out),
-            "platform": platform, "aspect": spec["aspect"],
-            "duration_sec": scene_dur * len(card_imgs)}
+    return {"ok": True, "out": str(out), "platform": platform,
+            "aspect": spec["aspect"], "duration_sec": total,
+            "animated": True}
 
 
 def queue_item(item: dict) -> dict:

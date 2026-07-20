@@ -7,9 +7,9 @@ a buyer posts a lead (or batch), we score it with the real Omega pipeline
 HYBRID PRICING (best of both worlds):
   - Grading is FREE for every lead (Omega score + A/B/C/D grade).
   - OUTCOME mode (default): charge only when a graded A/B/C lead CONVERTS.
-        EVAL_CONVERT_USD = 0.50   # per A/B/C lead that converts
+        EVAL_CONVERT_USD = 2.50   # per A/B/C lead that converts  (raised 2026-07-20: $0.50 -> $2.50)
   - PER_SCORE mode (opt-in, casual buyers): charge per lead scored.
-        EVAL_PRICE_USD = 0.20     # volume rate (was 0.50 casual)
+        EVAL_PRICE_USD = 0.20     # volume rate
   - MINIMUM DEAL SIZE: a single settlement is only worth it at >= $10.
         EVAL_MIN_USD = 10.00      # floor on any USDC charge / pay link
     Below $10 the deal isn't worth the rail + support cost, so the Solana
@@ -27,7 +27,7 @@ import sqlite3
 
 # Hybrid knobs (env-overridable)
 PRICE_USD = float(os.environ.get("EVAL_PRICE_USD", "0.20"))      # per-score (opt-in)
-CONVERT_USD = float(os.environ.get("EVAL_CONVERT_USD", "0.50"))  # per A/B/C conversion
+CONVERT_USD = float(os.environ.get("EVAL_CONVERT_USD", "2.50"))  # per A/B/C conversion (raised 2026-07-20)
 DEFAULT_MODE = os.environ.get("EVAL_MODE", "outcome")           # outcome | per_score
 MIN_USD = float(os.environ.get("EVAL_MIN_USD", "10.00"))         # floor: deal < $10 not worth it
 
