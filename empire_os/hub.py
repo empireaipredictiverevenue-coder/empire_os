@@ -1586,8 +1586,10 @@ async def outreach_webhook(request: Request):
     if to and subject:
         try:
             from empire_os import mail_sender as _ms
-            # Try Resend first (SPF-aligned), Brevo fallback
-            if _ms.RESEND_API_KEY:
+            # Mailgun > Resend > Brevo (Mailgun most reliable)
+            if _ms.MAILGUN_API_KEY:
+                res = _ms._mailgun_send(to, subject, body)
+            elif _ms.RESEND_API_KEY:
                 res = _ms._resend_send(to, subject, body)
             else:
                 res = _ms._brevo_api_send(to, subject, body)
@@ -7296,8 +7298,10 @@ async def outreach_webhook(request: Request):
     if to and subject:
         try:
             from empire_os import mail_sender as _ms
-            # Try Resend first (SPF-aligned), Brevo fallback
-            if _ms.RESEND_API_KEY:
+            # Mailgun > Resend > Brevo (Mailgun most reliable)
+            if _ms.MAILGUN_API_KEY:
+                res = _ms._mailgun_send(to, subject, body)
+            elif _ms.RESEND_API_KEY:
                 res = _ms._resend_send(to, subject, body)
             else:
                 res = _ms._brevo_api_send(to, subject, body)
@@ -7468,8 +7472,10 @@ async def outreach_webhook(request: Request):
     if to and subject:
         try:
             from empire_os import mail_sender as _ms
-            # Try Resend first (SPF-aligned), Brevo fallback
-            if _ms.RESEND_API_KEY:
+            # Mailgun > Resend > Brevo (Mailgun most reliable)
+            if _ms.MAILGUN_API_KEY:
+                res = _ms._mailgun_send(to, subject, body)
+            elif _ms.RESEND_API_KEY:
                 res = _ms._resend_send(to, subject, body)
             else:
                 res = _ms._brevo_api_send(to, subject, body)

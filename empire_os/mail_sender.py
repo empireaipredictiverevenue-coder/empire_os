@@ -39,6 +39,8 @@ if _ENV_PATH.exists():
         pass
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "")
+MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "sandbox.mailgun.org")
 FROM_EMAIL = os.environ.get("EMPIRE_FROM", "Empire OS <founder@empire-ai.co.uk>")
 # Pluggable SMTP relay (e.g. ImproveMX free tier) — kills the Resend bill.
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "resend").lower()
@@ -135,8 +137,12 @@ def _send(to: str, subject: str, body: str) -> dict:
                 return r
         except Exception as e:
             r = {"ok": False, "error": f"direct_mx: {e}"}
-    # Resend FIRST (SPF includes _spf.resend.com — proper deliverability).
-    # Brevo (SPF missing — emails hit spam).
+    # Mailgun FIRST (free tier, reliable HTTP API, works without port 25)
+    if MAILGUN_API_KEY:
+        r = _mailgun_send(to, subject, body)
+        if r.get("ok"):
+            return r
+    # Resend (SPF-aligned, fallback if Mailgun not configured)
     if RESEND_API_KEY:
         r = _resend_send(to, subject, body)
         if r.get("ok"):
@@ -239,6 +245,53 @@ def _brevo_api_send(to: str, subject: str, body: str) -> dict:
             if mid:
                 return {"ok": True, "brevo_id": mid}
             return {"ok": False, "error": f"no messageId: {result}"}
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
+        detail = ""
+        if isinstance(e, urllib.error.HTTPError):
+            detail = e.read().decode()[:200]
+        return {"ok": False, "error": str(e), "detail": detail}
+
+
+
+
+def _mailgun_send(to: str, subject: str, body: str) -> dict:
+    """Send one email via Mailgun HTTP API (no port 25, no SMTP blocks)."""
+    if not MAILGUN_API_KEY:
+        return {"ok": False, "error": "MAILGUN_API_KEY not set"}
+    from email.utils import encode_rfc2231
+    # multipart/form-data
+    boundary = "----mgboundary"
+    def field(name, value):
+        return (f"--{boundary}\r\n"
+                f"Content-Disposition: form-data; name=\"{name}\"\r\n\r\n"
+                f"{value}\r\n").encode()
+    body_bytes = (
+        field("from", FROM_EMAIL) +
+        field("to", to) +
+        field("subject", subject) +
+        field("text", body)
+    ) + f"--{boundary}--\r\n".encode()
+    url = f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages"
+    # Basic auth: api:KEY (without "key-" prefix)
+    auth_str = f"api:{MAILGUN_API_KEY}"
+    import base64
+    auth_b64 = base64.b64encode(auth_str.encode()).decode()
+    req = urllib.request.Request(
+        url,
+        data=body_bytes,
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Authorization": f"Basic {auth_b64}",
+            "User-Agent": "curl/8.5.0",
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            mid = result.get("id", "")
+            if mid:
+                return {"ok": True, "mailgun_id": mid}
+            return {"ok": False, "error": f"no id: {result}"}
     except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
         detail = ""
         if isinstance(e, urllib.error.HTTPError):
