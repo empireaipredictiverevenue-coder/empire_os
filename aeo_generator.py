@@ -18,7 +18,7 @@ Output: /srv/aeo/{tenant}/{niche}/index.html  -> served at
 
 Our OWN pages: tenant="empire", niches = our 5 B2B verticals.
 """
-import json, os, re
+import json, os, re, urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -102,7 +102,18 @@ def render(tenant, niche, city="", tone="sharp", points=None, questions=None, ct
     }
 
     pts_html = "\n".join(f"<li>{p}</li>" for p in points) or "<li>Verified, exclusive leads</li>"
-    cta_html = f'<div class="cta"><p>{cta or "Get verified " + disp + " leads — talk to Empire AI."}</p></div>'
+    signup_url = f"https://empire-ai.co.uk/v1/outreach/prospect/register?niche={slug}&city={urllib.parse.quote(city_d)}"
+    cta_html = (
+        f'<div class="cta">'
+        f'<p>{cta or "Get verified " + disp + " leads — join the Empire AI network."}</p>'
+        f'<p><a class="cta-btn" href="{signup_url}">Get Verified {disp} Leads &rarr;</a></p>'
+        f'<form action="/v1/outreach/prospect/register" method="POST" class="signup">'
+        f'<input type="hidden" name="niche" value="{slug}">'
+        f'<input type="hidden" name="metro" value="{city_d}">'
+        f'<input type="email" name="email" placeholder="you@company.com" required>'
+        f'<button type="submit">Get Leads</button>'
+        f'</form></div>'
+    )
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -135,6 +146,10 @@ def render(tenant, niche, city="", tone="sharp", points=None, questions=None, ct
 body {{ font-family:system-ui,sans-serif; max-width:820px; margin:2rem auto; padding:0 1rem; line-height:1.65; color:#1a1a1a; }}
 h1,h2 {{ color:#0a3d62; }} .meta {{ color:#666; font-size:.9rem; border-bottom:1px solid #ddd; padding-bottom:1rem; }}
 .cta {{ background:#f0f7ff; border:1px solid #0a3d62; border-radius:8px; padding:1.5rem; text-align:center; margin:2rem 0; }}
+.cta-btn {{ display:inline-block; background:#0a3d62; color:#fff; padding:.7rem 1.4rem; border-radius:6px; text-decoration:none; font-weight:600; margin:.5rem; }}
+.cta form {{ margin-top:1rem; }}
+.cta input[type=email] {{ padding:.6rem; border:1px solid #ccc; border-radius:6px; width:240px; }}
+.cta button {{ padding:.6rem 1.2rem; background:#0a3d62; color:#fff; border:none; border-radius:6px; cursor:pointer; }}
 details {{ margin:.5rem 0; }} summary {{ cursor:pointer; font-weight:600; }}
 </style>
 </head>

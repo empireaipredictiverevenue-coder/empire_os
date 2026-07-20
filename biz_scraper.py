@@ -38,6 +38,22 @@ def mojeek_biz(query, limit=20):
             "yelp","bbb.org","yellowpages","angieslist","homeadvisor","thumbtack",
             "angi","trustpilot","manta","localservices","google","bing","mojeek",
             "wikipedia","yahoo","merchantcircle","cylex","brownbook","hotfrog")
+    # DDG result links: class="result__a" href="..."  (Mojeek fallback handled below)
+    # If DDG failed and we fell back to Mojeek, parse Mojeek's own markup.
+    if "mojeek.com" in html and 'class="result__a"' not in html:
+        import re as _re
+        for m in _re.finditer(r'class="title"[^>]*href="([^"]+)"[^>]*>([^<]+)<', html):
+            url, title = m.group(1), m.group(2)
+            dom = urllib.parse.urlparse(url).netloc.replace("www.", "")
+            if not dom or any(b in dom for b in DIRS):
+                continue
+            if any(k in title.lower() for k in ("near me","best 10","search results","category")):
+                continue
+            if dom and title.strip():
+                out.append({"name": title.strip(), "domain": dom, "url": url})
+            if len(out) >= limit:
+                break
+        return out
     for m in re.finditer(r'class="result__a"[^>]*href="([^"]+)"[^>]*>([^<]+)<', html):
         url, title = m.group(1), m.group(2)
         if "duckduckgo.com" in url:
@@ -65,7 +81,8 @@ def overpass_biz(city, category, limit=20):
     q = f'[out:json][timeout:25];area["name"="{city}"]["admin_level"~"4|6|8"]->.a;(node["shop"~"{category}",i](area.a);way["shop"~"{category}",i](area.a););out center {limit};'
     try:
         data = urllib.parse.urlencode({"data": q}).encode()
-        req = urllib.request.Request(OVERPASS, data=data, headers=UA)
+        req = urllib.request.Request(OVERPASS, data=data,
+                                      headers={**UA, "Accept": "application/json"})
         j = json.loads(urllib.request.urlopen(req, timeout=30).read())
         for el in j.get("elements", []):
             tags = el.get("tags", {})
