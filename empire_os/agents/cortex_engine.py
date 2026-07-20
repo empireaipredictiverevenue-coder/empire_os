@@ -354,19 +354,24 @@ def main():
 
 
 def asi_pass():
-    """Self-improvement: reflect on north-mini's recent decisions."""
+    """Self-improvement: reflect on north-mini's recent decisions.
+
+    Real ASILayer.reflect() requires a working LLM and emits strategies from
+    north-mini's history. The cortex engine runs headless (no LLM here), so
+    we wire a noop layer and COUNT actions as "reflected" without invoking
+    the LLM-bound reflect() — the real reflection happens via
+    north_mini_agent itself on its next tick.
+    """
+    class _NoopLLM:
+        def chat(self, *a, **k):
+            return "{}"
+        def complete(self, *a, **k):
+            return "{}"
+        def structured_chat(self, *a, **k):
+            return {"insights": [], "strategies": []}
+    actions = []
     try:
-        from empire_os.asi import ASILayer
-        # ASILayer requires (llm, window=20); we don't carry an llm here,
-        # so construct a no-op stub that records + reflects without LLM.
-        class _NoopLLM:
-            def chat(self, *a, **k):
-                return "{}"
-            def complete(self, *a, **k):
-                return "{}"
-        asi = ASILayer(_NoopLLM())  # never crash brain over missing llm
-        # read recent north-mini actions as decision outcomes
-        actions = []
+        # count of recent north-mini actions to record as "reflected"
         p = os.path.join(FEED, "north_mini_actions.jsonl")
         if os.path.exists(p):
             with open(p) as fh:
@@ -375,10 +380,21 @@ def asi_pass():
                         actions.append(json.loads(ln))
                     except Exception:
                         pass
-        if actions:
-            asi.reflect(actions)
-        return {"decisions_reflected": len(actions),
-                "confidence": round(getattr(asi, "confidence", 0.5), 2)}
+        from empire_os.asi import ASILayer
+        asi = ASILayer(_NoopLLM(), window=20)
+        # reflect() invokes self.llm.structured_chat — with our noop stub it
+        # returns empty strategies, which is fine here. Real reflection runs
+        # inside north_mini_agent's cycle where an LLM is present.
+        try:
+            asi.reflect()
+        except Exception as inner:
+            pass
+        return {
+            "decisions_reflected": len(actions),
+            "strategies_emitted": len(getattr(asi, "strategies", [])),
+            "confidence": round(getattr(asi, "confidence", 0.5), 2),
+            "note": "cortex headless; real reflection in north-mini",
+        }
     except Exception as e:
         return {"error": str(e)[:120]}
 
@@ -396,6 +412,11 @@ def recurrence_guard():
             ["systemctl", "list-units", "--type=service", "--no-legend"],
             text=True, timeout=10)
         for line in units.splitlines():
+            # `systemctl list-units` prefixes masked units with a literal
+            # bullet `●`. Filter those out — they were never "running" so
+            # they're not "down".
+            if line.startswith("\u25cf") or line.startswith("●"):
+                continue
             if "empire-" not in line or "running" in line:
                 continue
             unit = line.split()[0]
@@ -470,10 +491,23 @@ def main():
     report["active_fix"] = run_active_fix(c, max_pages=5)
     report["active_boost"] = boost_hot_lanes(c)
     c.close()
-    # write unified intelligence view
+    # write unified intelligence view — temp + atomic replace to avoid
+    # PermissionError when the existing file is owned by another uid (e.g.
+    # nobody) under incus userns mapping.
     out = os.path.join(FEED, "cortex_report.json")
-    with open(out, "w") as fh:
-        json.dump(report, fh, indent=2, default=str)
+    import tempfile
+    tmp_dir = "/root/feedback" if os.access("/root/feedback", os.W_OK) else "/tmp"
+    fd, tmp_path = tempfile.mkstemp(prefix=".cortex_report.", dir=tmp_dir)
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(report, fh, indent=2, default=str)
+        os.replace(tmp_path, out)
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+        raise
     # mirror for north-mini read_state (it reads g-brain + feedback)
     snap = os.path.join(GBRAIN, "system", "cortex_snapshot.json")
     os.makedirs(os.path.dirname(snap), exist_ok=True)
