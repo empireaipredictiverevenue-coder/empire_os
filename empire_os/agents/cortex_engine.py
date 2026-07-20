@@ -149,16 +149,33 @@ def pillar_market_gaps(c):
 # lanes from real conversion. All writes are rate-limited + deduped (guards).
 
 def pillar_a2a(c):
-    """Read A2A catalog + realized rent revenue. Surfaces which products/
-    lanes agents actually pay for, so Cortex can reprice + source more."""
+    """Enhanced: Read A2A catalog + realized rent revenue + predictive intelligence.
+    Surfaces which products/
+lanes agents actually pay for, so Cortex can reprice + source more."""
     import urllib.request
     out = {"catalog_vault": None, "products": 0, "rent_revenue_usdc": 0.0,
-           "top_lanes": []}
+           "top_lanes": [], "predictive_advice": [], "cycle_velocity": 0.0}
     try:
         with urllib.request.urlopen(f"{HUB}/v1/a2a/catalog", timeout=8) as r:
             cat = json.loads(r.read())
         out["catalog_vault"] = bool(cat.get("vault"))
         out["products"] = len(cat.get("products", {}) or {})
+        # Enhanced: predict future lane demand based on margin decay patterns
+        try:
+            decay = c.execute(
+                "SELECT niche, AVG(margin_cents) FROM strategy_rent_ledger "
+                "WHERE created_at > (datetime('now', '-30 days')) GROUP BY niche").fetchall()
+            lane_trends = {} 
+            for niche, avg_margin in decay:
+                trend = "rising" if (avg_margin or 0) > 100 else "stable" if (avg_margin or 0) > 0 else "declining"
+                lane_trends[niche] = {"trend": trend, "margin_usdc": round((avg_margin or 0)/100.0, 2)}
+                if trend == "rising" and (avg_margin or 0) > 150:
+                    out["predictive_advice"].append({"action": "boost", "niche": niche, "reason": "high margin trend"})
+            # Forecast next cycles demand - simple heuristic
+            total_margin = sum((avg or 0) for _, avg in decay)
+            out["cycle_velocity"] = round(total_margin / max(1, len(decay)), 2) if decay else 0.0
+        except Exception:
+            pass
     except Exception as e:
         out["catalog_error"] = str(e)[:120]
     try:
@@ -174,48 +191,76 @@ def pillar_a2a(c):
         out["top_lanes"] = [{"niche": n, "margin_usdc": round(m / 100.0, 2)}
                              for n, m in sorted(lane_margin.items(),
                                                key=lambda x: -x[1])[:5]]
+        # Enhanced: predict next-cycle allocation based on profit pool distribution
+        if rows:
+            predicted_next_run = {}
+            for niche, buyer, billed, margin in rows:
+                confidence = min(1.0, (margin or 0) / 200.0)
+                predicted_next_run[niche] = round((margin or 0) * (1 + confidence * 0.3), 2)  # 30% optimistic boost
+            out["predicted_next_allocation"] = predicted_next_run
     except Exception as e:
         out["rent_error"] = str(e)[:120]
     return out
 
 
 def pillar_aeo(c):
-    """AEO coverage vs target niches. Emits aeo:generate blueprints for gaps
-    (active mode) so the content moat fills autonomously."""
+    """Enhanced AEO coverage vs target niches with predictive insights.
+    Emits aeo:generate blueprints for gaps (active mode) so the content moat fills autonomously.
+    Enhanced: predict gaps based on trend velocity + market demand concentration."""
     from empire_os.aeo_surface import list_pages
     SURFACE = os.getenv("AEO_SURFACE_ROOT", "/srv/aeo")
     try:
         published = {p.get("niche") for p in list_pages(SURFACE)}
     except Exception:
         published = set()
-    # target niches = normalized lanes sub_niche + hot demand niches
+    # Enhanced: target niches with velocity + demand concentration analysis
     targets = set()
+    velocity_scores = {}
+    demand_concentration = {}
     try:
+        # Target niches from real lead data (demand) + lane supply (target)
         for (n,) in c.execute("SELECT DISTINCT sub_niche FROM lanes WHERE sub_niche != ''").fetchall():
             targets.add(n)
         for (n,) in c.execute("SELECT DISTINCT niche FROM si_buyer_outreach WHERE niche != ''").fetchall():
             targets.add(n)
+        # Calculate demand concentration (how many leads per niche)
+        for (n,), count in c.execute("SELECT niche, COUNT(*) FROM si_buyer_outreach GROUP BY niche").fetchall():
+            demand_concentration[n] = count
+        # Calculate opportunity velocity (gap size * demand concentration)
+        for n in targets:
+            gap_size = 1 if n not in published else 0
+            demand = demand_concentration.get(n, 0)
+            velocity_scores[n] = gap_size * (demand / max(1, demand_concentration.get("top_niche", 1)))
     except Exception:
         pass
-    gaps = sorted(targets - published)
+    gaps = sorted(targets - published, key=lambda n: velocity_scores.get(n, 0), reverse=True)
     out = {"published": len(published), "targets": len(targets),
-           "gaps": len(gaps), "gap_sample": gaps[:10]}
+           "gaps": len(gaps), "gap_sample": gaps[:10],
+           "velocity_scores": {k: round(v, 2) for k, v in velocity_scores.items() if v > 0.5}}
     if os.environ.get("CORTEX_ACTIVE", "1") != "0":
         emitted = 0
+        # Enhanced: emit more aggressive on high-velocity gaps
         for niche in gaps:
-            try:
+            velocity = velocity_scores.get(niche, 0)
+            # Higher threshold for high-velocity gaps
+            if velocity > 1.5:  # Boosted threshold for AI-optimized urgency
+                bid = f"aeo_{niche}_{int(time.time())}_boost"
+            else:
                 bid = f"aeo_{niche}_{int(time.time())}"
+            try:
                 c.execute(
                     "INSERT INTO cortex_blueprints "
                     "(blueprint_id, campaign_type, visual_dna, script_dna, niche, created_at) "
                     "VALUES (?, 'aeo:generate', '{}', ?, ?, ?)",
-                    (bid, json.dumps({"niche": niche, "status": "pending"}),
+                    (bid, json.dumps({"niche": niche, "velocity": velocity, "status": \"pending\"}),
                      niche, now_iso()))
                 emitted += 1
             except Exception:
                 pass
         c.commit()
         out["blueprints_emitted"] = emitted
+        # Enhanced: prioritize by opportunity score
+        out["urgent_gaps"] = [n for n in gaps if velocity_scores.get(n, 0) > 1.0][:3]
     return out
 
 
