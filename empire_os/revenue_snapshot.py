@@ -100,13 +100,34 @@ def snapshot() -> dict:
     # --- threshold alerts (flag stalls so the ping drives action) ---
     alerts = []
     if collection_rate == 0 and total_billed > 0:
-        alerts.append(f"LEAK: 0% of ${total_billed:.0f} billed collected (78 invoices open, none paid)")
+        alerts.append(f"LEAK: 0% of ${total_billed:.0f} billed collected (invoices open, none paid)")
     if signup_conv == 0:
         alerts.append(f"LEAK: 0% signup->buyer conversion ({converted} converted of {signups} signups)")
     if touched / signups < 0.05 and signups > 1000:
         alerts.append(f"LEAK: nurture touch rate {touched/signups*100:.1f}% (only {touched} of {signups} contacted)")
     if seated[0] < 50:
         alerts.append(f"CAPACITY: only {seated[0]} seated lanes (revenue ceiling low)")
+
+    # --- payment confirmations (solana_listener marks paid_at on-chain) ---
+    paid_rows = c.execute(
+        "SELECT COUNT(*), COALESCE(SUM(amount_cents),0), MAX(paid_at) "
+        "FROM si_ppc_invoices WHERE paid_at IS NOT NULL").fetchone()
+    conf = {
+        "confirmed_count": paid_rows[0],
+        "confirmed_usd": round((paid_rows[1] or 0) / 100, 2),
+        "last_confirmed_at": paid_rows[2],
+    }
+    seat_conf = c.execute(
+        "SELECT COUNT(*) FROM si_subscription WHERE status='active' "
+        "AND payment_ref != ''").fetchone()[0]
+    conf["seats_activated"] = seat_conf
+    try:
+        import subprocess
+        out = subprocess.run(["pgrep", "-f", "solana_listener"],
+                             capture_output=True, text=True, timeout=5)
+        conf["listener_active"] = bool(out.stdout.strip())
+    except Exception:
+        conf["listener_active"] = False
 
     c.close()
     return {
@@ -118,6 +139,7 @@ def snapshot() -> dict:
             "by_status": inv_by,
             "per_buyer": buyers,
         },
+        "payments": conf,
         "nurture_funnel": funnel,
         "funnels": funnels,
         "outbound_campaigns": campaigns,
@@ -141,6 +163,11 @@ if __name__ == "__main__":
     print(f"Outbound: {len(s['outbound_campaigns'])} campaigns, "
           f"{s['outbound_audience_total']} audience | "
           f"Seated lanes: {s['seated_lanes']['seated_lanes']}")
+    p = s["payments"]
+    last = p["last_confirmed_at"] or "never"
+    print(f"Payments: {p['confirmed_count']} confirmed (${p['confirmed_usd']:.2f}) | "
+          f"seats activated: {p['seats_activated']} | listener: "
+          f"{'UP' if p['listener_active'] else 'DOWN'} | last: {last[:19]}")
     fn = s["funnels"]
     print(f"Conv: nurture contact {fn['nurture']['contact_rate_pct']}% | "
           f"signup->buyer {fn['nurture']['signup_to_buyer_pct']}% | "
