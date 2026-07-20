@@ -24,6 +24,34 @@ def _c():
     return c
 
 
+def _eval_section() -> dict:
+    """Empire Cortex eval product — real lead grading + USDC settlement."""
+    try:
+        c = _c()
+        ledger = c.execute(
+            "SELECT COUNT(*), COALESCE(SUM(price_usd),0) FROM evaluation_ledger"
+        ).fetchone()
+        graded = ledger[0]
+        ledger_usd = round((ledger[1] or 0), 2)
+        settle = c.execute(
+            "SELECT COUNT(*), COALESCE(SUM(amount_usd),0), "
+            "SUM(CASE WHEN status='settled' THEN 1 ELSE 0 END) "
+            "FROM evaluation_settlements"
+        ).fetchone()
+        c.close()
+        return {
+            "leads_graded": graded,
+            "ledger_usd": ledger_usd,
+            "settlements_total": settle[0],
+            "settlements_usd": round((settle[1] or 0), 2),
+            "settlements_paid": settle[2] or 0,
+        }
+    except Exception:
+        return {"leads_graded": 0, "ledger_usd": 0.0,
+                "settlements_total": 0, "settlements_usd": 0.0,
+                "settlements_paid": 0}
+
+
 def snapshot() -> dict:
     c = _c()
     now = datetime.now(timezone.utc).isoformat()
@@ -141,6 +169,7 @@ def snapshot() -> dict:
             "per_buyer": buyers,
         },
         "payments": conf,
+        "eval_product": _eval_section(),
         "nurture_funnel": funnel,
         "funnels": funnels,
         "outbound_campaigns": campaigns,
@@ -178,6 +207,9 @@ if __name__ == "__main__":
     print(f"FORECAST collections: 7d ${fc['forecast_collections_usd']['next_7d_exp']:.0f} "
           f"(±35%) | 30d ${fc['forecast_collections_usd']['next_30d_exp']:.0f} "
           f"| pipeline ${fc['pipeline']['pipeline_usd']:.0f} ({fc['pipeline']['queued_pay_links']} links)")
+    ev = s["eval_product"]
+    print(f"EVAL: {ev['leads_graded']} graded | ledger ${ev['ledger_usd']:.2f} | "
+          f"settlements {ev['settlements_paid']}/{ev['settlements_total']} paid (${ev['settlements_usd']:.2f})")
     if s["alerts"]:
         print("\n!!! ALERTS:")
         for a in s["alerts"]:
