@@ -52,6 +52,15 @@ def _eval_section() -> dict:
                 "settlements_paid": 0}
 
 
+def _behavior_section() -> dict:
+    """Empire Cortex behavioral intelligence — real human behavior signals."""
+    try:
+        from empire_os.behavior_engine import main as behavior_main
+        return behavior_main()
+    except Exception:
+        return {"error": "behavior_engine unavailable"}
+
+
 def snapshot() -> dict:
     c = _c()
     now = datetime.now(timezone.utc).isoformat()
@@ -170,6 +179,7 @@ def snapshot() -> dict:
         },
         "payments": conf,
         "eval_product": _eval_section(),
+        "behavior": _behavior_section(),
         "nurture_funnel": funnel,
         "funnels": funnels,
         "outbound_campaigns": campaigns,
@@ -210,6 +220,13 @@ if __name__ == "__main__":
     ev = s["eval_product"]
     print(f"EVAL: {ev['leads_graded']} graded | ledger ${ev['ledger_usd']:.2f} | "
           f"settlements {ev['settlements_paid']}/{ev['settlements_total']} paid (${ev['settlements_usd']:.2f})")
+    bv = s["behavior"]
+    att = bv.get("attention", {})
+    pf = bv.get("payment_friction", {})
+    od = bv.get("outreach_dropoff", {})
+    print(f"BEHAVIOR: top attention={att.get('top_niche')} ({att.get('top_niche_signup_share_pct')}%) | "
+          f"pay friction={pf.get('pay_links_sent')} links sent / 0 confirmed | "
+          f"drop-off={od.get('biggest_drop')} ({od.get('conversion_pct')}% conv)")
     if s["alerts"]:
         print("\n!!! ALERTS:")
         for a in s["alerts"]:
