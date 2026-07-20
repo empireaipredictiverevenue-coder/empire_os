@@ -52,7 +52,7 @@ def lane_facts(niche, metro):
     price = float(row[0]) if row and row[0] else SEAT_DEFAULT
     return price, free, total
 
-def build_spec(niche, metro):
+def build_spec(niche, metro, llm=False):
     disp, angle = NICHE_INFO.get(niche, (niche.replace("_"," ").title(), "buyers seeking qualified leads"))
     city = METRO_NAMES.get(metro, metro)
     price, free, total = lane_facts(niche, metro)
@@ -68,12 +68,19 @@ territory rights for your metro.</p>
 are available in {city}. Once a lane seats, it's closed — no reselling, no dilution.
 {angle.capitalize()} is the highest-intent segment we track.</p>
 """
-    qa = (f"What does a {disp} lead include? Exclusive territory + verified contact + intent signal.\n"
-          f"How fast can I seat a {city} lane? Same day — pay USDC with the lane memo, listener auto-seats.\n"
-          f"Is {disp} inventory exclusive? Yes — one buyer per lane, never resold.")
-    cta = f"Seat your {disp} lane in {city} — pay {price:,.0f} USDC, get exclusive leads."
+    if llm:
+        try:
+            import os, sys
+            sys.path.insert(0, os.path.dirname(__file__))
+            import article_spinner as SP
+            if os.getenv("GROQ_API_KEY") or os.getenv("OPENROUTER_API_KEY"):
+                spun = SP.spin(body, niche, city, n=1)[0]
+                if not spun.startswith("# spin error"):
+                    body = f"<h3>Verified {disp} in {city}</h3><p>{spun}</p>"
+        except Exception as e:
+            sys.stderr.write(f"llm spin failed, using template: {e}\n")
     signup_form = (
-        f'<div class="cta"><p>{cta}</p>'
+        f'<div class="cta"><p>Seat your {disp} lane in {city} — pay {price:,.0f} USDC, get exclusive leads.</p>'
         f'<p><a class="cta-btn" href="https://empire-ai.co.uk/v1/outreach/prospect/register?niche={niche}&amp;city={city}">'
         f'Get Verified {disp} &rarr;</a></p>'
         f'<form action="/v1/outreach/prospect/register" method="POST" class="signup">'
@@ -86,7 +93,9 @@ are available in {city}. Once a lane seats, it's closed — no reselling, no dil
         niche=niche,
         target_audience=f"{disp} buyers in {city} (law firms, lead brokers, restoration contractors)",
         pain_points=f"Diluted lists, scraped contacts, no exclusivity in {city}",
-        key_questions=qa,
+        key_questions=(f"What does a {disp} lead include? Exclusive territory + verified contact + intent signal.\n"
+          f"How fast can I seat a {city} lane? Same day — pay USDC with the lane memo, listener auto-seats.\n"
+          f"Is {disp} inventory exclusive? Yes — one buyer per lane, never resold."),
         content_angle=angle,
         tone="authoritative, local, buyer-intent",
         word_count_target=400,
@@ -94,18 +103,18 @@ are available in {city}. Once a lane seats, it's closed — no reselling, no dil
         internal_links=f"/aeo/empire/{niche}/",
         body_html=body + signup_form,
         meta_description=f"Verified exclusive {disp} in {city}. {free} open lanes, ${price:,.0f} USDC seat.",
-        call_to_action=cta,
+        call_to_action=f"Seat your {disp} lane in {city} — pay {price:,.0f} USDC, get exclusive leads.",
     )
 
-def deploy(niche, metro, surface_root=None):
-    spec = build_spec(niche, metro)
+def deploy(niche, metro, surface_root=None, llm=False):
+    spec = build_spec(niche, metro, llm=llm)
     # aeo_surface deploys to root/niche/index.html; we want root/niche/metro/index.html
     # so set spec.niche to "niche/metro"
     spec.niche = f"{niche}/{metro}"
     path = deploy_spec(spec, surface_root)
     return path
 
-def run_all(surface_root=None):
+def run_all(surface_root=None, llm=False):
     c = sqlite3.connect(DB)
     rows = c.execute("SELECT DISTINCT sub_niche, metro FROM lanes").fetchall()
     c.close()
@@ -114,7 +123,7 @@ def run_all(surface_root=None):
         if niche not in NICHE_INFO:
             continue
         try:
-            deploy(niche, metro, surface_root)
+            deploy(niche, metro, surface_root, llm=llm)
             done += 1
         except Exception as e:
             sys.stderr.write(f"skip {niche}/{metro}: {e}\n")
@@ -126,12 +135,14 @@ if __name__ == "__main__":
     ap.add_argument("--niche")
     ap.add_argument("--metro")
     ap.add_argument("--surface", default="/srv/aeo")
+    ap.add_argument("--llm", action="store_true",
+                    help="spin unique copy via Groq (GROQ_API_KEY) / OpenRouter; falls back to template on error")
     a = ap.parse_args()
     if a.all:
-        n = run_all(a.surface)
-        print(f"deployed {n} pages")
+        n = run_all(a.surface, llm=a.llm)
+        print(f"deployed {n} pages (llm={a.llm})")
     elif a.niche and a.metro:
-        p = deploy(a.niche, a.metro, a.surface)
-        print(f"deployed {p}")
+        p = deploy(a.niche, a.metro, a.surface, llm=a.llm)
+        print(f"deployed {p} (llm={a.llm})")
     else:
-        print("use --all or --niche X --metro Y")
+        print("use --all or --niche X --metro Y  [--llm]")
