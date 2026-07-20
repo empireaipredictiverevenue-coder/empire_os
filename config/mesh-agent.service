@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire OS Mesh Agent (rule-based coordination layer)
+After=network.target empire-hub-8081.service
+Requires=empire-hub-8081.service
+
+[Service]
+Type=simple
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/mesh_agent.py --no-llm
+Restart=always
+RestartSec=10
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
