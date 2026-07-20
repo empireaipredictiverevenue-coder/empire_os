@@ -1,0 +1,47 @@
+[
+  {
+    "name": "International Brotherhood of Electrical Workers",
+    "osm_id": 670542770,
+    "osm_value": "union",
+    "street": "North Loop West Frontage Road",
+    "housenumber": "1475",
+    "city": "Houston",
+    "county": "Harris",
+    "state": "TX",
+    "postcode": "77008",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 29.811875,
+    "lon": -95.4268118
+  },
+  {
+    "name": "Electrical Redesign Co., Inc.",
+    "osm_id": 52518814,
+    "osm_value": "industrial",
+    "street": "Lockwood Drive",
+    "housenumber": "",
+    "city": "Houston",
+    "county": "Harris",
+    "state": "Texas",
+    "postcode": "77016",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 29.7585593,
+    "lon": -95.3172252
+  },
+  {
+    "name": "Electrical Training Center",
+    "osm_id": 12849775801,
+    "osm_value": "electrician",
+    "street": "Covern Street",
+    "housenumber": "108",
+    "city": "Houston",
+    "county": "Harris",
+    "state": "Texas",
+    "postcode": "77061",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 29.6672087,
+    "lon": -95.2875968
+  }
+]

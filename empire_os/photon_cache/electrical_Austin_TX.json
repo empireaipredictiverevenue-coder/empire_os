@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Dial One Electrical Services",
+    "osm_id": 8623944926,
+    "osm_value": "company",
+    "street": "North Lamar Boulevard",
+    "housenumber": "11812",
+    "city": "Austin",
+    "county": "Travis",
+    "state": "TX",
+    "postcode": "78758",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 30.3893608,
+    "lon": -97.6832984
+  },
+  {
+    "name": "Beckett Electrical Services",
+    "osm_id": 8340477441,
+    "osm_value": "electrician",
+    "street": "Metric Boulevard",
+    "housenumber": "10621",
+    "city": "Austin",
+    "county": "Travis",
+    "state": "TX",
+    "postcode": "78758",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 30.3856407,
+    "lon": -97.7117118
+  },
+  {
+    "name": "WPR Electrical Vault",
+    "osm_id": 107936284,
+    "osm_value": "yes",
+    "street": "West Balcones Center Drive",
+    "housenumber": "3901",
+    "city": "Austin",
+    "county": "Travis",
+    "state": "Texas",
+    "postcode": "78759",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 30.3936174,
+    "lon": -97.7359148
+  }
+]

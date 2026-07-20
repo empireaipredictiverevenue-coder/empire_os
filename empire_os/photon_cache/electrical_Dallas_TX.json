@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Electrical Wholesale Supply Company",
+    "osm_id": 1121496046,
+    "osm_value": "electrical",
+    "street": "US Highway 80 East",
+    "housenumber": "718",
+    "city": "Mesquite",
+    "county": "Dallas",
+    "state": "TX",
+    "postcode": "75149",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 32.7919699,
+    "lon": -96.6062255
+  },
+  {
+    "name": "CEC Electrical",
+    "osm_id": 12398674250,
+    "osm_value": "wholesale",
+    "street": "Valley View Lane",
+    "housenumber": "2450",
+    "city": "Irving",
+    "county": "Dallas",
+    "state": "TX",
+    "postcode": "75061",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 32.840926,
+    "lon": -97.0205585
+  },
+  {
+    "name": "North Texas Electrical Training Center",
+    "osm_id": 13329727001,
+    "osm_value": "school",
+    "street": "West Tarrant Road",
+    "housenumber": "680",
+    "city": "Grand Prairie",
+    "county": "Dallas",
+    "state": "Texas",
+    "postcode": "75050",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 32.7584412,
+    "lon": -97.0087389
+  },
+  {
+    "name": "Electrical Storage",
+    "osm_id": 597906823,
+    "osm_value": "yes",
+    "street": "Abrams Road",
+    "housenumber": "",
+    "city": "Richardson",
+    "county": "Dallas",
+    "state": "Texas",
+    "postcode": "75243",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 32.9275083,
+    "lon": -96.7367362
+  }
+]

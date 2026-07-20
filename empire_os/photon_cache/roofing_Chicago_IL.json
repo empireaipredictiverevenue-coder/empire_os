@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Proliance General Contractors & Roofing Chicago",
+    "osm_id": 12377214858,
+    "osm_value": "roofer",
+    "street": "Oakmont Lane",
+    "housenumber": "550",
+    "city": "Westmont",
+    "county": "DuPage County",
+    "state": "IL",
+    "postcode": "60559",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 41.8218426,
+    "lon": -87.9631623
+  },
+  {
+    "name": "Roofing Academy X",
+    "osm_id": 11685236109,
+    "osm_value": "school",
+    "street": "East Grand Avenue",
+    "housenumber": "225",
+    "city": "Chicago",
+    "county": "Cook County",
+    "state": "IL",
+    "postcode": "60611",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 41.8916183,
+    "lon": -87.6219159
+  },
+  {
+    "name": "Stewart Roofing",
+    "osm_id": 210695072,
+    "osm_value": "roofer",
+    "street": "East 115th Street",
+    "housenumber": "361",
+    "city": "Chicago",
+    "county": "Cook County",
+    "state": "IL",
+    "postcode": "60628",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 41.6852294,
+    "lon": -87.6132158
+  },
+  {
+    "name": "Stewart Roofing",
+    "osm_id": 210695121,
+    "osm_value": "roofer",
+    "street": "East 115th Street",
+    "housenumber": "401",
+    "city": "Chicago",
+    "county": "Cook County",
+    "state": "IL",
+    "postcode": "60628",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 41.6852308,
+    "lon": -87.613062
+  }
+]

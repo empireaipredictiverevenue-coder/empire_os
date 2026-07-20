@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Superior HVAC",
+    "osm_id": 6832646119,
+    "osm_value": "hvac",
+    "street": "Decatur Street",
+    "housenumber": "1919",
+    "city": "Houston",
+    "county": "Harris",
+    "state": "TX",
+    "postcode": "77007",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 29.7668181,
+    "lon": -95.3781619
+  }
+]

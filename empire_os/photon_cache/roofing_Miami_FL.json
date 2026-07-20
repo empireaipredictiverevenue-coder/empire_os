@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Orian Roofing And Construction",
+    "osm_id": 11103235043,
+    "osm_value": "roofer",
+    "street": "South Miami Avenue",
+    "housenumber": "801",
+    "city": "Miami",
+    "county": "Miami-Dade",
+    "state": "FL",
+    "postcode": "33131",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 25.7658898,
+    "lon": -80.19302
+  },
+  {
+    "name": "JVV Roofing",
+    "osm_id": 12978737360,
+    "osm_value": "roofer",
+    "street": "Sunset Drive",
+    "housenumber": "5701",
+    "city": "South Miami",
+    "county": "Miami-Dade",
+    "state": "FL",
+    "postcode": "33143",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 25.7051456,
+    "lon": -80.2857751
+  },
+  {
+    "name": "Poe Roofing and Consulting Inc.",
+    "osm_id": 9835920967,
+    "osm_value": "roofer",
+    "street": "SW 188th St",
+    "housenumber": "10799",
+    "city": "Cutler Bay",
+    "county": "Miami-Dade",
+    "state": "FL",
+    "postcode": "33157",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 25.5931921,
+    "lon": -80.3664671
+  },
+  {
+    "name": "Sunniland Roofing Supplies",
+    "osm_id": 435730188,
+    "osm_value": "commercial",
+    "street": "Palmetto Expressway",
+    "housenumber": "",
+    "city": "Medley",
+    "county": "Miami-Dade",
+    "state": "Florida",
+    "postcode": "33195",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 25.8429548,
+    "lon": -80.3215716
+  }
+]

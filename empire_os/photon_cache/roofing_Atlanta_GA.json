@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Atlanta Metro Roofing",
+    "osm_id": 389337799,
+    "osm_value": "yes",
+    "street": "Cambridge Square",
+    "housenumber": "1070",
+    "city": "Alpharetta",
+    "county": "Fulton",
+    "state": "GA",
+    "postcode": "30009",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 34.06772,
+    "lon": -84.3151261
+  },
+  {
+    "name": "Kelco Roofing",
+    "osm_id": 13547393565,
+    "osm_value": "roofer",
+    "street": "Cheshire Bridge Road",
+    "housenumber": "",
+    "city": "Atlanta",
+    "county": "Fulton",
+    "state": "Georgia",
+    "postcode": "30324",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 33.8109852,
+    "lon": -84.3581977
+  }
+]

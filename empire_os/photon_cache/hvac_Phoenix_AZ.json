@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Walker Plumbing & HVAC",
+    "osm_id": 503491265,
+    "osm_value": "plumber",
+    "street": "East Rose Garden Loop",
+    "housenumber": "2228",
+    "city": "Phoenix",
+    "county": "Maricopa",
+    "state": "AZ",
+    "postcode": "85024",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 33.6775623,
+    "lon": -112.0340163
+  },
+  {
+    "name": "Ferguson HVAC Supply",
+    "osm_id": 263504291,
+    "osm_value": "hvac",
+    "street": "East Roeser Road",
+    "housenumber": "3402",
+    "city": "Phoenix",
+    "county": "Maricopa",
+    "state": "AZ",
+    "postcode": "85040",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 33.4001133,
+    "lon": -112.009083
+  },
+  {
+    "name": "United Rentals - Power & HVAC",
+    "osm_id": 215865591,
+    "osm_value": "rental",
+    "street": "East Winslow Avenue",
+    "housenumber": "3820",
+    "city": "Phoenix",
+    "county": "Maricopa",
+    "state": "AZ",
+    "postcode": "85040",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 33.4213682,
+    "lon": -111.9992894
+  },
+  {
+    "name": "Reece HVAC",
+    "osm_id": 11374661391,
+    "osm_value": "hvac",
+    "street": "North 54th Avenue",
+    "housenumber": "1202",
+    "city": "Phoenix",
+    "county": "Maricopa",
+    "state": "AZ",
+    "postcode": "85043",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 33.4619245,
+    "lon": -112.1772163
+  }
+]

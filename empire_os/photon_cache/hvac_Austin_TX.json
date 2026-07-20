@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Superior HVAC Austin",
+    "osm_id": 7093281462,
+    "osm_value": "yes",
+    "street": "Spicewood Springs Road",
+    "housenumber": "4408",
+    "city": "Austin",
+    "county": "Travis",
+    "state": "TX",
+    "postcode": "78759",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 30.37297,
+    "lon": -97.7577888
+  },
+  {
+    "name": "MORSCO HVAC Supply",
+    "osm_id": 6348097601,
+    "osm_value": "hvac",
+    "street": "Metric Boulevard",
+    "housenumber": "10508",
+    "city": "Austin",
+    "county": "Travis",
+    "state": "TX",
+    "postcode": "78758",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 30.3835596,
+    "lon": -97.711802
+  }
+]

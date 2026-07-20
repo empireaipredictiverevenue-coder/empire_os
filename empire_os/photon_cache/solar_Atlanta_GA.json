@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Better Tomorrow Solar",
+    "osm_id": 271016276,
+    "osm_value": "commercial",
+    "street": "Memorial Drive Southeast",
+    "housenumber": "1074",
+    "city": "Atlanta",
+    "county": "Fulton",
+    "state": "GA",
+    "postcode": "30316",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 33.7472149,
+    "lon": -84.3523668
+  },
+  {
+    "name": "Solar Charging Station",
+    "osm_id": 270006517,
+    "osm_value": "hut",
+    "street": "Ferst Drive Northwest",
+    "housenumber": "",
+    "city": "Atlanta",
+    "county": "Fulton",
+    "state": "Georgia",
+    "postcode": "30332",
+    "country": "United States",
+    "countrycode": "US",
+    "lat": 33.7763629,
+    "lon": -84.4011205
+  }
+]
