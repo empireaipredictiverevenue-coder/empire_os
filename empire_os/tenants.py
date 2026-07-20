@@ -193,6 +193,9 @@ class Tenant:
     source: str = ""
     webhook_url: str = ""
     niche: str = ""
+    api_key: str = ""
+    delivery_email: str = ""
+    last_delivery_at: str = ""
 
 
 @dataclass
