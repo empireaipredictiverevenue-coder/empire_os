@@ -72,6 +72,42 @@ def snapshot() -> dict:
         "WHERE occupied_by IS NOT NULL AND occupied_by != ''").fetchall()[0]
     seats = {"seated_lanes": seated[0], "seat_value_usd": seated[1]}
 
+    # --- funnel conversion rates (where the leaks are) ---
+    signups = funnel["total_signups"]
+    touched = funnel["touched_total"]
+    contacted = funnel["contacted"]
+    converted = c.execute(
+        "SELECT COUNT(*) FROM si_buyer_outreach WHERE converted=1").fetchone()[0]
+    nurture_conv = round(contacted / touched * 100, 2) if touched else 0.0
+    signup_conv = round(converted / signups * 100, 4) if signups else 0.0
+    collection_rate = round(paid_usd / total_billed * 100, 2) if total_billed else 0.0
+
+    funnels = {
+        "nurture": {
+            "signups": signups, "touched": touched, "contacted": contacted,
+            "converted": converted,
+            "touch_rate_pct": round(touched / signups * 100, 2) if signups else 0.0,
+            "contact_rate_pct": nurture_conv,
+            "signup_to_buyer_pct": signup_conv,
+        },
+        "collections": {
+            "billed_usd": round(total_billed, 2),
+            "collected_usd": round(paid_usd, 2),
+            "collection_rate_pct": collection_rate,
+        },
+    }
+
+    # --- threshold alerts (flag stalls so the ping drives action) ---
+    alerts = []
+    if collection_rate == 0 and total_billed > 0:
+        alerts.append(f"LEAK: 0% of ${total_billed:.0f} billed collected (78 invoices open, none paid)")
+    if signup_conv == 0:
+        alerts.append(f"LEAK: 0% signup->buyer conversion ({converted} converted of {signups} signups)")
+    if touched / signups < 0.05 and signups > 1000:
+        alerts.append(f"LEAK: nurture touch rate {touched/signups*100:.1f}% (only {touched} of {signups} contacted)")
+    if seated[0] < 50:
+        alerts.append(f"CAPACITY: only {seated[0]} seated lanes (revenue ceiling low)")
+
     c.close()
     return {
         "timestamp": now,
@@ -83,9 +119,11 @@ def snapshot() -> dict:
             "per_buyer": buyers,
         },
         "nurture_funnel": funnel,
+        "funnels": funnels,
         "outbound_campaigns": campaigns,
         "outbound_audience_total": total_audience,
         "seated_lanes": seats,
+        "alerts": alerts,
     }
 
 
@@ -103,3 +141,11 @@ if __name__ == "__main__":
     print(f"Outbound: {len(s['outbound_campaigns'])} campaigns, "
           f"{s['outbound_audience_total']} audience | "
           f"Seated lanes: {s['seated_lanes']['seated_lanes']}")
+    fn = s["funnels"]
+    print(f"Conv: nurture contact {fn['nurture']['contact_rate_pct']}% | "
+          f"signup->buyer {fn['nurture']['signup_to_buyer_pct']}% | "
+          f"collection {fn['collections']['collection_rate_pct']}%")
+    if s["alerts"]:
+        print("\n!!! ALERTS:")
+        for a in s["alerts"]:
+            print(f"  - {a}")
