@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """campaigns — outbound lead-gen campaigns on the Empire OS inventory.
-
 A campaign = targeted push against a niche/lane in the lead inventory
 (si_buyer_outreach / lane_leads). Tracks sent / billed / collected.
 The email_agent + lead_deliverer execute delivery; campaigns.py is the
 orchestration + state layer (KISS, SQLite).
 
-Schema: campaigns(id, name, niche, lane, tier, angle, status,
+NOTE: table is `outbound_campaigns` (not `campaigns`) — a stale `campaigns`
+table from an earlier session has an incompatible schema (blueprint_id,
+campaign_type, ...). Reusing it would collide. We own `outbound_campaigns`.
+
+Schema: outbound_campaigns(id, name, niche, lane, tier, angle, status,
         audience_size, sent, billed, collected, created_at, updated_at)
 """
+
 import sqlite3, json, time, uuid, sys
 sys.path.insert(0, "/root/empire_os")
 
 DB = "/root/empire_os/empire_os.db"
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS campaigns (
+CREATE TABLE IF NOT EXISTS outbound_campaigns (
     id TEXT PRIMARY KEY,
     name TEXT,
     niche TEXT,
@@ -63,7 +67,7 @@ def create(name: str, niche: str, lane: str = "", tier: str = "standard",
     aud = _audience(niche)
     cid = f"cmp-{uuid.uuid4().hex[:10]}"
     c = sqlite3.connect(DB, timeout=20); c.execute("PRAGMA busy_timeout=15000")
-    c.execute("INSERT INTO campaigns (id, name, niche, lane, tier, angle, status, audience_size) "
+    c.execute("INSERT INTO outbound_campaigns (id, name, niche, lane, tier, angle, status, audience_size) "
               "VALUES (?,?,?,?,?,?, 'draft', ?)",
               (cid, name, niche, lane, tier, angle, aud))
     c.commit(); c.close()
@@ -73,7 +77,7 @@ def create(name: str, niche: str, lane: str = "", tier: str = "standard",
 def list_all():
     c = sqlite3.connect(DB, timeout=20)
     rows = c.execute("SELECT id, name, niche, tier, status, audience_size, sent, billed "
-                     "FROM campaigns ORDER BY created_at DESC").fetchall()
+                     "FROM outbound_campaigns ORDER BY created_at DESC").fetchall()
     c.close()
     return [dict(zip(("id", "name", "niche", "tier", "status", "audience", "sent", "billed"), r))
             for r in rows]
@@ -82,7 +86,7 @@ def list_all():
 def launch(cid: str) -> dict:
     """Mark active + fire the delivery sweep for this campaign's niche."""
     c = sqlite3.connect(DB, timeout=20); c.execute("PRAGMA busy_timeout=15000")
-    c.execute("UPDATE campaigns SET status='active', updated_at=datetime('now') WHERE id=?", (cid,))
+    c.execute("UPDATE outbound_campaigns SET status='active', updated_at=datetime('now') WHERE id=?", (cid,))
     c.commit(); c.close()
     try:
         import empire_os.agents.lead_deliverer_agent as ld
