@@ -3,17 +3,15 @@
 Pulls competitor + high-converting video hooks + transcripts into
 hooks_transcripts.db. Self-running on cron (daily), idempotent upserts.
 
-Primary path: yt-dlp (free, no API key) for transcript + stats.
-Optional discovery: SerpAPI youtube search (degrades silently if 429/invalid).
-
-Env: SERPAPI_KEY (optional) in /root/empire_os/.env
+Path: 100% official YouTube Data API v3 (our OAuth client, no cookie wall).
+Discovery + stats via API. Transcripts of competitor videos are NOT
+downloadable via API (403) — title/hook + view/like stats are the core
+signal. For transcripts, provide cookies.txt + re-enable yt-dlp fallback.
 """
+
 from __future__ import annotations
 
-import os
 import sqlite3
-import json
-import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,14 +24,6 @@ import sys
 if sys_path not in sys.path:
     sys.path.insert(0, sys_path)
 
-
-def _serp_key() -> str:
-    key = os.environ.get("SERPAPI_KEY", "")
-    if not key and ENV.exists():
-        for line in ENV.read_text().splitlines():
-            if line.strip().startswith("SERPAPI_KEY="):
-                key = line.strip().split("=", 1)[1].strip().strip('"').strip("'")
-    return key
 
 
 def init_db() -> sqlite3.Connection:
@@ -53,84 +43,10 @@ def init_db() -> sqlite3.Connection:
     return c
 
 
-def _yt_dlp(video_url: str) -> dict:
-    """Extract transcript + stats via yt-dlp (free)."""
-    out = subprocess.run(
-        ["yt-dlp", "--dump-json", "--no-warnings",
-         "--skip-download", video_url],
-        capture_output=True, text=True, timeout=60)
-    if out.returncode != 0:
-        raise RuntimeError(out.stderr[:200])
-    meta = json.loads(out.stdout)
-    # subtitles / auto-captions -> transcript
-    trans = ""
-    for lang, tracks in (meta.get("subtitles", {}) or {}).items():
-        for t in tracks:
-            if t.get("ext") in ("vtt", "srv3", "json3"):
-                trans = _fetch_text(t["url"])
-                break
-        if trans:
-            break
-    if not trans:
-        for lang, tracks in (meta.get("automatic_captions", {}) or {}).items():
-            for t in tracks:
-                if t.get("ext") in ("vtt", "srv3", "json3"):
-                    trans = _fetch_text(t["url"])
-                    break
-            if trans:
-                break
-    return {
-        "id": meta.get("id", ""),
-        "title": meta.get("title", ""),
-        "channel": meta.get("channel_id", ""),
-        "channel_name": meta.get("channel", ""),
-        "views": int(meta.get("view_count") or 0),
-        "likes": int(meta.get("like_count") or 0),
-        "subs": int(meta.get("channel_follower_count") or 0),
-        "duration": str(meta.get("duration") or ""),
-        "published": meta.get("upload_date", ""),
-        "transcript": trans,
-    }
-
-
-def _fetch_text(url: str) -> str:
-    try:
-        import urllib.request, re, json
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        raw = urllib.request.urlopen(req, timeout=20).read().decode("utf-8", "ignore")
-        # json3 caption format
-        if raw.strip().startswith("{"):
-            try:
-                obj = json.loads(raw)
-                parts = []
-                for ev in obj.get("events", []):
-                    for seg in ev.get("segs", []):
-                        t = seg.get("utf8", "")
-                        if t:
-                            parts.append(t)
-                return " ".join(parts)[:20000]
-            except Exception:
-                pass
-        # vtt format
-        lines = [l for l in raw.splitlines()
-                 if l and not l.startswith("WEBVTT") and "-->" not in l
-                 and not re.match(r"^\d+$", l)]
-        return " ".join(lines)[:20000]
-    except Exception:
-        return ""
-
-
-def _conv_score(views: int, likes: int, subs: int) -> float:
-    if not views:
-        return 0.0
-    like_rate = likes / views
-    reach = (views / subs) if subs else 0.0
-    return round(min(1.0, like_rate * 5 + min(reach, 3) / 3), 4)
-
-
 def scrape_video(conn: sqlite3.Connection, url: str, niche: str):
-    d = _yt_dlp(url)
-    if not d["id"]:
+    vid = url.split("v=")[-1].split("&")[0] if "v=" in url else url
+    d = fetch_video(vid)
+    if not d.get("id"):
         return
     hook = d["title"].split("|")[0].strip()
     score = _conv_score(d["views"], d["likes"], d["subs"])
@@ -152,26 +68,27 @@ def scrape_video(conn: sqlite3.Connection, url: str, niche: str):
     conn.commit()
 
 
-def discover_via_serp(niche: str, limit: int = 5) -> list:
-    """Optional. Returns list of video URLs. Silent on failure."""
-    key = _serp_key()
-    if not key:
-        return []
+def fetch_video(video_id: str) -> dict:
+    from empire_os.agents.yt_discover import fetch_video as _fv
+    return _fv(video_id)
+
+
+def discover(niche: str, limit: int = 6) -> list:
+    """Discover top video URLs via YouTube Data API v3 (our OAuth)."""
     try:
-        import urllib.request, urllib.parse
-        params = {"api_key": key, "engine": "youtube",
-                  "q": f"{niche} how to OR tutorial", "hl": "en"}
-        u = "https://serpapi.com/search.json?" + urllib.parse.urlencode(params)
-        req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
-        d = json.loads(urllib.request.urlopen(req, timeout=20).read())
-        urls = []
-        for r in d.get("video_results", [])[:limit]:
-            vid = r.get("id") or r.get("video_id") or ""
-            if vid and not vid.startswith("UC"):
-                urls.append(f"https://youtube.com/watch?v={vid}")
-        return urls
-    except Exception:
+        from empire_os.agents.yt_discover import search as yt_search
+        return yt_search(niche, limit)
+    except Exception as e:
+        print(f"[grabber] discover fail {niche}: {e}")
         return []
+
+
+def _conv_score(views: int, likes: int, subs: int) -> float:
+    if not views:
+        return 0.0
+    like_rate = likes / views
+    reach = (views / subs) if subs else 0.0
+    return round(min(1.0, like_rate * 5 + min(reach, 3) / 3), 4)
 
 
 def run(niche_limit: int = 8, per_niche: int = 6) -> dict:
@@ -181,14 +98,11 @@ def run(niche_limit: int = 8, per_niche: int = 6) -> dict:
     if not niches:
         niches = ["plumbing", "roofing", "hvac", "ai_automation", "lead_gen", "seo"]
     stats = {"niches": len(niches), "videos": 0, "errors": 0,
-             "serp_used": 0}
+             "ytapi_used": 0}
     for nic in niches:
-        urls = discover_via_serp(nic, per_niche)
+        urls = discover(nic, per_niche)
         if urls:
-            stats["serp_used"] += 1
-        # fallbacks if serp empty: search yt-dlp via niche keyword
-        if not urls:
-            urls = [f"ytsearch{per_niche}:{nic} how to"]  # yt-dlp search syntax
+            stats["ytapi_used"] += 1
         for u in urls[:per_niche]:
             try:
                 scrape_video(conn, u, nic)
