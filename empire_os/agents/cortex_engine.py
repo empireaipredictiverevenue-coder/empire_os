@@ -52,11 +52,14 @@ def pillar_revenue(c):
     """Predictive revenue from live funnel state."""
     import empire_os.predictive as P
     lanes = c.execute("SELECT COUNT(*) FROM lanes").fetchone()[0]
+    # occupied = lanes that are actually owned by a tenant (real occupancy).
+    # The legacy code used `ON s.tenant_id IS NOT NULL` which is an
+    # always-true JOIN and returns lanes.max for any non-empty si_subscription
+    # table (the 462/462 hallucination in cortex_report.json). Compute real
+    # occupancy by counting lanes whose occupied_by column is set.
     occupied = c.execute(
-        "SELECT COUNT(DISTINCT lane_number) FROM lanes l "
-        "JOIN si_subscription s ON s.tenant_id IS NOT NULL "
-        "WHERE s.status IN ('active','awaiting_payment')").fetchone()[0] or \
-        c.execute("SELECT COUNT(*) FROM si_subscription WHERE status IN ('active','awaiting_payment')").fetchone()[0]
+        "SELECT COUNT(*) FROM lanes WHERE occupied_by IS NOT NULL "
+        "AND occupied_by != ''").fetchone()[0]
     leads_total = c.execute("SELECT COUNT(*) FROM si_buyer_outreach").fetchone()[0]
     # funnel_by_state from subscription statuses + crm_deals stages
     subs = c.execute("SELECT status, COUNT(*) FROM si_subscription GROUP BY status").fetchall()
@@ -103,11 +106,15 @@ def pillar_leaks(c):
 def pillar_waste(c):
     """Over-resourced / burning cycles with no output."""
     import empire_os.predictive as P
-    # waste = lanes with no subscription + agents that produced 0 output
+    # empty_lanes = lanes with NO subscription occupancy at all.
+    # The legacy code used `JOIN si_subscription s ON s.tenant_id IS NOT NULL`
+    # which is always-true, returning every lane_number; the resulting
+    # NOT IN subquery therefore returned 0 (always), masking the real
+    # occupancy gap. Real definition: a lane is "empty" when its
+    # occupied_by column is NULL or empty.
     empty_lanes = c.execute(
-        "SELECT COUNT(*) FROM lanes WHERE lane_number NOT IN ("
-        "SELECT DISTINCT lane_number FROM lanes l JOIN si_subscription s "
-        "ON s.tenant_id IS NOT NULL)").fetchone()[0]
+        "SELECT COUNT(*) FROM lanes WHERE occupied_by IS NULL "
+        "OR occupied_by = ''").fetchone()[0]
     try:
         # detect_waste(lane_data=[], agent_health={}) is the real signature;
         # empty_lanes is a derived KPI we tack on for visibility.
