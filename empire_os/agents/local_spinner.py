@@ -39,7 +39,34 @@ NICHE_INFO = {
     "mold_remediation": ("mold remediation leads", "property owners with toxic mold"),
 }
 
-SEAT_DEFAULT = 199.0
+SEAT_DEFAULT = 299.0  # bronze seat floor (niche_map.TIER_SEAT_CENTS)
+
+import re as _re
+def _md_to_html(md: str) -> str:
+    """Minimal Markdown->HTML (stdlib only): headings, bold, paragraphs.
+    Groq returns Markdown; injecting raw into <p> renders literal ### / **.
+    Line-based (not block-based) so a `### heading` that Groq emits without a
+    preceding blank line is still converted, never leaked as literal text."""
+    out, para = [], []
+    def flush():
+        if para:
+            txt = _re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", " ".join(para))
+            out.append(f"<p>{txt}</p>")
+            para.clear()
+    for line in md.strip().splitlines():
+        s = line.strip()
+        if not s:
+            flush(); continue
+        h = _re.match(r"^(#{1,6})\s+(.*)$", s)
+        if h:
+            flush()
+            lvl = 3 if len(h.group(1)) <= 3 else 4  # #/##/### -> h3, deeper -> h4
+            txt = _re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", h.group(2))
+            out.append(f"<h{lvl}>{txt}</h{lvl}>")
+        else:
+            para.append(s)
+    flush()
+    return "".join(out)
 
 def lane_facts(niche, metro):
     c = sqlite3.connect(DB)
@@ -76,7 +103,7 @@ are available in {city}. Once a lane seats, it's closed — no reselling, no dil
             if os.getenv("GROQ_API_KEY") or os.getenv("OPENROUTER_API_KEY"):
                 spun = SP.spin(body, niche, city, n=1)[0]
                 if not spun.startswith("# spin error"):
-                    body = f"<h3>Verified {disp} in {city}</h3><p>{spun}</p>"
+                    body = f"<h3>Verified {disp} in {city}</h3>" + _md_to_html(spun)
         except Exception as e:
             sys.stderr.write(f"llm spin failed, using template: {e}\n")
     signup_form = (
