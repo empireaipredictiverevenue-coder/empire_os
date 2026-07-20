@@ -188,3 +188,46 @@ EMPIRE_FROM. Hub systemd unit also loads /root/empire_os/.env (EnvironmentFile=)
 - /root/g-brain/build/growth_plan_northmini.md — north-mini original
 - /root/g-brain/growth/100k_strategy.md — YT long-form growth strategy
 - /root/empire_os/SAVEPOINT_2026-07-19.md — north-mini savepoint
+
+
+## SEO INFRASTRUCTURE (2026-07-20)
+
+### Photon Enrichment
+- /root/empire_os/empire_os/agents/photon_enrich.py — FREE OSM-based business lookup
+  (no API key, replaces dead SerpAPI/Google Maps)
+- /root/empire_os/empire_os/photon_cache/ — 7-day file cache (45+ entries)
+- 45 SEO pages generated: /root/empire_os/empire_os/seo_pages/
+
+### Routing
+- Caddy: /etc/caddy/Caddyfile (HTTP, /py/* /seo/* /local/* → python :9211, rest → hub via incus proxy)
+- Python SEO server: /root/venv/bin/python3 -m http.server 9211 --bind 127.0.0.1
+  Directory: /var/www/seo-pages/
+- cloudflared: /root/.cloudflared/config.yml → http://127.0.0.1:80
+- incus proxy: hubproxy device host:8000 → container:8081 (hub)
+
+### Systemd (durability)
+- /etc/systemd/system/empire-seo.service
+- /etc/systemd/system/empire-caddy.service
+- /etc/systemd/system/empire-cloudflared.service
+All enabled + active. Survive reboots.
+
+### Verification
+- v45: /root/feedback/obsidian/Empire OS Verification v45 (SEO + Caddy + CF tunnel).py
+  23/23 checks pass. Public SEO + hub endpoints all return 200.
+- All 45 SEO pages at /py/{niche}_{city}_{state}.html return 200 with real business data.
+
+### Key Caddy Gotchas (saved for future)
+- Cloudflare rejects Python urllib as bot (403). Use curl with -A "Mozilla/5.0".
+- caddy autosave.json can hold stale config. Delete it to force reload.
+- Caddy file_server has weird caching for new files in /static/*. Use python http.server.
+- Caddy with `auto_https off` requires HTTP-only upstreams. cloudflared handles TLS.
+
+### Public URLs (verified live 2026-07-20 20:08 UTC)
+- https://empire-ai.co.uk/py/simple.html → 200 (Python test file)
+- https://empire-ai.co.uk/py/roofing_Austin_TX.html → 200 (8404 bytes, real Austin roofers from OSM)
+- https://empire-ai.co.uk/seo/roofing_Austin_TX.html → 200 (alias)
+- https://empire-ai.co.uk/local/roofing_Austin_TX.html → 200 (alias)
+- https://empire-ai.co.uk/buy-leads → 200 (hub landing)
+- https://empire-ai.co.uk/v1/evaluate/credits → 200 (hub API)
+- https://empire-ai.co.uk/aeo/products/vertical_feed/ → 200 (AEO page)
+- https://empire-ai.co.uk/sitemap.xml → 200 (41600 bytes AEO sitemap)

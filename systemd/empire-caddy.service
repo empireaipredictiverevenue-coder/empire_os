@@ -1,0 +1,17 @@
+[Unit]
+Description=Empire OS Caddy (HTTP routing for empire-ai.co.uk)
+After=network.target empire-seo.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root
+ExecStart=/usr/bin/caddy run --config /etc/caddy/Caddyfile
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/caddy_empire.log
+StandardError=append:/var/log/caddy_empire.log
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

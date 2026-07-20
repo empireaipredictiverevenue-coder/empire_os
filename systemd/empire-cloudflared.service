@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloudflare Tunnel (named, empire-ai.co.uk)
+After=network.target empire-caddy.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/cloudflared tunnel --config /root/.cloudflared/config.yml run
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/cloudflared_empire.log
+StandardError=append:/var/log/cloudflared_empire.log
+
+[Install]
+WantedBy=multi-user.target

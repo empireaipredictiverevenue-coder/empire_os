@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire OS SEO file server (python http.server)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/seo-pages
+ExecStart=/root/venv/bin/python3 -m http.server 9211 --bind 127.0.0.1
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/seo_server.log
+StandardError=append:/var/log/seo_server.log
+
+[Install]
+WantedBy=multi-user.target
