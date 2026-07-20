@@ -13,7 +13,7 @@ submitted, driving organic traffic -> leads.
 
 Runs as empire-content-engine.service (timer every 30 min, Restart=always).
 """
-import os, sys, json, time, logging, sqlite3
+import os, sys, json, time, logging
 sys.path.insert(0, os.path.dirname(__file__))
 
 import article_writer as AW

@@ -331,28 +331,6 @@ def run_active_fix(c, max_pages: int = 5):
             "sitemap_urls": urls, "results": results}
 
 
-def main():
-    """Qualify a batch of prospects with omega_os (8-area lead scorer)."""
-    try:
-        from empire_os.omega_os import qualify_prospect
-        rows = c.execute(
-            "SELECT prospect_id, niche, metro FROM si_buyer_outreach "
-            "WHERE score IS NULL OR score = 0 LIMIT 25").fetchall()
-        scored = 0
-        for pid, niche, metro in rows:
-            try:
-                res = qualify_prospect("sqlite", pid, tort_key=niche)
-                c.execute("UPDATE si_buyer_outreach SET score=? WHERE prospect_id=?",
-                          (res.get("score", 0), pid))
-                scored += 1
-            except Exception:
-                pass
-        c.commit()
-        return {"scored": scored}
-    except Exception as e:
-        return {"error": str(e)[:120]}
-
-
 def asi_pass():
     """Self-improvement: reflect on north-mini's recent decisions.
 

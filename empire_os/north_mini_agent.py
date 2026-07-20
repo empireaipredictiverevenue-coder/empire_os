@@ -215,11 +215,24 @@ def _last(kind: str) -> dict:
     if not OUT_PLAN.exists():
         return {}
     try:
-        for ln in reversed(OUT_PLAN.read_text().splitlines()):
-            if ln.strip():
+        # Read last 8KB only; OUT_PLAN grows monotonically and we only
+        # need the most recent record per kind. This keeps cost O(1) per
+        # cycle instead of O(N) in total plans emitted.
+        with open(OUT_PLAN, "rb") as fh:
+            try:
+                fh.seek(-8192, 2)  # 8 KB from end
+            except OSError:
+                fh.seek(0)
+            tail = fh.read().decode("utf-8", errors="replace")
+        for ln in reversed(tail.splitlines()):
+            if not ln.strip():
+                continue
+            try:
                 d = json.loads(ln)
                 if d.get("doc", {}).get("type") == kind:
                     return d
+            except Exception:
+                continue
     except Exception:
         pass
     return {}
