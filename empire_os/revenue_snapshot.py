@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, "/root/empire_os")
 DB = "/root/empire_os/empire_os.db"
+import empire_os.predictive_revenue as pr
 
 
 def _c():
@@ -145,6 +146,7 @@ def snapshot() -> dict:
         "outbound_campaigns": campaigns,
         "outbound_audience_total": total_audience,
         "seated_lanes": seats,
+        "forecast": pr.forecast(),
         "alerts": alerts,
     }
 
@@ -172,6 +174,10 @@ if __name__ == "__main__":
     print(f"Conv: nurture contact {fn['nurture']['contact_rate_pct']}% | "
           f"signup->buyer {fn['nurture']['signup_to_buyer_pct']}% | "
           f"collection {fn['collections']['collection_rate_pct']}%")
+    fc = s["forecast"]
+    print(f"FORECAST collections: 7d ${fc['forecast_collections_usd']['next_7d_exp']:.0f} "
+          f"(±35%) | 30d ${fc['forecast_collections_usd']['next_30d_exp']:.0f} "
+          f"| pipeline ${fc['pipeline']['pipeline_usd']:.0f} ({fc['pipeline']['queued_pay_links']} links)")
     if s["alerts"]:
         print("\n!!! ALERTS:")
         for a in s["alerts"]:
