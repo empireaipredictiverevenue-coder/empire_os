@@ -109,10 +109,14 @@ def pillar_waste(c):
         "SELECT DISTINCT lane_number FROM lanes l JOIN si_subscription s "
         "ON s.tenant_id IS NOT NULL)").fetchone()[0]
     try:
-        waste = P.detect_waste({"empty_lanes": empty_lanes,
-                                "total_lanes": c.execute("SELECT COUNT(*) FROM lanes").fetchone()[0]})
+        # detect_waste(lane_data=[], agent_health={}) is the real signature;
+        # empty_lanes is a derived KPI we tack on for visibility.
+        raw = P.detect_waste(lane_data=[], agent_health={})
+        raw["empty_lanes"] = empty_lanes
+        raw["total_lanes"] = c.execute("SELECT COUNT(*) FROM lanes").fetchone()[0]
+        waste = raw
     except Exception as e:
-        waste = {"error": str(e)[:120]}
+        waste = {"error": str(e)[:120], "empty_lanes": empty_lanes}
     return {"waste": waste, "empty_lanes": empty_lanes}
 
 
@@ -346,7 +350,14 @@ def asi_pass():
     """Self-improvement: reflect on north-mini's recent decisions."""
     try:
         from empire_os.asi import ASILayer
-        asi = ASILayer()
+        # ASILayer requires (llm, window=20); we don't carry an llm here,
+        # so construct a no-op stub that records + reflects without LLM.
+        class _NoopLLM:
+            def chat(self, *a, **k):
+                return "{}"
+            def complete(self, *a, **k):
+                return "{}"
+        asi = ASILayer(_NoopLLM())  # never crash brain over missing llm
         # read recent north-mini actions as decision outcomes
         actions = []
         p = os.path.join(FEED, "north_mini_actions.jsonl")
@@ -368,13 +379,22 @@ def asi_pass():
 def recurrence_guard():
     """Empire_coder-style guard: units up + hub healthy + no stuck sim."""
     guard = {"units_down": [], "hub_health": False, "stuck_sim": 0, "alerts": []}
+    # Transient oneshot services fired by timers exit 0 by design; only
+    # long-running daemons (Restart=always, Type=simple) should warn as down.
+    TRANSIENT_OK = {
+        "empire-cortex-engine.service",  # timer --once, exits OK
+    }
     try:
         units = subprocess.check_output(
             ["systemctl", "list-units", "--type=service", "--no-legend"],
             text=True, timeout=10)
         for line in units.splitlines():
-            if "empire-" in line and "running" not in line:
-                guard["units_down"].append(line.split()[0])
+            if "empire-" not in line or "running" in line:
+                continue
+            unit = line.split()[0]
+            if unit in TRANSIENT_OK:
+                continue
+            guard["units_down"].append(unit)
     except Exception:
         pass
     # hub health (localhost, no Cloudflare WAF)

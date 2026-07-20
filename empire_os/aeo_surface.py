@@ -112,19 +112,41 @@ def deploy_spec(
 
 
 def list_pages(surface_root: Optional[str] = None) -> list[dict]:
-    """List all published AEO pages with metadata."""
+    """List all published AEO pages with metadata, including metro subpages.
+
+    URLs resolve under /aeo/<niche>/ and /aeo/<niche>/<METRO>/ (verified live).
+    """
     root = resolve_surface_root(surface_root)
-    pages = []
+    pages: list[dict] = []
+    skip_top = {"products", "empire"}  # /srv/aeo/empire/* is legacy mirror, skip
     for entry in sorted(root.iterdir()):
-        if entry.is_dir():
-            idx = entry / "index.html"
-            if idx.exists():
-                mtime = datetime.fromtimestamp(idx.stat().st_mtime).isoformat()
+        if not entry.is_dir() or entry.name in skip_top or entry.name.startswith("."):
+            continue
+        idx = entry / "index.html"
+        if idx.exists():
+            mtime = datetime.fromtimestamp(idx.stat().st_mtime).isoformat()
+            pages.append({
+                "niche": entry.name,
+                "metro": "",
+                "url_path": f"/aeo/{entry.name}/",
+                "path": str(idx),
+                "published_at": mtime,
+                "size_bytes": idx.stat().st_size,
+            })
+        # metro subdirs: /srv/aeo/<niche>/<METRO>/index.html
+        for sub in sorted(entry.iterdir()):
+            if not sub.is_dir() or sub.name.startswith("."):
+                continue
+            sub_idx = sub / "index.html"
+            if sub_idx.exists():
+                mtime = datetime.fromtimestamp(sub_idx.stat().st_mtime).isoformat()
                 pages.append({
                     "niche": entry.name,
-                    "path": str(idx),
+                    "metro": sub.name,
+                    "url_path": f"/aeo/{entry.name}/{sub.name}/",
+                    "path": str(sub_idx),
                     "published_at": mtime,
-                    "size_bytes": idx.stat().st_size,
+                    "size_bytes": sub_idx.stat().st_size,
                 })
     return pages
 

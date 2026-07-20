@@ -29,9 +29,12 @@ DB = os.getenv("EMPIRE_DB", "/root/empire_os/empire_os.db")
 
 
 def build_sitemap() -> int:
-    """Regenerate sitemap.xml from every published AEO page. Returns #urls."""
+    """Regenerate sitemap.xml from every published AEO page. Returns #urls.
+
+    Walks niche dir index.html AND metro subdirs (/aeo/<niche>/<METRO>/).
+    """
     pages = list_pages(SURFACE)
-    urls = [f"{SITE}/aeo/empire/{p['niche'].split('/')[-1]}/" for p in pages]
+    urls = [f"{SITE}{p['url_path']}" for p in pages]
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for u in urls:
@@ -39,7 +42,7 @@ def build_sitemap() -> int:
     xml.append("</urlset>")
     with open(os.path.join(SURFACE, "sitemap.xml"), "w") as f:
         f.write("\n".join(xml))
-    log.info("sitemap rebuilt: %d urls", len(urls))
+    log.info("sitemap rebuilt: %d urls (niches+metros)", len(urls))
     return len(urls)
 
 
