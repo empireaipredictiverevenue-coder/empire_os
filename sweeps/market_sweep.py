@@ -185,11 +185,18 @@ def fetch_overpass(lat, lon, tags, limit):
         city = tags_.get("addr:city", "")
         state = tags_.get("addr:state", "")
         street_full = f"{housenum} {street}".strip()
+        # contact details OSM sometimes carries
+        phone = (tags_.get("contact:phone") or tags_.get("phone")
+                 or tags_.get("tel") or "").strip()
+        website = (tags_.get("website") or tags_.get("contact:website")
+                   or tags_.get("url") or "").strip()
         out.append({
             "business_name": name,
             "street": street_full,
             "city": city,
             "state": state,
+            "phone": phone,
+            "website": website,
             "lat": lat_,
             "lon": lon_,
         })
@@ -235,14 +242,18 @@ def sweep_vertical_metro(conn, vertical, metro_slug, limit):
 
     for r in rows:
         biz = r["business_name"]
+        # skip junk alert rows (NOAA-style "Flash Flood Warning" etc.) — no
+        # street AND no city means it's not a real place of business
+        if not r.get("street") and not r.get("city"):
+            continue
         uid = make_uid(metro_label, biz)
         if (uid, biz, metro_label) in have:
             continue  # dedupe against existing rows
         have.add((uid, biz, metro_label))  # also dedupe within this batch
         pending.append((
-            uid, SOURCE_NAME, biz, "", "", "",            # contact/email/phone
-            metro_label, vertical, r["street"], r["city"], r["state"], "",  # zip
-            "",                                           # website
+            uid, SOURCE_NAME, biz, "", "", r.get("phone", ""),
+            metro_label, vertical, r["street"], r["city"], r["state"], "",
+            r.get("website", ""),
             now,
         ))
 
@@ -260,8 +271,17 @@ def sweep_vertical_metro(conn, vertical, metro_slug, limit):
     # INSERT OR IGNORE guards against any uid collision on the PK too.
     for i in range(0, len(pending), BATCH):
         chunk = pending[i:i + BATCH]
-        conn.executemany(sql, chunk)
-        conn.commit()
+        # retry on "database is locked" — hub may be writing concurrently
+        for _ in range(5):
+            try:
+                conn.executemany(sql, chunk)
+                conn.commit()
+                break
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower():
+                    time.sleep(1)
+                    continue
+                raise
         inserted += len(chunk)
         log(f"  inserted {inserted}/{len(pending)} (committed batch)")
     return inserted

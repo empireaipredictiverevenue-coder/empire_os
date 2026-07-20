@@ -50,7 +50,7 @@ def main(write: bool = True) -> dict:
             "name": r["business_name"],
             "details": f"{r['business_name']} — {r['niche']} in {r['city']}, {r['state']}",
             "phone": r["phone"] or "",
-            "zip_code": "",
+            "zip_code": r["zip"] or "",
             "source": "market_sweep",
             "ref": f"crm_{r['id']}",
         }
