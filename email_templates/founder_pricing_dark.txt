@@ -1,0 +1,36 @@
+EMPIRE OS // v3
+
+B2B LEADS FOR {CITY}
+
+Hi {business_name},
+
+You run a {niche} business in {city}.
+
+I run Empire OS - a B2B lead marketplace matching local service businesses with qualified buyers ready to spend.
+
+WHAT WE DELIVER
+* Verified buyer leads in your metro
+* Real contact info (name, phone, intent)
+* USDC payment - no card processing, no chargebacks
+* Pause anytime, no contracts
+
+THE MATH
+- Cost per lead: $10 USDC
+- Typical close rate: 1 in 5
+- Avg deal size: $500-$5,000
+- ROI per $10 spent: $50-$500
+
+CLAIM YOUR 5 FREE LEADS: empire-ai.co.uk/buy-leads?ref=founder-{business_short}
+
+or reply YES and I will send you 5 sample leads for {city}
+
+SOLANA PAY (no card needed):
+solana:egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM?amount=10&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&memo=LEAD-{business_short}&label=Empire+OS+Lead+Pack
+
+First 5 buyers in {city} get $5/lead for life.
+
+NO CARD * USDC INSTANT SETTLEMENT * NO CHARGEBACKS
+
+Phillip Livesley
+Empire OS, founder
+empire-ai.co.uk

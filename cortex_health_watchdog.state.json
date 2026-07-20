@@ -1,8 +1,8 @@
 {
   "last_alerts": {
-    "settlements_stalled": 1784578971.797554,
+    "settlements_stalled": 1784588244.9508317,
     "guard_unhealthy": 1784538173.8808866
   },
-  "settle_stall_counter": 230,
+  "settle_stall_counter": 258,
   "last_settlements": 2
 }

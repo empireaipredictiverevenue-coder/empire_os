@@ -137,7 +137,12 @@ def _send(to: str, subject: str, body: str) -> dict:
                 return r
         except Exception as e:
             r = {"ok": False, "error": f"direct_mx: {e}"}
-    # Mailgun FIRST (free tier, reliable HTTP API, works without port 25)
+    # Mailgun SMTP first (most reliable, proper auth, works after activation)
+    if _real_smtp_cfg() and SMTP_HOST == "smtp.mailgun.org":
+        r = _smtp_send(to, subject, body)
+        if r.get("ok"):
+            return r
+    # Mailgun HTTP API (free tier, fallback if SMTP fails)
     if MAILGUN_API_KEY:
         r = _mailgun_send(to, subject, body)
         if r.get("ok"):

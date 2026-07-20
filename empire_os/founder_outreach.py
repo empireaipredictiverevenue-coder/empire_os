@@ -28,23 +28,31 @@ en = importlib.util.module_from_spec(spec); spec.loader.exec_module(en)
 DB = "/root/empire_os/empire_os.db"
 HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 
-FOUNDER_COPY = {
-    "roofing": ("Empire OS — Founder Pricing for Roofing Contractors",
-        "Hi {name},<br><br>We're opening Empire OS to our first 20 roofing "
-        "contractors at founder pricing: <b>$299/mo + $25/lead</b> (reg $599 + $49). "
-        "You only pay when seated. Real exclusive leads, your metro, USDC or card.<br><br>"
-        "Reply FOUNDER or book: https://empire-ai.co.uk/buy-leads<br><br>"
-        "— Empire OS team"),
-    "hvac": ("Empire OS — Founder Pricing for HVAC Contractors",
-        "Hi {name},<br><br>Founder pricing for our first 20 HVAC contractors: "
-        "<b>$299/mo + $25/lead</b> (reg $599 + $49). Exclusive leads in your metro, "
-        "pay only when seated.<br><br>Reply FOUNDER or book: https://empire-ai.co.uk/buy-leads<br><br>"
-        "— Empire OS team"),
-    "b2b": ("Empire OS — Founder Pricing for B2B Lead Buyers",
-        "Hi {name},<br><br>Founder pricing for our first 20 lead buyers: "
-        "<b>$299/mo + $25/lead</b>. Exclusive verified leads, pay when seated.<br><br>"
-        "Reply FOUNDER or book: https://empire-ai.co.uk/buy-leads<br><br>— Empire OS team"),
-}
+# Branded dark-theme HTML templates (see render_founder_email.py)
+# Generated per-row using the empire_os.agents.render_founder_email module.
+
+def _render_branded(niche: str, name: str, metro: str, email: str) -> tuple[str, str]:
+    """Use the dark-theme renderer; fall back to plain text on import error."""
+    try:
+        from empire_os.agents.render_founder_email import render_email
+        city = (metro or "your area").split(",")[0].strip()
+        html, text, subject = render_email(
+            business_name=name or "there",
+            city=city,
+            state="",
+            niche=niche,
+            metro=metro,
+            phone="",
+        )
+        return subject, html  # HTML body (mail_sender sends as html or text)
+    except Exception as e:
+        # Fallback
+        subj = f"Empire OS — Founder Pricing for {niche.title()} ({metro or 'your area'})"
+        body = f"<p>Hi {name},</p><p>Founder pricing for Empire OS — your first 5 leads free, then $10 in USDC per lead.</p><p><a href='https://empire-ai.co.uk/buy-leads'>Claim free leads</a></p>"
+        return subj, body
+
+
+
 
 def _mint_pay_url(name, niche, to_email, tier="silver"):
     """Mint a per-prospect Solana Pay link via hub /v1/buyer_apply.
@@ -71,9 +79,8 @@ def _mint_pay_url(name, niche, to_email, tier="silver"):
         return "", ""
 
 
-def queue_email(cur, to_email, name, niche):
-    subj, body = FOUNDER_COPY.get(niche, FOUNDER_COPY["b2b"])
-    body = body.format(name=name or "there")
+def queue_email(cur, to_email, name, niche, metro=""):
+    subj, body = _render_branded(niche, name, metro, to_email)
     # Insert + COMMIT first so the founder-outreach transaction is NOT open
     # during the HTTP round-trip to the hub (otherwise we deadlock the shared
     # SQLite db: this proc holds the lock, hub's onboard() can't write -> 504).
@@ -176,10 +183,10 @@ def run_batch(cur, batch, niche=None):
     queued = 0
     for r in rows:
         pid = r["prospect_id"]
-        fresh = cur.execute("SELECT business_name, email, niche FROM si_buyer_outreach WHERE prospect_id=?", (pid,)).fetchone()
+        fresh = cur.execute("SELECT business_name, email, niche, metro FROM si_buyer_outreach WHERE prospect_id=?", (pid,)).fetchone()
         email = fresh["email"]
         name = (fresh["business_name"] or "").split("|")[0].split(" - ")[0].strip()
-        queue_email(cur, email, name, fresh["niche"] if fresh["niche"] else "b2b")
+        queue_email(cur, email, name, fresh["niche"] if fresh["niche"] else "b2b", fresh["metro"] if "metro" in fresh.keys() else "")
         queued += 1
     cur.commit()  # commit valid-email rows immediately so Brevo sends them
     # Now enrich a slice of missing-email rows
@@ -191,12 +198,12 @@ def run_batch(cur, batch, niche=None):
     for r in cur.execute(q2).fetchall():
         pid = r["prospect_id"]
         enrich_one(cur, pid)
-        fresh = cur.execute("SELECT business_name, email, niche FROM si_buyer_outreach WHERE prospect_id=?", (pid,)).fetchone()
+        fresh = cur.execute("SELECT business_name, email, niche, metro FROM si_buyer_outreach WHERE prospect_id=?", (pid,)).fetchone()
         email = fresh["email"] if fresh else None
         if not email or "@example" in email or "invalid" in email:
             continue
         name = (fresh["business_name"] or "").split("|")[0].split(" - ")[0].strip()
-        queue_email(cur, email, name, fresh["niche"] if fresh["niche"] else "b2b")
+        queue_email(cur, email, name, fresh["niche"] if fresh["niche"] else "b2b", fresh["metro"] if "metro" in fresh.keys() else "")
         queued += 1
         cur.commit()  # commit per enriched row so it doesn't pile up
     return queued
