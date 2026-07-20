@@ -72,8 +72,18 @@ are available in {city}. Once a lane seats, it's closed — no reselling, no dil
           f"How fast can I seat a {city} lane? Same day — pay USDC with the lane memo, listener auto-seats.\n"
           f"Is {disp} inventory exclusive? Yes — one buyer per lane, never resold.")
     cta = f"Seat your {disp} lane in {city} — pay {price:,.0f} USDC, get exclusive leads."
+    signup_form = (
+        f'<div class="cta"><p>{cta}</p>'
+        f'<p><a class="cta-btn" href="https://empire-ai.co.uk/v1/outreach/prospect/register?niche={niche}&amp;city={city}">'
+        f'Get Verified {disp} &rarr;</a></p>'
+        f'<form action="/v1/outreach/prospect/register" method="POST" class="signup">'
+        f'<input type="hidden" name="niche" value="{niche}">'
+        f'<input type="hidden" name="metro" value="{city}">'
+        f'<input type="email" name="email" placeholder="you@firm.com" required>'
+        f'<button type="submit">Get Leads</button></form></div>'
+    )
     return AeoSpecDraft(
-        niche=f"{niche}/{metro}" if False else niche,  # deploy_spec uses niche as dir; we pass metro separately
+        niche=niche,
         target_audience=f"{disp} buyers in {city} (law firms, lead brokers, restoration contractors)",
         pain_points=f"Diluted lists, scraped contacts, no exclusivity in {city}",
         key_questions=qa,
@@ -82,7 +92,7 @@ are available in {city}. Once a lane seats, it's closed — no reselling, no dil
         word_count_target=400,
         competitors="generic lead mills, directory scrapers",
         internal_links=f"/aeo/empire/{niche}/",
-        body_html=body,
+        body_html=body + signup_form,
         meta_description=f"Verified exclusive {disp} in {city}. {free} open lanes, ${price:,.0f} USDC seat.",
         call_to_action=cta,
     )
