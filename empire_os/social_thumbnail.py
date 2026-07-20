@@ -39,13 +39,19 @@ def _bg_prompt(niche: str, headline: str) -> str:
 
 
 def _fetch_bg(prompt: str, w: int, h: int) -> bytes | None:
-    url = POLLINATIONS + urllib.parse.quote(prompt) + \
-          f"?width={w}&height={h}&nologo=true&model=flux"
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        return urllib.request.urlopen(req, timeout=45).read()
-    except Exception:
-        return None
+    # Pollinations model ladder: flux-pro (best quality, same free endpoint)
+    # → flux (fallback). Both are FREE, no API key needed.
+    for model in ("flux-pro", "flux"):
+        url = (POLLINATIONS + urllib.parse.quote(prompt) +
+               f"?width={w}&height={h}&nologo=true&model={model}&seed=42&enhance=true")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            data = urllib.request.urlopen(req, timeout=45).read()
+            if len(data) > 5000:  # Pollinations sometimes returns tiny placeholder
+                return data
+        except Exception:
+            continue
+    return None
 
 
 def _gradient(w: int, h: int, c1=(10, 10, 10), c2=(20, 20, 40)) -> Image.Image:

@@ -61,14 +61,36 @@ No markdown, no commentary outside the JSON."""
     text = syn._llm([{"role": "user", "content": prompt}])
     if text.startswith("__ERR__"):
         return {"error": f"LLM failed: {text[7:]}"}
+    if not text or not text.strip():
+        return {"error": "LLM returned empty response (rate-limit or no key)",
+                "raw": text[:200]}
     s, e = text.find("{"), text.rfind("}") + 1
     if s < 0 or e <= s:
-        return {"error": "no JSON in outline", "raw": text[:200]}
-    blob = text[s:e].replace("```json", "").replace("```", "")
+        # Sometimes LLM wraps in markdown ```json ... ``` even after we strip
+        # Try one more pass: extract any { ... } block
+        import re
+        m = re.search(r"\{[\s\S]*\}", text)
+        if m:
+            s, e = m.start(), m.end()
+        else:
+            return {"error": "no JSON in outline", "raw": text[:300]}
+    blob = text[s:e].replace("```json", "").replace("```", "").strip()
+    # Sometimes LLM adds trailing commas — clean those
+    import re as _re
+    blob = _re.sub(r",\s*([}\]])", r"\1", blob)
     try:
         return json.loads(blob)
     except Exception as je:
-        return {"error": f"outline parse failed: {je}", "raw": blob[:200]}
+        # last resort: try to extract sections array even from broken JSON
+        try:
+            sec_match = _re.search(r'"sections"\s*:\s*\[(.*?)\]\s*[,}]', text, _re.DOTALL)
+            if sec_match:
+                return {"sections": [], "_partial": True,
+                        "error": f"outline parse failed: {je}",
+                        "raw": blob[:300]}
+        except Exception:
+            pass
+        return {"error": f"outline parse failed: {je}", "raw": blob[:300]}
 
 
 def _voice_section(text: str, wav: str) -> float:

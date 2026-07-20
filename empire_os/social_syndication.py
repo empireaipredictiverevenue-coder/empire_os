@@ -32,6 +32,28 @@ from pathlib import Path
 
 sys.path.insert(0, "/root/empire_os")
 
+# Robust .env loader (shells choke on unquoted <>@ in values like EMPIRE_FROM)
+def _load_env_file(path: str = "/root/empire_os/.env") -> None:
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path) as f:
+            for ln in f:
+                ln = ln.strip()
+                if not ln or ln.startswith("#") or "=" not in ln:
+                    continue
+                k, _, v = ln.partition("=")
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k:
+                    # OVERWRITE (don't skip if already in env): the container may
+                    # have a stale systemd-injected env (e.g. redacted MINIMAX_API_KEY
+                    # from a prior broken .env push). Always trust .env on disk.
+                    os.environ[k] = v
+    except Exception:
+        pass
+_load_env_file()
+
 # Direct OpenRouter call (free Gemma-4-31b) defined below as _llm()
 
 # Free OpenRouter model that works with the current key.
@@ -52,9 +74,9 @@ def _llm(messages: list[dict]) -> str:
     import urllib.request, urllib.error
 
     # 1) MiniMax M3 (preferred — no free-tier throttle)
-    mm_key = os.environ.get("MINIMAX_API_KEY", "")
+    mm_key = os.environ.get("MINIMAX_API_KEY", "").strip()
     if mm_key:
-        base = os.environ.get("LLM_BASE_URL", "https://api.minimax.io/v1")
+        base = os.environ.get("LLM_BASE_URL", "https://api.minimax.io/v1").strip()
         # Use M3 explicitly; .env may carry a free slug (tencent/hy3:free)
         # which is throttled — override to the paid M3 model.
         model = "MiniMax-M3"
@@ -66,10 +88,19 @@ def _llm(messages: list[dict]) -> str:
             headers={"Content-Type": "application/json",
                      "Authorization": f"Bearer {mm_key}"})
         try:
-            with urllib.request.urlopen(req, timeout=40) as resp:
+            with urllib.request.urlopen(req, timeout=60) as resp:
                 data = json.loads(resp.read().decode())
-            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            content = (data.get("choices", [{}])[0]
+                          .get("message", {})
+                          .get("content", ""))
+            if content:
+                return content
+            # empty content → log and fall through
+            import sys as _s
+            print(f"[llm] MiniMax empty content; resp={json.dumps(data)[:200]}", file=_s.stderr)
         except Exception as e:
+            import sys as _s
+            print(f"[llm] MiniMax fail {type(e).__name__}: {str(e)[:200]}; falling through", file=_s.stderr)
             # fall through to OpenRouter free tier
             pass
 
