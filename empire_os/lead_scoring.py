@@ -1,197 +1,84 @@
-"""AI Lead Scoring & Qualification Engine.
+#!/usr/bin/env python3
+"""Empire OS — lead scoring (prioritize outbound by close-probability).
 
-Uses local rule-based scoring enriched with signals from the crm_lead record.
-This provides immediate value without requiring external LLM API calls.
-An LLM-based re-scoring plugin point is included for when you wire up
-an AI provider.
+Derives a 0-100 lead_score + tier (hot/warm/cold) from data the sweep/enrich
+already produces (omega_score, icp_fit_score, employee_count, revenue_est,
+state, niche). No external model — deterministic, explainable, KISS.
 
-Scoring dimensions (each 0-100):
-  - data_completeness  — how enriched the record is
-  - business_presence  — has website, email, phone, social
-  - market_fit         — niche is in our target verticals
-  - engagement_potential — omega_score from lane_leads
-  - enrichment_quality — number of enrichment sources that returned data
-
-Composite score = weighted average of dimensions.
-Thresholds determine tier: cold / warm / hot / qualified.
+Run: /root/venv/bin/python3 empire_os/lead_scoring.py   # scores + writes back
 """
-from __future__ import annotations
-
-import json
-import logging
-import math
+import sqlite3, sys, json
 from datetime import datetime, timezone
-from typing import Any, Optional
 
-logger = logging.getLogger("lead_scoring")
+sys.path.insert(0, "/root/empire_os")
+DB = "/root/empire_os/empire_os.db"
 
-# ── Target niches (what we qualify for) ─────────────────────────────
-TARGET_NICHES = {
-    "roof_repair",
-    "residential_roofing",
-    "commercial_roofing",
-    "roofing",
-    "hvac",
-    "hvac_repair",
-    "plumbing",
-    "electrical",
-    "solar",
-    "solar_installation",
-    "general_contractor",
-    "home_improvement",
-    "siding",
-    "windows",
-    "gutter",
-    "paving",
-    "concrete",
-    "landscaping",
-    "pest_control",
-    "painting",
-    "flooring",
-}
-
-# Weights for each scoring dimension
-WEIGHTS = {
-    "data_completeness": 0.20,
-    "business_presence": 0.25,
-    "market_fit": 0.30,
-    "engagement_potential": 0.15,
-    "enrichment_quality": 0.10,
+# niches with proven buyer demand (seated lanes exist) -> higher priority
+HOT_NICHES = {
+    "residential_roofing", "roof_repair", "commercial_roofing", "hvac",
+    "plumbing", "water_damage", "fire_damage", "mold_remediation",
+    "storm_damage", "sewage_cleanup", "electrical", "disaster_restoration",
+    "legal_services", "mass_tort", "camp_lejeune", "roundup", "paraquat",
+    "afff", "zantac", "dental", "accounting", "tax_prep", "real_estate",
+    "insurance", "mortgage", "debt_relief", "pt_rehab", "vision",
+    "addiction", "weight_loss", "hormone_therapy", "investing",
 }
 
 
-def score_data_completeness(lead: dict) -> float:
-    """How complete is the record?"""
-    score = 0.0
-    checks = {
-        "business_name": 15,
-        "email": 15,
-        "phone": 15,
-        "website": 10,
-        "street": 5,
-        "city": 5,
-        "state": 5,
-        "zip": 5,
-        "license_no": 10,
-        "contact_name": 10,
-    }
-    for field, weight in checks.items():
-        val = lead.get(field)
-        if val and str(val).strip() and str(val) not in ("[]", "{}", ""):
-            score += weight
-    return min(score, 100.0)
+def score_lead(row: dict) -> tuple[int, str]:
+    s = 0
+    # signals the sweep/enrichment actually populate today
+    s += min(int(float(row.get("omega_score") or 0)), 45)      # 0-45
+    s += min(int(float(row.get("icp_fit_score") or 0)), 30)    # 0-30
+    # firmographic (filled by later enrichment pass; 0 today is neutral, not penalizing)
+    ec = int(row.get("employee_count") or 0)
+    s += 10 if ec >= 50 else 5 if ec >= 10 else 0
+    rev = (row.get("revenue_est") or "").replace("$", "").replace(",", "")
+    try:
+        s += 10 if float(rev) >= 1_000_000 else 5 if float(rev) >= 100_000 else 0
+    except ValueError:
+        pass
+    # niche demand (proven seated-lane demand)
+    if (row.get("niche") or "") in HOT_NICHES:
+        s += 15
+    s = max(0, min(100, s))
+    tier = "hot" if s >= 60 else "warm" if s >= 30 else "cold"
+    return s, tier
 
 
-def score_business_presence(lead: dict) -> float:
-    """Assess digital footprint."""
-    score = 0.0
-    if lead.get("website"):
-        score += 25
-    if lead.get("email"):
-        score += 20
-    if lead.get("phone"):
-        score += 20
-    social = lead.get("social_links", [])
-    if isinstance(social, str):
-        social = json.loads(social) if social.startswith("[") else []
-    score += min(len(social) * 10, 25)
-    if lead.get("bbb_rating"):
-        score += 10
-    return min(score, 100.0)
-
-
-def score_market_fit(lead: dict) -> float:
-    """How well does this lead fit our target niches?"""
-    niche = (lead.get("niche") or "").lower().strip()
-    if niche in TARGET_NICHES:
-        return 100.0
-    # Partial match
-    for target in TARGET_NICHES:
-        if target in niche or niche in target:
-            return 75.0
-    # Check business_name for keywords
-    name = (lead.get("business_name") or "").lower()
-    roofing_keywords = {"roof", "shingle", "gutter", "siding", "storm", "restoration"}
-    if any(kw in name for kw in roofing_keywords):
-        return 80.0
-    hvac_keywords = {"hvac", "heating", "cooling", "air", "furnace", "ac"}
-    if any(kw in name for kw in hvac_keywords):
-        return 80.0
-    const_keywords = {"construction", "contractor", "build", "remodel", "reno"}
-    if any(kw in name for kw in const_keywords):
-        return 60.0
-    return 30.0
-
-
-def score_engagement_potential(lead: dict) -> float:
-    """Use omega_score as proxy for engagement potential."""
-    omega = float(lead.get("omega_score", 0) or 0)
-    # Normalize to 0-100 (assuming omega is 0-1000 scale)
-    return min(omega / 10, 100.0)
-
-
-def score_enrichment_quality(lead: dict) -> float:
-    """How many enrichment sources have returned data?"""
-    return float(lead.get("enrichment_score", 0) or 0)
-
-
-def compute_lead_score(lead: dict) -> dict:
-    """Run all scoring dimensions and return composite."""
-    dims = {
-        "data_completeness": score_data_completeness(lead),
-        "business_presence": score_business_presence(lead),
-        "market_fit": score_market_fit(lead),
-        "engagement_potential": score_engagement_potential(lead),
-        "enrichment_quality": score_enrichment_quality(lead),
-    }
-    composite = sum(dims[k] * WEIGHTS[k] for k in dims)
-    composite = round(min(composite, 100.0), 1)
-
-    # Tier
-    if composite >= 75:
-        tier = "hot"
-    elif composite >= 50:
-        tier = "warm"
-    elif composite >= 25:
-        tier = "cold"
-    else:
-        tier = "dead"
-
-    # Recommended action
-    if tier == "hot":
-        action = "Contact immediately — qualified lead"
-    elif tier == "warm":
-        action = "Add to nurture sequence, enrich further"
-    elif tier == "cold":
-        action = "Enrich more data before contacting"
-    else:
-        action = "Insufficient data — skip or archive"
-
-    return {
-        "composite_score": composite,
-        "tier": tier,
-        "dimensions": dims,
-        "recommended_action": action,
-    }
-
-
-def get_qualification_summary(backend) -> dict:
-    """Return qualification stats across all leads."""
-    rows = backend.execute(
-        "SELECT id, business_name, omega_score, enrichment_score, niche FROM crm_leads"
+def run(write: bool = True) -> dict:
+    c = sqlite3.connect(DB, timeout=20)
+    c.row_factory = sqlite3.Row
+    # add columns if missing (idempotent)
+    for col in ("lead_score INTEGER DEFAULT 0", "lead_tier TEXT DEFAULT 'cold'"):
+        try:
+            c.execute(f"ALTER TABLE crm_leads ADD COLUMN {col}")
+        except sqlite3.OperationalError:
+            pass  # already exists
+    rows = c.execute(
+        "SELECT id, omega_score, icp_fit_score, enrichment_score, "
+        "employee_count, revenue_est, niche FROM crm_leads"
     ).fetchall()
-    tiers = {"hot": 0, "warm": 0, "cold": 0, "dead": 0}
-    niche_counts: dict = {}
-
+    counts = {"hot": 0, "warm": 0, "cold": 0}
+    updated = 0
     for r in rows:
-        lead = dict(r)
-        score_info = compute_lead_score(lead)
-        tiers[score_info["tier"]] = tiers.get(score_info["tier"], 0) + 1
-        n = lead.get("niche", "unknown") or "unknown"
-        niche_counts[n] = niche_counts.get(n, 0) + 1
+        sc, tier = score_lead(dict(r))
+        counts[tier] += 1
+        if write:
+            c.execute(
+                "UPDATE crm_leads SET lead_score=?, lead_tier=? WHERE id=?",
+                (sc, tier, r["id"]),
+            )
+            updated += 1
+    if write:
+        c.commit()
+    c.close()
+    return {"scored": updated, "tiers": counts,
+            "timestamp": datetime.now(timezone.utc).isoformat()}
 
-    return {
-        "total_scored": len(rows),
-        "tier_distribution": tiers,
-        "top_niches": sorted(niche_counts.items(), key=lambda x: -x[1])[:10],
-    }
+
+if __name__ == "__main__":
+    res = run(write=True)
+    print(json.dumps(res, indent=2))
+    print(f"\nScored {res['scored']} leads | "
+          f"hot={res['tiers']['hot']} warm={res['tiers']['warm']} cold={res['tiers']['cold']}")
