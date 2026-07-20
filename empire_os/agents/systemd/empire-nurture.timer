@@ -1,0 +1,11 @@
+[Unit]
+Description=Empire OS Nurture Daemon Timer
+Wants=empire-nurture.service
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+Unit=empire-nurture.service
+
+[Install]
+WantedBy=timers.target

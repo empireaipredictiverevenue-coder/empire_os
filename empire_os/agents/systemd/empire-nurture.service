@@ -1,0 +1,14 @@
+[Unit]
+Description=Empire OS Nurture Daemon (3-step cold-email sequence)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os/empire_os
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/nurture_daemon.py --once
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

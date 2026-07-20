@@ -1581,6 +1581,146 @@ async def outreach_webhook(request: Request):
 
 
 # ─────────────────────────────────────────────────────────────────
+# Inbound reply ingestion — flips reply_state='replied' on match.
+# Minimal contract: POST /v1/inbound/reply with
+#   {from_email, subject, body, in_reply_to?}
+# Designed to be called by either:
+#   - Resend inbound webhook (after Resend inbound domain is configured)
+#   - Manual POST (curl) when a reply is observed elsewhere
+#   - The inbound_reply_daemon.py IMAP poller
+# ─────────────────────────────────────────────────────────────────
+
+@app.post("/v1/inbound/reply")
+async def inbound_reply(request: Request):
+    """Mark a prospect as replied.
+
+    Body:
+      from_email (required, case-insensitive)
+      subject    (optional, logged)
+      body       (optional, logged)
+      in_reply_to (optional, Message-ID we sent; logged)
+
+    Side effects:
+      - Finds si_buyer_outreach.email = LOWER(from_email).
+      - If reply_state != 'replied': UPDATE reply_state='replied'.
+      - Appends the full event to /root/feedback/inbound_replies.jsonl.
+
+    Response:
+      200 {matched: bool, prospect_id?, reply_state, updated: bool}
+      400 if from_email missing
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        # Allow form-encoded fallback for some webhook providers
+        try:
+            form = await request.form()
+            payload = dict(form)
+        except Exception:
+            raise HTTPException(400, "invalid JSON body")
+
+    from_email = (payload.get("from_email") or payload.get("from") or "").strip()
+    if not from_email:
+        raise HTTPException(400, "from_email is required")
+
+    subject = payload.get("subject", "") or ""
+    body = payload.get("body", "") or ""
+    in_reply_to = payload.get("in_reply_to", "") or ""
+    source = payload.get("source", "manual") or "manual"
+
+    # Normalize the lookup key (lowercase, strip optional display-name).
+    raw = from_email
+    if "<" in raw and ">" in raw:
+        raw = raw.split("<", 1)[1].split(">", 1)[0]
+    key = raw.strip().lower()
+
+    matched = False
+    prospect_id = None
+    prior_state = None
+    new_state = None
+    updated = False
+    error = None
+
+    if not backend:
+        error = "backend not initialized"
+    else:
+        try:
+            # Ensure reply_state column is reachable (idempotent migration).
+            try:
+                cols = [r[1] for r in backend.execute(
+                    "PRAGMA table_info(si_buyer_outreach)").fetchall()]
+                if "reply_state" not in cols:
+                    backend.execute(
+                        "ALTER TABLE si_buyer_outreach "
+                        "ADD COLUMN reply_state TEXT DEFAULT 'cold'")
+                    backend.commit()
+            except Exception:
+                pass
+
+            rows = backend.execute(
+                "SELECT prospect_id, reply_state FROM si_buyer_outreach "
+                "WHERE LOWER(email) = ? LIMIT 1",
+                (key,),
+            ).fetchall()
+            if rows:
+                matched = True
+                prospect_id = rows[0][0]
+                prior_state = rows[0][1]
+                if prior_state != "replied":
+                    backend.execute(
+                        "UPDATE si_buyer_outreach "
+                        "SET reply_state='replied', last_touch_at=? "
+                        "WHERE prospect_id=?",
+                        (datetime.now(timezone.utc).isoformat(), prospect_id),
+                    )
+                    backend.commit()
+                    updated = True
+                    new_state = "replied"
+                else:
+                    new_state = prior_state  # already replied; no-op
+            else:
+                new_state = None
+        except Exception as e:
+            error = f"db_error: {str(e)[:160]}"
+
+    # Always append to audit log — even on no-match — so we can spot
+    # out-of-band replies and refine our outreach list.
+    try:
+        log_path = Path("/root/feedback/inbound_replies.jsonl")
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        event = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "from_email_raw": from_email,
+            "from_email_key": key,
+            "subject": subject,
+            "body_preview": (body or "")[:500],
+            "in_reply_to": in_reply_to,
+            "source": source,
+            "matched": matched,
+            "prospect_id": prospect_id,
+            "prior_state": prior_state,
+            "new_state": new_state,
+            "updated": updated,
+            "error": error,
+        }
+        with open(log_path, "a") as f:
+            f.write(json.dumps(event) + "\n")
+    except Exception as e:
+        # Log append failures must not lose the API response.
+        error = (error + " | log_error: " if error else "log_error: ") + str(e)[:120]
+
+    status_code = 200 if matched or not error else 500
+    return {
+        "matched": matched,
+        "prospect_id": prospect_id,
+        "prior_state": prior_state,
+        "reply_state": new_state,
+        "updated": updated,
+        "error": error,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────
 # A2A SALES MESH — agent-to-agent commerce.
 
 @app.get("/v1/outreach/prospect/{prospect_id}")
@@ -7423,28 +7563,39 @@ def semantic_search(q: str = "", limit: int = 20):
         return {"ok": True, "q": q, "count": 0, "items": []}
     c = EP._db()
     try:
-        c.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS lead_fts USING fts5("
-            "lead_ref, text, tokenize='porter')"
-        )
-        # (re)populate from the real lead catalog (lane_leads: notes+geo+niche)
+        # Use legacy lead_fts table if it exists (maintained from empire_os/agents/evaluation_product.py)
+        # This provides reliable search functionality for lane leads
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS lead_fts (
+                lead_ref TEXT PRIMARY KEY,
+                details TEXT,
+                omega_score REAL,
+                omega_tier TEXT,
+                source TEXT,
+                created_at TEXT,
+                name TEXT,
+                phone TEXT,
+                zip_code TEXT
+            )
+        """)
+        
+        # Repopulate from lane_leads if needed
         cnt = c.execute("SELECT count(*) FROM lead_fts").fetchone()[0]
-        src = c.execute("SELECT count(*) FROM lane_leads").fetchone()[0]
+        src = c.execute("SELECT count(*) FROM lane_leads WHERE omega_score IS NOT NULL").fetchone()[0]
         if cnt == 0 or cnt < src:
             c.execute("DELETE FROM lead_fts")
             rows = c.execute(
-                "SELECT id, COALESCE(notes,'')||' '||COALESCE(niche,'')||' '||"
-                "COALESCE(sub_niche,'')||' '||COALESCE(metro,'')||' '||"
-                "COALESCE(city,'')||' '||COALESCE(state,'') FROM lane_leads "
-                "WHERE notes IS NOT NULL OR niche IS NOT NULL LIMIT 50000"
+                "SELECT lead_ref, details, omega_score, omega_tier, source, created_at, "
+                "name, phone, zip_code FROM lane_leads WHERE omega_score IS NOT NULL"
             ).fetchall()
             c.executemany(
-                "INSERT INTO lead_fts (lead_ref, text) VALUES (?,?)",
-                [(f"lane_{r[0]}", r[1]) for r in rows],
+                "INSERT INTO lead_fts (lead_ref, details, omega_score, omega_tier, source, created_at, name, phone, zip_code) VALUES (?,?,?,?,?,?,?,?,?)",
+                rows,
             )
             c.commit()
+        
         res = c.execute(
-            "SELECT lead_ref, text FROM lead_fts WHERE lead_fts MATCH ? "
+            "SELECT lead_ref, details FROM lead_fts WHERE lead_fts MATCH ? "
             "ORDER BY rank LIMIT ?",
             (q, limit),
         ).fetchall()
