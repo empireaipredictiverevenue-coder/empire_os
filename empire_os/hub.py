@@ -1586,7 +1586,11 @@ async def outreach_webhook(request: Request):
     if to and subject:
         try:
             from empire_os import mail_sender as _ms
-            res = _ms._brevo_api_send(to, subject, body)
+            # Try Resend first (SPF-aligned), Brevo fallback
+            if _ms.RESEND_API_KEY:
+                res = _ms._resend_send(to, subject, body)
+            else:
+                res = _ms._brevo_api_send(to, subject, body)
             sent_ok = bool(res.get("ok"))
             send_info = str(res)[:160]
         except Exception as e:
@@ -7292,7 +7296,11 @@ async def outreach_webhook(request: Request):
     if to and subject:
         try:
             from empire_os import mail_sender as _ms
-            res = _ms._brevo_api_send(to, subject, body)
+            # Try Resend first (SPF-aligned), Brevo fallback
+            if _ms.RESEND_API_KEY:
+                res = _ms._resend_send(to, subject, body)
+            else:
+                res = _ms._brevo_api_send(to, subject, body)
             sent_ok = bool(res.get("ok"))
             send_info = str(res)[:160]
         except Exception as e:
@@ -7460,7 +7468,11 @@ async def outreach_webhook(request: Request):
     if to and subject:
         try:
             from empire_os import mail_sender as _ms
-            res = _ms._brevo_api_send(to, subject, body)
+            # Try Resend first (SPF-aligned), Brevo fallback
+            if _ms.RESEND_API_KEY:
+                res = _ms._resend_send(to, subject, body)
+            else:
+                res = _ms._brevo_api_send(to, subject, body)
             sent_ok = bool(res.get("ok"))
             send_info = str(res)[:160]
         except Exception as e:

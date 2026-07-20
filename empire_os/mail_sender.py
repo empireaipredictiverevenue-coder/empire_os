@@ -135,7 +135,13 @@ def _send(to: str, subject: str, body: str) -> dict:
                 return r
         except Exception as e:
             r = {"ok": False, "error": f"direct_mx: {e}"}
-    # Brevo API (bypasses SMTP IP block, no port 25 needed)
+    # Resend FIRST (SPF includes _spf.resend.com — proper deliverability).
+    # Brevo (SPF missing — emails hit spam).
+    if RESEND_API_KEY:
+        r = _resend_send(to, subject, body)
+        if r.get("ok"):
+            return r
+    # Brevo API fallback (bypasses SMTP IP block, no port 25 needed)
     if BREVO_API_KEY:
         r = _brevo_api_send(to, subject, body)
         if r.get("ok"):
@@ -176,7 +182,7 @@ def _resend_send(to: str, subject: str, body: str) -> dict:
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "User-Agent": "EmpireOS/1.0",
+            "User-Agent": "curl/8.5.0",  # CF 1010 blocks Python UA
             "Authorization": f"Bearer {RESEND_API_KEY}",
         },
     )
