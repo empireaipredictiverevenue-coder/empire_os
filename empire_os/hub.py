@@ -323,6 +323,26 @@ async def lifespan(app: FastAPI):
             return FileResponse(str(p), media_type="text/plain")
         return Response(status_code=404)
 
+    @app.get("/v1/indexnow/{key}.txt")
+    async def indexnow_key(key: str):
+        """Serve IndexNow verification key (Bing/DuckDuckGo/Yandex).
+        Under /v1/ so it passes the Caddy @app proxy and isn't shadowed
+        by the /aeo StaticFiles mount."""
+        from fastapi.responses import FileResponse
+        p = Path(AEO_SURFACE_ROOT) / f"{key}.txt"
+        if p.exists():
+            return FileResponse(str(p), media_type="text/plain")
+        return Response(status_code=404)
+
+    @app.get("/{key}.txt")
+    async def indexnow_key_root(key: str):
+        """Root-level IndexNow key (some engines require host-root keyLocation)."""
+        from fastapi.responses import FileResponse
+        p = Path(AEO_SURFACE_ROOT) / f"{key}.txt"
+        if p.exists():
+            return FileResponse(str(p), media_type="text/plain")
+        return Response(status_code=404)
+
     @app.get("/sitemap.xml")
     async def root_sitemap():
         from fastapi.responses import FileResponse
