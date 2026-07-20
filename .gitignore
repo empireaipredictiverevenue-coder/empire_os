@@ -11,3 +11,7 @@ __pycache__/
 anthropic-skills/
 claude-code/
 superpowers/
+
+# social engine draft artifacts
+empire_os/social_queue/
+empire_os/social_render/

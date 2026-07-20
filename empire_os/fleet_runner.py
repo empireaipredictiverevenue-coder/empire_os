@@ -99,6 +99,7 @@ SERVICES = {
     "customer_analysis", "relationship_engine", "influence_engine",
     "okf_tracker", "habit_memory", "agent_copilot", "agent_harness",
     "cortex_health_watchdog",
+    "social_syndication",
 }
 
 
