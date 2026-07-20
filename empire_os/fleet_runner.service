@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire OS Department Fleet Runner (in-process, no containers)
+After=network.target empire-hub-8081.service
+Requires=empire-hub-8081.service
+
+[Service]
+Type=simple
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/fleet_runner.py
+Restart=always
+RestartSec=10
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
