@@ -1973,6 +1973,7 @@ def product_detail(sku: str):
 @app.post("/v1/a2a/negotiate")
 def a2a_negotiate(req: dict):
     """Another agent posts buy-intent -> hub quotes + returns settle instr."""
+    VAULT = os.getenv("EMPIRE_VAULT", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9yAZM")
     if not backend:
         raise HTTPException(503, "backend not initialized")
     product = req.get("product", "lead_lane")
