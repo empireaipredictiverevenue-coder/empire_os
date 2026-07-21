@@ -6,17 +6,28 @@ PullPush.io is a free archive of Reddit submissions (no API key, no auth).
 Strategy:
   1. For each niche, search relevant subreddits
   2. Score posts by: buyer-intent keywords + recency + post quality
-  3. Output ranked prospects with author + permalink
-  4. Cache to /root/feedback/reddit_prospects.jsonl
+  3. CORTEX BOOST: score each post via omega_os.qualify_prospect (8-dim score)
+  4. Output ranked prospects with author + permalink + omega + grade
+  5. Cache to /root/feedback/reddit_prospects.jsonl
 """
 from __future__ import annotations
 import json
 import re
+import sys
 import time
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+# Cortex Omega integration (graceful fallback if not importable)
+try:
+    sys.path.insert(0, "/root/empire_os")
+    from empire_os import omega_os
+    _HAS_OMEGA = True
+except Exception:
+    omega_os = None
+    _HAS_OMEGA = False
 
 
 PULLPUSH_BASE = "https://api.pullpush.io/reddit/search/submission/"
@@ -99,13 +110,68 @@ def score_intent(title: str, selftext: str) -> tuple[int, str | None]:
     return 0, None
 
 
+def _grade_for(omega: float) -> str:
+    """omega is 0-1 (total/100). Map to A/B/C/D — matches eval_product.grade_for."""
+    if omega >= 0.75:
+        return "A"
+    if omega >= 0.55:
+        return "B"
+    if omega >= 0.35:
+        return "C"
+    return "D"
+
+
+def _score_with_omega(post: dict, niche: str) -> dict:
+    """CORTEX BOOST: run omega_os on the post content.
+
+    Returns {"omega": float|None, "grade": str|None, "tier": str|None,
+             "total_score": int|None} — all None if omega unavailable.
+    Falls back gracefully on any exception so the scraper never breaks.
+    """
+    if not _HAS_OMEGA or omega_os is None:
+        return {"omega": None, "grade": None, "tier": None, "total_score": None}
+    try:
+        # Build a prospect dict from the Reddit post for Omega
+        details = (post.get("selftext") or post.get("title") or "").strip()
+        res = omega_os.qualify_prospect(  # type: ignore[union-attr]
+            backend=None,
+            prospect_id=f"reddit_{post.get('id', int(time.time()))}",
+            tort_key=niche,  # use niche as tort_key proxy
+            details=details,
+            source=f"reddit_{post.get('subreddit', 'unknown')}",
+            name=post.get("author", ""),
+            phone="",
+            zip_code="",
+        )
+        total = float(res.get("total", 0.0))
+        omega = round(total / 100.0, 4)
+        return {
+            "omega": omega,
+            "grade": _grade_for(omega),
+            "tier": res.get("tier", ""),
+            "total_score": int(total),
+        }
+    except Exception:
+        return {"omega": None, "grade": None, "tier": None, "total_score": None}
+
+
 def find_prospects(
     niches: list[str],
     days_back: int = 30,
     min_intent: int = 5,
     max_per_sub: int = 50,
+    min_grade: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Find prospects across niches. Returns scored list."""
+    """Find prospects across niches. Returns scored list.
+
+    min_grade: drop prospects below this letter ('A'/'B'/'C'/'D').
+      - None (default): keep everything, sort by intent
+      - 'D' or lower: drop only junk (omega < 0.35)
+      - 'C': drop D-grade (recommended for outreach — keeps A/B/C)
+      - 'B': drop C/D (premium only)
+    """
+    _GRADE_RANK = {"A": 4, "B": 3, "C": 2, "D": 1}
+    rank_cutoff = _GRADE_RANK.get(min_grade, 0) if min_grade else 0
     after_utc = int(time.time()) - (days_back * 86400)
     seen_ids = set()
     results = []
@@ -124,7 +190,7 @@ def find_prospects(
                 if score < min_intent:
                     continue
                 seen_ids.add(pid)
-                results.append({
+                result = {
                     "niche": niche,
                     "subreddit": sub,
                     "post_id": pid,
@@ -138,10 +204,26 @@ def find_prospects(
                     "created_utc": post.get("created_utc", 0),
                     "intent_score": score,
                     "intent_keyword": kw,
-                })
+                }
+                # CORTEX BOOST: add omega + grade if available
+                omega_data = _score_with_omega(post, niche)
+                result.update(omega_data)
+                # Grade filter (only applies when cortex scored the post)
+                if rank_cutoff and result.get("grade"):
+                    if _GRADE_RANK.get(result["grade"], 0) < rank_cutoff:
+                        continue
+                results.append(result)
             time.sleep(5)  # PullPush rate limit: be polite
-    # Sort: intent desc, then score desc, then comments desc
-    results.sort(key=lambda p: (p["intent_score"], p["score"], p["num_comments"]), reverse=True)
+    # Sort: intent desc, then omega desc (preferring A/B/C), then score desc
+    results.sort(
+        key=lambda p: (
+            p["intent_score"],
+            p.get("omega") or 0.0,
+            p["score"],
+            p["num_comments"],
+        ),
+        reverse=True,
+    )
     return results
 
 
@@ -165,17 +247,101 @@ def save_prospects(prospects: list[dict]) -> int:
     return appended
 
 
+def write_to_eval_ledger(prospects: list[dict]) -> int:
+    """Push A/B/C-grade prospects into evaluation_ledger so they're billable.
+
+    Each row creates an 'awaiting_buyer' evaluation record tied to the
+    post's niche. When a buyer later submits an API key claiming this
+    prospect, record_conversion() charges $2.50.
+
+    Returns count written.
+    """
+    import sqlite3, time as _time
+    billable = [p for p in prospects if p.get("grade") in ("A", "B", "C")]
+    if not billable:
+        return 0
+    db = "/root/empire_os/empire_os.db"
+    try:
+        c = sqlite3.connect(db, timeout=30)
+    except Exception:
+        return 0
+    try:
+        # ensure schema (eval product manages its own; rely on it)
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS evaluation_ledger (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                buyer TEXT,
+                lead_ref TEXT,
+                niche TEXT,
+                omega REAL,
+                grade TEXT,
+                price_usd REAL,
+                billing TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TEXT
+            )"""
+        )
+        c.commit()
+        now = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
+        rows = [
+            (
+                "",  # buyer filled when claimed
+                f"reddit_{p['post_id']}",
+                p.get("niche", "unknown"),
+                p.get("omega", 0.0),
+                p.get("grade", ""),
+                0.0,  # outcome mode: 0 until conversion
+                "outcome",
+                "awaiting_buyer",
+                now,
+            )
+            for p in billable
+        ]
+        # INSERT OR IGNORE on lead_ref avoids duplicates if rerun
+        c.executemany(
+            "INSERT OR IGNORE INTO evaluation_ledger "
+            "(buyer, lead_ref, niche, omega, grade, price_usd, billing, status, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            rows,
+        )
+        c.commit()
+        return len(rows)
+    except Exception:
+        return 0
+    finally:
+        c.close()
+
+
 def main():
-    import sys
-    niches = sys.argv[1:] if len(sys.argv) > 1 else ["roofing", "hvac", "plumbing"]
-    print(f"Searching {niches} (last 30 days)...")
-    prospects = find_prospects(niches, days_back=30, min_intent=5)
-    print(f"Found {len(prospects)} buyer-intent posts")
+    import argparse
+    ap = argparse.ArgumentParser(description="Reddit buyer-intent scraper (cortex-boosted)")
+    ap.add_argument("niches", nargs="*", default=["roofing", "hvac", "plumbing"])
+    ap.add_argument("--days-back", type=int, default=30)
+    ap.add_argument("--min-intent", type=int, default=5)
+    ap.add_argument("--min-grade", choices=["A", "B", "C", "D"], default=None,
+                    help="Drop prospects below this grade (e.g. 'C' drops D junk)")
+    ap.add_argument("--to-ledger", action="store_true",
+                    help="Also push A/B/C prospects into evaluation_ledger (billable on claim)")
+    ap.add_argument("--test-run", action="store_true", help="Don't save anything")
+    args = ap.parse_args()
+
+    print(f"Searching {args.niches} (last {args.days_back}d, min_intent={args.min_intent}, min_grade={args.min_grade})...", flush=True)
+    prospects = find_prospects(
+        args.niches, days_back=args.days_back,
+        min_intent=args.min_intent, min_grade=args.min_grade,
+    )
+    print(f"Found {len(prospects)} buyer-intent posts", flush=True)
     for p in prospects[:10]:
-        print(f"  [{p['intent_score']}] r/{p['subreddit']} | score={p['score']} | {p['title'][:60]}")
-        print(f"    author: {p['author']} | kw='{p['intent_keyword']}' | {p['url']}")
+        omega_str = f"ω={p.get('omega', 0):.2f}/{p.get('grade', '-')}" if p.get('omega') is not None else "ω=N/A"
+        print(f"  [{p['intent_score']}] r/{p['subreddit']} | {omega_str} | score={p['score']} | {p['title'][:60]}", flush=True)
+        print(f"    author: {p['author']} | kw='{p['intent_keyword']}' | {p['url']}", flush=True)
+    if args.test_run:
+        return
     saved = save_prospects(prospects)
-    print(f"Appended {saved} new prospects to {CACHE_FILE}")
+    print(f"Appended {saved} new prospects to {CACHE_FILE}", flush=True)
+    if args.to_ledger:
+        ledged = write_to_eval_ledger(prospects)
+        print(f"Pushed {ledged} billable (A/B/C) prospects to evaluation_ledger", flush=True)
 
 
 if __name__ == "__main__":
