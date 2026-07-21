@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empire OS — Lead Marketplace</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;510;590;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-black: #08090a;
+  --panel-dark: #0f1011;
+  --surface-3: #191a1b;
+  --surface-hover: #28282c;
+  --text-primary: #f7f8f8;
+  --text-secondary: #d0d6e0;
+  --text-tertiary: #8a8f98;
+  --text-quaternary: #62666d;
+  --brand-indigo: #5e6ad2;
+  --accent-violet: #7170ff;
+  --accent-hover: #828fff;
+  --green: #27a644;
+  --emerald: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --border-primary: #23252a;
+  --border-secondary: #34343a;
+  --border-subtle: rgba(255,255,255,0.05);
+  --border-standard: rgba(255,255,255,0.08);
+  --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.4);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg-black);
+  color: var(--text-primary);
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.5;
+  font-feature-settings: "cv01", "ss03";
+  letter-spacing: -0.005em;
+  min-height: 100vh;
+}
+
+/* Layout */
+.app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+.sidebar {
+  background: var(--panel-dark);
+  border-right: 1px solid var(--border-subtle);
+  padding: 20px 16px;
+  position: sticky; top: 0; height: 100vh;
+}
+
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; padding: 0 8px; }
+.brand-logo {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--brand-indigo), var(--accent-violet));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 13px; color: white;
+  letter-spacing: -0.02em;
+}
+.brand-name { font-weight: 510; font-size: 15px; letter-spacing: -0.015em; }
+
+.nav-section { margin-bottom: 20px; }
+.nav-label {
+  font-size: 11px; font-weight: 500; color: var(--text-quaternary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 0 8px; margin-bottom: 6px;
+}
+.nav-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 8px; border-radius: 6px;
+  color: var(--text-secondary); cursor: pointer;
+  font-size: 13.5px; font-weight: 400;
+  transition: background 0.1s, color 0.1s;
+}
+.nav-item:hover { background: var(--surface-3); color: var(--text-primary); }
+.nav-item.active { background: var(--surface-3); color: var(--text-primary); }
+.nav-badge {
+  font-size: 11px; padding: 1px 7px; border-radius: 10px;
+  background: var(--brand-indigo); color: white; font-weight: 500;
+}
+.nav-badge.gray { background: var(--surface-hover); color: var(--text-tertiary); }
+
+/* Main */
+.main { padding: 32px 40px; max-width: 1400px; }
+
+.page-header { margin-bottom: 28px; }
+.page-title { font-size: 24px; font-weight: 510; letter-spacing: -0.025em; margin-bottom: 4px; }
+.page-sub { color: var(--text-tertiary); font-size: 13px; }
+
+/* KPI cards */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+.kpi {
+  background: var(--panel-dark);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+}
+.kpi-label {
+  font-size: 11.5px; color: var(--text-tertiary); font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;
+}
+.kpi-value { font-size: 26px; font-weight: 510; letter-spacing: -0.02em; margin-bottom: 4px; }
+.kpi-delta { font-size: 12px; color: var(--green); font-weight: 500; }
+.kpi-delta.neg { color: var(--red); }
+
+/* Toolbar */
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.filters { display: flex; gap: 8px; align-items: center; }
+.search {
+  background: var(--panel-dark);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 7px 12px;
+  color: var(--text-primary); font-size: 13px;
+  font-family: inherit; outline: none;
+  width: 280px;
+}
+.search:focus { border-color: var(--brand-indigo); }
+.search::placeholder { color: var(--text-quaternary); }
+
+.chip {
+  background: var(--panel-dark);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 6px 10px; font-size: 12.5px;
+  color: var(--text-secondary); cursor: pointer;
+  font-family: inherit; font-weight: 500;
+}
+.chip:hover { border-color: var(--border-standard); color: var(--text-primary); }
+.chip.active { background: var(--surface-3); color: var(--text-primary); border-color: var(--border-secondary); }
+
+.api-key-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel-dark);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.api-key-row label { font-size: 12px; color: var(--text-tertiary); font-weight: 500; }
+.api-key-row input {
+  background: transparent; border: none; outline: none;
+  color: var(--text-primary); font-size: 12.5px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  flex: 1;
+}
+
+/* Table */
+.table-wrap {
+  background: var(--panel-dark);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 12px 16px; }
+thead th {
+  font-size: 11.5px; font-weight: 500; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  background: var(--surface-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+tbody tr {
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.1s;
+}
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface-3); }
+
+.grade {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px;
+  font-weight: 590; font-size: 13px;
+}
+.grade-A { background: rgba(16,185,129,0.15); color: var(--emerald); }
+.grade-B { background: rgba(94,106,210,0.18); color: var(--accent-violet); }
+.grade-C { background: rgba(245,158,11,0.15); color: var(--amber); }
+.grade-D { background: rgba(255,255,255,0.06); color: var(--text-quaternary); }
+
+.lead-niche { font-weight: 500; color: var(--text-primary); }
+.lead-meta { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+.lead-detail {
+  color: var(--text-secondary); font-size: 13px;
+  max-width: 360px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.omega-bar {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-tertiary);
+}
+.omega-track {
+  width: 80px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.08); overflow: hidden;
+}
+.omega-fill {
+  height: 100%; background: var(--accent-violet);
+  border-radius: 2px;
+}
+
+.btn {
+  padding: 6px 12px; border-radius: 6px; font-size: 12.5px;
+  font-family: inherit; font-weight: 500; cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.1s, border-color 0.1s;
+}
+.btn-primary {
+  background: var(--brand-indigo); color: white;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-ghost {
+  background: transparent; color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+.btn-ghost:hover { background: var(--surface-3); color: var(--text-primary); border-color: var(--border-standard); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Empty state */
+.empty {
+  text-align: center; padding: 60px 20px;
+  color: var(--text-tertiary);
+}
+.empty-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
+.empty-title { font-size: 15px; font-weight: 510; color: var(--text-secondary); margin-bottom: 6px; }
+.empty-sub { font-size: 13px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--surface-3); border: 1px solid var(--border-secondary);
+  border-radius: 8px; padding: 12px 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  font-size: 13px; color: var(--text-primary);
+  display: none; max-width: 360px;
+}
+.toast.show { display: block; animation: slideIn 0.2s ease; }
+.toast.ok { border-color: var(--emerald); }
+.toast.err { border-color: var(--red); }
+
+@keyframes slideIn {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px; background: var(--surface-3); padding: 1px 5px;
+  border-radius: 3px;
+}
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .main { padding: 20px; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">E</div>
+      <div class="brand-name">Empire OS</div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Marketplace</div>
+      <div class="nav-item active">Browse leads <span class="nav-badge" id="kpi-available">0</span></div>
+      <div class="nav-item">My claims <span class="nav-badge gray" id="kpi-claimed">0</span></div>
+      <div class="nav-item">Sold <span class="nav-badge gray" id="kpi-sold">0</span></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Account</div>
+      <div class="nav-item">API keys</div>
+      <div class="nav-item">Settlements</div>
+      <div class="nav-item">Wallet <span class="nav-badge gray">USDC</span></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Docs</div>
+      <div class="nav-item">/v1/evaluate</div>
+      <div class="nav-item">/v1/evaluate/claim</div>
+      <div class="nav-item">/v1/evaluate/lead-sold</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <h1 class="page-title">Lead Marketplace</h1>
+      <div class="page-sub">Pre-graded prospects from Empire Cortex. Claim with your API key, settle on conversion.</div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">Available</div>
+        <div class="kpi-value" id="kpi-total">—</div>
+        <div class="kpi-delta" id="kpi-total-delta">live</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Grade A</div>
+        <div class="kpi-value" id="kpi-a">—</div>
+        <div class="kpi-delta">premium</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Grade B</div>
+        <div class="kpi-value" id="kpi-b">—</div>
+        <div class="kpi-delta">strong</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Grade C</div>
+        <div class="kpi-value" id="kpi-c">—</div>
+        <div class="kpi-delta">billable</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filters">
+        <input class="search" id="search-input" placeholder="Search by niche, ref, detail..." />
+        <button class="chip active" data-grade="">All</button>
+        <button class="chip" data-grade="A">A</button>
+        <button class="chip" data-grade="B">B</button>
+        <button class="chip" data-grade="C">C</button>
+        <button class="chip" data-grade="D">D</button>
+        <button class="chip" id="niche-roofing">roofing</button>
+        <button class="chip" id="niche-hvac">hvac</button>
+      </div>
+      <div class="api-key-row">
+        <label>API Key</label>
+        <input id="api-key" placeholder="evk_..." />
+        <button class="btn btn-ghost" id="signup-btn">Sign up</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px">Grade</th>
+            <th>Niche</th>
+            <th>Detail</th>
+            <th style="width:140px">Omega</th>
+            <th style="width:160px">Lead Ref</th>
+            <th style="width:100px"></th>
+          </tr>
+        </thead>
+        <tbody id="leads-body">
+        </tbody>
+      </table>
+      <div class="empty" id="empty-state" style="display:none">
+        <div class="empty-icon">∅</div>
+        <div class="empty-title">No leads available</div>
+        <div class="empty-sub">Run the reddit scraper or wait for new cortex-scored prospects.</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const HUB = window.location.origin;
+const $ = (id) => document.getElementById(id);
+const toast = (msg, kind) => {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (kind || '');
+  setTimeout(() => t.className = 'toast', 4000);
+};
+
+let state = { leads: [], grade: '', niche: '', q: '' };
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  const key = $('api-key').value.trim();
+  if (key) headers['X-API-Key'] = key;
+  const r = await fetch(HUB + path, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+  if (!r.ok) {
+    const text = await r.text();
+    throw new Error(`${r.status}: ${text.slice(0, 200)}`);
+  }
+  return r.json();
+}
+
+async function loadLeads() {
+  const params = new URLSearchParams();
+  if (state.grade) params.set('grade', state.grade);
+  if (state.niche) params.set('niche', state.niche);
+  params.set('limit', '100');
+  try {
+    const data = await api('/v1/evaluate/available?' + params);
+    state.leads = data.items || [];
+    render();
+    updateKpis(data);
+  } catch (e) {
+    toast('Load failed: ' + e.message, 'err');
+  }
+}
+
+function updateKpis(data) {
+  $('kpi-total').textContent = data.count || 0;
+  $('kpi-available').textContent = data.count || 0;
+  const byGrade = { A: 0, B: 0, C: 0, D: 0 };
+  state.leads.forEach(l => { byGrade[l.grade] = (byGrade[l.grade] || 0) + 1; });
+  $('kpi-a').textContent = byGrade.A;
+  $('kpi-b').textContent = byGrade.B;
+  $('kpi-c').textContent = byGrade.C;
+}
+
+function render() {
+  const tbody = $('leads-body');
+  const empty = $('empty-state');
+  const q = state.q.toLowerCase();
+  const filtered = state.leads.filter(l => {
+    if (q && !(l.niche.toLowerCase().includes(q) || l.lead_ref.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  tbody.innerHTML = filtered.map(l => {
+    const omega = (l.omega || 0) * 100;
+    const width = Math.max(8, Math.min(100, omega));
+    const detail = l.lead_ref.replace(/^reddit_/, '').slice(0, 40);
+    return `<tr>
+      <td><span class="grade grade-${l.grade}">${l.grade}</span></td>
+      <td><div class="lead-niche">${l.niche}</div><div class="lead-meta">${l.created_at ? new Date(l.created_at).toLocaleDateString() : ''}</div></td>
+      <td><div class="lead-detail">${detail}</div></td>
+      <td><div class="omega-bar"><div class="omega-track"><div class="omega-fill" style="width:${width}%"></div></div><span>${omega.toFixed(0)}%</span></div></td>
+      <td><code>${l.lead_ref.slice(0, 22)}</code></td>
+      <td><button class="btn btn-primary" data-ref="${l.lead_ref}">Claim</button></td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('button[data-ref]').forEach(b => {
+    b.onclick = () => claim(b.dataset.ref, b);
+  });
+}
+
+async function claim(ref, btn) {
+  const key = $('api-key').value.trim();
+  if (!key) { toast('Add your X-API-Key first (Sign up to get one)', 'err'); return; }
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await api('/v1/evaluate/claim', { method: 'POST', body: JSON.stringify({ lead_ref: ref }) });
+    if (r.ok) {
+      toast(`Claimed ${ref} (${r.grade} / ${r.niche})`, 'ok');
+      loadLeads();
+    } else {
+      toast('Claim failed: ' + r.error, 'err');
+      btn.disabled = false; btn.textContent = 'Claim';
+    }
+  } catch (e) {
+    toast('Claim error: ' + e.message, 'err');
+    btn.disabled = false; btn.textContent = 'Claim';
+  }
+}
+
+async function signup() {
+  const name = prompt('Business name for your API key:');
+  if (!name) return;
+  try {
+    const r = await api('/v1/evaluate/signup', { method: 'POST', body: JSON.stringify({ name }) });
+    if (r.ok && r.api_key) {
+      $('api-key').value = r.api_key;
+      toast('API key issued. Saved locally.', 'ok');
+      localStorage.setItem('empire_api_key', r.api_key);
+    } else {
+      toast('Signup failed: ' + (r.error || 'unknown'), 'err');
+    }
+  } catch (e) { toast('Signup error: ' + e.message, 'err'); }
+}
+
+document.querySelectorAll('[data-grade]').forEach(c => {
+  c.onclick = () => {
+    document.querySelectorAll('[data-grade]').forEach(x => x.classList.remove('active'));
+    c.classList.add('active');
+    state.grade = c.dataset.grade;
+    loadLeads();
+  };
+});
+document.getElementById('niche-roofing').onclick = () => { state.niche = state.niche === 'roofing' ? '' : 'roofing'; loadLeads(); };
+document.getElementById('niche-hvac').onclick = () => { state.niche = state.niche === 'hvac' ? '' : 'hvac'; loadLeads(); };
+$('search-input').oninput = (e) => { state.q = e.target.value; render(); };
+$('signup-btn').onclick = signup;
+
+// Restore saved key
+const saved = localStorage.getItem('empire_api_key');
+if (saved) $('api-key').value = saved;
+
+loadLeads();
+setInterval(loadLeads, 30000);  // refresh every 30s
+</script>
+</body>
+</html>

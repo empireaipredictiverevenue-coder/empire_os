@@ -5267,6 +5267,15 @@ def dashboard_page():
     return DASHBOARD_HTML
 
 
+@app.get("/buyer-dashboard", response_class=HTMLResponse)
+def buyer_dashboard_page():
+    """Serve the buyer-facing lead marketplace dashboard."""
+    p = Path("/root/empire_os/empire_os/static/buyer-dashboard.html")
+    if not p.exists():
+        raise HTTPException(404, "buyer dashboard not built")
+    return HTMLResponse(p.read_text())
+
+
 @app.get("/v1/dashboard/data")
 def dashboard_data():
     """JSON data endpoint for the dashboard."""
