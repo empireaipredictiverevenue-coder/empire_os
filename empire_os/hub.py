@@ -2485,6 +2485,412 @@ def seo_recent(n: int = 20, kind: str = ""):
     return {"entries": rows[-n:], "count": len(rows)}
 
 
+# ── Free Audit Lead Magnet ─────────────────────────────────────────
+
+@app.post("/v1/audit/free")
+def free_audit(data: dict, background_tasks: BackgroundTasks):
+    """Free SEO audit — score + grade + PDF emailed.
+    
+    POST body:
+      url    str  required
+      email  str  required
+      niche  str  optional (default "general")
+      metro  str  optional
+    
+    Returns { ok, score, grade, checks, message }.
+    Background: generates PDF, emails link, stores lead in CRM.
+    """
+    url = (data.get("url") or "").strip().lower()
+    email = (data.get("email") or "").strip().lower()
+    niche = (data.get("niche") or "general").strip().lower()
+    metro = (data.get("metro") or "").strip().upper()
+    
+    if not url or not email:
+        raise HTTPException(400, "url and email required")
+    if not url.startswith("http"):
+        url = "https://" + url
+    
+    # Rate limit: max 3/email/hour
+    rate_key = f"audit_{email}"
+    now = time.time()
+    _audit_rates = getattr(free_audit, "_rates", {})
+    recent = [t for t in _audit_rates.get(rate_key, []) if now - t < 3600]
+    if len(recent) >= 3:
+        raise HTTPException(429, "max 3 audits/email/hour")
+    recent.append(now)
+    _audit_rates[rate_key] = recent
+    free_audit._rates = _audit_rates
+    
+    result = _run_quick_audit(url)
+    result["url"] = url
+    result["niche"] = niche
+    result["metro"] = metro
+    
+    background_tasks.add_task(_handle_audit_completion, result, email)
+    
+    return {
+        "ok": True,
+        "score": result["score"],
+        "grade": result["grade"],
+        "checks": result["checks"],
+        "message": f"Audit complete. Full PDF sent to {email}",
+    }
+
+
+def _run_quick_audit(url: str) -> dict:
+    """Lightweight on-page + tech scan. Graceful fallback on timeouts."""
+    import urllib.request, urllib.error, ssl, re
+    from urllib.parse import urlparse
+    
+    checks = {
+        "onpage": {"title_len": 0, "h1_count": 0, "meta_desc_len": 0,
+                    "has_schema": False, "schema_types": []},
+        "tech": {"ssl": True, "hsts": False, "sitemap_xml": False,
+                  "robots_txt": False, "gzip": False, "cache_control": False,
+                  "redirects": 0, "final_url": url},
+    }
+    
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        req = urllib.request.Request(url,
+            headers={"User-Agent": "Mozilla/5.0 EmpireAudit/1.0"})
+        resp = urllib.request.urlopen(req, timeout=15, context=ctx)
+        
+        html = resp.read().decode("utf-8", errors="replace")
+        hdrs = dict(resp.headers)
+        
+        checks["tech"]["ssl"] = url.startswith("https")
+        checks["tech"]["hsts"] = "strict-transport-security" in hdrs
+        checks["tech"]["gzip"] = hdrs.get("content-encoding", "") in ("gzip", "br", "deflate")
+        checks["tech"]["cache_control"] = "cache-control" in hdrs
+        checks["tech"]["final_url"] = resp.geturl() if hasattr(resp, "geturl") else url
+        
+        m = re.search(r"<title[^>]*>(.*?)</title>", html, re.I | re.S)
+        if m: checks["onpage"]["title_len"] = len(m.group(1).strip())
+        
+        h1s = re.findall(r"<h1[^>]*>(.*?)</h1>", html, re.I | re.S)
+        checks["onpage"]["h1_count"] = len(h1s)
+        
+        m = re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\'](.*?)["\']',
+                      html, re.I | re.S)
+        if not m:
+            m = re.search(r'<meta[^>]+content=["\'](.*?)["\'][^>]+name=["\']description["\']',
+                          html, re.I | re.S)
+        if m: checks["onpage"]["meta_desc_len"] = len(m.group(1).strip())
+        
+        checks["onpage"]["has_schema"] = "schema.org" in html.lower() or "application/ld+json" in html
+        
+        parsed = urlparse(url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        for path, key in [("/robots.txt", "robots_txt"), ("/sitemap.xml", "sitemap_xml")]:
+            try:
+                r = urllib.request.urlopen(f"{base}{path}", timeout=5, context=ctx)
+                checks["tech"][key] = r.status == 200
+            except Exception:
+                pass
+    except Exception:
+        pass
+    
+    # Score
+    s = 50
+    o, t = checks["onpage"], checks["tech"]
+    if o["title_len"] >= 30: s += 8
+    if o["h1_count"] == 1: s += 8
+    if 120 <= o["meta_desc_len"] <= 160: s += 8
+    if o["has_schema"]: s += 8
+    if t["ssl"]: s += 5
+    if t["hsts"]: s += 3
+    if t["gzip"]: s += 5
+    if t["cache_control"]: s += 3
+    if t["robots_txt"]: s += 3
+    if t["sitemap_xml"]: s += 4
+    
+    s = max(0, min(100, s))
+    grade = ("F" if s < 60 else
+             "D" if s < 70 else
+             "C" if s < 80 else
+             "B" if s < 90 else "A")
+    
+    return {"score": s, "grade": grade, "checks": checks}
+
+
+def _handle_audit_completion(result: dict, email: str):
+    """Background task: PDF + email + CRM."""
+    try:
+        from empire_os.audit_report import generate_pdf
+        import shutil
+        
+        pdf_path = generate_pdf(result)
+        pdf_dir = Path("/srv/aeo/audits")
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+        pdf_name = f"audit_{int(time.time())}.pdf"
+        shutil.copy2(pdf_path, str(pdf_dir / pdf_name))
+        dl_url = f"https://empire-ai.co.uk/audits/{pdf_name}"
+        
+        subject = (f"Your {result['niche'].title()} SEO Audit"
+                   f" — Score: {result['score']}/100 ({result['grade']})")
+        
+        lines = []
+        chk = result.get("checks", {})
+        op = chk.get("onpage", {})
+        tc = chk.get("tech", {})
+        if op:
+            lines.append(f"Title: {op.get('title_len', '?')} chars")
+            lines.append(f"H1 tags: {op.get('h1_count', '?')}")
+            lines.append(f"Meta desc: {op.get('meta_desc_len', '?')} chars")
+            lines.append(f"Schema: {'yes' if op.get('has_schema') else 'no'}")
+        if tc:
+            lines.append(f"HTTPS: {'yes' if tc.get('ssl') else 'no'}")
+            lines.append(f"Gzip: {'on' if tc.get('gzip') else 'off'}")
+            lines.append(f"robots.txt: {'ok' if tc.get('robots_txt') else 'missing'}")
+            lines.append(f"sitemap.xml: {'ok' if tc.get('sitemap_xml') else 'missing'}")
+        
+        body = (
+            f"Your SEO audit for {result['url']} is ready.\n\n"
+            f"Score: {result['score']}/100 (Grade {result['grade']})\n\n"
+            + "\n".join(lines) +
+            f"\n\nDownload full report: {dl_url}\n\n"
+            f"Want fixes? Start $10 trial: https://empire-ai.co.uk/buy-leads\n\n---\nEmpire AI\n"
+        )
+        
+        from empire_os.mail_sender import _send
+        _send(to=email, subject=subject, body=body)
+        
+        # Store lead in funnel DB via raw SQL
+        try:
+            db_path = os.environ.get("EMPIRE_DB_PATH", "empire_os.db")
+            b = SQLiteBackend(db_path)
+            b.execute(
+                "INSERT OR IGNORE INTO funnel_state (key_id, state_json, updated_at) "
+                "VALUES (?, ?, ?)",
+                (f"audit.{int(time.time())}.{email.split('@')[0]}",
+                 json.dumps({
+                     "url": result.get("url"), "email": email,
+                     "niche": result.get("niche"), "metro": result.get("metro"),
+                     "score": result.get("score"), "grade": result.get("grade"),
+                     "pdf_url": dl_url, "source": "free_audit", "stage": "discovered",
+                     "ts": datetime.now(timezone.utc).isoformat(),
+                 }),
+                 time.time())
+            )
+            b.commit()
+        except Exception:
+            pass
+        
+        os.unlink(pdf_path)
+    except Exception as e:
+        logger.warning("audit completion: %s", e)
+
+
+@app.get("/v1/audits/{audit_id}")
+def serve_audit_pdf(audit_id: str):
+    """Serve a generated audit PDF."""
+    pdf_path = Path("/srv/aeo/audits") / audit_id
+    if not pdf_path.exists() or not audit_id.endswith(".pdf"):
+        raise HTTPException(404, "audit not found")
+    return FileResponse(str(pdf_path), media_type="application/pdf",
+                        filename=audit_id)
+
+
+@app.get("/free-audit", response_class=HTMLResponse)
+async def free_audit_page():
+    """Serve the free audit lead capture landing page."""
+    try:
+        p = Path(__file__).parent / "templates" / "audit" / "landing.html"
+        return HTMLResponse(p.read_text(encoding="utf-8"))
+    except Exception:
+        return HTMLResponse(
+            "<h1>Free SEO Audit</h1><p>Temporarily unavailable.</p>")
+
+
+AUDIT_PRODUCTS = {
+    "deep": {"name": "Deep SEO Audit", "price_usd": 29, "price_usdc": 29},
+}
+
+
+@backend_required
+@app.post("/v1/audit/deep")
+def deep_audit_paid(data: dict, background_tasks: BackgroundTasks):
+    """Paid deep SEO audit — 25+ checks, premium PDF.
+    
+    POST body:
+      url    str  required
+      email  str  required
+      niche  str  optional
+      metro  str  optional
+      payment_ref  str  optional — if already paid, pass the reference
+    
+    Payment flow:
+      1. POST without payment_ref → returns { ok, invoice_id, payment_instructions }
+      2. Pay via USDC to vault wallet with memo = invoice_id
+      3. POST again with payment_ref=invoice_id → runs audit + emails PDF
+    
+    Or pass payment_ref=free for immediate run (internal/dev).
+    """
+    url = (data.get("url") or "").strip().lower()
+    email = (data.get("email") or "").strip().lower()
+    niche = (data.get("niche") or "general").strip().lower()
+    metro = (data.get("metro") or "").strip().upper()
+    payment_ref = (data.get("payment_ref") or "").strip()
+    
+    if not url or not email:
+        raise HTTPException(400, "url and email required")
+    if not url.startswith("http"):
+        url = "https://" + url
+    
+    if payment_ref:
+        # Verify payment
+        if payment_ref != "free":
+            paid = _check_payment(payment_ref, 29)
+            if not paid:
+                raise HTTPException(402, "payment required — see payment_instructions")
+        
+        # Run deep audit
+        from empire_os.deep_audit import run_deep_audit
+        result = run_deep_audit(url)
+        result["url"] = url
+        result["niche"] = niche
+        result["metro"] = metro
+        
+        background_tasks.add_task(_handle_deep_audit_delivery, result, email)
+        
+        return {
+            "ok": True,
+            "score": result["score"],
+            "grade": result["grade"],
+            "checks": result["checks"],
+            "issues": result.get("issues", []),
+            "fixes": result.get("fixes", []),
+            "message": f"Deep audit complete. Premium PDF sent to {email}",
+        }
+    else:
+        # Generate invoice
+        invoice_id = f"deep_{int(time.time())}_{email.split('@')[0]}"
+        vault = os.environ.get("SOLANA_VAULT_WALLET", "")
+        
+        # Persist invoice
+        try:
+            b = SQLiteBackend(os.environ.get("EMPIRE_DB_PATH", "empire_os.db"))
+            b.execute(
+                "INSERT OR REPLACE INTO funnel_state (key_id, state_json, updated_at) "
+                "VALUES (?, ?, ?)",
+                (f"invoice.{invoice_id}",
+                 json.dumps({"invoice_id": invoice_id, "url": url, "email": email,
+                              "amount_usdc": 29, "product": "deep_audit",
+                              "status": "pending", "ts": datetime.now(timezone.utc).isoformat()}),
+                 time.time())
+            )
+            b.commit()
+        except Exception:
+            pass
+        
+        payment_info = {
+            "invoice_id": invoice_id,
+            "amount_usdc": 29,
+            "amount_usd": 29,
+            "vault_wallet": vault if vault else "ComingSoon",
+            "memo": invoice_id,
+            "chain": "Solana",
+            "token": "USDC",
+        }
+        if vault:
+            payment_info["payment_url"] = (
+                f"https://solscan.io/account/{vault}?memo={invoice_id}#transfers"
+            )
+        
+        return {
+            "ok": True,
+            "requires_payment": True,
+            "payment": payment_info,
+            "message": f"Send {payment_info['amount_usdc']} USDC to vault wallet with memo {invoice_id}, then POST /v1/audit/deep with payment_ref={invoice_id}",
+        }
+
+
+def _check_payment(payment_ref: str, expected_amount: int) -> bool:
+    """Check if an invoice has been paid. Uses DB + optional RPC check."""
+    try:
+        b = SQLiteBackend(os.environ.get("EMPIRE_DB_PATH", "empire_os.db"))
+        rows = list(b.execute(
+            "SELECT state_json FROM funnel_state WHERE key_id = ?",
+            (f"invoice.{payment_ref}",)
+        ))
+        if rows:
+            state = json.loads(rows[0][0])
+            if state.get("status") == "paid":
+                return True
+    except Exception:
+        pass
+    
+    # Allow 'free' for testing
+    if payment_ref == "free":
+        return True
+    
+    return False
+
+
+def _handle_deep_audit_delivery(result: dict, email: str):
+    """Background: generate premium PDF, email to user."""
+    try:
+        from empire_os.deep_audit import generate_deep_pdf
+        import shutil
+        from empire_os.mail_sender import _send
+        
+        pdf_path = generate_deep_pdf(result)
+        pdf_dir = Path("/srv/aeo/audits")
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+        pdf_name = f"deep_{int(time.time())}.pdf"
+        shutil.copy2(pdf_path, str(pdf_dir / pdf_name))
+        dl_url = f"https://empire-ai.co.uk/audits/{pdf_name}"
+        
+        subject = (f"[Premium] {result['niche'].title()} Deep SEO Audit"
+                   f" — Score: {result['score']}/100 ({result['grade']})")
+        
+        chk = result.get("checks", {})
+        issues_list = result.get("issues", [])
+        fixes_list = result.get("fixes", [])
+        
+        body_parts = [
+            f"Your Deep SEO Audit for {result['url']} is ready.\n",
+            f"Score: {result['score']}/100 (Grade {result['grade']})\n",
+            f"Issues found: {len(issues_list)}\n",
+        ]
+        if issues_list:
+            body_parts.append("\nKey Issues:")
+            for i in issues_list[:5]:
+                body_parts.append(f"  - {i}")
+        if fixes_list:
+            body_parts.append("\nTop Fixes:")
+            for f in fixes_list:
+                body_parts.append(f"  - {f}")
+        
+        body_parts.extend([
+            f"\nDownload full premium report: {dl_url}",
+            "\nWant us to implement these fixes? Reply to this email.",
+            "\n---\nEmpire AI — empire-ai.co.uk\n",
+        ])
+        
+        body = "\n".join(body_parts)
+        _send(to=email, subject=subject, body=body)
+        
+        # Mark paid in DB
+        try:
+            b = SQLiteBackend(os.environ.get("EMPIRE_DB_PATH", "empire_os.db"))
+            b.execute(
+                "UPDATE funnel_state SET state_json = json_set(state_json, '$.audit_delivered', 1) "
+                "WHERE state_json LIKE ?",
+                (f'%{result["url"]}%',)
+            )
+            b.commit()
+        except Exception:
+            pass
+        
+        os.unlink(pdf_path)
+    except Exception as e:
+        logger.warning("deep audit delivery: %s", e)
+
+
 @app.post("/v1/mass-torts/direct")
 def mass_torts_direct(req: dict):
     """Mass-tort lead discovery intake.
@@ -7633,6 +8039,57 @@ async def evaluate_lead_sold(req: dict, request: Request):
     if not buyer or not lead_ref:
         raise HTTPException(400, "X-API-Key + lead_ref required")
     return {"ok": True, "authed": bool(key_buyer), **EP.record_conversion(buyer, lead_ref)}
+
+
+@app.post("/v1/evaluate/claim")
+def evaluate_claim(req: dict, request: Request):
+    """Claim a pre-graded prospect from the eval ledger.
+
+    Use after reddit_scraper (or any cortex-scored pipeline) pushes A/B/C
+    prospects into evaluation_ledger with status='awaiting_buyer'.
+    Auth: X-API-Key. Body: lead_ref (str,required).
+    Sets buyer + status='claimed' so a later /v1/evaluate/lead-sold call
+    charges CONVERT_USD. Idempotent per lead_ref; double-claims return error.
+    """
+    from empire_os.agents import evaluation_product as EP
+    key_buyer = EP.resolve_buyer(request.headers.get("x-api-key", ""))
+    buyer = key_buyer or (req.get("buyer") or "").strip()
+    lead_ref = (req.get("lead_ref") or "").strip()
+    if not buyer or not lead_ref:
+        raise HTTPException(400, "X-API-Key + lead_ref required")
+    return {"ok": True, "authed": bool(key_buyer), **EP.claim_prospect(buyer, lead_ref)}
+
+
+@app.get("/v1/evaluate/available")
+def evaluate_available(niche: str = "", grade: str = "", limit: int = 50):
+    """List unclaimed pre-graded prospects (awaiting_buyer status).
+
+    Optional filters: niche (substring), grade ('A'/'B'/'C'), limit (default 50).
+    Buyers call this to discover leads to claim, then POST /v1/evaluate/claim.
+    """
+    from empire_os.agents import evaluation_product as EP
+    c = EP._db()
+    try:
+        q = "SELECT lead_ref, niche, omega, grade, created_at FROM evaluation_ledger " \
+            "WHERE status='awaiting_buyer'"
+        params: list = []
+        if niche:
+            q += " AND niche LIKE ?"
+            params.append(f"%{niche}%")
+        if grade and grade in ("A", "B", "C", "D"):
+            q += " AND grade=?"
+            params.append(grade)
+        q += " ORDER BY omega DESC LIMIT ?"
+        params.append(int(limit))
+        rows = c.execute(q, params).fetchall()
+    finally:
+        c.close()
+    items = [
+        {"lead_ref": r[0], "niche": r[1], "omega": r[2],
+         "grade": r[3], "created_at": r[4]}
+        for r in rows
+    ]
+    return {"ok": True, "count": len(items), "items": items}
 
 
 @app.get("/v1/search")

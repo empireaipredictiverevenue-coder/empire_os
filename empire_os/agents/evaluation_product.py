@@ -466,6 +466,47 @@ def ledger_total(buyer: str = None) -> float:
         c.close()
 
 
+def claim_prospect(buyer: str, lead_ref: str) -> dict:
+    """Claim a pre-graded prospect (e.g. from reddit_scraper to-ledger push).
+
+    Updates the existing evaluation_ledger row's buyer + status='claimed'
+    so record_conversion() will charge CONVERT_USD when the buyer later
+    marks it sold. Idempotent: re-claiming the same lead_ref is a no-op.
+    """
+    if not buyer or not lead_ref:
+        return {"ok": False, "error": "buyer + lead_ref required"}
+    c = _db()
+    try:
+        row = c.execute(
+            "SELECT id, grade, status, niche FROM evaluation_ledger "
+            "WHERE lead_ref=? ORDER BY id DESC LIMIT 1",
+            (lead_ref,),
+        ).fetchone()
+        if not row:
+            return {"ok": False, "error": f"lead_ref {lead_ref!r} not found in ledger"}
+        lid, grade, status, niche = row
+        if status == "billed" or status == "billed_credit":
+            return {"ok": False, "error": f"already billed (status={status})",
+                    "grade": grade, "niche": niche}
+        if status == "claimed" and c.execute(
+            "SELECT buyer FROM evaluation_ledger WHERE id=?", (lid,)
+        ).fetchone()[0] != buyer:
+            return {"ok": False, "error": "already claimed by another buyer",
+                    "grade": grade, "niche": niche}
+        c.execute(
+            "UPDATE evaluation_ledger SET buyer=?, status='claimed' WHERE id=?",
+            (buyer, lid),
+        )
+        c.commit()
+        return {
+            "ok": True, "ledger_id": lid, "buyer": buyer, "lead_ref": lead_ref,
+            "grade": grade, "niche": niche, "status": "claimed",
+            "note": "use /v1/evaluate/conversion to mark sold and charge",
+        }
+    finally:
+        c.close()
+
+
 if __name__ == "__main__":
     # smoke test (no network, real omega scoring on a dummy lead)
     r = evaluate_lead("smoke_test", {"ref": "smoke_1", "details": "roof repair Queens NY", "name": "Joe", "phone": "5551234", "zip_code": "11368"})
