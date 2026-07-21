@@ -274,9 +274,9 @@ code {
 
     <div class="nav-section">
       <div class="nav-label">Marketplace</div>
-      <div class="nav-item active">Browse leads <span class="nav-badge" id="kpi-available">0</span></div>
-      <div class="nav-item">My claims <span class="nav-badge gray" id="kpi-claimed">0</span></div>
-      <div class="nav-item">Sold <span class="nav-badge gray" id="kpi-sold">0</span></div>
+      <div class="nav-item active" data-view="available">Browse leads <span class="nav-badge" id="kpi-available">0</span></div>
+      <div class="nav-item" data-view="claims">My claims <span class="nav-badge gray" id="kpi-claimed">0</span></div>
+      <div class="nav-item" data-view="sold">Sold <span class="nav-badge gray" id="kpi-sold">0</span></div>
     </div>
 
     <div class="nav-section">
@@ -377,7 +377,7 @@ const toast = (msg, kind) => {
   setTimeout(() => t.className = 'toast', 4000);
 };
 
-let state = { leads: [], grade: '', niche: '', q: '' };
+let state = { leads: [], claims: [], sold: [], view: 'available', grade: '', niche: '', q: '' };
 
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -399,10 +399,32 @@ async function loadLeads() {
   try {
     const data = await api('/v1/evaluate/available?' + params);
     state.leads = data.items || [];
-    render();
+    if (state.view === 'available') render();
     updateKpis(data);
   } catch (e) {
     toast('Load failed: ' + e.message, 'err');
+  }
+}
+
+async function loadClaims() {
+  try {
+    const [claims, sold] = await Promise.all([
+      api('/v1/evaluate/my-claims?status=claimed'),
+      api('/v1/evaluate/my-claims?status=sold'),
+    ]);
+    state.claims = claims.items || [];
+    state.sold = sold.items || [];
+    state.billedTotal = sold.billed_usd || 0;
+    $('kpi-claimed').textContent = state.claims.length;
+    $('kpi-sold').textContent = state.sold.length;
+    if (state.view === 'claims' || state.view === 'sold') render();
+  } catch (e) {
+    if (e.message.includes('401')) {
+      $('kpi-claimed').textContent = '—';
+      $('kpi-sold').textContent = '—';
+    } else {
+      toast('Claims load failed: ' + e.message, 'err');
+    }
   }
 }
 
@@ -420,31 +442,93 @@ function render() {
   const tbody = $('leads-body');
   const empty = $('empty-state');
   const q = state.q.toLowerCase();
-  const filtered = state.leads.filter(l => {
-    if (q && !(l.niche.toLowerCase().includes(q) || l.lead_ref.toLowerCase().includes(q))) return false;
+  let rows = [];
+  let emptyMsg = 'No leads available.';
+  let emptySub = 'Run the reddit scraper or wait for new cortex-scored prospects.';
+
+  if (state.view === 'available') {
+    rows = state.leads;
+  } else if (state.view === 'claims') {
+    rows = state.claims;
+    emptyMsg = 'No active claims.';
+    emptySub = 'Browse leads and claim one to see it here.';
+  } else if (state.view === 'sold') {
+    rows = state.sold;
+    emptyMsg = 'No sales yet.';
+    emptySub = 'Mark a claimed lead as sold to charge $2.50.';
+  }
+
+  const filtered = rows.filter(l => {
+    if (q && !(String(l.niche || '').toLowerCase().includes(q)
+            || String(l.lead_ref || '').toLowerCase().includes(q))) return false;
     return true;
   });
+
+  // Update page title + KPI card for current view
+  const titles = { available: 'Lead Marketplace', claims: 'My Claims', sold: 'Sold Leads' };
+  const subs = {
+    available: 'Pre-graded prospects from Empire Cortex. Claim with your API key, settle on conversion.',
+    claims: 'Prospects you have claimed. Mark them sold to trigger a $2.50 USDC charge.',
+    sold: 'Settled conversions. Settlement via Solana Pay memo.',
+  };
+  document.querySelector('.page-title').textContent = titles[state.view];
+  document.querySelector('.page-sub').textContent = subs[state.view];
+
   if (!filtered.length) {
     tbody.innerHTML = '';
     empty.style.display = 'block';
+    document.querySelector('.empty-title').textContent = emptyMsg;
+    document.querySelector('.empty-sub').textContent = emptySub;
     return;
   }
   empty.style.display = 'none';
-  tbody.innerHTML = filtered.map(l => {
-    const omega = (l.omega || 0) * 100;
-    const width = Math.max(8, Math.min(100, omega));
-    const detail = l.lead_ref.replace(/^reddit_/, '').slice(0, 40);
-    return `<tr>
-      <td><span class="grade grade-${l.grade}">${l.grade}</span></td>
-      <td><div class="lead-niche">${l.niche}</div><div class="lead-meta">${l.created_at ? new Date(l.created_at).toLocaleDateString() : ''}</div></td>
-      <td><div class="lead-detail">${detail}</div></td>
-      <td><div class="omega-bar"><div class="omega-track"><div class="omega-fill" style="width:${width}%"></div></div><span>${omega.toFixed(0)}%</span></div></td>
-      <td><code>${l.lead_ref.slice(0, 22)}</code></td>
-      <td><button class="btn btn-primary" data-ref="${l.lead_ref}">Claim</button></td>
-    </tr>`;
-  }).join('');
-  tbody.querySelectorAll('button[data-ref]').forEach(b => {
-    b.onclick = () => claim(b.dataset.ref, b);
+
+  if (state.view === 'available') {
+    tbody.innerHTML = filtered.map(l => {
+      const omega = (l.omega || 0) * 100;
+      const width = Math.max(8, Math.min(100, omega));
+      const detail = l.lead_ref.replace(/^reddit_/, '').slice(0, 40);
+      return `<tr>
+        <td><span class="grade grade-${l.grade}">${l.grade}</span></td>
+        <td><div class="lead-niche">${l.niche}</div><div class="lead-meta">${l.created_at ? new Date(l.created_at).toLocaleDateString() : ''}</div></td>
+        <td><div class="lead-detail">${detail}</div></td>
+        <td><div class="omega-bar"><div class="omega-track"><div class="omega-fill" style="width:${width}%"></div></div><span>${omega.toFixed(0)}%</span></div></td>
+        <td><code>${l.lead_ref.slice(0, 22)}</code></td>
+        <td><button class="btn btn-primary" data-ref="${l.lead_ref}" data-act="claim">Claim</button></td>
+      </tr>`;
+    }).join('');
+  } else if (state.view === 'claims') {
+    tbody.innerHTML = filtered.map(l => {
+      const omega = (l.omega || 0) * 100;
+      const width = Math.max(8, Math.min(100, omega));
+      return `<tr>
+        <td><span class="grade grade-${l.grade}">${l.grade}</span></td>
+        <td><div class="lead-niche">${l.niche}</div><div class="lead-meta">claimed ${l.created_at ? new Date(l.created_at).toLocaleDateString() : ''}</div></td>
+        <td><div class="lead-detail">${l.lead_ref}</div></td>
+        <td><div class="omega-bar"><div class="omega-track"><div class="omega-fill" style="width:${width}%"></div></div><span>${omega.toFixed(0)}%</span></div></td>
+        <td><code>${l.lead_ref.slice(0, 22)}</code></td>
+        <td><button class="btn btn-primary" data-ref="${l.lead_ref}" data-act="sell">Mark Sold</button></td>
+      </tr>`;
+    }).join('');
+  } else {
+    tbody.innerHTML = filtered.map(l => {
+      const omega = (l.omega || 0) * 100;
+      const width = Math.max(8, Math.min(100, omega));
+      const price = l.price_usd || 0;
+      return `<tr>
+        <td><span class="grade grade-${l.grade}">${l.grade}</span></td>
+        <td><div class="lead-niche">${l.niche}</div><div class="lead-meta">sold ${l.created_at ? new Date(l.created_at).toLocaleDateString() : ''}</div></td>
+        <td><div class="lead-detail">${l.lead_ref}</div></td>
+        <td><div class="omega-bar"><div class="omega-track"><div class="omega-fill" style="width:${width}%"></div></div><span>${omega.toFixed(0)}%</span></div></td>
+        <td><code style="color: var(--emerald)">$${price.toFixed(2)}</code></td>
+        <td><span style="color: var(--green); font-size: 12px; font-weight: 500;">${l.status}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  tbody.querySelectorAll('button[data-act]').forEach(b => {
+    const ref = b.dataset.ref, act = b.dataset.act;
+    b.onclick = () => act === 'claim' ? claim(ref, b) : sell(ref, b);
   });
 }
 
@@ -476,10 +560,41 @@ async function signup() {
       $('api-key').value = r.api_key;
       toast('API key issued. Saved locally.', 'ok');
       localStorage.setItem('empire_api_key', r.api_key);
+      loadClaims();
     } else {
       toast('Signup failed: ' + (r.error || 'unknown'), 'err');
     }
   } catch (e) { toast('Signup error: ' + e.message, 'err'); }
+}
+
+async function sell(ref, btn) {
+  const key = $('api-key').value.trim();
+  if (!key) { toast('Add your X-API-Key first', 'err'); return; }
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await api('/v1/evaluate/lead-sold', { method: 'POST', body: JSON.stringify({ lead_ref: ref }) });
+    if (r.ok && r.charged) {
+      const demand = r.demand_usd || r.amount_usd;
+      const memoTxt = r.pay_memo ? `\nMemo: ${r.pay_memo}` : '';
+      toast(`Charged $${r.amount_usd} (${r.grade}) — settle $${demand} via Solana Pay${memoTxt}`, 'ok');
+      loadClaims();
+    } else {
+      toast('Sell failed: ' + (r.reason || r.error || 'unknown'), 'err');
+      btn.disabled = false; btn.textContent = 'Mark Sold';
+    }
+  } catch (e) {
+    toast('Sell error: ' + e.message, 'err');
+    btn.disabled = false; btn.textContent = 'Mark Sold';
+  }
+}
+
+function switchView(view) {
+  state.view = view;
+  document.querySelectorAll('.nav-item[data-view]').forEach(n => {
+    n.classList.toggle('active', n.dataset.view === view);
+  });
+  if (view === 'available') loadLeads();
+  else loadClaims();
 }
 
 document.querySelectorAll('[data-grade]').forEach(c => {
@@ -494,13 +609,17 @@ document.getElementById('niche-roofing').onclick = () => { state.niche = state.n
 document.getElementById('niche-hvac').onclick = () => { state.niche = state.niche === 'hvac' ? '' : 'hvac'; loadLeads(); };
 $('search-input').oninput = (e) => { state.q = e.target.value; render(); };
 $('signup-btn').onclick = signup;
+document.querySelectorAll('.nav-item[data-view]').forEach(n => {
+  n.onclick = () => switchView(n.dataset.view);
+});
 
 // Restore saved key
 const saved = localStorage.getItem('empire_api_key');
 if (saved) $('api-key').value = saved;
 
 loadLeads();
-setInterval(loadLeads, 30000);  // refresh every 30s
+loadClaims();
+setInterval(() => { loadLeads(); loadClaims(); }, 30000);
 </script>
 </body>
 </html>

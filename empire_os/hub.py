@@ -8101,6 +8101,46 @@ def evaluate_available(niche: str = "", grade: str = "", limit: int = 50):
     return {"ok": True, "count": len(items), "items": items}
 
 
+@app.get("/v1/evaluate/my-claims")
+def evaluate_my_claims(request: Request, status: str = ""):
+    """List prospects claimed by the authenticated buyer.
+
+    Auth: X-API-Key (resolves to tenant_id).
+    Optional status filter: 'claimed' (default), 'sold' (any billed status),
+    or 'all' (every status). Sorted by claim id desc.
+    """
+    from empire_os.agents import evaluation_product as EP
+    buyer = EP.resolve_buyer(request.headers.get("x-api-key", ""))
+    if not buyer:
+        raise HTTPException(401, "X-API-Key required (or invalid)")
+    c = EP._db()
+    try:
+        q = ("SELECT id, lead_ref, niche, omega, grade, price_usd, "
+             "billing, status, created_at FROM evaluation_ledger "
+             "WHERE buyer=?")
+        params: list = [buyer]
+        if status == "claimed":
+            q += " AND status='claimed'"
+        elif status == "sold":
+            q += " AND status IN ('billed','billed_credit')"
+        elif status and status != "all":
+            params.append(status)
+            q += " AND status=?"
+        q += " ORDER BY id DESC LIMIT 200"
+        rows = c.execute(q, params).fetchall()
+    finally:
+        c.close()
+    keys = ("id", "lead_ref", "niche", "omega", "grade", "price_usd",
+            "billing", "status", "created_at")
+    items = [dict(zip(keys, r)) for r in rows]
+    billed_total = sum(i["price_usd"] for i in items
+                       if i["status"] in ("billed", "billed_credit"))
+    return {
+        "ok": True, "buyer": buyer, "count": len(items),
+        "billed_usd": round(billed_total, 2), "items": items,
+    }
+
+
 @app.get("/v1/search")
 def semantic_search(q: str = "", limit: int = 20):
     """Meaning-based lead catalog search via SQLite FTS5 (no external deps).
