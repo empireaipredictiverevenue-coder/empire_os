@@ -8069,6 +8069,23 @@ def evaluate_claim(req: dict, request: Request):
     return {"ok": True, "authed": bool(key_buyer), **EP.claim_prospect(buyer, lead_ref)}
 
 
+@app.post("/v1/evaluate/audit")
+def evaluate_audit(req: dict):
+    """Free audit lead-magnet — runs the audit pipeline on a URL.
+
+    Body: url (str,required), persist (bool, default true).
+    Returns {ok, url, score, grade, checks, lead_ref, billable}.
+    If persist=true (default), writes the result into evaluation_ledger
+    as 'awaiting_buyer' so a buyer can later claim + mark sold ($2.50).
+    """
+    from empire_os.agents import evaluation_product as EP
+    url = (req.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "url required")
+    persist = bool(req.get("persist", True))
+    return EP.score_audit(url, persist=persist)
+
+
 @app.get("/v1/evaluate/available")
 def evaluate_available(niche: str = "", grade: str = "", limit: int = 50):
     """List unclaimed pre-graded prospects (awaiting_buyer status).

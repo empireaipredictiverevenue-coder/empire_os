@@ -507,6 +507,79 @@ def claim_prospect(buyer: str, lead_ref: str) -> dict:
         c.close()
 
 
+def score_audit(url: str, persist: bool = True) -> dict:
+    """Run free audit lead-magnet on a URL.
+
+    Returns {url, score (0-100), grade (A/B/C/D/F), checks, audit_report_path}.
+    If persist=True, writes the audit as an awaiting_buyer row in
+    evaluation_ledger so a buyer can claim + later mark it sold (charge $2.50).
+
+    Falls back to a synthetic grade if the audit pipeline is unavailable
+    (e.g. in a slim container without claude-seo scripts).
+    """
+    import hashlib
+    url = (url or "").strip()
+    if not url:
+        return {"ok": False, "error": "url required"}
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    result: dict = {"ok": True, "url": url}
+    try:
+        from empire_os.audit_api import run_audit
+        audit = run_audit(url)
+        result.update({
+            "score": int(audit.get("score", 0)),
+            "grade": audit.get("grade", "F"),
+            "checks": audit.get("checks", {}),
+            "audited_at": audit.get("audited_at"),
+        })
+    except Exception as e:
+        # Fallback: lightweight header check (free, no external deps)
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "EmpireOS/1.0"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                body = r.read().decode("utf-8", "ignore")[:50000]
+                status = r.status
+            has_title = "<title>" in body.lower()
+            has_meta = 'name="description"' in body.lower()
+            has_h1 = "<h1" in body.lower()
+            has_ssl = url.startswith("https://")
+            score = sum([20 if has_ssl else 0, 20 if has_title else 0,
+                         20 if has_meta else 0, 20 if has_h1 else 0, 20 if status == 200 else 0])
+            grade = "A" if score >= 90 else "B" if score >= 80 else "C" if score >= 70 else "D" if score >= 60 else "F"
+            result.update({
+                "score": score, "grade": grade,
+                "checks": {"https": has_ssl, "title": has_title,
+                           "meta_description": has_meta, "h1": has_h1,
+                           "status": status},
+                "fallback": True,
+                "fallback_reason": str(e)[:100],
+            })
+        except Exception as e2:
+            return {"ok": False, "error": f"audit failed: {e2}"}
+
+    if persist:
+        url_hash = hashlib.sha1(url.encode("utf-8")).hexdigest()[:12]
+        lead_ref = f"audit_{url_hash}"
+        c = _db()
+        try:
+            c.execute(
+                "INSERT OR IGNORE INTO evaluation_ledger "
+                "(buyer, lead_ref, niche, omega, grade, price_usd, billing, status, created_at) "
+                "VALUES ('', ?, 'audit', ?, ?, 0.0, 'outcome', 'awaiting_buyer', ?)",
+                (lead_ref, round(result["score"] / 100.0, 4),
+                 result["grade"], time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+            )
+            c.commit()
+            result["lead_ref"] = lead_ref
+            result["billable"] = result["grade"] in ("A", "B", "C")
+        finally:
+            c.close()
+    return result
+
+
 if __name__ == "__main__":
     # smoke test (no network, real omega scoring on a dummy lead)
     r = evaluate_lead("smoke_test", {"ref": "smoke_1", "details": "roof repair Queens NY", "name": "Joe", "phone": "5551234", "zip_code": "11368"})
