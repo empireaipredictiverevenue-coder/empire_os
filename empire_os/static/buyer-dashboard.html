@@ -333,6 +333,7 @@ code {
         <button class="chip" data-grade="D">D</button>
         <button class="chip" id="niche-roofing">roofing</button>
         <button class="chip" id="niche-hvac">hvac</button>
+        <button class="chip" id="audit-btn">+ Audit URL</button>
       </div>
       <div class="api-key-row">
         <label>API Key</label>
@@ -597,6 +598,27 @@ function switchView(view) {
   else loadClaims();
 }
 
+async function runAudit() {
+  const url = prompt('Enter URL to audit (free lead magnet):');
+  if (!url) return;
+  const btn = $('audit-btn');
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await api('/v1/evaluate/audit', { method: 'POST', body: JSON.stringify({ url, persist: true }) });
+    if (r.ok) {
+      const billable = r.billable ? ' (billable)' : '';
+      toast(`Audit: ${r.score}/100 ${r.grade}${billable} — saved as ${r.lead_ref}`, 'ok');
+      loadLeads();
+    } else {
+      toast('Audit failed: ' + (r.error || 'unknown'), 'err');
+    }
+  } catch (e) {
+    toast('Audit error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '+ Audit URL';
+  }
+}
+
 document.querySelectorAll('[data-grade]').forEach(c => {
   c.onclick = () => {
     document.querySelectorAll('[data-grade]').forEach(x => x.classList.remove('active'));
@@ -609,6 +631,7 @@ document.getElementById('niche-roofing').onclick = () => { state.niche = state.n
 document.getElementById('niche-hvac').onclick = () => { state.niche = state.niche === 'hvac' ? '' : 'hvac'; loadLeads(); };
 $('search-input').oninput = (e) => { state.q = e.target.value; render(); };
 $('signup-btn').onclick = signup;
+$('audit-btn').onclick = runAudit;
 document.querySelectorAll('.nav-item[data-view]').forEach(n => {
   n.onclick = () => switchView(n.dataset.view);
 });
