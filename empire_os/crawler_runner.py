@@ -31,12 +31,14 @@ from pathlib import Path
 import requests
 
 from empire_os.lead_sources import list_sources, run_all_sources, _import_sources
+from empire_os.cortex_scorer import get_niche_score
+from empire_os.ai_intelligence import process_lead
 
 
 # ── hub URL: point at the REAL container hub (not the dead 8081 stub) ──
 HUB_URL = os.environ.get(
     "EMPIRE_HUB_URL",
-    "http://10.118.155.218:8000/v1/leads/direct",
+    "http://10.118.155.218:8081/v1/leads/direct",
 )
 LOG_PATH = Path("/root/feedback/crawler_runs.jsonl")
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -63,15 +65,42 @@ def log(level, msg, **fields):
     print(json.dumps(event))
 
 
-def post_lead(payload: dict) -> tuple[bool, dict]:
-    try:
-        r = requests.post(HUB_URL, json=payload, timeout=15)
-        return r.status_code == 200, r.json() if r.status_code == 200 else {}
-    except Exception as e:
-        return False, {"error": str(e)}
+def post_lead(payload: dict, max_retries: int = 5) -> tuple[bool, dict]:
+    """
+    POST a lead with retry loop for SQLite-lock contention.
+    Hub returns 500 'database is locked' ~60% of the time during peak writes.
+    Retry with exponential backoff: 0.5s, 1s, 2s, 4s, 8s (max 15s).
+    """
+    import time as _t
+    for attempt in range(max_retries):
+        try:
+            r = requests.post(HUB_URL, json=payload, timeout=15)
+            if r.status_code == 200:
+                return True, r.json()
+            # 500 'database is locked' → retry
+            if r.status_code == 500 and "locked" in r.text.lower():
+                wait = 0.5 * (2 ** attempt)
+                if attempt < max_retries - 1:
+                    log("RETRY", "hub_locked",
+                        attempt=attempt + 1, max=max_retries,
+                        wait_s=round(wait, 1),
+                        status=r.status_code)
+                    _t.sleep(wait)
+                    continue
+            return False, r.json() if r.headers.get("content-type", "").startswith("application/json") else {"error": r.text[:200], "status": r.status_code}
+        except Exception as e:
+            wait = 0.5 * (2 ** attempt)
+            if attempt < max_retries - 1:
+                log("RETRY", "post_exception",
+                    attempt=attempt + 1, error=str(e)[:80],
+                    wait_s=round(wait, 1))
+                _t.sleep(wait)
+                continue
+            return False, {"error": str(e)}
+    return False, {"error": "max_retries_exhausted"}
 
 
-def run_source_safe(src, metro, dry_run):
+def run_source_safe(src, metro, dry_run, args):
     """Run one source with error isolation.  Never propagates exceptions."""
     if src.tier != "real":
         log("SKIP", "source_not_real", source=src.name, tier=src.tier)
@@ -98,6 +127,15 @@ def run_source_safe(src, metro, dry_run):
     try:
         for cand in src.run_fn(metro=metro):
             candidates += 1
+            
+            # Cortex intake enrichment: boost lead_score based on niche/metro intelligence
+            try:
+                boosted = get_niche_score(cand.niche, cand.metro)
+                if boosted > cand.lead_score:
+                    cand.lead_score = boosted
+            except Exception:
+                pass  # scoring is best-effort
+            
             if dry_run:
                 log("DRYRUN", "candidate",
                     source=cand.source, niche=cand.niche,
@@ -109,6 +147,32 @@ def run_source_safe(src, metro, dry_run):
                 log("POSTED", "lead",
                     source=cand.source, db_id=resp.get("db_id"),
                     lane=resp.get("lane_id"), name=cand.name[:40])
+                
+                # AI Intelligence pipeline: enrich + score + tier + match
+                try:
+                    ai_result = process_lead(
+                        domain=cand.name,
+                        metro=cand.metro or args.metro or "UNKNOWN",
+                        content=cand.details or f"{cand.name} {cand.niche} {cand.metro}",
+                    )
+                    tier = ai_result.get("omega_tier", {}).get("tier", "unknown")
+                    strategy = ai_result.get("routing", {}).get("strategy", "unknown")
+                    priority = ai_result.get("routing", {}).get("priority", 0)
+                    expected_rev = ai_result.get("revenue_prediction", {}).get("expected_revenue", 0)
+                    log("AI", "intelligence_complete",
+                        lead_id=resp.get("db_id"),
+                        tier=tier, strategy=strategy,
+                        priority=priority, expected_rev=expected_rev)
+                    
+                    # Summary log every 10 leads
+                    if posted % 10 == 0:
+                        log("SUMMARY", "crawler_progress",
+                            source=src.name, posted=posted,
+                            latest_tier=tier, latest_rev=expected_rev,
+                            latest_strategy=strategy)
+                except Exception as e:
+                    log("ERROR", "ai_intelligence_failed",
+                        source=cand.source, error=str(e))
             else:
                 errors += 1
                 log("ERROR", "lead_post_failed",
@@ -158,7 +222,7 @@ def main():
         sources = list_sources()
 
     for src in sources:
-        c, p, e = run_source_safe(src, args.metro, args.dry_run)
+        c, p, e = run_source_safe(src, args.metro, args.dry_run, args)
         candidates_total += c
         posted_total += p
         errored_total += e

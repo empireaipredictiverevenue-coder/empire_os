@@ -355,43 +355,54 @@ def push_to_a2a(enriched: EnrichedLead) -> bool:
 # ──────────────────────────────────────────────────────────────────────
 # MAIN ENTRYPOINTS
 # ──────────────────────────────────────────────────────────────────────
-def enrich_lead(cand: Any) -> EnrichedLead:
-    """Enrich a single LeadCandidate with all intelligence."""
+def enrich_lead(cand: Any, quick: bool = False) -> EnrichedLead:
+    """Enrich a single LeadCandidate with all intelligence. quick=True skips HTTP calls (buyer_matches)."""
     niche = (cand.niche or "").strip()
     metro = (cand.metro or "").strip()
-    
+
     # Cortex
     cortex_score, cortex_tier = get_cortex_score(niche, metro)
-    
+
     # Synthetic Intelligence
     synth = analyze_lead_synthetic(
         cand.name, cand.email, niche, metro, cand.details, cand.source
     )
-    
+
     # Boost lead_score with cortex
     boosted_score = max(cand.lead_score, cortex_score)
-    
+
     # Omega
     omega_tier, omega_conf = get_omega_tier(
         niche, metro, boosted_score, cortex_score, synth["fit"]
     )
-    
+
     # AEO priority
-    # Quick lead count for this niche/metro
     lead_count = 0
-    try:
-        with sqlite3.connect(DB) as c:
-            lead_count = c.execute(
-                "SELECT COUNT(*) FROM si_buyer_outreach WHERE niche=? AND metro=?",
-                (niche, metro)
-            ).fetchone()[0]
-    except Exception:
-        pass
-    
+    if not quick:
+        try:
+            with sqlite3.connect(DB, timeout=10) as c:
+                lead_count = c.execute(
+                    "SELECT COUNT(*) FROM si_buyer_outreach WHERE niche=? AND metro=?",
+                    (niche, metro)
+                ).fetchone()[0]
+        except Exception:
+            pass
+
     aeo_prio = get_aeo_priority(niche, metro, cortex_score, lead_count, omega_tier)
-    
-    # A2A buyer matches
-    buyer_matches = find_buyer_matches(niche, metro, omega_tier) if omega_tier in ("S","A","B") else []
+
+    # A2A buyer matches — only when not quick (HTTP call)
+    buyer_matches = [] if quick else find_buyer_matches(niche, metro, omega_tier)
+    if quick and omega_tier in ("S", "A", "B"):
+        # lightweight: just count from local DB, no HTTP
+        try:
+            with sqlite3.connect(DB, timeout=10) as c:
+                cnt = c.execute(
+                    "SELECT COUNT(*) FROM si_buyer_outreach WHERE niche=? AND metro=? AND payout_per_lead > 0",
+                    (niche, metro)
+                ).fetchone()[0]
+                buyer_matches = [{"buyer_count": cnt, "quick": True}]
+        except Exception:
+            pass
     
     return EnrichedLead(
         name=cand.name,
@@ -462,43 +473,89 @@ def persist_enriched(enriched: EnrichedLead) -> bool:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# DAEMON: Continuous enrichment loop
+# DAEMON: Continuous enrichment loop (lane_leads target)
 # ──────────────────────────────────────────────────────────────────────
-def enrichment_daemon(interval: int = 300, batch_size: int = 100):
-    """Run continuously: pull unenriched leads, enrich, persist, push A2A."""
-    print(f"[intelligence] enrichment daemon starting, interval={interval}s")
+def enrichment_cycle(batch_size: int = 500) -> dict:
+    """
+    One enrichment cycle against lane_leads.
+    Returns summary dict {considered, enriched, skipped, errors}.
+    Skips leads that already have predicted_value_usd set (don't double-work).
+    """
+    summary = {"considered": 0, "enriched": 0, "skipped": 0, "errors": 0, "started": time.time()}
+    try:
+        with sqlite3.connect(DB, timeout=60) as c:
+            c.execute("PRAGMA journal_mode=WAL")
+            c.execute("PRAGMA busy_timeout=60000")
+            # target lane_leads where omega_tier is tier-B+ AND not yet value-enriched
+            rows = c.execute("""
+                SELECT id, niche, metro, omega_tier, omega_score, icp_fit_score,
+                       street, city, state, zip
+                FROM lane_leads
+                WHERE omega_tier IN ('gold','silver','tier_a','tier_b','S','A','B','C')
+                  AND (buyer_id IS NULL OR buyer_id='')
+                  AND (predicted_value_usd IS NULL OR predicted_value_usd = 0)
+                ORDER BY id DESC LIMIT ?
+            """, (batch_size,)).fetchall()
+            summary["considered"] = len(rows)
+
+            for row in rows:
+                lid, niche, metro, tier, score, icp_fit, street, city, state, zipc = row
+                try:
+                    # Build a fake candidate for analysis (lane_leads has no
+                    # email/phone/name -- those live on si_buyer_outreach,
+                    # but for enrichment we just need niche/metro/details)
+                    details_parts = [niche or '', metro or '', street or '', city or '', state or '']
+                    details = " ".join([p for p in details_parts if p])
+                    cand = type("Cand", (), {
+                        "name": f"lane_lead_{lid}",
+                        "email": "",
+                        "phone": "",
+                        "niche": niche or "",
+                        "metro": metro or "",
+                        "state": state or "",
+                        "details": details,
+                        "source": "lane_leads",
+                        "lead_score": score or 50,
+                        "url": "",
+                        "raw": {},
+                    })()
+                    enriched = enrich_lead(cand, quick=True)
+
+                    # UPDATE lane_leads with intelligence layer results
+                    c.execute("""
+                        UPDATE lane_leads SET
+                            cortex_score = COALESCE(NULLIF(?, 0), cortex_score),
+                            aeo_priority = COALESCE(NULLIF(?, 0), aeo_priority)
+                        WHERE id = ?
+                    """, (
+                        enriched.cortex_score,
+                        enriched.aeo_priority,
+                        lid,
+                    ))
+                    summary["enriched"] += 1
+                except Exception as e:
+                    summary["errors"] += 1
+                    print(f"  enrich error on {lid}: {e}")
+            c.commit()
+    except Exception as e:
+        print(f"[enrichment_cycle] error: {e}")
+        summary["errors"] += 1
+    summary["elapsed"] = round(time.time() - summary["started"], 2)
+    return summary
+
+
+def enrichment_daemon(interval: int = 900, batch_size: int = 500):
+    """
+    Run continuously: enrich unenriched lane_leads on a loop.
+    Note: A2A push is handled by a2a_buyer_marketplace.py on its own timer.
+    """
+    print(f"[intelligence] enrichment daemon starting, interval={interval}s, batch={batch_size}")
     while True:
         try:
-            with sqlite3.connect(DB) as c:
-                rows = c.execute("""
-                    SELECT prospect_id, name, email, phone, niche, metro, state,
-                           details, source, lead_score, url, raw
-                    FROM si_buyer_outreach
-                    WHERE enriched_at IS NULL 
-                       OR enriched_at < datetime('now', '-24 hours')
-                       OR cortex_score IS NULL
-                    ORDER BY lead_score DESC
-                    LIMIT ?
-                """, (batch_size,)).fetchall()
-            
-            for row in rows:
-                cand = type("Cand", (), {
-                    "name": row[1], "email": row[2], "phone": row[3],
-                    "niche": row[4], "metro": row[5], "state": row[6],
-                    "details": row[7], "source": row[8], "lead_score": row[9],
-                    "url": row[10], "raw": json.loads(row[11]) if row[11] else {}
-                })()
-                
-                enriched = enrich_lead(cand)
-                persist_enriched(enriched)
-                
-                if enriched.omega_tier in ("S", "A", "B"):
-                    push_to_a2a(enriched)
-                    print(f"  A2A pushed: {enriched.name} ({enriched.omega_tier})")
-        
+            s = enrichment_cycle(batch_size)
+            print(f"[intelligence] cycle: considered={s['considered']} enriched={s['enriched']} errors={s['errors']} elapsed={s['elapsed']}s")
         except Exception as e:
             print(f"[enrichment_daemon] error: {e}")
-        
         time.sleep(interval)
 
 
@@ -506,6 +563,10 @@ if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "daemon":
         enrichment_daemon()
+    elif len(sys.argv) > 1 and sys.argv[1] == "once":
+        # one-shot for systemd timer
+        s = enrichment_cycle(int(sys.argv[2]) if len(sys.argv) > 2 else 500)
+        print(json.dumps(s, indent=2))
     elif len(sys.argv) > 1 and sys.argv[1] == "aeo":
         print(json.dumps(auto_aeo(), indent=2))
     elif len(sys.argv) > 1 and sys.argv[1] == "test":
