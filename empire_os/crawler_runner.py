@@ -144,9 +144,35 @@ def run_source_safe(src, metro, dry_run, args):
             ok, resp = post_lead(cand.to_intake_payload())
             if ok:
                 posted += 1
+                # Fetch predicted $ value (set by intelligence_enrich.timer or earlier cycles).
+                # Cheap query — lane_leads.id == resp.db_id after POST.
+                payout_usd = 0.0
+                predicted_usd = 0.0
+                buyer_count = 0
+                cortex_score = 0
+                try:
+                    import sqlite3 as _sq
+                    with _sq.connect("/root/empire_os/empire_os.db", timeout=5) as _c:
+                        row = _c.execute(
+                            "SELECT payout_usd, predicted_value_usd, buyer_count, cortex_score FROM lane_leads WHERE id=?",
+                            (resp.get("db_id"),)
+                        ).fetchone()
+                        if row:
+                            payout_usd = row[0] or 0.0
+                            predicted_usd = row[1] or 0.0
+                            buyer_count = row[2] or 0
+                            cortex_score = row[3] or 0
+                except Exception:
+                    pass  # best-effort; DB might be locked
                 log("POSTED", "lead",
                     source=cand.source, db_id=resp.get("db_id"),
-                    lane=resp.get("lane_id"), name=cand.name[:40])
+                    lane=resp.get("lane_id"), name=cand.name[:40],
+                    score=resp.get("score"), tier=resp.get("tier"),
+                    cortex=cortex_score,
+                    payout_usd=round(payout_usd, 2),
+                    predicted_value_usd=round(predicted_usd, 2),
+                    buyer_count=buyer_count,
+                    status=resp.get("status"))
                 
                 # AI Intelligence pipeline: enrich + score + tier + match
                 try:
