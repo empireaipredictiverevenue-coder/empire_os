@@ -22,26 +22,44 @@ from typing import Optional
 
 logger = logging.getLogger("mail_sender")
 
-# ── Auto-load .env so RESEND_API_KEY is available ─────────────────────
+# Load /root/empire_os/.env if not already in process env (so standalone
+# mail_sender_runner.py works without systemd-passed env). Mirrors hub.py.
 _ENV_PATH = Path("/root/empire_os/.env")
 if _ENV_PATH.exists():
     try:
-        for _ln in _ENV_PATH.read_text().splitlines():
-            _ln = _ln.strip()
-            if not _ln or _ln.startswith("#") or "=" not in _ln:
+        for _line in _ENV_PATH.read_text().splitlines():
+            _line = _line.strip()
+            if not _line or _line.startswith("#") or "=" not in _line:
                 continue
-            _k, _v = _ln.split("=", 1)
+            _k, _v = _line.split("=", 1)
             _k = _k.strip()
-            _v = _v.strip().strip('"').strip("'")
+            _v = _v.strip()
             if _k and _k not in os.environ:
                 os.environ[_k] = _v
     except Exception:
         pass
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+# Email providers from environment
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+SENDGRID_FROM = os.environ.get("SENDGRID_FROM", "Empire OS <founder@empire-ai.co.uk>")
 MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "")
 MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "sandbox.mailgun.org")
 FROM_EMAIL = os.environ.get("EMPIRE_FROM", "Empire OS <founder@empire-ai.co.uk>")
+# Pluggable SMTP relay (e.g. ImproveMX free tier) — kills the Resend bill.
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "resend").lower()
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.improvmx.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+SMTP_TLS = os.environ.get("SMTP_TLS", "1") == "1"
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+FEEDBACK_DIR = Path("/root/feedback")
+POLL_INTERVAL = 30
+MAX_PER_CYCLE = 10
+
+# Daily send quota
+DAILY_SEND_LIMIT = int(os.environ.get("EMAIL_SEND_DAILY_LIMIT", "100"))
 # Pluggable SMTP relay (e.g. ImproveMX free tier) — kills the Resend bill.
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "resend").lower()
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.improvmx.com")
@@ -121,59 +139,102 @@ def _real_smtp_cfg() -> bool:
 
 
 def _send(to: str, subject: str, body: str) -> dict:
-    """Dispatch with failover: direct MX -> Resend -> SMTP relay.
+    """Dispatch through selected provider, then managed fallbacks.
 
-    direct MX needs no creds (sovereign delivery). Used first when backend
-    is 'direct' OR when SMTP creds are placeholder/missing. Resend then
-    SMTP relay are the managed fallbacks.
+    EMAIL_BACKEND=resend makes Resend primary. EMAIL_BACKEND=sendgrid makes
+    SendGrid primary. EMAIL_BACKEND=mailgun makes Mailgun SMTP/HTTP primary.
+    EMAIL_BACKEND=direct uses direct MX when port 25 is reachable.
+    Remaining configured providers are fallbacks.
     """
-    # direct MX first (no creds, sovereign) — but only when backend explicitly
-    # 'direct' AND port 25 reachable. In cloud hosts port 25 is usually
-    # blocked, so we skip fast to avoid 30s hangs.
+    last_result = {"ok": False, "error": "no usable backend"}
+
+    if EMAIL_BACKEND == "sendgrid" and SENDGRID_API_KEY:
+        last_result = _sendgrid_send(to, subject, body)
+        if last_result.get("ok"):
+            return last_result
+
+    if EMAIL_BACKEND == "resend" and RESEND_API_KEY:
+        last_result = _resend_send(to, subject, body)
+        if last_result.get("ok"):
+            return last_result
+
     if EMAIL_BACKEND == "direct" and _port25_open():
-        try:
-            r = _direct_mx_send(to, subject, body)
-            if r.get("ok"):
-                return r
-        except Exception as e:
-            r = {"ok": False, "error": f"direct_mx: {e}"}
-    # Mailgun SMTP first (most reliable, proper auth, works after activation)
-    if _real_smtp_cfg() and SMTP_HOST == "smtp.mailgun.org":
-        r = _smtp_send(to, subject, body)
-        if r.get("ok"):
-            return r
-    # Mailgun HTTP API (free tier, fallback if SMTP fails)
-    if MAILGUN_API_KEY:
-        r = _mailgun_send(to, subject, body)
-        if r.get("ok"):
-            return r
-    # Resend (SPF-aligned, fallback if Mailgun not configured)
-    if RESEND_API_KEY:
-        r = _resend_send(to, subject, body)
-        if r.get("ok"):
-            return r
-    # Brevo API fallback (bypasses SMTP IP block, no port 25 needed)
+        last_result = _direct_mx_send(to, subject, body)
+        if last_result.get("ok"):
+            return last_result
+
+    if EMAIL_BACKEND == "mailgun":
+        if _real_smtp_cfg() and SMTP_HOST == "smtp.mailgun.org":
+            last_result = _smtp_send(to, subject, body)
+            if last_result.get("ok"):
+                return last_result
+        if MAILGUN_API_KEY:
+            last_result = _mailgun_send(to, subject, body)
+            if last_result.get("ok"):
+                return last_result
+
+    if SENDGRID_API_KEY and EMAIL_BACKEND != "sendgrid":
+        last_result = _sendgrid_send(to, subject, body)
+        if last_result.get("ok"):
+            return last_result
+
+    if RESEND_API_KEY and EMAIL_BACKEND != "resend":
+        last_result = _resend_send(to, subject, body)
+        if last_result.get("ok"):
+            return last_result
+
+    if MAILGUN_API_KEY and EMAIL_BACKEND != "mailgun":
+        last_result = _mailgun_send(to, subject, body)
+        if last_result.get("ok"):
+            return last_result
+
     if BREVO_API_KEY:
-        r = _brevo_api_send(to, subject, body)
-        if r.get("ok"):
-            return r
-    # Resend (if key present)
-    if RESEND_API_KEY:
-        r = _resend_send(to, subject, body)
-        if r.get("ok"):
-            return r
-        err = str(r.get("error", ""))
-        if "429" in err or "quota" in err.lower() or "daily" in err.lower():
-            if _real_smtp_cfg():
-                s = _smtp_send(to, subject, body)
-                if s.get("ok"):
-                    s["fallback"] = "smtp"
-                return s
-            return r
-    # SMTP relay (real creds only)
+        last_result = _brevo_api_send(to, subject, body)
+        if last_result.get("ok"):
+            return last_result
+
     if _real_smtp_cfg():
         return _smtp_send(to, subject, body)
-    return r if "r" in dir() else {"ok": False, "error": "no usable backend"}
+
+    return last_result
+
+
+def _sendgrid_send(to: str, subject: str, body: str) -> dict:
+    """Send one email via SendGrid v3 API. Returns {ok, message_id?, error?}.
+
+    Uses SENDGRID_FROM (verified single sender) as the From address. The
+    EMPIRE_FROM env var (founder@empire-ai.co.uk) is set as reply-to so
+    replies land in the founder inbox.
+    """
+    if not SENDGRID_API_KEY:
+        return {"ok": False, "error": "SENDGRID_API_KEY not set"}
+    payload = json.dumps({
+        "personalizations": [{"to": [{"email": to}]}],
+        "from": {"email": SENDGRID_FROM},
+        "reply_to": {"email": "founder@empire-ai.co.uk"},
+        "subject": subject,
+        "content": [{"type": "text/plain", "value": body}],
+    }).encode()
+    try:
+        req = urllib.request.Request(
+            "https://api.sendgrid.com/v3/mail/send",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            msg_id = r.headers.get("X-Message-Id", "")
+            return {"ok": True, "msg_id": f"sendgrid:{msg_id}"}
+    except urllib.error.HTTPError as e:
+        try:
+            detail = e.read().decode()[:200]
+        except Exception:
+            detail = ""
+        return {"ok": False, "error": f"HTTP {e.code}: {detail}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
 
 
 def _resend_send(to: str, subject: str, body: str) -> dict:
