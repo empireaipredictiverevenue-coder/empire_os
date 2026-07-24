@@ -78,6 +78,7 @@ from empire_os.agi_closer import AgiCloserAgent
 from empire_os.agi_loop import AgiLoop
 from empire_os.agent_core import OllamaClient, OpenRouterClient
 from empire_os.dashboard import DASHBOARD_HTML, build_dashboard_data
+from empire_os.dashboard_v2 import router as dashboard_v2_router, init_dashboard
 from empire_os.telegram_bot import send_brief, send_message, send_alert
 from empire_os.waterfall import build_default_waterfall
 from empire_os.auto_pilot import AutoPilot
@@ -578,6 +579,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Include dashboard v2 router
+app.include_router(dashboard_v2_router)
+
+# Initialize dashboard backend reference
+init_dashboard(backend)
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
