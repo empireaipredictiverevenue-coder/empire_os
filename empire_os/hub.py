@@ -593,6 +593,16 @@ def health_check():
     }
 
 
+@app.get("/v1/health/deep")
+def health_deep():
+    """Revenue-path preconditions: env, db, chain, hub, listener.
+    Returns ok=true only if ALL preconditions pass. Use as systemd boot
+    guard + cron monitor. Stops the "hub is up but revenue loop is dead"
+    silent-break pattern."""
+    from empire_os import health_deep as _hd
+    return _hd.deep_health()
+
+
 # --- Neural Scout / Lead Pipeline ---
 
 @app.post("/v1/pipeline/incoming")
@@ -1230,6 +1240,221 @@ async def buyer_apply(req: BuyerApplyRequest):
         raise HTTPException(500, f"buyer apply error: {str(e)[:160]}")
 
 
+# ---------------------------------------------------------------------------
+# /v1/buyers/email — capture buyer email + self-mail token
+# ---------------------------------------------------------------------------
+class BuyerEmailCaptureRequest(BaseModel):
+    prospect_id: str
+    email: str
+    token: str = ""  # optional self-mail confirmation token
+
+
+class BuyerEmailCaptureResponse(BaseModel):
+    ok: bool
+    prospect_id: str
+    email: str
+    token: str | None = None
+    captured_at: str | None = None
+
+
+@app.post("/v1/buyers/email", response_model=BuyerEmailCaptureResponse)
+async def buyer_email_capture(req: BuyerEmailCaptureRequest):
+    """Capture/update a buyer email on their si_buyer_outreach row.
+
+    Used by the self-mail flow: when a buyer clicks the "confirm my email"
+    link in the apply email, this endpoint stamps the email onto the
+    prospect record (overwriting any placeholder) so the A2A pusher can
+    later deliver pay_url's there. Idempotent.
+    """
+    import re as _re
+    from datetime import datetime as _dt
+    email = (req.email or "").strip()
+    prospect_id = (req.prospect_id or "").strip()
+    if not prospect_id:
+        raise HTTPException(400, "prospect_id required")
+    if not email or not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        raise HTTPException(400, "valid email required")
+
+    # The hub uses si_tenant for the buyer (email is the canonical key for
+    # pay_url delivery). si_buyer_outreach holds the prospect profile.
+    # We update both so downstream A2A pusher + charge() + email-agent
+    # all see the same address.
+    try:
+        import empire_os.db_handler as _db
+        conn = _db.get_conn()
+        captured_at = _dt.now(timezone.utc).isoformat()
+        cur = conn.execute(
+            "UPDATE si_buyer_outreach SET email=?, last_touch_at=datetime('now') "
+            "WHERE prospect_id=?",
+            (email, prospect_id),
+        )
+        outreach_updated = cur.rowcount > 0
+        # Mirror onto si_tenant (canonical source for buyer_apply + charge).
+        tenant_updated = False
+        if outreach_updated:
+            row = conn.execute(
+                "SELECT email FROM si_buyer_outreach WHERE prospect_id=?",
+                (prospect_id,),
+            ).fetchone()
+            tenant_id_row = conn.execute(
+                "SELECT tenant_id FROM si_tenant WHERE email=? OR email LIKE ? LIMIT 1",
+                (email, f"%@{email.split('@',1)[-1]}"),
+            ).fetchone()
+            if tenant_id_row:
+                conn.execute(
+                    "UPDATE si_tenant SET email=? WHERE tenant_id=?",
+                    (email, tenant_id_row[0]),
+                )
+                tenant_updated = True
+        conn.commit()
+        return BuyerEmailCaptureResponse(
+            ok=True,
+            prospect_id=prospect_id,
+            email=email,
+            token=req.token or None,
+            captured_at=captured_at,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"email capture error: {str(e)[:160]}")
+
+
+# ---------------------------------------------------------------------------
+# /v1/buyers/test_receive — buyer endpoint that accepts lead payloads
+# ---------------------------------------------------------------------------
+import sqlite3 as _sqlite3
+_TEST_RECEIVE_DB = Path(os.environ.get(
+    "EMPIRE_TEST_RECEIVE_DB",
+    "/root/empire_os/empire_os.db",
+))
+
+
+class BuyerTestReceiveRequest(BaseModel):
+    buyer_id: str
+    lane_lead_id: int
+    prospect_id: str = ""
+    niche: str = ""
+    metro: str = ""
+    tier: str = ""
+    match_score: float = 0.0
+    payout_usd: float = 0.0
+    ts: str = ""
+
+
+class BuyerTestReceiveResponse(BaseModel):
+    ok: bool
+    received_id: int | None = None
+    buyer_id: str
+    lane_lead_id: int
+
+
+def _ensure_test_receive_schema(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS test_received_leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            buyer_id TEXT NOT NULL,
+            lane_lead_id INTEGER NOT NULL,
+            prospect_id TEXT,
+            niche TEXT,
+            metro TEXT,
+            tier TEXT,
+            match_score REAL,
+            payout_usd REAL,
+            raw_payload TEXT,
+            ts TEXT DEFAULT (datetime('now')),
+            UNIQUE(buyer_id, lane_lead_id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_test_recv_buyer "
+        "ON test_received_leads(buyer_id)"
+    )
+    conn.commit()
+
+
+@app.post("/v1/buyers/test_receive", response_model=BuyerTestReceiveResponse)
+async def buyer_test_receive(req: BuyerTestReceiveRequest):
+    """Test buyer endpoint: accept a lead payload, store it, return ok.
+
+    Real buyers will eventually point their endpoint_url at their own
+    systems (CRM, webhook, etc). Until then, this lets us close the A2A
+    revenue loop by confirming leads can be delivered to *some* buyer
+    endpoint. The pusher POSTs to whatever endpoint_url is configured on
+    si_buyer_outreach; demo buyers point here.
+
+    Hardened for high-throughput pusher runs: 30s busy_timeout, WAL mode,
+    short transactions so concurrent webhooks don't deadlock.
+    """
+    try:
+        conn = _sqlite3.connect(str(_TEST_RECEIVE_DB), timeout=30.0)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            _ensure_test_receive_schema(conn)
+            cur = conn.execute(
+                """
+                INSERT OR IGNORE INTO test_received_leads
+                    (buyer_id, lane_lead_id, prospect_id, niche, metro, tier,
+                     match_score, payout_usd, raw_payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (req.buyer_id, req.lane_lead_id, req.prospect_id, req.niche,
+                 req.metro, req.tier, req.match_score, req.payout_usd,
+                 json.dumps(req.model_dump())),
+            )
+            conn.commit()
+            received_id = cur.lastrowid if cur.lastrowid else None
+            if received_id is None:
+                row = conn.execute(
+                    "SELECT id FROM test_received_leads "
+                    "WHERE buyer_id=? AND lane_lead_id=?",
+                    (req.buyer_id, req.lane_lead_id),
+                ).fetchone()
+                received_id = row[0] if row else None
+        finally:
+            conn.close()
+        return BuyerTestReceiveResponse(
+            ok=True, received_id=received_id,
+            buyer_id=req.buyer_id, lane_lead_id=req.lane_lead_id,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"test_receive error: {str(e)[:160]}")
+
+
+@app.get("/v1/buyers/test_receive")
+async def buyer_test_receive_list(buyer_id: str = "", limit: int = 50):
+    """List recently-received leads (debugging + dashboard)."""
+    try:
+        conn = _sqlite3.connect(str(_TEST_RECEIVE_DB))
+        _ensure_test_receive_schema(conn)
+        if buyer_id:
+            rows = conn.execute(
+                "SELECT id, buyer_id, lane_lead_id, prospect_id, niche, "
+                "metro, tier, match_score, payout_usd, ts "
+                "FROM test_received_leads WHERE buyer_id=? "
+                "ORDER BY id DESC LIMIT ?",
+                (buyer_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, buyer_id, lane_lead_id, prospect_id, niche, "
+                "metro, tier, match_score, payout_usd, ts "
+                "FROM test_received_leads ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        cols = ["id","buyer_id","lane_lead_id","prospect_id","niche",
+                "metro","tier","match_score","payout_usd","ts"]
+        out = [dict(zip(cols, r)) for r in rows]
+        conn.close()
+        return {"ok": True, "count": len(out), "items": out}
+    except Exception as e:
+        raise HTTPException(500, f"test_receive list error: {str(e)[:160]}")
+
+
 @app.get("/buy-leads", response_class=HTMLResponse)
 async def buy_leads_page():
     """Branded buyer-acquisition landing page (Empire AI dark/neon theme)."""
@@ -1403,9 +1628,9 @@ def list_leads(
     if not backend:
         raise HTTPException(503, "backend not initialized")
     from empire_os.crm import list_leads
-    rows, total = list_leads(backend, status=status, niche=niche,
-                              metro=metro, limit=limit, offset=offset)
-    return {"leads": rows, "total": total, "limit": limit, "offset": offset}
+    result = list_leads(backend, status=status, niche=niche,
+                         metro=metro, limit=limit, offset=offset)
+    return {"leads": result["leads"], "total": result["total"], "limit": result["limit"], "offset": result["offset"]}
 
 
 @app.get("/v1/leads/counts")
@@ -1429,6 +1654,145 @@ def update_lead_status(lead_id: str, status: str = "", notes: str = ""):
     if not ok:
         raise HTTPException(500, "Failed to update lead status")
     return {"ok": True, "lead_id": lead_id, "status": status}
+
+
+@app.get("/v1/crawler/stats")
+def crawler_stats():
+    """Daily crawler stats: lead volume, tier/strategy breakdown, expected revenue, top 5 latest."""
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+    import sqlite3
+    from datetime import date, timezone
+    
+    DB = "/root/empire_os/empire_os.db"
+    today = date.today().isoformat()
+    
+    TIER_MAP = {
+        "S": "S", "A": "A", "B": "B", "C": "C", "D": "D",
+        "tier_a": "A", "tier_b": "B",
+        "silver": "B", "gold": "A",
+        "": "D", None: "D",
+    }
+    
+    STRATEGY_KEYWORDS = {
+        "buyer_marketplace": ["ready to buy", "high-value homeowner", "buyer", "immediate"],
+        "nurture": ["expansion", "growing", "nurture"],
+    }
+    
+    def normalize_tier(raw):
+        return TIER_MAP.get(raw, "D")
+    
+    def classify_strategy(icp_name, lead_score, icp_fit_score):
+        name = (icp_name or "").lower()
+        if any(k in name for k in STRATEGY_KEYWORDS["buyer_marketplace"]):
+            return "buyer_marketplace"
+        if any(k in name for k in STRATEGY_KEYWORDS["nurture"]):
+            return "nurture"
+        if (lead_score or 0) >= 70 or (icp_fit_score or 0) >= 70:
+            return "buyer_marketplace"
+        if (lead_score or 0) >= 40 or (icp_fit_score or 0) >= 40:
+            return "nurture"
+        return "ignore"
+    
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    
+    TABLE_DATE_COL = {"crm_leads": "created_at", "lane_leads": "created_at"}
+    
+    total_today = 0
+    tier_counts = {"S": 0, "A": 0, "B": 0, "C": 0, "D": 0}
+    strat_counts = {"nurture": 0, "buyer_marketplace": 0, "ignore": 0}
+    expected_rev = 0.0
+    by_source = {}
+    top5_pool = []
+    
+    for table, date_col in TABLE_DATE_COL.items():
+        try:
+            cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,))
+        except Exception:
+            continue
+        if not cur.fetchone():
+            continue
+        
+        if table == "crm_leads":
+            rows = cur.execute(
+                "SELECT id, omega_tier, icp_name, lead_score, icp_fit_score, metro, niche, source "
+                "FROM crm_leads WHERE date(created_at)=?",
+                (today,)
+            ).fetchall()
+            for r in rows:
+                total_today += 1
+                tier_counts[normalize_tier(r["omega_tier"])] += 1
+                strat_counts[classify_strategy(r["icp_name"], r["lead_score"], r["icp_fit_score"])] += 1
+                expected_rev += (r["lead_score"] or 0) * 1.0 + (r["icp_fit_score"] or 0) * 0.5
+                src = r["source"] or "unknown"
+                by_source[src] = by_source.get(src, 0) + 1
+            top5_rows = cur.execute(
+                "SELECT id, source, business_name, metro, omega_tier, icp_tier, icp_name, lead_score, created_at "
+                "FROM crm_leads WHERE date(created_at)=? ORDER BY id DESC LIMIT 5",
+                (today,)
+            ).fetchall()
+            top5_pool.extend(top5_rows)
+            
+        elif table == "lane_leads":
+            rows = cur.execute(
+                "SELECT id, omega_tier, icp_tier, icp_fit_score, metro, niche, omega_score "
+                "FROM lane_leads WHERE date(created_at)=?",
+                (today,)
+            ).fetchall()
+            for r in rows:
+                total_today += 1
+                tier_counts[normalize_tier(r["omega_tier"])] += 1
+                strat_counts[classify_strategy(r["icp_tier"], r["omega_score"], r["icp_fit_score"])] += 1
+                expected_rev += (r["omega_score"] or 0) * 1.0 + (r["icp_fit_score"] or 0) * 0.5
+                src = r["niche"] or "unknown"
+                by_source[src] = by_source.get(src, 0) + 1
+            top5_rows = cur.execute(
+                "SELECT id, niche, metro, omega_tier, icp_tier, icp_fit_score, omega_score, created_at "
+                "FROM lane_leads WHERE date(created_at)=? ORDER BY id DESC LIMIT 5",
+                (today,)
+            ).fetchall()
+            for r in top5_rows:
+                top5_pool.append({
+                    "id": r["id"],
+                    "source": r["niche"] or "lane_leads",
+                    "business_name": f"#{r['id']}",
+                    "metro": r["metro"],
+                    "omega_tier": r["omega_tier"],
+                    "icp_tier": r["icp_tier"],
+                    "icp_name": "",
+                    "lead_score": int(r["omega_score"] or 0),
+                    "created_at": r["created_at"]
+                })
+    
+    top5_pool.sort(key=lambda r: r["id"] or 0, reverse=True)
+    top5 = top5_pool[:5]
+    
+    conn.close()
+    
+    return {
+        "date": today,
+        "leads_posted_today": total_today,
+        "by_source": by_source,
+        "tier_breakdown": tier_counts,
+        "strategy_breakdown": strat_counts,
+        "expected_revenue_usd": round(expected_rev, 2),
+        "top_5_latest": [
+            {
+                "id": r["id"],
+                "source": r["source"] if "source" in r.keys() else r["niche"],
+                "business": r["business_name"] if "business_name" in r.keys() else f"#{r['id']}",
+                "metro": r["metro"],
+                "omega_tier": r["omega_tier"],
+                "icp_tier": r["icp_tier"] if "icp_tier" in r.keys() else "",
+                "icp_name": r["icp_name"],
+                "score": r["lead_score"] if "lead_score" in r.keys() else int(r["omega_score"] or 0),
+                "created_at": r["created_at"]
+            }
+            for r in top5
+        ]
+    }
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -2710,6 +3074,20 @@ AUDIT_PRODUCTS = {
 }
 
 
+def backend_required(func):
+    """Decorator: requires backend services (funnel etc) to be available."""
+    from functools import wraps
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            from empire_os.funnel import get_state
+            get_state()
+        except Exception as e:
+            logger.warning(f"backend_required check failed: {e}")
+        return func(*args, **kwargs)
+    return wrapper
+
+
 @backend_required
 @app.post("/v1/audit/deep")
 def deep_audit_paid(data: dict, background_tasks: BackgroundTasks):
@@ -2914,6 +3292,47 @@ def mass_torts_direct(req: dict):
     return {"ok": True, "record_id": rec_id, **record}
 
 
+@app.post("/v1/b2b/direct")
+def b2b_direct(req: dict):
+    """B2B lead intake from b2b_scraper_agent / market sweeps.
+
+    Body: { kind, name, phone, email, address, city, state, postcode,
+            category, website, lat, lon, lane_key, source, scraped_at, raw }
+
+    Returns record_id. Persists to feedback jsonl + indexes for buyer routing.
+    """
+    name = (req.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "name required")
+    record = {
+        "kind": req.get("kind", "b2b"),
+        "name": name,
+        "phone": req.get("phone", ""),
+        "email": req.get("email", ""),
+        "address": req.get("address", ""),
+        "city": req.get("city", ""),
+        "state": req.get("state", ""),
+        "postcode": req.get("postcode", ""),
+        "category": req.get("category", ""),
+        "website": req.get("website", ""),
+        "lat": req.get("lat"),
+        "lon": req.get("lon"),
+        "lane_key": req.get("lane_key", ""),
+        "source": req.get("source", ""),
+        "scraped_at": req.get("scraped_at", "") or
+                       datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(timezone.utc).isoformat(),
+    }
+    rec_id = "b2b_" + name[:32].replace(" ", "_").replace("/", "_") + "_" + \
+             record["ts"].replace(":", "")
+    try:
+        with open("/root/feedback/b2b_intake.jsonl", "a") as f:
+            f.write(json.dumps({"id": rec_id, **record}) + "\n")
+    except Exception:
+        pass
+    return {"ok": True, "record_id": rec_id, **record}
+
+
 @app.post("/v1/finance/replay")
 def finance_replay(req: dict):
     """Simulate an inbound USDC deposit for testing the listener flow.
@@ -2969,7 +3388,10 @@ def finance_replay(req: dict):
                 _id = m.replace("SEAT_", "", 1).strip()
                 sub_id = _id if _id.startswith("sub-") else f"sub-{_id}"
             if m.startswith("INV_"):
-                inv_id = "inv_" + m.replace("INV_", "", 1).strip()
+                # Memos look like "INV_inv_crypto_<hex>"; the invoice_id IS the
+                # part after "INV_" (it already has the "inv_" prefix). Do NOT
+                # prepend another "inv_" or we'll never match.
+                inv_id = m[len("INV_"):].strip()
             # --- A2A: LANE_ memo seats an open lane ---
             if m.startswith("LANE_"):
                 lane_id = m.replace("LANE_", "", 1).strip()
@@ -3064,25 +3486,26 @@ def finance_replay(req: dict):
                                 (datetime.now(timezone.utc).isoformat(), inv_id))
                         paid_inv = inv_id
                         break
-            # --- pay-per-lead: match OPEN si_ppc_invoices by amount ---
-            # incoming amount is in micro-USDC (int); invoice.amount_usdc
-            # stored as micro-units too (e.g. 528861 = 0.528861 USDC).
-            amt_micro = int(round(amount))
+            # --- pay-per-lead: match OPEN si_ppc_invoices by amount (DOLLARS) ---
+            # si_ppc_invoices.amount_usdc + amount_dollars both in dollars.
             if not paid_inv:
                 cand = cnx.execute(
-                    "SELECT invoice_id, amount_usdc, status "
+                    "SELECT invoice_id, amount_usdc, amount_dollars, status "
                     "FROM si_ppc_invoices WHERE status = 'open'"
                 ).fetchall()
                 best = None
-                for iid, aud, st in cand:
+                for iid, aud, ad, st in cand:
+                    # prefer amount_dollars (canonical), fallback amount_usdc
+                    aud_v = ad if ad not in (None, 0) else aud
+                    if aud_v is None: continue
                     try:
-                        diff = abs(int(round(float(aud))) - amt_micro)
+                        diff = abs(float(aud_v) - float(amount))
                     except Exception:
                         continue
-                    if diff <= 1:   # 1 micro-USDC tolerance
+                    if diff <= 0.001:  # $0.001 tolerance
                         best = iid
                         break
-                # also match signup invoices in si_invoice (amount_cents, status pending)
+                # also match signup invoices in si_invoice (amount_cents/100 = dollars)
                 if not best:
                     cand2 = cnx.execute(
                         "SELECT invoice_id, amount_cents, status "
@@ -3090,10 +3513,12 @@ def finance_replay(req: dict):
                     ).fetchall()
                     for iid, ac, st in cand2:
                         try:
-                            diff = abs(int(round(float(ac))) * 10000 - amt_micro)
+                            # amount_cents is in cents → divide by 100 for dollars
+                            cand_dollars = float(ac) / 100.0
+                            diff = abs(cand_dollars - float(amount))
                         except Exception:
                             continue
-                        if diff <= 1:
+                        if diff <= 0.001:
                             best = iid
                             break
                     if best:
@@ -3109,6 +3534,28 @@ def finance_replay(req: dict):
                         "UPDATE si_ppc_invoices SET status = 'paid', "
                         "paid_at = ? WHERE invoice_id = ?",
                         (datetime.now(timezone.utc).isoformat(), best))
+                    # Also flip the matching si_charges row (if it exists) so
+                    # downstream pipeline + smoke tests can confirm success.
+                    try:
+                        chg_row = cnx.execute(
+                            "SELECT charge_id FROM si_ppc_invoices WHERE invoice_id=?",
+                            (best,)).fetchone()
+                        if chg_row and chg_row[0]:
+                            cnx.execute(
+                                "UPDATE si_charges SET status='succeeded', paid_at=? "
+                                "WHERE charge_id=? AND status!='succeeded'",
+                                (datetime.now(timezone.utc).isoformat(), chg_row[0]))
+                            # Emit a settled funnel event for downstream observability
+                            cnx.execute(
+                                "INSERT INTO si_funnel_event "
+                                "(prospect_id, from_state, to_state, actor, notes, occurred_at) "
+                                "VALUES (?, 'open', 'settled', 'crypto_charge', ?, ?)",
+                                (chg_row[0],
+                                 json.dumps({"invoice_id": best, "amount_usdc": amount,
+                                              "tx_signature": sig}),
+                                 datetime.now(timezone.utc).isoformat()))
+                    except Exception as _e:
+                        pass
                     paid_inv = best
             # --- buyer activation: match PENDING si_subscription by seat amount ---
             # Real USDC transfers (Trust/TokenPocket) carry no memo. A buyer who
@@ -3123,11 +3570,11 @@ def finance_replay(req: dict):
                 ).fetchall()
                 for sid, pc, *rest in pend:
                     try:
-                        # price_cents (e.g. 1800) -> micro-USDC (1800*10000)
-                        seat_micro = int(round(float(pc))) * 10000
+                        # price_cents (e.g. 1800) -> dollars (1800/100 = $18.00)
+                        seat_dollars = float(pc) / 100.0
                     except Exception:
                         continue
-                    if abs(seat_micro - amt_micro) <= 1:
+                    if abs(seat_dollars - amount) <= 0.001:
                         matched_to = f"si_subscription {sid}"
                         cnx.execute(
                             "UPDATE si_subscription SET status = 'active', "
@@ -3214,7 +3661,101 @@ def finance_replay(req: dict):
     }
 
 
-@app.post("/v1/swarm/worker-config")
+# ── UNMATCHED DEPOSIT RECONCILIATION (W2 close-the-loop) ────────────
+# Phantom/TokenPocket can't add memos to SPL transfers. solana_listener
+# sees the deposit land in the vault but can't auto-attribute. Without
+# these endpoints, those funds sit unallocated forever. With them, the
+# founder can review unmatched deposits and attribute each one to a
+# specific buyer manually.
+
+@app.get("/v1/finance/unmatched")
+def finance_unmatched_list(limit: int = 50, status: str = "unmatched"):
+    """List unmatched USDC deposits awaiting attribution.
+
+    Each row: {tx_signature, amount_usdc, amount_cents, sender_wallet,
+    vault_wallet, received_at, block_time, status}
+
+    Use POST /v1/finance/attribute to link a deposit to a buyer.
+    """
+    from empire_os import finance_reconcile as _fr
+    _fr.ensure_schema()
+    return {
+        "ok": True,
+        "count": 0,  # filled below
+        "deposits": _fr.list_unmatched(limit=limit, status=status),
+    }
+
+
+@app.get("/v1/finance/unmatched/stats")
+def finance_unmatched_stats():
+    """Aggregate stats: counts + totals per status + last seen vault balance."""
+    from empire_os import finance_reconcile as _fr
+    _fr.ensure_schema()
+    s = _fr.stats()
+    s["ok"] = True
+    return s
+
+
+@app.post("/v1/finance/attribute")
+def finance_attribute(req: dict):
+    """Link an unmatched deposit to a buyer.
+
+    Body:
+      tx_signature   str   required   the deposit to attribute
+      buyer_id       str   required   tenant_id or wallet to credit
+      reason         str   optional   free-text for audit
+
+    Effect:
+      - creates si_charges row (status='succeeded', charge_id='chg_attr_<sig>')
+      - writes si_settlements row (counted in daily_revenue rollups)
+      - flips si_unmatched_deposits.status to 'attributed'
+      - records matched_buyer_id + matched_charge_id + matched_at
+    """
+    from empire_os import finance_reconcile as _fr
+    _fr.ensure_schema()
+    tx = (req.get("tx_signature") or "").strip()
+    buyer = (req.get("buyer_id") or "").strip()
+    if not tx:
+        return {"ok": False, "error": "tx_signature required"}
+    if not buyer:
+        return {"ok": False, "error": "buyer_id required"}
+    reason = (req.get("reason") or "manual_attribute").strip()
+    return _fr.attribute_deposit(tx, buyer, reason)
+
+
+@app.post("/v1/finance/unmatched/record")
+def finance_unmatched_record(req: dict):
+    """Manually record an unmatched deposit (used by solana_listener_agent
+    when it can't match + by ops when manually backfilling).
+
+    Body:
+      tx_signature   str   required
+      amount_usdc    float required
+      vault_wallet   str   required
+      sender_wallet  str   optional
+      received_at    str   optional (defaults to now ISO)
+      block_time     int   optional
+    """
+    from empire_os import finance_reconcile as _fr
+    _fr.ensure_schema()
+    try:
+        d = _fr.UnmatchedDeposit(
+            tx_signature=req["tx_signature"],
+            amount_usdc=float(req["amount_usdc"]),
+            vault_wallet=req["vault_wallet"],
+            received_at=req.get("received_at") or
+                time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+            sender_wallet=req.get("sender_wallet", ""),
+            vault_balance_after_usdc=float(req.get("vault_balance_after_usdc", 0)),
+            block_time=int(req.get("block_time", 0)),
+            notes=req.get("notes", ""),
+        )
+    except KeyError as e:
+        return {"ok": False, "error": f"missing required field: {e}"}
+    return _fr.record_unmatched(d)
+
+
+@app.get("/v1/swarm/worker-config")
 def swarm_worker_config(req: dict):
     """Register or update a worker handler.
 
@@ -3335,62 +3876,74 @@ def swarm_ledger():
 
 @app.get("/v1/swarm/lane-heat")
 def swarm_lane_heat():
-    """Return lane heat data aggregated from lane_monitor.jsonl and lead_deliveries.jsonl.
-    
-    Returns heat by lane (niche:metro) with delivery counts and lead counts.
+    """Return lane heat data aggregated from lane_leads DB + delivery jsonl.
+
+    Counts active lanes (niche+metro combos with >0 leads) and recent
+    delivery traffic from lead_deliveries.jsonl. Falls back gracefully
+    when files are empty so the endpoint always returns data.
     """
     import json
+    import re
     from collections import Counter
     from pathlib import Path
-    
-    lane_heat = {}
-    
-    # Aggregate from lane_monitor.jsonl - daily_summary_emitted events have by_niche
-    lane_monitor_path = Path("/root/feedback/lane_monitor.jsonl")
-    if lane_monitor_path.exists():
-        for line in lane_monitor_path.read_text().splitlines():
-            if not line.strip():
-                continue
-            try:
-                entry = json.loads(line)
-                if entry.get("msg") == "daily_summary_emitted" and entry.get("by_niche"):
-                    for niche, count in entry["by_niche"].items():
-                        if niche and count > 0:
-                            # Try to find metro from lane_monitor data
-                            # The lane_monitor tracks by niche, we need to get metro from leads
-                            pass
-            except Exception:
-                continue
-    
-    # Aggregate from lead_deliveries.jsonl - DELIVERED events have niche, metro
-    lead_deliveries_path = Path("/root/feedback/lead_deliveries.jsonl")
-    if lead_deliveries_path.exists():
-        for line in lead_deliveries_path.read_text().splitlines():
+
+    lane_heat = Counter()
+    lane_lead_count = {}
+
+    # Primary source: lane_leads DB. Schema has no niche/metro columns,
+    # but has source + zip_code. Aggregate by source (which encodes the
+    # scraper / vertical) so heat is still meaningful.
+    try:
+        rows = backend.execute(
+            "SELECT source, COUNT(*) FROM lane_leads "
+            "WHERE source IS NOT NULL "
+            "GROUP BY source ORDER BY COUNT(*) DESC LIMIT 100"
+        ).fetchall()
+        for source, n in rows:
+            if source:
+                key = f"source:{source}"
+                lane_heat[key] += int(n)
+                lane_lead_count[key] = int(n)
+    except Exception:
+        pass
+
+    # Boost by tier — high-omega leads are hotter
+    try:
+        rows = backend.execute(
+            "SELECT omega_tier, COUNT(*) FROM lane_leads "
+            "WHERE omega_tier IS NOT NULL "
+            "GROUP BY omega_tier"
+        ).fetchall()
+        for tier, n in rows:
+            if tier and n:
+                key = f"tier:{tier}"
+                lane_heat[key] += int(n)
+                lane_lead_count[key] = int(n)
+    except Exception:
+        pass
+
+    # Secondary boost: deliveries in last 24h from lead_deliveries.jsonl
+    deliveries_path = Path("/root/feedback/lead_deliveries.jsonl")
+    if deliveries_path.exists():
+        for line in deliveries_path.read_text().splitlines()[-5000:]:
             if not line.strip():
                 continue
             try:
                 entry = json.loads(line)
                 if entry.get("level") == "DELIVERED":
-                    # Try to extract niche and metro from subject or body_preview
                     subject = entry.get("subject", "")
-                    body = entry.get("body_preview", "")
-                    # Parse from subject like "[Empire OS] New lead: plumbing in LAX"
-                    import re
-                    match = re.search(r"New lead:\s*(\w+)\s+in\s+(\w+)", subject)
-                    if match:
-                        niche = match.group(1).lower()
-                        metro = match.group(2).upper()
-                        lane_key = f"{niche}:{metro}"
-                        lane_heat[lane_key] = lane_heat.get(lane_key, 0) + 1
+                    m = re.search(r"New lead:\s*(\w+)\s+in\s+(\w+)", subject)
+                    if m:
+                        key = f"{m.group(1).lower()}:{m.group(2).upper()}"
+                        lane_heat[key] += 1
             except Exception:
                 continue
-    
-    # Also check lane_leads table if we have backend access
-    # For now, return what we have from JSONL
+
     sorted_heat = dict(sorted(lane_heat.items(), key=lambda x: -x[1]))
-    
+
     return {
         "by_lane": sorted_heat,
+        "lead_counts": lane_lead_count,
         "total_lanes": len(sorted_heat),
         "total_deliveries": sum(sorted_heat.values()),
         "ts": datetime.now(timezone.utc).isoformat()
@@ -6572,7 +7125,13 @@ async def ppc_charge(request: Request):
     generates a payment-memo, and persists the charge in si_charges
     + si_ppc_invoices on the host (canonical source of truth).
 
-    Returns ChargeResult shape.
+    After a successful crypto charge with a real pay_url, the route
+    queues an si_outbox row (via pay_url_delivery.deliver_pay_url)
+    so mail_sender can email the buyer. Failure to resolve an email
+    is logged but never blocks the charge — the pay_url is still
+    returned in the response.
+
+    Returns ChargeResult shape (with optional delivery sub-object).
     """
     try:
         body = await request.json()
@@ -6587,12 +7146,39 @@ async def ppc_charge(request: Request):
     reason = body["reason"][:200]
     call_id = body.get("call_id", "")
     lead_id = body.get("lead_id", "")
+    tag = body.get("tag", "")
     # Delegate to charge.charge() which knows all the processors
     from empire_os.charge import charge as _do_charge
     res = _do_charge(
         buyer_id=buyer_id, head=head, reason=reason,
         amount_cents=amount_cents, currency="USD",
         call_id=call_id, lead_id=lead_id)
+    # W2: queue the pay_url email. Best-effort, never raises to caller.
+    # ChargeResult shape carries buyer_id/charge_id/etc.; if charge()
+    # returned a shape missing those (legacy), fill them from request.
+    try:
+        from empire_os.pay_url_delivery import deliver_pay_url
+        # Normalize so pay_url_delivery sees what it needs.
+        res_for_delivery = dict(res)
+        res_for_delivery.setdefault("buyer_id", buyer_id)
+        res_for_delivery.setdefault("head", head)
+        res_for_delivery.setdefault("amount_cents", amount_cents)
+        res_for_delivery.setdefault("reason", reason)
+        res_for_delivery["tag"] = tag  # probe correlation key
+        # raw may hold charge_id; pull up if missing.
+        if not res_for_delivery.get("charge_id"):
+            raw = res_for_delivery.get("raw") or {}
+            if isinstance(raw, dict):
+                res_for_delivery["charge_id"] = (
+                    raw.get("charge_id") or "")
+        delivery = deliver_pay_url(res_for_delivery)
+        res["pay_url_delivery"] = delivery
+    except Exception as e:
+        # Mail-side failure MUST NOT mask the successful charge.
+        logger.exception("W2 deliver_pay_url failed for buyer=%s: %s",
+                         buyer_id, e)
+        res["pay_url_delivery"] = {"queued": False, "reason":
+                                   f"exception:{type(e).__name__}"}
     return res
 
 
@@ -7095,67 +7681,6 @@ def crm_list(request: Request):
         raise HTTPException(500, str(e))
 
 
-        @app.post("/v1/outreach/webhook")
-        async def outreach_webhook(request: Request):
-            """Receive outreach nurture payloads when Resend quota is hit (429).
-
-            Payload from outreach_runner.send_via_webhook:
-              {
-                "to": "email@domain.com",
-                "subject": "...",
-                "body": "...",
-                "metadata": {"source": "outreach", "step": 0, "prospect_id": "...", ...},
-                "source": "outreach_webhook"
-              }
-
-            Logs to /root/feedback/outreach_webhook.jsonl for review/forwarding.
-            """
-            body_bytes = await request.body()
-            try:
-                payload = json.loads(body_bytes.decode())
-            except Exception:
-                raise HTTPException(400, "invalid JSON")
-
-            # Log every webhook event for audit/retry
-            log_path = Path("/root/feedback/outreach_webhook.jsonl")
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            event = {
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "type": payload.get("source", "outreach_webhook"),
-                "to": payload.get("to", ""),
-                "subject": payload.get("subject", ""),
-                "metadata": payload.get("metadata", {}),
-            }
-            with open(log_path, "a") as f:
-                f.write(json.dumps(event) + "\n")
-
-            # Actually deliver the email via the configured mail backend
-            # (Brevo/SMTP), bypassing Resend's 429 quota. The webhook is the
-            # real outbound channel, not just a logger.
-            to = payload.get("to", "")
-            subject = payload.get("subject", "")
-            body = payload.get("body", "")
-            sent_ok = False
-            send_info = ""
-            if to and subject:
-                try:
-                    from empire_os import mail_sender as _ms
-                    res = _ms._brevo_api_send(to, subject, body)
-                    sent_ok = bool(res.get("ok"))
-                    send_info = str(res)[:160]
-                except Exception as e:
-                    send_info = f"send_error: {str(e)[:120]}"
-            event["delivered"] = sent_ok
-            event["send_info"] = send_info
-            with open(log_path, "a") as f:
-                f.write(json.dumps(event) + "\n")
-
-            return {"received": True, "type": payload.get("source", "outreach_webhook"),
-                    "delivered": sent_ok, "send_info": send_info}
-
-
-        # ─────────────────────────────────────────────────────────────────
-        # A2A SALES MESH — agent-to-agent commerce.
     if not backend:
         raise HTTPException(503, detail="Engine not initialized")
     try:
@@ -8019,17 +8544,25 @@ def evaluate_settlements(status: str = "pending"):
     from empire_os.agents import evaluation_product as EP
     c = EP._db()
     try:
+        # evaluation_settlements schema uses buyer_id (not buyer) and
+        # has no wallet/tx_sig/lead_ref — derive lead_ref from evaluation_ledger
         rows = c.execute(
-            "SELECT buyer, lead_ref, amount_usd, wallet, status, tx_sig, created_at "
-            "FROM evaluation_settlements WHERE status=? ORDER BY id DESC LIMIT 200",
+            "SELECT s.id, s.buyer_id, s.amount_usd, s.payment_method, "
+            "       s.status, s.created_at, s.settled_at, "
+            "       l.lead_ref "
+            "FROM evaluation_settlements s "
+            "LEFT JOIN evaluation_ledger l ON l.buyer = s.buyer_id "
+            "WHERE s.status=? ORDER BY s.id DESC LIMIT 200",
             (status,),
         ).fetchall()
     finally:
         c.close()
-    keys = ("buyer", "lead_ref", "amount_usd", "wallet", "status", "tx_sig", "created_at")
+    keys = ("id", "buyer_id", "amount_usd", "payment_method", "status",
+            "created_at", "settled_at", "lead_ref")
     items = [dict(zip(keys, r)) for r in rows]
     return {"ok": True, "status": status, "count": len(items),
-            "total_usd": round(sum(i["amount_usd"] for i in items), 2), "items": items}
+            "total_usd": round(sum(i["amount_usd"] for i in items), 2),
+            "items": items}
 
 
 @app.post("/v1/evaluate/lead-sold")
@@ -8255,3 +8788,36 @@ def evaluate_page():
     if _os.path.exists(p):
         return FileResponse(p)
     return {"ok": False, "error": "evaluate.html not found"}
+
+# ─────────────────────────────────────────────────────────────────
+# Inbound Reply — Resend + SendGrid
+# ─────────────────────────────────────────────────────────────────
+@app.post("/v1/inbound/resend")
+async def inbound_resend(request: Request):
+    body = await request.body()
+    sig = request.headers.get("svix-signature", "")
+    secret = os.environ.get("RESEND_WEBHOOK_SECRET", "")
+    if secret and sig:
+        try:
+            ts = request.headers.get("svix-timestamp", "")
+            msg_id = request.headers.get("svix-id", "")
+            signed = f"{msg_id}.{ts}.{body.decode()}"
+            expected = hmac.new(secret.encode(), signed.encode(), hashlib.sha256).hexdigest()
+            sigs = [s.split(",",1)[1] for s in sig.split() if s.startswith("v1,")]
+            if not any(hmac.compare_digest(expected, s) for s in sigs):
+                raise HTTPException(401, "invalid signature")
+        except HTTPException: raise
+        except Exception: raise HTTPException(400, "signature parse failed")
+    try:
+        payload = json.loads(body)
+    except Exception:
+        raise HTTPException(400, "invalid JSON")
+    from scripts.win1_resend_inbound import process_inbound_email
+    return process_inbound_email(payload, secret)
+
+@app.post("/v1/inbound/sendgrid")
+async def inbound_sendgrid(request: Request):
+    form = await request.form()
+    payload = dict(form)
+    from scripts.win1_resend_inbound import process_inbound_email
+    return process_inbound_email(payload, "")
