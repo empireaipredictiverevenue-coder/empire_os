@@ -110,7 +110,7 @@ def get_active_buyers():
     con.row_factory = sqlite3.Row
     cur = con.cursor()
     
-    # Get all active buyers from outreach
+    # Get all active buyers from outreach with their wallet addresses
     buyers = cur.execute(
         """
         SELECT b.prospect_id, b.niche, b.metro, b.wallet, b.payout_per_lead,
@@ -122,23 +122,27 @@ def get_active_buyers():
         """
     ).fetchall()
     
-    # Get buyer IDs that have payment methods
-    payment_buyers = set()
-    for row in cur.execute("SELECT buyer_id FROM si_buyer_payment_methods"):
-        payment_buyers.add(row["buyer_id"])
+    # Build wallet -> payment_method lookup for crypto (USDC) buyers only
+    wallet_payments = {}
+    for row in cur.execute("SELECT buyer_id, processor, customer_ref, payment_ref FROM si_buyer_payment_methods WHERE processor='usdc'"):
+        wallet_payments[row["customer_ref"]] = dict(row)
     
     con.close()
     
-    # Filter buyers that have payment methods
+    # Filter buyers that have crypto payment methods
     result = []
     for b in buyers:
-        # Check if this prospect_id has a payment method
-        if b["prospect_id"] in payment_buyers:
-            result.append(dict(b))
-        else:
-            # Also check if wallet is set (means crypto payment)
-            if b["wallet"] and b["wallet"] != "":
-                result.append(dict(b))
+        bdict = dict(b)
+        
+        # Crypto buyers: match by wallet address
+        if b["wallet"] and b["wallet"] != "":
+            if b["wallet"] in wallet_payments:
+                bdict["payment_method"] = wallet_payments[b["wallet"]]
+                result.append(bdict)
+            # Fallback: if wallet is set, assume crypto payment capability
+            else:
+                bdict["payment_method"] = {"processor": "usdc", "wallet": b["wallet"]}
+                result.append(bdict)
     
     return result
 
@@ -218,13 +222,14 @@ def deliver_lead(lead: dict, buyer: dict) -> bool:
         return False
     
     payload = {
-        "lead_id": lead["id"],
+        "buyer_id": prospect_id,
+        "lane_lead_id": lead["id"],
+        "prospect_id": prospect_id,
         "niche": lead["niche"],
         "sub_niche": lead.get("sub_niche", ""),
         "metro": lead.get("metro", ""),
-        "omega_score": lead.get("omega_score"),
-        "omega_tier": lead.get("omega_tier"),
-        "predicted_revenue": lead.get("predicted_revenue"),
+        "tier": lead.get("omega_tier", ""),
+        "match_score": lead.get("priority_score", 0),
         "payout_usd": buyer.get("payout_per_lead", 0),
         "ts": datetime.now(timezone.utc).isoformat(),
     }
