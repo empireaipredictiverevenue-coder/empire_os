@@ -2119,7 +2119,7 @@ def crawler_stats():
         
         if table == "crm_leads":
             rows = cur.execute(
-                "SELECT id, omega_tier, icp_name, lead_score, icp_fit_score, metro, niche, source "
+                "SELECT lead_uid AS id, NULL AS omega_tier, icp_name, icp_score AS lead_score, icp_fit_score, metro, niche, source "
                 "FROM crm_leads WHERE date(created_at)=?",
                 (today,)
             ).fetchall()
@@ -2131,15 +2131,15 @@ def crawler_stats():
                 src = r["source"] or "unknown"
                 by_source[src] = by_source.get(src, 0) + 1
             top5_rows = cur.execute(
-                "SELECT id, source, business_name, metro, omega_tier, icp_tier, icp_name, lead_score, created_at "
-                "FROM crm_leads WHERE date(created_at)=? ORDER BY id DESC LIMIT 5",
+                "SELECT lead_uid AS id, source, business_name, metro, NULL AS omega_tier, icp_tier, icp_name, icp_score AS lead_score, created_at "
+                "FROM crm_leads WHERE date(created_at)=? ORDER BY lead_uid DESC LIMIT 5",
                 (today,)
             ).fetchall()
             top5_pool.extend(top5_rows)
             
         elif table == "lane_leads":
             rows = cur.execute(
-                "SELECT id, omega_tier, icp_tier, icp_fit_score, metro, niche, omega_score "
+                "SELECT lead_ref AS id, NULL AS omega_tier, source AS icp_tier, NULL AS icp_fit_score, zip_code AS metro, name AS niche, omega_score "
                 "FROM lane_leads WHERE date(created_at)=?",
                 (today,)
             ).fetchall()
@@ -2151,8 +2151,8 @@ def crawler_stats():
                 src = r["niche"] or "unknown"
                 by_source[src] = by_source.get(src, 0) + 1
             top5_rows = cur.execute(
-                "SELECT id, niche, metro, omega_tier, icp_tier, icp_fit_score, omega_score, created_at "
-                "FROM lane_leads WHERE date(created_at)=? ORDER BY id DESC LIMIT 5",
+                "SELECT lead_ref AS id, name AS niche, zip_code AS metro, NULL AS omega_tier, source AS icp_tier, NULL AS icp_fit_score, omega_score, created_at "
+                "FROM lane_leads WHERE date(created_at)=? ORDER BY lead_ref DESC LIMIT 5",
                 (today,)
             ).fetchall()
             for r in top5_rows:
