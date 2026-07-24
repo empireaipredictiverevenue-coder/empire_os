@@ -1,0 +1,2 @@
+{"ts": "2026-07-23T16:12:16.624516+00:00", "level": "ERROR", "msg": "overpass_fail", "niche": "hvac", "metro": "DFW", "err": "overpass down"}
+{"ts": "2026-07-23T16:13:22.962157+00:00", "level": "ERROR", "msg": "overpass_fail", "niche": "hvac", "metro": "DFW", "err": "net"}

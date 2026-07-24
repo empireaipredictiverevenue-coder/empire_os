@@ -50,6 +50,16 @@ if not api_key or api_key.lower() in ("none", "skip"):
     print("No key entered, exiting.", file=sys.stderr)
     sys.exit(1)
 
+# Back up before any write so a destructive op is recoverable
+import time as _t, shutil
+bk_dir = Path("/root/empire_secrets")
+bk_dir.mkdir(parents=True, exist_ok=True)
+os.chmod(bk_dir, 0o700)
+bk_path = bk_dir / f".env.bak.{int(_t.time())}"
+shutil.copy2(ENV_PATH, bk_path)
+os.chmod(bk_path, 0o600)
+print(f"backup: {bk_path}", file=sys.stderr)
+
 os.chmod(ENV_PATH, 0o600)
 new_lines.append(f"RESEND_API_KEY={api_key}")
 ENV_PATH.write_text("\n".join(new_lines) + "\n")

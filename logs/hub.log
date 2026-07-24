@@ -8,3 +8,26 @@ Traceback (most recent call last):
     data = crm_list_leads(
                          ^
 SyntaxError: '(' was never closed
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/empire_os/empire_os/hub.py", line 85, in <module>
+    from empire_os.payout import PayoutEngine
+  File "/root/empire_os/empire_os/payout.py", line 22, in <module>
+    from solders.keypair import Keypair
+ModuleNotFoundError: No module named 'solders'
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/empire_os/empire_os/hub.py", line 85, in <module>
+    from empire_os.payout import PayoutEngine
+  File "/root/empire_os/empire_os/payout.py", line 22, in <module>
+    from solders.keypair import Keypair
+ModuleNotFoundError: No module named 'solders'
+ERROR:    [Errno 98] Address already in use
+ERROR:    [Errno 98] Address already in use
+ERROR:    [Errno 98] Address already in use
+ERROR:    [Errno 98] Address already in use
+ERROR:    [Errno 98] Address already in use
+ERROR:    [Errno 98] Address already in use
+ERROR:    [Errno 98] Address already in use

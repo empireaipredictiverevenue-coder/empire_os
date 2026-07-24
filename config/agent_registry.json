@@ -284,14 +284,13 @@
       "registered_at": "2026-07-13T17:07:28.567602+00:00"
     },
     "ppc-router": {
-      "role": "ppc",
-      "container": "ppc-router",
-      "ip": "10.118.155.138 (eth0)",
-      "log_path": "/root/ppc/ppc.log",
-      "health_url": "http://localhost:9200/health",
-      "depends_on": [],
-      "description": "ppc agent \u2014 auto-provisioned",
-      "registered_at": "2026-07-13T21:00:48.576866+00:00"
+      "port": 9200,
+      "script_path": "/root/empire_os/empire_os/agents/ppc_router_agent.py",
+      "health_url": "http://10.118.155.218:9200/health",
+      "health_check": "GET",
+      "role_script": "/root/empire_os/scripts/pm2_setup.py",
+      "environment_file": "/root/empire_os/.env",
+      "restart_policy": "always"
     },
     "data-acq": {
       "role": "data_acquisition",
@@ -566,12 +565,12 @@
     "lead-sniper-agent": {
       "role": "lead_sniper",
       "container": "lead-sniper-agent",
-      "ip": "",
+      "ip": "10.118.155.0 (eth0)",
       "log_path": "/root/lead_sniper/lead_sniper.log",
       "health_url": "http://localhost:9109/health",
       "depends_on": [],
-      "description": "lead_sniper agent - precision over volume",
-      "registered_at": "2026-07-14T09:44:06+00:00"
+      "description": "Precision lead sniper with Cortex Intelligence integration",
+      "registered_at": "2026-07-21T23:00:00.000000+00:00"
     },
     "product-research-agent": {
       "role": "product_research",
@@ -676,5 +675,5 @@
       "registered_at": "2026-07-14T16:24:12+00:00"
     }
   },
-  "last_updated": "2026-07-14T16:24:12+00:00"
+  "last_updated": "2026-07-21T23:00:00.000000+00:00"
 }

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{ grade }} — {{ niche|title }} SEO Audit for {{ url }}</title>
+<style>
+  @page { size: A4; margin: 2cm; }
+  body { font-family: "DejaVu Sans", "Helvetica", Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #1a1a1a; }
+  .header { text-align: center; border-bottom: 3px solid #0a3d62; padding-bottom: 1rem; margin-bottom: 2rem; }
+  .header h1 { margin: 0; color: #0a3d62; font-size: 24pt; }
+  .header .meta { color: #666; font-size: 10pt; margin-top: 0.5rem; }
+  .score-badge { display: inline-block; background: {% if score >= 90 %}#27ae60{% elif score >= 80 %}#2ecc71{% elif score >= 70 %}#f39c12{% elif score >= 60 %}#e67e22{% else %}#e74c3c{% endif %}; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 28pt; font-weight: bold; margin: 1rem 0; }
+  .grade { font-size: 14pt; opacity: 0.9; }
+  .section { margin: 2rem 0; page-break-inside: avoid; }
+  .section h2 { color: #0a3d62; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
+  .checks-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+  .check { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 1rem; }
+  .check h4 { margin: 0 0 0.5rem; color: #0a3d62; font-size: 10pt; text-transform: uppercase; }
+  .check .row { display: flex; justify-content: space-between; font-size: 9.5pt; margin: 0.25rem 0; }
+  .check .label { color: #666; }
+  .check .value { font-weight: 600; }
+  .check .value.good { color: #27ae60; }
+  .check .value.warn { color: #f39c12; }
+  .check .value.bad { color: #e74c3c; }
+  .summary { background: #e8f4fd; border: 1px solid #bee5eb; border-radius: 6px; padding: 1rem; margin: 1.5rem 0; }
+  .fixes { background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 1.5rem; }
+  .fixes h3 { margin-top: 0; color: #856404; }
+  .fixes ol { margin: 0; padding-left: 1.25rem; }
+  .fixes li { margin: 0.75rem 0; line-height: 1.6; }
+  .fix-item { margin: 1rem 0; padding: 1rem; background: white; border-radius: 4px; border-left: 4px solid #0a3d62; }
+  .fix-item h4 { margin: 0 0 0.5rem; color: #0a3d62; }
+  .fix-item .meta { font-size: 9pt; color: #666; margin-bottom: 0.5rem; }
+  .fix-item .step { margin: 0.25rem 0; padding-left: 1rem; }
+  .cta-box { background: #0a3d62; color: white; padding: 1.5rem; border-radius: 8px; text-align: center; margin: 2rem 0; }
+  .cta-box a { color: #f39c12; font-weight: bold; text-decoration: none; }
+  .footer { margin-top: 3rem; text-align: center; color: #999; font-size: 9pt; border-top: 1px solid #eee; padding-top: 1rem; }
+  .logo { color: #0a3d62; font-weight: bold; }
+  .value-class { font-weight: 600; }
+  .value-class.good { color: #27ae60; }
+  .value-class.warn { color: #f39c12; }
+  .value-class.bad { color: #e74c3c; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>SEO Health Audit</h1>
+  <div class="meta">{{ niche|title }} · {{ metro }} · {{ date }}</div>
+  <div class="meta">{{ url }}</div>
+</div>
+
+<div style="text-align: center;">
+  <div class="score-badge">{{ score }}
+    <div class="grade">Grade {{ grade }}</div>
+  </div>
+  <p style="color: #666;">Scored against 25+ technical + on-page + CWV checks</p>
+</div>
+
+<div class="summary">{{ summary|safe }}</div>
+
+<div class="section">
+  <h2>On-Page SEO</h2>
+  {% if checks.onpage %}
+  <div class="checks-grid">
+    <div class="check">
+      <h4>Title Tag</h4>
+      <div class="row"><span class="label">Length</span><span class="value value-class {{ 'good' if checks.onpage['Title Len'] >= 30 and checks.onpage['Title Len'] <= 60 else 'bad' }}">{{ checks.onpage['Title Len'] }} chars</span></div>
+      <div class="row"><span class="label">Status</span><span class="value value-class {{ 'good' if checks.onpage['Title Len'] >= 30 and checks.onpage['Title Len'] <= 60 else 'bad' }}">{{ 'OK' if checks.onpage['Title Len'] >= 30 and checks.onpage['Title Len'] <= 60 else 'FIX NEEDED' }}</span></div>
+    </div>
+    <div class="check">
+      <h4>H1 Structure</h4>
+      <div class="row"><span class="label">Count</span><span class="value value-class {{ 'good' if checks.onpage['H1 Count'] == 1 else 'bad' }}">{{ checks.onpage['H1 Count'] }}</span></div>
+      <div class="row"><span class="label">Status</span><span class="value value-class {{ 'good' if checks.onpage['H1 Count'] == 1 else 'bad' }}">{{ 'OK' if checks.onpage['H1 Count'] == 1 else 'FIX NEEDED' }}</span></div>
+    </div>
+    <div class="check">
+      <h4>Meta Description</h4>
+      <div class="row"><span class="label">Length</span><span class="value value-class {{ 'good' if checks.onpage['Meta Desc Len'] >= 120 and checks.onpage['Meta Desc Len'] <= 160 else 'bad' }}">{{ checks.onpage['Meta Desc Len'] }} chars</span></div>
+      <div class="row"><span class="label">Status</span><span class="value value-class {{ 'good' if checks.onpage['Meta Desc Len'] >= 120 and checks.onpage['Meta Desc Len'] <= 160 else 'bad' }}">{{ 'OK' if checks.onpage['Meta Desc Len'] >= 120 and checks.onpage['Meta Desc Len'] <= 160 else 'FIX NEEDED' }}</span></div>
+    </div>
+    <div class="check">
+      <h4>Schema Markup</h4>
+      <div class="row"><span class="label">Present</span><span class="value value-class {{ 'good' if checks.onpage['Has Schema'] else 'bad' }}">{{ 'Yes' if checks.onpage['Has Schema'] else 'No' }}</span></div>
+      <div class="row"><span class="label">Types</span><span class="value">{{ checks.onpage['Schema Types'] if checks.onpage['Schema Types'] else 'None' }}</span></div>
+    </div>
+  </div>
+  {% else %}
+  <p>On-page checks not available.</p>
+  {% endif %}
+</div>
+
+<div class="section">
+  <h2>Technical Health</h2>
+  {% if checks.tech %}
+  <div class="checks-grid">
+    <div class="check">
+      <h4>SSL / Security</h4>
+      <div class="row"><span class="label">HTTPS</span><span class="value value-class {{ 'good' if checks.tech['Ssl'] else 'bad' }}">{{ 'Yes' if checks.tech['Ssl'] else 'No' }}</span></div>
+      <div class="row"><span class="label">HSTS</span><span class="value value-class {{ 'good' if checks.tech['Hsts'] else 'warn' }}">{{ 'Yes' if checks.tech['Hsts'] else 'Missing' }}</span></div>
+    </div>
+    <div class="check">
+      <h4>Performance</h4>
+      <div class="row"><span class="label">Gzip/Brotli</span><span class="value value-class {{ 'good' if checks.tech['Gzip'] else 'warn' }}">{{ 'Enabled' if checks.tech['Gzip'] else 'Disabled' }}</span></div>
+      <div class="row"><span class="label">Cache-Control</span><span class="value value-class {{ 'good' if checks.tech['Cache Control'] else 'warn' }}">{{ 'Set' if checks.tech['Cache Control'] else 'Missing' }}</span></div>
+    </div>
+    <div class="check">
+      <h4>Crawlability</h4>
+      <div class="row"><span class="label">robots.txt</span><span class="value value-class {{ 'good' if checks.tech['Robots Txt'] else 'warn' }}">{{ 'Found' if checks.tech['Robots Txt'] else 'Missing' }}</span></div>
+      <div class="row"><span class="label">sitemap.xml</span><span class="value value-class {{ 'good' if checks.tech['Sitemap Xml'] else 'warn' }}">{{ 'Found' if checks.tech['Sitemap Xml'] else 'Missing' }}</span></div>
+    </div>
+    <div class="check">
+      <h4>Redirects</h4>
+      <div class="row"><span class="label">Count</span><span class="value">{{ checks.tech['Redirects'] }}</span></div>
+      <div class="row"><span class="label">Final URL</span><span class="value">{{ checks.tech['Final Url'] }}</span></div>
+    </div>
+  </div>
+  {% else %}
+  <p>Technical checks not available.</p>
+  {% endif %}
+</div>
+
+{% if checks.psi %}
+<div class="section">
+  <h2>Core Web Vitals (PageSpeed Insights)</h2>
+  <div class="checks-grid">
+    <div class="check">
+      <h4>Performance Score</h4>
+      <div class="row"><span class="label">Mobile</span><span class="value value-class {{ 'good' if checks.psi['Performance Score'] >= 90 else ('warn' if checks.psi['Performance Score'] >= 50 else 'bad') }}">{{ checks.psi['Performance Score'] }}/100</span></div>
+    </div>
+    <div class="check">
+      <h4>LCP (Loading)</h4>
+      <div class="row"><span class="label">Value</span><span class="value value-class {{ 'good' if checks.psi['Lcp'] <= 2500 else ('warn' if checks.psi['Lcp'] <= 4000 else 'bad') }}">{{ (checks.psi['Lcp']/1000)|round(1) }}s</span></div>
+      <div class="row"><span class="label">Target</span><span class="value">≤ 2.5s</span></div>
+    </div>
+    <div class="check">
+      <h4>INP (Interactivity)</h4>
+      <div class="row"><span class="label">Value</span><span class="value value-class {{ 'good' if checks.psi['Inp'] <= 200 else ('warn' if checks.psi['Inp'] <= 500 else 'bad') }}">{{ checks.psi['Inp'] }}ms</span></div>
+      <div class="row"><span class="label">Target</span><span class="value">≤ 200ms</span></div>
+    </div>
+    <div class="check">
+      <h4>CLS (Visual Stability)</h4>
+      <div class="row"><span class="label">Value</span><span class="value value-class {{ 'good' if checks.psi['Cls'] <= 0.1 else ('warn' if checks.psi['Cls'] <= 0.25 else 'bad') }}">{{ checks.psi['Cls'] }}</span></div>
+      <div class="row"><span class="label">Target</span><span class="value">≤ 0.1</span></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="section fixes">
+  <h3>Top 3 Fixes for Immediate Impact</h3>
+  <ol>
+    {% for fix in fixes %}
+    <li class="fix-item">
+      <h4>{{ fix.title }}</h4>
+      <div class="meta">Impact: {{ fix.impact }} · Effort: {{ fix.effort }}</div>
+      <p>{{ fix.description }}</p>
+      <ol>
+        {% for step in fix.steps %}
+        <li class="step">{{ step }}</li>
+        {% endfor %}
+      </ol>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+
+<div class="cta-box">
+  {{ cta|safe }}
+</div>
+
+<div class="footer">
+  <div class="logo">Empire AI</div>
+  <div>Generated {{ date }} · <a href="https://empire-ai.co.uk" style="color: #999;">empire-ai.co.uk</a></div>
+  <div>This audit analyzes technical SEO, on-page factors, and Core Web Vitals. Fix the items above to improve rankings and conversions.</div>
+</div>
+</body>
+</html>

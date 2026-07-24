@@ -20,7 +20,8 @@ from typing import Iterator
 
 import requests
 
-from empire_os.lead_sources import LeadCandidate, SourceInfo, infer_niche
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
 
 
 # NYC DOB work_type → lane niche
@@ -181,7 +182,7 @@ def _run_nyc(lookback_days: int = 7) -> Iterator[LeadCandidate]:
         time.sleep(0.3)
 
 
-def run(metro: str = None) -> Iterator[LeadCandidate]:
+def run(metro: str = None, verticals: list = None, limit: int = 40) -> Iterator[LeadCandidate]:
     if metro and metro != "NYC":
         return
     yield from _run_nyc()

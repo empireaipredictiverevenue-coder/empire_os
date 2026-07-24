@@ -13,7 +13,11 @@ landing pages -> SEO moat that feeds the lead funnel.
 LLM: OpenRouter (openai/gpt-4o-mini), same creds as Cortex Judge.
 """
 import os, sys, json, time, logging
+# Put parent dir on path so `from empire_os.X` resolves to top-level modules,
+# not the agents/ subdir which would shadow the package.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(__file__))
+
 from empire_os.aeo_surface import deploy_spec
 from empire_os.marketing import AeoSpecDraft
 import article_spinner as SP
@@ -60,9 +64,9 @@ def draft_spec(niche: str, signal: str = "") -> AeoSpecDraft:
           "(2 generic competitor types), call_to_action (a lead-buy CTA with "
           "the phrase 'get verified {niche} leads'). Keep it factual, no fluff."
     )
-    c = SP._client()
+    c, provider = SP._client()
     r = c.chat.completions.create(
-        model=SP.MODEL,
+        model=SP._model_name(provider),
         messages=[
             {"role": "system", "content": "You output ONLY valid minified JSON."},
             {"role": "user", "content": brief},

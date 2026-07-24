@@ -1,3 +1,7 @@
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 """NWS Weather Alerts — REAL (free).
 
 Tier: real (no key)
@@ -21,7 +25,10 @@ from datetime import datetime, timezone
 from typing import Iterator
 from pathlib import Path
 
-from empire_os.lead_sources import LeadCandidate, SourceInfo
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 
 
 URL = "https://api.weather.gov/alerts/active"
@@ -49,7 +56,7 @@ EVENT_NICHE = {
 UA = "(EmpireOS/1.0, contact@empire-ai.co.uk)"
 
 
-def run(metro: str = None) -> Iterator[LeadCandidate]:
+def run(metro: str = None, verticals: list = None, limit: int = 40) -> Iterator[LeadCandidate]:
     try:
         r = requests.get(URL, headers={"User-Agent": UA}, timeout=15)
         if r.status_code != 200:

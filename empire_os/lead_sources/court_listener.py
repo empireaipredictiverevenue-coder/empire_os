@@ -1,3 +1,7 @@
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 """CourtListener / RECAP source — REAL (free, 5K calls/day).
 
 Tier: real
@@ -28,7 +32,10 @@ from datetime import date, timedelta
 from typing import Iterator
 from pathlib import Path
 
-from empire_os.lead_sources import LeadCandidate, SourceInfo
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 
 
 COURTLISTENER_URL = "https://www.courtlistener.com/api/rest/v4/search/"
@@ -77,7 +84,7 @@ CASES = [
 ]
 
 
-def run(metro: str = None) -> Iterator[LeadCandidate]:
+def run(metro: str = None, verticals: list = None, limit: int = 40) -> Iterator[LeadCandidate]:
     token = _read_token()
     end = date.today()
     start = end - timedelta(days=7)

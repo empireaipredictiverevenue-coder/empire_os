@@ -32,7 +32,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import sqlite3
 import sys
 import time
 import urllib.request
@@ -44,14 +43,20 @@ sys.path.insert(0, "/root/empire_os")
 
 from empire_os.agent_core import OllamaClient
 from empire_os.synthetic_agents import SyntheticAgent
-from empire_os.synthetic_intelligence import score_niche_fit
+from empire_os.synthetic_intelligence import (
+    score_niche_fit,
+    analyze_lead,
+    LeadAnalysis,
+    generate_synthetic_leads,
+    SyntheticIntelligence,
+)
 
 ROLE_DIR = Path("/root/sniper")
 ROLE_DIR.mkdir(parents=True, exist_ok=True)
 SHOTS_LOG = ROLE_DIR / "shots.jsonl"
 TICK_INTERVAL = 120  # 2 min — snipers move fast
 
-# High-intent urgency keywords — these are the "buying now" signals
+# High-intent urgency keywords with weights
 URGENCY_KEYWORDS = [
     "need a", "need an", "need someone", "looking for",
     "emergency", "urgent", "asap", "today", "right now",
@@ -61,6 +66,17 @@ URGENCY_KEYWORDS = [
     "broken", "leaking", "flooding", "no heat", "no ac",
     "fire damage", "storm damage", "hail damage",
 ]
+
+# Keyword weight mapping for intelligent urgency scoring
+URGENCY_WEIGHTS = {
+    "emergency": 1.0, "urgent": 0.9, "asap": 0.8, "today": 0.7, "right now": 0.6,
+    "this weekend": 0.5, "tomorrow": 0.4, "quickly": 0.3, "fast": 0.3, "need a": 0.5,
+    "need an": 0.5, "need someone": 0.5, "looking for": 0.4, "recommend": 0.3,
+    "who do you use": 0.3, "who do you recommend": 0.3, "any good": 0.2,
+    "anyone know": 0.2, "hire": 0.3, "hiring": 0.3, "broken": 0.2, "leaking": 0.2,
+    "flooding": 0.2, "no heat": 0.2, "no ac": 0.2, "fire damage": 0.3,
+    "storm damage": 0.3, "hail damage": 0.3,
+}
 # Scoring weights
 W_INTENT = 0.5
 W_FIT = 0.3
@@ -69,7 +85,7 @@ SNIPER_THRESHOLD = 0.6   # below this, don't queue
 KILL_THRESHOLD = 0.8     # above this, alert operator
 
 # ── Guard rails (operator-review mode) ──────────────────────────────────
-# lead-sniper FINDSt leads only. It never auto-emails. Finds land in the
+# lead-sniper FINDS leads only. It never auto-emails. Finds land in the
 # empire_tasks review queue (task_type='sniper_review') for human promotion.
 # NO si_outbox writes. NO founder@ spam. NO simulation.
 MAX_PER_CYCLE = int(os.environ.get("SNIPER_MAX_PER_CYCLE", "5"))
@@ -232,6 +248,7 @@ class RedditUrgentScope(_BaseScope):
 
         subs = self.SUBREDDITS.get(niche, ["HomeImprovement"])
         out = []
+        entries = []
         try:
             for sub in subs[:2]:
                 url = f"https://old.reddit.com/r/{sub}/new/.rss"
@@ -372,10 +389,6 @@ class CountyPermitsUrgentScope(_BaseScope):
         return out
 
 
-# ──────────────────────────────────────────────────────────────────────
-# Lead Sniper Agent
-# ──────────────────────────────────────────────────────────────────────
-
 class LeadSniperAgent(SyntheticAgent):
     """High-intent lead sniper. Fast cycle. Direct to outbox."""
 
@@ -389,27 +402,146 @@ class LeadSniperAgent(SyntheticAgent):
             "county_permits_urgent": CountyPermitsUrgentScope(),
         }
         self._cycle_kills = 0
+        # Cortex intelligence integration
+        self.cortex_llm = None  # Injected via context or config
+        self.learning_examples = []
 
     def _score(self, lead: dict, niche: str) -> float:
         """Compute sniper score (0..1) for one lead."""
         details = lead.get("details", {})
         text = json.dumps(details).lower()
-        # Intent score
-        hits = sum(1 for kw in URGENCY_KEYWORDS if kw in text)
-        intent = min(1.0, hits / 3.0)
-        # Niche fit
-        fit = score_niche_fit(lead, niche)
-        # Recency bonus
+
+        # Enhanced Intent score with weighted urgency
+        intent = self._weighted_intent_score(text)
+
+        # Enhanced Niche fit with multi-layer analysis
+        fit = self._enhanced_niche_fit(lead, niche)
+
+        # Recency bonus with better granularity
         age = details.get("age_hours", 999)
-        if age <= 24:
-            recency = 1.0
-        elif age <= 48:
-            recency = 0.7
-        elif age <= 72:
-            recency = 0.5
-        else:
-            recency = 0.2
+        recency = self._recency_score(age)
+
         return W_INTENT * intent + W_FIT * fit + W_RECENCY * recency
+
+    def _weighted_intent_score(self, text):
+        """Compute intent score with keyword weights."""
+        # High-value urgency keywords
+        high_value_keywords = ["emergency", "urgent", "asap", "today", "right now", "need a", "need an"]
+        medium_value_keywords = ["quickly", "fast", "tomorrow", "this weekend", "need someone"]
+        low_value_keywords = ["recommend", "who do you use", "any good", "anyone know", "hire"]
+
+        intent_score = 0.0
+        # High value: 100% of available hits
+        for kw in high_value_keywords:
+            intent_score += text.count(kw) * 1.0
+        # Medium value: 70% of available hits
+        for kw in medium_value_keywords:
+            intent_score += text.count(kw) * 0.7
+        # Low value: 40% of available hits
+        for kw in low_value_keywords:
+            intent_score += text.count(kw) * 0.4
+
+        return min(1.0, intent_score / 3.0)
+
+    def _enhanced_niche_fit(self, lead, niche):
+        """Multi-layer niche fit analysis."""
+        base_fit = score_niche_fit(lead, niche)
+
+        # Layer 2: Business legitimacy signals
+        legitimacy_score = self._analyze_legitimacy_signals(lead)
+
+        # Layer 3: Technical indicators
+        technical_score = self._analyze_technical_indicators(lead)
+
+        # Layer 4: Revenue capacity signals
+        revenue_score = self._analyze_revenue_capacity(lead)
+
+        # Composite score with layer importance
+        final_fit = (
+            base_fit * 0.3 +           # Original keyword matching
+            legitimacy_score * 0.25 + # Business legitimacy
+            technical_score * 0.25 +  # Technical indicators
+            revenue_score * 0.2       # Revenue capacity
+        )
+
+        return min(1.0, final_fit)
+
+    def _analyze_legitimacy_signals(self, lead):
+        """Analyze business legitimacy indicators."""
+        score = 0.0
+        name = str(lead.get("name", "")).lower()
+
+        # Established name patterns
+        if any(word in name for word in ["company", "inc", "llc", "corp", "enterprise"]):
+            score += 0.8
+
+        # Professional formatting
+        if any(char in name for char in [".", "&", "group"]):
+            score += 0.6
+
+        # Length suggests established business
+        if len(name) > 20:
+            score += 0.4
+
+        return min(1.0, score)
+
+    def _analyze_technical_indicators(self, lead):
+        """Analyze technical/business indicators."""
+        details = lead.get("details", {})
+        details_text = json.dumps(details).lower()
+
+        score = 0.0
+
+        # Website presence
+        if "http" in details_text or ".com" in details_text or ".net" in details_text:
+            score += 0.8
+
+        # Social media indicators
+        social_indicators = ["linkedin", "facebook", "instagram", "twitter", "yelp"]
+        if any(indicator in details_text for indicator in social_indicators):
+            score += 0.6
+
+        # Professional contact info
+        if "phone" in details_text or "email" in details_text:
+            score += 0.4
+
+        return min(1.0, score)
+
+    def _analyze_revenue_capacity(self, lead):
+        """Analyze revenue-generating capacity."""
+        details = lead.get("details", {})
+        details_text = json.dumps(details).lower()
+
+        score = 0.0
+
+        # Emergency indicators (high revenue urgency)
+        emergency_words = ["emergency", "urgent", "asap", "today", "right now"]
+        emergency_count = sum(1 for word in emergency_words if word in details_text)
+        score += min(0.6, emergency_count * 0.2)
+
+        # Business problem indicators (revenue opportunity)
+        problem_indicators = ["broken", "leaking", "flooding", "no heat", "no ac", "damage"]
+        problem_count = sum(1 for indicator in problem_indicators if indicator in details_text)
+        score += min(0.4, problem_count * 0.2)
+
+        return score
+
+    def _recency_score(self, age_hours):
+        """More granular recency scoring."""
+        if age_hours <= 12:
+            return 1.0
+        elif age_hours <= 24:
+            return 0.9
+        elif age_hours <= 48:
+            return 0.7
+        elif age_hours <= 72:
+            return 0.5
+        elif age_hours <= 168:  # 1 week
+            return 0.3
+        elif age_hours <= 720:   # 30 days
+            return 0.2
+        else:
+            return 0.1
 
     def _emit_kill_alert(self, lead: dict, niche: str, score: float):
         try:
@@ -484,6 +616,23 @@ class LeadSniperAgent(SyntheticAgent):
                 shots.append({**shot, "decision": "cap_reached"})
                 continue
             post = _queue_review(lead, niche, score)
+            
+            # Cortex Intelligence: Multi-niche analysis for qualified leads
+            if score >= SNIPER_THRESHOLD:
+                try:
+                    analysis = analyze_lead(lead, llm=self.cortex_llm)
+                    shot["cortex_analysis"] = {
+                        "primary_niche": analysis.primary_niche,
+                        "primary_fit": analysis.primary_fit,
+                        "secondary_niches": analysis.secondary_niches,
+                        "recommendation": analysis.recommendation,
+                        "reasoning": analysis.reasoning,
+                    }
+                    if analysis.recommendation == "re_route" and analysis.secondary_niches:
+                        shot["cortex_analysis"]["re_route_to"] = analysis.secondary_niches[0][0]
+                except Exception as e:
+                    shot["cortex_analysis"] = {"error": str(e)[:100]}
+            
             shots.append({**shot, "decision": post.get("status", "queue"), "post": post})
             if post.get("status") == "review_queued":
                 queued_this_cycle += 1
@@ -501,6 +650,23 @@ class LeadSniperAgent(SyntheticAgent):
             "shots": shots,
             "scope_health": {n: s.stats for n, s in self.scopes.items()},
         }
+
+        # Cortex Learning Loop: Feed observations into Synthetic Intelligence
+        try:
+            from empire_os.synthetic_intelligence import SyntheticIntelligence
+            if self.cortex_llm and hasattr(self, 'learning_examples'):
+                cortex = SyntheticIntelligence(self.cortex_llm, n_synthetic=3)
+                observed = {"niche": niche, "leads_scanned": len(all_leads),
+                           "leads_qualified": len([s for s in shots if s.get("decision") == "review_queued"]),
+                           "kills": len(kills), "shots": shots}
+                decision_data = {"action": "snipe", "niche": niche, "summary": f"{len(kills)} kills, {len(shots)} shots"}
+                new_examples = cortex.augment(observed, decision_data)
+                self.learning_examples.extend(new_examples)
+                if new_examples:
+                    record["cortex_learning"] = {"new_examples": len(new_examples)}
+        except Exception:
+            pass  # Cortex learning is best-effort
+
         with SHOTS_LOG.open("a") as f:
             f.write(json.dumps(record) + "\n")
         return {

@@ -14,7 +14,10 @@ submitted, driving organic traffic -> leads.
 Runs as empire-content-engine.service (timer every 30 min, Restart=always).
 """
 import os, sys, json, time, logging
+# Add BOTH the agents/ dir (for sibling modules like article_writer) AND
+# the parent empire_os/ dir (so `from empire_os.funnel import` resolves).
 sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import article_writer as AW
 import scrapecreators_enrich as SC
@@ -83,7 +86,10 @@ def submit_gsc() -> str:
 
 def tick(dry_run: bool = False) -> dict:
     out = {}
-    out["scrape"] = SC.run(dry_run=dry_run, cap=8 if not dry_run else 8)
+    try:
+        out["scrape"] = SC.run(dry_run=dry_run, cap=8 if not dry_run else 8)
+    except Exception as e:
+        out["scrape"] = f"scrape skipped: {str(e)[:120]}"
     out["predict"] = PR.run(dry_run=dry_run)
     out["articles"] = AW.run(dry_run=dry_run, limit=3 if not dry_run else 3)
     if not dry_run:

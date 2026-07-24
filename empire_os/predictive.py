@@ -380,3 +380,7 @@ if __name__ == "__main__":
     print("Waste indicators: %d" % report["waste"]["total_waste_indicators"])
     print()
     print("Full report: %s" % out)
+
+
+# Backward-compat aliases (must be after function definitions)
+market_gaps = detect_market_gaps

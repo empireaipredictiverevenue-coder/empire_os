@@ -315,7 +315,7 @@ def charge(buyer_id: str, head: int, reason: str,
     if processor == "usdc":
         crypto_res = charge_crypto(
             buyer_id=buyer_id, head=head, reason=reason,
-            amount_usdc=max(1, amount_cents / 100),
+            amount_usdc=max(0.01, amount_cents / 100),
             call_id=call_id, lead_id=lead_id, charge_id=charge_id)
         resp = {"ok": crypto_res.get("status") != "failed",
                 "raw": crypto_res,

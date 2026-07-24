@@ -16,19 +16,18 @@ ROOT = Path("/root/empire_os")
 DB = ROOT / "empire_os.db"
 PRICING = Path("/root/g-brain/revenue/pricing.md")
 
-# sku -> (name, setup_fee_usdc)
-# Parsed from pricing.md "DB SKUs" block. Tiers are T1/T2/T3/T4(titanium).
+# sku -> (name, setup_fee_usdc)  — ALL setup fees $0 for initial traction
 SKUS = {
-    "empire_leads_engine": ("Empire Leads Engine", 10000),
-    "hermes_framework":    ("Hermes Framework", 8000),
-    "opencut_studio":      ("OpenCut Studio", 5000),
-    "empire_templates":    ("Empire Templates", 3000),
-    "marketingskills":     ("MarketingSkills", 3000),
+    "empire_leads_engine": ("Empire Leads Engine", 0),
+    "hermes_framework":    ("Hermes Framework", 0),
+    "opencut_studio":      ("OpenCut Studio", 0),
+    "empire_templates":    ("Empire Templates", 0),
+    "marketingskills":     ("MarketingSkills", 0),
     "satellite_idle_watch":("Satellite Idle Watch", 0),
     "skillspector_audit":  ("SkillSpector Audit", 0),
-    "synthetic_agent":     ("Synthetic Agent", 10000),
+    "synthetic_agent":     ("Synthetic Agent", 0),
     "aeo_monitor":         ("AEO Monitor", 0),
-    "agent_copilot":       ("Agent Co-Pilot", 3000),
+    "agent_copilot":       ("Agent Co-Pilot", 0),
 }
 # T1 base prices (USDC/mo) from pricing.md; T2=x2.5 T3=x5 T4=x10
 T1 = {
@@ -42,10 +41,9 @@ T1 = {
 def parse_block(text: str) -> dict:
     """Extract per-sku T1..T4 + setup from the DB SKUs block."""
     out = {}
-    # match lines like:  "  - empire_leads_engine: 199 / 599 / 1999 / 5999   (setup $10,000)"
     pat = re.compile(
-        r"-\s*([a-z0-9_]+):\s*([\d.]+)\s*/\s*([\d.]+)\s*/\s*([\d.]+)\s*/\s*([\d.]+)"
-        r"(?:\s*\(setup\s*\$?([\d,]+)\))?", re.I)
+        r"--\s*([a-z0-9_]+):\s*([\d.]+)\s*/\s*([\d.]+)\s*/\s*([\d.]+)\s*/\s*([\d.]+)"
+        r"(?:\s*\(\s*setup\s*\$?([\d,]+)?\s*\))?", re.I)
     for m in pat.finditer(text):
         sku, t1, t2, t3, t4, setup = m.groups()
         out[sku] = {
@@ -58,39 +56,60 @@ def parse_block(text: str) -> dict:
 def main() -> int:
     if not PRICING.exists():
         print(f"ERROR: pricing.md not found at {PRICING}")
-        return 2
+        return 1
+
     text = PRICING.read_text()
     parsed = parse_block(text)
 
-    con = sqlite3.connect(DB)
-    con.execute(
-        """CREATE TABLE IF NOT EXISTS si_products (
-            sku TEXT PRIMARY KEY, name TEXT, repo_url TEXT, license TEXT,
-            description TEXT, b2b_angle TEXT,
-            tier1_usdc REAL, tier2_usdc REAL, tier3_usdc REAL, tier4_usdc REAL,
-            setup_fee_usdc REAL, active INTEGER, created_at TEXT)""")
+    con = sqlite3.connect(str(DB), timeout=30)
+    con.execute("PRAGMA journal_mode=WAL")
+    count = 0
+
+    # Ensure table exists with all columns
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS si_products (
+            sku TEXT PRIMARY KEY,
+            name TEXT,
+            repo_url TEXT DEFAULT '',
+            license TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            b2b_angle TEXT DEFAULT '',
+            tier1_usdc REAL DEFAULT 0,
+            tier2_usdc REAL DEFAULT 0,
+            tier3_usdc REAL DEFAULT 0,
+            tier4_usdc REAL DEFAULT 0,
+            setup_fee_usdc REAL DEFAULT 0,
+            active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now')),
+            features TEXT,
+            benefits TEXT,
+            deliverables TEXT
+        )
+    """)
+    con.commit()
+
     now = datetime.now(timezone.utc).isoformat()
-    n = 0
-    for sku, (name, setup_md) in SKUS.items():
-        p = parsed.get(sku)
-        if not p:
-            print(f"  skip {sku}: not found in pricing.md block")
-            continue
-        # trust pricing.md block tiers; fall back to SKUS default setup
-        setup = p["setup"] if p["setup"] else setup_md
+    for sku, (name, setup) in SKUS.items():
+        p = parsed.get(sku, {})
+        t1 = p.get("t1", T1.get(sku, 0))
+        t2 = p.get("t2", t1 * 2.5)
+        t3 = p.get("t3", t1 * 5)
+        t4 = p.get("t4", t1 * 10)
+        s = p.get("setup", setup)
+        desc = f"{name} -- Empire OS marketplace SKU"
         con.execute(
             "INSERT OR REPLACE INTO si_products "
-            "(sku, name, repo_url, license, description, b2b_angle, "
-            "tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, setup_fee_usdc, "
-            "active, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?)",
-            (sku, name, "", "", f"{name} — Empire OS marketplace SKU",
-             "B2B lead-gen / agent commerce",
-             p["t1"], p["t2"], p["t3"], p["t4"], setup, now))
-        n += 1
+            "(sku, name, description, b2b_angle, "
+            "tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, "
+            "setup_fee_usdc, active, created_at) "
+            "VALUES (?,?,?,?,  ?,?,?,?,  ?,1,?)",
+            (sku, name, desc, "B2B lead-gen / agent commerce",
+             t1, t2, t3, t4, s, now))
+        count += 1
+
     con.commit()
-    total = con.execute("SELECT COUNT(*) FROM si_products WHERE active=1").fetchone()[0]
     con.close()
-    print(f"Seeded {n} SKUs into si_products (active total now: {total})")
+    print(f"Seeded {count} products (all setup fees $0)")
     return 0
 
 

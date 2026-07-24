@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire OS A2A Buyer Marketplace Pusher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+# Run the pusher inside the empire-hub LXC container where the live DB lives.
+ExecStart=/usr/bin/incus exec empire-hub -- /root/venv/bin/python3 /root/empire_os/empire_os/a2a_buyer_marketplace.py
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

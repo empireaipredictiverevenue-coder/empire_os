@@ -7,8 +7,8 @@ keep the facts/intent but use different wording, structure and angle. Each
 variant is genuinely distinct (passes duplicate-content checks) so we can
 superscale the SEO moat: one researched brief -> many city/niche landing pages.
 
-LLM priority: GROQ_API_KEY (free tier, llama-3.3-70b) -> OPENROUTER_API_KEY (paid).
-No secrets in code: keys read from env at runtime.
+LLM priority: GOOGLE_API_KEY (free Gemini) -> GROQ_API_KEY (free tier) ->
+OPENROUTER_API_KEY (paid). No secrets in code: keys read from env at runtime.
 """
 import os, sys, json, time
 sys.path.insert(0, os.path.dirname(__file__))
@@ -16,28 +16,40 @@ from openai import OpenAI
 
 MODEL = os.getenv("SPIN_MODEL", "openai/gpt-4o-mini")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
 
 def _client():
-    """Return (OpenAI client, is_groq bool). Groq free tier preferred."""
-    gkey = os.getenv("GROQ_API_KEY")
+    """Return (OpenAI client, provider_name). Gemini free tier preferred."""
+    gkey = os.getenv("GOOGLE_API_KEY")
     if gkey:
-        return OpenAI(api_key=gkey, base_url="https://api.groq.com/openai/v1"), True
+        return (OpenAI(api_key=gkey,
+                        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                        timeout=60.0),
+                "gemini")
+    gqkey = os.getenv("GROQ_API_KEY")
+    if gqkey:
+        return OpenAI(api_key=gqkey, base_url="https://api.groq.com/openai/v1"), "groq"
     okey = os.getenv("OPENROUTER_API_KEY") or os.getenv("SCRAPECREATORS_API_KEY")
     if okey:
-        return OpenAI(api_key=okey, base_url="https://openrouter.ai/api/v1"), False
-    raise RuntimeError("no GROQ_API_KEY or OPENROUTER_API_KEY in env")
+        return OpenAI(api_key=okey, base_url="https://openrouter.ai/api/v1"), "openrouter"
+    raise RuntimeError(
+        "no LLM key (GOOGLE_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY) in env")
 
 
-def _model_name(is_groq):
-    return GROQ_MODEL if is_groq else MODEL
+def _model_name(provider):
+    if provider == "gemini":
+        return GEMINI_MODEL
+    if provider == "groq":
+        return GROQ_MODEL
+    return MODEL
 
 
 def spin(text: str, niche: str, metro: str = "", n: int = 3,
          tone: str = "authoritative, local, buyer-intent") -> list:
     """Return N unique rewritten articles for (niche, metro)."""
-    c, is_groq = _client()
-    model = _model_name(is_groq)
+    c, provider = _client()
+    model = _model_name(provider)
     outs = []
     sys_p = (
         f"You are an SEO copywriter. Rewrite the source article into a unique, "
@@ -66,8 +78,8 @@ def spin(text: str, niche: str, metro: str = "", n: int = 3,
 
 def spin_from_topic(topic: str, niche: str, metro: str = "", n: int = 3) -> list:
     """Draft a fresh article on a topic, then spin it into N variants."""
-    c, is_groq = _client()
-    model = _model_name(is_groq)
+    c, provider = _client()
+    model = _model_name(provider)
     seed = c.chat.completions.create(
         model=model,
         messages=[

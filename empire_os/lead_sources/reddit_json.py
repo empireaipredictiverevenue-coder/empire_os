@@ -1,3 +1,7 @@
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 """Reddit JSON source — REAL (zero auth, public).
 
 Tier: real (works without OAuth)
@@ -20,7 +24,10 @@ import requests
 from typing import Iterator
 from pathlib import Path
 
-from empire_os.lead_sources import LeadCandidate, SourceInfo
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 
 
 UA = "Mozilla/5.0 (EmpireOS-Crawler/1.0; +https://empire-ai.co.uk/bot)"
@@ -81,7 +88,7 @@ def _scrape_post(url: str) -> str:
         return ""
 
 
-def run(metro: str = None) -> Iterator[LeadCandidate]:
+def run(metro: str = None, verticals: list = None, limit: int = 40) -> Iterator[LeadCandidate]:
     for query, m, niche in SEARCHES:
         if metro and metro != m:
             continue

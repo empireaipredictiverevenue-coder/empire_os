@@ -84,7 +84,7 @@ def build() -> list:
     created = []
     for camp in campaigns:
         exists = c.execute(
-            "SELECT id FROM outbound_campaigns WHERE name=?",
+            "SELECT name FROM outbound_campaigns WHERE name=?",
             (camp["name"],)).fetchone()
         if exists:
             created.append(f"skip(exists):{camp['name']}")

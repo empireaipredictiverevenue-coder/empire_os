@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -148,6 +149,76 @@ def _save_state(state: dict) -> None:
     tmp.replace(STATE_PATH)
 
 
+def _is_unit_truly_down(unit: str) -> bool:
+    """Mirror of cortex_engine._is_unit_truly_down — classify whether a unit
+    flagged by the cortex guard is genuinely broken, vs. a timer-activated
+    oneshot that ran successfully and exited cleanly.
+
+    Used by the watchdog to defensively filter `guard.units_down` so it does
+    not page the user for the same false-positive pattern (Result=success
+    oneshots that show `inactive dead`).
+    """
+    try:
+        out = subprocess.check_output(
+            ["systemctl", "show", unit,
+             "--property=Type,Result,ActiveState,SubState,ExecMainStatus,TriggeredBy"],
+            text=True, timeout=5)
+    except Exception:
+        # On the host, empire-* units live inside the empire-hub container.
+        # If we're called outside the container, `systemctl show` may fail —
+        # treat as "don't know" and keep the original guard verdict.
+        return True
+
+    props: dict[str, str] = {}
+    for ln in out.splitlines():
+        if "=" not in ln:
+            continue
+        k, _, v = ln.partition("=")
+        props[k.strip()] = v.strip()
+
+    active = props.get("ActiveState", "").lower()
+    result = props.get("Result", "").lower()
+    unit_type = props.get("Type", "").lower()
+    triggered_by = props.get("TriggeredBy", "").strip()
+    exec_status = props.get("ExecMainStatus", "").strip()
+
+    if active == "failed":
+        return True
+    if result in ("exit-code", "failed", "timeout", "signal"):
+        return True
+    if exec_status and exec_status not in ("0",):
+        try:
+            return int(exec_status) != 0
+        except ValueError:
+            return True
+
+    # The falsely-flagged case: timer-fired oneshot that ran cleanly.
+    if unit_type == "oneshot" and result == "success":
+        return False
+    if unit_type == "oneshot" and active == "inactive" and result == "success":
+        return False
+
+    if active in ("active", "running"):
+        return False
+    return active not in ("active", "running")
+
+
+def _filter_false_positive_units(units_down: list[str]) -> list[str]:
+    """Drop cleanly-exited timer-fired oneshots from a guard.units_down list.
+    Used as belt-and-suspenders defense against the cortex mis-classification."""
+    if not units_down:
+        return units_down
+    filtered: list[str] = []
+    for u in units_down:
+        try:
+            truly_down = _is_unit_truly_down(u)
+        except Exception:
+            truly_down = True
+        if truly_down:
+            filtered.append(u)
+    return filtered
+
+
 # ───────────────────────────── detection ────────────────────────────────────
 
 
@@ -206,10 +277,19 @@ def detect(report: dict, state: dict) -> list[dict]:
         g_status = str(guard.get("status") or "").strip()
         if g_status and g_status.lower() != "healthy":
             units_down = guard.get("units_down") or []
-            fired.append({
-                "mode": "guard_unhealthy",
-                "detail": f"status={g_status!r} units_down={units_down}",
-            })
+            # Belt-and-suspenders: filter cleanly-exited timer-fired oneshots
+            # so a stale cortex report (or a future regression in cortex's
+            # guard logic) does not page the operator for healthy units.
+            units_down_real = _filter_false_positive_units(list(units_down))
+            if units_down_real:
+                fired.append({
+                    "mode": "guard_unhealthy",
+                    "detail": f"status={g_status!r} units_down={units_down_real}",
+                })
+            else:
+                _log("INFO", "guard degraded but no real down units after filter",
+                     raw_units_down=list(units_down),
+                     g_status=g_status)
 
     # (d) pillar_revenue.occupied_lanes == pillar_revenue.lanes (full saturation)
     rev = report.get("revenue") or report.get("pillar_revenue") or {}

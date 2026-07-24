@@ -33,6 +33,10 @@ def _bg_prompt(niche: str, headline: str) -> str:
         "plumbing": "plumber fixing pipe, wet tools, dramatic lighting",
         "roofing": "roof repair aerial, house, storm clouds, cinematic",
         "towing": "tow truck night, highway, neon, cinematic",
+        "empire_ai": (
+            "futuristic dashboard holographic, predictive revenue chart glowing, "
+            "AI brain visual, dark navy and electric cyan, cinematic depth of field"
+        ),
         "default": "entrepreneur dark background, neon glow, cinematic tech",
     }.get(niche.lower(), "dark gradient, neon accent, cinematic tech")
     return f"{base}, youtube thumbnail style, high contrast, no text"
@@ -108,7 +112,8 @@ def generate_thumbnail(headline: str, niche: str = "default",
 
     # accent bar + niche tag
     accent = {"plumbing": (0, 150, 255), "roofing": (255, 120, 0),
-              "towing": (255, 210, 0), "default": (0, 230, 160)}.get(
+              "towing": (255, 210, 0), "empire_ai": (0, 230, 220),
+              "default": (0, 230, 160)}.get(
         niche.lower(), (0, 230, 160))
     draw.rectangle([60, int(h * 0.45) - 12, 260, int(h * 0.45) + 12], fill=accent)
     draw.text((72, int(h * 0.45) - 4), niche.upper()[:12],

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free SEO Audit — Empire AI</title>
+<style>
+  :root { --black: #0a0a0a; --white: #f5f5f5; --gold: #f0b429; --green: #22c55e; --red: #ef4444; --gray: #6b7280; --radius: 12px; --pad: 20px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--black); color: var(--white); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; min-height: 100vh; }
+  .container { max-width: 820px; margin: 0 auto; padding: 40px 20px; }
+  header { text-align: center; margin-bottom: 48px; }
+  header h1 { font-size: 2.6rem; font-weight: 700; letter-spacing: -0.03em; background: linear-gradient(135deg, #f0b429 0%, #f59e0b 50%, #d97706 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  header p { color: var(--gray); font-size: 1.1rem; margin-top: 8px; }
+  .score-ring { display: flex; gap: 24px; align-items: center; justify-content: center; margin: 24px 0; }
+  .ring { width: 120px; height: 120px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; font-weight: 800; position: relative; }
+  .ring.good { border: 6px solid var(--green); color: var(--green); }
+  .ring.ok { border: 6px solid var(--gold); color: var(--gold); }
+  .ring.bad { border: 6px solid var(--red); color: var(--red); }
+  .ring .grade { font-size: 1.2rem; opacity: 0.7; display: block; text-align: center; }
+  
+  .card { background: #111; border-radius: var(--radius); padding: var(--pad); margin-bottom: 16px; border: 1px solid #1f1f1f; }
+  .card h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray); margin-bottom: 12px; }
+  .check-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a1a; font-size: 0.95rem; }
+  .check-row:last-child { border-bottom: none; }
+  .check-row .status { font-weight: 600; }
+  .check-row .status.pass { color: var(--green); }
+  .check-row .status.fail { color: var(--red); }
+  
+  input, select { width: 100%; padding: 12px 16px; background: #0a0a0a; border: 1px solid #222; border-radius: 8px; color: var(--white); font-size: 1rem; margin-bottom: 12px; }
+  input:focus, select:focus { outline: none; border-color: var(--gold); }
+  button { width: 100%; padding: 14px; background: linear-gradient(135deg, #f0b429, #d97706); color: #000; font-size: 1.1rem; font-weight: 700; border: none; border-radius: 8px; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button:hover:not(:disabled) { transform: translateY(-1px); }
+  .error { background: #2d0a0a; border: 1px solid var(--red); color: var(--red); padding: 12px; border-radius: 8px; margin: 12px 0; display: none; }
+  .loading { text-align: center; display: none; }
+  .loading span { animation: pulse 1.5s infinite; color: var(--gray); }
+  @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+  .result { display: none; }
+  .hero { background: linear-gradient(145deg, #111, #0a0a0a); border: 1px solid #1f1f1f; padding: 32px; border-radius: var(--radius); margin-bottom: 24px; }
+  .hero h2 { font-size: 1.8rem; margin-bottom: 12px; }
+  .hero .subtitle { color: var(--gray); font-size: 1.05rem; }
+  .cta-text { background: #0f0f0f; border: 1px solid #1f1f1f; border-radius: var(--radius); padding: 24px; margin-top: 24px; text-align: center; }
+  .cta-text h3 { color: var(--gold); font-size: 1.3rem; margin-bottom: 8px; }
+  .inline-flex { display: flex; gap: 12px; }
+  .inline-flex > * { flex: 1; }
+  @media (max-width: 600px) { .inline-flex { flex-direction: column; } header h1 { font-size: 1.8rem; } }
+  .tagline { display: flex; gap: 36px; justify-content: center; margin: 32px 0; flex-wrap: wrap; }
+  .tagline span { color: var(--gray); font-size: 0.9rem; }
+  .tagline strong { color: var(--white); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Free SEO Audit</h1>
+    <p>AI-powered site analysis — score, issues, fixes. No credit card.</p>
+  </header>
+
+  <div class="hero" id="form-section">
+    <h2>Your Site, Scored Instantly</h2>
+    <p class="subtitle">Enter your URL and we'll run 12 SEO checks — on-page, technical, schema — and email you a branded PDF report with prioritized fixes.</p>
+    
+    <div class="tagline">
+      <span>🔍 <strong>12 checks</strong> in 15 seconds</span>
+      <span>📄 <strong>Branded PDF</strong> emailed</span>
+      <span>🎯 <strong>Prioritized fixes</strong></span>
+    </div>
+
+    <form id="audit-form">
+      <div class="inline-flex">
+        <input type="url" id="url" placeholder="https://yoursite.com" required>
+        <input type="email" id="email" placeholder="your@email.com" required>
+      </div>
+      <div class="inline-flex">
+        <input type="text" id="niche" placeholder="Niche (e.g. plumbing)">
+        <input type="text" id="metro" placeholder="Metro (e.g. NYC)">
+      </div>
+      <button type="submit" id="submit-btn">🔍 Run Free Audit</button>
+    </form>
+    <div class="error" id="error-msg"></div>
+    <div class="loading" id="loading"><span>⏳ Scanning your site...</span></div>
+  </div>
+
+  <div class="result" id="result-section">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div class="score-ring">
+        <div class="ring" id="score-ring"><span id="score-val">0</span><span class="grade" id="grade-val">F</span></div>
+      </div>
+      <h2 style="font-size:1.5rem;">Your Audit Results</h2>
+      <p style="color:var(--gray);">Check your email for the full PDF report with prioritized fixes.</p>
+    </div>
+
+    <div class="card" id="onpage-card">
+      <h3>📄 On-Page SEO</h3>
+      <div id="onpage-checks"></div>
+    </div>
+
+    <div class="card" id="tech-card">
+      <h3>⚙️ Technical</h3>
+      <div id="tech-checks"></div>
+    </div>
+
+    <div class="cta-text">
+      <h3>Want Us to Fix These Issues?</h3>
+      <p style="color:var(--gray);margin-bottom:16px;">Start at $10 — we implement top fixes, monitor weekly, deliver leads.</p>
+      <button onclick="window.location.href='/buy-leads'" style="max-width:300px;margin:0 auto;">🚀 Start $10 Trial</button>
+    </div>
+  </div>
+
+  <footer style="text-align:center;color:var(--gray);font-size:0.85rem;margin-top:48px;">
+    Empire AI — empire-ai.co.uk
+  </footer>
+</div>
+
+<script>
+const form = document.getElementById('audit-form');
+const submitBtn = document.getElementById('submit-btn');
+const loading = document.getElementById('loading');
+const errorMsg = document.getElementById('error-msg');
+const formSection = document.getElementById('form-section');
+const resultSection = document.getElementById('result-section');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorMsg.style.display = 'none';
+  loading.style.display = 'block';
+  submitBtn.disabled = true;
+
+  const body = {
+    url: document.getElementById('url').value,
+    email: document.getElementById('email').value,
+    niche: document.getElementById('niche').value || 'general',
+    metro: document.getElementById('metro').value || '',
+  };
+
+  try {
+    const res = await fetch('/v1/audit/free', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.message || data.detail || 'Audit failed');
+    
+    displayResults(data);
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.style.display = 'block';
+  } finally {
+    loading.style.display = 'none';
+    submitBtn.disabled = false;
+  }
+});
+
+function displayResults(data) {
+  const score = data.score;
+  const grade = data.grade;
+  const checks = data.checks;
+  
+  const ring = document.getElementById('score-ring');
+  ring.className = 'ring ' + (score >= 80 ? 'good' : score >= 60 ? 'ok' : 'bad');
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('grade-val').textContent = grade;
+  
+  // On-page checks
+  const onpageEl = document.getElementById('onpage-checks');
+  if (checks.onpage) {
+    const items = [
+      { label: 'Title Tag', val: checks.onpage.title_len + ' chars', pass: checks.onpage.title_len >= 30 },
+      { label: 'H1 Tags', val: checks.onpage.h1_count + ' found', pass: parseInt(checks.onpage.h1_count) === 1 },
+      { label: 'Meta Description', val: checks.onpage.meta_desc_len + ' chars', pass: checks.onpage.meta_desc_len >= 120 },
+      { label: 'Schema.org', val: checks.onpage.has_schema ? 'Present' : 'Missing', pass: checks.onpage.has_schema },
+    ];
+    onpageEl.innerHTML = items.map(i => 
+      `<div class="check-row"><span>${i.label}</span><span class="status ${i.pass ? 'pass' : 'fail'}">${i.pass ? '✅' : '⚠️'} ${i.val}</span></div>`
+    ).join('');
+  }
+  
+  // Tech checks
+  const techEl = document.getElementById('tech-checks');
+  if (checks.tech) {
+    const items = [
+      { label: 'HTTPS', val: checks.tech.ssl ? 'Enabled' : 'Disabled', pass: checks.tech.ssl },
+      { label: 'HSTS', val: checks.tech.hsts ? 'Present' : 'Missing', pass: checks.tech.hsts },
+      { label: 'Gzip', val: checks.tech.gzip ? 'Enabled' : 'Disabled', pass: checks.tech.gzip },
+      { label: 'robots.txt', val: checks.tech.robots_txt ? 'Found' : 'Missing', pass: checks.tech.robots_txt },
+      { label: 'Sitemap.xml', val: checks.tech.sitemap_xml ? 'Found' : 'Missing', pass: checks.tech.sitemap_xml },
+    ];
+    techEl.innerHTML = items.map(i =>
+      `<div class="check-row"><span>${i.label}</span><span class="status ${i.pass ? 'pass' : 'fail'}">${i.pass ? '✅' : '⚠️'} ${i.val}</span></div>`
+    ).join('');
+  }
+  
+  formSection.style.display = 'none';
+  resultSection.style.display = 'block';
+  
+  // Scroll to results
+  resultSection.scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+</body>
+</html>

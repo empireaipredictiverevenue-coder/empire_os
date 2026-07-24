@@ -252,7 +252,7 @@ def pillar_aeo(c):
                     "INSERT INTO cortex_blueprints "
                     "(blueprint_id, campaign_type, visual_dna, script_dna, niche, created_at) "
                     "VALUES (?, 'aeo:generate', '{}', ?, ?, ?)",
-                    (bid, json.dumps({"niche": niche, "velocity": velocity, "status": \"pending\"}),
+                    (bid, json.dumps({"niche": niche, "velocity": velocity, "status": "pending"}),
                      niche, now_iso()))
                 emitted += 1
             except Exception:
@@ -422,13 +422,81 @@ def asi_pass():
         return {"error": str(e)[:120]}
 
 
+def _is_unit_truly_down(unit: str) -> bool:
+    """Return True iff this systemd unit is genuinely down (not a cleanly-
+    exited timer-activated oneshot).
+
+    The previous version of `recurrence_guard` flagged every empire-* unit
+    whose `systemctl list-units` row did NOT contain the literal word
+    "running". That mis-classified every timer-activated oneshot (e.g.
+    `empire-predictive-router.service`, `empire-settle-funnel.service`,
+    `empire-cortex-engine.service`) as "down" because after a successful run
+    they transition to `active inactive dead` and never show "running" at
+    all — yet they ran cleanly with `Result=success`.
+
+    Correct classification via `systemctl show`:
+      • Type=oneshot && Result=success && RemainAfterExit=no → NOT down
+        (it is supposed to exit; will be re-launched by its timer)
+      • Type=oneshot && Result=exit-code (or Result=failed)    → DOWN
+      • ActiveState=failed                                     → DOWN
+      • anything else not in `active` / `running`             → DOWN
+    """
+    try:
+        out = subprocess.check_output(
+            ["systemctl", "show", unit,
+             "--property=Type,Result,ActiveState,SubState,RemainAfterExit,ExecMainStatus,TriggeredBy"],
+            text=True, timeout=5)
+    except Exception:
+        return False  # can't introspect → don't claim down (avoid false positive)
+
+    props: dict[str, str] = {}
+    for ln in out.splitlines():
+        if "=" not in ln:
+            continue
+        k, _, v = ln.partition("=")
+        props[k.strip()] = v.strip()
+
+    active = props.get("ActiveState", "").lower()
+    result = props.get("Result", "").lower()
+    unit_type = props.get("Type", "").lower()
+    triggered_by = props.get("TriggeredBy", "").strip()
+    exec_status = props.get("ExecMainStatus", "").strip()
+
+    # Hard-fail states — these are genuinely broken
+    if active == "failed":
+        return True
+    if result in ("exit-code", "failed", "timeout", "signal"):
+        return True
+    if exec_status and exec_status not in ("0",):
+        # Non-zero exit code from the most recent run
+        try:
+            return int(exec_status) != 0
+        except ValueError:
+            return True
+
+    # The falsely-flagged case: oneshot fired by a timer that exited cleanly.
+    # `inactive (dead)` with Result=success is a healthy, completed oneshot —
+    # the next timer tick will launch it again. NOT down.
+    if unit_type == "oneshot" and result == "success" and triggered_by:
+        return False
+    if unit_type == "oneshot" and active == "inactive" and result == "success":
+        return False
+
+    # Daemon-style units (Type=simple / Type=notify) should be active.
+    if active in ("active", "running"):
+        return False
+    # Anything else not active (inactive/deactivating/reloading) without
+    # the cleanly-exited oneshot escape hatch above → flag as down.
+    return active not in ("active", "running")
+
+
 def recurrence_guard():
     """Empire_coder-style guard: units up + hub healthy + no stuck sim."""
     guard = {"units_down": [], "hub_health": False, "stuck_sim": 0, "alerts": []}
     # Transient oneshot services fired by timers exit 0 by design; only
     # long-running daemons (Restart=always, Type=simple) should warn as down.
     TRANSIENT_OK = {
-        "empire-cortex-engine.service",  # timer --once, exits OK
+        "empire-cortex-engine.service",  # belt-and-suspenders: timer --once, exits OK
     }
     try:
         units = subprocess.check_output(
@@ -440,12 +508,22 @@ def recurrence_guard():
             # they're not "down".
             if line.startswith("\u25cf") or line.startswith("●"):
                 continue
-            if "empire-" not in line or "running" in line:
+            if "empire-" not in line:
                 continue
-            unit = line.split()[0]
+            parts = line.split()
+            if len(parts) < 1:
+                continue
+            unit = parts[0]
             if unit in TRANSIENT_OK:
                 continue
-            guard["units_down"].append(unit)
+            # Long-running daemons showing "active running" are obviously up;
+            # short-circuit to avoid a redundant `systemctl show`.
+            if "running" in line:
+                continue
+            # Anything else: verify via `systemctl show` so cleanly-exited
+            # timer-activated oneshots are not mis-flagged.
+            if _is_unit_truly_down(unit):
+                guard["units_down"].append(unit)
     except Exception:
         pass
     # hub health (localhost, no Cloudflare WAF)

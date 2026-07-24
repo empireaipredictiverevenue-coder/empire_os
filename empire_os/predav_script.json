@@ -1,0 +1,12 @@
+{
+  "answer": "Hello, I'm Phillip Livesley, founder of Empire AI. We built the Predictive Revenue Intelligence System that transforms your B2B pipeline into predictable, scalable revenue streams. Our AI analyzes thousands of interactions daily to identify high-value prospects, automate qualification, and deliver measurable ROI. We're currently seeking strategic partners who want to leverage this revenue intelligence to accelerate their growth.",
+  "hook": "Ready to turn your pipeline into predictable revenue?",
+  "beats": [
+    {"text": "Our AI engine analyzes thousands of B2B interactions to identify qualified prospects with 10x better accuracy"},
+    {"text": "You get real revenue conversations, not just leads - qualified and pre-sold"},
+    {"text": "Our partners typically see 10X ROI in their first 90 days"},
+    {"text": "Real-time revenue prediction and automated qualification"},
+    {"text": "Integration with your existing sales funnel"}
+  ],
+  "title": "Empire AI Predictive Revenue Intelligence System"
+}

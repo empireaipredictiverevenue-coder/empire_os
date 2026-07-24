@@ -40,20 +40,35 @@ FIELDS = [
 
 
 def confirm_path_safe():
-    """Create .env with 0600 perms BEFORE any value is written."""
-    if ENV_PATH.exists():
-        # Don't overwrite a real config without asking
-        resp = ""
-        if sys.stdin.isatty():
-            resp = input("%s exists. Overwrite? [y/N]: " % ENV_PATH).strip().lower()
-        # In pipe mode or with empty input, default to NO (safe default)
-        if resp != "y":
-            print("Aborted. Existing .env left untouched.")
-            sys.exit(1)
+    """Open .env in MERGE mode — read existing keys first, write only the keys
+    in FIELDS that the user provides. NEVER truncate. NEVER drop keys we
+    don't know about. Back up to /root/empire_secrets/.env.bak.<ts> before any
+    write so a destructive op is always recoverable.
+    """
     ENV_PATH.parent.mkdir(parents=True, exist_ok=True)
-    # Create the file with 0600 right now, before any secret enters it
+    existing: dict[str, str] = {}
+    if ENV_PATH.exists():
+        # Backup FIRST so any merge mishap is recoverable
+        import time as _t
+        bk_dir = Path("/root/empire_secrets")
+        bk_dir.mkdir(parents=True, exist_ok=True)
+        os.chmod(bk_dir, 0o700)
+        bk_path = bk_dir / f".env.bak.{int(_t.time())}"
+        import shutil
+        shutil.copy2(ENV_PATH, bk_path)
+        os.chmod(bk_path, 0o600)
+        sys.stderr.write(f"backup: {bk_path}\n")
+        for line in ENV_PATH.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            existing[k.strip()] = v.strip()
+        sys.stderr.write(f"merge: preserving {len(existing)} existing keys: "
+                         f"{sorted(existing.keys())}\n")
+    # Open in write mode but we'll write the merged set atomically
     fd = os.open(str(ENV_PATH), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    return os.fdopen(fd, "w")
+    return os.fdopen(fd, "w"), existing
 
 
 def safe_show(value):
@@ -79,9 +94,14 @@ def main():
     print("=" * 50)
     print()
 
-    f = confirm_path_safe()
+    f, existing = confirm_path_safe()
 
     try:
+        # Start the merged set from what we already have. write_env.py
+        # only knows about FIELDS; any other keys in the existing .env
+        # (SOLANA_PAYER_SECRET, SendGrid block, anything else) are
+        # PRESERVED untouched.
+        merged = dict(existing)
         for key, default, label in FIELDS:
             prompt = "%s\n  %s: " % (label, key)
             if default:
@@ -90,18 +110,22 @@ def main():
             try:
                 raw = input(prompt)
             except EOFError:
-                # Non-interactive: stop asking
-                print("\n  (no more input — using defaults for remaining)")
+                # Non-interactive: stop asking, keep existing for unknown keys
+                print("\n  (no more input — keeping existing values for remaining keys)")
                 break
 
             value = raw.strip()
             if not value and default:
                 value = default
             if not value:
+                # No input + no default = leave any existing value alone
+                if key in merged:
+                    print("  kept existing %s" % key)
+                    continue
                 print("  skipped (empty, no default)")
                 continue
 
-            f.write("%s=%s\n" % (key, value))
+            merged[key] = value
             print("  + %s = %s" % (key, safe_show(value)))
 
     except KeyboardInterrupt:
@@ -110,6 +134,11 @@ def main():
         ENV_PATH.unlink()
         sys.exit(1)
 
+    # Write merged set atomically — unknowns go LAST (preserved order)
+    for k, v in merged.items():
+        f.write("%s=%s\n" % (k, v))
+    f.flush()
+    os.fsync(f.fileno())
     f.close()
     # Belt and suspenders
     os.chmod(ENV_PATH, 0o600)

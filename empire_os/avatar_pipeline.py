@@ -144,42 +144,30 @@ def talking_head(audio_wav: str, out_mp4: str) -> str:
 
     Returns Empire OS face generation method used.
     """
-    # Empire OS SadTalker lip-sync (requires portrait + CLI)
-    if PORTRAIT.exists() and shutil.which("sadtalker"):
-        subprocess.run(
-            ["sadtalker", "--driven_audio", audio_wav,
-             "--source_image", str(PORTRAIT), "--result_dir",
-             str(ASSETS / "out"), "--preprocess", "full"],
-            capture_output=True, text=True, timeout=300
-        )
-        res = next((p for p in (ASSETS / "out").rglob("*.mp4")), None)
-        if res:
-            shutil.move(str(res), out_mp4)
-            return "sadtalker"
-
-    # Empire OS Ken Burns portrait loop (no lip-sync, real face + voice)
+    # Empire OS Ken Burns portrait loop (simplified, reliable approach)
     if PORTRAIT.exists():
         if not _ensure_ffmpeg():
             return "failed"
-        # duration from audio
+        # Use realistic 5-8 minute video duration (not hours)
         try:
             dur = subprocess.run(
                 ["ffprobe", "-v", "error", "-show_entries",
                  "format=duration", "-of", "default=nw=1:nk=1", audio_wav],
                 capture_output=True, text=True, timeout=20).stdout.strip()
-            dur = float(dur) if dur else 15.0
+            dur = float(dur) if dur else 180.0  # Default 3 minutes
+            # Cap duration at 8 minutes (480 seconds) for practical video length
+            dur = min(dur, 480.0)
         except Exception:
-            dur = 15.0
+            dur = 180.0  # Default 3 minutes
+        
+        # Simplified, faster video generation
         cmd = [
             "ffmpeg", "-y", "-loop", "1", "-i", str(PORTRAIT),
-            "-i", audio_wav, "-t", str(dur), "-r", "30", "-vf",
-            "scale=1080:1920:force_original_aspect_ratio=increase,"
-            "crop=1080:1920,"
-            "zoompan=z='min(zoom+0.0004,1.06)':d=150:s=1080x1920:fps=30",
+            "-i", audio_wav, "-t", str(dur), "-r", "30",
             "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "128k", "-shortest", out_mp4
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode == 0 and Path(out_mp4).exists():
             return "kenburns"
 
@@ -219,49 +207,52 @@ def talking_head(audio_wav: str, out_mp4: str) -> str:
         )
         return "fallback"
 
-def _upload_to_youtube(video_path: str, script: dict) -> bool:
-    """Automatically upload Empire OS video to YouTube.
+def _upload_to_youtube(video_path: str, script: dict) -> dict:
+    """Upload Empire OS video to YouTube via real Data API v3.
 
-    Args:
-        video_path: Path to the Empire OS video file
-        script: The original script used to generate the Empire OS video
-
-    Returns:
-        True if Empire OS YouTube upload successful, False otherwise
+    Returns dict with success status and youtube_id/url on success.
     """
     try:
         empireos_video = Path(video_path)
         if not empireos_video.exists() or empireos_video.stat().st_size == 0:
-            print(f"⚠️ Empire OS Warning: Video file not found or empty: {video_path}")
-            return False
+            return {"success": False, "error": "video file missing or empty"}
 
-        upload_cmd = [
-            "yt-dlp", "--upload-to-youtube",
-            "--title", script.get("title", f"Empire OS Avatar Video"),
-            "--description", f"{script.get('answer', '')} {script.get('hook', '')}",
-            "--tags", "#EmpireOS,#AIautomation,#BusinessEfficiency,#EnterpriseSolutions",
-            "--category", "Education",
-            "--privacyStatus", "public",
-            str(empireos_video)
-        ]
+        from empire_os.youtube_uploader import upload_video
 
-        print(f"🚀 Empire OS Uploading video to YouTube...")
-        print(f"   📁 Video: {empireos_video.name}")
-        print(f"   📺 Title: {script.get('title', 'Empire OS Avatar Video')}")
+        title = (script.get("title") or "Empire AI — Predictive Revenue Intelligence")[:100]
+        answer = script.get("answer", "")
+        hook = script.get("hook", "")
+        body = " ".join(b.get("text", "") for b in script.get("beats", []))
+        description = f"""{hook}
 
-        result = subprocess.run(upload_cmd, capture_output=True, text=True, timeout=300)
+{answer}
 
-        if result.returncode == 0:
-            print(f"✅ Empire OS YouTube upload successful!")
-            print(f"   📺 YouTube URL: {result.stdout}")
-            return True
-        else:
-            print(f"❌ Empire OS YouTube upload failed: {result.stderr}")
-            return False
+{body}
+
+🎯 Free Empire AI discovery call (video lead): https://track.empire-ai.co.uk/u/discovery_call?ref=youtube
+🚀 Join Empire AI beta (50% off + free setup): https://track.empire-ai.co.uk/u/beta_signup?ref=youtube
+📊 Download case study + ROI breakdown: https://track.empire-ai.co.uk/u/case_study?ref=youtube
+🔗 Connect with Phillip on LinkedIn: https://track.empire-ai.co.uk/u/networking?ref=youtube
+🎥 Schedule Empire AI platform demo: https://track.empire-ai.co.uk/u/demo_request?ref=youtube
+
+#EmpireAI #RevenueIntelligence #B2BSaaS #AIautomation #SalesTech"""
+
+        tags = ["EmpireAI", "RevenueIntelligence", "B2BSaaS", "AIautomation",
+                "SalesTech", "LeadGeneration", "PredictiveRevenue", "AIAvatar",
+                "FounderStory", "B2BConversion"]
+
+        print(f"🚀 Empire OS Uploading to YouTube via Data API v3...")
+        print(f"   📁 Video: {empireos_video.name} ({empireos_video.stat().st_size} bytes)")
+        print(f"   📺 Title: {title}")
+
+        youtube_id, status = upload_video(str(empireos_video), title, description, tags)
+        url = f"https://youtu.be/{youtube_id}" if youtube_id else None
+        print(f"✅ Empire OS YouTube upload complete: {url} (status={status})")
+        return {"success": True, "youtube_id": youtube_id, "url": url, "upload_status": status}
 
     except Exception as e:
-        print(f"⚠️ Empire OS Warning: YouTube upload exception: {str(e)}")
-        return False
+        print(f"❌ Empire OS YouTube upload failed: {e}")
+        return {"success": False, "error": str(e)}
 
 def run(script: dict, out_path: str = "", upload_to_youtube: bool = False) -> dict:
     """Empire OS complete production workflow orchestrator.
@@ -290,19 +281,40 @@ def run(script: dict, out_path: str = "", upload_to_youtube: bool = False) -> di
     if engine == "failed":
         return {"ok": False, "error": "Empire OS voice synthesis failed"}
 
-    # Empire OS avatar generation
-    face_mode = talking_head(wav, str(out))
+    # Empire OS avatar generation — try cinematic render first (full branding kit),
+    # fall back to simple talking-head loop if cinematic fails or no portrait.
+    beats = [b.get("text", "Key insight") for b in script.get("beats", [])]
+    if not beats:
+        beats = ["Predictive Revenue Intelligence", "10X ROI", "Real-Time Pipeline"]
+    portrait = Path("/root/avatar_assets/portrait_hi.jpg")
+    face_mode = "failed"
+    try:
+        from empire_os.video_quality import render_cinematic
+        cinematic_out = out.with_suffix(".cinematic.mp4")
+        res = render_cinematic(wav, portrait, beats, str(cinematic_out), script=script)
+        if res.get("ok"):
+            # replace the bare talking-head render with the cinematic one
+            shutil.move(str(cinematic_out), str(out))
+            face_mode = "cinematic"
+        else:
+            print(f"⚠️ Cinematic render failed ({res.get('error','')[:80]}), falling back")
+    except Exception as e:
+        print(f"⚠️ Cinematic render unavailable: {e}")
+
     if face_mode == "failed":
-        return {"ok": False, "error": "Empire OS avatar generation failed"}
+        face_mode = talking_head(wav, str(out))
+        if face_mode == "failed":
+            return {"ok": False, "error": "Empire OS avatar generation failed"}
 
     youtube_status = None
     if upload_to_youtube:
         print(f"\n🚀 Initiating Empire OS automatic YouTube upload...")
-        youtube_status = _upload_to_youtube(str(out), script)
-        if youtube_status:
-            print(f"✅ Empire OS video successfully uploaded to YouTube!")
+        yt = _upload_to_youtube(str(out), script)
+        if yt.get("success"):
+            print(f"✅ Empire OS video uploaded: {yt.get('url')}")
         else:
-            print(f"⚠️ Empire OS YouTube upload failed (video still generated locally)")
+            print(f"⚠️ Empire OS YouTube upload failed: {yt.get('error')}")
+        youtube_status = yt
 
     return {
         "ok": True,

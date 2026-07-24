@@ -266,20 +266,9 @@ def _ollama_reachable() -> bool:
     except Exception:
         return False
 
-if not os.environ.get("MINIMAX_API_KEY") and _load_openrouter_key() and not _ollama_reachable():
-    _orig_ollama = OllamaClient
-    class _OllamaToOpenRouter(OllamaClient):
-        """Drop-in OllamaClient replacement backed by OpenRouter."""
-        def __init__(self, base_url=None, model=None, timeout=60, **kw):
-            self._or = OpenRouterClient(model=model or _OR_FALLBACK_MODEL, timeout=timeout)
-            self.model = self._or.model
-            self.timeout = timeout
-        def chat(self, messages, system=None, temperature=0.3, format=None, **kw):
-            return self._or.chat(messages, system=system, temperature=temperature)
-        def structured_chat(self, messages, system=None, temperature=0.2, **kw):
-            return self._or.structured_chat(messages, system=system, temperature=temperature)
-    OllamaClient = _OllamaToOpenRouter
-    logger.info("Ollama unreachable + OpenRouter key present — agents use OpenRouter (%s)", _OR_FALLBACK_MODEL)
+def _load_openrouter_key() -> bool:
+    """Check if OpenRouter API key is available from environment variable."""
+    return bool(os.environ.get("OPENROUTER_API_KEY"))
 
 
 

@@ -26,7 +26,13 @@ VELOCITY_THRESHOLD = float(os.getenv("VELOCITY_THRESHOLD", "50"))
 
 
 def _db():
-    c = sqlite3.connect(DB)
+    """Open DB connection with WAL mode + busy timeout. Caller MUST close()."""
+    c = sqlite3.connect(DB, timeout=30)
+    # WAL mode is a database-level setting — set once per connection.
+    # PRAGMA busy_timeout controls how long writers wait for locks.
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("PRAGMA busy_timeout=30000")
+    c.execute("PRAGMA synchronous=NORMAL")
     c.execute("""CREATE TABLE IF NOT EXISTS hot_targets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         keyword TEXT, niche TEXT, velocity REAL,
@@ -103,12 +109,18 @@ def run(dry_run: bool = False) -> dict:
     hots = sorted(seen.values(), key=lambda x: -x["velocity"])
     if not dry_run:
         c = _db()
-        for h in hots:
-            c.execute(
-                "INSERT INTO hot_targets (keyword,niche,velocity,source,ts) "
-                "VALUES (?,?,?,?,?)",
-                (h["keyword"], h["niche"], h["velocity"], h["source"], h["ts"]))
-        c.commit()
+        try:
+            for h in hots:
+                c.execute(
+                    "INSERT INTO hot_targets (keyword,niche,velocity,source,ts) "
+                    "VALUES (?,?,?,?,?)",
+                    (h["keyword"], h["niche"], h["velocity"], h["source"], h["ts"]))
+            c.commit()
+        except sqlite3.OperationalError as e:
+            # Lock contention even with busy_timeout — log + skip rather than crash
+            log.error("hot_targets insert failed: %s", e)
+        finally:
+            c.close()
     return {"hot_count": len(hots), "top": hots[:5]}
 
 

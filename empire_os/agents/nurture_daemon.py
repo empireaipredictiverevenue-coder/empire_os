@@ -41,7 +41,7 @@ def daily_cap(now=None):
 SEQUENCE = [
     (0,  "value"),     # Day 0: niche insight, no ask
     (3,  "nudge"),     # Day +3: short reply in thread
-    (7,  "micro_ask"), # Day +7: "5-min chat?"
+    (7,  "ask"),       # Day +7: "5-min chat?"
 ]
 
 VALUE_TPL = (
@@ -49,7 +49,7 @@ VALUE_TPL = (
     "We grade those homeowner triggers and route the hot ones to local crews. "
     "No ask — just know the pipeline exists if you want it."
 )
-NUdGE_TPL = (
+NUDGE_TPL = (
     "Following up on the roofing trigger volume in {metro}. "
     "Last storm cycle we tracked 400+ homeowner leads there. Happy to show the grade breakdown."
 )
@@ -82,7 +82,7 @@ def build_email(kind, name, metro, niche):
     name = (name or "there").split()[0] if name else "there"
     trigger = {"residential_roofing":"roof damage","roof_repair":"storm repair",
                "water_damage":"flood damage","hvac":"HVAC failure"}.get(niche,"storm damage")
-    tpl = {"value":VALUE_TPL,"nudge":NUdGE_TPL,"ask":ASK_TPL}[kind]
+    tpl = {"value":VALUE_TPL,"nudge":NUDGE_TPL,"ask":ASK_TPL}[kind]
     return tpl.format(name=name, metro=metro or "your area", trigger=trigger)
 
 def queue_send(cur, prospect, kind, step):

@@ -1,3 +1,7 @@
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 #!/usr/bin/env python3
 """
 Empire OS v3 — Overpass (OpenStreetMap) local-lead source
@@ -28,7 +32,11 @@ import urllib.parse
 import json
 import time
 
-from empire_os.lead_sources import LeadCandidate, SourceInfo, infer_niche
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 
 # Major US metro centers (lat, lon). Add more as coverage grows.
 METRO_COORDS = {

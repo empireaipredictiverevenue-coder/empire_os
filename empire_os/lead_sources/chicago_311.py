@@ -1,3 +1,7 @@
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 """Chicago 311 Service Requests source — REAL (free).
 
 Tier: real (no key required)
@@ -20,7 +24,10 @@ import requests
 import time
 from datetime import date, timedelta
 from typing import Iterator
-from empire_os.lead_sources import LeadCandidate, SourceInfo
+from empire_os.lead_sources.models import LeadCandidate, SourceInfo
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
+from empire_os.lead_sources.utils import infer_niche
 
 
 URL_311 = "https://data.cityofchicago.org/resource/v6f7-df3a.json"
@@ -48,7 +55,7 @@ CATEGORY_NICHE = {
 }
 
 
-def run(metro: str = None) -> Iterator[LeadCandidate]:
+def run(metro: str = None, verticals: list = None, limit: int = 40) -> Iterator[LeadCandidate]:
     if metro and metro != "CHI":
         return
 

@@ -1,233 +1,191 @@
 #!/usr/bin/env python3
-"""Empire OS — revenue snapshot (reads the tables that ACTUALLY hold money).
-
-The legacy revenue_dashboard.py reads si_settlements / si_charges which are
-empty; real revenue lives in si_ppc_invoices (PPL invoices billed per delivered
-lead) + the nurture funnel in si_buyer_outreach + outbound_campaigns audiences.
-
-Outputs a compact JSON snapshot + prints a human summary. Designed to be cron'd
-(Telegram delivery handled by the cron wrapper, not here).
-
-Run inside the container: /root/venv/bin/python3 empire_os/revenue_snapshot.py
 """
-import sqlite3, json, sys
+Empire OS v3 — Revenue Snapshot Reporter
+=========================================
+Pulls live DB state + AI summary (Cortex brain) + sends to ANY messaging
+platform via `hermes send`. Runs as systemd timer for daily/30min cadence.
+
+Usage:
+    python3 -m empire_os.revenue_snapshot           # full snapshot
+    python3 -m empire_os.revenue_snapshot --json    # JSON only
+    python3 -m empire_os.revenue_snapshot --send telegram  # push to telegram
+"""
+import json
+import os
+import sqlite3
+import subprocess
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
-sys.path.insert(0, "/root/empire_os")
-DB = "/root/empire_os/empire_os.db"
-import empire_os.predictive_revenue as pr
-
-
-def _c():
-    c = sqlite3.connect(DB, timeout=20)
-    c.row_factory = sqlite3.Row
-    return c
-
-
-def _eval_section() -> dict:
-    """Empire Cortex eval product — real lead grading + USDC settlement."""
-    try:
-        c = _c()
-        ledger = c.execute(
-            "SELECT COUNT(*), COALESCE(SUM(price_usd),0) FROM evaluation_ledger"
-        ).fetchone()
-        graded = ledger[0]
-        ledger_usd = round((ledger[1] or 0), 2)
-        settle = c.execute(
-            "SELECT COUNT(*), COALESCE(SUM(amount_usd),0), "
-            "SUM(CASE WHEN status='settled' THEN 1 ELSE 0 END) "
-            "FROM evaluation_settlements"
-        ).fetchone()
-        c.close()
-        return {
-            "leads_graded": graded,
-            "ledger_usd": ledger_usd,
-            "settlements_total": settle[0],
-            "settlements_usd": round((settle[1] or 0), 2),
-            "settlements_paid": settle[2] or 0,
-        }
-    except Exception:
-        return {"leads_graded": 0, "ledger_usd": 0.0,
-                "settlements_total": 0, "settlements_usd": 0.0,
-                "settlements_paid": 0}
-
-
-def _behavior_section() -> dict:
-    """Empire Cortex behavioral intelligence — real human behavior signals."""
-    try:
-        from empire_os.behavior_engine import main as behavior_main
-        return behavior_main()
-    except Exception:
-        return {"error": "behavior_engine unavailable"}
+DB_PATH = "/root/empire_os/empire_os.db"
+FEEDBACK = Path("/root/feedback")
+FEEDBACK.mkdir(parents=True, exist_ok=True)
 
 
 def snapshot() -> dict:
-    c = _c()
-    now = datetime.now(timezone.utc).isoformat()
+    c = sqlite3.connect(DB_PATH)
+    c.row_factory = sqlite3.Row
 
-    # --- PPL invoicing (real revenue engine) ---
-    inv = c.execute(
-        "SELECT status, COUNT(*) n, COALESCE(SUM(amount_cents),0) cents "
-        "FROM si_ppc_invoices GROUP BY status"
-    ).fetchall()
-    inv_by = {r["status"]: {"count": r["n"], "usd": r["cents"] / 100} for r in inv}
-    total_billed = sum(v["usd"] for v in inv_by.values())
-    open_usd = inv_by.get("open", {}).get("usd", 0.0)
-    paid_usd = inv_by.get("paid", {}).get("usd", 0.0) + inv_by.get("settled", {}).get("usd", 0.0)
+    snap = {"ts": datetime.now(timezone.utc).isoformat()}
 
-    # per-buyer billed
-    per_buyer = c.execute(
-        "SELECT buyer_id, COUNT(*) n, COALESCE(SUM(amount_cents),0) cents "
-        "FROM si_ppc_invoices GROUP BY buyer_id ORDER BY cents DESC"
-    ).fetchall()
-    buyers = [{"buyer_id": r["buyer_id"][:8], "invoices": r["n"],
-               "billed_usd": r["cents"] / 100} for r in per_buyer]
-
-    # --- nurture funnel (inbound AEO signups) ---
-    st = dict(c.execute(
-        "SELECT reply_state, COUNT(*) FROM si_buyer_outreach GROUP BY 1").fetchall())
-    touched = c.execute(
-        "SELECT COUNT(*) FROM si_buyer_outreach WHERE touch_count>0").fetchone()[0]
-    funnel = {
-        "total_signups": sum(st.values()),
-        "cold": st.get("cold", 0),
-        "contacted": st.get("contacted", 0),
-        "touched_total": touched,
-        "failed_recovered": st.get("outreach_failed", 0),
+    # LEADS
+    snap["leads"] = {
+        "total": c.execute("SELECT COUNT(*) FROM lane_leads").fetchone()[0],
+        "last_1h": c.execute("SELECT COUNT(*) FROM lane_leads WHERE created_at > datetime('now','-1 hour')").fetchone()[0],
+        "last_24h": c.execute("SELECT COUNT(*) FROM lane_leads WHERE created_at > datetime('now','-1 day')").fetchone()[0],
+        "by_tier": {r["omega_tier"]: r["COUNT(*)"] for r in c.execute("SELECT omega_tier, COUNT(*) AS 'COUNT(*)' FROM lane_leads GROUP BY omega_tier").fetchall() if r["omega_tier"]},
+        "avg_fit_score": c.execute(
+            "SELECT ROUND(AVG(MIN(100, MAX(0, icp_fit_score))), 1) "
+            "FROM lane_leads WHERE icp_fit_score IS NOT NULL"
+        ).fetchone()[0] or 0,
     }
 
-    # --- outbound campaigns ---
-    camps = c.execute(
-        "SELECT name, status, audience_size, sent FROM outbound_campaigns").fetchall()
-    campaigns = [{"name": r["name"], "status": r["status"],
-                  "audience": r["audience_size"], "sent": r["sent"]}
-                 for r in camps]
-    total_audience = sum(r["audience_size"] for r in camps)
-
-    # --- seated lanes (revenue capacity) ---
-    seated = c.execute(
-        "SELECT COUNT(*), COALESCE(SUM(seat_price),0) FROM lanes "
-        "WHERE occupied_by IS NOT NULL AND occupied_by != ''").fetchall()[0]
-    seats = {"seated_lanes": seated[0], "seat_value_usd": seated[1]}
-
-    # --- funnel conversion rates (where the leaks are) ---
-    signups = funnel["total_signups"]
-    touched = funnel["touched_total"]
-    contacted = funnel["contacted"]
-    converted = c.execute(
-        "SELECT COUNT(*) FROM si_buyer_outreach WHERE converted=1").fetchone()[0]
-    nurture_conv = round(contacted / touched * 100, 2) if touched else 0.0
-    signup_conv = round(converted / signups * 100, 4) if signups else 0.0
-    collection_rate = round(paid_usd / total_billed * 100, 2) if total_billed else 0.0
-
-    funnels = {
-        "nurture": {
-            "signups": signups, "touched": touched, "contacted": contacted,
-            "converted": converted,
-            "touch_rate_pct": round(touched / signups * 100, 2) if signups else 0.0,
-            "contact_rate_pct": nurture_conv,
-            "signup_to_buyer_pct": signup_conv,
-        },
-        "collections": {
-            "billed_usd": round(total_billed, 2),
-            "collected_usd": round(paid_usd, 2),
-            "collection_rate_pct": collection_rate,
-        },
+    # A2A MATCHES
+    snap["a2a"] = {
+        "total": c.execute("SELECT COUNT(*) FROM buyer_leads").fetchone()[0],
+        "delivered_http_200": c.execute(
+            "SELECT COUNT(*) FROM buyer_leads WHERE endpoint_status='http_200'"
+        ).fetchone()[0],
+        "pending": c.execute(
+            "SELECT COUNT(*) FROM buyer_leads WHERE endpoint_status='pending'"
+        ).fetchone()[0],
+        "no_endpoint": c.execute(
+            "SELECT COUNT(*) FROM buyer_leads WHERE endpoint_status='no_endpoint'"
+        ).fetchone()[0],
+        "locked_usd": c.execute(
+            "SELECT ROUND(SUM(payout_usd), 2) FROM buyer_leads "
+            "WHERE endpoint_status='http_200'"
+        ).fetchone()[0] or 0,
+        "test_received": c.execute(
+            "SELECT COUNT(*) FROM test_received_leads"
+        ).fetchone()[0],
     }
 
-    # --- threshold alerts (flag stalls so the ping drives action) ---
-    alerts = []
-    if collection_rate == 0 and total_billed > 0:
-        alerts.append(f"LEAK: 0% of ${total_billed:.0f} billed collected (invoices open, none paid)")
-    if signup_conv == 0:
-        alerts.append(f"LEAK: 0% signup->buyer conversion ({converted} converted of {signups} signups)")
-    if touched / signups < 0.05 and signups > 1000:
-        alerts.append(f"LEAK: nurture touch rate {touched/signups*100:.1f}% (only {touched} of {signups} contacted)")
-    if seated[0] < 50:
-        alerts.append(f"CAPACITY: only {seated[0]} seated lanes (revenue ceiling low)")
-
-    # --- payment confirmations (solana_listener marks paid_at on-chain) ---
-    paid_rows = c.execute(
-        "SELECT COUNT(*), COALESCE(SUM(amount_cents),0), MAX(paid_at) "
-        "FROM si_ppc_invoices WHERE paid_at IS NOT NULL").fetchone()
-    conf = {
-        "confirmed_count": paid_rows[0],
-        "confirmed_usd": round((paid_rows[1] or 0) / 100, 2),
-        "last_confirmed_at": paid_rows[2],
+    # BUYERS
+    snap["buyers"] = {
+        "total": c.execute("SELECT COUNT(*) FROM si_buyer_outreach").fetchone()[0],
+        "priced": c.execute(
+            "SELECT COUNT(*) FROM si_buyer_outreach WHERE payout_per_lead > 0"
+        ).fetchone()[0],
+        "with_endpoint": c.execute(
+            "SELECT COUNT(*) FROM si_buyer_outreach "
+            "WHERE endpoint_url != '' AND endpoint_url IS NOT NULL"
+        ).fetchone()[0],
     }
-    seat_conf = c.execute(
-        "SELECT COUNT(*) FROM si_subscription WHERE status='active' "
-        "AND payment_ref != ''").fetchone()[0]
-    conf["seats_activated"] = seat_conf
+
+    # CHARGES
+    snap["charges"] = {
+        "total": c.execute("SELECT COUNT(*) FROM si_charges").fetchone()[0],
+        "open": c.execute("SELECT COUNT(*) FROM si_charges WHERE status='open'").fetchone()[0],
+        "paid": c.execute("SELECT COUNT(*) FROM si_charges WHERE status='paid'").fetchone()[0],
+        "vault_usdc": c.execute(
+            "SELECT ROUND(COALESCE(SUM(amount_cents), 0) / 100.0, 4) "
+            "FROM si_charges WHERE status='paid'"
+        ).fetchone()[0] or 0,
+    }
+
+    # SETTLEMENTS
     try:
-        import subprocess
-        out = subprocess.run(["pgrep", "-f", "solana_listener"],
-                             capture_output=True, text=True, timeout=5)
-        conf["listener_active"] = bool(out.stdout.strip())
+        snap["settlements"] = {
+            "rows": c.execute("SELECT COUNT(*) FROM si_settlements").fetchone()[0],
+        }
     except Exception:
-        conf["listener_active"] = False
+        snap["settlements"] = {"rows": 0, "note": "table missing"}
 
-    c.close()
-    return {
-        "timestamp": now,
-        "revenue": {
-            "total_billed_usd": round(total_billed, 2),
-            "open_usd": round(open_usd, 2),
-            "collected_usd": round(paid_usd, 2),
-            "by_status": inv_by,
-            "per_buyer": buyers,
-        },
-        "payments": conf,
-        "eval_product": _eval_section(),
-        "behavior": _behavior_section(),
-        "nurture_funnel": funnel,
-        "funnels": funnels,
-        "outbound_campaigns": campaigns,
-        "outbound_audience_total": total_audience,
-        "seated_lanes": seats,
-        "forecast": pr.forecast(),
-        "alerts": alerts,
-    }
+    # CORPUS BRAIN
+    brain_path = FEEDBACK / "cortex_brain.json"
+    if brain_path.exists():
+        brain = json.loads(brain_path.read_text())
+        snap["cortex_alerts"] = brain.get("snapshot", {}).get("alerts", [])[:5]
+        advice = brain.get("advice", {})
+        snap["cortex_summary"] = (advice.get("content", "") or "")[:500]
+    return snap
+
+
+def render_text(snap: dict) -> str:
+    """Compact ASCII report for message body."""
+    L, A, B = snap["leads"], snap["a2a"], snap["buyers"]
+    CH = snap["charges"]
+
+    lines = [
+        "📊 EMPIRE OS v3 — REVENUE SNAPSHOT",
+        f"⏱ {snap['ts'][:19]} UTC",
+        "",
+        "LEADS",
+        f"  total:        {L['total']:,}",
+        f"  last 1h:      {L['last_1h']:,}",
+        f"  last 24h:     {L['last_24h']:,}",
+        f"  by tier:      {' '.join(f'{k}={v}' for k, v in L['by_tier'].items())}",
+        f"  avg fit:      {L['avg_fit_score']:.1f}/100",
+        "",
+        "A2A",
+        f"  matches:      {A['total']:,}",
+        f"  delivered:    {A['delivered_http_200']:,}",
+        f"  pending:      {A['pending']:,}",
+        f"  test_recv:    {A['test_received']:,}",
+        f"  locked USD:   ${A['locked_usd']}",
+        "",
+        "BUYERS",
+        f"  priced:       {B['priced']:,}",
+        f"  endpointed:   {B['with_endpoint']:,}",
+        "",
+        "CHARGES",
+        f"  total:        {CH['total']:,}",
+        f"  open:         {CH['open']:,}",
+        f"  paid:         {CH['paid']:,}",
+        f"  vault USDC:   ${CH['vault_usdc']}",
+        "",
+        f"SETTLEMENTS rows: {snap['settlements']['rows']}",
+    ]
+    if snap.get("cortex_summary"):
+        lines.append("")
+        lines.append("🧠 CORTEX")
+        lines.append(snap["cortex_summary"])
+    if snap.get("cortex_alerts"):
+        lines.append("")
+        lines.append("⚠ ALERTS")
+        for a in snap["cortex_alerts"][:3]:
+            lines.append(f"  • {a[:120]}")
+    return "\n".join(lines)
+
+
+def send(target: str, body: str, subject: str = None) -> int:
+    """Send via hermes CLI (uses Telegram/Discord/Slack bot token)."""
+    cmd = ["hermes", "send", "-t", target, "--quiet"]
+    if subject:
+        cmd.extend(["--subject", subject])
+    cmd.append(body)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    return r.returncode
+
+
+def main():
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("--json", action="store_true", help="Print JSON")
+    p.add_argument("--save", action="store_true", help="Save to /root/feedback")
+    p.add_argument("--send", default=None, help="Send to: telegram / telegram:-100... / etc")
+    args = p.parse_args()
+
+    snap = snapshot()
+    if args.json:
+        print(json.dumps(snap, indent=2, default=str))
+    else:
+        print(render_text(snap))
+
+    if args.save:
+        path = FEEDBACK / "revenue_snapshot.json"
+        path.write_text(json.dumps(snap, indent=2, default=str))
+        print(f"\nSaved: {path}")
+
+    if args.send:
+        body = render_text(snap)
+        subject = f"Empire OS Snapshot — ${snap['a2a']['locked_usd']} locked / {snap['leads']['last_24h']} leads / 24h"
+        rc = send(args.send, body, subject)
+        print(f"\nSend to {args.send}: exit={rc}")
 
 
 if __name__ == "__main__":
-    s = snapshot()
-    print(json.dumps(s, indent=2))
-    # one-line summary for cron/telegram
-    r = s["revenue"]
-    print(f"\n=== SUMMARY {s['timestamp'][:10]} ===")
-    print(f"Billed ${r['total_billed_usd']:.2f} | Open ${r['open_usd']:.2f} | "
-          f"Collected ${r['collected_usd']:.2f}")
-    print(f"Nurture: {s['nurture_funnel']['total_signups']} signups, "
-          f"{s['nurture_funnel']['touched_total']} touched, "
-          f"{s['nurture_funnel']['contacted']} contacted")
-    print(f"Outbound: {len(s['outbound_campaigns'])} campaigns, "
-          f"{s['outbound_audience_total']} audience | "
-          f"Seated lanes: {s['seated_lanes']['seated_lanes']}")
-    p = s["payments"]
-    last = p["last_confirmed_at"] or "never"
-    print(f"Payments: {p['confirmed_count']} confirmed (${p['confirmed_usd']:.2f}) | "
-          f"seats activated: {p['seats_activated']} | listener: "
-          f"{'UP' if p['listener_active'] else 'DOWN'} | last: {last[:19]}")
-    fn = s["funnels"]
-    print(f"Conv: nurture contact {fn['nurture']['contact_rate_pct']}% | "
-          f"signup->buyer {fn['nurture']['signup_to_buyer_pct']}% | "
-          f"collection {fn['collections']['collection_rate_pct']}%")
-    fc = s["forecast"]
-    print(f"FORECAST collections: 7d ${fc['forecast_collections_usd']['next_7d_exp']:.0f} "
-          f"(±35%) | 30d ${fc['forecast_collections_usd']['next_30d_exp']:.0f} "
-          f"| pipeline ${fc['pipeline']['pipeline_usd']:.0f} ({fc['pipeline']['queued_pay_links']} links)")
-    ev = s["eval_product"]
-    print(f"EVAL: {ev['leads_graded']} graded | ledger ${ev['ledger_usd']:.2f} | "
-          f"settlements {ev['settlements_paid']}/{ev['settlements_total']} paid (${ev['settlements_usd']:.2f})")
-    bv = s["behavior"]
-    att = bv.get("attention", {})
-    pf = bv.get("payment_friction", {})
-    od = bv.get("outreach_dropoff", {})
-    print(f"BEHAVIOR: top attention={att.get('top_niche')} ({att.get('top_niche_signup_share_pct')}%) | "
-          f"pay friction={pf.get('pay_links_sent')} links sent / 0 confirmed | "
-          f"drop-off={od.get('biggest_drop')} ({od.get('conversion_pct')}% conv)")
-    if s["alerts"]:
-        print("\n!!! ALERTS:")
-        for a in s["alerts"]:
-            print(f"  - {a}")
+    main()
+

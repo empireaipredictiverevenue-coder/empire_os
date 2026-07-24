@@ -64,6 +64,7 @@ def log(level, msg, **fields):
     FB.mkdir(parents=True, exist_ok=True)
     with open(LOG, "a") as f:
         f.write(json.dumps(e) + "\n")
+    # Also print to stdout so systemd journal captures it
     print(json.dumps(e), flush=True)
 
 
@@ -178,41 +179,105 @@ def get_memo_for_signature(sig: str) -> str:
 
 
 def detect_incoming():
-    """Detect new incoming USDC by balance delta (no getTransaction needed)."""
+    """Detect new incoming USDC by balance delta (no getTransaction needed).
+
+    Critical ordering (audit fix 2026-07-22):
+      1) Read current + prev balance
+      2) Build replay + record bodies
+      3) Attempt replay (auto-match)
+      4) If no match, attempt record_unmatched WITH RETRY
+      5) ONLY save_balance AFTER both succeed
+    If steps 3 or 4 fail after retries, the prev balance is NOT updated,
+    so the next tick re-attempts the same delta. No silent deposit loss.
+    """
     cur = vault_usdc_balance()
     prev = last_seen_balance()
-    save_balance(cur)
     if cur <= prev:
         return  # no new funds
     delta = round(cur - prev, 6)
-    delta_micro = int(round(delta * 1_000_000))  # micro-USDC to match si_ppc_invoices
+    delta_micro = int(round(delta * 1_000_000))
     log("INFO", "usdc_incoming", amount_usdc=delta_micro,
         prev=prev, now=cur, ata=VAULT)
-    # Extract the on-chain memo from the most recent tx that hit the vault,
-    # so replay can match SEAT_/INV_/LANE_ memos (not just amount).
+
+    # Extract the on-chain memo from the most recent tx that hit the vault.
     memo = ""
+    sigs = []
     try:
         sigs = recent_signatures(limit=5)
         if sigs:
             memo = get_memo_for_signature(sigs[0]["signature"])
     except Exception as e:
         log("WARN", "memo_lookup_skip", err=str(e)[:120])
+
+    tx_sig = sigs[0]["signature"] if sigs else f"balance-diff-{int(time.time()*1e6)}"
     replay_body = {
-        "amount_usdc": delta_micro,   # micro-units, matches invoice schema
+        "amount_usdc": delta,
         "memo": memo,
         "wallet_from": "solana_listener",
-        "tx_signature": sigs[0]["signature"] if sigs else "balance-diff",
+        "tx_signature": tx_sig,
         "note": "detected via ATA balance delta + on-chain memo",
     }
-    try:
-        rr = _session.post(f"{HUB}/v1/finance/replay",
-                           json=replay_body, timeout=10).json()
-        log("INFO", "replay_invoked", matched_to=rr.get("matched_to"),
-            paid_sub=rr.get("paid_subscription_id"),
-            paid_inv=rr.get("paid_invoice_id"),
-            balance_after=rr.get("balance_after_usdc"))
-    except Exception as e:
-        log("ERROR", "replay_call_fail", err=str(e)[:150])
+
+    # --- Step 1: replay (auto-match attempt) ---
+    rr = None
+    replay_ok = False
+    for attempt in range(3):
+        try:
+            rr = _session.post(f"{HUB}/v1/finance/replay",
+                               json=replay_body, timeout=10).json()
+            replay_ok = True
+            log("INFO", "replay_invoked",
+                attempt=attempt + 1,
+                matched_to=rr.get("matched_to"),
+                paid_sub=rr.get("paid_subscription_id"),
+                paid_inv=rr.get("paid_invoice_id"),
+                balance_after=rr.get("balance_after_usdc"))
+            break
+        except Exception as e:
+            log("WARN", "replay_retry",
+                attempt=attempt + 1, err=str(e)[:120])
+            time.sleep(2 ** attempt)  # 1s, 2s, 4s
+    if not replay_ok:
+        log("ERROR", "replay_failed_after_retries",
+            tx=tx_sig, delta_usdc=delta)
+        # Do NOT save_balance — next tick retries the same delta.
+        return
+
+    # --- Step 2: record_unmatched (with retry) if replay didn't auto-match ---
+    matched = bool(rr.get("matched_to")) or bool(rr.get("paid_invoice_id"))
+    if not matched:
+        record_body = {
+            "tx_signature": tx_sig,
+            "amount_usdc": delta,
+            "vault_wallet": VAULT,
+            "received_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            "vault_balance_after_usdc": cur,
+            "notes": "auto-captured by solana_listener; replay matched_to=null",
+        }
+        record_ok = False
+        for attempt in range(3):
+            try:
+                ures = _session.post(f"{HUB}/v1/finance/unmatched/record",
+                                      json=record_body, timeout=10).json()
+                log("INFO", "unmatched_recorded",
+                    attempt=attempt + 1,
+                    unmatched_id=ures.get("id"),
+                    duplicate=ures.get("duplicate", False))
+                record_ok = True
+                break
+            except Exception as ue:
+                log("WARN", "unmatched_record_retry",
+                    attempt=attempt + 1, err=str(ue)[:120])
+                time.sleep(2 ** attempt)
+        if not record_ok:
+            log("ERROR", "unmatched_record_failed_after_retries",
+                tx=tx_sig, delta_usdc=delta,
+                note="balance NOT updated — next tick will retry")
+            # Do NOT save_balance — next tick retries the same delta.
+            return
+
+    # --- Step 3: only NOW commit the balance ---
+    save_balance(cur)
 
 
 def process(sig, ata):
@@ -249,6 +314,9 @@ def cycle():
             process(s["signature"], s["ata"])
         if new_count:
             log("INFO", "polled", new=new_count, total=len(sigs))
+    
+    # Heartbeat every cycle so health check sees activity
+    log("INFO", "heartbeat", status="alive")
 
 
 if __name__ == "__main__":
