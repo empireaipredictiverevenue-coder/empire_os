@@ -90,12 +90,10 @@ def get_pending_leads(limit: int = BATCH_SIZE):
     cur = con.cursor()
     rows = cur.execute(
         """
-        SELECT id, niche, sub_niche, metro, omega_score, omega_tier,
-               icp_fit_score as lead_score, icp_fit_score, buyer_id, payout_usd
+        SELECT lead_ref AS id, omega_score, omega_tier, buyer_id
         FROM lane_leads
-        WHERE status = 'pending'
-          AND (buyer_id IS NULL OR buyer_id = '')
-        ORDER BY omega_score DESC, icp_fit_score DESC
+        WHERE (buyer_id IS NULL OR buyer_id = '')
+        ORDER BY omega_score DESC
         LIMIT ?
         """,
         (limit,),
@@ -125,24 +123,16 @@ def get_active_buyers():
     # Build wallet -> payment_method lookup for crypto (USDC) buyers only
     wallet_payments = {}
     for row in cur.execute("SELECT buyer_id, processor, customer_ref, payment_ref FROM si_buyer_payment_methods WHERE processor='usdc'"):
-        wallet_payments[row["customer_ref"]] = dict(row)
+        wallet_payments[row["buyer_id"]] = dict(row)
     
     con.close()
     
-    # Filter buyers that have crypto payment methods
+    # All active buyers with prospect_id are valid
     result = []
     for b in buyers:
         bdict = dict(b)
-        
-        # Crypto buyers: match by wallet address
-        if b["wallet"] and b["wallet"] != "":
-            if b["wallet"] in wallet_payments:
-                bdict["payment_method"] = wallet_payments[b["wallet"]]
-                result.append(bdict)
-            # Fallback: if wallet is set, assume crypto payment capability
-            else:
-                bdict["payment_method"] = {"processor": "usdc", "wallet": b["wallet"]}
-                result.append(bdict)
+        bdict["payment_method"] = {"processor": "usdc", "wallet": b["prospect_id"]}
+        result.append(bdict)
     
     return result
 
@@ -225,11 +215,11 @@ def deliver_lead(lead: dict, buyer: dict) -> bool:
         "buyer_id": prospect_id,
         "lane_lead_id": lead["id"],
         "prospect_id": prospect_id,
-        "niche": lead["niche"],
+        "niche": "",
         "sub_niche": lead.get("sub_niche", ""),
         "metro": lead.get("metro", ""),
         "tier": lead.get("omega_tier", ""),
-        "match_score": lead.get("priority_score", 0),
+        "match_score": 0,
         "payout_usd": buyer.get("payout_per_lead", 0),
         "ts": datetime.now(timezone.utc).isoformat(),
     }
@@ -238,8 +228,22 @@ def deliver_lead(lead: dict, buyer: dict) -> bool:
     api_key = prospect_id  # Use prospect_id as HMAC key
     sig = hmac.new(api_key.encode(), body, hashlib.sha256).hexdigest()
     
+    endpoint_url = buyer.get("endpoint_url", "")
+    if not endpoint_url:
+        log("WARN", "lead_delivery_no_endpoint", buyer=prospect_id)
+        # Record as failed delivery
+        con = sqlite3.connect(DB)
+        cur = con.cursor()
+        cur.execute(
+            "INSERT INTO buyer_leads (buyer_id, lane_lead_id, prospect_id, niche, metro, omega_tier, match_score, payout_usd, endpoint_status, endpoint_response) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (prospect_id, lead["id"], prospect_id, "", "", "", 0, buyer.get("payout_per_lead", 0), "no_endpoint", "buyer has no endpoint_url")
+        )
+        con.commit()
+        con.close()
+        return False
+    
     req = urllib.request.Request(
-        buyer["endpoint_url"],
+        endpoint_url,
         data=body,
         headers={
             "Content-Type": "application/json",
@@ -274,10 +278,10 @@ def deliver_lead(lead: dict, buyer: dict) -> bool:
             prospect_id,
             lead["id"],
             prospect_id,
-            lead["niche"],
+            "",
             lead.get("metro", ""),
             lead.get("omega_tier", ""),
-            lead.get("priority_score", 0),
+            0,
             buyer.get("payout_per_lead", 0),
             endpoint_status,
             endpoint_response,
@@ -287,7 +291,7 @@ def deliver_lead(lead: dict, buyer: dict) -> bool:
     # Update lane_leads status
     new_status = "delivered" if success else "pending"  # keep pending on failure for retry
     cur.execute(
-        "UPDATE lane_leads SET status = ?, buyer_id = ? WHERE id = ?",
+        "UPDATE lane_leads SET status = ?, buyer_id = ? WHERE lead_ref = ?",
         (new_status, prospect_id, lead["id"]),
     )
     con.commit()
