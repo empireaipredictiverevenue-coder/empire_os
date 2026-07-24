@@ -15,11 +15,14 @@ from __future__ import annotations
 import time
 import json
 import base64
+import secrets
 from dataclasses import asdict
 from datetime import datetime, timezone, timedelta
 import asyncio
 import logging
 import os
+import hmac
+import hashlib
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, Any
@@ -49,10 +52,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
-import hmac as _hmac
-import hashlib as _hashlib
-import hashlib  # used by hub_intake
 
 from empire_os.funnel import (
     SQLiteBackend,
@@ -127,6 +126,24 @@ from empire_os.homeowner_matching import (
     InvalidJobStatusError,
     InvalidMatchStatusError,
 )
+
+
+def _ensure_a2a_buyer_schema(backend):
+    """Add A2A buyer onboarding columns to existing tables."""
+    # Add hmac_secret to si_buyer_outreach
+    try:
+        backend.execute("ALTER TABLE si_buyer_outreach ADD COLUMN hmac_secret TEXT DEFAULT ''")
+        backend.commit()
+    except Exception:
+        pass
+
+    # Add updated_at to buyer_leads
+    try:
+        backend.execute("ALTER TABLE buyer_leads ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))")
+        backend.commit()
+    except Exception:
+        pass
+
 
 # ── CRM ──
 from empire_os.crm import (
@@ -296,6 +313,9 @@ async def lifespan(app: FastAPI):
 
     # Ensure homeowner matching schema (carrier_rosters, homeowner_jobs, job_matches)
     ensure_homeowner_matching_schema(backend)
+
+    # Ensure A2A buyer onboarding schema extensions
+    _ensure_a2a_buyer_schema(backend)
 
     # Mount AEO surface at /aeo
     aeo_root = Path(AEO_SURFACE_ROOT)
@@ -1424,6 +1444,381 @@ async def buyer_test_receive(req: BuyerTestReceiveRequest):
     except Exception as e:
         raise HTTPException(500, f"test_receive error: {str(e)[:160]}")
 
+
+# ═══════════════════════════════════════════════════════════════════════
+# A2A Buyer Onboarding API
+# ═══════════════════════════════════════════════════════════════════════
+
+class BuyerRegisterRequest(BaseModel):
+    """Buyer registration payload for A2A onboarding."""
+    business_name: str
+    email: str
+    niches: str = ""           # comma-separated niches (e.g., "roofing,hvac")
+    metros: str = ""           # comma-separated metros (e.g., "DFW,ATL")
+    wallet: str = ""           # USDC/Solana wallet address
+    payout_per_lead: float = 0.0
+    endpoint_url: str = ""     # buyer's webhook endpoint for lead delivery
+    hmac_secret: str = ""      # HMAC secret for webhook verification
+    source: str = "a2a_register"
+    active: int = 1
+
+
+class BuyerRegisterResponse(BaseModel):
+    ok: bool
+    buyer_id: str
+    business_name: str
+    niches: str
+    metros: str
+    wallet: str
+    payout_per_lead: float
+    endpoint_url: str
+    hmac_secret: str
+    active: int
+    created_at: str
+
+
+def _generate_hmac_secret() -> str:
+    """Generate a secure HMAC secret for webhook verification."""
+    return "hmac_" + secrets.token_hex(24)
+
+
+def _verify_hmac_signature(payload: bytes, secret: str, signature_header: str) -> bool:
+    """Verify HMAC-SHA256 signature. Supports 'sha256=<sig>' format."""
+    if not signature_header:
+        return False
+    # Accept formats: "sha256=<hex>", "v1=<hex>", or just "<hex>"
+    sig = signature_header
+    if sig.startswith("sha256="):
+        sig = sig[7:]
+    elif sig.startswith("v1="):
+        sig = sig[3:]
+    expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, sig)
+
+
+@app.post("/v1/buyers/register", response_model=BuyerRegisterResponse)
+async def buyer_register(req: BuyerRegisterRequest):
+    """Register a new A2A buyer.
+
+    Creates/updates a row in si_buyer_outreach with niches, metros, wallet,
+    payout terms, webhook endpoint, and HMAC secret for secure lead delivery.
+    Idempotent on email (updates existing row).
+    """
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+
+    email = req.email.strip().lower()
+    business_name = req.business_name.strip()
+    niches = req.niches.strip()
+    metros = req.metros.strip().upper()
+    wallet = req.wallet.strip()
+    payout_per_lead = float(req.payout_per_lead)
+    endpoint_url = req.endpoint_url.strip()
+    hmac_secret = req.hmac_secret.strip() or _generate_hmac_secret()
+
+    if not email or "@" not in email:
+        raise HTTPException(400, "valid email required")
+    if not business_name:
+        raise HTTPException(400, "business_name required")
+
+    # Generate buyer_id from email for stable identity
+    buyer_id = "buyer_" + hashlib.sha256(email.encode()).hexdigest()[:16]
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Upsert into si_buyer_outreach
+    backend.execute("""
+        INSERT INTO si_buyer_outreach (
+            prospect_id, business_name, email, niches, metros,
+            wallet, payout_per_lead, endpoint_url, active, source,
+            first_touch_at, last_touch_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(prospect_id) DO UPDATE SET
+            business_name=excluded.business_name,
+            email=excluded.email,
+            niches=excluded.niches,
+            metros=excluded.metros,
+            wallet=excluded.wallet,
+            payout_per_lead=excluded.payout_per_lead,
+            endpoint_url=excluded.endpoint_url,
+            active=excluded.active,
+            last_touch_at=excluded.last_touch_at
+    """, (
+        buyer_id, business_name, email, niches, metros,
+        wallet, payout_per_lead, endpoint_url, req.active, req.source,
+        now, now
+    ))
+    backend.commit()
+
+    # Also create a default payment method entry for USDC if wallet provided
+    if wallet:
+        from empire_os.charge import add_payment_method
+        add_payment_method(
+            buyer_id=buyer_id,
+            processor="usdc",
+            customer_ref=wallet,
+            payment_ref="",
+            brand="usdc",
+            last4=wallet[-4:] if len(wallet) >= 4 else wallet,
+            is_default=1
+        )
+
+    return BuyerRegisterResponse(
+        ok=True,
+        buyer_id=buyer_id,
+        business_name=business_name,
+        niches=niches,
+        metros=metros,
+        wallet=wallet,
+        payout_per_lead=payout_per_lead,
+        endpoint_url=endpoint_url,
+        hmac_secret=hmac_secret,
+        active=req.active,
+        created_at=now
+    )
+
+
+class BuyerWebhookVerifyRequest(BaseModel):
+    """Request to verify a webhook signature (for buyer self-test)."""
+    buyer_id: str
+    payload: dict
+    signature: str
+
+
+class BuyerWebhookVerifyResponse(BaseModel):
+    ok: bool
+    verified: bool
+    buyer_id: str
+
+
+@app.post("/v1/buyers/webhook/verify", response_model=BuyerWebhookVerifyResponse)
+async def buyer_webhook_verify(req: BuyerWebhookVerifyRequest):
+    """Verify HMAC signature for a buyer webhook (self-test endpoint).
+
+    Buyers can POST their test payload + signature to confirm their
+    signing implementation matches before going live.
+    """
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+
+    row = backend.execute(
+        "SELECT hmac_secret FROM si_buyer_outreach WHERE prospect_id=?",
+        (req.buyer_id,)
+    ).fetchone()
+
+    if not row or not row[0]:
+        raise HTTPException(404, "buyer not found or no HMAC secret configured")
+
+    hmac_secret = row[0]
+    payload_bytes = json.dumps(req.payload, separators=(",", ":")).encode()
+    verified = _verify_hmac_signature(payload_bytes, hmac_secret, req.signature)
+
+    return BuyerWebhookVerifyResponse(
+        ok=True,
+        verified=verified,
+        buyer_id=req.buyer_id
+    )
+
+
+class LeadAcceptRequest(BaseModel):
+    """Buyer confirms receipt/acceptance of a delivered lead."""
+    buyer_id: str
+    lane_lead_id: int
+    accepted: bool = True
+    notes: str = ""
+
+
+class LeadAcceptResponse(BaseModel):
+    ok: bool
+    buyer_id: str
+    lane_lead_id: int
+    accepted: bool
+    updated_at: str
+
+
+@app.post("/v1/buyers/{buyer_id}/leads/{lane_lead_id}/accept", response_model=LeadAcceptResponse)
+async def buyer_lead_accept(buyer_id: str, lane_lead_id: int, req: LeadAcceptRequest):
+    """Buyer confirms acceptance (or rejection) of a delivered lead.
+
+    Updates buyer_leads.endpoint_status to 'accepted' or 'rejected',
+    and records the buyer's response for payout reconciliation.
+    """
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+
+    # Verify buyer exists
+    row = backend.execute(
+        "SELECT prospect_id FROM si_buyer_outreach WHERE prospect_id=?",
+        (buyer_id,)
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "buyer not found")
+
+    # Verify the lead assignment exists
+    lead_row = backend.execute(
+        "SELECT id, buyer_id, endpoint_status FROM buyer_leads WHERE buyer_id=? AND lane_lead_id=?",
+        (buyer_id, lane_lead_id)
+    ).fetchone()
+    if not lead_row:
+        raise HTTPException(404, "lead assignment not found for this buyer")
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    status = "accepted" if req.accepted else "rejected"
+
+    backend.execute(
+        """UPDATE buyer_leads
+           SET endpoint_status=?, endpoint_response=?, updated_at=?
+           WHERE buyer_id=? AND lane_lead_id=?""",
+        (status, req.notes[:500], now, buyer_id, lane_lead_id)
+    )
+    backend.commit()
+
+    return LeadAcceptResponse(
+        ok=True,
+        buyer_id=buyer_id,
+        lane_lead_id=lane_lead_id,
+        accepted=req.accepted,
+        updated_at=now
+    )
+
+
+class PayoutTermsRequest(BaseModel):
+    """Update payout terms for a buyer."""
+    buyer_id: str
+    payout_per_lead: float
+    wallet: str = ""           # optional USDC wallet update
+    endpoint_url: str = ""     # optional webhook endpoint update
+    hmac_secret: str = ""      # optional HMAC secret rotation
+
+
+class PayoutTermsResponse(BaseModel):
+    ok: bool
+    buyer_id: str
+    payout_per_lead: float
+    wallet: str
+    endpoint_url: str
+    updated_at: str
+
+
+@app.post("/v1/buyers/{buyer_id}/payout-terms", response_model=PayoutTermsResponse)
+async def buyer_payout_terms(buyer_id: str, req: PayoutTermsRequest):
+    """Update payout terms for a buyer (wallet, per-lead rate, webhook, HMAC)."""
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+
+    row = backend.execute(
+        "SELECT prospect_id FROM si_buyer_outreach WHERE prospect_id=?",
+        (buyer_id,)
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "buyer not found")
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+
+    updates = []
+    params = []
+
+    if req.payout_per_lead is not None:
+        updates.append("payout_per_lead=?")
+        params.append(float(req.payout_per_lead))
+    if req.wallet:
+        updates.append("wallet=?")
+        params.append(req.wallet.strip())
+    if req.endpoint_url:
+        updates.append("endpoint_url=?")
+        params.append(req.endpoint_url.strip())
+    if req.hmac_secret:
+        updates.append("hmac_secret=?")
+        params.append(req.hmac_secret.strip())
+
+    if updates:
+        updates.append("last_touch_at=?")
+        params.append(now)
+        params.append(buyer_id)
+
+        backend.execute(
+            f"UPDATE si_buyer_outreach SET {', '.join(updates)} WHERE prospect_id=?",
+            params
+        )
+        backend.commit()
+
+        # Also update payment method if wallet changed
+        if req.wallet:
+            from empire_os.charge import add_payment_method
+            add_payment_method(
+                buyer_id=buyer_id,
+                processor="usdc",
+                customer_ref=req.wallet.strip(),
+                payment_ref="",
+                brand="usdc",
+                last4=req.wallet.strip()[-4:] if len(req.wallet.strip()) >= 4 else req.wallet.strip(),
+                is_default=1
+            )
+
+    # Return current state
+    cur = backend.execute(
+        "SELECT payout_per_lead, wallet, endpoint_url FROM si_buyer_outreach WHERE prospect_id=?",
+        (buyer_id,)
+    ).fetchone()
+
+    return PayoutTermsResponse(
+        ok=True,
+        buyer_id=buyer_id,
+        payout_per_lead=cur[0] if cur else 0.0,
+        wallet=cur[1] if cur else "",
+        endpoint_url=cur[2] if cur else "",
+        updated_at=now
+    )
+
+
+class BuyerConfigResponse(BaseModel):
+    ok: bool
+    buyer_id: str
+    business_name: str
+    email: str
+    niches: str
+    metros: str
+    wallet: str
+    payout_per_lead: float
+    endpoint_url: str
+    active: int
+
+
+@app.get("/v1/buyers/{buyer_id}/config", response_model=BuyerConfigResponse)
+async def buyer_get_config(buyer_id: str):
+    """Get buyer configuration (for dashboard / buyer self-serve)."""
+    if not backend:
+        raise HTTPException(503, "backend not initialized")
+
+    row = backend.execute(
+        """SELECT prospect_id, business_name, email, niches, metros,
+                  wallet, payout_per_lead, endpoint_url, active
+           FROM si_buyer_outreach WHERE prospect_id=?""",
+        (buyer_id,)
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "buyer not found")
+
+    return BuyerConfigResponse(
+        ok=True,
+        buyer_id=row[0],
+        business_name=row[1],
+        email=row[2],
+        niches=row[3],
+        metros=row[4],
+        wallet=row[5],
+        payout_per_lead=row[6],
+        endpoint_url=row[7],
+        active=row[8]
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Existing test_receive endpoint (moved down)
+# ═══════════════════════════════════════════════════════════════════════
 
 @app.get("/v1/buyers/test_receive")
 async def buyer_test_receive_list(buyer_id: str = "", limit: int = 50):
@@ -3421,6 +3816,86 @@ def finance_replay(req: dict):
                         "WHERE id=?",
                         (req.get("tx_signature", ""), erow[0]))
                     matched_to = f"eval settlement {ev_buyer}/{ev_ref}"
+            # --- Lead settlement: LEAD_<lead_id> marks lead as settled ---
+            if m.startswith("LEAD_"):
+                lead_id = m[len("LEAD_"):].strip()
+                # Find the prospect_id in si_funnel_event for this lead
+                # lead_id could be lane_leads.id, lane_leads.prospect_id, or crm_leads.lead_uid
+                prospect_row = cnx.execute(
+                    """SELECT DISTINCT prospect_id FROM si_funnel_event
+                       WHERE prospect_id = ? OR prospect_id LIKE ? OR prospect_id LIKE ?""",
+                    (lead_id, f"%{lead_id}%", f"lead_{lead_id}%"),
+                ).fetchone()
+
+                if not prospect_row:
+                    # Try crm_leads table
+                    crm_row = cnx.execute(
+                        "SELECT id, lead_uid FROM crm_leads WHERE id = ? OR lead_uid = ?",
+                        (lead_id, lead_id),
+                    ).fetchone()
+                    if crm_row:
+                        prospect_id = crm_row["lead_uid"] or str(crm_row["id"])
+                    else:
+                        # Try lane_leads
+                        lane_row = cnx.execute(
+                            "SELECT id, prospect_id FROM lane_leads WHERE id = ? OR prospect_id = ?",
+                            (lead_id, lead_id),
+                        ).fetchone()
+                        if lane_row:
+                            prospect_id = lane_row["prospect_id"]
+                        else:
+                            prospect_id = lead_id  # fallback
+                else:
+                    prospect_id = prospect_row["prospect_id"]
+
+                # Check current funnel state
+                current_state = cnx.execute(
+                    """SELECT to_state FROM si_funnel_event
+                       WHERE prospect_id = ? ORDER BY id DESC LIMIT 1""",
+                    (prospect_id,),
+                ).fetchone()
+
+                if current_state and current_state["to_state"] == "settled":
+                    matched_to = f"lead {lead_id} (already settled)"
+                else:
+                    # Write funnel event transition to 'settled'
+                    occurred_at = datetime.now(timezone.utc).isoformat()
+                    cnx.execute(
+                        """INSERT INTO si_funnel_event
+                           (prospect_id, from_state, to_state, actor, notes, occurred_at)
+                           VALUES (?, ?, ?, ?, ?, ?)""",
+                        (
+                            prospect_id,
+                            current_state["to_state"] if current_state else "claimed",
+                            "settled",
+                            "solana_listener",
+                            json.dumps({
+                                "lead_id": lead_id,
+                                "amount_usdc": amount,
+                                "tx_signature": sig,
+                                "memo": m,
+                                "settled_at": occurred_at,
+                            }),
+                            occurred_at,
+                        ),
+                    )
+
+                    # Write si_settlements row for audit/revenue tracking
+                    amount_cents = int(round(amount * 100))
+                    cnx.execute(
+                        """INSERT INTO si_settlements
+                           (prospect_id, tenant_id, amount_cents, settled_at, settled_by, notes)
+                           VALUES (?, ?, ?, ?, ?, ?)""",
+                        (
+                            prospect_id,
+                            "",  # tenant_id unknown at this stage
+                            amount_cents,
+                            occurred_at,
+                            "solana_listener",
+                            f"USDC settlement for lead {lead_id} via tx {sig[:20]}",
+                        ),
+                    )
+                    matched_to = f"lead {lead_id}"
             # --- Eval product: EVALBUY_<buyer>_<pack> = one on-chain credit-pack purchase ---
             if m.startswith("EVALBUY_"):
                 from empire_os.agents.evaluation_product import _settle_pack

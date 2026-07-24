@@ -22,6 +22,9 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
+# Import settlement gateway for lead settlement via memo matching
+from empire_os.agents.settlement_gateway import process_settlement
+
 # Load .env (same pattern as charge.py) so HUB_URL + keys resolve from
 # /root/empire_os/.env at startup. Without this, pm2-launched processes
 # fall back to the hardcoded dead default (127.0.0.1:8081) and the
@@ -242,6 +245,17 @@ def detect_incoming():
             tx=tx_sig, delta_usdc=delta)
         # Do NOT save_balance — next tick retries the same delta.
         return
+
+    # --- Step 1b: ALSO process via settlement gateway for LEAD_ memo matching ---
+    # The replay endpoint handles subscriptions/invoices, but lead settlements
+    # with LEAD_<lead_id> memos need the settlement_gateway to transition
+    # si_funnel_event to 'settled' and write si_settlements.
+    if memo and memo.startswith("LEAD_"):
+        try:
+            settlement_result = process_settlement(memo, tx_sig, delta)
+            log("INFO", "settlement_gateway_lead", result=settlement_result)
+        except Exception as e:
+            log("ERROR", "settlement_gateway_error", err=str(e)[:150])
 
     # --- Step 2: record_unmatched (with retry) if replay didn't auto-match ---
     matched = bool(rr.get("matched_to")) or bool(rr.get("paid_invoice_id"))

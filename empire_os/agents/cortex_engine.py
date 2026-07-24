@@ -45,7 +45,11 @@ def now_iso():
 
 
 def _db():
-    return sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=30.0)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=NORMAL")
+    con.execute("PRAGMA busy_timeout=30000")
+    return con
 
 
 def pillar_revenue(c):

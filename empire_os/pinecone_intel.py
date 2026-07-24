@@ -18,6 +18,7 @@ import sys
 import time
 import subprocess
 import hashlib
+import requests
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 
@@ -32,7 +33,13 @@ DIMENSION = 1536
 _mcp_cache = {}
 
 def _get_api_key() -> str:
-    """Read PINECONE_API_KEY from container .env"""
+    """Read PINECONE_API_KEY from environment or container .env"""
+    # First check environment variable
+    api_key = os.environ.get("PINECONE_API_KEY")
+    if api_key:
+        return api_key.strip().strip('"').strip("'")
+    
+    # Fallback to .env file
     env_path = Path("/root/empire_os/.env")
     if not env_path.exists():
         return ""
@@ -98,9 +105,45 @@ def _mcp_call(method: str, params: dict = None, timeout: int = 15) -> dict:
     except Exception as e:
         return {"error": str(e)}
 
+def _pinecone_embed(text: str) -> List[float]:
+    """Generate embedding via Pinecone API directly"""
+    api_key = _get_api_key()
+    if not api_key:
+        return []
+    
+    # Use Pinecone's hosted embedding endpoint
+    # Pinecone uses the multilingual-e5-large model for 1536-dim embeddings
+    url = "https://api.pinecone.io/embed"
+    headers = {
+        "Api-Key": api_key,
+        "Content-Type": "application/json",
+        "X-Pinecone-API-Version": "2024-07"
+    }
+    payload = {
+        "model": "multilingual-e5-large",
+        "inputs": [text],
+        "parameters": {"input_type": "passage"}
+    }
+    
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if "data" in data and len(data["data"]) > 0:
+                return data["data"][0]["values"]
+        return []
+    except Exception as e:
+        print(f"Pinecone embed error: {e}", file=sys.stderr)
+        return []
+
 def embed_text(text: str) -> List[float]:
-    """Generate embedding for text via Pinecone MCP or local fallback"""
-    # Try to use Pinecone's built-in embedding via MCP
+    """Generate embedding for text via Pinecone API or MCP"""
+    # Try Pinecone direct API first (more reliable)
+    vector = _pinecone_embed(text)
+    if vector:
+        return vector
+    
+    # Fallback to MCP
     resp = _mcp_call("tools/call", {
         "name": "embed-text",
         "arguments": {"text": text, "model": "multilingual-e5-large"}
@@ -109,19 +152,12 @@ def embed_text(text: str) -> List[float]:
     if "result" in resp and "vector" in resp["result"]:
         return resp["result"]["vector"]
     
-    # Local deterministic fallback (hash-based pseudo-embedding)
-    return _local_embedding(text)
-
-def _local_embedding(text: str) -> List[float]:
-    """Deterministic pseudo-embedding for offline/development"""
-    # Use multiple hash seeds to create 1536-dim vector
-    vec = []
-    for i in range(12):  # 12 * 128 = 1536
-        seed = f"{text}:{i}"
-        h = hashlib.md5(seed.encode()).digest()
-        for b in h:
-            vec.append((b - 128) / 128.0)  # normalize to [-1, 1]
-    return vec[:DIMENSION]
+    # No fallback - raise error if no API key or both methods fail
+    api_key = _get_api_key()
+    if not api_key:
+        raise RuntimeError("PINECONE_API_KEY not configured. Set PINECONE_API_KEY in .env or environment.")
+    
+    raise RuntimeError(f"Pinecone embedding failed: {resp.get('error', 'unknown error')}")
 
 def upsert_lead(lead_id: int, lead_data: dict, namespace: str = "leads") -> bool:
     """Upsert lead vector to Pinecone"""

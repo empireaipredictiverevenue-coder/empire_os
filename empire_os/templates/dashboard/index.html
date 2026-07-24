@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empire OS v3 — Real-time Dashboard</title>
+<!-- Tailwind CSS via CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Chart.js via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- HTMX via CDN -->
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --line: #30363d;
+    --txt: #c9d1d9;
+    --mut: #8b949e;
+    --grn: #3fb950;
+    --red: #f85149;
+    --blu: #58a6ff;
+    --gld: #d29922;
+    --pur: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); color: var(--txt); font-size: 13px; line-height: 1.5; }
+  .stat { font-size: 28px; font-weight: 700; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .badge-pending { background: #3a2d00; color: var(--gld); }
+  .badge-routed { background: #3b1f6e; color: var(--pur); }
+  .badge-delivered { background: #0d419d; color: var(--blu); }
+  .badge-settled { background: #06280f; color: var(--grn); }
+  .badge-active { background: #06280f; color: var(--grn); }
+  .badge-pending-soft { background: #3a2d00; color: var(--gld); }
+  .badge-high { background: #3a0d0d; color: var(--red); }
+  .badge-medium { background: #3a2d00; color: var(--gld); }
+  .badge-low { background: #0d419d; color: var(--blu); }
+  .badge-dead { background: #1a1a1a; color: var(--mut); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .chart-container { width: 100%; height: 220px; }
+  .table-container { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--mut); font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:hover { background: rgba(88, 166, 255, 0.05); }
+  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--mut); margin-bottom: 12px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .kpi-card { padding: 16px; }
+  .kpi-label { font-size: 10px; color: var(--mut); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .kpi-value { font-size: 24px; font-weight: 700; }
+  .kpi-value-green { color: var(--grn); }
+  .kpi-value-blue { color: var(--blu); }
+  .kpi-value-purple { color: var(--pur); }
+  .kpi-value-yellow { color: var(--gld); }
+  .kpi-value-red { color: var(--red); }
+  .heat-cell { padding: 6px 8px; text-align: center; border: 1px solid var(--line); font-size: 11px; }
+  .heat-hot { background: #3a0d0d; color: var(--red); }
+  .heat-warm { background: #3a2d00; color: var(--gld); }
+  .heat-cool { background: #0d419d; color: var(--blu); }
+  .heat-dead { background: #1a1a1a; color: var(--mut); }
+  .refresh-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--grn); margin-left: 8px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body class="p-6">
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <header class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <h1 class="text-lg font-bold text-blue-400">Empire OS v3 — Real-time Dashboard</h1>
+    <div class="flex items-center gap-4 text-xs text-slate-500">
+      <span id="last-updated">Loading...</span>
+      <span class="refresh-indicator" aria-hidden="true"></span>
+      <span id="auto-refresh-status">Auto-refresh: 30s</span>
+    </div>
+  </header>
+
+  <!-- Funnel Section -->
+  <section class="mb-6" hx-get="/dashboard/api/funnel" hx-trigger="load, every 30s" hx-target="#funnel-content" hx-swap="innerHTML">
+    <h2 class="section-title">Funnel: Pending → Routed → Delivered → Settled</h2>
+    <div id="funnel-content" class="kpi-grid">
+      <div class="card kpi-card"><div class="kpi-label">Pending</div><div class="kpi-value kpi-value-yellow" id="funnel-pending">—</div></div>
+      <div class="card kpi-card"><div class="kpi-label">Routed</div><div class="kpi-value kpi-value-purple" id="funnel-routed">—</div></div>
+      <div class="card kpi-card"><div class="kpi-label">Delivered</div><div class="kpi-value kpi-value-blue" id="funnel-delivered">—</div></div>
+      <div class="card kpi-card"><div class="kpi-label">Settled</div><div class="kpi-value kpi-value-green" id="funnel-settled">—</div></div>
+    </div>
+    <div class="card p-4 mt-4">
+      <canvas id="funnel-chart" class="chart-container"></canvas>
+    </div>
+    <div class="grid grid-cols-4 gap-2 mt-2 text-xs">
+      <div class="card p-2 text-center">P→R: <span id="cr-pr" class="font-bold">—%</span></div>
+      <div class="card p-2 text-center">R→D: <span id="cr-rd" class="font-bold">—%</span></div>
+      <div class="card p-2 text-center">D→S: <span id="cr-ds" class="font-bold">—%</span></div>
+      <div class="card p-2 text-center">Overall: <span id="cr-overall" class="font-bold">—%</span></div>
+    </div>
+  </section>
+
+  <!-- Revenue Section -->
+  <section class="mb-6" hx-get="/dashboard/api/revenue" hx-trigger="load, every 60s" hx-target="#revenue-content" hx-swap="innerHTML">
+    <h2 class="section-title">Revenue: Active MRR & Projected</h2>
+    <div id="revenue-content" class="kpi-grid">
+      <div class="card kpi-card"><div class="kpi-label">Active MRR</div><div class="kpi-value kpi-value-green" id="rev-active">$—</div></div>
+      <div class="card kpi-card"><div class="kpi-label">Projected New MRR</div><div class="kpi-value kpi-value-blue" id="rev-projected">$—</div></div>
+      <div class="card kpi-card"><div class="kpi-label">Total Predicted MRR</div><div class="kpi-value kpi-value-purple" id="rev-total">$—</div></div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <div class="card p-4"><h3 class="text-xs text-slate-500 mb-2">Last 7 Days Revenue</h3><canvas id="rev-7d-chart" class="chart-container"></canvas></div>
+      <div class="card p-4"><h3 class="text-xs text-slate-500 mb-2">Last 30 Days Revenue</h3><canvas id="rev-30d-chart" class="chart-container"></canvas></div>
+    </div>
+    <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+      <div class="card p-2">Potential if Full: <span id="rev-potential" class="font-bold">$—</span></div>
+      <div class="card p-2">Unrealized: <span id="rev-unrealized" class="font-bold">$—</span></div>
+      <div class="card p-2">Velocity: <span id="rev-velocity" class="font-bold">—</span> | Confidence: <span id="rev-conf" class="font-bold">—</span></div>
+    </div>
+  </section>
+
+  <!-- Buyer Performance Section -->
+  <section class="mb-6" hx-get="/dashboard/api/buyers" hx-trigger="load, every 30s" hx-target="#buyers-content" hx-swap="innerHTML">
+    <h2 class="section-title">Buyer Performance: Leads / Payout / Conversion</h2>
+    <div class="card overflow-x-auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Buyer</th><th>Tier</th><th>Status</th><th>Delivered</th><th>Pending</th>
+            <th>Payout</th><th>Conv. Rate</th><th>Avg Value</th>
+          </tr>
+        </thead>
+        <tbody id="buyers-body" id="buyers-content">
+          <tr><td colspan="8" class="text-center text-slate-500 py-4">Loading buyers...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Market Heat Map Section -->
+  <section class="mb-6" hx-get="/dashboard/api/heatmap" hx-trigger="load, every 60s" hx-target="#heatmap-content" hx-swap="innerHTML">
+    <h2 class="section-title">Market Heat Map: Niche × Metro (Occupancy + Demand)</h2>
+    <div class="card overflow-x-auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Niche</th><th>Metro</th><th>Lanes</th><th>Occupied</th><th>Occupancy</th>
+            <th>Leads</th><th>Intensity</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="heatmap-body" id="heatmap-content">
+          <tr><td colspan="8" class="text-center text-slate-500 py-4">Loading heatmap...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Leaks & Gaps Section -->
+  <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="card p-4" hx-get="/dashboard/api/leaks" hx-trigger="load, every 60s" hx-target="#leaks-content" hx-swap="innerHTML">
+      <h3 class="text-xs text-red-400 mb-2">Funnel Leaks</h3>
+      <pre id="leaks-content" class="text-xs text-slate-400">Loading...</pre>
+    </div>
+    <div class="card p-4" hx-get="/dashboard/api/gaps" hx-trigger="load, every 60s" hx-target="#gaps-content" hx-swap="innerHTML">
+      <h3 class="text-xs text-yellow-400 mb-2">Market Gaps</h3>
+      <pre id="gaps-content" class="text-xs text-slate-400">Loading...</pre>
+    </div>
+  </section>
+</div>
+
+<script>
+// Chart instances
+let funnelChart = null, rev7dChart = null, rev30dChart = null;
+
+// Colors
+const colors = {
+  pending: '#d29922', routed: '#bc8cff', delivered: '#58a6ff', settled: '#3fb950',
+  active: '#3fb950', projected: '#58a6ff', total: '#bc8cff'
+};
+
+// Update timestamp
+function updateTimestamp() {
+  document.getElementById('last-updated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+}
+
+// Render funnel chart from JSON data
+function renderFunnelChart(data) {
+  const ctx = document.getElementById('funnel-chart');
+  if (!ctx) return;
+  if (funnelChart) funnelChart.destroy();
+  funnelChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Pending', 'Routed', 'Delivered', 'Settled'],
+      datasets: [{
+        label: 'Count',
+        data: [data.pending, data.routed, data.delivered, data.settled],
+        backgroundColor: [colors.pending, colors.routed, colors.delivered, colors.settled],
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#30363d' }, ticks: { color: '#8b949e' } },
+        x: { grid: { display: false }, ticks: { color: '#8b949e' } }
+      }
+    }
+  });
+}
+
+// Render revenue charts
+function renderRevenueCharts(data) {
+  // 7-day chart
+  const ctx7 = document.getElementById('rev-7d-chart');
+  if (ctx7 && data.last_7_days) {
+    const labels7 = data.last_7_days.map(d => d.date.slice(5));
+    const values7 = data.last_7_days.map(d => d.revenue_cents / 100);
+    if (rev7dChart) rev7dChart.destroy();
+    rev7dChart = new Chart(ctx7, {
+      type: 'line',
+      data: { labels: labels7, datasets: [{ label: 'Revenue ($)', data: values7, borderColor: colors.active, backgroundColor: colors.active + '33', fill: true, tension: 0.3, pointRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#30363d' }, ticks: { color: '#8b949e' } }, x: { grid: { display: false }, ticks: { color: '#8b949e' } } } }
+    });
+  }
+  // 30-day chart
+  const ctx30 = document.getElementById('rev-30d-chart');
+  if (ctx30 && data.last_30_days) {
+    const labels30 = data.last_30_days.map(d => d.date.slice(5));
+    const values30 = data.last_30_days.map(d => d.revenue_cents / 100);
+    if (rev30dChart) rev30dChart.destroy();
+    rev30dChart = new Chart(ctx30, {
+      type: 'line',
+      data: { labels: labels30, datasets: [{ label: 'Revenue ($)', data: values30, borderColor: colors.projected, backgroundColor: colors.projected + '33', fill: true, tension: 0.3, pointRadius: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#30363d' }, ticks: { color: '#8b949e' } }, x: { grid: { display: false }, ticks: { color: '#8b949e' } } } }
+    });
+  }
+}
+
+// Render buyers table
+function renderBuyers(buyers) {
+  const tbody = document.getElementById('buyers-body');
+  if (!tbody) return;
+  if (!buyers || buyers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-slate-500 py-4">No buyers</td></tr>';
+    return;
+  }
+  tbody.innerHTML = buyers.map(b => `
+    <tr class="hover:bg-slate-800/50">
+      <td class="font-mono">${b.name}</td>
+      <td><span class="badge" style="background:#1a3a1a;color:#3fb950">${b.tier}</span></td>
+      <td><span class="badge" style="background:${b.status==='active'?'#06280f':'#3a0d0d'};color:${b.status==='active'?'#3fb950':'#f85149'}">${b.status}</span></td>
+      <td class="font-bold text-green-400">${b.leads_delivered}</td>
+      <td class="text-yellow-400">${b.leads_pending}</td>
+      <td>$${(b.payout_cents/100).toLocaleString()}</td>
+      <td class="font-bold">${b.conversion_rate}%</td>
+      <td>$${b.avg_lead_value.toFixed(2)}</td>
+    </tr>
+  `).join('');
+}
+
+// Render heatmap table
+function renderHeatmap(heat) {
+  const tbody = document.getElementById('heatmap-body');
+  if (!tbody) return;
+  tbody.innerHTML = heat.slice(0, 50).map(h => `
+    <tr class="hover:bg-slate-800/50">
+      <td class="font-mono text-xs">${h.niche}</td>
+      <td class="font-mono text-xs">${h.metro}</td>
+      <td>${h.lane_count}</td>
+      <td>${h.occupied_count}</td>
+      <td class="font-bold">${h.occupancy_rate}%</td>
+      <td class="font-bold ${h.lead_count > 10 ? 'text-yellow-400' : h.lead_count > 5 ? 'text-blue-400' : 'text-slate-400'}">${h.lead_count}</td>
+      <td><span class="badge badge-${h.lead_intensity}">${h.lead_intensity.toUpperCase()}</span></td>
+      <td class="text-xs">${h.action}</td>
+    </tr>
+  `).join('');
+}
+
+// Render leaks
+function renderLeaks(leaks) {
+  document.getElementById('leaks-content').textContent = JSON.stringify(leaks, null, 2);
+}
+
+// Render gaps
+function renderGaps(gaps) {
+  document.getElementById('gaps-content').textContent = JSON.stringify(gaps, null, 2);
+}
+
+// HTMX event listeners for partial updates
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+  const target = evt.detail.target;
+  if (target.id === 'funnel-content') {
+    updateTimestamp();
+    renderFunnelChart(JSON.parse(target.textContent));
+  } else if (target.id === 'revenue-content') {
+    updateTimestamp();
+    renderRevenueCharts(JSON.parse(target.textContent));
+  } else if (target.id === 'buyers-content') {
+    updateTimestamp();
+    renderBuyers(JSON.parse(target.textContent));
+  } else if (target.id === 'heatmap-content') {
+    updateTimestamp();
+    renderHeatmap(JSON.parse(target.textContent));
+  } else if (target.id === 'leaks-content') {
+    updateTimestamp();
+    renderLeaks(JSON.parse(target.textContent));
+  } else if (target.id === 'gaps-content') {
+    updateTimestamp();
+    renderGaps(JSON.parse(target.textContent));
+  }
+});
+
+// Initial load
+updateTimestamp();
+</script>
+</body>
+</html>

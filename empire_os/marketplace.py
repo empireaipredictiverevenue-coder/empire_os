@@ -337,6 +337,55 @@ def create_buyer(name: str, email: str, wallet: str = "",
     )
     if not ok:
         return ""
+    
+    # Also insert into si_buyer_outreach for buyer outreach tracking
+    # (prospect_id = tenant_id for buyers)
+    outreach_script = (
+        "import sqlite3, sys\n"
+        "c = sqlite3.connect('%s')\n"
+        "c.execute('''\n"
+        "    INSERT OR IGNORE INTO si_buyer_outreach\n"
+        "        (prospect_id, business_name, email, metro, niche,\n"
+        "         phone, source, score, url, reply_state, wallet, payout_per_lead, active)\n"
+        "    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n"
+        "''', (\n"
+        "    sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5],\n"
+        "    sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10],\n"
+        "    sys.argv[11], sys.argv[12], sys.argv[13]\n"
+        "))\n"
+        "c.commit()\n"
+        "c.close()\n"
+    ) % HUB_DB_PATH
+    _hub_exec(
+        outreach_script.replace("sys.argv[1]", repr(tenant_id))
+              .replace("sys.argv[2]", repr(name))
+              .replace("sys.argv[3]", repr(email))
+              .replace("sys.argv[4]", repr(""))  # metro - will be filled later
+              .replace("sys.argv[5]", repr(""))  # niche - will be filled later
+              .replace("sys.argv[6]", repr(""))
+              .replace("sys.argv[7]", repr(method))
+              .replace("sys.argv[8]", repr(0))
+              .replace("sys.argv[9]", repr(""))
+              .replace("sys.argv[10]", repr("cold"))
+              .replace("sys.argv[11]", repr(wallet))
+              .replace("sys.argv[12]", repr(0))
+              .replace("sys.argv[13]", repr(1))
+    )
+    
+    # Upsert buyer vector to Pinecone for semantic matching
+    try:
+        from empire_os.pinecone_intel import upsert_buyer
+        upsert_buyer(buyer_id=tenant_id, buyer_data={
+            "niche": "",  # Will be updated when buyer subscribes to a lane
+            "metro": "",  # Will be updated when buyer subscribes to a lane
+            "company_name": name,
+            "payout_per_lead": 0,  # Will be updated with tier pricing
+            "wallet": wallet,
+            "active": 1,
+        })
+    except Exception as e:
+        print(f"Pinecone upsert_buyer failed: {e}", file=sys.stderr)
+    
     return tenant_id
 
 
@@ -444,6 +493,20 @@ def buy_lane_access(tenant_id: str, niche: str, metro: str,
     ok, err = _hub_exec(full)
     if not ok:
         return {"error": err}
+
+    # Update Pinecone buyer vector with niche, metro, and payout info
+    try:
+        from empire_os.pinecone_intel import upsert_buyer
+        upsert_buyer(buyer_id=tenant_id, buyer_data={
+            "niche": niche,
+            "metro": metro,
+            "company_name": "",  # Will be filled from si_tenant
+            "payout_per_lead": price / 100.0,  # Convert cents to dollars
+            "wallet": "",  # Will be filled from si_tenant
+            "active": 1,
+        })
+    except Exception as e:
+        print(f"Pinecone upsert_buyer update failed: {e}", file=sys.stderr)
 
     return {
         "subscription_id": sub_id,
