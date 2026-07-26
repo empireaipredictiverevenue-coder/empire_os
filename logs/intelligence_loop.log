@@ -1,0 +1,941 @@
+[16:46:24] INTEL INFO: Intelligence loop started
+[16:46:47] INTEL ERROR: Failed to initialize database schema: near "INDEX": syntax error
+[16:46:47] INTEL INFO: Intelligence loop cycle 1
+[16:46:47] INTEL INFO: Starting scan for source neural_scout
+[16:46:48] INTEL ERROR: Failed to save scan result: cannot start a transaction within a transaction
+[16:46:48] INTEL ERROR: Scan failed for source neural_scout
+[16:46:48] INTEL INFO: Starting scan for source scout_intel
+[16:46:49] INTEL ERROR: Failed to save scan result: cannot start a transaction within a transaction
+[16:46:49] INTEL ERROR: Scan failed for source scout_intel
+[16:46:49] INTEL INFO: Starting scan for source predictive
+[16:46:50] INTEL ERROR: Failed to save scan result: cannot start a transaction within a transaction
+[16:46:50] INTEL ERROR: Scan failed for source predictive
+[16:46:50] INTEL INFO: Starting scan for source crawler
+[16:46:51] INTEL ERROR: Failed to save scan result: cannot start a transaction within a transaction
+[16:46:51] INTEL ERROR: Scan failed for source crawler
+[16:46:51] INTEL INFO: Starting scan for source sim
+[16:46:52] INTEL ERROR: Failed to save scan result: cannot start a transaction within a transaction
+[16:46:52] INTEL ERROR: Scan failed for source sim
+[16:46:52] INTEL INFO: Starting scan for source deep_research
+[16:46:53] INTEL ERROR: Failed to save scan result: cannot start a transaction within a transaction
+[16:46:53] INTEL ERROR: Scan failed for source deep_research
+[16:46:53] INTEL INFO: Cycle 1 complete, processed 6 tasks
+[16:47:23] INTEL INFO: Intelligence loop cycle 2
+[16:47:23] INTEL INFO: Cycle 2 complete, processed 0 tasks
+[16:47:53] INTEL INFO: Intelligence loop cycle 3
+[16:47:53] INTEL INFO: Cycle 3 complete, processed 0 tasks
+[16:48:23] INTEL INFO: Intelligence loop cycle 4
+[16:48:23] INTEL INFO: Cycle 4 complete, processed 0 tasks
+[16:48:53] INTEL INFO: Intelligence loop cycle 5
+[16:48:53] INTEL INFO: Cycle 5 complete, processed 0 tasks
+[16:49:43] INTEL INFO: Intelligence loop cycle 6
+[16:49:43] INTEL INFO: Cycle 6 complete, processed 0 tasks
+[16:50:13] INTEL INFO: Intelligence loop cycle 7
+[16:50:13] INTEL INFO: Cycle 7 complete, processed 0 tasks
+[16:50:43] INTEL INFO: Intelligence loop cycle 8
+[16:50:43] INTEL INFO: Cycle 8 complete, processed 0 tasks
+[16:51:13] INTEL INFO: Intelligence loop cycle 9
+[16:51:13] INTEL INFO: Cycle 9 complete, processed 0 tasks
+[16:51:43] INTEL INFO: Intelligence loop cycle 10
+[16:51:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[16:51:43] INTEL INFO: Cycle 10 complete, processed 0 tasks
+[16:52:13] INTEL INFO: Intelligence loop cycle 11
+[16:52:13] INTEL INFO: Cycle 11 complete, processed 0 tasks
+[16:52:43] INTEL INFO: Intelligence loop cycle 12
+[16:52:43] INTEL INFO: Cycle 12 complete, processed 0 tasks
+[16:53:13] INTEL INFO: Intelligence loop cycle 13
+[16:53:13] INTEL INFO: Cycle 13 complete, processed 0 tasks
+[16:53:43] INTEL INFO: Intelligence loop cycle 14
+[16:53:43] INTEL INFO: Cycle 14 complete, processed 0 tasks
+[16:54:13] INTEL INFO: Intelligence loop cycle 15
+[16:54:13] INTEL INFO: Cycle 15 complete, processed 0 tasks
+[16:54:43] INTEL INFO: Intelligence loop cycle 16
+[16:54:43] INTEL INFO: Cycle 16 complete, processed 0 tasks
+[16:55:13] INTEL INFO: Intelligence loop cycle 17
+[16:55:13] INTEL INFO: Cycle 17 complete, processed 0 tasks
+[16:55:43] INTEL INFO: Intelligence loop cycle 18
+[16:55:43] INTEL INFO: Cycle 18 complete, processed 0 tasks
+[16:56:13] INTEL INFO: Intelligence loop cycle 19
+[16:56:13] INTEL INFO: Cycle 19 complete, processed 0 tasks
+[16:56:43] INTEL INFO: Intelligence loop cycle 20
+[16:56:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[16:56:43] INTEL INFO: Cycle 20 complete, processed 0 tasks
+[16:57:13] INTEL INFO: Intelligence loop cycle 21
+[16:57:13] INTEL INFO: Cycle 21 complete, processed 0 tasks
+[16:57:43] INTEL INFO: Intelligence loop cycle 22
+[16:57:43] INTEL INFO: Cycle 22 complete, processed 0 tasks
+[16:58:13] INTEL INFO: Intelligence loop cycle 23
+[16:58:13] INTEL INFO: Cycle 23 complete, processed 0 tasks
+[16:58:43] INTEL INFO: Intelligence loop cycle 24
+[16:58:43] INTEL INFO: Cycle 24 complete, processed 0 tasks
+[16:59:13] INTEL INFO: Intelligence loop cycle 25
+[16:59:13] INTEL INFO: Cycle 25 complete, processed 0 tasks
+[16:59:43] INTEL INFO: Intelligence loop cycle 26
+[16:59:43] INTEL INFO: Cycle 26 complete, processed 0 tasks
+[17:00:13] INTEL INFO: Intelligence loop cycle 27
+[17:00:13] INTEL INFO: Cycle 27 complete, processed 0 tasks
+[17:00:43] INTEL INFO: Intelligence loop cycle 28
+[17:00:43] INTEL INFO: Cycle 28 complete, processed 0 tasks
+[17:01:13] INTEL INFO: Intelligence loop cycle 29
+[17:01:13] INTEL INFO: Cycle 29 complete, processed 0 tasks
+[17:01:43] INTEL INFO: Intelligence loop cycle 30
+[17:01:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:01:43] INTEL INFO: Cycle 30 complete, processed 0 tasks
+[17:02:13] INTEL INFO: Intelligence loop cycle 31
+[17:02:13] INTEL INFO: Cycle 31 complete, processed 0 tasks
+[17:02:43] INTEL INFO: Intelligence loop cycle 32
+[17:02:43] INTEL INFO: Cycle 32 complete, processed 0 tasks
+[17:03:13] INTEL INFO: Intelligence loop cycle 33
+[17:03:13] INTEL INFO: Cycle 33 complete, processed 0 tasks
+[17:03:43] INTEL INFO: Intelligence loop cycle 34
+[17:03:43] INTEL INFO: Cycle 34 complete, processed 0 tasks
+[17:04:13] INTEL INFO: Intelligence loop cycle 35
+[17:04:13] INTEL INFO: Cycle 35 complete, processed 0 tasks
+[17:04:43] INTEL INFO: Intelligence loop cycle 36
+[17:04:43] INTEL INFO: Cycle 36 complete, processed 0 tasks
+[17:05:13] INTEL INFO: Intelligence loop cycle 37
+[17:05:13] INTEL INFO: Cycle 37 complete, processed 0 tasks
+[17:05:43] INTEL INFO: Intelligence loop cycle 38
+[17:05:43] INTEL INFO: Cycle 38 complete, processed 0 tasks
+[17:06:13] INTEL INFO: Intelligence loop cycle 39
+[17:06:13] INTEL INFO: Cycle 39 complete, processed 0 tasks
+[17:06:43] INTEL INFO: Intelligence loop cycle 40
+[17:06:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:06:43] INTEL INFO: Cycle 40 complete, processed 0 tasks
+[17:07:13] INTEL INFO: Intelligence loop cycle 41
+[17:07:13] INTEL INFO: Cycle 41 complete, processed 0 tasks
+[17:07:43] INTEL INFO: Intelligence loop cycle 42
+[17:07:43] INTEL INFO: Cycle 42 complete, processed 0 tasks
+[17:08:13] INTEL INFO: Intelligence loop cycle 43
+[17:08:13] INTEL INFO: Cycle 43 complete, processed 0 tasks
+[17:08:43] INTEL INFO: Intelligence loop cycle 44
+[17:08:43] INTEL INFO: Cycle 44 complete, processed 0 tasks
+[17:09:13] INTEL INFO: Intelligence loop cycle 45
+[17:09:13] INTEL INFO: Cycle 45 complete, processed 0 tasks
+[17:09:43] INTEL INFO: Intelligence loop cycle 46
+[17:09:43] INTEL INFO: Cycle 46 complete, processed 0 tasks
+[17:10:13] INTEL INFO: Intelligence loop cycle 47
+[17:10:13] INTEL INFO: Cycle 47 complete, processed 0 tasks
+[17:10:43] INTEL INFO: Intelligence loop cycle 48
+[17:10:43] INTEL INFO: Cycle 48 complete, processed 0 tasks
+[17:11:13] INTEL INFO: Intelligence loop cycle 49
+[17:11:13] INTEL INFO: Cycle 49 complete, processed 0 tasks
+[17:11:43] INTEL INFO: Intelligence loop cycle 50
+[17:11:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:11:43] INTEL INFO: Cycle 50 complete, processed 0 tasks
+[17:12:13] INTEL INFO: Intelligence loop cycle 51
+[17:12:13] INTEL INFO: Cycle 51 complete, processed 0 tasks
+[17:12:43] INTEL INFO: Intelligence loop cycle 52
+[17:12:43] INTEL INFO: Cycle 52 complete, processed 0 tasks
+[17:13:13] INTEL INFO: Intelligence loop cycle 53
+[17:13:13] INTEL INFO: Cycle 53 complete, processed 0 tasks
+[17:13:43] INTEL INFO: Intelligence loop cycle 54
+[17:13:43] INTEL INFO: Cycle 54 complete, processed 0 tasks
+[17:14:13] INTEL INFO: Intelligence loop cycle 55
+[17:14:13] INTEL INFO: Cycle 55 complete, processed 0 tasks
+[17:14:43] INTEL INFO: Intelligence loop cycle 56
+[17:14:43] INTEL INFO: Cycle 56 complete, processed 0 tasks
+[17:15:13] INTEL INFO: Intelligence loop cycle 57
+[17:15:13] INTEL INFO: Cycle 57 complete, processed 0 tasks
+[17:15:43] INTEL INFO: Intelligence loop cycle 58
+[17:15:43] INTEL INFO: Cycle 58 complete, processed 0 tasks
+[17:16:13] INTEL INFO: Intelligence loop cycle 59
+[17:16:13] INTEL INFO: Cycle 59 complete, processed 0 tasks
+[17:16:43] INTEL INFO: Intelligence loop cycle 60
+[17:16:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:16:43] INTEL INFO: Cycle 60 complete, processed 0 tasks
+[17:17:13] INTEL INFO: Intelligence loop cycle 61
+[17:17:13] INTEL INFO: Cycle 61 complete, processed 0 tasks
+[17:17:43] INTEL INFO: Intelligence loop cycle 62
+[17:17:43] INTEL INFO: Cycle 62 complete, processed 0 tasks
+[17:18:13] INTEL INFO: Intelligence loop cycle 63
+[17:18:13] INTEL INFO: Cycle 63 complete, processed 0 tasks
+[17:18:43] INTEL INFO: Intelligence loop cycle 64
+[17:18:43] INTEL INFO: Cycle 64 complete, processed 0 tasks
+[17:19:13] INTEL INFO: Intelligence loop cycle 65
+[17:19:13] INTEL INFO: Cycle 65 complete, processed 0 tasks
+[17:19:43] INTEL INFO: Intelligence loop cycle 66
+[17:19:43] INTEL INFO: Cycle 66 complete, processed 0 tasks
+[17:20:13] INTEL INFO: Intelligence loop cycle 67
+[17:20:13] INTEL INFO: Cycle 67 complete, processed 0 tasks
+[17:20:43] INTEL INFO: Intelligence loop cycle 68
+[17:20:43] INTEL INFO: Cycle 68 complete, processed 0 tasks
+[17:21:13] INTEL INFO: Intelligence loop cycle 69
+[17:21:13] INTEL INFO: Cycle 69 complete, processed 0 tasks
+[17:21:43] INTEL INFO: Intelligence loop cycle 70
+[17:21:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:21:43] INTEL INFO: Cycle 70 complete, processed 0 tasks
+[17:22:13] INTEL INFO: Intelligence loop cycle 71
+[17:22:13] INTEL INFO: Cycle 71 complete, processed 0 tasks
+[17:22:43] INTEL INFO: Intelligence loop cycle 72
+[17:22:43] INTEL INFO: Cycle 72 complete, processed 0 tasks
+[17:23:13] INTEL INFO: Intelligence loop cycle 73
+[17:23:13] INTEL INFO: Cycle 73 complete, processed 0 tasks
+[17:23:43] INTEL INFO: Intelligence loop cycle 74
+[17:23:43] INTEL INFO: Cycle 74 complete, processed 0 tasks
+[17:24:13] INTEL INFO: Intelligence loop cycle 75
+[17:24:13] INTEL INFO: Cycle 75 complete, processed 0 tasks
+[17:24:43] INTEL INFO: Intelligence loop cycle 76
+[17:24:43] INTEL INFO: Cycle 76 complete, processed 0 tasks
+[17:25:13] INTEL INFO: Intelligence loop cycle 77
+[17:25:13] INTEL INFO: Cycle 77 complete, processed 0 tasks
+[17:25:43] INTEL INFO: Intelligence loop cycle 78
+[17:25:43] INTEL INFO: Cycle 78 complete, processed 0 tasks
+[17:26:13] INTEL INFO: Intelligence loop cycle 79
+[17:26:13] INTEL INFO: Cycle 79 complete, processed 0 tasks
+[17:26:43] INTEL INFO: Intelligence loop cycle 80
+[17:26:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:26:43] INTEL INFO: Cycle 80 complete, processed 0 tasks
+[17:27:13] INTEL INFO: Intelligence loop cycle 81
+[17:27:13] INTEL INFO: Cycle 81 complete, processed 0 tasks
+[17:27:43] INTEL INFO: Intelligence loop cycle 82
+[17:27:43] INTEL INFO: Cycle 82 complete, processed 0 tasks
+[17:28:13] INTEL INFO: Intelligence loop cycle 83
+[17:28:13] INTEL INFO: Cycle 83 complete, processed 0 tasks
+[17:28:43] INTEL INFO: Intelligence loop cycle 84
+[17:28:43] INTEL INFO: Cycle 84 complete, processed 0 tasks
+[17:29:13] INTEL INFO: Intelligence loop cycle 85
+[17:29:13] INTEL INFO: Cycle 85 complete, processed 0 tasks
+[17:29:43] INTEL INFO: Intelligence loop cycle 86
+[17:29:43] INTEL INFO: Cycle 86 complete, processed 0 tasks
+[17:30:13] INTEL INFO: Intelligence loop cycle 87
+[17:30:13] INTEL INFO: Cycle 87 complete, processed 0 tasks
+[17:30:43] INTEL INFO: Intelligence loop cycle 88
+[17:30:43] INTEL INFO: Cycle 88 complete, processed 0 tasks
+[17:31:13] INTEL INFO: Intelligence loop cycle 89
+[17:31:13] INTEL INFO: Cycle 89 complete, processed 0 tasks
+[17:31:43] INTEL INFO: Intelligence loop cycle 90
+[17:31:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:31:43] INTEL INFO: Cycle 90 complete, processed 0 tasks
+[17:32:13] INTEL INFO: Intelligence loop cycle 91
+[17:32:13] INTEL INFO: Cycle 91 complete, processed 0 tasks
+[17:32:43] INTEL INFO: Intelligence loop cycle 92
+[17:32:43] INTEL INFO: Cycle 92 complete, processed 0 tasks
+[17:33:13] INTEL INFO: Intelligence loop cycle 93
+[17:33:13] INTEL INFO: Cycle 93 complete, processed 0 tasks
+[17:33:43] INTEL INFO: Intelligence loop cycle 94
+[17:33:43] INTEL INFO: Cycle 94 complete, processed 0 tasks
+[17:34:13] INTEL INFO: Intelligence loop cycle 95
+[17:34:13] INTEL INFO: Cycle 95 complete, processed 0 tasks
+[17:34:43] INTEL INFO: Intelligence loop cycle 96
+[17:34:43] INTEL INFO: Cycle 96 complete, processed 0 tasks
+[17:35:13] INTEL INFO: Intelligence loop cycle 97
+[17:35:13] INTEL INFO: Cycle 97 complete, processed 0 tasks
+[17:35:43] INTEL INFO: Intelligence loop cycle 98
+[17:35:43] INTEL INFO: Cycle 98 complete, processed 0 tasks
+[17:36:13] INTEL INFO: Intelligence loop cycle 99
+[17:36:13] INTEL INFO: Cycle 99 complete, processed 0 tasks
+[17:36:43] INTEL INFO: Intelligence loop cycle 100
+[17:36:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:36:43] INTEL INFO: Cycle 100 complete, processed 0 tasks
+[17:37:13] INTEL INFO: Intelligence loop cycle 101
+[17:37:13] INTEL INFO: Cycle 101 complete, processed 0 tasks
+[17:37:43] INTEL INFO: Intelligence loop cycle 102
+[17:37:43] INTEL INFO: Cycle 102 complete, processed 0 tasks
+[17:38:13] INTEL INFO: Intelligence loop cycle 103
+[17:38:13] INTEL INFO: Cycle 103 complete, processed 0 tasks
+[17:38:43] INTEL INFO: Intelligence loop cycle 104
+[17:38:43] INTEL INFO: Cycle 104 complete, processed 0 tasks
+[17:39:13] INTEL INFO: Intelligence loop cycle 105
+[17:39:13] INTEL INFO: Cycle 105 complete, processed 0 tasks
+[17:39:43] INTEL INFO: Intelligence loop cycle 106
+[17:39:43] INTEL INFO: Cycle 106 complete, processed 0 tasks
+[17:40:13] INTEL INFO: Intelligence loop cycle 107
+[17:40:13] INTEL INFO: Cycle 107 complete, processed 0 tasks
+[17:40:43] INTEL INFO: Intelligence loop cycle 108
+[17:40:43] INTEL INFO: Cycle 108 complete, processed 0 tasks
+[17:41:13] INTEL INFO: Intelligence loop cycle 109
+[17:41:13] INTEL INFO: Cycle 109 complete, processed 0 tasks
+[17:41:43] INTEL INFO: Intelligence loop cycle 110
+[17:41:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:41:43] INTEL INFO: Cycle 110 complete, processed 0 tasks
+[17:42:13] INTEL INFO: Intelligence loop cycle 111
+[17:42:13] INTEL INFO: Cycle 111 complete, processed 0 tasks
+[17:42:43] INTEL INFO: Intelligence loop cycle 112
+[17:42:43] INTEL INFO: Cycle 112 complete, processed 0 tasks
+[17:43:13] INTEL INFO: Intelligence loop cycle 113
+[17:43:13] INTEL INFO: Cycle 113 complete, processed 0 tasks
+[17:43:43] INTEL INFO: Intelligence loop cycle 114
+[17:43:43] INTEL INFO: Cycle 114 complete, processed 0 tasks
+[17:44:13] INTEL INFO: Intelligence loop cycle 115
+[17:44:13] INTEL INFO: Cycle 115 complete, processed 0 tasks
+[17:44:43] INTEL INFO: Intelligence loop cycle 116
+[17:44:43] INTEL INFO: Cycle 116 complete, processed 0 tasks
+[17:45:13] INTEL INFO: Intelligence loop cycle 117
+[17:45:13] INTEL INFO: Cycle 117 complete, processed 0 tasks
+[17:45:43] INTEL INFO: Intelligence loop cycle 118
+[17:45:43] INTEL INFO: Cycle 118 complete, processed 0 tasks
+[17:46:13] INTEL INFO: Intelligence loop cycle 119
+[17:46:13] INTEL INFO: Cycle 119 complete, processed 0 tasks
+[17:46:43] INTEL INFO: Intelligence loop cycle 120
+[17:46:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:46:43] INTEL INFO: Cycle 120 complete, processed 0 tasks
+[17:47:13] INTEL INFO: Intelligence loop cycle 121
+[17:47:13] INTEL INFO: Cycle 121 complete, processed 0 tasks
+[17:47:43] INTEL INFO: Intelligence loop cycle 122
+[17:47:43] INTEL INFO: Cycle 122 complete, processed 0 tasks
+[17:48:13] INTEL INFO: Intelligence loop cycle 123
+[17:48:13] INTEL INFO: Cycle 123 complete, processed 0 tasks
+[17:48:43] INTEL INFO: Intelligence loop cycle 124
+[17:48:43] INTEL INFO: Cycle 124 complete, processed 0 tasks
+[17:49:13] INTEL INFO: Intelligence loop cycle 125
+[17:49:13] INTEL INFO: Cycle 125 complete, processed 0 tasks
+[17:49:43] INTEL INFO: Intelligence loop cycle 126
+[17:49:43] INTEL INFO: Cycle 126 complete, processed 0 tasks
+[17:50:13] INTEL INFO: Intelligence loop cycle 127
+[17:50:13] INTEL INFO: Cycle 127 complete, processed 0 tasks
+[17:50:43] INTEL INFO: Intelligence loop cycle 128
+[17:50:43] INTEL INFO: Cycle 128 complete, processed 0 tasks
+[17:51:13] INTEL INFO: Intelligence loop cycle 129
+[17:51:13] INTEL INFO: Cycle 129 complete, processed 0 tasks
+[17:51:43] INTEL INFO: Intelligence loop cycle 130
+[17:51:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:51:43] INTEL INFO: Cycle 130 complete, processed 0 tasks
+[17:52:13] INTEL INFO: Intelligence loop cycle 131
+[17:52:13] INTEL INFO: Cycle 131 complete, processed 0 tasks
+[17:52:43] INTEL INFO: Intelligence loop cycle 132
+[17:52:43] INTEL INFO: Cycle 132 complete, processed 0 tasks
+[17:53:13] INTEL INFO: Intelligence loop cycle 133
+[17:53:13] INTEL INFO: Cycle 133 complete, processed 0 tasks
+[17:53:43] INTEL INFO: Intelligence loop cycle 134
+[17:53:43] INTEL INFO: Cycle 134 complete, processed 0 tasks
+[17:54:13] INTEL INFO: Intelligence loop cycle 135
+[17:54:13] INTEL INFO: Cycle 135 complete, processed 0 tasks
+[17:54:43] INTEL INFO: Intelligence loop cycle 136
+[17:54:43] INTEL INFO: Cycle 136 complete, processed 0 tasks
+[17:55:13] INTEL INFO: Intelligence loop cycle 137
+[17:55:13] INTEL INFO: Cycle 137 complete, processed 0 tasks
+[17:55:43] INTEL INFO: Intelligence loop cycle 138
+[17:55:43] INTEL INFO: Cycle 138 complete, processed 0 tasks
+[17:56:13] INTEL INFO: Intelligence loop cycle 139
+[17:56:13] INTEL INFO: Cycle 139 complete, processed 0 tasks
+[17:56:43] INTEL INFO: Intelligence loop cycle 140
+[17:56:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[17:56:43] INTEL INFO: Cycle 140 complete, processed 0 tasks
+[17:57:13] INTEL INFO: Intelligence loop cycle 141
+[17:57:13] INTEL INFO: Cycle 141 complete, processed 0 tasks
+[17:57:43] INTEL INFO: Intelligence loop cycle 142
+[17:57:43] INTEL INFO: Cycle 142 complete, processed 0 tasks
+[17:58:13] INTEL INFO: Intelligence loop cycle 143
+[17:58:13] INTEL INFO: Cycle 143 complete, processed 0 tasks
+[17:58:43] INTEL INFO: Intelligence loop cycle 144
+[17:58:43] INTEL INFO: Cycle 144 complete, processed 0 tasks
+[17:59:13] INTEL INFO: Intelligence loop cycle 145
+[17:59:13] INTEL INFO: Cycle 145 complete, processed 0 tasks
+[17:59:43] INTEL INFO: Intelligence loop cycle 146
+[17:59:43] INTEL INFO: Cycle 146 complete, processed 0 tasks
+[18:00:13] INTEL INFO: Intelligence loop cycle 147
+[18:00:13] INTEL INFO: Cycle 147 complete, processed 0 tasks
+[18:00:43] INTEL INFO: Intelligence loop cycle 148
+[18:00:43] INTEL INFO: Cycle 148 complete, processed 0 tasks
+[18:01:13] INTEL INFO: Intelligence loop cycle 149
+[18:01:13] INTEL INFO: Cycle 149 complete, processed 0 tasks
+[18:01:43] INTEL INFO: Intelligence loop cycle 150
+[18:01:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:01:43] INTEL INFO: Cycle 150 complete, processed 0 tasks
+[18:02:13] INTEL INFO: Intelligence loop cycle 151
+[18:02:13] INTEL INFO: Cycle 151 complete, processed 0 tasks
+[18:02:43] INTEL INFO: Intelligence loop cycle 152
+[18:02:43] INTEL INFO: Cycle 152 complete, processed 0 tasks
+[18:03:13] INTEL INFO: Intelligence loop cycle 153
+[18:03:13] INTEL INFO: Cycle 153 complete, processed 0 tasks
+[18:03:43] INTEL INFO: Intelligence loop cycle 154
+[18:03:43] INTEL INFO: Cycle 154 complete, processed 0 tasks
+[18:04:13] INTEL INFO: Intelligence loop cycle 155
+[18:04:13] INTEL INFO: Cycle 155 complete, processed 0 tasks
+[18:04:43] INTEL INFO: Intelligence loop cycle 156
+[18:04:43] INTEL INFO: Cycle 156 complete, processed 0 tasks
+[18:05:13] INTEL INFO: Intelligence loop cycle 157
+[18:05:13] INTEL INFO: Cycle 157 complete, processed 0 tasks
+[18:05:43] INTEL INFO: Intelligence loop cycle 158
+[18:05:43] INTEL INFO: Cycle 158 complete, processed 0 tasks
+[18:06:13] INTEL INFO: Intelligence loop cycle 159
+[18:06:13] INTEL INFO: Cycle 159 complete, processed 0 tasks
+[18:06:43] INTEL INFO: Intelligence loop cycle 160
+[18:06:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:06:43] INTEL INFO: Cycle 160 complete, processed 0 tasks
+[18:07:13] INTEL INFO: Intelligence loop cycle 161
+[18:07:13] INTEL INFO: Cycle 161 complete, processed 0 tasks
+[18:07:43] INTEL INFO: Intelligence loop cycle 162
+[18:07:43] INTEL INFO: Cycle 162 complete, processed 0 tasks
+[18:08:13] INTEL INFO: Intelligence loop cycle 163
+[18:08:13] INTEL INFO: Cycle 163 complete, processed 0 tasks
+[18:08:43] INTEL INFO: Intelligence loop cycle 164
+[18:08:43] INTEL INFO: Cycle 164 complete, processed 0 tasks
+[18:09:13] INTEL INFO: Intelligence loop cycle 165
+[18:09:13] INTEL INFO: Cycle 165 complete, processed 0 tasks
+[18:09:43] INTEL INFO: Intelligence loop cycle 166
+[18:09:43] INTEL INFO: Cycle 166 complete, processed 0 tasks
+[18:10:13] INTEL INFO: Intelligence loop cycle 167
+[18:10:13] INTEL INFO: Cycle 167 complete, processed 0 tasks
+[18:10:43] INTEL INFO: Intelligence loop cycle 168
+[18:10:43] INTEL INFO: Cycle 168 complete, processed 0 tasks
+[18:11:13] INTEL INFO: Intelligence loop cycle 169
+[18:11:13] INTEL INFO: Cycle 169 complete, processed 0 tasks
+[18:11:43] INTEL INFO: Intelligence loop cycle 170
+[18:11:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:11:43] INTEL INFO: Cycle 170 complete, processed 0 tasks
+[18:12:13] INTEL INFO: Intelligence loop cycle 171
+[18:12:13] INTEL INFO: Cycle 171 complete, processed 0 tasks
+[18:12:43] INTEL INFO: Intelligence loop cycle 172
+[18:12:43] INTEL INFO: Cycle 172 complete, processed 0 tasks
+[18:13:13] INTEL INFO: Intelligence loop cycle 173
+[18:13:13] INTEL INFO: Cycle 173 complete, processed 0 tasks
+[18:13:43] INTEL INFO: Intelligence loop cycle 174
+[18:13:43] INTEL INFO: Cycle 174 complete, processed 0 tasks
+[18:14:13] INTEL INFO: Intelligence loop cycle 175
+[18:14:13] INTEL INFO: Cycle 175 complete, processed 0 tasks
+[18:14:43] INTEL INFO: Intelligence loop cycle 176
+[18:14:43] INTEL INFO: Cycle 176 complete, processed 0 tasks
+[18:15:13] INTEL INFO: Intelligence loop cycle 177
+[18:15:13] INTEL INFO: Cycle 177 complete, processed 0 tasks
+[18:15:43] INTEL INFO: Intelligence loop cycle 178
+[18:15:43] INTEL INFO: Cycle 178 complete, processed 0 tasks
+[18:16:13] INTEL INFO: Intelligence loop cycle 179
+[18:16:13] INTEL INFO: Cycle 179 complete, processed 0 tasks
+[18:16:43] INTEL INFO: Intelligence loop cycle 180
+[18:16:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:16:43] INTEL INFO: Cycle 180 complete, processed 0 tasks
+[18:17:13] INTEL INFO: Intelligence loop cycle 181
+[18:17:13] INTEL INFO: Cycle 181 complete, processed 0 tasks
+[18:17:43] INTEL INFO: Intelligence loop cycle 182
+[18:17:43] INTEL INFO: Cycle 182 complete, processed 0 tasks
+[18:18:13] INTEL INFO: Intelligence loop cycle 183
+[18:18:13] INTEL INFO: Cycle 183 complete, processed 0 tasks
+[18:18:43] INTEL INFO: Intelligence loop cycle 184
+[18:18:43] INTEL INFO: Cycle 184 complete, processed 0 tasks
+[18:19:13] INTEL INFO: Intelligence loop cycle 185
+[18:19:13] INTEL INFO: Cycle 185 complete, processed 0 tasks
+[18:19:43] INTEL INFO: Intelligence loop cycle 186
+[18:19:43] INTEL INFO: Cycle 186 complete, processed 0 tasks
+[18:20:13] INTEL INFO: Intelligence loop cycle 187
+[18:20:13] INTEL INFO: Cycle 187 complete, processed 0 tasks
+[18:20:43] INTEL INFO: Intelligence loop cycle 188
+[18:20:43] INTEL INFO: Cycle 188 complete, processed 0 tasks
+[18:21:13] INTEL INFO: Intelligence loop cycle 189
+[18:21:13] INTEL INFO: Cycle 189 complete, processed 0 tasks
+[18:21:43] INTEL INFO: Intelligence loop cycle 190
+[18:21:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:21:43] INTEL INFO: Cycle 190 complete, processed 0 tasks
+[18:22:13] INTEL INFO: Intelligence loop cycle 191
+[18:22:13] INTEL INFO: Cycle 191 complete, processed 0 tasks
+[18:22:43] INTEL INFO: Intelligence loop cycle 192
+[18:22:43] INTEL INFO: Cycle 192 complete, processed 0 tasks
+[18:23:13] INTEL INFO: Intelligence loop cycle 193
+[18:23:13] INTEL INFO: Cycle 193 complete, processed 0 tasks
+[18:23:43] INTEL INFO: Intelligence loop cycle 194
+[18:23:43] INTEL INFO: Cycle 194 complete, processed 0 tasks
+[18:24:13] INTEL INFO: Intelligence loop cycle 195
+[18:24:13] INTEL INFO: Cycle 195 complete, processed 0 tasks
+[18:24:43] INTEL INFO: Intelligence loop cycle 196
+[18:24:43] INTEL INFO: Cycle 196 complete, processed 0 tasks
+[18:25:13] INTEL INFO: Intelligence loop cycle 197
+[18:25:13] INTEL INFO: Cycle 197 complete, processed 0 tasks
+[18:25:43] INTEL INFO: Intelligence loop cycle 198
+[18:25:43] INTEL INFO: Cycle 198 complete, processed 0 tasks
+[18:26:13] INTEL INFO: Intelligence loop cycle 199
+[18:26:13] INTEL INFO: Cycle 199 complete, processed 0 tasks
+[18:26:43] INTEL INFO: Intelligence loop cycle 200
+[18:26:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:26:43] INTEL INFO: Cycle 200 complete, processed 0 tasks
+[18:27:13] INTEL INFO: Intelligence loop cycle 201
+[18:27:13] INTEL INFO: Cycle 201 complete, processed 0 tasks
+[18:27:43] INTEL INFO: Intelligence loop cycle 202
+[18:27:43] INTEL INFO: Cycle 202 complete, processed 0 tasks
+[18:28:13] INTEL INFO: Intelligence loop cycle 203
+[18:28:13] INTEL INFO: Cycle 203 complete, processed 0 tasks
+[18:28:43] INTEL INFO: Intelligence loop cycle 204
+[18:28:43] INTEL INFO: Cycle 204 complete, processed 0 tasks
+[18:29:13] INTEL INFO: Intelligence loop cycle 205
+[18:29:13] INTEL INFO: Cycle 205 complete, processed 0 tasks
+[18:29:43] INTEL INFO: Intelligence loop cycle 206
+[18:29:43] INTEL INFO: Cycle 206 complete, processed 0 tasks
+[18:30:13] INTEL INFO: Intelligence loop cycle 207
+[18:30:13] INTEL INFO: Cycle 207 complete, processed 0 tasks
+[18:30:43] INTEL INFO: Intelligence loop cycle 208
+[18:30:43] INTEL INFO: Cycle 208 complete, processed 0 tasks
+[18:31:13] INTEL INFO: Intelligence loop cycle 209
+[18:31:13] INTEL INFO: Cycle 209 complete, processed 0 tasks
+[18:31:43] INTEL INFO: Intelligence loop cycle 210
+[18:31:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:31:43] INTEL INFO: Cycle 210 complete, processed 0 tasks
+[18:32:13] INTEL INFO: Intelligence loop cycle 211
+[18:32:13] INTEL INFO: Cycle 211 complete, processed 0 tasks
+[18:32:43] INTEL INFO: Intelligence loop cycle 212
+[18:32:43] INTEL INFO: Cycle 212 complete, processed 0 tasks
+[18:33:13] INTEL INFO: Intelligence loop cycle 213
+[18:33:13] INTEL INFO: Cycle 213 complete, processed 0 tasks
+[18:33:43] INTEL INFO: Intelligence loop cycle 214
+[18:33:43] INTEL INFO: Cycle 214 complete, processed 0 tasks
+[18:34:13] INTEL INFO: Intelligence loop cycle 215
+[18:34:13] INTEL INFO: Cycle 215 complete, processed 0 tasks
+[18:34:43] INTEL INFO: Intelligence loop cycle 216
+[18:34:43] INTEL INFO: Cycle 216 complete, processed 0 tasks
+[18:35:13] INTEL INFO: Intelligence loop cycle 217
+[18:35:13] INTEL INFO: Cycle 217 complete, processed 0 tasks
+[18:35:43] INTEL INFO: Intelligence loop cycle 218
+[18:35:43] INTEL INFO: Cycle 218 complete, processed 0 tasks
+[18:36:13] INTEL INFO: Intelligence loop cycle 219
+[18:36:13] INTEL INFO: Cycle 219 complete, processed 0 tasks
+[18:36:43] INTEL INFO: Intelligence loop cycle 220
+[18:36:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:36:43] INTEL INFO: Cycle 220 complete, processed 0 tasks
+[18:37:13] INTEL INFO: Intelligence loop cycle 221
+[18:37:13] INTEL INFO: Cycle 221 complete, processed 0 tasks
+[18:37:43] INTEL INFO: Intelligence loop cycle 222
+[18:37:43] INTEL INFO: Cycle 222 complete, processed 0 tasks
+[18:38:13] INTEL INFO: Intelligence loop cycle 223
+[18:38:13] INTEL INFO: Cycle 223 complete, processed 0 tasks
+[18:38:43] INTEL INFO: Intelligence loop cycle 224
+[18:38:43] INTEL INFO: Cycle 224 complete, processed 0 tasks
+[18:39:13] INTEL INFO: Intelligence loop cycle 225
+[18:39:13] INTEL INFO: Cycle 225 complete, processed 0 tasks
+[18:39:43] INTEL INFO: Intelligence loop cycle 226
+[18:39:43] INTEL INFO: Cycle 226 complete, processed 0 tasks
+[18:40:13] INTEL INFO: Intelligence loop cycle 227
+[18:40:13] INTEL INFO: Cycle 227 complete, processed 0 tasks
+[18:40:43] INTEL INFO: Intelligence loop cycle 228
+[18:40:43] INTEL INFO: Cycle 228 complete, processed 0 tasks
+[18:41:13] INTEL INFO: Intelligence loop cycle 229
+[18:41:13] INTEL INFO: Cycle 229 complete, processed 0 tasks
+[18:41:43] INTEL INFO: Intelligence loop cycle 230
+[18:41:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:41:43] INTEL INFO: Cycle 230 complete, processed 0 tasks
+[18:42:13] INTEL INFO: Intelligence loop cycle 231
+[18:42:13] INTEL INFO: Cycle 231 complete, processed 0 tasks
+[18:42:43] INTEL INFO: Intelligence loop cycle 232
+[18:42:43] INTEL INFO: Cycle 232 complete, processed 0 tasks
+[18:43:13] INTEL INFO: Intelligence loop cycle 233
+[18:43:13] INTEL INFO: Cycle 233 complete, processed 0 tasks
+[18:43:43] INTEL INFO: Intelligence loop cycle 234
+[18:43:43] INTEL INFO: Cycle 234 complete, processed 0 tasks
+[18:44:13] INTEL INFO: Intelligence loop cycle 235
+[18:44:13] INTEL INFO: Cycle 235 complete, processed 0 tasks
+[18:44:43] INTEL INFO: Intelligence loop cycle 236
+[18:44:43] INTEL INFO: Cycle 236 complete, processed 0 tasks
+[18:45:13] INTEL INFO: Intelligence loop cycle 237
+[18:45:13] INTEL INFO: Cycle 237 complete, processed 0 tasks
+[18:45:43] INTEL INFO: Intelligence loop cycle 238
+[18:45:43] INTEL INFO: Cycle 238 complete, processed 0 tasks
+[18:46:13] INTEL INFO: Intelligence loop cycle 239
+[18:46:13] INTEL INFO: Cycle 239 complete, processed 0 tasks
+[18:46:43] INTEL INFO: Intelligence loop cycle 240
+[18:46:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:46:43] INTEL INFO: Cycle 240 complete, processed 0 tasks
+[18:47:13] INTEL INFO: Intelligence loop cycle 241
+[18:47:13] INTEL INFO: Cycle 241 complete, processed 0 tasks
+[18:47:43] INTEL INFO: Intelligence loop cycle 242
+[18:47:43] INTEL INFO: Cycle 242 complete, processed 0 tasks
+[18:48:13] INTEL INFO: Intelligence loop cycle 243
+[18:48:13] INTEL INFO: Cycle 243 complete, processed 0 tasks
+[18:48:43] INTEL INFO: Intelligence loop cycle 244
+[18:48:43] INTEL INFO: Cycle 244 complete, processed 0 tasks
+[18:49:13] INTEL INFO: Intelligence loop cycle 245
+[18:49:13] INTEL INFO: Cycle 245 complete, processed 0 tasks
+[18:49:43] INTEL INFO: Intelligence loop cycle 246
+[18:49:43] INTEL INFO: Cycle 246 complete, processed 0 tasks
+[18:50:13] INTEL INFO: Intelligence loop cycle 247
+[18:50:13] INTEL INFO: Cycle 247 complete, processed 0 tasks
+[18:50:43] INTEL INFO: Intelligence loop cycle 248
+[18:50:43] INTEL INFO: Cycle 248 complete, processed 0 tasks
+[18:51:13] INTEL INFO: Intelligence loop cycle 249
+[18:51:13] INTEL INFO: Cycle 249 complete, processed 0 tasks
+[18:51:43] INTEL INFO: Intelligence loop cycle 250
+[18:51:43] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:51:43] INTEL INFO: Cycle 250 complete, processed 0 tasks
+[18:52:13] INTEL INFO: Intelligence loop cycle 251
+[18:52:13] INTEL INFO: Cycle 251 complete, processed 0 tasks
+[18:52:43] INTEL INFO: Intelligence loop cycle 252
+[18:52:43] INTEL INFO: Cycle 252 complete, processed 0 tasks
+[18:53:13] INTEL INFO: Intelligence loop cycle 253
+[18:53:13] INTEL INFO: Cycle 253 complete, processed 0 tasks
+[18:53:43] INTEL INFO: Intelligence loop cycle 254
+[18:53:43] INTEL INFO: Cycle 254 complete, processed 0 tasks
+[18:54:13] INTEL INFO: Intelligence loop cycle 255
+[18:54:13] INTEL INFO: Cycle 255 complete, processed 0 tasks
+[18:54:43] INTEL INFO: Intelligence loop cycle 256
+[18:54:43] INTEL INFO: Cycle 256 complete, processed 0 tasks
+[18:55:13] INTEL INFO: Intelligence loop cycle 257
+[18:55:13] INTEL INFO: Cycle 257 complete, processed 0 tasks
+[18:55:58] INTEL INFO: Intelligence loop cycle 258
+[18:56:07] INTEL INFO: Cycle 258 complete, processed 0 tasks
+[18:56:57] INTEL INFO: Intelligence loop cycle 259
+[18:56:57] INTEL INFO: Cycle 259 complete, processed 0 tasks
+[18:57:27] INTEL INFO: Intelligence loop cycle 260
+[18:57:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[18:57:27] INTEL INFO: Cycle 260 complete, processed 0 tasks
+[18:57:57] INTEL INFO: Intelligence loop cycle 261
+[18:57:57] INTEL INFO: Cycle 261 complete, processed 0 tasks
+[18:58:27] INTEL INFO: Intelligence loop cycle 262
+[18:58:27] INTEL INFO: Cycle 262 complete, processed 0 tasks
+[18:58:57] INTEL INFO: Intelligence loop cycle 263
+[18:58:57] INTEL INFO: Cycle 263 complete, processed 0 tasks
+[18:59:27] INTEL INFO: Intelligence loop cycle 264
+[18:59:27] INTEL INFO: Cycle 264 complete, processed 0 tasks
+[18:59:57] INTEL INFO: Intelligence loop cycle 265
+[18:59:57] INTEL INFO: Cycle 265 complete, processed 0 tasks
+[19:00:27] INTEL INFO: Intelligence loop cycle 266
+[19:00:27] INTEL INFO: Cycle 266 complete, processed 0 tasks
+[19:00:57] INTEL INFO: Intelligence loop cycle 267
+[19:00:57] INTEL INFO: Cycle 267 complete, processed 0 tasks
+[19:01:27] INTEL INFO: Intelligence loop cycle 268
+[19:01:27] INTEL INFO: Cycle 268 complete, processed 0 tasks
+[19:01:57] INTEL INFO: Intelligence loop cycle 269
+[19:01:57] INTEL INFO: Cycle 269 complete, processed 0 tasks
+[19:02:27] INTEL INFO: Intelligence loop cycle 270
+[19:02:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:02:27] INTEL INFO: Cycle 270 complete, processed 0 tasks
+[19:02:57] INTEL INFO: Intelligence loop cycle 271
+[19:02:57] INTEL INFO: Cycle 271 complete, processed 0 tasks
+[19:03:27] INTEL INFO: Intelligence loop cycle 272
+[19:03:27] INTEL INFO: Cycle 272 complete, processed 0 tasks
+[19:03:57] INTEL INFO: Intelligence loop cycle 273
+[19:03:57] INTEL INFO: Cycle 273 complete, processed 0 tasks
+[19:04:27] INTEL INFO: Intelligence loop cycle 274
+[19:04:27] INTEL INFO: Cycle 274 complete, processed 0 tasks
+[19:04:57] INTEL INFO: Intelligence loop cycle 275
+[19:04:57] INTEL INFO: Cycle 275 complete, processed 0 tasks
+[19:05:27] INTEL INFO: Intelligence loop cycle 276
+[19:05:27] INTEL INFO: Cycle 276 complete, processed 0 tasks
+[19:05:57] INTEL INFO: Intelligence loop cycle 277
+[19:05:57] INTEL INFO: Cycle 277 complete, processed 0 tasks
+[19:06:27] INTEL INFO: Intelligence loop cycle 278
+[19:06:27] INTEL INFO: Cycle 278 complete, processed 0 tasks
+[19:06:57] INTEL INFO: Intelligence loop cycle 279
+[19:06:57] INTEL INFO: Cycle 279 complete, processed 0 tasks
+[19:07:27] INTEL INFO: Intelligence loop cycle 280
+[19:07:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:07:27] INTEL INFO: Cycle 280 complete, processed 0 tasks
+[19:07:57] INTEL INFO: Intelligence loop cycle 281
+[19:07:57] INTEL INFO: Cycle 281 complete, processed 0 tasks
+[19:08:27] INTEL INFO: Intelligence loop cycle 282
+[19:08:27] INTEL INFO: Cycle 282 complete, processed 0 tasks
+[19:08:57] INTEL INFO: Intelligence loop cycle 283
+[19:08:57] INTEL INFO: Cycle 283 complete, processed 0 tasks
+[19:09:27] INTEL INFO: Intelligence loop cycle 284
+[19:09:27] INTEL INFO: Cycle 284 complete, processed 0 tasks
+[19:09:57] INTEL INFO: Intelligence loop cycle 285
+[19:09:57] INTEL INFO: Cycle 285 complete, processed 0 tasks
+[19:10:27] INTEL INFO: Intelligence loop cycle 286
+[19:10:27] INTEL INFO: Cycle 286 complete, processed 0 tasks
+[19:10:57] INTEL INFO: Intelligence loop cycle 287
+[19:10:57] INTEL INFO: Cycle 287 complete, processed 0 tasks
+[19:11:27] INTEL INFO: Intelligence loop cycle 288
+[19:11:27] INTEL INFO: Cycle 288 complete, processed 0 tasks
+[19:11:57] INTEL INFO: Intelligence loop cycle 289
+[19:11:57] INTEL INFO: Cycle 289 complete, processed 0 tasks
+[19:12:27] INTEL INFO: Intelligence loop cycle 290
+[19:12:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:12:27] INTEL INFO: Cycle 290 complete, processed 0 tasks
+[19:12:57] INTEL INFO: Intelligence loop cycle 291
+[19:12:57] INTEL INFO: Cycle 291 complete, processed 0 tasks
+[19:13:27] INTEL INFO: Intelligence loop cycle 292
+[19:13:27] INTEL INFO: Cycle 292 complete, processed 0 tasks
+[19:13:57] INTEL INFO: Intelligence loop cycle 293
+[19:13:57] INTEL INFO: Cycle 293 complete, processed 0 tasks
+[19:14:27] INTEL INFO: Intelligence loop cycle 294
+[19:14:27] INTEL INFO: Cycle 294 complete, processed 0 tasks
+[19:14:57] INTEL INFO: Intelligence loop cycle 295
+[19:14:57] INTEL INFO: Cycle 295 complete, processed 0 tasks
+[19:15:27] INTEL INFO: Intelligence loop cycle 296
+[19:15:27] INTEL INFO: Cycle 296 complete, processed 0 tasks
+[19:15:57] INTEL INFO: Intelligence loop cycle 297
+[19:15:57] INTEL INFO: Cycle 297 complete, processed 0 tasks
+[19:16:27] INTEL INFO: Intelligence loop cycle 298
+[19:16:27] INTEL INFO: Cycle 298 complete, processed 0 tasks
+[19:16:57] INTEL INFO: Intelligence loop cycle 299
+[19:16:57] INTEL INFO: Cycle 299 complete, processed 0 tasks
+[19:17:27] INTEL INFO: Intelligence loop cycle 300
+[19:17:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:17:27] INTEL INFO: Cycle 300 complete, processed 0 tasks
+[19:17:57] INTEL INFO: Intelligence loop cycle 301
+[19:17:57] INTEL INFO: Cycle 301 complete, processed 0 tasks
+[19:18:27] INTEL INFO: Intelligence loop cycle 302
+[19:18:27] INTEL INFO: Cycle 302 complete, processed 0 tasks
+[19:18:57] INTEL INFO: Intelligence loop cycle 303
+[19:18:57] INTEL INFO: Cycle 303 complete, processed 0 tasks
+[19:19:27] INTEL INFO: Intelligence loop cycle 304
+[19:19:27] INTEL INFO: Cycle 304 complete, processed 0 tasks
+[19:19:57] INTEL INFO: Intelligence loop cycle 305
+[19:19:57] INTEL INFO: Cycle 305 complete, processed 0 tasks
+[19:20:27] INTEL INFO: Intelligence loop cycle 306
+[19:20:27] INTEL INFO: Cycle 306 complete, processed 0 tasks
+[19:20:57] INTEL INFO: Intelligence loop cycle 307
+[19:20:57] INTEL INFO: Cycle 307 complete, processed 0 tasks
+[19:21:27] INTEL INFO: Intelligence loop cycle 308
+[19:21:27] INTEL INFO: Cycle 308 complete, processed 0 tasks
+[19:21:57] INTEL INFO: Intelligence loop cycle 309
+[19:21:57] INTEL INFO: Cycle 309 complete, processed 0 tasks
+[19:22:27] INTEL INFO: Intelligence loop cycle 310
+[19:22:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:22:27] INTEL INFO: Cycle 310 complete, processed 0 tasks
+[19:22:57] INTEL INFO: Intelligence loop cycle 311
+[19:22:57] INTEL INFO: Cycle 311 complete, processed 0 tasks
+[19:23:27] INTEL INFO: Intelligence loop cycle 312
+[19:23:27] INTEL INFO: Cycle 312 complete, processed 0 tasks
+[19:23:57] INTEL INFO: Intelligence loop cycle 313
+[19:23:57] INTEL INFO: Cycle 313 complete, processed 0 tasks
+[19:24:27] INTEL INFO: Intelligence loop cycle 314
+[19:24:27] INTEL INFO: Cycle 314 complete, processed 0 tasks
+[19:24:57] INTEL INFO: Intelligence loop cycle 315
+[19:24:57] INTEL INFO: Cycle 315 complete, processed 0 tasks
+[19:25:27] INTEL INFO: Intelligence loop cycle 316
+[19:25:27] INTEL INFO: Cycle 316 complete, processed 0 tasks
+[19:25:57] INTEL INFO: Intelligence loop cycle 317
+[19:25:57] INTEL INFO: Cycle 317 complete, processed 0 tasks
+[19:26:27] INTEL INFO: Intelligence loop cycle 318
+[19:26:27] INTEL INFO: Cycle 318 complete, processed 0 tasks
+[19:26:57] INTEL INFO: Intelligence loop cycle 319
+[19:26:57] INTEL INFO: Cycle 319 complete, processed 0 tasks
+[19:27:27] INTEL INFO: Intelligence loop cycle 320
+[19:27:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:27:27] INTEL INFO: Cycle 320 complete, processed 0 tasks
+[19:27:57] INTEL INFO: Intelligence loop cycle 321
+[19:27:57] INTEL INFO: Cycle 321 complete, processed 0 tasks
+[19:28:27] INTEL INFO: Intelligence loop cycle 322
+[19:28:27] INTEL INFO: Cycle 322 complete, processed 0 tasks
+[19:28:57] INTEL INFO: Intelligence loop cycle 323
+[19:28:57] INTEL INFO: Cycle 323 complete, processed 0 tasks
+[19:29:27] INTEL INFO: Intelligence loop cycle 324
+[19:29:27] INTEL INFO: Cycle 324 complete, processed 0 tasks
+[19:29:57] INTEL INFO: Intelligence loop cycle 325
+[19:29:57] INTEL INFO: Cycle 325 complete, processed 0 tasks
+[19:30:27] INTEL INFO: Intelligence loop cycle 326
+[19:30:27] INTEL INFO: Cycle 326 complete, processed 0 tasks
+[19:30:57] INTEL INFO: Intelligence loop cycle 327
+[19:30:57] INTEL INFO: Cycle 327 complete, processed 0 tasks
+[19:31:27] INTEL INFO: Intelligence loop cycle 328
+[19:31:27] INTEL INFO: Cycle 328 complete, processed 0 tasks
+[19:31:57] INTEL INFO: Intelligence loop cycle 329
+[19:31:57] INTEL INFO: Cycle 329 complete, processed 0 tasks
+[19:32:27] INTEL INFO: Intelligence loop cycle 330
+[19:32:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:32:27] INTEL INFO: Cycle 330 complete, processed 0 tasks
+[19:32:57] INTEL INFO: Intelligence loop cycle 331
+[19:32:57] INTEL INFO: Cycle 331 complete, processed 0 tasks
+[19:33:27] INTEL INFO: Intelligence loop cycle 332
+[19:33:27] INTEL INFO: Cycle 332 complete, processed 0 tasks
+[19:33:57] INTEL INFO: Intelligence loop cycle 333
+[19:33:57] INTEL INFO: Cycle 333 complete, processed 0 tasks
+[19:34:27] INTEL INFO: Intelligence loop cycle 334
+[19:34:27] INTEL INFO: Cycle 334 complete, processed 0 tasks
+[19:34:57] INTEL INFO: Intelligence loop cycle 335
+[19:34:57] INTEL INFO: Cycle 335 complete, processed 0 tasks
+[19:35:27] INTEL INFO: Intelligence loop cycle 336
+[19:35:27] INTEL INFO: Cycle 336 complete, processed 0 tasks
+[19:35:57] INTEL INFO: Intelligence loop cycle 337
+[19:35:57] INTEL INFO: Cycle 337 complete, processed 0 tasks
+[19:36:27] INTEL INFO: Intelligence loop cycle 338
+[19:36:27] INTEL INFO: Cycle 338 complete, processed 0 tasks
+[19:36:57] INTEL INFO: Intelligence loop cycle 339
+[19:36:57] INTEL INFO: Cycle 339 complete, processed 0 tasks
+[19:37:27] INTEL INFO: Intelligence loop cycle 340
+[19:37:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:37:27] INTEL INFO: Cycle 340 complete, processed 0 tasks
+[19:37:57] INTEL INFO: Intelligence loop cycle 341
+[19:37:57] INTEL INFO: Cycle 341 complete, processed 0 tasks
+[19:38:27] INTEL INFO: Intelligence loop cycle 342
+[19:38:27] INTEL INFO: Cycle 342 complete, processed 0 tasks
+[19:38:57] INTEL INFO: Intelligence loop cycle 343
+[19:38:57] INTEL INFO: Cycle 343 complete, processed 0 tasks
+[19:39:27] INTEL INFO: Intelligence loop cycle 344
+[19:39:27] INTEL INFO: Cycle 344 complete, processed 0 tasks
+[19:39:57] INTEL INFO: Intelligence loop cycle 345
+[19:39:57] INTEL INFO: Cycle 345 complete, processed 0 tasks
+[19:40:27] INTEL INFO: Intelligence loop cycle 346
+[19:40:27] INTEL INFO: Cycle 346 complete, processed 0 tasks
+[19:40:57] INTEL INFO: Intelligence loop cycle 347
+[19:40:57] INTEL INFO: Cycle 347 complete, processed 0 tasks
+[19:41:27] INTEL INFO: Intelligence loop cycle 348
+[19:41:27] INTEL INFO: Cycle 348 complete, processed 0 tasks
+[19:41:57] INTEL INFO: Intelligence loop cycle 349
+[19:41:57] INTEL INFO: Cycle 349 complete, processed 0 tasks
+[19:42:27] INTEL INFO: Intelligence loop cycle 350
+[19:42:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:42:27] INTEL INFO: Cycle 350 complete, processed 0 tasks
+[19:42:57] INTEL INFO: Intelligence loop cycle 351
+[19:42:57] INTEL INFO: Cycle 351 complete, processed 0 tasks
+[19:43:27] INTEL INFO: Intelligence loop cycle 352
+[19:43:27] INTEL INFO: Cycle 352 complete, processed 0 tasks
+[19:43:57] INTEL INFO: Intelligence loop cycle 353
+[19:43:57] INTEL INFO: Cycle 353 complete, processed 0 tasks
+[19:44:27] INTEL INFO: Intelligence loop cycle 354
+[19:44:27] INTEL INFO: Cycle 354 complete, processed 0 tasks
+[19:44:57] INTEL INFO: Intelligence loop cycle 355
+[19:44:57] INTEL INFO: Cycle 355 complete, processed 0 tasks
+[19:45:27] INTEL INFO: Intelligence loop cycle 356
+[19:45:27] INTEL INFO: Cycle 356 complete, processed 0 tasks
+[19:45:57] INTEL INFO: Intelligence loop cycle 357
+[19:45:57] INTEL INFO: Cycle 357 complete, processed 0 tasks
+[19:46:27] INTEL INFO: Intelligence loop cycle 358
+[19:46:27] INTEL INFO: Cycle 358 complete, processed 0 tasks
+[19:46:57] INTEL INFO: Intelligence loop cycle 359
+[19:46:57] INTEL INFO: Cycle 359 complete, processed 0 tasks
+[19:47:27] INTEL INFO: Intelligence loop cycle 360
+[19:47:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:47:27] INTEL INFO: Cycle 360 complete, processed 0 tasks
+[19:47:57] INTEL INFO: Intelligence loop cycle 361
+[19:47:57] INTEL INFO: Cycle 361 complete, processed 0 tasks
+[19:48:27] INTEL INFO: Intelligence loop cycle 362
+[19:48:27] INTEL INFO: Cycle 362 complete, processed 0 tasks
+[19:48:57] INTEL INFO: Intelligence loop cycle 363
+[19:48:57] INTEL INFO: Cycle 363 complete, processed 0 tasks
+[19:49:27] INTEL INFO: Intelligence loop cycle 364
+[19:49:27] INTEL INFO: Cycle 364 complete, processed 0 tasks
+[19:49:57] INTEL INFO: Intelligence loop cycle 365
+[19:49:57] INTEL INFO: Cycle 365 complete, processed 0 tasks
+[19:50:27] INTEL INFO: Intelligence loop cycle 366
+[19:50:27] INTEL INFO: Cycle 366 complete, processed 0 tasks
+[19:50:57] INTEL INFO: Intelligence loop cycle 367
+[19:50:57] INTEL INFO: Cycle 367 complete, processed 0 tasks
+[19:51:27] INTEL INFO: Intelligence loop cycle 368
+[19:51:27] INTEL INFO: Cycle 368 complete, processed 0 tasks
+[19:51:57] INTEL INFO: Intelligence loop cycle 369
+[19:51:57] INTEL INFO: Cycle 369 complete, processed 0 tasks
+[19:52:27] INTEL INFO: Intelligence loop cycle 370
+[19:52:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:52:27] INTEL INFO: Cycle 370 complete, processed 0 tasks
+[19:52:57] INTEL INFO: Intelligence loop cycle 371
+[19:52:57] INTEL INFO: Cycle 371 complete, processed 0 tasks
+[19:53:27] INTEL INFO: Intelligence loop cycle 372
+[19:53:27] INTEL INFO: Cycle 372 complete, processed 0 tasks
+[19:53:57] INTEL INFO: Intelligence loop cycle 373
+[19:53:57] INTEL INFO: Cycle 373 complete, processed 0 tasks
+[19:54:27] INTEL INFO: Intelligence loop cycle 374
+[19:54:27] INTEL INFO: Cycle 374 complete, processed 0 tasks
+[19:54:57] INTEL INFO: Intelligence loop cycle 375
+[19:54:57] INTEL INFO: Cycle 375 complete, processed 0 tasks
+[19:55:27] INTEL INFO: Intelligence loop cycle 376
+[19:55:27] INTEL INFO: Cycle 376 complete, processed 0 tasks
+[19:55:57] INTEL INFO: Intelligence loop cycle 377
+[19:55:57] INTEL INFO: Cycle 377 complete, processed 0 tasks
+[19:56:27] INTEL INFO: Intelligence loop cycle 378
+[19:56:27] INTEL INFO: Cycle 378 complete, processed 0 tasks
+[19:56:57] INTEL INFO: Intelligence loop cycle 379
+[19:56:57] INTEL INFO: Cycle 379 complete, processed 0 tasks
+[19:57:27] INTEL INFO: Intelligence loop cycle 380
+[19:57:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[19:57:27] INTEL INFO: Cycle 380 complete, processed 0 tasks
+[19:57:57] INTEL INFO: Intelligence loop cycle 381
+[19:57:57] INTEL INFO: Cycle 381 complete, processed 0 tasks
+[19:58:27] INTEL INFO: Intelligence loop cycle 382
+[19:58:27] INTEL INFO: Cycle 382 complete, processed 0 tasks
+[19:58:57] INTEL INFO: Intelligence loop cycle 383
+[19:58:57] INTEL INFO: Cycle 383 complete, processed 0 tasks
+[19:59:27] INTEL INFO: Intelligence loop cycle 384
+[19:59:27] INTEL INFO: Cycle 384 complete, processed 0 tasks
+[19:59:57] INTEL INFO: Intelligence loop cycle 385
+[19:59:57] INTEL INFO: Cycle 385 complete, processed 0 tasks
+[20:00:27] INTEL INFO: Intelligence loop cycle 386
+[20:00:27] INTEL INFO: Cycle 386 complete, processed 0 tasks
+[20:00:57] INTEL INFO: Intelligence loop cycle 387
+[20:00:57] INTEL INFO: Cycle 387 complete, processed 0 tasks
+[20:01:27] INTEL INFO: Intelligence loop cycle 388
+[20:01:27] INTEL INFO: Cycle 388 complete, processed 0 tasks
+[20:01:57] INTEL INFO: Intelligence loop cycle 389
+[20:01:57] INTEL INFO: Cycle 389 complete, processed 0 tasks
+[20:02:27] INTEL INFO: Intelligence loop cycle 390
+[20:02:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[20:02:27] INTEL INFO: Cycle 390 complete, processed 0 tasks
+[20:02:57] INTEL INFO: Intelligence loop cycle 391
+[20:02:57] INTEL INFO: Cycle 391 complete, processed 0 tasks
+[20:03:27] INTEL INFO: Intelligence loop cycle 392
+[20:03:27] INTEL INFO: Cycle 392 complete, processed 0 tasks
+[20:03:57] INTEL INFO: Intelligence loop cycle 393
+[20:03:57] INTEL INFO: Cycle 393 complete, processed 0 tasks
+[20:04:27] INTEL INFO: Intelligence loop cycle 394
+[20:04:27] INTEL INFO: Cycle 394 complete, processed 0 tasks
+[20:04:57] INTEL INFO: Intelligence loop cycle 395
+[20:04:57] INTEL INFO: Cycle 395 complete, processed 0 tasks
+[20:05:27] INTEL INFO: Intelligence loop cycle 396
+[20:05:27] INTEL INFO: Cycle 396 complete, processed 0 tasks
+[20:05:57] INTEL INFO: Intelligence loop cycle 397
+[20:05:57] INTEL INFO: Cycle 397 complete, processed 0 tasks
+[20:06:27] INTEL INFO: Intelligence loop cycle 398
+[20:06:27] INTEL INFO: Cycle 398 complete, processed 0 tasks
+[20:06:57] INTEL INFO: Intelligence loop cycle 399
+[20:06:57] INTEL INFO: Cycle 399 complete, processed 0 tasks
+[20:07:27] INTEL INFO: Intelligence loop cycle 400
+[20:07:27] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[20:07:27] INTEL INFO: Cycle 400 complete, processed 0 tasks
+[20:07:57] INTEL INFO: Intelligence loop cycle 401
+[20:07:57] INTEL INFO: Cycle 401 complete, processed 0 tasks
+[20:08:27] INTEL INFO: Intelligence loop cycle 402
+[20:08:27] INTEL INFO: Cycle 402 complete, processed 0 tasks
+[20:08:57] INTEL INFO: Intelligence loop cycle 403
+[20:08:57] INTEL INFO: Cycle 403 complete, processed 0 tasks
+[20:09:27] INTEL INFO: Intelligence loop cycle 404
+[20:09:27] INTEL INFO: Cycle 404 complete, processed 0 tasks
+[20:09:57] INTEL INFO: Intelligence loop cycle 405
+[20:09:57] INTEL INFO: Cycle 405 complete, processed 0 tasks
+[20:10:28] INTEL INFO: Intelligence loop cycle 406
+[20:10:28] INTEL INFO: Cycle 406 complete, processed 0 tasks
+[20:10:58] INTEL INFO: Intelligence loop cycle 407
+[20:10:58] INTEL INFO: Cycle 407 complete, processed 0 tasks
+[20:11:28] INTEL INFO: Intelligence loop cycle 408
+[20:11:28] INTEL INFO: Cycle 408 complete, processed 0 tasks
+[20:11:58] INTEL INFO: Intelligence loop cycle 409
+[20:11:58] INTEL INFO: Cycle 409 complete, processed 0 tasks
+[20:12:28] INTEL INFO: Intelligence loop cycle 410
+[20:12:28] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[20:12:28] INTEL INFO: Cycle 410 complete, processed 0 tasks
+[20:12:58] INTEL INFO: Intelligence loop cycle 411
+[20:12:58] INTEL INFO: Cycle 411 complete, processed 0 tasks
+[20:13:28] INTEL INFO: Intelligence loop cycle 412
+[20:13:28] INTEL INFO: Cycle 412 complete, processed 0 tasks
+[20:13:58] INTEL INFO: Intelligence loop cycle 413
+[20:13:58] INTEL INFO: Cycle 413 complete, processed 0 tasks
+[20:14:28] INTEL INFO: Intelligence loop cycle 414
+[20:14:28] INTEL INFO: Cycle 414 complete, processed 0 tasks
+[20:14:58] INTEL INFO: Intelligence loop cycle 415
+[20:14:58] INTEL INFO: Cycle 415 complete, processed 0 tasks
+[20:15:28] INTEL INFO: Intelligence loop cycle 416
+[20:15:28] INTEL INFO: Cycle 416 complete, processed 0 tasks
+[20:15:58] INTEL INFO: Intelligence loop cycle 417
+[20:15:58] INTEL INFO: Cycle 417 complete, processed 0 tasks
+[20:16:28] INTEL INFO: Intelligence loop cycle 418
+[20:16:28] INTEL INFO: Cycle 418 complete, processed 0 tasks
+[20:16:58] INTEL INFO: Intelligence loop cycle 419
+[20:16:58] INTEL INFO: Cycle 419 complete, processed 0 tasks
+[20:17:28] INTEL INFO: Intelligence loop cycle 420
+[20:17:28] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[20:17:28] INTEL INFO: Cycle 420 complete, processed 0 tasks
+[20:17:58] INTEL INFO: Intelligence loop cycle 421
+[20:17:58] INTEL INFO: Cycle 421 complete, processed 0 tasks
+[20:18:28] INTEL INFO: Intelligence loop cycle 422
+[20:18:28] INTEL INFO: Cycle 422 complete, processed 0 tasks
+[20:18:58] INTEL INFO: Intelligence loop cycle 423
+[20:18:58] INTEL INFO: Cycle 423 complete, processed 0 tasks
+[20:19:28] INTEL INFO: Intelligence loop cycle 424
+[20:19:28] INTEL INFO: Cycle 424 complete, processed 0 tasks
+[20:19:58] INTEL INFO: Intelligence loop cycle 425
+[20:19:58] INTEL INFO: Cycle 425 complete, processed 0 tasks
+[20:20:28] INTEL INFO: Intelligence loop cycle 426
+[20:20:28] INTEL INFO: Cycle 426 complete, processed 0 tasks
+[20:20:58] INTEL INFO: Intelligence loop cycle 427
+[20:20:58] INTEL INFO: Cycle 427 complete, processed 0 tasks
+[20:21:28] INTEL INFO: Intelligence loop cycle 428
+[20:21:28] INTEL INFO: Cycle 428 complete, processed 0 tasks
+[20:21:58] INTEL INFO: Intelligence loop cycle 429
+[20:21:58] INTEL INFO: Cycle 429 complete, processed 0 tasks
+[20:22:29] INTEL INFO: Intelligence loop cycle 430
+[20:22:29] INTEL ERROR: Failed to cleanup old data: no such table: scan_results
+[20:22:29] INTEL INFO: Cycle 430 complete, processed 0 tasks
+[20:23:11] INTEL INFO: Intelligence loop cycle 431
+[20:23:11] INTEL INFO: Cycle 431 complete, processed 0 tasks
+[20:23:44] INTEL INFO: Intelligence loop cycle 432
+[20:23:44] INTEL INFO: Cycle 432 complete, processed 0 tasks
+[20:24:51] INTEL INFO: Intelligence loop cycle 433
+[20:24:51] INTEL INFO: Cycle 433 complete, processed 0 tasks
+[20:25:21] INTEL INFO: Intelligence loop cycle 434
+[20:25:21] INTEL INFO: Cycle 434 complete, processed 0 tasks
+[20:25:51] INTEL INFO: Intelligence loop cycle 435
+[20:25:51] INTEL INFO: Cycle 435 complete, processed 0 tasks
+[20:26:21] INTEL INFO: Intelligence loop cycle 436
+[20:26:21] INTEL INFO: Cycle 436 complete, processed 0 tasks
+[20:26:51] INTEL INFO: Intelligence loop cycle 437
+[20:26:51] INTEL INFO: Cycle 437 complete, processed 0 tasks
+[20:27:21] INTEL INFO: Intelligence loop cycle 438
+[20:27:21] INTEL INFO: Cycle 438 complete, processed 0 tasks
+[20:27:25] INTEL INFO: Intelligence loop received signal 15, shutting down
+[20:27:51] INTEL INFO: Intelligence loop stopped

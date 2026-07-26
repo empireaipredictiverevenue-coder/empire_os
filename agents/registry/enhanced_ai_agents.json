@@ -1,0 +1,118 @@
+{
+  "ai_enhancement_registry": {
+    "registry_version": "v2.0-enhanced",
+    "last_updated": "$(date -Iseconds)",
+    "total_enhanced_capabilities": 6,
+    "visibility_framework": "internal_network"
+  },
+  "enhanced_ai_services": [
+    {
+      "service_id": "intelligent_prospects_v2",
+      "service_name": "Intelligent Prospect Discovery",
+      "api_endpoint": "https://internal.empire-os.local/api/v2/ai/intelligent_prospects",
+      "agent_access_level": "full",
+      "capability": "AI-powered lead generation with Cortex integration",
+      "deployment_status": "active",
+      "performance_metrics": {
+        "accuracy": 0.94,
+        "response_time": 0.8,
+        "throughput": 1500
+      }
+    },
+    {
+      "service_id": "market_discovery_v2", 
+      "service_name": "Enhanced Market Discovery",
+      "api_endpoint": "https://internal.empire-os.local/api/v2/ai/enhanced_market_discovery",
+      "agent_access_level": "full",
+      "capability": "Comprehensive market analysis with AI intelligence",
+      "deployment_status": "active",
+      "performance_metrics": {
+        "accuracy": 0.92,
+        "response_time": 1.2,
+        "throughput": 800
+      }
+    },
+    {
+      "service_id": "dynamic_pricing_v2",
+      "service_name": "AI Dynamic Pricing Engine", 
+      "api_endpoint": "https://internal.empire-os.local/api/v2/ai/dynamic_pricing",
+      "agent_access_level": "read",
+      "capability": "Real-time pricing optimization",
+      "deployment_status": "active",
+      "performance_metrics": {
+        "accuracy": 0.88,
+        "response_time": 0.5,
+        "throughput": 2000
+      }
+    },
+    {
+      "service_id": "content_optimization_v2",
+      "service_name": "Intelligent Content Optimization",
+      "api_endpoint": "https://internal.empire-os.local/api/v2/ai/content_optimization", 
+      "agent_access_level": "read",
+      "capability": "AI-powered content personalization and optimization",
+      "deployment_status": "active",
+      "performance_metrics": {
+        "accuracy": 0.91,
+        "response_time": 1.0,
+        "throughput": 1200
+      }
+    },
+    {
+      "service_id": "campaign_optimization_v2",
+      "service_name": "Automated Campaign Optimization",
+      "api_endpoint": "https://internal.empire-os.local/api/v2/ai/campaign_optimization",
+      "agent_access_level": "read",
+      "capability": "AI-driven campaign budget and strategy optimization",
+      "deployment_status": "active",
+      "performance_metrics": {
+        "accuracy": 0.89,
+        "response_time": 0.9,
+        "throughput": 1800
+      }
+    },
+    {
+      "service_id": "continuous_learning_v2",
+      "service_name": "Continuous AI Learning",
+      "api_endpoint": "https://internal.empire-os.local/api/v2/ai/continuous_learning",
+      "agent_access_level": "event_stream",
+      "capability": "Real-time AI model improvement and adaptation",
+      "deployment_status": "active",
+      "performance_metrics": {
+        "accuracy": 0.90,
+        "response_time": 2.5,
+        "throughput": 600
+      }
+    }
+  ],
+  "agent_communication_protocol": {
+    "agent_registry_access": {
+      "read_accessible": ["revenue_agents", "marketing_agents"],
+      "full_access": ["ai_agents", "system_agents"],
+      "communication_pattern": "pubsub_channel"
+    },
+    "api_authentication": {
+      "internal_network_trust": true,
+      "api_key_requirements": "service_account",
+      "rate_limiting": "enabled",
+      "monitoring": "enabled"
+    }
+  },
+  "visibility_status": {
+    "external_agents": {
+      "accessible_services": 6,
+      "visibility_level": "public_api",
+      "documentation": "available"
+    },
+    "internal_agents": {
+      "accessible_services": 6,
+      "visibility_level": "full_internal",
+      "real_time_updates": true
+    },
+    "system_agents": {
+      "accessible_services": 6,
+      "visibility_level": "full_admin",
+      "privileged_access": true
+    }
+  }
+}

@@ -1,11 +1,6 @@
 """
-Outbound email sender — polls si_outbox, dispatches via Resend API.
-
-Designed to run as either:
-  a) A background thread inside the hub process, or
-  b) A standalone cron job / systemd service
-
-Logs every send attempt to /root/feedback/mail_sender.jsonl
+Resend-only mail sender — polls si_outbox, dispatches via Resend API.
+Stripped: no SendGrid, Mailgun, Brevo, direct MX, or SMTP fallbacks.
 """
 
 from __future__ import annotations
@@ -13,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -22,8 +18,6 @@ from typing import Optional
 
 logger = logging.getLogger("mail_sender")
 
-# Load /root/empire_os/.env if not already in process env (so standalone
-# mail_sender_runner.py works without systemd-passed env). Mirrors hub.py.
 _ENV_PATH = Path("/root/empire_os/.env")
 if _ENV_PATH.exists():
     try:
@@ -40,201 +34,12 @@ if _ENV_PATH.exists():
         pass
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
-# Email providers from environment
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
-SENDGRID_FROM = os.environ.get("SENDGRID_FROM", "Empire OS <founder@empire-ai.co.uk>")
-MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "")
-MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "sandbox.mailgun.org")
 FROM_EMAIL = os.environ.get("EMPIRE_FROM", "Empire OS <founder@empire-ai.co.uk>")
-# Pluggable SMTP relay (e.g. ImproveMX free tier) — kills the Resend bill.
-EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "resend").lower()
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.improvmx.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
-SMTP_TLS = os.environ.get("SMTP_TLS", "1") == "1"
 HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FEEDBACK_DIR = Path("/root/feedback")
 POLL_INTERVAL = 30
 MAX_PER_CYCLE = 10
-
-# Daily send quota
 DAILY_SEND_LIMIT = int(os.environ.get("EMAIL_SEND_DAILY_LIMIT", "100"))
-# Pluggable SMTP relay (e.g. ImproveMX free tier) — kills the Resend bill.
-EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "resend").lower()
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.improvmx.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
-SMTP_TLS = os.environ.get("SMTP_TLS", "1") == "1"
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
-FEEDBACK_DIR = Path("/root/feedback")
-POLL_INTERVAL = 30  # seconds between poll cycles
-MAX_PER_CYCLE = 10  # max emails to pull per poll
-
-
-def _direct_mx_send(to: str, subject: str, body: str) -> dict:
-    """Sovereign outbound: resolve recipient MX + deliver straight to :25.
-    No SaaS, no relay creds, no daily quota. Open-source route."""
-    try:
-        import smtplib
-        import socket
-        import dns.resolver  # pip install dnspython
-        domain = to.split("@")[-1].strip().lower()
-        if not domain:
-            return {"ok": False, "error": "no recipient domain"}
-        try:
-            mx = sorted(dns.resolver.resolve(domain, "MX"),
-                       key=lambda r: r.preference)[0].exchange.to_text().rstrip(".")
-        except Exception:
-            mx = domain  # fallback: try the A/AAAA directly
-        from email.mime.text import MIMEText
-        msg = MIMEText(body, _charset="utf-8")
-        msg["Subject"] = subject
-        msg["From"] = FROM_EMAIL
-        msg["To"] = to
-        # 10s connect + 30s overall; some MX are slow/blocked -> fail fast
-        s = smtplib.SMTP(mx, 25, timeout=30)
-        s.ehlo()
-        if s.has_extn("starttls"):
-            s.starttls()
-        s.ehlo()
-        s.sendmail(FROM_EMAIL, [to], msg.as_string())
-        s.quit()
-        return {"ok": True, "msg_id": f"direct:{mx}:{to}"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
-
-def _smtp_send(to: str, subject: str, body: str) -> dict:
-    """Send one email via an SMTP relay (ImproveMX/Mailgun/etc). $0 if the
-    relay is free. Returns {ok, msg_id?, error?}."""
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
-        return {"ok": False, "error": "SMTP not configured (SMTP_HOST/USER/PASS)"}
-    try:
-        import smtplib
-        from email.mime.text import MIMEText
-        msg = MIMEText(body, _charset="utf-8")
-        msg["Subject"] = subject
-        msg["From"] = FROM_EMAIL
-        msg["To"] = to
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
-            if SMTP_TLS:
-                s.starttls()
-            s.login(SMTP_USER, SMTP_PASS)
-            s.sendmail(FROM_EMAIL, [to], msg.as_string())
-        return {"ok": True, "msg_id": f"smtp:{to}"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
-
-def _real_smtp_cfg() -> bool:
-    """True only if SMTP creds are real (not REPLACE_WITH_ placeholders)."""
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
-        return False
-    for v in (SMTP_USER, SMTP_PASS):
-        if str(v).startswith("REPLACE_WITH_"):
-            return False
-    return True
-
-
-def _send(to: str, subject: str, body: str) -> dict:
-    """Dispatch through selected provider, then managed fallbacks.
-
-    EMAIL_BACKEND=resend makes Resend primary. EMAIL_BACKEND=sendgrid makes
-    SendGrid primary. EMAIL_BACKEND=mailgun makes Mailgun SMTP/HTTP primary.
-    EMAIL_BACKEND=direct uses direct MX when port 25 is reachable.
-    Remaining configured providers are fallbacks.
-    """
-    last_result = {"ok": False, "error": "no usable backend"}
-
-    if EMAIL_BACKEND == "sendgrid" and SENDGRID_API_KEY:
-        last_result = _sendgrid_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if EMAIL_BACKEND == "resend" and RESEND_API_KEY:
-        last_result = _resend_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if EMAIL_BACKEND == "direct" and _port25_open():
-        last_result = _direct_mx_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if EMAIL_BACKEND == "mailgun":
-        if _real_smtp_cfg() and SMTP_HOST == "smtp.mailgun.org":
-            last_result = _smtp_send(to, subject, body)
-            if last_result.get("ok"):
-                return last_result
-        if MAILGUN_API_KEY:
-            last_result = _mailgun_send(to, subject, body)
-            if last_result.get("ok"):
-                return last_result
-
-    if SENDGRID_API_KEY and EMAIL_BACKEND != "sendgrid":
-        last_result = _sendgrid_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if RESEND_API_KEY and EMAIL_BACKEND != "resend":
-        last_result = _resend_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if MAILGUN_API_KEY and EMAIL_BACKEND != "mailgun":
-        last_result = _mailgun_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if BREVO_API_KEY:
-        last_result = _brevo_api_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if _real_smtp_cfg():
-        return _smtp_send(to, subject, body)
-
-    return last_result
-
-
-def _sendgrid_send(to: str, subject: str, body: str) -> dict:
-    """Send one email via SendGrid v3 API. Returns {ok, message_id?, error?}.
-
-    Uses SENDGRID_FROM (verified single sender) as the From address. The
-    EMPIRE_FROM env var (founder@empire-ai.co.uk) is set as reply-to so
-    replies land in the founder inbox.
-    """
-    if not SENDGRID_API_KEY:
-        return {"ok": False, "error": "SENDGRID_API_KEY not set"}
-    payload = json.dumps({
-        "personalizations": [{"to": [{"email": to}]}],
-        "from": {"email": SENDGRID_FROM},
-        "reply_to": {"email": "founder@empire-ai.co.uk"},
-        "subject": subject,
-        "content": [{"type": "text/plain", "value": body}],
-    }).encode()
-    try:
-        req = urllib.request.Request(
-            "https://api.sendgrid.com/v3/mail/send",
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {SENDGRID_API_KEY}",
-                "Content-Type": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            msg_id = r.headers.get("X-Message-Id", "")
-            return {"ok": True, "msg_id": f"sendgrid:{msg_id}"}
-    except urllib.error.HTTPError as e:
-        try:
-            detail = e.read().decode()[:200]
-        except Exception:
-            detail = ""
-        return {"ok": False, "error": f"HTTP {e.code}: {detail}"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
 
 
 def _resend_send(to: str, subject: str, body: str) -> dict:
@@ -242,19 +47,25 @@ def _resend_send(to: str, subject: str, body: str) -> dict:
     if not RESEND_API_KEY:
         return {"ok": False, "error": "RESEND_API_KEY not set"}
 
-    payload = json.dumps({
+    is_html = bool(body and ("<html" in body.lower() or "<!doctype" in body.lower() or "<table" in body.lower() or "<h1" in body.lower()))
+    payload_dict = {
         "from": FROM_EMAIL,
         "to": [to],
         "subject": subject,
-        "text": body,
-    }).encode()
+    }
+    if is_html:
+        payload_dict["html"] = body
+        payload_dict["text"] = re.sub(r"<[^>]+>", "", body)
+    else:
+        payload_dict["text"] = body
+    payload = json.dumps(payload_dict).encode()
 
     req = urllib.request.Request(
         "https://api.resend.com/emails",
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "User-Agent": "curl/8.5.0",  # CF 1010 blocks Python UA
+            "User-Agent": "curl/8.5.0",
             "Authorization": f"Bearer {RESEND_API_KEY}",
         },
     )
@@ -270,99 +81,6 @@ def _resend_send(to: str, subject: str, body: str) -> dict:
         if isinstance(e, urllib.error.HTTPError):
             body_text = e.read().decode()[:200]
         return {"ok": False, "error": str(e), "detail": body_text}
-
-
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
-
-
-def _port25_open() -> bool:
-    """Fast probe: can we reach any MX on :25? Cloud hosts usually block it."""
-    import socket
-    try:
-        s = socket.create_connection(("smtp.gmail.com", 25), timeout=4)
-        s.close()
-        return True
-    except Exception:
-        return False
-
-
-def _brevo_api_send(to: str, subject: str, body: str) -> dict:
-    """Send via Brevo REST API (bypasses SMTP IP block on cloud hosts)."""
-    if not BREVO_API_KEY:
-        return {"ok": False, "error": "BREVO_API_KEY not set"}
-    payload = json.dumps({
-        "sender": {"email": FROM_EMAIL.split("<")[-1].rstrip(">") if "<" in FROM_EMAIL else FROM_EMAIL},
-        "to": [{"email": to}],
-        "subject": subject,
-        "textContent": body,
-    }).encode()
-    req = urllib.request.Request(
-        "https://api.brevo.com/v3/smtp/email",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "api-key": BREVO_API_KEY,
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode())
-            mid = result.get("messageId", "")
-            if mid:
-                return {"ok": True, "brevo_id": mid}
-            return {"ok": False, "error": f"no messageId: {result}"}
-    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
-        detail = ""
-        if isinstance(e, urllib.error.HTTPError):
-            detail = e.read().decode()[:200]
-        return {"ok": False, "error": str(e), "detail": detail}
-
-
-
-
-def _mailgun_send(to: str, subject: str, body: str) -> dict:
-    """Send one email via Mailgun HTTP API (no port 25, no SMTP blocks)."""
-    if not MAILGUN_API_KEY:
-        return {"ok": False, "error": "MAILGUN_API_KEY not set"}
-    from email.utils import encode_rfc2231
-    # multipart/form-data
-    boundary = "----mgboundary"
-    def field(name, value):
-        return (f"--{boundary}\r\n"
-                f"Content-Disposition: form-data; name=\"{name}\"\r\n\r\n"
-                f"{value}\r\n").encode()
-    body_bytes = (
-        field("from", FROM_EMAIL) +
-        field("to", to) +
-        field("subject", subject) +
-        field("text", body)
-    ) + f"--{boundary}--\r\n".encode()
-    url = f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages"
-    # Basic auth: api:KEY (without "key-" prefix)
-    auth_str = f"api:{MAILGUN_API_KEY}"
-    import base64
-    auth_b64 = base64.b64encode(auth_str.encode()).decode()
-    req = urllib.request.Request(
-        url,
-        data=body_bytes,
-        headers={
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
-            "Authorization": f"Basic {auth_b64}",
-            "User-Agent": "curl/8.5.0",
-        }
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode())
-            mid = result.get("id", "")
-            if mid:
-                return {"ok": True, "mailgun_id": mid}
-            return {"ok": False, "error": f"no id: {result}"}
-    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
-        detail = ""
-        if isinstance(e, urllib.error.HTTPError):
-            detail = e.read().decode()[:200]
-        return {"ok": False, "error": str(e), "detail": detail}
 
 
 def _hub_get(endpoint: str) -> Optional[dict]:
@@ -402,7 +120,7 @@ def _log_send(entry: dict):
 
 
 def send_pending_batch() -> int:
-    """Fetch pending emails from hub and send them. Returns count sent."""
+    """Fetch pending emails from hub and send via Resend. Returns count sent."""
     resp = _hub_get(f"/v1/outbox/pending?n={MAX_PER_CYCLE}")
     if not resp or not resp.get("rows"):
         return 0
@@ -416,10 +134,9 @@ def send_pending_batch() -> int:
 
         logger.info("sending %d → %s: %s", out_id, to_email, subject[:60])
 
-        result = _send(to_email, subject, body)
+        result = _resend_send(to_email, subject, body)
 
         if result.get("ok"):
-            # Mark sent on hub
             mark = _hub_post(f"/v1/outbox/{out_id}/mark", {
                 "status": "sent",
                 "resend_id": result.get("resend_id", ""),
@@ -427,13 +144,12 @@ def send_pending_batch() -> int:
             status = "sent"
             log_entry = {
                 "id": out_id, "to": to_email, "status": "sent",
-                "backend": EMAIL_BACKEND,
+                "backend": "resend",
                 "resend_id": result.get("resend_id"),
                 "hub_mark_ok": mark.get("ok", False) if mark else False,
             }
             sent += 1
         else:
-            # Mark failed
             err = result.get("error", "unknown")
             _hub_post(f"/v1/outbox/{out_id}/mark", {
                 "status": "failed",
@@ -448,7 +164,6 @@ def send_pending_batch() -> int:
         _log_send(log_entry)
         logger.info("  → %s (resend_id=%s)", status, log_entry.get("resend_id", ""))
 
-        # Brief throttle between sends (Resend rate limit)
         time.sleep(1)
 
     return sent

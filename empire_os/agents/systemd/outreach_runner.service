@@ -1,0 +1,19 @@
+[Unit]
+Description=Empire OS Agent: outreach_runner
+After=network.target
+StartLimitBurst=3
+StartLimitInterval=60
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/empire_os
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/outreach_runner.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

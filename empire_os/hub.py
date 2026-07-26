@@ -79,6 +79,7 @@ from empire_os.agi_loop import AgiLoop
 from empire_os.agent_core import OllamaClient, OpenRouterClient
 from empire_os.dashboard import DASHBOARD_HTML, build_dashboard_data
 from empire_os.dashboard_v2 import router as dashboard_v2_router, init_dashboard
+from empire_os.email_intelligence import email_intelligence_router
 from empire_os.telegram_bot import send_brief, send_message, send_alert
 from empire_os.waterfall import build_default_waterfall
 from empire_os.auto_pilot import AutoPilot
@@ -582,6 +583,10 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # Include dashboard v2 router
 app.include_router(dashboard_v2_router)
+
+# Include email_intelligence router (Hunter.io alternative)
+if email_intelligence_router is not None:
+    app.include_router(email_intelligence_router)
 
 # Initialize dashboard backend reference
 init_dashboard(backend)
@@ -1232,7 +1237,7 @@ async def buyer_apply(req: BuyerApplyRequest):
     """
     tier = req.tier.lower()
     if tier not in ("bronze", "silver", "gold", "platinum"):
-        tier = "silver"
+        tier = "bronze"
     try:
         import empire_os.auto_onboard as ao
         res = await asyncio.wait_for(

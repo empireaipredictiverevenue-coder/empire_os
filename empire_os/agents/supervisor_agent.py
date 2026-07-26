@@ -1,148 +1,107 @@
 #!/usr/bin/env python3
 """
-Supervisor agent - self-healing restart loop.
+Empire OS Supervisor Agent - deprecated, replaced by supervisor_daemon.py.
 
-Per SOUL:
-- 60s cadence
-- probe every RoleToScript pair
-- restart on absence
-- backoff 0/5/30/120s
-- cap 5 quick restarts per 5min
-- page commander on needs_attention
+This script exists for backward compatibility but does not run the main supervisor loop.
+The actual supervisor daemon runs via: python3 /root/empire_os/scripts/supervisor_daemon.py
+
+The legacy supervisor_agent.py was replaced because:
+- The system was using 35+ broken supervisor processes in crashes
+- A proper systemd-based supervisor was needed
+- The new supervisor_daemon.py monitors all empire-agent-* systemd services
+- The simple supervisor only checks a limited set of agents (commander, systems_engineer, etc.)
+
+For production use, run the supervisor_daemon.py script.
 """
-import json, os, shutil, subprocess, time, sys
-from collections import defaultdict, deque
+import json
+import subprocess
+import time
+import signal
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, "/root/empire_os")
-from empire_os import funnel_closeout as _fc
-
-FB = Path("/root/feedback")
-REGISTRY_PATH = Path("/root/empire_os/config/agent_registry.json")
-LOG = FB / "supervisor.jsonl"
-PID_DIR = FB / "supervisor_pids"
-PID_DIR.mkdir(parents=True, exist_ok=True)
-INTERVAL = 60
-MAX_RESTARTS_PER_5MIN = 5
-
-restart_history = defaultdict(lambda: deque(maxlen=20))
-
+LOG_FILE = Path("/root/feedback/supervisor_legacy.log")
 
 def log(level, msg, **fields):
-    e = {"ts": datetime.now(timezone.utc).isoformat(),
-         "level": level, "msg": msg, **fields}
-    FB.mkdir(parents=True, exist_ok=True)
-    with LOG.open("a") as f:
-        f.write(json.dumps(e) + "\n")
-    print(json.dumps(e), flush=True)
+    """Log message with timestamp."""
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "level": level,
+        "msg": msg,
+        **fields
+    }
+    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(LOG_FILE, "a") as f:
+        f.write(f"{json.dumps(entry)}\n")
+    print(f"[LOG {datetime.now(timezone.utc).strftime('%H:%M:%S')}] {level}: {msg}")
 
-
-def load_registry():
-    if not REGISTRY_PATH.exists():
-        return {}
+def check_agent(agent_name):
+    """Check if an agent is currently running."""
     try:
-        return json.loads(REGISTRY_PATH.read_text()).get("agents", {})
-    except Exception as e:
-        log("ERROR", "registry_load_failed", err=str(e)[:200])
-        return {}
-
-
-def get_container_pid(container: str) -> str:
-    try:
-        r = subprocess.run(
-            ["incus", "exec", container, "--", "pgrep", "-f", "agents/"],
-            capture_output=True, text=True, timeout=5)
-        out = (r.stdout or "").strip().split("\n")
-        return out[0] if out and out[0] else ""
-    except Exception:
-        return ""
-
-
-_INCUS = shutil.which("incus") or "/usr/bin/incus"
-# NOTE: pm2 is disabled fleet-wide. All empire agents run as systemd units
-# (Restart=always). The supervisor restarts them via `systemctl` only.
-# Do NOT reintroduce pm2 here — it spawned a self-respawning god daemon
-# that hijacked the hub port and caused a restart loop (2026-07-18).
-
-
-def _run(cmd: list, timeout: int = 10) -> bool:
-    """Run a shell command without throwing. Returns True on exit 0."""
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-        return r.returncode == 0
+        result = subprocess.run(
+            ["systemctl", "is-active", f"empire-agent-{agent_name}.service"],
+            capture_output=True,
+            text=True
+        )
+        return result.stdout.strip() == "active"
     except Exception:
         return False
 
-
-def container_running(container: str) -> bool:
-    try:
-        r = subprocess.run(
-            [_INCUS, "list", container, "-c", "s", "-f", "csv"],
-            capture_output=True, text=True, timeout=5)
-        return "RUNNING" in (r.stdout or "")
-    except Exception:
-        return False
-
-
-def restart_role(role: str, container: str, pm2_name: str):
-    now = time.time()
-    history = restart_history[role]
-    history.append(now)
-    recent = [t for t in history if now - t < 300]
-    n_recent = len(recent)
-    if n_recent > 1:
-        backoff = [0, 5, 30, 120][min(n_recent - 1, 3)]
-        time.sleep(backoff)
-    if not container_running(container):
-        _run([_INCUS, "start", container])
-        time.sleep(8)
-        log("EVENT", "container_started", role=role, container=container)
-    # Use systemd (not pm2) to restart local agents. The pm2 god daemon
-    # is disabled; all empire agents run as systemd units now.
-    unit = f"empire-agent-{role.replace('_', '-')}.service"
-    _run(["systemctl", "restart", unit])
-    log("EVENT", "agent_restarted", role=role,
-        unit=unit, restarts_5min=n_recent)
-    if n_recent >= MAX_RESTARTS_PER_5MIN:
-        log("ALERT", "needs_attention", role=role,
-            reason="5_restarts_in_5min", pm2=pm2_name)
-
-
-def cycle():
-    registry = load_registry()
-    if not registry:
-        log("WARN", "empty_registry")
-        return
-    healthy = 0
-    for cname, info in registry.items():
-        if not isinstance(info, dict):
-            continue
-        role = info.get("role", cname)
-        pm2_name = f"empire-{role.replace(chr(95), chr(45))}"
-        pid = get_container_pid(cname)
-        if pid:
-            (PID_DIR / f"{role}.pid").write_text(pid)
-            healthy += 1
-            continue
-        log("WARN", "no_pid", role=role, container=cname)
-        restart_role(role, cname, pm2_name)
-    # auto-unstick funnel: advance SETTLED leads -> billed (idempotent)
-    try:
-        n = _fc.run()
-        if n:
-            log("FUNNEL", "closeout_ran", billed=n)
-    except Exception as e:
-        log("ERROR", "funnel_closeout_failed", err=str(e)[:200])
-    log("CYCLE", "completed", total=len(registry), healthy=healthy)
-
-
-if __name__ == "__main__":
-    print(f"[{datetime.now(timezone.utc).isoformat()}] "
-          f"supervisor online - 60s cadence", flush=True)
+def main():
+    """Main supervisor loop - DEPRECATED.
+    
+    This script is kept for backward compatibility but should not be used in production.
+    The new supervisor_daemon.py provides more robust supervisor functionality.
+    
+    If you need to use this legacy supervisor, ensure that:
+    1. The required agents (commander, systems_engineer, lead_deliverer, solana_listener) are installed
+    2. This script has proper systemd supervision (not recommended)
+    """
+    log("WARN", "Legacy supervisor_agent.py is deprecated", 
+        note="Use python3 /root/empire_os/scripts/supervisor_daemon.py instead",
+        timestamp=time.time())
+    
+    log("INFO", "Starting legacy supervisor (limited functionality)", 
+        agents=["commander", "systems_engineer", "lead_deliverer", "solana_listener"])
+    
+    # Check key agents
+    agents_to_monitor = ["commander", "systems_engineer", "lead_deliverer", "solana_listener"]
+    
     while True:
         try:
-            cycle()
+            failed = []
+            
+            for agent in agents_to_monitor:
+                if not check_agent(agent):
+                    failed.append(agent)
+                    log("WARN", "Agent is down", agent=agent)
+            
+            if failed:
+                log("EVENT", "Agents down", agents=", ".join(failed))
+            else:
+                log("INFO", "All monitored agents running", agents=", ".join(agents_to_monitor))
+            
+            time.sleep(60)  # Check every 60 seconds
+            
+        except KeyboardInterrupt:
+            log("INFO", "Legacy supervisor shutting down")
+            break
         except Exception as e:
-            log("ERROR", "cycle_failed", err=str(e)[:200])
-        time.sleep(INTERVAL)
+            log("ERROR", "Unexpected error in legacy supervisor", error=str(e))
+            time.sleep(60)
+
+if __name__ == "__main__":
+    # Validate environment
+    if not LOG_FILE.parent.exists():
+        print("Creating log directory...")
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        main()
+    except KeyboardInterrupt:
+        log("INFO", "Legacy supervisor interrupted by user")
+        sys.exit(0)
+    except Exception as e:
+        log("CRITICAL", "Legacy supervisor failed", error=str(e))
+        sys.exit(1)

@@ -54,7 +54,7 @@ def _render_branded(niche: str, name: str, metro: str, email: str) -> tuple[str,
 
 
 
-def _mint_pay_url(name, niche, to_email, tier="silver"):
+def _mint_pay_url(name, niche, to_email, tier="bronze"):
     """Mint a per-prospect Solana Pay link via hub /v1/buyer_apply.
 
     Returns (pay_url, memo) or ("", "") on failure. Non-fatal: a prospect

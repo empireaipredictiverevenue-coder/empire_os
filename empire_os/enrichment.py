@@ -36,21 +36,23 @@ logger = logging.getLogger("enrichment")
 
 # ── Priority-ordered provider list ──────────────────────────────────
 # Higher priority = runs first. Falls back through the list.
+# ALL FREE. NO PAID APIs. WE BUILD BETTER.
 PRIORITY = [
-    "website_scraper",   # free: scrape biz site for email/phone
-    "bbb_lookup",        # free: BBB rating/years
-    "whois_lookup",      # free: domain RDAP
-    "email_pattern",     # free: guess info@domain
-    "google_search",      # free: SERP scrape phone/site
-    "ddg_search",        # free: DuckDuckGo HTML SERP email scrape (no key)
-    "bing_search",       # free: Bing SERP email scrape (no key)
-    # External (verify-only, free tiers):
-    "hunter",            # Hunter.io verified emails (HUNTER_API_KEY, 25/mo)
-    # "prospeo",          # Prospeo API fully deprecated (all endpoints 404)
-    # "apollo",           # Apollo free plan 403s all search APIs (paid only)
-    # "clearbit",
-    # "people_data_labs",
-    # "google_places",
+    "website_scraper",      # free: scrape biz site for email/phone/social/tech
+    "ddg_search",           # free: DuckDuckGo HTML SERP email scrape (least blocking)
+    "bing_search",          # free: Bing HTML SERP email scrape
+    "google_search",        # free: Google HTML SERP phone/site (more blocking)
+    "whois_lookup",         # free: domain RDAP creation date, registrar
+    "bbb_lookup",           # free: BBB rating, years in business, accreditation
+    "email_pattern",        # free: guess info@/contact@/sales@/hello@
+    "linkedin_guess",       # free: guess LinkedIn from name + domain
+    "social_footprint",     # free: find FB/IG/TW/YT/TikTok from site + name
+    "tech_stack",           # free: detect CMS, analytics, ads pixels, CRM, chat
+    "permit_signals",       # free: check permits_nyc/permits_chi for contractor activity
+    "reviews_mine",         # free: Google/Yelp/Angi review count + sentiment
+    "news_signals",         # free: local news mentions (expansion, acquisition)
+    "hiring_signals",       # free: job postings = growth intent
+    "ad_intelligence",      # free: FB Ad Library, Google Ads transparency
 ]
 
 USER_AGENT = (

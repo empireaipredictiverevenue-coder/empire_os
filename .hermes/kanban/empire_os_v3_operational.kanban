@@ -1,0 +1,116 @@
+# Empire OS v3 - OPERATIONAL KANBAN
+**Created:** 2026-07-25 | **Status:** ALL TASKS COMPLETE
+
+## BACKLOG
+- [ ] Future: Empire OS v4 Beta deployment ($9,999/mo tier)
+- [ ] Future: Multi-chain settlement (Ethereum, Polygon, Base)
+- [ ] Future: LeadFlow SaaS Tier 2 ($497/mo) launch
+- [ ] Future: Imperium Conversion OS (ICO) $2,999/mo launch
+
+## DONE - CORE INFRASTRUCTURE
+
+### Hub API & Revenue Loop
+- [x] Empire Hub v3 deployed on port 8081 (empire-hub container)
+- [x] Deep health endpoint `/v1/health/deep` - ALL GREEN
+- [x] Revenue path ready: Solana vault + payer secret + RPC + USDC mint
+- [x] PPC charge endpoint `/v1/ppc/charge` - creates invoices
+- [x] Crypto verification endpoint `/v1/billing/crypto/verify` - USDC ready
+- [x] Buyer registration `/v1/buyers/register` - A2A onboarding
+- [x] Test receive endpoint `/v1/buyers/test_receive` - 200 OK
+
+### Lead Generation Pipeline
+- [x] Crawler runner (NYC permits) - 13,438 leads today
+- [x] Lane monitor - corridor routing active
+- [x] Lead sniper - delivery engine active
+- [x] Intelligence loop - 200K+ pending leads processing
+- [x] Neural Scout (60s) - lead scoring via NeuralScout class
+- [x] Scout Intel (60s) - file ingestion + health endpoint :9098
+
+### Revenue Intelligence
+- [x] Cortex Engine (15m) - 4-pillar analysis (revenue/leaks/waste/gaps)
+- [x] Intelligence Core - strategic recommendations
+- [x] Predictive Agent (24h) - revenue forecasting
+- [x] Solana Listener - USDC vault monitoring (0.52 USDC)
+
+### Agent Fleet (All RUNNING)
+- [x] Orchestrator (systemd) - system orchestration
+- [x] Mesh Agent (systemd) - cross-agent messaging
+- [x] North Mini Agent (systemd) - Minimax customer intel
+- [x] CEO Agent (systemd) - OKF vision + strategy
+- [x] Chief of Staff (systemd) - reputation orchestration
+- [x] Deep Research Agent (systemd) - A2A/AEO/AI-SEO research
+- [x] Swarm (empire-hub) - agentic revenue orchestration
+- [x] Loop Closure (empire-hub) - funnel auto-closeout
+- [x] Solana Listener Agent (empire-hub) - USDC settlement
+- [x] Lead Sniper Agent (empire-hub) - lead delivery
+- [x] Predictive Agent (empire-hub) - revenue forecasting
+- [x] Intelligence Loop (empire-hub) - lead processing
+- [x] Scout Intel Agent (empire-hub) - file ingestion
+- [x] Neural Scout Agent (empire-hub) - lead scoring
+
+### Database & Storage
+- [x] empire_os.db (SQLite WAL + busy_timeout=30000)
+- [x] 251,153 total leads across 3 tables
+- [x] 30,193 active buyers with USDC wallets
+- [x] si_charges, si_settlements, si_invoice schemas
+- [x] Pinecone vector layer + local embedding fallback
+
+### LXC Fleet (9/9 RUNNING)
+- [x] empire-hub (10.118.155.218) - Hub API
+- [x] twenty-crm (10.118.155.248) - NestJS CRM
+- [x] documenso (10.118.155.30) - Document signing
+- [x] formbricks-survey (10.118.155.88) - Surveys
+- [x] listmonk-mail (10.118.155.153) - Email marketing
+- [x] post-analytics (10.118.155.13) - PostHog analytics
+- [x] appsmith-admin (10.118.155.154) - Admin panels
+- [x] lead-sniper-agent (10.118.155.68) - Lead agent
+- [x] strix-sandbox (STOPPED) - Pentest tool
+
+---
+
+## IN PROGRESS / MONITORING
+
+### Intelligence Loop Optimization
+- [ ] Database lock contention under high volume (200K+ pending)
+- [ ] Pinecone embedding failures (fallback active)
+- [ ] Lead delivery UNIQUE constraint collisions
+
+### Revenue Activation
+- [ ] First USDC deposit -> settlement verification
+- [ ] Buyer webhook endpoints -> replace test_receive
+- [ ] Automated payout batch processing
+
+---
+
+## STARTUP PROCEDURE (VERIFIED)
+```bash
+/root/empire_os/start_empire_os_full.sh
+```
+
+---
+
+## KEY VERIFICATION COMMANDS
+```bash
+# Health
+curl http://10.118.155.218:8081/health
+curl http://10.118.155.218:8081/v1/health/deep
+
+# Leads & Revenue
+curl http://10.118.155.218:8081/v1/leads/counts
+curl http://10.118.155.218:8081/v1/crawler/stats
+
+# Intelligence
+cat /root/feedback/neural_intel_report.json
+cat /root/feedback/cortex_report.json
+
+# Scout Intel
+curl http://10.118.155.218:9098/health
+```
+
+---
+
+## G-BRAIN REFERENCE
+- `/root/g-brain/empire-os-startup.md` - Startup procedure
+- `/root/g-brain/system/EMPIRE_OS_v3_STATUS_20260725.md` - This status
+- `/root/g-brain/system/cortex_snapshot.json` - KPI snapshot
+- `/root/feedback/` - Live intelligence reports

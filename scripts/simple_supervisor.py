@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Simple supervisor that ensures key agents stay running."""
+import subprocess
+import time
+from datetime import datetime
+from pathlib import Path
+
+LOG_FILE = Path("/root/feedback/simple_supervisor.log")
+
+def log(level, msg, **fields):
+    entry = {"ts": datetime.now().isoformat(), "level": level, "msg": msg, **fields}
+    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(LOG_FILE, "a") as f:
+        f.write(f"{entry}\n")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {level}: {msg}")
+
+def check_agent(agent_name):
+    result = subprocess.run(["systemctl", "is-active", f"empire-agent-{agent_name}.service"], capture_output=True, text=True)
+    return result.stdout.strip() == "active"
+
+def start_agent(agent_name):
+    log("INFO", f"Starting agent {agent_name}")
+    subprocess.run(["systemctl", "start", f"empire-agent-{agent_name}.service"], capture_output=True)
+    time.sleep(2)
+    return check_agent(agent_name)
+
+def main():
+    log("INFO", "Starting simple supervisor")
+    agents = ["commander", "systems_engineer", "lead_deliverer", "solana_listener"]
+    
+    while True:
+        try:
+            failed = []
+            for agent in agents:
+                if not check_agent(agent):
+                    failed.append(agent)
+                    start_agent(agent)
+            
+            if failed:
+                log("EVENT", f"Agents down: {', '.join(failed)}")
+            else:
+                log("INFO", f"All agents running: {', '.join(agents)}")
+            
+            time.sleep(60)
+        except KeyboardInterrupt:
+            log("INFO", "Supervisor shutting down")
+            break
+        except Exception as e:
+            log("ERROR", f"Error: {e}")
+            time.sleep(60)
+
+if __name__ == "__main__":
+    main()

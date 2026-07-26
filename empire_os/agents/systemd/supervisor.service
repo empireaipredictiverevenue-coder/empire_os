@@ -1,0 +1,29 @@
+# Service configuration for Empire OS Supervisor Daemon
+# This service monitors the 62 Empire OS agents and restarts them if they fail
+# Based on supervisor_agent.py - The current supervisor implementation
+
+[Unit]
+Description=Empire OS Supervisor Daemon - Monitors and Restarts Agents
+After=network.target
+StartLimitBurst=3
+StartLimitInterval=60
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/empire_os
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/root/empire_os/venv/bin/python3 /root/empire_os/empire_os/agents/supervisor.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
+# This service monitors the 4 core agents that are critical for Empire OS operation:
+# - commander: System orchestration
+# - systems_engineer: Technical operations and maintenance
+# - lead_deliverer: Lead delivery and tracking
+# - solana_listener: Solana blockchain monitoring

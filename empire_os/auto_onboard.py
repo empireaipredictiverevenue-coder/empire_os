@@ -18,7 +18,7 @@ TIER_RATES = {
     "gold":     {"monthly": 119900, "per_lead": 9900},
     "platinum": {"monthly": 239900, "per_lead": 19900},
 }
-DEFAULT_TIER = "silver"
+DEFAULT_TIER = "bronze"
 
 # ── Direct lane seating (local DB, no Supabase dependency) ────────────
 _SUBS = {}  # populated on first call

@@ -5,8 +5,7 @@ Empire OS v3 - finance agent.
 Reconciles USDC vault balance vs pending invoices every 5 minutes.
 Reads:
   - /v1/satellite/active (matches subscribers to alerts)
-  - DB: si_ppc_invoices WHERE status = "open"  (canonical, tries
-         legacy si_invoice WHERE status = "pending" as fallback)
+  - DB: si_ppc_invoices WHERE status = "open" (canonical)
   - Helius RPC for current vault USDC balance
 Writes:
   - /v1/swarm/audit-log entries (deposit events)
@@ -73,13 +72,11 @@ def get_usdc_balance() -> float:
 def pending_total() -> float:
     """
     Sum of pending (open) PPC invoices, in USD cents.
-    Tries the canonical `si_ppc_invoices` table first (status='open');
-    falls back to legacy `si_invoice` (status='pending') if present;
-    returns 0.0 on any DB/table error rather than throwing.
+    Uses the canonical `si_ppc_invoices` table first (status='open');
+    Returns 0.0 on any DB/table error rather than throwing.
     """
     for sql in (
         "SELECT COALESCE(SUM(amount_cents), 0) FROM si_ppc_invoices WHERE status = 'open'",
-        "SELECT COALESCE(SUM(amount_cents), 0) FROM si_invoice WHERE status = 'pending'",
     ):
         try:
             cnx = sqlite3.connect(DB)
@@ -89,12 +86,9 @@ def pending_total() -> float:
             finally:
                 cnx.close()
         except Exception as e:
-            err = str(e)[:120]
-            # Only log on first attempt (si_ppc_invoices) so the legacy
-            # fallback doesn't double-log when it succeeds.
-            if "si_ppc_invoices" in sql:
-                log("WARN", "pending_ppc_table_missing_or_other", err=err)
-            # try next candidate
+            log("WARN", "pending_ppc_table_missing_or_other", err=str(e)[:120])
+            # schema migration: si_invoice table removed, use placeholder
+            return 0.0
     return 0.0
 
 
