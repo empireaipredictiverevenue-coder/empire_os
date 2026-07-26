@@ -2708,7 +2708,7 @@ def products_pricing():
                         "features": sp.get("features", []),
                         "benefits": sp.get("benefits", []),
                         "deliverables": sp.get("deliverables", [])}
-    return {"vault": VAULT, "settlement": "solana_usdc", "pricing": out}
+    return {"vault": os.environ.get("SOLANA_VAULT_WALLET", ""), "settlement": "solana_usdc", "pricing": out}
 
 
 @app.get("/v1/products/{sku}")
@@ -2740,7 +2740,7 @@ def product_detail(sku: str):
                 "features": json.loads(row[7]) if row[7] else sp.get("features", []),
                 "benefits": json.loads(row[8]) if row[8] else sp.get("benefits", []),
                 "deliverables": json.loads(row[9]) if row[9] else sp.get("deliverables", []),
-                "vault": VAULT, "settlement": "solana_usdc"}
+                "vault": os.environ.get("SOLANA_VAULT_WALLET", VAULT), "settlement": "solana_usdc"}
     # PRODUCT_PRICES SKU
     if sku in PRODUCT_PRICES:
         sp = specs.get(sku, {})
@@ -2751,7 +2751,7 @@ def product_detail(sku: str):
                 "setup_fee_usdc": 0.0, "whitelabel": False,
                 "features": sp.get("features", []), "benefits": sp.get("benefits", []),
                 "deliverables": sp.get("deliverables", []),
-                "vault": VAULT, "settlement": "solana_usdc"}
+                "vault": os.environ.get("SOLANA_VAULT_WALLET", VAULT), "settlement": "solana_usdc"}
     raise HTTPException(404, "sku not found")
 
 
