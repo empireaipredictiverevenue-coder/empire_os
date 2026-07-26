@@ -2845,11 +2845,11 @@ def a2a_negotiate(req: dict):
 
     return {
         "matched": True,
-        "vault": VAULT,
+        "vault": os.environ.get("SOLANA_VAULT_WALLET", VAULT),
         "settle_instruction": {
             "token": "USDC",
             "amount_usdc": quote.get("seat_price_usdc") or quote.get("price_usdc"),
-            "to": VAULT,
+            "to": os.environ.get("SOLANA_VAULT_WALLET", VAULT),
             "memo": quote["memo"],
         },
         "quote": quote,
