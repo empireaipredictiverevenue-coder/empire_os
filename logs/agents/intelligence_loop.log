@@ -1018,3 +1018,27 @@
 {"ts": "2026-07-26T22:01:41.780218+00:00", "level": "WARN", "msg": "semantic_match_failed", "error": "PINECONE_API_KEY not configured. Set PINECONE_API_KEY in .env or environment."}
 {"ts": "2026-07-26T22:01:41.781401+00:00", "level": "WARN", "msg": "lead_delivery_no_endpoint", "buyer": "ms_ee3001c948e9"}
 {"ts": "2026-07-26T22:01:46.816495+00:00", "level": "ERROR", "msg": "tick_exception", "error": "database is locked"}
+{"ts": "2026-07-26T22:02:46.818279+00:00", "level": "CYCLE", "msg": "intelligence_tick_start"}
+{"ts": "2026-07-26T22:02:46.832891+00:00", "level": "WARN", "msg": "semantic_match_failed", "error": "PINECONE_API_KEY not configured. Set PINECONE_API_KEY in .env or environment."}
+{"ts": "2026-07-26T22:02:46.833211+00:00", "level": "WARN", "msg": "lead_delivery_no_endpoint", "buyer": "ms_ee3001c948e9"}
+{"ts": "2026-07-26T22:02:51.880591+00:00", "level": "ERROR", "msg": "tick_exception", "error": "database is locked"}
+{"ts": "2026-07-26T22:03:51.881147+00:00", "level": "CYCLE", "msg": "intelligence_tick_start"}
+{"ts": "2026-07-26T22:03:51.896050+00:00", "level": "WARN", "msg": "semantic_match_failed", "error": "PINECONE_API_KEY not configured. Set PINECONE_API_KEY in .env or environment."}
+{"ts": "2026-07-26T22:03:51.897045+00:00", "level": "WARN", "msg": "lead_delivery_no_endpoint", "buyer": "ms_ee3001c948e9"}
+{"ts": "2026-07-26T22:03:56.921489+00:00", "level": "ERROR", "msg": "tick_exception", "error": "database is locked"}
+{"ts": "2026-07-26T22:04:56.922026+00:00", "level": "CYCLE", "msg": "intelligence_tick_start"}
+{"ts": "2026-07-26T22:04:56.940865+00:00", "level": "WARN", "msg": "semantic_match_failed", "error": "PINECONE_API_KEY not configured. Set PINECONE_API_KEY in .env or environment."}
+{"ts": "2026-07-26T22:04:56.941133+00:00", "level": "WARN", "msg": "lead_delivery_no_endpoint", "buyer": "ms_ee3001c948e9"}
+{"ts": "2026-07-26T22:05:01.976475+00:00", "level": "ERROR", "msg": "tick_exception", "error": "database is locked"}
+{"ts": "2026-07-26T22:06:01.977502+00:00", "level": "CYCLE", "msg": "intelligence_tick_start"}
+{"ts": "2026-07-26T22:06:01.999885+00:00", "level": "WARN", "msg": "semantic_match_failed", "error": "PINECONE_API_KEY not configured. Set PINECONE_API_KEY in .env or environment."}
+{"ts": "2026-07-26T22:06:02.000444+00:00", "level": "WARN", "msg": "lead_delivery_no_endpoint", "buyer": "ms_ee3001c948e9"}
+{"ts": "2026-07-26T22:06:07.097556+00:00", "level": "ERROR", "msg": "tick_exception", "error": "database is locked"}
+{"ts": "2026-07-26T22:07:07.100305+00:00", "level": "CYCLE", "msg": "intelligence_tick_start"}
+{"ts": "2026-07-26T22:07:07.117459+00:00", "level": "WARN", "msg": "semantic_match_failed", "error": "PINECONE_API_KEY not configured. Set PINECONE_API_KEY in .env or environment."}
+{"ts": "2026-07-26T22:07:07.117729+00:00", "level": "WARN", "msg": "lead_delivery_no_endpoint", "buyer": "ms_ee3001c948e9"}
+{"ts": "2026-07-26T22:07:12.140397+00:00", "level": "ERROR", "msg": "tick_exception", "error": "database is locked"}
+{"ts": "2026-07-26T22:08:12.141070+00:00", "level": "CYCLE", "msg": "intelligence_tick_start"}
+{"ts": "2026-07-26T22:08:12.183707+00:00", "level": "WARN", "msg": "semantic_match_failed", "error": "PINECONE_API_KEY not configured. Set PINECONE_API_KEY in .env or environment."}
+{"ts": "2026-07-26T22:08:12.184213+00:00", "level": "WARN", "msg": "lead_delivery_no_endpoint", "buyer": "ms_ee3001c948e9"}
+{"ts": "2026-07-26T22:08:17.212139+00:00", "level": "ERROR", "msg": "tick_exception", "error": "database is locked"}

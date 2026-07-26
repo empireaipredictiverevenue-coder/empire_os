@@ -2600,9 +2600,15 @@ PRODUCT_CATALOG = {
     "warehouse_asset": "Warehouse inventory + asset reporting feed.",
     "strike_pack": "Tiered emergency lead burst for a niche/metro event.",
     "ai_closer": "Tiered MRR: AI closes your leads, settles in USDC.",
+    "leadflow_saas_t2": "LeadFlow SaaS Tier 2 — Enterprise lead qualification + AI scoring + automated seller outreach. 13K leads/day pipeline, buyer_marketplace targeting, MiniMax intelligence.",
+    "imperium_conversion_os": "Imperium Conversion OS (ICO) — Full revenue loop: crawler → AI segmentation → buyer push → USDC settlement. 30K pre-funded wallets, Solana listener, auto vault reconciliation.",
+    "empire_os_v4_beta": "Empire OS v4 Beta — Self-driving empire operations. Lead scraping, AI scoring, buyer marketplace, multi-chain settlements. 30K+ leads active.",
 }
 PRODUCT_PRICES = {"satellite_wastage": 99.0, "warehouse_asset": 79.0,
-                  "strike_pack": 199.0, "ai_closer": 299.0}
+                  "strike_pack": 199.0, "ai_closer": 299.0,
+                  "leadflow_saas_t2": 497.0,
+                  "imperium_conversion_os": 2999.0,
+                  "empire_os_v4_beta": 9999.0}
 
 
 def ensure_products_table():

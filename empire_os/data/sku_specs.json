@@ -1,0 +1,20 @@
+{
+  "leadflow_saas_t2": {
+    "name": "LeadFlow SaaS Tier 2",
+    "features": ["AI lead scoring (MiniMax-M3 via OpenRouter)", "Automated seller outreach", "Buyer marketplace targeting by tier", "13K leads/day pipeline access", "Real-time lead enrichment"],
+    "benefits": ["$25k+/mo revenue at 50+ prospects", "Pay-per-lead in USDC", "No LLM credits needed (MiniMax via OpenRouter)"],
+    "deliverables": ["Qualified lead stream", "Outreach automation", "Tier-based buyer routing", "Weekly performance report"]
+  },
+  "imperium_conversion_os": {
+    "name": "Imperium Conversion OS (ICO)",
+    "features": ["Full revenue loop integration (crawler → AI seg → buyer push → USDC settlement)", "30,192 pre-funded buyer wallets", "Active Solana listener for auto-reconciliation", "AI segmentation engine", "Multi-chain settlement ready"],
+    "benefits": ["$60k+/mo revenue at 20+ enterprise clients", "Real USDC settlement (no simulation)", "Automated vault reconciliation", "Buyer marketplace push"],
+    "deliverables": ["Live revenue loop", "Buyer wallet infrastructure", "Settlement monitoring dashboard", "Enterprise onboarding package"]
+  },
+  "empire_os_v4_beta": {
+    "name": "Empire OS v4 Beta",
+    "features": ["Complete self-driving empire operations", "Lead scraping (8 sources)", "AI scoring and buyer marketplace", "Multi-chain settlement (Solana, Ethereum, Polygon, Base)", "Autonomous agent swarm"],
+    "benefits": ["$50k+/mo at 5 beta deployments", "Self-driving operations", "Full revenue intelligence", "Early access to v4 features"],
+    "deliverables": ["Full empire OS platform access", "Agent swarm deployment", "Multi-chain settlement keys", "Beta feature roadmap"]
+  }
+}
