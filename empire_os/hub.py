@@ -1170,13 +1170,13 @@ def direct_lead_intake(req: dict):
         backend.execute(
             "INSERT INTO lane_leads "
             "(lane_id, prospect_id, status, omega_score, omega_tier, "
-            "notes, niche, created_at) "
-            "VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)",
+            "notes, niche, metro, created_at) "
+            "VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?)",
             (lane_id, prospect_id, score, tier,
              f"name={req.get('name','')} email={req.get('email','')} "
              f"phone={req.get('phone','')} metro={metro} "
              f"state={req.get('state','')} details={req.get('details','')}",
-             niche, now)
+             niche, metro, now)
         )
         backend.commit()
         # Get the inserted ID
@@ -2065,30 +2065,35 @@ def update_lead_status(lead_id: str, status: str = "", notes: str = ""):
 
 @app.get("/v1/crawler/stats")
 def crawler_stats():
-    """Daily crawler stats: lead volume, tier/strategy breakdown, expected revenue, top 5 latest."""
+    """Daily crawler stats: lead volume, tier/strategy breakdown, expected revenue, top 5 latest.
+
+    Schema-aware: introspects each table for the columns it actually has
+    (crm_leads vs lane_leads have drifted across v3 versions — see g-brain
+    TRUTH_AUDIT for full history). Returns 200 with whatever it's got.
+    """
     if not backend:
         raise HTTPException(503, "backend not initialized")
     import sqlite3
-    from datetime import date, timezone
-    
+    from datetime import date
+
     DB = "/root/empire_os/empire_os.db"
     today = date.today().isoformat()
-    
+
     TIER_MAP = {
         "S": "S", "A": "A", "B": "B", "C": "C", "D": "D",
         "tier_a": "A", "tier_b": "B",
         "silver": "B", "gold": "A",
         "": "D", None: "D",
     }
-    
+
     STRATEGY_KEYWORDS = {
         "buyer_marketplace": ["ready to buy", "high-value homeowner", "buyer", "immediate"],
         "nurture": ["expansion", "growing", "nurture"],
     }
-    
+
     def normalize_tier(raw):
         return TIER_MAP.get(raw, "D")
-    
+
     def classify_strategy(icp_name, lead_score, icp_fit_score):
         name = (icp_name or "").lower()
         if any(k in name for k in STRATEGY_KEYWORDS["buyer_marketplace"]):
@@ -2100,84 +2105,123 @@ def crawler_stats():
         if (lead_score or 0) >= 40 or (icp_fit_score or 0) >= 40:
             return "nurture"
         return "ignore"
-    
+
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    
-    TABLE_DATE_COL = {"crm_leads": "created_at", "lane_leads": "created_at"}
-    
+
+    def cols(t):
+        try:
+            cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (t,))
+            if not cur.fetchone():
+                return set()
+            return {r[1] for r in cur.execute(f"PRAGMA table_info({t})").fetchall()}
+        except Exception:
+            return set()
+
+    def first_existing(cset, candidates, default=None):
+        for c in candidates:
+            if c in cset:
+                return c
+        return default
+
     total_today = 0
     tier_counts = {"S": 0, "A": 0, "B": 0, "C": 0, "D": 0}
     strat_counts = {"nurture": 0, "buyer_marketplace": 0, "ignore": 0}
     expected_rev = 0.0
     by_source = {}
     top5_pool = []
-    
-    for table, date_col in TABLE_DATE_COL.items():
-        try:
-            cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,))
-        except Exception:
-            continue
-        if not cur.fetchone():
-            continue
-        
-        if table == "crm_leads":
-            rows = cur.execute(
-                "SELECT lead_uid AS id, NULL AS omega_tier, icp_name, icp_score AS lead_score, icp_fit_score, metro, niche, source "
-                "FROM crm_leads WHERE date(created_at)=?",
-                (today,)
-            ).fetchall()
-            for r in rows:
-                total_today += 1
-                tier_counts[normalize_tier(r["omega_tier"])] += 1
-                strat_counts[classify_strategy(r["icp_name"], r["lead_score"], r["icp_fit_score"])] += 1
-                expected_rev += (r["lead_score"] or 0) * 1.0 + (r["icp_fit_score"] or 0) * 0.5
-                src = r["source"] or "unknown"
-                by_source[src] = by_source.get(src, 0) + 1
-            top5_rows = cur.execute(
-                "SELECT lead_uid AS id, source, business_name, metro, NULL AS omega_tier, icp_tier, icp_name, icp_score AS lead_score, created_at "
-                "FROM crm_leads WHERE date(created_at)=? ORDER BY lead_uid DESC LIMIT 5",
-                (today,)
-            ).fetchall()
-            top5_pool.extend(top5_rows)
-            
-        elif table == "lane_leads":
-            rows = cur.execute(
-                "SELECT lead_ref AS id, NULL AS omega_tier, source AS icp_tier, NULL AS icp_fit_score, zip_code AS metro, name AS niche, omega_score "
-                "FROM lane_leads WHERE date(created_at)=?",
-                (today,)
-            ).fetchall()
-            for r in rows:
-                total_today += 1
-                tier_counts[normalize_tier(r["omega_tier"])] += 1
-                strat_counts[classify_strategy(r["icp_tier"], r["omega_score"], r["icp_fit_score"])] += 1
-                expected_rev += (r["omega_score"] or 0) * 1.0 + (r["icp_fit_score"] or 0) * 0.5
-                src = r["niche"] or "unknown"
-                by_source[src] = by_source.get(src, 0) + 1
-            top5_rows = cur.execute(
-                "SELECT lead_ref AS id, name AS niche, zip_code AS metro, NULL AS omega_tier, source AS icp_tier, NULL AS icp_fit_score, omega_score, created_at "
-                "FROM lane_leads WHERE date(created_at)=? ORDER BY lead_ref DESC LIMIT 5",
-                (today,)
-            ).fetchall()
-            for r in top5_rows:
-                top5_pool.append({
-                    "id": r["id"],
-                    "source": r["niche"] or "lane_leads",
-                    "business_name": f"#{r['id']}",
-                    "metro": r["metro"],
-                    "omega_tier": r["omega_tier"],
-                    "icp_tier": r["icp_tier"],
-                    "icp_name": "",
-                    "lead_score": int(r["omega_score"] or 0),
-                    "created_at": r["created_at"]
-                })
-    
-    top5_pool.sort(key=lambda r: r["id"] or 0, reverse=True)
+
+    # ---- crm_leads ----
+    crm_cols = cols("crm_leads")
+    if crm_cols:
+        crm_id = first_existing(crm_cols, ["lead_uid", "id"], "id")
+        crm_tier = first_existing(crm_cols, ["omega_tier", "lead_tier", "icp_tier"], None)
+        crm_icp_name = first_existing(crm_cols, ["icp_name"], None)
+        crm_icp_tier = first_existing(crm_cols, ["icp_tier"], None)
+        crm_lead_score = first_existing(crm_cols, ["lead_score", "icp_score"], "lead_score")
+        crm_fit = "icp_fit_score" if "icp_fit_score" in crm_cols else None
+        crm_select = (
+            f"SELECT {crm_id} AS id, "
+            f"{crm_tier or 'NULL'} AS omega_tier, "
+            f"{crm_icp_name or 'NULL'} AS icp_name, "
+            f"{crm_lead_score or 'NULL'} AS lead_score, "
+            f"{crm_fit or 'NULL'} AS icp_fit_score, "
+            "metro, niche, source, business_name "
+            f"FROM crm_leads WHERE date(created_at)=?"
+        )
+        for r in cur.execute(crm_select, (today,)).fetchall():
+            total_today += 1
+            tier_counts[normalize_tier(r["omega_tier"])] += 1
+            strat_counts[classify_strategy(r["icp_name"], r["lead_score"], r["icp_fit_score"])] += 1
+            expected_rev += (r["lead_score"] or 0) * 1.0 + (r["icp_fit_score"] or 0) * 0.5
+            src = r["source"] or "unknown"
+            by_source[src] = by_source.get(src, 0) + 1
+        top5_rows = cur.execute(
+            f"SELECT {crm_id} AS id, source, business_name, metro, "
+            f"{crm_tier or 'NULL'} AS omega_tier, {crm_icp_tier or 'NULL'} AS icp_tier, "
+            f"{crm_icp_name or 'NULL'} AS icp_name, {crm_lead_score or 'NULL'} AS lead_score, "
+            "created_at "
+            f"FROM crm_leads WHERE date(created_at)=? ORDER BY {crm_id} DESC LIMIT 5",
+            (today,),
+        ).fetchall()
+        top5_pool.extend(top5_rows)
+
+    # ---- lane_leads ----
+    # lane_leads has no `source`, no `name`, no `lead_ref`. The natural key is
+    # `id` (or `prospect_id`), and metro/niche come from `metro`/`niche` cols.
+    # Tier/score live in `omega_tier`/`omega_score`. We build the SELECT with
+    # ONLY the columns that actually exist on this build.
+    ll_cols = cols("lane_leads")
+    if ll_cols:
+        ll_id = first_existing(ll_cols, ["lead_ref", "prospect_id", "id"], "id")
+        ll_tier_col = first_existing(ll_cols, ["omega_tier"], None)
+        ll_score_col = first_existing(ll_cols, ["omega_score"], None)
+        ll_fit_col = first_existing(ll_cols, ["icp_fit_score"], None)
+        ll_icp_tier = first_existing(ll_cols, ["icp_tier"], None)
+        ll_select = (
+            f"SELECT {ll_id} AS id, "
+            f"{ll_tier_col or 'NULL'} AS omega_tier, "
+            f"{ll_icp_tier or 'NULL'} AS icp_tier, "
+            f"{ll_fit_col or 'NULL'} AS icp_fit_score, "
+            "metro, niche, "
+            f"{ll_score_col or 'NULL'} AS omega_score "
+            f"FROM lane_leads WHERE date(created_at)=?"
+        )
+        for r in cur.execute(ll_select, (today,)).fetchall():
+            total_today += 1
+            tier_counts[normalize_tier(r["omega_tier"])] += 1
+            strat_counts[classify_strategy(r["icp_tier"], r["omega_score"], r["icp_fit_score"])] += 1
+            expected_rev += (r["omega_score"] or 0) * 1.0 + (r["icp_fit_score"] or 0) * 0.5
+            src = r["niche"] or "unknown"
+            by_source[src] = by_source.get(src, 0) + 1
+        top5_rows = cur.execute(
+            f"SELECT {ll_id} AS id, niche, metro, "
+            f"{ll_tier_col or 'NULL'} AS omega_tier, "
+            f"{ll_icp_tier or 'NULL'} AS icp_tier, "
+            f"{ll_fit_col or 'NULL'} AS icp_fit_score, "
+            f"{ll_score_col or 'NULL'} AS omega_score, created_at "
+            f"FROM lane_leads WHERE date(created_at)=? ORDER BY {ll_id} DESC LIMIT 5",
+            (today,),
+        ).fetchall()
+        for r in top5_rows:
+            top5_pool.append({
+                "id": r["id"],
+                "source": r["niche"] or "lane_leads",
+                "business_name": f"#{r['id']}",
+                "metro": r["metro"],
+                "omega_tier": r["omega_tier"],
+                "icp_tier": r["icp_tier"],
+                "icp_name": "",
+                "lead_score": int(r["omega_score"] or 0),
+                "created_at": r["created_at"],
+            })
+
+    top5_pool.sort(key=lambda r: str(r["id"] or ""), reverse=True)
     top5 = top5_pool[:5]
-    
+
     conn.close()
-    
+
     return {
         "date": today,
         "leads_posted_today": total_today,
@@ -2195,10 +2239,10 @@ def crawler_stats():
                 "icp_tier": r["icp_tier"] if "icp_tier" in r.keys() else "",
                 "icp_name": r["icp_name"],
                 "score": r["lead_score"] if "lead_score" in r.keys() else int(r["omega_score"] or 0),
-                "created_at": r["created_at"]
+                "created_at": r["created_at"],
             }
             for r in top5
-        ]
+        ],
     }
 
 

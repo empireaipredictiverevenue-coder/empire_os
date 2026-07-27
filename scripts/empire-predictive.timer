@@ -1,0 +1,12 @@
+[Unit]
+Description=Empire Predictive Revenue + Market Gap analysis (daily at 23:50)
+Documentation=https://hermes-agent.nousresearch.com/docs
+
+[Timer]
+OnCalendar=*-*-* 23:50:00 America/New_York
+Persistent=true
+AccuracySec=60s
+Unit=empire-predictive.service
+
+[Install]
+WantedBy=timers.target

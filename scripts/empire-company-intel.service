@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire Competitor + Buyer-Intent Pulse snapshot (writes company_intel.jsonl + competitor_signals.jsonl)
+Documentation=https://hermes-agent.nousresearch.com/docs
+After=network-online.target empire-hub-8081.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+EnvironmentFile=/root/empire_os/.env
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/empire_company_intel.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empire-company-intel
+TimeoutStartSec=120
+TimeoutStopSec=10

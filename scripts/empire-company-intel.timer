@@ -1,0 +1,13 @@
+[Unit]
+Description=Empire Competitor + Buyer-Intent Pulse (every 6 hours)
+Documentation=https://hermes-agent.nousresearch.com/docs
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=6h
+Persistent=true
+AccuracySec=60s
+Unit=empire-company-intel.service
+
+[Install]
+WantedBy=timers.target

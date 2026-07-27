@@ -1,0 +1,13 @@
+[Unit]
+Description=Empire AI Intel + market intelligence scoring (every 15 minutes)
+Documentation=https://hermes-agent.nousresearch.com/docs
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Persistent=true
+AccuracySec=10s
+Unit=empire-ai-intel.service
+
+[Install]
+WantedBy=timers.target

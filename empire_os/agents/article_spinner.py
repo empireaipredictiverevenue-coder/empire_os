@@ -14,13 +14,21 @@ import os, sys, json, time
 sys.path.insert(0, os.path.dirname(__file__))
 from openai import OpenAI
 
+MINIMAX_MODEL = os.getenv("MINIMAX_MODEL", "MiniMax-M3")
 MODEL = os.getenv("SPIN_MODEL", "openai/gpt-4o-mini")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
 
 def _client():
-    """Return (OpenAI client, provider_name). Gemini free tier preferred."""
+    """Return (OpenAI client, provider_name).
+
+    Priority order (any one with an env-key wins):
+      1. GOOGLE_API_KEY  -> Gemini free tier
+      2. GROQ_API_KEY    -> Groq free tier
+      3. MINIMAX_API_KEY -> MiniMax M3 (monthly subscription)
+      4. OPENROUTER_API_KEY / SCRAPECREATORS_API_KEY -> last-resort, paid
+    """
     gkey = os.getenv("GOOGLE_API_KEY")
     if gkey:
         return (OpenAI(api_key=gkey,
@@ -30,11 +38,19 @@ def _client():
     gqkey = os.getenv("GROQ_API_KEY")
     if gqkey:
         return OpenAI(api_key=gqkey, base_url="https://api.groq.com/openai/v1"), "groq"
+    mkey = os.getenv("MINIMAX_API_KEY")
+    if mkey:
+        return (OpenAI(api_key=mkey,
+                        base_url="https://api.minimax.io/v1",
+                        timeout=60.0),
+                "minimax")
     okey = os.getenv("OPENROUTER_API_KEY") or os.getenv("SCRAPECREATORS_API_KEY")
     if okey:
         return OpenAI(api_key=okey, base_url="https://openrouter.ai/api/v1"), "openrouter"
     raise RuntimeError(
-        "no LLM key (GOOGLE_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY) in env")
+        "no LLM key (GOOGLE_API_KEY, GROQ_API_KEY, MINIMAX_API_KEY, or "
+        "OPENROUTER_API_KEY) in env"
+    )
 
 
 def _model_name(provider):
@@ -42,8 +58,9 @@ def _model_name(provider):
         return GEMINI_MODEL
     if provider == "groq":
         return GROQ_MODEL
+    if provider == "minimax":
+        return MINIMAX_MODEL
     return MODEL
-
 
 def spin(text: str, niche: str, metro: str = "", n: int = 3,
          tone: str = "authoritative, local, buyer-intent") -> list:

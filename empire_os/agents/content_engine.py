@@ -20,7 +20,14 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import article_writer as AW
-import scrapecreators_enrich as SC
+try:
+    # empire_enrich is our in-house replacement for scrapecreators_enrich.
+    # Falls back to the legacy name if the migration hasn't run yet.
+    import empire_enrich as SC
+    log.info("using empire_enrich (in-house scrapecreators replacement)")
+except ImportError:
+    import scrapecreators_enrich as SC
+    log.info("using legacy scrapecreators_enrich")
 import predictive_router as PR
 from empire_os.aeo_surface import list_pages
 

@@ -340,8 +340,8 @@ def route_leads_to_lanes(conn: sqlite3.Connection, sample: int | None = None,
             if not dry_run:
                 conn.execute(
                     "INSERT INTO lane_leads (lane_id, prospect_id, status, "
-                    "omega_score, niche) VALUES (?,?,?,?,?)",
-                    (lane_id, pid, "pending", omega, p["niche"]))
+                    "omega_score, niche, metro) VALUES (?,?,?,?,?,?)",
+                    (lane_id, pid, "pending", omega, p["niche"], metro))
             inserted_total += 1
             stats["by_niche_group"].setdefault(p["niche"], 0)
             stats["by_niche_group"][p["niche"]] += 1

@@ -305,10 +305,26 @@ def route_lead(backend, prospect_id: str, details: str,
     }
 
     # Log the lead
+    # Bug fix 2026-07-27: previous INSERT only wrote 4 columns (lane_id,
+    # prospect_id, status, created_at) — metro/niche were resolved during
+    # routing but never written. Result: ~430k of 433k lane_leads had NULL
+    # metro, making them unroutable downstream. lane_id encodes metro
+    # (format `<niche>:<metro>`) but every downstream consumer reads from
+    # the metro column.
     try:
         backend.execute(
-            "INSERT INTO lane_leads (lane_id, prospect_id, status, created_at) VALUES (?,?,?,?)",
-            (lane_id, prospect_id, "routed", datetime.now(timezone.utc).isoformat()),
+            "INSERT INTO lane_leads "
+            "(lane_id, prospect_id, status, created_at, metro, niche, sub_niche) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (
+                lane_id,
+                prospect_id,
+                "routed",
+                datetime.now(timezone.utc).isoformat(),
+                metro,
+                best_niche,
+                ", ".join(m[0] for m in matches[1:3]) or None,
+            ),
         )
         backend.commit()
     except Exception as e:

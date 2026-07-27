@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire OS market intelligence snapshot (writes /root/feedback/market_intel.jsonl + market_intel_latest.json)
+Documentation=https://hermes-agent.nousresearch.com/docs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+Environment="PYTHONPATH=/root/empire_os"
+ExecStart=/root/venv/bin/python3 /root/empire_os/scripts/empire_intel_market.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empire-intel-market
+TimeoutStartSec=60
+TimeoutStopSec=10

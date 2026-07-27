@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire Predictive Revenue + Market Gap + Competitor Intel (daily snapshot)
+Documentation=https://hermes-agent.nousresearch.com/docs
+After=network-online.target empire-hub-8081.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+EnvironmentFile=/root/empire_os/.env
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/empire_predictive.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empire-predictive
+TimeoutStartSec=300
+TimeoutStopSec=10

@@ -226,12 +226,13 @@ def _persist_scan(bbox: dict, parcels: list[dict], niches_by_parcel: dict[str, l
             try:
                 c.execute(
                     "INSERT INTO lane_leads (lane_id, prospect_id, status, "
-                    "omega_score, omega_tier, notes, niche, created_at) "
-                    "VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)",
+                    "omega_score, omega_tier, notes, niche, metro, created_at) "
+                    "VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?)",
                     (lane_id, prospect_id, score,
                      "tier_a" if score >= 0.85 else "tier_b",
                      f"satellite_damage score={score} parcel={p['parcel_id']}",
                      niches[0] if niches else "general",
+                     metro_code or "",
                      ts),
                 )
                 counts["lane_leads"] += 1

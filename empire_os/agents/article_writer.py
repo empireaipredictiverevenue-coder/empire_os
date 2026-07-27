@@ -71,7 +71,7 @@ def draft_spec(niche: str, signal: str = "") -> AeoSpecDraft:
             {"role": "system", "content": "You output ONLY valid minified JSON."},
             {"role": "user", "content": brief},
         ],
-        temperature=0.6, max_tokens=1200,
+        temperature=0.6, max_tokens=800,
     )
     try:
         d = json.loads(r.choices[0].message.content.strip()

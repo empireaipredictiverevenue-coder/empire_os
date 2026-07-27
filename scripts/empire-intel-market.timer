@@ -1,0 +1,13 @@
+[Unit]
+Description=Empire OS market intelligence + lead-pipeline guard (every 5 minutes)
+Documentation=https://hermes-agent.nousresearch.com/docs
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=5min
+Persistent=true
+AccuracySec=10s
+Unit=empire-intel-market.service
+
+[Install]
+WantedBy=timers.target

@@ -38,8 +38,11 @@ sleep 3
 # ────────────────────────────────────────────────────────────────
 echo "[Phase 1] Starting Hub API in empire-hub container..."
 incus exec empire-hub -- bash -c "
+mkdir -p /root/empire_os/logs/hub
 cd /root/empire_os
-/root/venv/bin/python3 -m empire_os.hub --host 0.0.0.0 --port 8081 > /root/empire_os/logs/hub/hub.log 2>&1 &
+export EMPIRE_PORT=8081
+export EMPIRE_HOST=0.0.0.0
+/root/venv/bin/python3 -m empire_os.hub > /root/empire_os/logs/hub/hub.log 2>&1 &
 sleep 3
 curl -s http://127.0.0.1:8081/health
 " || true
