@@ -61,9 +61,40 @@ class GrowthAgent(SyntheticAgent):
                 "WHERE stage='awaiting_payment'").fetchone()
             state["crm_deals_total"] = crm.execute(
                 "SELECT COUNT(*) FROM crm_deals").fetchone()[0]
+            # NEW: A2A + lease + affiliate signals
+            state["a2a_quotes_pending"] = crm.execute(
+                "SELECT COUNT(*) FROM a2a_quotes WHERE status='pending'").fetchone()[0]
+            state["a2a_released_usdc"] = crm.execute(
+                "SELECT COALESCE(SUM(amount_usdc),0) FROM a2a_quotes WHERE status='released'"
+            ).fetchone()[0]
+            state["lease_active"] = crm.execute(
+                "SELECT COUNT(*), COALESCE(SUM(price_usdc),0) FROM lead_leases WHERE status='active'"
+            ).fetchone()
+            state["affiliate_pending_usdc"] = crm.execute(
+                "SELECT COALESCE(SUM(amount_cents),0)/100.0 FROM affiliate_ledger WHERE status='pending'"
+            ).fetchone()[0]
+            state["affiliate_conversions"] = crm.execute(
+                "SELECT COUNT(*) FROM affiliate_conversions"
+            ).fetchone()[0]
             crm.close()
         except Exception as e:
             state["crm_error"] = str(e)
+
+        # NEW: AEO engagement signal
+        try:
+            import sqlite3
+            c = sqlite3.connect("/root/empire_os/empire_os.db")
+            state["aeo_clicks_24h"] = c.execute(
+                "SELECT COUNT(*) FROM aeo_events "
+                "WHERE event_type='click' AND ts >= datetime('now','-1 day')"
+            ).fetchone()[0]
+            state["aeo_impressions_24h"] = c.execute(
+                "SELECT COUNT(*) FROM aeo_events "
+                "WHERE event_type='impression' AND ts >= datetime('now','-1 day')"
+            ).fetchone()[0]
+            c.close()
+        except Exception:
+            state["aeo_clicks_24h"] = 0
 
         return state
 

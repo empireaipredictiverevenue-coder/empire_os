@@ -19,7 +19,7 @@ Every 15 min it:
 
 Run: python3 cortex_engine.py [--once]
 """
-import sqlite3, json, os, sys, time, datetime, subprocess
+import sqlite3, json, os, sys, time, datetime, subprocess, shutil
 sys.path.insert(0, "/root/empire_os")
 DB = "/root/empire_os/empire_os.db"
 HUB = "http://127.0.0.1:8081"
@@ -579,6 +579,14 @@ def omega_pass(c):
 
 def main():
     c = _db()
+    # New: revenue_engine.snapshot() — pulls live state from all monetization
+    # surfaces (vault, AEO, A2A, lease, affiliate, awaiting outreach).
+    revenue_engine_snap = {}
+    try:
+        from empire_os.revenue_engine import snapshot as rev_snap
+        revenue_engine_snap = rev_snap()
+    except Exception as e:
+        revenue_engine_snap = {"error": str(e)[:200]}
     report = {
         "ts": now_iso(),
         "revenue": pillar_revenue(c),
@@ -590,6 +598,7 @@ def main():
         "omega": omega_pass(c),
         "asi": asi_pass(),
         "guard": recurrence_guard(),
+        "revenue_engine": revenue_engine_snap,
     }
     # active intelligence: drive A2A + AEO from real conversion (guarded)
     report["active_aeo"] = run_active_aeo(c, max_pages=10)
@@ -606,7 +615,7 @@ def main():
     try:
         with os.fdopen(fd, "w") as fh:
             json.dump(report, fh, indent=2, default=str)
-        os.replace(tmp_path, out)
+        shutil.move(tmp_path, out)
     except Exception:
         try:
             os.remove(tmp_path)

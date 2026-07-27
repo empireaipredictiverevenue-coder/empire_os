@@ -103,6 +103,12 @@ def main():
     awaiting = c.execute(
         "SELECT * FROM crm_deals WHERE stage='awaiting_payment'").fetchall()
 
+    # NEW: A2A pending quotes (signed but unpaid in 30 min window)
+    a2a_pending = c.execute(
+        "SELECT quote_id, amount_usdc, expires_at FROM a2a_quotes "
+        "WHERE status='pending' AND expires_at > datetime('now')"
+    ).fetchall()
+
     sent_total = 0
     for d in awaiting:
         tenant_id = d["tenant_id"]
@@ -148,8 +154,54 @@ def main():
             break
         time.sleep(0.5)
 
+    # NEW: A2A pending quote reminders (1-touch, since 30-min expiry is short)
+    a2a_sent = 0
+    if sent_total < args.max:
+        for q in a2a_pending:
+            if sent_total >= args.max:
+                break
+            quote_id = q["quote_id"]
+            amount = q["amount_usdc"]
+            # Pull prospect email from quote meta (best-effort)
+            meta_row = c.execute(
+                "SELECT meta FROM a2a_quotes WHERE quote_id=?", (quote_id,)
+            ).fetchone()
+            prospect_email = ""
+            if meta_row and meta_row["meta"]:
+                try:
+                    import json as _json
+                    md = _json.loads(meta_row["meta"])
+                    prospect_email = md.get("prospect_email", "")
+                except Exception:
+                    pass
+            if not prospect_email or "@" not in prospect_email:
+                continue
+            vault = os.environ.get("SOLANA_VAULT_WALLET",
+                                   "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+            pay_url = (
+                f"solana:{vault}?amount={amount:.2f}"
+                f"&label=Empire%20A2A&memo=a2a:{quote_id}"
+            )
+            subject = f"Reminder: your ${amount:.0f} USDC A2A offer (expires in ~15 min)"
+            body = (
+                f"Hi,\n\nYour Empire OS A2A offer is still pending:\n\n"
+                f"  Amount: ${amount:.2f} USDC\n  Quote: {quote_id}\n\n"
+                f"Pay here: {pay_url}\n\n— Empire OS"
+            )
+            if args.dry_run:
+                print(f"[dry] a2a reminder -> {prospect_email} ({quote_id})")
+                a2a_sent += 1
+                sent_total += 1
+                continue
+            ok = queue_email(prospect_email, subject, body, quote_id)
+            if ok:
+                a2a_sent += 1
+                sent_total += 1
+                print(f"[sent] a2a reminder -> {prospect_email} ({quote_id})")
+            time.sleep(0.5)
+
     c.close()
-    print(f"\nDone. Touches queued this run: {sent_total}")
+    print(f"\nDone. Touches queued: {sent_total} (a2a reminders: {a2a_sent})")
 
 if __name__ == "__main__":
     main()

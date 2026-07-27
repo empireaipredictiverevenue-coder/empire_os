@@ -161,16 +161,18 @@ class Agent(ABC):
 # ── Ollama LLM Client ────────────────────────────────────────────────
 
 class OllamaClient:
-    """Lightweight client for Ollama on ornith-agent:11434."""
+    """Lightweight client for Ollama — uses env OLLAMA_HOST or defaults to localhost:11434."""
 
     def __init__(
         self,
-        base_url: str = "http://10.218.156.211:11434",
-        model: str = "qwen2.5:7b",
+        base_url: str = "",
+        model: str = "",
         timeout: int = 30,
     ):
-        self.base_url = base_url.rstrip("/")
-        self.model = model
+        self.base_url = (base_url or os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")).rstrip("/")
+        # Use OLLAMA_MODEL for local ollama, fall back to LLM_MODEL for cross-compat,
+        # then hard default
+        self.model = model or os.environ.get("OLLAMA_MODEL") or os.environ.get("LLM_MODEL") or "qwen2.5:3b"
         self.timeout = timeout
         self._session = None
 
@@ -357,15 +359,34 @@ class ApiClient:
                     "stripped": stripped[:500]}
 
 
+_OR_FALLBACK_MODEL = os.environ.get("OR_FALLBACK_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
+
+def _ollama_reachable(host: str = "") -> bool:
+    """Check if an Ollama instance is reachable at the given host or env default."""
+    import urllib.request, urllib.error, socket
+    base = (host or os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")).rstrip("/")
+    try:
+        req = urllib.request.Request(f"{base}/api/tags")
+        with urllib.request.urlopen(req, timeout=3):
+            return True
+    except Exception:
+        return False
+
+
 # ── Auto-select: API vs Ollama ────────────────────────────────────────
 # Priority:
+# 0. If OLLAMA_HOST is explicitly set AND ollama is reachable, use local Ollama.
 # 1. OPENROUTER_API_KEY → OpenRouter (GPT-4o-mini)
 # 2. GOOGLE_API_KEY → Gemini (gemini-1.5-pro)
 # 3. MINIMAX_API_KEY → MiniMax (M2.7-highspeed)
-# 4. Ollama fallback (no API keys)
+# 4. Ollama fallback (no API keys, no settings)
 
-# 1. OpenRouter takes priority (fully managed, paid+free tiers)
-if os.environ.get("OPENROUTER_API_KEY"):
+# 0. Local Ollama wins if OLLAMA_HOST is set and reachable
+_ollama_configured = os.environ.get("OLLAMA_HOST")
+if _ollama_configured and _ollama_reachable():
+    logger.info("OLLAMA_HOST=%s reachable — agents will use local Ollama (%s)",
+                 _ollama_configured, os.environ.get("LLM_MODEL", "default"))
+elif os.environ.get("OPENROUTER_API_KEY"):
     _ollama_base = OllamaClient
     OllamaClient = ApiClient
     logger.info("OPENROUTER_API_KEY detected — agents will use OpenRouter (%s)", os.environ.get("OR_FALLBACK_MODEL", "openai/gpt-4o-mini"))
@@ -476,22 +497,8 @@ logger.debug("OpenRouterClient alias created for ApiClient")
 
 
 # ── Ollama-dead fallback → OpenRouter ────────────────────────────────
-# The default OllamaClient points at a remote host (ornith-agent:11434)
-# that is often unreachable from this box. If Ollama is down AND we have an
-# OpenRouter key, transparently swap OllamaClient → OpenRouterClient so the
-# observe-reason-act agents (growth, innovator, etc.) keep working without
-# code changes. Uses a capable free model, not the code-only north-mini one.
-
-_OR_FALLBACK_MODEL = os.environ.get("OR_FALLBACK_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
-
-def _ollama_reachable() -> bool:
-    import urllib.request, urllib.error, socket
-    try:
-        req = urllib.request.Request("http://10.218.156.211:11434/api/tags")
-        with urllib.request.urlopen(req, timeout=3):
-            return True
-    except Exception:
-        return False
+# Safety net: if the local Ollama goes down mid-session (e.g. OOM restart)
+# and we have an OpenRouter key, transparently swap to avoid outages.
 
 if not _ollama_reachable() and os.environ.get("OPENROUTER_API_KEY"):
     _ollama_base = OllamaClient

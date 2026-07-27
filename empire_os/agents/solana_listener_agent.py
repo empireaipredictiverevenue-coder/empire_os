@@ -257,6 +257,24 @@ def detect_incoming():
         except Exception as e:
             log("ERROR", "settlement_gateway_error", err=str(e)[:150])
 
+    # --- Step 1c: A2A escrow auto-fund ---
+    # Memo format "a2a:q_xxxxxxxxxxxx" → call /v1/a2a/escrow/{id}/fund
+    # so the quote transitions pending → funded and the buyer gets delivery.
+    if memo and memo.startswith("a2a:q_"):
+        quote_id = memo.split(":", 1)[1].strip()
+        if quote_id:
+            try:
+                fr = _session.post(
+                    f"{HUB}/v1/a2a/escrow/{quote_id}/fund",
+                    json={"deposit_tx": tx_sig},
+                    timeout=10,
+                ).json()
+                log("INFO", "a2a_escrow_funded",
+                    quote_id=quote_id, result=fr.get("status") or fr.get("error"),
+                    ok=fr.get("ok"))
+            except Exception as e:
+                log("WARN", "a2a_escrow_fund_retry", err=str(e)[:150])
+
     # --- Step 2: record_unmatched (with retry) if replay didn't auto-match ---
     matched = bool(rr.get("matched_to")) or bool(rr.get("paid_invoice_id"))
     if not matched:

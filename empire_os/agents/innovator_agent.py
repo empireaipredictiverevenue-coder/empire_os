@@ -28,9 +28,21 @@ def derive_proposals():
             "SELECT COUNT(*), COALESCE(SUM(amount_usdc),0) FROM crm_deals "
             "WHERE stage='awaiting_payment'").fetchone()
         contacts = crm.execute("SELECT COUNT(*) FROM crm_contacts").fetchone()[0]
+        # NEW: A2A pending quotes + active leases from this session
+        a2a_pending_n, a2a_pending_usd = crm.execute(
+            "SELECT COUNT(*), COALESCE(SUM(amount_usdc),0) FROM a2a_quotes "
+            "WHERE status IN ('pending','funded')").fetchone()
+        lease_active_n, lease_active_usd = crm.execute(
+            "SELECT COUNT(*), COALESCE(SUM(price_usdc),0) FROM lead_leases "
+            "WHERE status='active'").fetchone()
+        # NEW: Affiliate pending payout (revenue owed)
+        aff_pending_cents = crm.execute(
+            "SELECT COALESCE(SUM(amount_cents),0) FROM affiliate_ledger "
+            "WHERE status='pending'").fetchone()[0]
         crm.close()
     except Exception:
         awaiting_n, awaiting_usd, contacts = 0, 0, 0
+        a2a_pending_n, a2a_pending_usd, lease_active_n, lease_active_usd, aff_pending_cents = 0, 0, 0, 0, 0
     try:
         pages = len(json.loads(urllib.request.urlopen(
             "http://127.0.0.1:8081/v1/aeo/pages", timeout=10).read()).get("pages", []))
@@ -75,6 +87,50 @@ def derive_proposals():
             "ship_action": {"kind": "create_source",
                             "args": {"name": "page_signup", "source_kind": "aeo_cta", "license": "free"}},
             "rationale": f"{pages} AEO pages generating buyer intent to capture",
+        })
+    # NEW: A2A pending pipeline recovery
+    if a2a_pending_n > 0:
+        props.append({
+            "name": "A2A Quote Expiry Reaper",
+            "category": "ops", "tier": "gold",
+            "build_cost_hours": 6, "infra_cost_usdc_monthly": 3,
+            "expected_revenue_usdc_monthly": int(a2a_pending_usd * 0.08),
+            "scores": {"market": 5, "defensibility": 4, "build": 5,
+                       "infra_cost": 5, "fy_money": 5},
+            "ship_action": {"kind": "create_endpoint",
+                            "args": {"path": "/v1/a2a/expire-due",
+                                     "method": "POST",
+                                     "delivers": "auto-expire stale quotes + send one reminder email"}},
+            "rationale": f"{a2a_pending_n} pending A2A quotes = ${a2a_pending_usd:,.0f} in pipeline (30-min expiry currently silent)",
+        })
+    # NEW: Lease activation acceleration
+    if lease_active_n > 0:
+        props.append({
+            "name": "Lease Renewal Auto-Drip",
+            "category": "ai_product", "tier": "silver",
+            "build_cost_hours": 10, "infra_cost_usdc_monthly": 5,
+            "expected_revenue_usdc_monthly": int(lease_active_usd * 0.10),
+            "scores": {"market": 4, "defensibility": 4, "build": 4,
+                       "infra_cost": 5, "fy_money": 4},
+            "ship_action": {"kind": "create_endpoint",
+                            "args": {"path": "/v1/leases/renew/drip",
+                                     "method": "POST",
+                                     "delivers": "auto-send renewal pay_url 7d before lease expiry"}},
+            "rationale": f"{lease_active_n} active leases = ${lease_active_usd:,.0f} recurring, currently no renewal touch",
+        })
+    # NEW: Affiliate payout automation
+    if aff_pending_cents > 0:
+        props.append({
+            "name": "Affiliate Auto-Sweep",
+            "category": "ops", "tier": "silver",
+            "build_cost_hours": 4, "infra_cost_usdc_monthly": 2,
+            "expected_revenue_usdc_monthly": int(aff_pending_cents * 0.001),
+            "scores": {"market": 4, "defensibility": 5, "build": 5,
+                       "infra_cost": 5, "fy_money": 4},
+            "ship_action": {"kind": "patch_payout_scheduler",
+                            "args": {"module": "empire_os/payout_scheduler.py",
+                                     "add": "sweep affiliate_ledger via mark_paid() after each batch"}},
+            "rationale": f"${aff_pending_cents/100:,.2f} affiliate commissions pending, manual sweep only",
         })
     return props
 

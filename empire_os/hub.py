@@ -59,6 +59,7 @@ from empire_os.funnel import (
     list_states,
     events_for,
     count_by_state,
+    FunnelState,
 )
 from empire_os.neural_scout import NeuralScout, calculate_synthetic_score
 from empire_os.traffic_specialist import (
@@ -2758,6 +2759,270 @@ def a2a_catalog():
     return {"vault": vault, "products": cat, "settlement": "solana_usdc"}
 
 
+@app.post("/v1/a2a/quote")
+def a2a_create_quote(req: dict):
+    """Create a signed quote for an A2A product purchase.
+
+    Body: { product, buyer_wallet, quantity?, meta? }
+    Returns: { quote_id, amount_usdc, signed_payload, vault_sig, pay_url, expires_at }
+    """
+    from empire_os.a2a_marketplace import create_quote, compute_amount
+    from empire_os.amount_policy import validate as policy_validate
+    product = req.get("product", "")
+    wallet = req.get("buyer_wallet", "")
+    if not product or not wallet:
+        raise HTTPException(400, "product and buyer_wallet required")
+    qty = int(req.get("quantity", 1))
+    amount = compute_amount(product, qty)
+    pol = policy_validate("a2a", amount)
+    if not pol["ok"]:
+        raise HTTPException(422, pol["error"])
+    return create_quote(product, wallet, qty, req.get("meta"))
+
+
+@app.get("/v1/a2a/quote/{quote_id}")
+def a2a_get_quote(quote_id: str):
+    """Get quote + escrow status."""
+    from empire_os.a2a_marketplace import get_quote
+    q = get_quote(quote_id)
+    if not q:
+        raise HTTPException(404, "quote not found")
+    return q
+
+
+@app.post("/v1/a2a/escrow/{quote_id}/fund")
+def a2a_fund(quote_id: str, req: dict):
+    """Mark quote funded after deposit tx confirmed."""
+    from empire_os.a2a_marketplace import fund_quote
+    tx = req.get("deposit_tx", "")
+    if not tx:
+        raise HTTPException(400, "deposit_tx required")
+    result = fund_quote(quote_id, tx)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error", "fund_failed"))
+    return result
+
+
+@app.post("/v1/a2a/escrow/{quote_id}/release")
+def a2a_release(quote_id: str, req: dict = None):
+    """Release escrow after delivery. Marks payout pending."""
+    from empire_os.a2a_marketplace import release_escrow
+    proof = (req or {}).get("delivery_proof", "")
+    result = release_escrow(quote_id, proof)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error", "release_failed"))
+    return result
+
+
+@app.post("/v1/a2a/escrow/{quote_id}/refund")
+def a2a_refund(quote_id: str, req: dict = None):
+    """Refund escrow (dispute, expiry, etc)."""
+    from empire_os.a2a_marketplace import refund_escrow
+    reason = (req or {}).get("reason", "")
+    result = refund_escrow(quote_id, reason)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error", "refund_failed"))
+    return result
+
+
+@app.get("/v1/a2a/quotes")
+def a2a_list_quotes(status: str = None, limit: int = 50):
+    """List quotes (optionally filter by status)."""
+    from empire_os.a2a_marketplace import list_quotes
+    return list_quotes(limit=limit, status=status)
+
+
+@app.post("/v1/leases")
+def create_lease(req: dict):
+    """Create a lead lease (bulk discount, time-bound access).
+
+    Body: { niche, metro?, max_leads, buyer_wallet, quote_id? }
+    """
+    from empire_os.lead_lease import create_lease as _create
+    from empire_os.amount_policy import validate as policy_validate
+    niche = req.get("niche", "")
+    metro = req.get("metro", "")
+    max_leads = int(req.get("max_leads", 0))
+    wallet = req.get("buyer_wallet", "")
+    if not niche or max_leads <= 0 or not wallet:
+        raise HTTPException(400, "niche, max_leads, buyer_wallet required")
+    from empire_os.lead_lease import compute_price
+    amount = compute_price(max_leads, niche)
+    pol = policy_validate("lease", amount)
+    if not pol["ok"]:
+        raise HTTPException(422, pol["error"])
+    return _create(niche, metro, max_leads, wallet, req.get("quote_id"))
+
+
+@app.get("/v1/leases/{lease_id}")
+def get_lease(lease_id: str):
+    from empire_os.lead_lease import get_lease as _get
+    l = _get(lease_id)
+    if not l:
+        raise HTTPException(404, "lease not found")
+    return l
+
+
+@app.post("/v1/leases/{lease_id}/activate")
+def activate_lease(lease_id: str, req: dict):
+    """Activate lease after deposit tx confirmed."""
+    from empire_os.lead_lease import activate_lease as _activate
+    tx = req.get("deposit_tx", "")
+    if not tx:
+        raise HTTPException(400, "deposit_tx required")
+    result = _activate(lease_id, tx)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error", "activate_failed"))
+    return result
+
+
+@app.post("/v1/leases/{lease_id}/consume")
+def consume_lease(lease_id: str, req: dict):
+    """Mark a leased lead as consumed (delivered)."""
+    from empire_os.lead_lease import consume_lease_lead
+    pid = req.get("prospect_id", "")
+    if not pid:
+        raise HTTPException(400, "prospect_id required")
+    return consume_lease_lead(lease_id, pid)
+
+
+@app.post("/v1/leases/{lease_id}/renew")
+def renew_lease(lease_id: str, req: dict = None):
+    """Extend lease by N days."""
+    from empire_os.lead_lease import renew_lease as _renew
+    extra = int((req or {}).get("extra_days", 30))
+    result = _renew(lease_id, extra)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error", "renew_failed"))
+    return result
+
+
+@app.get("/v1/leases")
+def list_leases(buyer_wallet: str = None, status: str = None, limit: int = 50):
+    from empire_os.lead_lease import list_leases as _list
+    return _list(buyer_wallet=buyer_wallet, status=status, limit=limit)
+
+
+@app.post("/v1/leases/expire-due")
+def expire_due():
+    """Background helper: mark expired leases."""
+    from empire_os.lead_lease import expire_due_leases
+    n = expire_due_leases()
+    return {"expired": n}
+
+
+@app.post("/v1/affiliate/register")
+def affiliate_register(req: dict):
+    """Register an affiliate ref code -> wallet."""
+    from empire_os.affiliate import register_ref
+    code = req.get("code", "")
+    wallet = req.get("wallet", "")
+    if not code or not wallet:
+        raise HTTPException(400, "code and wallet required")
+    bps = int(req.get("commission_bps", 1000))
+    return register_ref(code, wallet, bps, req.get("label"))
+
+
+@app.get("/v1/affiliate/{code}")
+def affiliate_get(code: str):
+    from empire_os.affiliate import get_ref
+    r = get_ref(code)
+    if not r:
+        raise HTTPException(404, "ref not found or inactive")
+    return r
+
+
+@app.post("/v1/affiliate/{code}/conversion")
+def affiliate_record_conversion(code: str, req: dict):
+    """Record a conversion attributed to a ref code.
+
+    Body: { source, amount_cents, buyer_wallet?, meta? }
+    """
+    from empire_os.affiliate import record_conversion
+    source = req.get("source", "")
+    amount = int(req.get("amount_cents", 0))
+    if not source or amount <= 0:
+        raise HTTPException(400, "source and positive amount_cents required")
+    return record_conversion(
+        code, source, amount,
+        buyer_wallet=req.get("buyer_wallet"),
+        meta=req.get("meta"),
+    )
+
+
+@app.post("/v1/affiliate/sweep")
+def affiliate_sweep():
+    """Trigger a sweep: aggregate pending commissions and mark for payout."""
+    from empire_os.affiliate import pending_payouts
+    payouts = pending_payouts()
+    return {"pending_payouts": payouts, "count": len(payouts)}
+
+
+@app.post("/v1/affiliate/{code}/mark-paid")
+def affiliate_mark_paid(code: str, req: dict):
+    """Mark pending ledger for ref as paid after payout_tx."""
+    from empire_os.affiliate import mark_paid
+    tx = req.get("payout_tx", "")
+    if not tx:
+        raise HTTPException(400, "payout_tx required")
+    return mark_paid(code, tx)
+
+
+@app.get("/v1/affiliate/{code}/report")
+def affiliate_report(code: str, days: int = 30):
+    from empire_os.affiliate import report
+    return report(ref_code=code, days=days)
+
+
+@app.get("/v1/intelligence")
+def get_intelligence():
+    """Live intelligence snapshot — single source for AI sales loop."""
+    from empire_os.empire_intelligence import snapshot as intel_snap
+    return intel_snap()
+
+
+@app.get("/v1/revenue/snapshot")
+def revenue_snapshot():
+    """Live revenue snapshot across all surfaces."""
+    from empire_os.revenue_engine import snapshot
+    return snapshot()
+
+
+@app.post("/v1/revenue/snapshot/persist")
+def revenue_snapshot_persist():
+    """Persist revenue snapshot to /root/empire_os/feedback/revenue.jsonl."""
+    from empire_os.revenue_engine import snapshot, persist
+    snap = snapshot()
+    sid = persist(snap)
+    return {"id": sid, "ts": snap["ts"]}
+
+
+@app.post("/v1/revenue/awaiting/run")
+def revenue_awaiting_run(req: dict = None):
+    """Outreach batch to awaiting_payment subscribers."""
+    from empire_os.revenue_engine import awaiting_subs_outreach
+    batch = int((req or {}).get("batch", 10))
+    dry = bool((req or {}).get("dry_run", False))
+    return awaiting_subs_outreach(batch=batch, dry_run=dry)
+
+
+@app.post("/v1/intelligence/persist")
+def persist_intelligence():
+    """Persist current snapshot to DB + jsonl for north-mini."""
+    from empire_os.empire_intelligence import snapshot as intel_snap, persist
+    snap = intel_snap()
+    sid = persist(snap)
+    return {"id": sid, "ts": snap["ts"]}
+
+
+@app.post("/v1/sales-agent/run")
+def sales_agent_run(dry_run: bool = True):
+    """One tick of the AI sales agent."""
+    os.environ["SALES_AGENT_DRY_RUN"] = "1" if dry_run else "0"
+    from empire_os.a2a_sales_agent import run_once
+    return run_once()
+
+
 @app.get("/v1/products/pricing")
 def products_pricing():
     """Full tiered pricing + one-time white-label setup fees (USDC/mo)."""
@@ -4805,14 +5070,91 @@ def serve_robots():
 
 
 @app.get("/aeo/{niche}")
-def serve_aeo_page(niche: str):
-    """Serve an AEO landing page by niche key."""
-    aeo_root = Path("/srv/aeo")
-    page_path = aeo_root / niche / "index.html"
-    if not page_path.exists():
+def serve_aeo_page(niche: str, ref: str = None):
+    """Serve an AEO landing page by niche key with dynamic monetization CTA."""
+    from empire_os.aeo_monetize import render_page
+    html, status = render_page(niche, ref_code=ref)
+    if status == 404:
         raise HTTPException(404, f"AEO page not found for niche: {niche}")
-    content = page_path.read_text(encoding="utf-8")
-    return HTMLResponse(content)
+    return HTMLResponse(html)
+
+
+@app.get("/v1/aeo/track")
+def aeo_track(niche: str, event: str, ref: str = None,
+              request: Request = None):
+    """1x1 tracking pixel endpoint — logs AEO events.
+
+    On click with a valid ref code, automatically records an affiliate
+    conversion (assumes pay URL intent — attribution only, no money).
+    """
+    from empire_os.aeo_monetize import db, ensure_tables, log_event
+    from empire_os.affiliate import get_ref, record_conversion
+    c = db()
+    try:
+        ensure_tables(c)
+        ip = request.client.host if request else ""
+        ua = request.headers.get("user-agent", "") if request else ""
+        log_event(c, niche, event, ref_code=ref, ip=ip, ua=ua)
+        # Auto-conversion on click with valid ref
+        if event == "click" and ref and get_ref(ref):
+            price_cents = 0
+            try:
+                # Pull current niche price for the conversion value
+                from empire_os.aeo_monetize import get_price
+                price_cents = int(get_price(c, niche) * 100)
+            except Exception:
+                pass
+            if price_cents > 0:
+                record_conversion(ref, "aeo", price_cents,
+                                  meta={"niche": niche, "source": "aeo_track_click"})
+    finally:
+        c.close()
+    return Response(content=b"", media_type="image/gif")
+
+
+@app.get("/v1/aeo/price/{niche}")
+def aeo_price(niche: str):
+    """Return USDC price for a niche (clamped to policy min/max)."""
+    from empire_os.aeo_monetize import db as aeo_db, ensure_tables, seed_pricing, get_price, build_pay_url
+    from empire_os.amount_policy import validate as policy_validate
+    c = aeo_db()
+    try:
+        ensure_tables(c)
+        seed_pricing(c)
+        price = get_price(c, niche)
+        pol = policy_validate("aeo", price)
+        # If price is below min (small niche) clamp up; above max clamp down
+        if not pol["ok"]:
+            if "below_min" in pol["error"]:
+                price = pol["min_usdc"]
+            elif "above_max" in pol["error"]:
+                price = pol["max_usdc"]
+        return {
+            "niche": niche,
+            "price_usdc": price,
+            "policy": {"min_usdc": pol["min_usdc"], "max_usdc": pol["max_usdc"]},
+            "pay_url": build_pay_url(niche, price),
+        }
+    finally:
+        c.close()
+
+
+@app.get("/v1/amount-policy/{channel}")
+def get_amount_policy(channel: str):
+    """Show min/max/default for a channel."""
+    from empire_os.amount_policy import db as pol_db, get_policy
+    c = pol_db()
+    try:
+        return {"channel": channel, **get_policy(c, channel)}
+    finally:
+        c.close()
+
+
+@app.get("/v1/aeo/conversions")
+def aeo_conversions(days: int = 7):
+    """AEO conversion report — impressions / clicks / purchases / USDC."""
+    from empire_os.aeo_monetize import conversion_report
+    return conversion_report(days)
 
 
 @app.get("/signup")
@@ -5397,6 +5739,79 @@ def get_counts():
     if not backend:
         raise HTTPException(status_code=503, detail="Engine not initialized")
     return count_by_state(backend)
+
+
+@app.post("/v1/closer/run")
+def closer_run(req: dict = None):
+    """Trigger one agi_closer cycle via the funnel backend."""
+    req = req or {}
+    limit = int(req.get("limit") or 25)
+    if backend is None:
+        raise HTTPException(status_code=503, detail="Engine not initialized")
+    if agi_closer is None:
+        return {"ok": False, "error": "agi_closer agent not initialized (check hub logs)"}
+    try:
+        raw = count_by_state(backend)
+        # Reshape funnel counts to what agi_closer.reason() expects
+        state = {
+            "sent_count": raw.get(FunnelState.OUTREACH_SENT.value, 0),
+            "replied_count": raw.get(FunnelState.REPLIED.value, 0),
+            "claimed_count": raw.get(FunnelState.CLAIMED.value, 0),
+            "settled_count": raw.get(FunnelState.SETTLED.value, 0),
+            "snapshots_preview": [],
+        }
+        decision = agi_closer.reason(state)
+        try:
+            act = agi_closer.act(decision)
+        except Exception:
+            act = {"status": "skipped", "reason": "act failed"}
+        return {"ok": True, "limit": limit, "before": raw, "decision": decision, "act": act}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/v1/sales/run")
+def sales_run(req: dict = None):
+    """Trigger one agi_sales cycle — match and draft outreach."""
+    req = req or {}
+    limit = int(req.get("limit") or 25)
+    if backend is None:
+        raise HTTPException(status_code=503, detail="Engine not initialized")
+    if agi_sales is None:
+        return {"ok": False, "error": "agi_sales agent not initialized (check hub logs)"}
+    try:
+        raw = count_by_state(backend)
+        state = {
+            "discovered_count": raw.get(FunnelState.DISCOVERED.value, 0),
+            "matched_count": raw.get(FunnelState.MATCHED.value, 0),
+            "drafted_count": raw.get(FunnelState.OUTREACH_DRAFTED.value, 0),
+            "sent_count": raw.get(FunnelState.OUTREACH_SENT.value, 0),
+            "deal_count": 0,
+            "deals_preview": [],
+        }
+        decision = agi_sales.reason(state)
+        try:
+            act = agi_sales.act(decision)
+        except Exception:
+            act = {"status": "skipped", "reason": "act failed"}
+        return {"ok": True, "limit": limit, "before": raw, "decision": decision, "act": act}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    try:
+        before = count_by_state(backend)
+        prospects = backend._conn.execute(
+            "SELECT prospect_id FROM prospects WHERE state = 'MATCHED' ORDER BY updated_at ASC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        touched = len(prospects)
+        decision = agi_sales.reason({"prospects": [r[0] for r in prospects], "before": before})
+        try:
+            act = agi_sales.act(decision)
+        except Exception:
+            act = {"status": "skipped", "reason": "act failed"}
+        return {"ok": True, "limit": limit, "touched": touched, "before": before, "decision": decision, "act": act}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 # --- Daily Revenue ---
@@ -6198,6 +6613,195 @@ def hermes_framework(req: dict):
     return {"ok": True, "result": info}
 
 
+# --- Hermes Control Panel (operator UI: start/stop/restart/list/status) ---
+@app.get("/v1/hermes/agents")
+def hermes_agents_list():
+    """Return all empire systemd units + last 5 log lines each (no auth
+    required - panel is operator-only via network/UI access)."""
+    import subprocess as _sp
+    try:
+        out = _sp.run(
+            ["systemctl", "list-unit-files", "--type=service", "--no-pager"],
+            capture_output=True, text=True, timeout=10,
+        ).stdout
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    units = []
+    for ln in out.splitlines():
+        parts = ln.split()
+        if not parts or not parts[0].startswith("empire-"):
+            continue
+        name = parts[0].replace(".service", "")
+        state = parts[1] if len(parts) > 1 else "unknown"
+        # try to fetch last 3 log lines + active state
+        log_out = ""
+        try:
+            log_out = _sp.run(
+                ["journalctl", "-u", parts[0], "--no-pager", "-n", "3", "-q"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip()[-600:]
+        except Exception:
+            pass
+        try:
+            active = _sp.run(
+                ["systemctl", "is-active", parts[0]],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip()
+        except Exception:
+            active = "?"
+        units.append({
+            "name": name,
+            "state": state,
+            "active": active,
+            "logs": log_out,
+        })
+    return {"ok": True, "count": len(units), "units": units}
+
+
+@app.post("/v1/hermes/agent/action")
+def hermes_agent_action(req: dict):
+    """Operator action: start / stop / restart a single empire systemd unit."""
+    import subprocess as _sp
+    name = (req.get("name") or "").strip()
+    action = (req.get("action") or "").strip().lower()
+    if action not in ("start", "stop", "restart", "status"):
+        raise HTTPException(400, "action must be start|stop|restart|status")
+    if not name.startswith("empire-") or "/" in name or ".." in name:
+        raise HTTPException(400, "name must be an empire systemd unit")
+    target = f"{name}.service"
+    try:
+        out = _sp.run(
+            ["systemctl", action, target],
+            capture_output=True, text=True, timeout=30,
+        )
+        active = _sp.run(
+            ["systemctl", "is-active", target],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+        return {
+            "ok": out.returncode == 0,
+            "name": name,
+            "action": action,
+            "active": active,
+            "stdout": out.stdout[-400:],
+            "stderr": out.stderr[-400:],
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/v1/hermes/chat")
+def hermes_chat(req: dict):
+    """Operator support bot. Routes to cortex_ai_assistant.py when available
+    (uses Gemini/MiniMax via OpenRouter); falls back to rule-based lookup
+    over Empire OS SKUs, agents, KB snippets."""
+    msg = (req.get("message") or "").strip()
+    if not msg:
+        raise HTTPException(400, "message required")
+    ctx = (req.get("context") or "").strip()[:500]
+    answer = None
+    # Try LLM brain first
+    try:
+        import importlib.util as _iu
+        for cand in (
+            "/root/empire_os/empire_os/cortex_ai_assistant.py",
+            "/root/empire_os/empire_os/agents/cortex_ai_assistant.py",
+        ):
+            if _os.path.exists(cand):
+                spec = _iu.spec_from_file_location("cortex", cand)
+                mod = _iu.module_from_spec(spec); spec.loader.exec_module(mod)
+                if hasattr(mod, "ask_brain"):
+                    r = mod.ask_brain(
+                        f"[Operator question]\nQ: {msg}\nContext: {ctx}\nA:"
+                    )
+                    if isinstance(r, dict) and r.get("ok"):
+                        answer = r.get("content")
+                break
+    except Exception as e:
+        answer = None
+    # Rule-based fallback: answer from inventory of system
+    if not answer:
+        answer = rule_answer(msg)
+    _audit_jsonl("hermes_chat", "operator", {"len": len(msg), "ctx": bool(ctx)})
+    return {"ok": True, "answer": answer, "model": "cortex" if answer != rule_answer(msg) else "rule-based"}
+
+
+def rule_answer(msg: str) -> str:
+    """Cheap KB lookup for common operator questions."""
+    m = msg.lower()
+    if any(k in m for k in ("start", "stop", "restart", "agent")):
+        return ("Use POST /v1/hermes/agent/action with "
+                "{name:'empire-agent-X', action:'start|stop|restart'}. "
+                "List units: GET /v1/hermes/agents.")
+    if "lead" in m and ("deliver" in m or "send" in m):
+        return ("Delivered leads live in /root/feedback/lead_deliveries.jsonl. "
+                "Service: empire-agent-lead_deliverer. Restart via "
+                "/v1/hermes/agent/action.")
+    if "usdc" in m or "solana" in m or "vault" in m or "settle" in m:
+        return ("Vault: egJ1t9...9AZM. Settlement listener: "
+                "empire-agent-solana_listener. Check si_unmatched_deposits "
+                "for unmatched transfers; trigger via POST /v1/finance/replay "
+                "{amount_usdc, memo, tx_signature}.")
+    if "buy" in m or "buyer" in m or "apply" in m:
+        return ("POST /v1/buyers/apply {name, niche, tier, email, webhook_url} "
+                "returns subscription_id + pay URL. Pay in USDC to "
+                "egJ1t9...9AZM. Service then activates.")
+    if "health" in m or "status" in m:
+        return ("GET /v1/health = liveness. GET /v1/health/deep = env, db, "
+                "chain, hub, listener. GET /v1/hermes/agents = full systemd "
+                "fleet status.")
+    if "white-label" in m or "white label" in m or "brand" in m:
+        return ("Operator: GET/PUT /v1/hermes/whitelabel manages brand name "
+                "+ accent color. Tenant-side: require sku_hermes_framework "
+                "T2+ (POST /v1/hermes/framework).")
+    if "evaluate" in m or "grade" in m or "score" in m or "omega" in m:
+        return ("POST /v1/evaluate = single grade (FREE tier). "
+                "POST /v1/evaluate/buy = credit pack $10 (memo EVALBUY_). "
+                "GET /v1/evaluate/credits, /v1/evaluate/ledger, "
+                "/v1/evaluate/settlements.")
+    if "aeo" in m or "cite" in m or "answer engine" in m:
+        return ("Auto-published /aeo/* pages. aeo_monitor_agent tracks "
+                "ChatGPT/Perplexity/Claude citations. Update: edit "
+                "/root/empire_os/empire_os/agents/aeo_monitor.py + restart.")
+    return ("Ask me about: agent start/stop/restart, lead delivery, USDC "
+            "settlement, buyer apply, health checks, white-label, evaluation "
+            "product, AEO citations. Or POST /v1/hermes/chat with full "
+            "context for LLM-routed answer.")
+
+
+@app.get("/v1/hermes/whitelabel")
+def hermes_whitelabel_get():
+    """Read operator brand config (logo URL + accent color hex)."""
+    import json as _j
+    p = "/root/empire_os/empire_os/.whitelabel.json"
+    if not _os.path.exists(p):
+        return {"ok": True, "brand_name": "Empire AI", "accent": "#39ff88",
+                "logo": "", "tagline": "Empire AI — Lead Constellation"}
+    try:
+        return {"ok": True, **_j.load(open(p))}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.put("/v1/hermes/whitelabel")
+def hermes_whitelabel_put(req: dict):
+    """Set operator brand config. Persisted to /root/empire_os/.whitelabel.json"""
+    import json as _j
+    body = {
+        "brand_name": str(req.get("brand_name", "Empire AI"))[:40],
+        "accent":     str(req.get("accent",     "#39ff88"))[:9],
+        "logo":       str(req.get("logo",       ""))[:300],
+        "tagline":    str(req.get("tagline",    "Empire AI — Lead Constellation"))[:120],
+    }
+    p = "/root/empire_os/empire_os/.whitelabel.json"
+    try:
+        _os.makedirs(_os.path.dirname(p), exist_ok=True)
+        _j.dump(body, open(p, "w"))
+        return {"ok": True, **body}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/v1/lead-lane/access")
 def lead_lane_access(req: dict):
     """B2B: buyer with active sku_lead_lane gets open lane inventory."""
@@ -6449,14 +7053,28 @@ def dashboard_buyers():
 #     under event-loop load from internal agent self-calls) ---
 import os as _os
 _SITE = _os.path.join(_os.path.dirname(__file__), "static", "index.html")
+_CONSTELLATION = _os.path.join(_os.path.dirname(__file__), "static", "constellation.html")
+_EMPIRE = _os.path.join(_os.path.dirname(__file__), "static", "empire.html")
 @app.get("/static/index.html")
+@app.get("/static/constellation.html")
+@app.get("/static/empire.html")
+@app.get("/constellation")
+@app.get("/empire")
 @app.get("/site")
+@app.get("/")
 async def site_index():
-    if not _os.path.exists(_SITE):
+    # Priority: empire.html (high-end neon theme) > constellation (legacy)
+    if _os.path.exists(_EMPIRE):
+        target = _EMPIRE
+    elif _os.path.exists(_CONSTELLATION):
+        target = _CONSTELLATION
+    else:
+        target = _SITE
+    if not _os.path.exists(target):
         from fastapi import HTTPException
         raise HTTPException(404, "site not built")
     from fastapi.responses import FileResponse
-    return FileResponse(_SITE, media_type="text/html")
+    return FileResponse(target, media_type="text/html")
 
 
 # --- Decision Queue ---
