@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import article_writer as AW
+log = logging.getLogger("content_engine")
 try:
     # empire_enrich is our in-house replacement for scrapecreators_enrich.
     # Falls back to the legacy name if the migration hasn't run yet.
@@ -30,8 +31,6 @@ except ImportError:
     log.info("using legacy scrapecreators_enrich")
 import predictive_router as PR
 from empire_os.aeo_surface import list_pages
-
-log = logging.getLogger("content_engine")
 SURFACE = os.getenv("AEO_SURFACE_ROOT", "/srv/aeo")
 SITE = "https://empire-ai.co.uk"
 GSC_CREDS = os.getenv("GSC_CREDS", "/root/.gsc-creds.json")

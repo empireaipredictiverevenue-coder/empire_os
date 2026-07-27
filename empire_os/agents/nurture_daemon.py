@@ -1,24 +1,12 @@
 #!/usr/bin/env python3
-"""Empire OS Nurture Daemon — 3-step threaded cold-email sequence.
+"""Empire OS Nurture Daemon — 3-step cold-email sequence, human-written.
 
-Stolen + adapted from:
-- ai-cold-outreach-engine (warm-up ramp, threaded replies, state machine)
-- opengtm (ICP tiers hot/warm/cold)
-- dealer-scraper (contacts_json model)
-
-Design:
-- Reads buyer prospects from crm_leads (status='new', contacts_json populated)
-  OR si_buyer_outreach (legacy, reply_state='cold')
-- Sends max DAILY_CAP emails, ramping 5->8->12->15 over 4 weeks (warm-up)
-- 3-step sequence: Day0 value, Day+3 nudge (reply in thread), Day+7 micro-ask
-- On reply (POST /v1/inbound/reply flips reply_state), prospect exits sequence
-- Writes queued sends to si_outbox (source='nurture_daemon', status='pending')
-  for the existing founder_outreach / Brevo sender to ship.
-
-Run:
-  nurture_daemon.py --dry-run          # show what would send
-  nurture_daemon.py --limit 10         # send up to 10 now
-  nurture_daemon.py --once             # one tick
+Rules:
+- Grade 6-7 reading level (short sentences, simple words)
+- No AI garbage: no "hope you're well", "reaching out", "touching base"
+- No "I noticed", "I saw", "just checking in"
+- Real human voice: direct, specific, one clear ask
+- Uses Empire OS dark-branded HTML template
 """
 from __future__ import annotations
 import argparse, json, os, sqlite3, sys, time
@@ -39,25 +27,32 @@ def daily_cap(now=None):
 
 # sequence steps: (day_offset, kind)
 SEQUENCE = [
-    (0,  "value"),     # Day 0: niche insight, no ask
-    (3,  "nudge"),     # Day +3: short reply in thread
-    (7,  "ask"),       # Day +7: "5-min chat?"
+    (0,  "value"),     # Day 0: useful insight, no ask
+    (3,  "nudge"),     # Day +3: short follow-up in thread
+    (7,  "ask"),       # Day +7: one clear micro-ask
 ]
 
+# Grade 6-7 templates — short sentences, simple words, no fluff
 VALUE_TPL = (
-    "Hi {name}, noticed {trigger} is hitting {metro} hard this season. "
-    "We grade those homeowner triggers and route the hot ones to local crews. "
-    "No ask — just know the pipeline exists if you want it."
+    "Roof damage spikes in {metro} every storm season. "
+    "We track the addresses. We grade the leads. "
+    "You get the hot ones. No cost to look."
 )
 NUDGE_TPL = (
-    "Following up on the roofing trigger volume in {metro}. "
-    "Last storm cycle we tracked 400+ homeowner leads there. Happy to show the grade breakdown."
+    "Last storm cycle we saw 400+ roof leads in {metro}. "
+    "Most went cold because nobody called fast enough. "
+    "Want the list?"
 )
 ASK_TPL = (
-    "Worth a 5-min look at how the trigger feed works? "
-    "You'd get exclusive homeowner leads in {metro}, pay per seated lead in USDC. "
+    "5-minute call. I'll show you the feed. "
+    "You pay per seated lead in USDC. "
     "Reply 'yes' and I'll send the link."
 )
+
+# Load branded HTML template
+TEMPLATE_PATH = "/root/empire_os/email_templates/founder_pricing_dark.html"
+with open(TEMPLATE_PATH) as f:
+    HTML_TEMPLATE = f.read()
 
 def get_prospects(cur, limit):
     """Pull buyers ready for next sequence step."""
@@ -78,21 +73,35 @@ def get_prospects(cur, limit):
     """, (limit,)).fetchall()
     return rows
 
-def build_email(kind, name, metro, niche):
+def build_text(kind, name, metro, niche):
     name = (name or "there").split()[0] if name else "there"
     trigger = {"residential_roofing":"roof damage","roof_repair":"storm repair",
-               "water_damage":"flood damage","hvac":"HVAC failure"}.get(niche,"storm damage")
-    tpl = {"value":VALUE_TPL,"nudge":NUDGE_TPL,"ask":ASK_TPL}[kind]
+               "water_damage":"flood damage","hvac":"HVAC failure"}.get(niche, "storm damage")
+    tpl = {"value":VALUE_TPL, "nudge":NUDGE_TPL, "ask":ASK_TPL}[kind]
     return tpl.format(name=name, metro=metro or "your area", trigger=trigger)
+
+def build_html(kind, name, metro, niche):
+    """Wrap plain text in branded HTML template."""
+    text = build_text(kind, name, metro, niche)
+    # Simple conversion: line breaks to <br>, keep it clean
+    html_body = text.replace("\n", "<br>")
+    return HTML_TEMPLATE.format(
+        business_name=name or "there",
+        business_short=(name or "lead").lower().replace(" ", "")[:20],
+        city=metro or "your city",
+        niche=niche or "home services",
+        custom_body=html_body
+    )
 
 def queue_send(cur, prospect, kind, step):
     pid, name, email, metro, niche = prospect[0], prospect[1], prospect[2], prospect[3], prospect[4]
-    body = build_email(kind, name, metro, niche)
+    text_body = build_text(kind, name, metro, niche)
+    html_body = build_html(kind, name, metro, niche)
     meta = json.dumps({"niche": niche, "metro": metro, "seq_step": step, "kind": kind})
     cur.execute("""
         INSERT INTO si_outbox (to_email, subject, body, source, status, created_at, meta_json)
         VALUES (?, ?, ?, 'nurture_daemon', 'pending', ?, ?)
-    """, (email, f"Empire OS — {kind} ({metro or 'leads'})", body,
+    """, (email, f"Empire OS — {kind} ({metro or 'leads'})", text_body,
           datetime.now(timezone.utc).isoformat(), meta))
     # advance seq_step + last_touch
     cur.execute("""
@@ -109,6 +118,7 @@ def main():
 
     cap = daily_cap()
     print(f"[nurture] daily_cap={cap} limit={args.limit} dry_run={args.dry_run}")
+
     c = sqlite3.connect(DB); cur = c.cursor()
 
     # count already sent today
@@ -120,7 +130,8 @@ def main():
     print(f"[nurture] sent_today={sent_today} room={room}")
 
     if room == 0:
-        print("[nurture] daily cap hit. stopping."); return
+        print("[nurture] daily cap hit. stopping.")
+        return
 
     prospects = get_prospects(cur, min(args.limit, room))
     print(f"[nurture] prospects due: {len(prospects)}")

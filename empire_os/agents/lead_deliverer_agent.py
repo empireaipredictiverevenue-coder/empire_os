@@ -328,7 +328,7 @@ def bill_on_delivery(buyer: dict, lead: dict) -> str | None:
 def _log_ppc_invoice(buyer: dict, lead: dict) -> str:
     """Bill the delivered lead to the buyer (pay-per-lead) and log it to the
     ppc ledger so solana_listener can collect USDC against it.
-    Amount = base_payout * fee_rate (buyer's agreed rate). USDC has 6 decimals."""
+    Amount = base_payout * fee_rate (buyer's agreed rate). USDC stored in USD dollars."""
     import urllib.request, json, uuid
     # Prefer the agreed pay-per-lead rate; fall back to base*fee.
     per_lead = int(buyer.get("per_lead_cents") or 0)
@@ -338,8 +338,7 @@ def _log_ppc_invoice(buyer: dict, lead: dict) -> str:
         usd = per_lead / 100.0
     else:
         usd = base * rate if (base and rate) else 0.0
-    amount_usdc = int(usd * 1_000_000)  # 6 decimals
-    if amount_usdc <= 0:
+    if usd <= 0:
         return ""  # no billable amount agreed -> skip (NO-SIM: never fake $0)
     iid = f"ppc-{uuid.uuid4().hex[:12]}"
     body = {
@@ -347,7 +346,8 @@ def _log_ppc_invoice(buyer: dict, lead: dict) -> str:
         "buyer_id": buyer.get("tenant_id", ""),
         "lead_id": str(lead.get("lead_id", lead.get("id", ""))),
         "amount_cents": int(usd * 100),
-        "amount_usdc": amount_usdc,
+        "amount_usdc": usd,  # USD dollars (not micro)
+        "amount_dollars": usd,  # USD dollars (same)
         "status": "open",
         "metadata": f"pay-per-lead {buyer.get('niche','')} {lead.get('metro','')}",
         "ts": __import__("datetime").datetime.utcnow().isoformat() + "Z",
@@ -466,14 +466,17 @@ def render_lead_delivered_email(lead: dict, buyer: dict) -> tuple[str, str, str]
 def find_matching_buyers(lead: dict = None) -> list:
     """Find active buyers (and their subscriptions) for lead delivery.
 
-    For now: returns ALL active lane-subscription buyers, regardless of
-    niche/metro. Once a si_lane_subscription table exists, this will
+    For now: returns ALL active lane-subscription buyers + buyer_outreach buyers,
+    regardless of niche/metro. Once a si_lane_subscription table exists, this will
     filter by matching niche+metro.
 
     Note: si_tenant lacks webhook_url/api_key/delivery_email columns.
     We synthesize a delivery_email from t.email as a sensible default
     so the email path is exercised end-to-end.
     """
+    buyers = []
+    
+    # 1. Lane subscription buyers (existing logic)
     rows = _hub_sql("""
         SELECT t.tenant_id, t.name, t.email, t.plan AS tenant_plan,
                s.subscription_id, s.plan, s.seats, s.per_lead_cents
@@ -488,7 +491,17 @@ def find_matching_buyers(lead: dict = None) -> list:
         r.setdefault("webhook_url", None)
         r.setdefault("api_key", "")
         r.setdefault("delivery_email", r.get("email", ""))
-    return rows
+        buyers.append(r)
+    
+    # 2. Buyer outreach buyers (30K+ real buyers with webhooks/emails/payouts)
+    try:
+        outreach_buyers = find_buyer_outreach_buyers()
+        buyers.extend(outreach_buyers)
+        _log_event("INFO", f"find_matching_buyers: {len(rows)} lane buyers + {len(outreach_buyers)} outreach buyers")
+    except Exception as e:
+        _log_event("WARN", "could not load buyer_outreach buyers", err=str(e)[:160])
+    
+    return buyers
 
 
 def find_storm_buyers() -> list:
@@ -529,8 +542,52 @@ def find_storm_buyers() -> list:
             "fee_rate": float(r.get("fee_rate") or 0),
             # seat_price is derived the same way lanes do (seat_price = base_payout / fee_rate).
             # fee_rate of 1.0 means base_payout already is the full price. Fallback to base_payout
-            # so the delivery log / invoice never carries a None (was the storm-path gap).
+            # so the delivery log / invoice never carries None (was the storm-path gap).
             "seat_price": round(float(r.get("base_payout") or 0) / float(r.get("fee_rate") or 1.0), 2),
+        }
+        matched.append(buyer)
+    return matched
+
+
+def find_buyer_outreach_buyers() -> list:
+    """Active buyers from si_buyer_outreach table (local DB, 30K+ real buyers).
+
+    These are the goldmine prospects loaded from outreach campaigns.
+    Returns buyer dicts shaped for deliver_lead() with webhook, email, payout_per_lead.
+    """
+    rows = _hub_sql("""
+        SELECT prospect_id, business_name, email, endpoint_url, hmac_secret,
+               payout_per_lead, niches, metros
+        FROM si_buyer_outreach
+        WHERE active = 1
+          AND (endpoint_url IS NOT NULL AND endpoint_url != '')
+          AND (email IS NOT NULL AND email != '')
+    """)
+    
+    matched = []
+    for r in rows:
+        # niche from niches field (comma-separated)
+        niches = [n.strip().lower() for n in (r.get("niches") or "").split(",") if n.strip()]
+        metros = [m.strip() for m in (r.get("metros") or "").split(",") if m.strip()]
+        
+        # Use payout_per_lead as the base_payout (already in dollars)
+        base_payout = float(r.get("payout_per_lead") or 0)
+        # fee_rate = 1.0 since payout_per_lead is the full price
+        fee_rate = 1.0
+        
+        buyer = {
+            "tenant_id": r.get("prospect_id"),
+            "buyer_name": r.get("business_name", ""),
+            "niche": niches[0] if niches else "general",
+            "niches": niches,
+            "metros": metros,
+            "webhook_url": r.get("endpoint_url"),
+            "api_key": r.get("hmac_secret", "") or "",
+            "delivery_email": r.get("email", ""),
+            "base_payout": base_payout,
+            "fee_rate": fee_rate,
+            "seat_price": base_payout / fee_rate,
+            "per_lead_cents": int(base_payout * 100),
         }
         matched.append(buyer)
     return matched

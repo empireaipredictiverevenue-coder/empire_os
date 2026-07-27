@@ -1,0 +1,2 @@
+Skipping database tools -- PINECONE_API_KEY environment variable is not set.
+Pinecone MCP Server running on stdio

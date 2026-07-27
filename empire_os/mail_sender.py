@@ -120,7 +120,7 @@ def _log_send(entry: dict):
 
 
 def send_pending_batch() -> int:
-    """Fetch pending emails from hub and send via Resend. Returns count sent."""
+    """Fetch pending emails from hub and send them. Returns count sent."""
     resp = _hub_get(f"/v1/outbox/pending?n={MAX_PER_CYCLE}")
     if not resp or not resp.get("rows"):
         return 0
@@ -130,7 +130,7 @@ def send_pending_batch() -> int:
         out_id = item["id"]
         to_email = item["to_email"]
         subject = item["subject"]
-        body = item["body"]
+        body = item.get("html_body") or item["body"]
 
         logger.info("sending %d → %s: %s", out_id, to_email, subject[:60])
 

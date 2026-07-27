@@ -84,7 +84,9 @@ from empire_os.telegram_bot import send_brief, send_message, send_alert
 from empire_os.waterfall import build_default_waterfall
 from empire_os.auto_pilot import AutoPilot
 from empire_os.payout import PayoutEngine
-from empire_os.agents.satellite_damage_agent import run_scan as _damage_scan
+from empire_os.satellite_strike_service import ingest_strike as _satellite_strike
+from empire_os.satellite_strike_service import classify_event, resolve_metro
+from empire_os.satellite_strike_service import _COUNTY_TO_METRO
 from empire_os.fee_agent import FeeAgent
 from empire_os.watcher_agent import WatcherAgent
 from empire_os.tenants import TenantStore, PLANS, compute_invoice_amount, check_quota
@@ -1049,51 +1051,99 @@ def damage_consent_status(prospect_id: str):
 
 @app.post("/v1/satellite/strike")
 def satellite_strike(req: dict):
-    """Receive a severe weather alert from satellite-strike agent, create CRM lead."""
     if not backend:
         raise HTTPException(503, "backend not initialized")
-    try:
-        event = req.get("event", "Unknown")
-        severity = req.get("severity", "Unknown")
-        area = req.get("area", "")
-        headline = req.get("headline", "")
-        event_id = req.get("id", "")
 
-        # Extract metro from area description (first location + state)
-        import re
-        metro = area.split(";")[0].strip() if area else "Unknown"
-        metro = re.sub(r'\s+', ' ', metro).strip()
-        now = datetime.utcnow().isoformat()
 
-        # Create CRM lead via direct SQL (matches import_from_lane_leads pattern)
-        lead_uid = f"storm_{event_id.split('/')[-1][:32]}" if event_id else f"storm_{int(time.time())}"
-        notes = f"{headline} | {area} | severity={severity}" if headline else f"{event} in {area}"
+# Map NWS county text + polygon centroid to our metro codes
+_COUNTY_TO_METRO = {
+    # NYC
+    "new york, ny": "NYC", "kings, ny": "NYC", "queens, ny": "NYC",
+    "bronx, ny": "NYC", "richmond, ny": "NYC",
+    "nassau, ny": "NYC", "westchester, ny": "NYC",
+    # LAX
+    "los angeles, ca": "LAX", "orange, ca": "LAX", "san bernardino, ca": "LAX",
+    # SFO
+    "san francisco, ca": "SFO", "san mateo, ca": "SFO", "alameda, ca": "SFO",
+    # HOU
+    "harris, tx": "HOU", "fort bend, tx": "HOU", "montgomery, tx": "HOU", "brazoria, tx": "HOU",
+    # DFW
+    "dallas, tx": "DFW", "tarrant, tx": "DFW", "collin, tx": "DFW",
+    "denton, tx": "DFW", "ellis, tx": "DFW", "johnson, tx": "DFW",
+    # CHI
+    "cook, il": "CHI", "dupage, il": "CHI", "lake, il": "CHI",
+    "kane, il": "CHI", "will, il": "CHI",
+    # MIA
+    "miami-dade, fl": "MIA", "broward, fl": "MIA", "palm beach, fl": "MIA",
+    # PHL
+    "philadelphia, pa": "PHL", "delaware, pa": "PHL", "montgomery, pa": "PHL",
+    "bucks, pa": "PHL", "chester, pa": "PHL",
+    # BOS, ATL, WDC
+    "suffolk, ma": "BOS", "middlesex, ma": "BOS", "norfolk, ma": "BOS",
+    "fulton, ga": "ATL", "dekalb, ga": "ATL", "cobb, ga": "ATL", "gwinnett, ga": "ATL",
+    "district of columbia, dc": "WDC", "arlington, va": "WDC",
+    "alexandria, va": "WDC", "fairfax, va": "WDC", "prince william, va": "WDC",
+}
 
-        # Idempotent: skip if this storm alert already created a lead
-        existing = backend.execute(
-            "SELECT id FROM crm_leads WHERE lead_uid = ?", (lead_uid,)
-        ).fetchone()
-        if existing:
-            return {"ok": True, "notified": 0, "already": True,
-                    "lead_id": existing[0], "event": event}
 
-        backend.execute(
-            """INSERT INTO crm_leads
-               (lead_uid, source, niche, metro, business_name, notes, status, omega_score, created_at, updated_at)
-               VALUES (?, 'satellite_strike', 'roofing', ?, ?, ?, 'new', 5.0, ?, ?)""",
-            (lead_uid, metro, f"Storm Damage — {event}", notes[:500], now, now),
-        )
-        lid = backend.execute("SELECT last_insert_rowid()").fetchone()[0]
-        backend.execute(
-            "INSERT INTO crm_activities (lead_id, act_type, summary, actor) VALUES (?, 'system', ?, 'satellite_strike')",
-            (lid, f"Storm event: {event} in {metro}"),
-        )
-        backend.commit()
+def _resolve_metro_from_event(coords: list, area: str, event: str) -> str:
+    """Find our metro code (NYC/HOU/DFW/...) from an NWS alert.
 
-        return {"ok": True, "notified": 1, "lead_id": lid, "event": event}
-    except Exception as e:
-        import traceback
-        raise HTTPException(500, detail=str(e)[:300] + " | " + traceback.format_exc()[:200])
+    Order:
+      1. polygon centroid -> reverse-geocode via a lat/lon -> metro
+         heuristic (cover the 11 supported metros with city bounding boxes).
+      2. area string -> parse "Montgomery, MD" style tokens to a county,
+         then look up in _COUNTY_TO_METRO.
+      3. Fallback to the first token of area.
+    """
+    # 1. polygon centroid -> nearest supported metro by lat/lon bbox
+    if coords and isinstance(coords, list) and coords:
+        try:
+            flat = []
+            for pt in coords[:50]:  # cap for safety
+                if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                    flat.append(float(pt[0]))
+                    flat.append(float(pt[1]))
+            if len(flat) >= 2:
+                lat = sum(flat[0::2]) / max(1, len(flat[0::2]))
+                lon = sum(flat[1::2]) / max(1, len(flat[1::2]))
+                hit = _metro_from_latlon(lat, lon)
+                if hit:
+                    return hit
+        except Exception:
+            pass
+
+    # 2. area string -> county lookup
+    if area:
+        for token in (t.strip() for t in area.split(";")):
+            low = token.lower()
+            for k, metro in _COUNTY_TO_METRO.items():
+                if k in low or low.startswith(k.split(",")[0]):
+                    return metro
+
+    # 3. fallback
+    return area.split(";")[0].strip() if area else "Unknown"
+
+
+def _metro_from_latlon(lat: float, lon: float) -> str | None:
+    """Coarse lat/lon -> metro code (rounded city bboxes)."""
+    boxes = [
+        ("NYC", 40.40, 40.95, -74.30, -73.65),
+        ("LAX", 33.70, 34.35, -118.85, -117.65),
+        ("SFO", 37.30, 38.00, -123.00, -121.80),
+        ("HOU", 29.40, 30.30, -95.85, -94.90),
+        ("DFW", 32.50, 33.40, -97.65, -96.45),
+        ("CHI", 41.45, 42.35, -88.45, -87.30),
+        ("MIA", 25.40, 26.40, -80.85, -80.05),
+        ("PHL", 39.80, 40.40, -75.55, -74.85),
+        ("BOS", 42.10, 42.70, -71.45, -70.65),
+        ("ATL", 33.55, 34.05, -84.65, -84.15),
+        ("WDC", 38.65, 39.30, -77.40, -76.65),
+    ]
+    for code, la_min, la_max, lo_min, lo_max in boxes:
+        if la_min <= lat <= la_max and lo_min <= lon <= lo_max:
+            return code
+    return None
 
 def lead_intake(req: LeadIntakeRequest):
     """Capture a lead from AEO form → route → score → store."""
@@ -4844,7 +4894,7 @@ def outbox_pending(n: int = 10):
         for r in cnx.execute(
             "SELECT o.id, o.to_email, o.subject, o.body, o.lane, o.tier, "
             "o.lead_id, o.source, o.status, o.created_at, "
-            "o.recipient_kind, o.meta_json "
+            "o.recipient_kind, o.meta_json, o.html_body "
             "FROM si_outbox o "
             "WHERE o.status='pending' "
             "AND (o.recipient_kind IS NULL OR o.recipient_kind='buyer' "
@@ -4868,6 +4918,7 @@ def outbox_pending(n: int = 10):
                 "created_at":     r[9],
                 "recipient_kind": r[10],
                 "meta_json":      r[11],
+                "html_body":      r[12],
             })
         return {"rows": rows, "count": len(rows)}
     finally:
