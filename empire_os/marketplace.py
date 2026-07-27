@@ -375,14 +375,16 @@ def create_buyer(name: str, email: str, wallet: str = "",
     # Upsert buyer vector to Pinecone for semantic matching
     try:
         from empire_os.pinecone_intel import upsert_buyer
-        upsert_buyer(buyer_id=tenant_id, buyer_data={
-            "niche": "",  # Will be updated when buyer subscribes to a lane
-            "metro": "",  # Will be updated when buyer subscribes to a lane
-            "company_name": name,
-            "payout_per_lead": 0,  # Will be updated with tier pricing
-            "wallet": wallet,
-            "active": 1,
-        })
+        from empire_os.pinecone_client import get_client
+        with get_client() as client:
+            upsert_buyer(tenant_id, {
+                "niche": "",  # Will be updated when buyer subscribes to a lane
+                "metro": "",  # Will be updated when buyer subscribes to a lane
+                "company_name": name,
+                "payout_per_lead": 0,  # Will be updated with tier pricing
+                "wallet": wallet,
+                "active": 1,
+            }, client=client)
     except Exception as e:
         print(f"Pinecone upsert_buyer failed: {e}", file=sys.stderr)
     
@@ -497,14 +499,16 @@ def buy_lane_access(tenant_id: str, niche: str, metro: str,
     # Update Pinecone buyer vector with niche, metro, and payout info
     try:
         from empire_os.pinecone_intel import upsert_buyer
-        upsert_buyer(buyer_id=tenant_id, buyer_data={
-            "niche": niche,
-            "metro": metro,
-            "company_name": "",  # Will be filled from si_tenant
-            "payout_per_lead": price / 100.0,  # Convert cents to dollars
-            "wallet": "",  # Will be filled from si_tenant
-            "active": 1,
-        })
+        from empire_os.pinecone_client import get_client
+        with get_client() as client:
+            upsert_buyer(tenant_id, {
+                "niche": niche,
+                "metro": metro,
+                "company_name": "",  # Will be filled from si_tenant
+                "payout_per_lead": price / 100.0,  # Convert cents to dollars
+                "wallet": "",  # Will be filled from si_tenant
+                "active": 1,
+            }, client=client)
     except Exception as e:
         print(f"Pinecone upsert_buyer update failed: {e}", file=sys.stderr)
 

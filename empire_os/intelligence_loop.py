@@ -34,16 +34,8 @@ from empire_os.ai_intelligence import (
     BuyerMatch,
 )
 from empire_os.agent_core import OllamaClient
-from empire_os.pinecone_intel import (
-    embed_text,
-    upsert_lead,
-    upsert_buyer,
-    find_similar_buyers,
-    find_similar_leads,
-    semantic_buyer_match,
-    get_pinecone_stats,
-    bootstrap_index,
-)
+from empire_os.pinecone_intel import semantic_buyer_match
+from empire_os.pinecone_client import get_client
 DB = "/root/empire_os/empire_os.db"
 LOG_DIR = Path("/root/feedback/intelligence_loop")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -168,7 +160,8 @@ def match_buyer_intelligently(lead: dict, buyers: list) -> dict | None:
     
     # First try Pinecone semantic matching (vector similarity + metadata filtering)
     try:
-        semantic_match = semantic_buyer_match(lead)
+        with get_client() as client:
+            semantic_match = semantic_buyer_match(lead, client=client)
         if semantic_match:
             # Verify the matched buyer is in our active buyers list
             buyer_ids = {b["prospect_id"] for b in buyers}
