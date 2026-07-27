@@ -92,42 +92,37 @@ def _is_own_source(source: str | None) -> bool:
 
 
 def _pipeline_view() -> dict:
-    """Lead-pipeline: empire-sourced vs others, per (metro, niche).
-
-    Schema-aware: skips the per-source classification if `lane_leads.source`
-    is not present (host snapshot vs container live schema).
-    """
+    """Lead-pipeline: empire-sourced vs others, per (metro, niche)."""
     con = _db()
     try:
         cols = _lane_leads_cols()
         if "metro" not in cols or "niche" not in cols:
-            return {}
+            return {"data_drift": True, "reason": "missing_metro_or_niche"}
+        # Live lane_leads schema has no source column. Never issue SQL against
+        # a column that schema inspection proved absent; preserve uncertainty.
         if "source" not in cols:
-            # Without a source column, treat ALL lane_leads as "competing"
-            # because we can't separate ours from theirs. Emit a
-            # single per-(metro,niche) entry per niche, no source split.
-            sql = """
-            SELECT metro, niche, COUNT(*) AS total
-            FROM lane_leads
-            WHERE metro IS NOT NULL AND metro != ''
-              AND niche IS NOT NULL AND niche != ''
-            GROUP BY metro, niche
-            ORDER BY metro, total DESC
-            """
-            rows = con.execute(sql).fetchall()
+            rows = con.execute("""
+                SELECT metro, niche, COUNT(*) AS total
+                FROM lane_leads
+                WHERE metro IS NOT NULL AND metro != ''
+                  AND niche IS NOT NULL AND niche != ''
+                GROUP BY metro, niche
+                ORDER BY metro, total DESC
+            """).fetchall()
             out = {}
             for r in rows:
                 out.setdefault(r["metro"], {})[r["niche"]] = {
                     "total_leads_30d": _safe_int(r["total"]),
-                    "empire_leads_30d": _safe_int(r["total"]),  # we don't know
-                    "competing_leads_30d": 0,
-                    "our_supply_share_pct": 0.0,  # unknown
-                    "data_drift": True,  # flag for callers
+                    "empire_leads_30d": None,
+                    "competing_leads_30d": None,
+                    "our_supply_share_pct": None,
+                    "data_drift": True,
+                    "reason": "lane_leads_source_column_missing",
                 }
-            return out
+            return {"data": out, "data_drift": True,
+                    "reason": "lane_leads_source_column_missing"}
         sql = """
-        SELECT metro, niche,
-               COUNT(*) AS total,
+        SELECT metro, niche, COUNT(*) AS total,
                SUM(CASE WHEN source LIKE 'empire_enrich/%'
                          OR source LIKE 'permits:%'
                          OR source LIKE 'nyc_hpd:%'
@@ -143,30 +138,24 @@ def _pipeline_view() -> dict:
                          OR source LIKE 'sam_gov:%'
                          OR source LIKE 'acris:%'
                          OR source LIKE 'dob_violations:%'
-                         OR source LIKE 'hud:%'
-                         THEN 1 ELSE 0 END) AS empire_total
+                         OR source LIKE 'hud:%' THEN 1 ELSE 0 END) AS empire_total
         FROM lane_leads
         WHERE metro IS NOT NULL AND metro != ''
           AND niche IS NOT NULL AND niche != ''
-        GROUP BY metro, niche
-        ORDER BY metro, total DESC
+        GROUP BY metro, niche ORDER BY metro, total DESC
         """
         rows = con.execute(sql).fetchall()
         out = {}
         for r in rows:
-            metro = r["metro"]
-            niche = r["niche"]
             total = _safe_int(r["total"])
             empire = _safe_int(r["empire_total"])
-            others = max(0, total - empire)
-            share = (empire / total) if total else 0
-            out.setdefault(metro, {})[niche] = {
+            out.setdefault(r["metro"], {})[r["niche"]] = {
                 "total_leads_30d": total,
                 "empire_leads_30d": empire,
-                "competing_leads_30d": others,
-                "our_supply_share_pct": round(share * 100, 1),
+                "competing_leads_30d": max(0, total - empire),
+                "our_supply_share_pct": round((empire / total) * 100, 1) if total else 0.0,
             }
-        return out
+        return {"data": out, "data_drift": False}
     finally:
         con.close()
 
@@ -282,6 +271,7 @@ def main() -> dict:
     snap = {"ts": _now(), "schema_drift_safe": True}
     try:
         snap["pipeline"] = _pipeline_view()
+        snap["pipeline_data"] = snap["pipeline"].get("data", {})
         snap["competitors"] = _buyer_competitors()
         snap["intent_signals"] = _buyer_intent_signals()
         # Aggregate top-level
