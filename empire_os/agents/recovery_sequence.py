@@ -64,6 +64,8 @@ def get_pay_url(tenant_id):
     import os
     try:
         c = sqlite3.connect(DB)
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=30000")
         row = c.execute(
             "SELECT payment_ref, price_cents FROM si_subscription "
             "WHERE tenant_id=?", (tenant_id,)).fetchone()
@@ -99,6 +101,11 @@ def main():
     args = ap.parse_args()
 
     c = sqlite3.connect(DB)
+    try:
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=30000")
+    except Exception:
+        pass
     c.row_factory = sqlite3.Row
     awaiting = c.execute(
         "SELECT * FROM crm_deals WHERE stage='awaiting_payment'").fetchall()

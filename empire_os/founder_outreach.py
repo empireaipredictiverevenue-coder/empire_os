@@ -84,12 +84,28 @@ def queue_email(cur, to_email, name, niche, metro=""):
     # Insert + COMMIT first so the founder-outreach transaction is NOT open
     # during the HTTP round-trip to the hub (otherwise we deadlock the shared
     # SQLite db: this proc holds the lock, hub's onboard() can't write -> 504).
-    cur.execute(
-        "INSERT INTO si_outbox (to_email, subject, body, lane, tier, source, status, recipient_kind, created_at) "
-        "VALUES (?,?,?,?,?,?, 'pending', 'prospect', datetime('now'))",
-        (to_email, subj, body, niche, "founder", "founder_outreach"),
-    )
-    cur.commit()
+    for attempt in range(8):
+        try:
+            cur.execute(
+                "INSERT INTO si_outbox (to_email, subject, body, lane, tier, source, status, recipient_kind, created_at) "
+                "VALUES (?,?,?,?,?,?, 'pending', 'prospect', datetime('now'))",
+                (to_email, subj, body, niche, "founder", "founder_outreach"),
+            )
+            cur.commit()
+            return True
+        except sqlite3.OperationalError as e:
+            err = str(e)
+            if "locked" in err and attempt < 7:
+                # Roll back the failed txn so the connection is usable again,
+                # then back off exponentially.
+                try:
+                    cur.connection.rollback()
+                except Exception:
+                    pass
+                time.sleep(1.0 * (attempt + 1))
+                continue
+            raise
+    return False
     outbox_id = cur.execute(
         "SELECT id FROM si_outbox WHERE rowid=last_insert_rowid()").fetchone()[0]
     # Now mint a personal pay link (no open transaction) and patch the row.
@@ -223,6 +239,12 @@ def main():
     ap.add_argument("--watch", action="store_true")
     a = ap.parse_args()
     c = sqlite3.connect(DB, timeout=30); c.row_factory = sqlite3.Row
+    # WAL mode = multiple readers + 1 writer concurrently without "database is locked"
+    try:
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=30000")
+    except Exception:
+        pass
     if a.watch:
         while True:
             reload_env()

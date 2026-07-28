@@ -93,6 +93,11 @@ def _ollama_chat(prompt: str, system: str = "", timeout: int = 90) -> Optional[s
 def warm_prospects(limit: int = BATCH) -> list:
     """Pull warm prospects: have email, no active subscription."""
     c = sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=30000")
+    except Exception:
+        pass
     c.row_factory = sqlite3.Row
     try:
         rows = c.execute("""

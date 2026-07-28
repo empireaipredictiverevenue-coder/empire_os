@@ -27,6 +27,11 @@ JSONL_PATH = FEEDBACK_DIR / "revenue.jsonl"
 
 def db() -> sqlite3.Connection:
     c = sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=30000")
+    except Exception:
+        pass
     c.row_factory = sqlite3.Row
     return c
 
