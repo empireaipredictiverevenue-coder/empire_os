@@ -23,7 +23,7 @@ def daily_cap(now=None):
     if days < 7:   return 5
     if days < 14:  return 8
     if days < 21:  return 12
-    return 15
+    return 30  # bumped to 30/day once warmed up — Brevo free = 300/day
 
 # sequence steps: (day_offset, kind)
 SEQUENCE = [
@@ -114,7 +114,43 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=10)
     ap.add_argument("--once", action="store_true")
+    ap.add_argument("--watch", action="store_true",
+                    help="Continuous loop: tick every N seconds, exit on cap.")
+    ap.add_argument("--interval", type=int, default=300,
+                    help="Seconds between ticks when --watch is set.")
     args = ap.parse_args()
+
+    if args.watch:
+        # Long-lived daemon mode. Auto-enroll cold prospects every 6h,
+        # then tick the nurture queue every --interval seconds.
+        _run_watch(args)
+        return
+
+    _run_once(args)
+
+
+def _run_watch(args):
+    """Continuous: enroll every 6h, tick every interval until daily cap."""
+    print(f"[nurture] watching: enroll every 6h, tick every {args.interval}s")
+    last_enroll = 0
+    while True:
+        # Auto-enroll cold prospects every 6h
+        if time.time() - last_enroll > 6 * 3600:
+            try:
+                sys.path.insert(0, "/root/empire_os")
+                from empire_os.nurture_enroll import run as enroll_run
+                r = enroll_run()
+                print(f"[nurture-enroll] {r}")
+            except Exception as e:
+                print(f"[nurture-enroll] error: {e}")
+            last_enroll = time.time()
+        # Tick
+        _run_once(args)
+        # If cap was hit, sleep longer (next day)
+        time.sleep(args.interval)
+
+
+def _run_once(args):
 
     cap = daily_cap()
     print(f"[nurture] daily_cap={cap} limit={args.limit} dry_run={args.dry_run}")
