@@ -91,7 +91,11 @@ def _ollama_chat(prompt: str, system: str = "", timeout: int = 90) -> Optional[s
 
 
 def warm_prospects(limit: int = BATCH) -> list:
-    """Pull warm prospects: have email, no active subscription."""
+    """Pull warm prospects: have email, no active subscription.
+
+    Dedupes against the last 24h of a2a_sales.jsonl — if we already
+    emailed prospect X in the last 24h, skip them.
+    """
     c = sqlite3.connect(DB_PATH, timeout=15)
     try:
         c.execute("PRAGMA journal_mode=WAL")
@@ -107,10 +111,48 @@ def warm_prospects(limit: int = BATCH) -> list:
               AND email NOT LIKE 'dc-%' AND email NOT LIKE '%@v.co'
             ORDER BY payout_per_lead DESC NULLS LAST, last_touch_at DESC
             LIMIT ?
-        """, (limit,)).fetchall()
-        return [dict(r) for r in rows]
+        """, (limit * 3,)).fetchall()  # over-fetch since we'll dedupe
+        prospects = [dict(r) for r in rows]
     finally:
         c.close()
+
+    # Dedupe against last 24h of a2a_sales.jsonl + suppressed bounces
+    recently_emailed = _recently_emailed_set(hours=24)
+    return [
+        p for p in prospects
+        if p.get("email", "").lower() not in recently_emailed
+        and not is_suppressed(p.get("email", ""))
+    ][:limit]
+
+
+def _recently_emailed_set(hours: int = 24) -> set:
+    """Read a2a_sales.jsonl + return set of emails sent in the last N hours."""
+    import json
+    from datetime import datetime, timezone, timedelta
+    log_path = Path(LOG_PATH)
+    if not log_path.exists():
+        return set()
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    emails = set()
+    try:
+        with open(log_path) as f:
+            for line in f:
+                try:
+                    e = json.loads(line)
+                except Exception:
+                    continue
+                if e.get("event") != "email_attempt":
+                    continue
+                if not e.get("result", {}).get("sent"):
+                    continue
+                if e.get("ts", "") < cutoff:
+                    continue
+                pe = e.get("prospect_email", "").lower().strip()
+                if pe:
+                    emails.add(pe)
+    except Exception:
+        return set()
+    return emails
 
 
 def pick_product(prospect: dict, snapshot: dict) -> Optional[dict]:
@@ -185,6 +227,7 @@ def send_quote_email(quote: dict, prospect: dict) -> dict:
 
     try:
         import urllib.request
+        import urllib.error
         payload = {
             "sender": {"name": "Empire OS", "email": sender_email},
             "to": [{"email": email}],
@@ -199,8 +242,91 @@ def send_quote_email(quote: dict, prospect: dict) -> dict:
         with urllib.request.urlopen(req, timeout=30) as r:
             resp = json.loads(r.read())
             return {"sent": True, "brevo_id": resp.get("messageId", "")}
+    except urllib.error.HTTPError as e:
+        # Parse Brevo bounce/block response
+        body = ""
+        try:
+            body = e.read().decode()[:500]
+        except Exception:
+            pass
+        is_bounce = _record_suppression(email, str(e.code), body)
+        return {"sent": False, "error": f"HTTP {e.code}: {body[:200]}",
+                "suppressed": is_bounce}
     except Exception as e:
         return {"sent": False, "error": str(e)[:200]}
+
+
+def _record_suppression(email: str, status_code: str, body: str) -> bool:
+    """Record a Brevo bounce/block in suppressed_emails + return True.
+
+    Idempotent. Hard-bounces (400) + soft-bounces (5xx) tracked.
+    Skips transient errors (429 rate-limit, network).
+    """
+    if not email or "@" not in email:
+        return False
+    # Heuristic: 400 with specific Brevo codes are hard bounces
+    hard = any(s in body for s in (
+        "invalid_parameter", "contact blocked", "Email is not valid",
+        "mailbox does not exist", "domain does not exist", "spam complaint",
+    ))
+    if not hard and status_code not in ("400", "403", "410"):
+        return False
+    try:
+        c = sqlite3.connect(DB_PATH, timeout=15)
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS suppressed_emails (
+                email TEXT PRIMARY KEY,
+                reason TEXT,
+                status_code TEXT,
+                first_seen TEXT,
+                last_seen TEXT,
+                bounce_count INTEGER DEFAULT 1
+            )""")
+        c.execute("PRAGMA busy_timeout=30000")
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        # Upsert: increment count on conflict
+        c.execute("""
+            INSERT INTO suppressed_emails (email, reason, status_code, first_seen, last_seen, bounce_count)
+            VALUES (?, ?, ?, ?, ?, 1)
+            ON CONFLICT(email) DO UPDATE SET
+                bounce_count = bounce_count + 1,
+                last_seen = ?,
+                reason = ?,
+                status_code = ?
+        """, (email, body[:200], status_code, now, now, now, body[:200], status_code))
+        c.commit()
+        c.close()
+        return True
+    except Exception as e:
+        return False
+
+
+def is_suppressed(email: str) -> bool:
+    """True if email is in the suppressed list — skip sending."""
+    if not email:
+        return False
+    try:
+        c = sqlite3.connect(DB_PATH, timeout=10)
+        c.execute("PRAGMA journal_mode=WAL")
+        c.row_factory = sqlite3.Row
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS suppressed_emails (
+                email TEXT PRIMARY KEY,
+                reason TEXT,
+                status_code TEXT,
+                first_seen TEXT,
+                last_seen TEXT,
+                bounce_count INTEGER DEFAULT 1
+            )""")
+        row = c.execute(
+            "SELECT email FROM suppressed_emails WHERE email = ?", (email.lower(),)
+        ).fetchone()
+        c.close()
+        return row is not None
+    except Exception:
+        return False
 
 
 def run_once() -> dict:
