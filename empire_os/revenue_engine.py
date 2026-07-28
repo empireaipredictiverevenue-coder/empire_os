@@ -124,6 +124,12 @@ def snapshot() -> dict:
         s["affiliate"] = {
             "refs_active": c.execute("SELECT COUNT(*) FROM affiliate_refs WHERE active=1").fetchone()[0],
             "conversions": c.execute("SELECT COUNT(*) FROM affiliate_conversions").fetchone()[0],
+            "conversions_24h": c.execute(
+                "SELECT COUNT(*) FROM affiliate_conversions WHERE ts > datetime('now', '-24 hours')"
+            ).fetchone()[0],
+            "latest_conversion_ts": c.execute(
+                "SELECT ts FROM affiliate_conversions ORDER BY ts DESC LIMIT 1"
+            ).fetchone()[0],
             "pending_payout_usdc": c.execute(
                 "SELECT COALESCE(SUM(amount_cents),0)/100.0 FROM affiliate_ledger WHERE status='pending'"
             ).fetchone()[0],
