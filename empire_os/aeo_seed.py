@@ -41,6 +41,103 @@ NICHES = {
         "keywords": "real estate, realtor, buyer agent, listing agent, property, residential real estate",
         "body": "AI automation helps real estate agents convert more online leads into showings by responding in seconds, qualifying by budget and timeline, and booking tours straight to your calendar 24/7. Right now, you can capture every Zillow and Facebook lead without paying a virtual assistant to follow up.",
     },
+    # Vector 2 expansion (2026-07-28) — niches with real lane_leads supply
+    "legal_services": {
+        "title": "Legal Services",
+        "schema_type": "LegalService",
+        "keywords": "lawyer, attorney, legal services, personal injury, family law, estate planning",
+        "body": "AI automation helps law firms convert more intake calls into signed retainers by responding 24/7, qualifying by case type and jurisdiction, and booking consultations straight to your calendar. Right now, you can capture every web lead without missing after-hours opportunities.",
+    },
+    "insurance": {
+        "title": "Insurance",
+        "schema_type": "InsuranceAgency",
+        "keywords": "insurance agent, auto insurance, home insurance, life insurance, commercial insurance",
+        "body": "AI automation helps insurance agents quote more binds by responding in seconds, qualifying by coverage type and risk profile, and booking policy reviews. Right now, you can capture every comparison-shopper without losing them to the carrier that responds first.",
+    },
+    "debt_relief": {
+        "title": "Debt Relief",
+        "schema_type": "FinancialService",
+        "keywords": "debt relief, debt consolidation, credit counseling, bankruptcy, debt settlement",
+        "body": "AI automation helps debt relief firms convert more distressed callers into enrolled clients by responding instantly, qualifying by debt amount and state, and booking consultations. Right now, you can capture every inbound lead without losing them to a faster competitor.",
+    },
+    "accounting": {
+        "title": "Accounting",
+        "schema_type": "AccountingService",
+        "keywords": "accountant, CPA, bookkeeping, tax preparation, payroll, financial services",
+        "body": "AI automation helps CPAs and accountants win more tax-season clients by responding in seconds during peak demand, qualifying by entity type and complexity, and booking consultations. Right now, you can capture every lead without burning out your front desk during tax season.",
+    },
+    "mortgage": {
+        "title": "Mortgage",
+        "schema_type": "MortgageBroker",
+        "keywords": "mortgage broker, home loan, refinance, FHA loan, VA loan, mortgage rate",
+        "body": "AI automation helps mortgage brokers close more loans by responding in seconds during rate-driven shopping, qualifying by credit and down payment, and booking application appointments. Right now, you can capture every rate-comparison shopper without losing them to Rocket or SoFi.",
+    },
+    "managed_it": {
+        "title": "Managed IT",
+        "schema_type": "ITService",
+        "keywords": "managed IT, IT support, network security, cloud services, IT consulting, MSP",
+        "body": "AI automation helps MSPs convert more inbound leads into signed managed-services contracts by responding in seconds, qualifying by environment and headcount, and booking discovery calls. Right now, you can capture every lead without losing them to a faster-responding competitor.",
+    },
+    "mold_remediation": {
+        "title": "Mold Remediation",
+        "schema_type": "HomeAndConstructionBusiness",
+        "keywords": "mold removal, mold remediation, black mold, mold inspection, water damage",
+        "body": "AI automation helps mold remediation companies respond to urgent calls in seconds, qualify by affected area and severity, and book inspections 24/7. Right now, you can capture every high-intent lead without missing emergency opportunities.",
+    },
+    "water_damage": {
+        "title": "Water Damage Restoration",
+        "schema_type": "HomeAndConstructionBusiness",
+        "keywords": "water damage, flood restoration, water cleanup, mold, emergency restoration",
+        "body": "AI automation helps water damage restoration companies respond to emergencies in seconds, qualify by severity and insurance status, and book same-day inspections. Right now, you can capture every emergency lead without missing time-critical jobs.",
+    },
+    "fire_damage": {
+        "title": "Fire Damage Restoration",
+        "schema_type": "HomeAndConstructionBusiness",
+        "keywords": "fire damage, smoke damage, fire restoration, soot cleanup, emergency restoration",
+        "body": "AI automation helps fire damage restoration companies respond to emergencies in seconds, qualify by insurance and severity, and book immediate inspections. Right now, you can capture every emergency lead without losing them to the first responder on scene.",
+    },
+    "storm_damage": {
+        "title": "Storm Damage Repair",
+        "schema_type": "HomeAndConstructionBusiness",
+        "keywords": "storm damage, hail damage, wind damage, roof storm, insurance claim",
+        "body": "AI automation helps storm damage contractors respond to post-storm leads in seconds, qualify by damage type and insurance, and book emergency inspections. Right now, you can capture every storm-driven lead before they sign with a competitor.",
+    },
+    "commercial_roofing": {
+        "title": "Commercial Roofing",
+        "schema_type": "RoofingContractor",
+        "keywords": "commercial roofing, flat roof, TPO, EPDM, commercial roof repair",
+        "body": "AI automation helps commercial roofing contractors win more bids by responding to RFQs in seconds, qualifying by square footage and scope, and booking site surveys. Right now, you can capture every commercial lead without losing them to the GC's preferred vendor list.",
+    },
+    "roof_repair": {
+        "title": "Roof Repair",
+        "schema_type": "RoofingContractor",
+        "keywords": "roof repair, leak repair, shingle repair, emergency roofer, roof patch",
+        "body": "AI automation helps roof repair specialists respond to leak calls in seconds, qualify by damage scope, and book same-day inspections. Right now, you can capture every emergency repair lead before they patch it themselves.",
+    },
+    "general_contractor": {
+        "title": "General Contractor",
+        "schema_type": "GeneralContractor",
+        "keywords": "general contractor, home remodel, renovation, construction, home improvement",
+        "body": "AI automation helps general contractors respond to bid requests in seconds, qualify by project scope and budget, and book consultations. Right now, you can capture every project lead before they hire the next contractor on Angi.",
+    },
+    "marketing": {
+        "title": "Marketing Agency",
+        "schema_type": "ProfessionalService",
+        "keywords": "marketing agency, digital marketing, SEO agency, paid ads, social media marketing",
+        "body": "AI automation helps marketing agencies respond to RFPs in seconds, qualify by industry and budget, and book discovery calls. Right now, you can capture every inbound lead without losing them to a faster competitor.",
+    },
+    "real_estate_attorney": {
+        "title": "Real Estate Attorney",
+        "schema_type": "LegalService",
+        "keywords": "real estate attorney, real estate lawyer, closing attorney, title attorney",
+        "body": "AI automation helps real estate attorneys respond to closing and contract questions in seconds, qualify by transaction type, and book consultations. Right now, you can capture every referral without missing time-sensitive closings.",
+    },
+    "tax_resolution": {
+        "title": "Tax Resolution",
+        "schema_type": "FinancialService",
+        "keywords": "tax resolution, IRS problems, tax debt, back taxes, tax attorney, enrolled agent",
+        "body": "AI automation helps tax resolution firms convert more distressed callers into clients by responding instantly, qualifying by tax debt amount, and booking consultations. Right now, you can capture every IRS-problem lead without missing the 30-day response window.",
+    },
 }
 
 
