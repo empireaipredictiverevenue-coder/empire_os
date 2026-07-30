@@ -229,7 +229,23 @@ def subs_stats(backend) -> dict[str, Any]:
     awaiting_row = dict(backend.execute(
         "SELECT COUNT(*) AS count FROM si_subscription WHERE status='awaiting_payment'"
     ).fetchone())
-    paid_charges_row = dict(backend.execute(
+    # 134 from the old loose query = synthetic auto-seats.
+    # The honest bar is: charge.amount_cents > 0 AND a matching
+    # real on-chain settlement row (with non-null settled_at) exists.
+    # si_charges has buyer_id; si_settlements links via prospect_id (the
+    # charge's customer_ref carries the subscription_id, but the
+    # simplest reliable join is buyer_id round-trip -> tenant_id).
+    paid_unique_buyer_count = dict(backend.execute(
+        "SELECT COUNT(DISTINCT c.buyer_id) AS count "
+        "FROM si_charges c "
+        "INNER JOIN si_subscription sub ON sub.subscription_id = c.customer_ref "
+        "INNER JOIN si_settlements s ON s.tenant_id = sub.tenant_id "
+        "WHERE c.status='paid' AND c.amount_cents > 0 "
+        "AND s.settled_at IS NOT NULL"
+    ).fetchone())
+    paid_charges_row = {"count": paid_unique_buyer_count["count"]}
+    # Strict = paid AND settled (real money landed); loose = just paid (legacy).
+    paid_charges_loose = dict(backend.execute(
         "SELECT COUNT(DISTINCT buyer_id) AS count FROM si_charges "
         "WHERE status='paid' AND buyer_id IS NOT NULL"
     ).fetchone())
@@ -238,7 +254,11 @@ def subs_stats(backend) -> dict[str, Any]:
         "active": active_row["count"] if active_row else 0,
         "awaiting_payment": awaiting_row["count"] if awaiting_row else 0,
         "by_status": by_status,
+        # Strict: paid + on-chain settled.
         "unique_paid_subscriptions": paid_charges_row["count"] if paid_charges_row else 0,
+        # Legacy loose count kept for the dashboard so old C-suite views
+        # don't go blank. Distinct names prevent silent misuse downstream.
+        "unique_paid_legacy_loose": paid_charges_loose["count"] if paid_charges_loose else 0,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 

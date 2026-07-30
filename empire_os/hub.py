@@ -957,6 +957,110 @@ def damage_scan(req: DamageScanRequest):
         raise HTTPException(status_code=500, detail=str(e)[:300])
 
 
+@app.post("/v1/damage/report/email")
+def damage_report_email(req: dict):
+    """Generate a single-parcel damage report and queue the email to send.
+
+    Body: { scan_id, parcel_id, damage_score, lat, lon,
+            metro_code, postcode, to_email, subject }
+    Returns the report record (path + body preview) AND the outbox row id.
+    The outbox row gets picked up by mail_sender's normal flush loop.
+    """
+    from empire_os.agents import damage_report_generator as drg
+    from fastapi import HTTPException as _HE
+    import os as _os
+    parcel = {
+        "parcel_id": req.get("parcel_id", "parcel"),
+        "damage_score": float(req.get("damage_score", 0.5)),
+        "lat": float(req.get("lat", 0.0)),
+        "lon": float(req.get("lon", 0.0)),
+    }
+    scan_id = req.get("scan_id") or               time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+    metro = req.get("metro_code") or None
+    pc = req.get("postcode") or None
+    record = drg.generate(parcel, scan_id=scan_id,
+                          metro_code=metro, postcode=pc)
+    to_email = req.get("to_email", "flavag83@gmail.com")
+    subject = req.get("subject", "Empire AI — Storm restoration info")
+    # Body is the report HTML inline so the recipient sees formatted content
+    inline_html = ""
+    if _os.path.exists(record["html_path"]):
+        with open(record["html_path"], "r", errors="ignore") as f:
+            inline_html = f.read()[:7800]
+
+    # Enqueue to outbox — same path as Brevo direct send.
+    import sqlite3 as _sq3
+    cnx = _sq3.connect("/root/empire_os/empire_os.db")
+    try:
+        cnx.execute(
+            "CREATE TABLE IF NOT EXISTS si_outbox ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "to_email TEXT, subject TEXT, body TEXT,"
+            "lane TEXT, tier TEXT, lead_id TEXT, source TEXT,"
+            "status TEXT DEFAULT 'pending',"
+            "created_at TEXT DEFAULT (datetime('now')),"
+            "sent_at TEXT, resend_id TEXT,"
+            "recipient_kind TEXT DEFAULT 'buyer',"
+            "meta_json TEXT, html_body TEXT)"
+        )
+        cnx.commit()
+        cur = cnx.execute(
+            "INSERT INTO si_outbox "
+            "(to_email, subject, body, lane, tier, lead_id, source, "
+            " recipient_kind, meta_json, html_body) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (to_email, subject,
+             record["body"][:7800],
+             "satellite_damage_report",
+             "report_email",
+             req.get("parcel_id", ""),
+             "damage_report_generator",
+             "prospect",
+             json.dumps({"scan_id": scan_id,
+                         "report_path": record["path"],
+                         "state": record["state"]}),
+             inline_html)
+        )
+        cnx.commit()
+        out_id = cur.lastrowid
+    finally:
+        cnx.close()
+    return {
+        "ok": True,
+        "report": record,
+        "outbox_id": out_id,
+        "to_email": to_email,
+        "message": "report saved + email queued (mail_sender will flush)"
+    }
+
+
+@app.get("/v1/damage/report/{scan_id}/{parcel_id}")
+def damage_report(scan_id: str, parcel_id: str):
+    """Serve the saved damage report for a single parcel.
+
+    Reports are written by empire_os.agents.damage_report_generator
+    to /root/empire_os/feedback/reports/damage/<scan_id>/.
+
+    Returns 404 if no report exists. HTML only — the underlying
+    generator falls back from PDF to HTML when reportlab is unavailable.
+    """
+    from empire_os.agents.damage_report_generator import REPORTS_DIR
+    import os
+    candidates = [
+        f"{REPORTS_DIR}/{scan_id}/{parcel_id}.html",
+        f"{REPORTS_DIR}/{scan_id}/{parcel_id}.pdf",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            with open(path, "r", errors="ignore") as f:
+                txt = f.read()
+            from fastapi.responses import Response
+            mt = ("text/html" if path.endswith(".html")
+                  else "application/pdf")
+            return Response(content=txt, media_type=mt)
+    raise HTTPException(404, f"no report for {scan_id}/{parcel_id}")
+
+
 @app.get("/v1/damage/scan/recent")
 def damage_scan_recent(limit: int = 5):
     """Tail the most recent satellite_damage.jsonl entries."""

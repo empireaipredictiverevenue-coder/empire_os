@@ -1152,6 +1152,7 @@ async function _loadLiveMetrics(){
       fetch('/v1/stats/revenue').then(r=>r.json()),
       fetch('/v1/stats/leads').then(r=>r.json()),
       fetch('/v1/stats/subs').then(r=>r.json()),
+      fetch('/v1/stats/funnel').then(r=>r.json()),
       fetch('/v1/stats/vault').then(r=>r.json()),
     ]);
     const arr = (vault.arr_estimate_cents != null)
