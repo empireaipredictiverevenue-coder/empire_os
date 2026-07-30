@@ -4300,25 +4300,88 @@ def _handle_deep_audit_delivery(result: dict, email: str):
 
 @app.post("/v1/mass-torts/direct")
 def mass_torts_direct(req: dict):
-    """Mass-tort lead discovery intake.
+    """Mass-tort lead discovery intake — NOW PERSISTS + ROUTES TO BUYERS.
 
-    Body: { niche, label, signals, url_template, notes, scraped_at }
+    Body: { niche, label, signals, url_template, notes, scraped_at,
+            omega_tier, cortex_score, candidates (list) }
+
+    Old behavior (Jul-23 build): echoed `record_id` and dropped everything.
+    New behavior (Jul-30 patch):
+      1. Write feedback JSONL entry to /root/empire_os/feedback/mass_torts/*.jsonl
+      2. If `candidates` is provided, insert lane_leads rows for each
+         candidate (only when tier ∈ {S, A, B}).
+      3. Mirror to si_prospect_consent with opted_in=0 (compliance gate).
+      4. Return persistence confirmation so mass_tort_intel can verify
+         downstream effects.
     """
     niche = (req.get("niche") or "").strip()
     if not niche:
         raise HTTPException(400, "niche required")
+    label = req.get("label", "")
+    signals = int(req.get("signals", 0))
+    ts = (req.get("scraped_at") or
+          datetime.now(timezone.utc).isoformat())
     record = {
         "niche": niche,
-        "label": req.get("label", ""),
-        "signals": req.get("signals", 0),
+        "label": label,
+        "signals": signals,
         "url_template": req.get("url_template", ""),
-        "notes": req.get("notes", "")[:500],
-        "scraped_at": req.get("scraped_at", "") or
-                       datetime.now(timezone.utc).isoformat(),
+        "notes": str(req.get("notes", ""))[:500],
+        "scraped_at": ts,
         "ts": datetime.now(timezone.utc).isoformat(),
     }
-    rec_id = "mt_" + niche + "_" + record["ts"].replace(":", "")
-    return {"ok": True, "record_id": rec_id, **record}
+    rec_id = "mt_" + niche + "_" + record["ts"].replace(":", "").replace("-", "")[:14]
+
+    # Persist JSONL (always succeeds even if DB step below fails)
+    log_dir = Path("/root/empire_os/feedback/mass_torts")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "intake.jsonl"
+    with open(log_path, "a") as f:
+        f.write(json.dumps({"record_id": rec_id, **record}) + "\n")
+
+    inserted_lane_leads = 0
+    candidates = req.get("candidates") or []
+    omega_tier = (req.get("omega_tier") or "").upper()
+    if not omega_tier and isinstance(candidates, list) and candidates:
+        omega_tier = str(candidates[0].get("omega_tier", "")).upper()
+    # Only persist S/A/B tier candidates as actionable leads.
+    if omega_tier in ("S", "A", "B") and isinstance(candidates, list):
+        try:
+            import sqlite3 as _sq
+            cnx = _sq.connect("/root/empire_os/empire_os.db", timeout=20)
+            cnx.execute("PRAGMA busy_timeout=20000")
+            ts_now = datetime.now(timezone.utc).isoformat()
+            for cand in candidates[:50]:
+                pid = ("mt:" + niche + ":" +
+                       str(cand.get("uid", cand.get("id", "anon")))[:40])
+                # ensure prospect_consent row exists
+                cnx.execute(
+                    "INSERT OR IGNORE INTO si_prospect_consent "
+                    "(prospect_id, opted_in, opted_in_at, niche, source) "
+                    "VALUES (?, 0, NULL, ?, 'mass_tort_intel')",
+                    (pid, niche))
+                # insert lane_leads row
+                try:
+                    cnx.execute(
+                        "INSERT OR IGNORE INTO lane_leads "
+                        "(lane_id, prospect_id, status, notes, niche, "
+                        " omega_tier, created_at) "
+                        "VALUES (?, ?, 'pending', ?, ?, ?, ?)",
+                        ("mass_tort:" + niche + ":" + str(rec_id)[-6:],
+                         pid,
+                         "mass_tort " + niche + " signals=" + str(signals),
+                         niche, omega_tier, ts_now))
+                    inserted_lane_leads += 1
+                except Exception:
+                    pass  # schema mismatch — skip silently
+            cnx.commit()
+            cnx.close()
+        except Exception as e:
+            record["persist_error"] = str(e)[:200]
+
+    record["record_id"] = rec_id
+    record["lane_leads_inserted"] = inserted_lane_leads
+    return record
 
 
 @app.post("/v1/b2b/direct")
