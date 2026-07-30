@@ -1049,14 +1049,23 @@ def classified_leads(tier: str = "WHALE", limit: int = 100):
         raise HTTPException(400, f"tier must be one of {tiers}")
     c = _sq.connect("/root/empire_os/empire_os.db", timeout=20)
     try:
-        rows = [dict(r) for r in c.execute(
+        cols = ("prospect_id", "niche", "classified_tier",
+                "classified_reasons", "classified_at",
+                "whale_tier", "whale_reasons", "whale_harvester_score")
+        rows = []
+        for r in c.execute(
             """SELECT prospect_id, niche, classified_tier,
-                      classified_reasons, classified_at
+                      classified_reasons, classified_at,
+                      whale_tier, whale_reasons,
+                      whale_harvester_score
                FROM si_prospect_consent
-               WHERE classified_tier = ?
+               WHERE (classified_tier = ? OR whale_tier = ?)
                  AND source != 'mass_tort_intel'
                LIMIT ?""",
-            (tier, min(limit, 1000)))]
+            (tier, tier, min(limit, 1000))):
+            rdict = dict(zip(cols, r))
+            rdict.setdefault("classified_tier", tier)
+            rows.append(rdict)
         # Join with si_buyer_outreach for contact info when present
         if rows:
             ids = [r["prospect_id"] for r in rows]
