@@ -1034,6 +1034,51 @@ def damage_report_email(req: dict):
     }
 
 
+@app.get("/v1/leads/classified")
+def classified_leads(tier: str = "WHALE", limit: int = 100):
+    """Return buyers classified as the given tier (WHALE default).
+
+    Reads from si_prospect_consent.classified_tier. Used by the
+    chief-of-staff / account-manager outreach loop.
+
+    Query: ?tier=WHALE|ENTERPRISE|GOLD|SILVER&limit=N
+    """
+    import sqlite3 as _sq
+    tiers = ("WHALE", "ENTERPRISE", "GOLD", "SILVER", "OWNER_OPERATOR")
+    if tier not in tiers:
+        raise HTTPException(400, f"tier must be one of {tiers}")
+    c = _sq.connect("/root/empire_os/empire_os.db", timeout=20)
+    try:
+        rows = [dict(r) for r in c.execute(
+            """SELECT prospect_id, niche, classified_tier,
+                      classified_reasons, classified_at
+               FROM si_prospect_consent
+               WHERE classified_tier = ?
+                 AND source != 'mass_tort_intel'
+               LIMIT ?""",
+            (tier, min(limit, 1000)))]
+        # Join with si_buyer_outreach for contact info when present
+        if rows:
+            ids = [r["prospect_id"] for r in rows]
+            ph = ",".join("?" * len(ids))
+            outreach = {dict(r)["prospect_id"]: dict(r) for r in
+                c.execute(f"""
+                    SELECT prospect_id, business_name, email, niches,
+                           score, wallet
+                    FROM si_buyer_outreach
+                    WHERE prospect_id IN ({ph})""", ids)}
+            for r in rows:
+                o = outreach.get(r["prospect_id"], {})
+                r["business_name"] = o.get("business_name", "")
+                r["email"] = o.get("email", "")
+                r["outreach_score"] = o.get("score", 0)
+                r["wallet"] = o.get("wallet", "")
+        return {"ok": True, "tier": tier, "count": len(rows),
+                "results": rows}
+    finally:
+        c.close()
+
+
 @app.get("/v1/damage/report/{scan_id}/{parcel_id}")
 def damage_report(scan_id: str, parcel_id: str):
     """Serve the saved damage report for a single parcel.
