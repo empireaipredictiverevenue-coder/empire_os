@@ -390,11 +390,58 @@
 })();
 
 // ===== live metrics =====
-fetch('/v1/stats/revenue').then(r=>r.json()).then(d=>{
-  if(d && d.revenue_cents){
-    // live numbers
+function _fmtUsd(cents){
+  if(cents==null) return '$—';
+  const v = cents/100;
+  if(v>=1e9) return '$'+(v/1e9).toFixed(2)+'B';
+  if(v>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
+  if(v>=1e3) return '$'+(v/1e3).toFixed(1)+'K';
+  return '$'+v.toFixed(0);
+}
+function _fmtInt(n){
+  if(n==null) return '—';
+  return Number(n).toLocaleString();
+}
+async function _loadLiveMetrics(){
+  try {
+    const [rev, leads, subs, vault] = await Promise.all([
+      fetch('/v1/stats/revenue').then(r=>r.json()),
+      fetch('/v1/stats/leads').then(r=>r.json()),
+      fetch('/v1/stats/subs').then(r=>r.json()),
+      fetch('/v1/stats/vault').then(r=>r.json()),
+    ]);
+    // ARR: prefer vault's estimate, fall back to monthly * 12 from charges
+    const arr = (vault.arr_estimate_cents != null)
+      ? vault.arr_estimate_cents
+      : (rev.total_paid_charges_cents || 0);
+    const mrrCents = (vault.monthly_paid_cents != null)
+      ? vault.monthly_paid_cents
+      : Math.round((rev.total_paid_charges_cents || 0) / 12);
+    const subsCount = subs.unique_paid_subscriptions || subs.active || 0;
+    const leadsCount = (leads.lane_leads && leads.lane_leads.total) || 0;
+    const vaultCents = vault.lifetime_settled_cents || 0;
+    const mrrEl = document.getElementById('mrr');
+    const subsEl = document.getElementById('subs');
+    const leadsEl = document.getElementById('leads');
+    const vaultEl = document.getElementById('vault');
+    if (mrrEl) mrrEl.textContent = _fmtUsd(arr);
+    if (subsEl) subsEl.textContent = _fmtInt(subsCount);
+    if (leadsEl) {
+      const ll = leadsCount;
+      leadsEl.textContent = ll >= 1000 ? (ll/1000).toFixed(0)+'K' : ll.toString();
+    }
+    if (vaultEl) vaultEl.textContent = _fmtUsd(vaultCents);
+    // Optional: append MRR pill near ARR for empire.html parity
+    const subsLabel = document.querySelector('#subs + .l');
+    if (subsLabel && subs.active) subsLabel.innerHTML += '<br><span style="font-size:10px;opacity:.7">'+
+      subs.active+' total / '+subs.awaiting_payment+' awaiting</span>';
+  } catch (e) {
+    // network failure: keep seeded numbers, do not change DOM
+    console.warn('[empire] live metrics load failed:', e);
   }
-}).catch(()=>{});
+}
+_loadLiveMetrics();
+setInterval(_loadLiveMetrics, 60000);
 
 // ===== apply as buyer =====
 function applyBuyer(e){

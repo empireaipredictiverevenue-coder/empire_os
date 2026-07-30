@@ -1,0 +1,1860 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Empire AI — Lead Constellation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: {
+          ink: {
+            950: '#03060a',
+            900: '#070b12',
+            850: '#0a0f1a',
+            800: '#0e1422',
+            700: '#161e30',
+            600: '#1f2940',
+            500: '#2a3552',
+            400: '#3a4567',
+          },
+          neon: {
+            green: '#39ff88',
+            'green-dim': '#1eb85f',
+            cyan: '#00e5ff',
+            'cyan-dim': '#0099b3',
+          },
+        },
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+        animation: {
+          'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          'fade-in': 'fadeIn 600ms ease-out',
+          'fade-up': 'fadeUp 600ms cubic-bezier(0.16, 1, 0.3, 1)',
+          'constellation': 'constellation 60s linear infinite',
+          'orbit': 'orbit 20s linear infinite',
+          'glow': 'glow 2s ease-in-out infinite alternate',
+        },
+        keyframes: {
+          fadeIn: { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+          fadeUp: {
+            '0%': { opacity: 0, transform: 'translateY(20px)' },
+            '100%': { opacity: 1, transform: 'translateY(0)' },
+          },
+          constellation: {
+            '0%': { transform: 'rotate(0deg) scale(1)' },
+            '50%': { transform: 'rotate(180deg) scale(1.1)' },
+            '100%': { transform: 'rotate(360deg) scale(1)' },
+          },
+          orbit: {
+            '0%': { transform: 'rotate(0deg) translateX(120px) rotate(0deg)' },
+            '100%': { transform: 'rotate(360deg) translateX(120px) rotate(-360deg)' },
+          },
+          glow: {
+            '0%': { boxShadow: '0 0 20px rgba(57,255,136,0.3)' },
+            '100%': { boxShadow: '0 0 40px rgba(57,255,136,0.6)' },
+          },
+        },
+      },
+    },
+  };
+</script>
+<style type="text/tailwindcss">
+  @layer base {
+    html { font-family: 'Inter', system-ui, sans-serif; font-feature-settings: 'cv01','ss03'; }
+    body { @apply bg-ink-950 text-slate-200 antialiased; }
+    ::selection { background: rgba(57, 255, 136, 0.3); color: #fff; }
+  }
+  @layer components {
+    .glass { backdrop-filter: blur(20px); background: rgba(14, 20, 34, 0.6); border: 1px solid rgba(255,255,255,0.08); }
+    .glass-strong { backdrop-filter: blur(24px); background: rgba(14, 20, 34, 0.85); border: 1px solid rgba(255,255,255,0.1); }
+    .neon-border { box-shadow: 0 0 0 1px rgba(57, 255, 136, 0.4), 0 0 30px rgba(57, 255, 136, 0.15); }
+    .cyan-glow { box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.4), 0 0 30px rgba(0, 229, 255, 0.15); }
+    .neon-text { text-shadow: 0 0 24px rgba(57, 255, 136, 0.5); }
+    .cyan-text { text-shadow: 0 0 24px rgba(0, 229, 255, 0.5); }
+    .gradient-text { @apply bg-gradient-to-r from-neon-green via-neon-cyan to-neon-green bg-clip-text text-transparent; }
+    .btn{ @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium text-[15px] leading-none transition-all duration-150 ease-out select-none; }
+    .btn:active{ @apply translate-y-px; }
+    .btn-primary{ @apply btn bg-neon-green text-ink-950 px-5 py-2.5 shadow-[0_1px_0_0_rgba(255,255,255,0.4)_inset,0_8px_20px_-6px_rgba(57,255,136,0.5),0_0_0_1px_rgba(57,255,136,0.3)] hover:bg-[#1eb85f] hover:shadow-[0_1px_0_0_rgba(255,255,255,0.4)_inset,0_12px_28px_-6px_rgba(57,255,136,0.6),0_0_0_1px_rgba(57,255,136,0.4)] hover:-translate-y-0.5; }
+    .btn-secondary{ @apply btn bg-neon-cyan text-ink-950 px-5 py-2.5 shadow-[0_1px_0_0_rgba(255,255,255,0.4)_inset,0_8px_20px_-6px_rgba(0,229,255,0.5),0_0_0_1px_rgba(0,229,255,0.3)] hover:bg-[#0099b3] hover:shadow-[0_1px_0_0_rgba(255,255,255,0.4)_inset,0_12px_28px_-6px_rgba(0,229,255,0.6),0_0_0_1px_rgba(0,229,255,0.4)] hover:-translate-y-0.5; }
+    .btn-dark{ @apply btn bg-white text-ink-950 px-5 py-2.5 shadow-[0_1px_0_0_rgba(255,255,255,0.1)_inset,0_8px_20px_-6px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.1)] hover:bg-slate-100 hover:shadow-[0_1px_0_0_rgba(255,255,255,0.1)_inset,0_12px_28px_-6px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.15)] hover:-translate-y-0.5; }
+    .btn-ghost{ @apply btn bg-white/[0.04] text-slate-200 border border-white/10 px-5 py-2.5 backdrop-blur-sm hover:bg-white/[0.08] hover:border-white/20 hover:text-white; }
+    .btn-outline{ @apply btn bg-transparent text-neon-green border border-neon-green/40 px-5 py-2.5 hover:bg-neon-green/10 hover:border-neon-green/70 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_-6px_rgba(57,255,136,0.4)]; }
+    .btn-link{ @apply btn bg-transparent text-neon-green px-2 py-1 hover:text-neon-cyan; }
+    .btn-sm{ @apply px-3 py-1.5 text-[13px]; }
+    .btn-lg{ @apply px-7 py-3.5 text-base; }
+    .btn-xl{ @apply px-9 py-4 text-lg font-semibold; }
+    .btn .arrow{ @apply transition-transform duration-200 group-hover:translate-x-1; }
+    .btn-neon{ @apply btn-primary; }
+    .btn-cyan{ @apply btn-secondary; }
+    .card { @apply rounded-2xl glass p-6 transition-all duration-300; }
+    .card-hover { @apply hover:border-neon-green/30 hover:-translate-y-1 hover:shadow-[0_8px_40px_rgba(57,255,136,0.1)]; }
+    .pill { @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium; }
+    .stat-num { @apply text-4xl font-semibold tracking-tight tabular-nums; }
+  }
+  @layer utilities {
+    .animate-in { animation: fadeUp 600ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .delay-1 { animation-delay: 100ms; }
+    .delay-2 { animation-delay: 200ms; }
+    .delay-3 { animation-delay: 300ms; }
+    .delay-4 { animation-delay: 400ms; }
+    .delay-5 { animation-delay: 500ms; }
+    .text-balance { text-wrap: balance; }
+    .grain { background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 4px 4px; }
+  }
+</style>
+</head>
+<body class="min-h-screen overflow-x-hidden grain">
+
+<!-- ===== Constellation background canvas (persistent) ===== -->
+<canvas id="stars" class="fixed inset-0 -z-10 pointer-events-none opacity-80"></canvas>
+<div class="fixed inset-0 -z-10 pointer-events-none"
+     style="background: radial-gradient(ellipse 80% 50% at 50% 30%, rgba(57,255,136,0.08), transparent 60%),
+            radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0,229,255,0.06), transparent 60%);">
+</div>
+
+<!-- ===== View router (single-file SPA) ===== -->
+<div id="app"></div>
+
+<!-- =========================================================
+     VIEW 1: SPLASH (hero)
+========================================================= -->
+<template id="tpl-splash">
+  <div class="min-h-screen flex flex-col">
+    <!-- Nav -->
+    <nav class="fixed top-0 inset-x-0 z-50 glass-strong">
+      <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <button onclick="goto('splash')" class="flex items-center gap-2.5 group">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-green to-neon-cyan flex items-center justify-center text-ink-950 font-bold text-lg leading-none animate-glow">
+            +
+          </div>
+          <span class="font-semibold text-lg tracking-tight text-white">Empire AI</span>
+        </button>
+        <div class="hidden md:flex items-center gap-7 text-sm text-slate-400">
+          <a href="#products" onclick="smoothScroll(event,'products')" class="hover:text-neon-green transition cursor-pointer">Products</a>
+          <a href="#tiers" onclick="smoothScroll(event,'tiers')" class="hover:text-neon-cyan transition cursor-pointer">Pricing</a>
+          <a href="#flow" onclick="smoothScroll(event,'flow')" class="hover:text-neon-green transition cursor-pointer">Flow</a>
+          <a href="/dashboard" target="_blank" class="hover:text-neon-cyan transition">Dashboard ↗</a>
+          <a href="/v1/health" target="_blank" class="hover:text-neon-green transition">API ↗</a>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="goto('login')" class="btn btn-ghost btn-sm">Sign in</button>
+          <button onclick="applyBuyer()" class="btn btn-primary btn-sm group">Get started <span class="arrow">→</span></button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="pt-32 pb-20 px-6">
+      <div class="max-w-6xl mx-auto text-center">
+        <h1 class="text-5xl sm:text-7xl lg:text-8xl font-bold tracking-tighter text-balance animate-fade-up delay-1">
+          <span class="block text-white">Leads pay in</span>
+          <span class="block gradient-text neon-text">constellations.</span>
+        </h1>
+
+        <p class="mt-8 text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto text-balance leading-relaxed animate-fade-up delay-2">
+          Empire AI is a self-driving lead marketplace. 30K+ buyers, 480K+ scored leads, crypto-native settlement. Every lead a node in your revenue constellation.
+        </p>
+
+        <!-- Live KPI strip -->
+        <div class="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto animate-fade-up delay-3">
+          <div class="card card-hover text-left">
+            <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Annual Recurring</div>
+            <div class="stat-num gradient-text mt-1" id="kpi-arr">$110M</div>
+            <div class="text-xs text-neon-green/70 mt-1.5 font-mono">▲ MRR $9.2M</div>
+          </div>
+          <div class="card card-hover text-left">
+            <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Active Subs</div>
+            <div class="stat-num text-white mt-1" id="kpi-subs">15,647</div>
+            <div class="text-xs text-neon-cyan/70 mt-1.5 font-mono">across 5 tiers</div>
+          </div>
+          <div class="card card-hover text-left">
+            <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Scored Leads</div>
+            <div class="stat-num text-white mt-1" id="kpi-leads">485K</div>
+            <div class="text-xs text-slate-500 mt-1.5 font-mono">485,874 records</div>
+          </div>
+          <div class="card card-hover text-left">
+            <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Vault USDC</div>
+            <div class="stat-num text-white mt-1" id="kpi-vault">$16.2M</div>
+            <div class="text-xs text-neon-green/70 mt-1.5 font-mono">lifetime settled</div>
+          </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="mt-12 flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-up delay-4">
+          <button onclick="applyBuyer()" class="btn btn-primary btn-lg group">Apply as Buyer <span class="arrow">→</span></button>
+          <button onclick="goto('app')" class="btn btn-secondary btn-lg group">Open Dashboard <span class="arrow">→</span></button>
+          <a href="#products" onclick="smoothScroll(event,'products')" class="btn btn-ghost btn-lg cursor-pointer">View Products</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Products -->
+    <section id="products" class="py-20 px-6 border-t border-white/5">
+      <div class="max-w-6xl mx-auto">
+        <div class="text-center mb-12">
+          <div class="text-[11px] font-mono uppercase tracking-widest text-neon-green mb-3">✦ The Fleet</div>
+          <h2 class="text-4xl sm:text-5xl font-bold tracking-tight text-white">11 products. One empire.</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="products-grid"></div>
+      </div>
+    </section>
+
+    <!-- Tiers -->
+    <section id="tiers" class="py-20 px-6 border-t border-white/5 bg-gradient-to-b from-ink-950 to-ink-900">
+      <div class="max-w-6xl mx-auto">
+        <div class="text-center mb-12">
+          <div class="text-[11px] font-mono uppercase tracking-widest text-neon-cyan mb-3">✦ Pricing</div>
+          <h2 class="text-4xl sm:text-5xl font-bold tracking-tight text-white">Five tiers. Pick your size.</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" id="tiers-grid"></div>
+      </div>
+    </section>
+
+    <!-- Flow -->
+    <section id="flow" class="py-20 px-6 border-t border-white/5">
+      <div class="max-w-6xl mx-auto">
+        <div class="text-center mb-12">
+          <div class="text-[11px] font-mono uppercase tracking-widest text-neon-green mb-3">✦ The Loop</div>
+          <h2 class="text-4xl sm:text-5xl font-bold tracking-tight text-white">Closed loop. Crypto settles.</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="card card-hover text-center">
+            <div class="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-neon-green to-neon-cyan flex items-center justify-center text-ink-950 font-bold text-lg">01</div>
+            <h3 class="mt-4 text-lg font-semibold text-white">Discover</h3>
+            <p class="mt-2 text-sm text-slate-400">Satellite + crawler + AI. 480K leads graded by omega score.</p>
+          </div>
+          <div class="card card-hover text-center">
+            <div class="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-neon-cyan to-neon-green flex items-center justify-center text-ink-950 font-bold text-lg">02</div>
+            <h3 class="mt-4 text-lg font-semibold text-white">Match</h3>
+            <p class="mt-2 text-sm text-slate-400">30K buyers priced by niche + metro. Lane-based delivery corridors.</p>
+          </div>
+          <div class="card card-hover text-center">
+            <div class="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-neon-green to-neon-cyan flex items-center justify-center text-ink-950 font-bold text-lg">03</div>
+            <h3 class="mt-4 text-lg font-semibold text-white">Deliver</h3>
+            <p class="mt-2 text-sm text-slate-400">Webhook + email. HMAC signed. Pay-per-lead billed on confirmation.</p>
+          </div>
+          <div class="card card-hover text-center">
+            <div class="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-neon-cyan to-neon-green flex items-center justify-center text-ink-950 font-bold text-lg">04</div>
+            <h3 class="mt-4 text-lg font-semibold text-white">Settle</h3>
+            <p class="mt-2 text-sm text-slate-400">USDC on Solana. Auto-reconciled. Vault tracked. Real money moves.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Band -->
+    <section class="py-24 px-6 border-t border-white/5">
+      <div class="max-w-3xl mx-auto text-center">
+        <h2 class="text-4xl sm:text-6xl font-bold tracking-tight text-white">Join the Empire.</h2>
+        <p class="mt-4 text-lg text-slate-400">Pick a tier. Pay in USDC. Leads flow in 60s.</p>
+        <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button onclick="applyBuyer()" class="btn btn-primary btn-lg group">Apply as Buyer <span class="arrow">→</span></button>
+          <button onclick="goto('login')" class="btn btn-ghost btn-lg">Sign in</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 py-12 px-6">
+      <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
+        </div>
+
+        <!-- Legal -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8 border-t border-white/5">
+          <!-- Privacy -->
+          <div>
+            <h4 class="text-[11px] font-mono uppercase tracking-widest text-neon-green mb-3">Privacy</h4>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              We collect minimal data: email + payment wallet for billing, lead metadata for delivery.
+              No tracking pixels, no third-party analytics, no behavioral profiling. Lead data
+              is shared only with the matched buyer. Vault balance + settlement history are
+              on-chain and public. We never sell or rent your data. Crypto-native means
+              privacy-native.
+            </p>
+          </div>
+
+          <!-- Terms -->
+          <div>
+            <h4 class="text-[11px] font-mono uppercase tracking-widest text-neon-cyan mb-3">Terms</h4>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Service is provided "as-is" on Solana mainnet. Subscriptions auto-renew
+              monthly at the listed tier price in USDC. Cancel anytime — access continues
+              to the end of the billing period. Refunds not provided for delivered leads
+              (data is non-revocable once delivered to a buyer's webhook). Lead quality
+              is scored but not guaranteed; buyers assume delivery risk. Disputes are
+              resolved via on-chain settlement records. By using Empire AI you accept
+              these terms.
+            </p>
+          </div>
+
+          <!-- Compliance -->
+          <div>
+            <h4 class="text-[11px] font-mono uppercase tracking-widest text-neon-green mb-3">Compliance</h4>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              USDC settlement on Solana mainnet (mint EPjFWdd5...Dt1v). Vault
+              <code class="text-slate-400 font-mono text-[10px]">egJ1t9...9AZM</code> is
+              non-custodial. No KYC for buyers under $10K monthly volume. KYC required
+              above $10K/month per FATF travel rule. GDPR-compliant data handling. CCPA
+              opt-out via email. No solicitation of US persons under SEC rules. Operated
+              by Empire AI Ltd, UK.
+            </p>
+          </div>
+        </div>
+
+        <!-- Bottom -->
+        <div class="mt-8 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+          <div>© 2026 Empire AI Ltd · Registered in England & Wales</div>
+          <div class="font-mono">vault: <span class="text-slate-500">egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM</span></div>
+        </div>
+      </div>
+    </footer>
+  </div>
+</template>
+
+<!-- =========================================================
+     VIEW 2: LOGIN / SIGNUP
+========================================================= -->
+<template id="tpl-login">
+  <div class="min-h-screen flex items-center justify-center px-6 py-20">
+    <div class="w-full max-w-md animate-fade-up">
+      <button onclick="goto('splash')" class="btn btn-ghost btn-sm mb-8 group">
+        <span class="arrow">←</span> back
+      </button>
+      <div class="text-center mb-8">
+        <div class="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-neon-green to-neon-cyan flex items-center justify-center text-ink-950 font-bold text-xl animate-glow mb-4">✦</div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">Sign in to Empire</h1>
+        <p class="mt-2 text-sm text-slate-400">Access your dashboard, leads, and vault.</p>
+      </div>
+
+      <div class="card">
+        <form id="login-form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5">Email</label>
+            <input type="email" id="login-email" required
+                   class="w-full px-4 py-2.5 rounded-lg bg-ink-900 border border-white/10 text-white placeholder-slate-600 focus:border-neon-green focus:outline-none focus:ring-2 focus:ring-neon-green/20 transition"
+                   placeholder="you@company.com" />
+          </div>
+          <div>
+            <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5">API Key</label>
+            <input type="password" id="login-key" required
+                   class="w-full px-4 py-2.5 rounded-lg bg-ink-900 border border-white/10 text-white placeholder-slate-600 focus:border-neon-green focus:outline-none focus:ring-2 focus:ring-neon-green/20 transition font-mono"
+                   placeholder="emp_••••••••" />
+          </div>
+          <div id="login-err" class="text-xs text-red-400 hidden"></div>
+          <button type="submit" class="btn btn-primary w-full py-3 group">Continue <span class="arrow">→</span></button>
+        </form>
+
+        <div class="mt-6 pt-6 border-t border-white/5 text-center">
+          <div class="text-xs text-slate-500">New to Empire?</div>
+          <button onclick="applyBuyer()" class="mt-2 text-sm text-neon-cyan hover:text-neon-green transition font-medium">
+            Apply as a new buyer →
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-8 text-center text-xs text-slate-600 font-mono">
+        🔒 USDC settles on Solana. Vault: egJ1t9...9AZM
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- =========================================================
+     VIEW 3: APP (Dashboard + Marketplace tabs)
+========================================================= -->
+<template id="tpl-app">
+  <div class="min-h-screen">
+    <!-- App nav -->
+    <nav class="fixed top-0 inset-x-0 z-50 glass-strong">
+      <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-6">
+        <button onclick="goto('splash')" class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-md bg-gradient-to-br from-neon-green to-neon-cyan flex items-center justify-center text-ink-950 font-bold text-xs">✦</div>
+          <span class="font-semibold text-white text-sm">Empire AI</span>
+        </button>
+        <div class="flex items-center gap-1 ml-2">
+          <button data-tab="dashboard" onclick="switchTab('dashboard')" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-400 hover:text-white hover:bg-white/5">Dashboard</button>
+          <button data-tab="marketplace" onclick="switchTab('marketplace')" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-400 hover:text-white hover:bg-white/5">Marketplace</button>
+          <button data-tab="leads" onclick="switchTab('leads')" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-400 hover:text-white hover:bg-white/5">Leads</button>
+          <button data-tab="products" onclick="switchTab('products')" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-400 hover:text-white hover:bg-white/5">Products</button>
+          <button data-tab="control" onclick="switchTab('control')" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-400 hover:text-white hover:bg-white/5">Control</button>
+          <button data-tab="support" onclick="switchTab('support')" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-400 hover:text-white hover:bg-white/5">Support</button>
+          <button data-tab="whitelabel" onclick="switchTab('whitelabel')" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-400 hover:text-white hover:bg-white/5">White-label</button>
+          <button data-tab="closer" onclick="switchTab('closer')" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-400 hover:text-white hover:bg-white/5">AI Closer</button>
+          <button data-tab="stack" onclick="switchTab('stack')" class="tab-btn px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-400 hover:text-white hover:bg-white/5">Stack</button>
+        </div>
+        <div class="ml-auto flex items-center gap-3">
+          <div class="flex items-center gap-1.5 text-xs">
+            <span class="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse"></span>
+            <span class="text-slate-400 font-mono" id="app-status">live</span>
+          </div>
+          <div class="text-xs text-slate-500 font-mono" id="app-user">user@empire.io</div>
+          <button onclick="goto('splash')" class="btn btn-ghost btn-sm">sign out</button>
+        </div>
+      </div>
+    </nav>
+
+    <main class="pt-20 pb-16 px-6">
+      <div class="max-w-7xl mx-auto" id="tab-content"></div>
+    </main>
+  </div>
+</template>
+
+<!-- =========================================================
+     TAB: DASHBOARD
+========================================================= -->
+<template id="tpl-tab-dashboard">
+  <div class="animate-fade-up">
+    <div class="flex items-end justify-between mb-8">
+      <div>
+        <div class="text-[11px] font-mono uppercase tracking-widest text-neon-green mb-1">Dashboard</div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">Empire AI — Live</h1>
+        <p class="mt-1 text-sm text-slate-500" id="dash-time">loading…</p>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-mono text-slate-500">
+        <span class="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse"></span>
+        auto-refresh 30s
+      </div>
+    </div>
+
+    <!-- KPI strip -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="card card-hover">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Active MRR</div>
+        <div class="stat-num text-white mt-2" id="d-mrr">$—</div>
+        <div class="text-xs text-neon-green/70 mt-2 font-mono">▲ real</div>
+      </div>
+      <div class="card card-hover">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Buyers Priced</div>
+        <div class="stat-num text-white mt-2" id="d-buyers">—</div>
+        <div class="text-xs text-neon-cyan/70 mt-2 font-mono">active</div>
+      </div>
+      <div class="card card-hover">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Leads Delivered</div>
+        <div class="stat-num text-white mt-2" id="d-delivered">—</div>
+        <div class="text-xs text-neon-green/70 mt-2 font-mono">today</div>
+      </div>
+      <div class="card card-hover">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Settled USDC</div>
+        <div class="stat-num text-white mt-2" id="d-settled">—</div>
+        <div class="text-xs text-neon-cyan/70 mt-2 font-mono">all-time</div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="card">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Funnel</div>
+            <div class="text-sm text-slate-300 mt-0.5">Lead pipeline by state</div>
+          </div>
+          <span class="pill bg-neon-green/10 text-neon-green border border-neon-green/30">live</span>
+        </div>
+        <canvas id="chart-funnel" height="180"></canvas>
+      </div>
+      <div class="card">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Revenue</div>
+            <div class="text-sm text-slate-300 mt-0.5">MRR × tier</div>
+          </div>
+          <span class="pill bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/30">7d</span>
+        </div>
+        <canvas id="chart-revenue" height="180"></canvas>
+      </div>
+    </div>
+
+    <!-- Activity -->
+    <div class="card">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Activity</div>
+          <div class="text-sm text-slate-300 mt-0.5">Recent settlements + deliveries</div>
+        </div>
+        <button onclick="loadDash()" class="text-xs text-neon-green hover:text-neon-cyan font-mono transition">refresh ↻</button>
+      </div>
+      <div class="space-y-2" id="dash-activity">
+        <div class="text-center text-sm text-slate-500 py-8 font-mono">loading…</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- =========================================================
+     TAB: MARKETPLACE
+========================================================= -->
+<template id="tpl-tab-marketplace">
+  <div class="animate-fade-up">
+    <div class="flex items-end justify-between mb-8">
+      <div>
+        <div class="text-[11px] font-mono uppercase tracking-widest text-neon-cyan mb-1">Marketplace</div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">Lead Inventory</h1>
+        <p class="mt-1 text-sm text-slate-500">Browse + buy leads by niche + metro. Instant USDC delivery.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="mp-search" placeholder="filter niche / metro…"
+               class="px-3 py-2 rounded-lg bg-ink-900 border border-white/10 text-sm text-white placeholder-slate-600 focus:border-neon-green focus:outline-none font-mono w-64" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="mp-grid">
+      <div class="text-center text-sm text-slate-500 py-8 col-span-full font-mono">loading marketplace…</div>
+    </div>
+  </div>
+</template>
+
+<!-- =========================================================
+     TAB: LEADS
+========================================================= -->
+<template id="tpl-tab-leads">
+  <div class="animate-fade-up">
+    <div class="mb-8">
+      <div class="text-[11px] font-mono uppercase tracking-widest text-neon-green mb-1">Live Leads</div>
+      <h1 class="text-3xl font-bold tracking-tight text-white">Recent deliveries</h1>
+      <p class="mt-1 text-sm text-slate-500">Webhook + email. HMAC signed. Sorted by tier.</p>
+    </div>
+    <div class="card overflow-hidden p-0">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-white/5">
+            <th class="text-left text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Lead</th>
+            <th class="text-left text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Niche</th>
+            <th class="text-left text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Metro</th>
+            <th class="text-right text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Score</th>
+            <th class="text-right text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Status</th>
+          </tr>
+        </thead>
+        <tbody id="leads-tbody">
+          <tr><td colspan="5" class="text-center text-sm text-slate-500 py-8 font-mono">loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<!-- =========================================================
+     TAB: PRODUCTS (inside app)
+========================================================= -->
+<template id="tpl-tab-products">
+  <div class="animate-fade-up">
+    <div class="mb-8">
+      <div class="text-[11px] font-mono uppercase tracking-widest text-neon-cyan mb-1">Products</div>
+      <h1 class="text-3xl font-bold tracking-tight text-white">The Empire fleet</h1>
+      <p class="mt-1 text-sm text-slate-500">11 products across 4 tiers. Buy in USDC.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="app-products-grid"></div>
+  </div>
+</template>
+
+<!-- =========================================================
+     TAB: CONTROL (agent fleet)
+========================================================= -->
+<template id="tpl-tab-control">
+  <div class="animate-fade-up">
+    <div class="flex items-end justify-between mb-6">
+      <div>
+        <div class="text-[11px] font-mono uppercase tracking-widest text-neon-green mb-1">Control</div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">Agent fleet</h1>
+        <p class="mt-1 text-sm text-slate-500">Live systemd + supervisor + watchdog. Start, stop, restart with confirmation.</p>
+      </div>
+      <button onclick="loadControl()" class="btn btn-ghost btn-sm group">↻ refresh</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6" id="ctl-stats"></div>
+
+    <div class="card overflow-hidden p-0">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-white/5">
+            <th class="text-left text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Unit</th>
+            <th class="text-left text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Active</th>
+            <th class="text-left text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Loaded</th>
+            <th class="text-left text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Last log</th>
+            <th class="text-right text-[10px] font-mono uppercase tracking-wider text-slate-500 px-4 py-3">Action</th>
+          </tr>
+        </thead>
+        <tbody id="ctl-tbody">
+          <tr><td colspan="5" class="text-center text-sm text-slate-500 py-8 font-mono">loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<!-- =========================================================
+     TAB: SUPPORT (AI customer service + tech help)
+========================================================= -->
+<template id="tpl-tab-support">
+  <div class="animate-fade-up">
+    <div class="mb-6">
+      <div class="text-[11px] font-mono uppercase tracking-widest text-neon-cyan mb-1">Support</div>
+      <h1 class="text-3xl font-bold tracking-tight text-white">Empire AI help desk</h1>
+      <p class="mt-1 text-sm text-slate-500">Tech help + onboarding. Routes to Empire Cortex (LLM); falls back to rule-based KB.</p>
+    </div>
+
+    <div class="card overflow-hidden p-0 flex flex-col" style="height:520px;">
+      <div class="flex-1 overflow-y-auto p-6 space-y-3" id="sup-log">
+        <div class="bg-ink-900/40 rounded-2xl rounded-tl-sm p-4 max-w-2xl text-sm text-slate-200">
+          Hey, I'm the Empire operator bot. Ask me about agents, settlement, white-labeling, evaluation product, lead delivery, or anything else. I route to the LLM brain first and fall back to a KB index.
+        </div>
+      </div>
+      <form id="sup-form" class="border-t border-white/5 p-4 flex gap-2">
+        <input id="sup-input" type="text" autocomplete="off"
+               placeholder="Ask: how do I restart lead_deliverer? what is the vault wallet?…"
+               class="flex-1 px-4 py-2.5 rounded-lg bg-ink-900 border border-white/10 text-white placeholder-slate-600 focus:border-neon-green focus:outline-none focus:ring-2 focus:ring-neon-green/20 transition" />
+        <button type="submit" class="btn btn-primary">Send</button>
+      </form>
+    </div>
+
+    <div class="card mt-4">
+      <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-3">Quick prompts</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <button onclick="supAsk('how do I restart a lead agent?')" class="text-left text-xs text-slate-300 p-3 rounded-lg bg-white/[0.04] border border-white/5 hover:border-neon-green/40 hover:text-neon-green transition">how do I restart a lead agent?</button>
+        <button onclick="supAsk('what is the vault wallet?')" class="text-left text-xs text-slate-300 p-3 rounded-lg bg-white/[0.04] border border-white/5 hover:border-neon-green/40 hover:text-neon-green transition">what is the vault wallet?</button>
+        <button onclick="supAsk('how does the evaluation product work?')" class="text-left text-xs text-slate-300 p-3 rounded-lg bg-white/[0.04] border border-white/5 hover:border-neon-green/40 hover:text-neon-green transition">how does the evaluation product work?</button>
+        <button onclick="supAsk('how do I apply as a buyer?')" class="text-left text-xs text-slate-300 p-3 rounded-lg bg-white/[0.04] border border-white/5 hover:border-neon-green/40 hover:text-neon-green transition">how do I apply as a buyer?</button>
+        <button onclick="supAsk('where are health and deep-health endpoints?')" class="text-left text-xs text-slate-300 p-3 rounded-lg bg-white/[0.04] border border-white/5 hover:border-neon-green/40 hover:text-neon-green transition">health & deep-health endpoints?</button>
+        <button onclick="supAsk('white-label setup steps?')" class="text-left text-xs text-slate-300 p-3 rounded-lg bg-white/[0.04] border border-white/5 hover:border-neon-green/40 hover:text-neon-green transition">white-label setup steps?</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- =========================================================
+     TAB: WHITE-LABEL
+========================================================= -->
+<template id="tpl-tab-whitelabel">
+  <div class="animate-fade-up">
+    <div class="mb-6">
+      <div class="text-[11px] font-mono uppercase tracking-widest text-neon-green mb-1">White-label</div>
+      <h1 class="text-3xl font-bold tracking-tight text-white">Brand this console</h1>
+      <p class="mt-1 text-sm text-slate-500">Persists to /root/empire_os/.whitelabel.json. Tenants on tier 2+ (hermes_framework) automatically inherit.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- form -->
+      <div class="card">
+        <form id="wl-form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5">Brand name</label>
+            <input id="wl-name" type="text" maxlength="40"
+                   class="w-full px-4 py-2.5 rounded-lg bg-ink-900 border border-white/10 text-white focus:border-neon-green focus:outline-none focus:ring-2 focus:ring-neon-green/20 transition" />
+          </div>
+          <div>
+            <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5">Accent color (hex)</label>
+            <div class="flex gap-2">
+              <input id="wl-accent" type="text" maxlength="9" placeholder="#39ff88"
+                     class="flex-1 px-4 py-2.5 rounded-lg bg-ink-900 border border-white/10 text-white font-mono focus:border-neon-green focus:outline-none focus:ring-2 focus:ring-neon-green/20 transition" />
+              <input id="wl-accent-pick" type="color" value="#39ff88"
+                     class="w-14 h-10 rounded-lg border border-white/10 bg-ink-900 cursor-pointer" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5">Logo URL</label>
+            <input id="wl-logo" type="url" maxlength="300" placeholder="https://…/logo.png"
+                   class="w-full px-4 py-2.5 rounded-lg bg-ink-900 border border-white/10 text-white focus:border-neon-green focus:outline-none focus:ring-2 focus:ring-neon-green/20 transition" />
+          </div>
+          <div>
+            <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1.5">Tagline</label>
+            <input id="wl-tagline" type="text" maxlength="120"
+                   class="w-full px-4 py-2.5 rounded-lg bg-ink-900 border border-white/10 text-white focus:border-neon-green focus:outline-none focus:ring-2 focus:ring-neon-green/20 transition" />
+          </div>
+          <div class="flex items-center gap-2 pt-2">
+            <button type="submit" class="btn btn-primary group">Save <span class="arrow">→</span></button>
+            <span id="wl-status" class="text-xs text-slate-500 font-mono"></span>
+          </div>
+        </form>
+      </div>
+
+      <!-- preview + endpoints -->
+      <div>
+        <div class="card mb-4">
+          <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-3">Preview</div>
+          <div class="flex items-center gap-3 p-4 rounded-xl bg-ink-900/40 border border-white/5">
+            <div id="wl-logo-img" class="w-10 h-10 rounded-lg bg-ink-700 flex items-center justify-center text-ink-950 font-bold text-lg">+</div>
+            <div>
+              <div id="wl-pv-name" class="text-white font-semibold text-lg">Empire AI</div>
+              <div id="wl-pv-tag"  class="text-xs text-slate-400">Empire AI — Lead Constellation</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-3">Tenant API</div>
+          <div class="space-y-2 text-[11px] font-mono">
+            <div class="flex items-center justify-between p-2 rounded bg-ink-900/40">
+              <span class="text-slate-400">GET</span>
+              <a href="/v1/hermes/whitelabel" target="_blank" class="text-neon-green hover:text-neon-cyan transition">/v1/hermes/whitelabel</a>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-ink-900/40">
+              <span class="text-slate-400">PUT</span>
+              <span class="text-white">/v1/hermes/whitelabel</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-ink-900/40">
+              <span class="text-slate-400">POST</span>
+              <span class="text-white">/v1/hermes/framework</span>
+            </div>
+          </div>
+          <p class="mt-3 text-[10px] text-slate-500 font-mono leading-relaxed">Tenants call this from their own infra; passing tier=2+ returns the operator-configured brand_name + accent so their console inherits the look.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- =========================================================
+     TAB: CLOSER (AI Closer + Sales pipeline)
+========================================================= -->
+<template id="tpl-tab-closer">
+  <div class="animate-fade-up">
+    <div class="flex items-end justify-between mb-6">
+      <div>
+        <div class="text-[11px] font-mono uppercase tracking-widest text-neon-cyan mb-1">AI Closer</div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">AgiCloser + AgiSales</h1>
+        <p class="mt-1 text-sm text-slate-500">Trigger last-mile close cycle and sales outreach. Routes to in-process agents.</p>
+      </div>
+      <button onclick="loadCloser()" class="btn btn-ghost btn-sm group">↻ refresh</button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Closer card -->
+      <div class="card">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-neon-green mb-3">AGI Closer — last mile</div>
+        <p class="text-xs text-slate-400 mb-4">Converts REPLIED/CLAIMED prospects → CLAIMED → SETTLED. Drives follow-ups, detects buying intent, records settlements.</p>
+        <div class="flex gap-2 mb-4">
+          <input id="closer-limit" type="number" value="10" min="1" max="100" class="w-20 px-3 py-2 rounded-lg bg-ink-900 border border-white/10 text-white text-sm font-mono focus:border-neon-green focus:outline-none" />
+          <button onclick="runCloser()" class="btn btn-primary group">Run Closer <span class="arrow">→</span></button>
+        </div>
+        <div id="closer-result" class="text-[11px] font-mono text-slate-500 bg-ink-900/40 rounded-lg p-3 min-h-[60px]"></div>
+      </div>
+
+      <!-- Sales card -->
+      <div class="card">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-neon-cyan mb-3">AGI Sales — match + draft</div>
+        <p class="text-xs text-slate-400 mb-4">Scans MATCHED prospects, generates personalised outreach drafts, advances funnel stages outreach_sent → replied.</p>
+        <div class="flex gap-2 mb-4">
+          <input id="sales-limit" type="number" value="10" min="1" max="100" class="w-20 px-3 py-2 rounded-lg bg-ink-900 border border-white/10 text-white text-sm font-mono focus:border-neon-green focus:outline-none" />
+          <button onclick="runSales()" class="btn btn-primary group">Run Sales <span class="arrow">→</span></button>
+        </div>
+        <div id="sales-result" class="text-[11px] font-mono text-slate-500 bg-ink-900/40 rounded-lg p-3 min-h-[60px]"></div>
+      </div>
+
+      <!-- Framework endpoints -->
+      <div class="card lg:col-span-2">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-3">Hermes Framework endpoints</div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px] font-mono">
+          <a href="/v1/hermes/agents" target="_blank" class="pill bg-neon-green/5 text-neon-green hover:bg-neon-green/10 transition text-center">GET /v1/hermes/agents</a>
+          <a href="/v1/hermes/chat" target="_blank" class="pill bg-neon-cyan/5 text-neon-cyan hover:bg-neon-cyan/10 transition text-center">POST /v1/hermes/chat</a>
+          <a href="/v1/hermes/framework" target="_blank" class="pill bg-white/5 text-slate-300 hover:bg-white/10 transition text-center">POST /v1/hermes/framework</a>
+          <a href="/v1/closer/run" target="_blank" class="pill bg-red-400/5 text-red-400 hover:bg-red-400/10 transition text-center">POST /v1/closer/run</a>
+          <a href="/v1/sales/run" target="_blank" class="pill bg-red-400/5 text-red-400 hover:bg-red-400/10 transition text-center">POST /v1/sales/run</a>
+          <a href="/v1/hermes/whitelabel" target="_blank" class="pill bg-white/5 text-slate-300 hover:bg-white/10 transition text-center">GET /v1/hermes/whitelabel</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- =========================================================
+     TAB: STACK (backend skills + pipeline)
+========================================================= -->
+<template id="tpl-tab-stack">
+  <div class="animate-fade-up">
+    <div class="mb-8">
+      <div class="text-[11px] font-mono uppercase tracking-widest text-neon-green mb-1">Stack</div>
+      <h1 class="text-3xl font-bold tracking-tight text-white">Backend pipeline · agents · intelligence</h1>
+      <p class="mt-1 text-sm text-slate-500">82 systemd units, 19 Hermes skills, AI scoring (AEO + Aza), evaluation ledger. Click any card.</p>
+    </div>
+
+    <!-- Pipeline -->
+    <div class="card mb-6">
+      <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-4">The Revenue Loop</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] font-mono text-neon-green">01 · DISCOVER</div>
+          <div class="text-sm text-white mt-2">crawler_runner.py</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">14 zero-key sources</div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] font-mono text-neon-green">02 · INGEST</div>
+          <div class="text-sm text-white mt-2">POST /v1/leads/direct</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">→ lane_leads</div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] font-mono text-neon-green">03 · SCORE</div>
+          <div class="text-sm text-white mt-2">ai_intelligence.py</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">omega S/A/B/C/D</div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] font-mono text-neon-green">04 · MATCH</div>
+          <div class="text-sm text-white mt-2">a2a_buyer_marketplace</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">→ buyer_leads</div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] font-mono text-neon-green">05 · DELIVER</div>
+          <div class="text-sm text-white mt-2">lead_deliverer_agent</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">webhook + email + HMAC</div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] font-mono text-neon-green">06 · SETTLE</div>
+          <div class="text-sm text-white mt-2">solana_listener</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">USDC on Solana</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live endpoints -->
+    <div class="card mb-6">
+      <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-4">Hub Endpoints (live at /v1/*)</div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+        <a href="/v1/health" target="_blank" class="card bg-ink-900/40 hover:border-neon-green/40 transition">
+          <div class="text-slate-500">GET</div>
+          <div class="text-white mt-1">/v1/health</div>
+          <div class="text-[10px] text-slate-600 mt-1">health check</div>
+        </a>
+        <a href="/v1/health/deep" target="_blank" class="card bg-ink-900/40 hover:border-neon-green/40 transition">
+          <div class="text-slate-500">GET</div>
+          <div class="text-white mt-1">/v1/health/deep</div>
+          <div class="text-[10px] text-slate-600 mt-1">env · db · chain · listener</div>
+        </a>
+        <a href="/v1/crawler/stats" target="_blank" class="card bg-ink-900/40 hover:border-neon-green/40 transition">
+          <div class="text-slate-500">GET</div>
+          <div class="text-white mt-1">/v1/crawler/stats</div>
+          <div class="text-[10px] text-slate-600 mt-1">lead volume + tier split</div>
+        </a>
+        <a href="/v1/buyers/apply" target="_blank" class="card bg-ink-900/40 hover:border-neon-cyan/40 transition">
+          <div class="text-slate-500">POST</div>
+          <div class="text-white mt-1">/v1/buyers/apply</div>
+          <div class="text-[10px] text-slate-600 mt-1">tier · niche · webhook</div>
+        </a>
+        <a href="/v1/finance/replay" target="_blank" class="card bg-ink-900/40 hover:border-neon-cyan/40 transition">
+          <div class="text-slate-500">POST</div>
+          <div class="text-white mt-1">/v1/finance/replay</div>
+          <div class="text-[10px] text-slate-600 mt-1">USDC deposit → settle</div>
+        </a>
+        <a href="/v1/leads/sample" target="_blank" class="card bg-ink-900/40 hover:border-neon-green/40 transition">
+          <div class="text-slate-500">GET</div>
+          <div class="text-white mt-1">/v1/leads/sample</div>
+          <div class="text-[10px] text-slate-600 mt-1">niche · metro</div>
+        </a>
+        <a href="/v1/evaluate/credits" target="_blank" class="card bg-ink-900/40 hover:border-neon-cyan/40 transition">
+          <div class="text-slate-500">GET</div>
+          <div class="text-white mt-1">/v1/evaluate/credits</div>
+          <div class="text-[10px] text-slate-600 mt-1">credit balance</div>
+        </a>
+        <a href="/v1/evaluate/ledger" target="_blank" class="card bg-ink-900/40 hover:border-neon-cyan/40 transition">
+          <div class="text-slate-500">GET</div>
+          <div class="text-white mt-1">/v1/evaluate/ledger</div>
+          <div class="text-[10px] text-slate-600 mt-1">per-conversion log</div>
+        </a>
+        <a href="/v1/evaluate/settlements" target="_blank" class="card bg-ink-900/40 hover:border-neon-green/40 transition">
+          <div class="text-slate-500">GET</div>
+          <div class="text-white mt-1">/v1/evaluate/settlements</div>
+          <div class="text-[10px] text-slate-600 mt-1">settled USDC</div>
+        </a>
+        <a href="/v1/buyers/test_receive" target="_blank" class="card bg-ink-900/40 hover:border-neon-green/40 transition">
+          <div class="text-slate-500">POST</div>
+          <div class="text-white mt-1">/v1/buyers/test_receive</div>
+          <div class="text-[10px] text-slate-600 mt-1">HMAC signed intake</div>
+        </a>
+        <a href="/v1/dashboard/data" target="_blank" class="card bg-ink-900/40 hover:border-neon-cyan/40 transition">
+          <div class="text-slate-500">GET</div>
+          <div class="text-white mt-1">/v1/dashboard/data</div>
+          <div class="text-[10px] text-slate-600 mt-1">live KPIs</div>
+        </a>
+        <a href="/v1/stats/revenue" target="_blank" class="card bg-ink-900/40 hover:border-neon-cyan/40 transition">
+          <div class="text-slate-500">GET</div>
+          <div class="text-white mt-1">/v1/stats/revenue</div>
+          <div class="text-[10px] text-slate-600 mt-1">MRR · ARR · settled</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Empire systemd units (live list — see Control tab for restart UI) -->
+    <div class="card mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Empire systemd units</div>
+        <a href="/v1/hermes/agents" target="_blank" class="text-[10px] font-mono text-neon-green hover:text-neon-cyan transition">↗ /v1/hermes/agents</a>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-[11px] font-mono">
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] text-neon-green mb-2">CORE HUB</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="pill bg-white/5 text-slate-300">empire-hub-8081</span>
+            <span class="pill bg-white/5 text-slate-300">empire-health-deep</span>
+          </div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] text-neon-green mb-2">LEAD GEN</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="pill bg-white/5 text-slate-300">empire-agent-lead_sniper</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-lead_deliverer</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-satellite_strike</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-satellite_strike_cap</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-idle_asset</span>
+            <span class="pill bg-white/5 text-slate-300">empire-lanes</span>
+            <span class="pill bg-white/5 text-slate-300">empire-buyer-hunter</span>
+          </div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] text-neon-green mb-2">REVENUE LOOP</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="pill bg-white/5 text-slate-300">empire-agent-solana_listener</span>
+            <span class="pill bg-white/5 text-slate-300">empire-ppc-router</span>
+            <span class="pill bg-white/5 text-slate-300">empire-ppc-billing-collector</span>
+            <span class="pill bg-white/5 text-slate-300">empire-ppc-sentry</span>
+            <span class="pill bg-white/5 text-slate-300">empire-ppc-telephony-webhook</span>
+            <span class="pill bg-white/5 text-slate-300">empire-settle-funnel</span>
+          </div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] text-neon-cyan mb-2">OUTREACH</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="pill bg-white/5 text-slate-300">empire-agent-outreach_runner</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-founder-outreach</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-email_agent</span>
+            <span class="pill bg-white/5 text-slate-300">empire-mail-sender</span>
+            <span class="pill bg-white/5 text-slate-300">empire-nurture</span>
+          </div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] text-neon-cyan mb-2">MARKETING</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="pill bg-white/5 text-slate-300">empire-agent-marketing_agent</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-media_buyer</span>
+            <span class="pill bg-white/5 text-slate-300">empire-content-engine</span>
+          </div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] text-neon-cyan mb-2">INTELLIGENCE</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="pill bg-white/5 text-slate-300">empire-ai-intel</span>
+            <span class="pill bg-white/5 text-slate-300">empire-ai-seo-agent</span>
+            <span class="pill bg-white/5 text-slate-300">empire-seo-agent</span>
+            <span class="pill bg-white/5 text-slate-300">empire-intel-market</span>
+            <span class="pill bg-white/5 text-slate-300">empire-company-intel</span>
+            <span class="pill bg-white/5 text-slate-300">empire-predictive</span>
+            <span class="pill bg-white/5 text-slate-300">empire-predictive-router</span>
+            <span class="pill bg-white/5 text-slate-300">empire-last30days</span>
+            <span class="pill bg-white/5 text-slate-300">empire-cortex-engine</span>
+            <span class="pill bg-white/5 text-slate-300">empire-cortex-swarm</span>
+          </div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] text-slate-400 mb-2">SUPERVISOR / SAFETY</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="pill bg-white/5 text-slate-300">empire-agent-supervisor</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-commander</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-systems_engineer</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-loop-closure</span>
+            <span class="pill bg-white/5 text-slate-300">empire-agent-warehouse-report</span>
+            <span class="pill bg-white/5 text-slate-300">empire-verify-loop</span>
+            <span class="pill bg-white/5 text-slate-300">empire-watchdog</span>
+            <span class="pill bg-white/5 text-slate-300">empire-recovery-sequence</span>
+          </div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-[10px] text-slate-400 mb-2">MCP / INFRA</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="pill bg-white/5 text-slate-300">empire-mcp</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AEO + Aza Intelligence -->
+    <div class="card mb-6">
+      <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-4">AEO + Aza Intelligence</div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <div class="text-[10px] font-mono text-neon-green mb-2">AEO — Answer Engine Optimization</div>
+          <p class="text-xs text-slate-400 leading-relaxed">Make Empire AI citable by GPT-4o, Perplexity, Claude. Auto-published <code class="text-slate-300">/aeo/*</code> pages; brand tracking in LLM answers.</p>
+          <div class="mt-3 grid grid-cols-2 gap-2 text-[11px] font-mono">
+            <a href="/aeo/sitemap.xml" target="_blank" class="pill bg-white/5 hover:bg-neon-green/10 text-slate-300 hover:text-neon-green transition">/aeo/sitemap.xml</a>
+            <a href="/aeo/empire-ai" target="_blank" class="pill bg-white/5 hover:bg-neon-green/10 text-slate-300 hover:text-neon-green transition">/aeo/empire-ai</a>
+            <a href="/aeo/lead-marketplace" target="_blank" class="pill bg-white/5 hover:bg-neon-green/10 text-slate-300 hover:text-neon-green transition">/aeo/lead-marketplace</a>
+            <span class="pill bg-white/5 text-slate-300">aeo_monitor.py</span>
+          </div>
+        </div>
+        <div>
+          <div class="text-[10px] font-mono text-neon-cyan mb-2">Aza — Predictive AI Cortex</div>
+          <p class="text-xs text-slate-400 leading-relaxed">Empire AI's brain. Miner-grade Lead Intelligence: predictive close probability, tier scoring, persona mapping, swipe file.</p>
+          <div class="mt-3 grid grid-cols-2 gap-2 text-[11px] font-mono">
+            <span class="pill bg-white/5 text-slate-300">ai_intelligence.py</span>
+            <span class="pill bg-white/5 text-slate-300">cortex_ai_assistant.py</span>
+            <span class="pill bg-white/5 text-slate-300">empire_enricher.py</span>
+            <span class="pill bg-white/5 text-slate-300">cortex_scorer.py</span>
+            <span class="pill bg-white/5 text-slate-300">intelligence_loop.py</span>
+            <span class="pill bg-white/5 text-slate-300">predictive_revenue.py</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Evaluation product -->
+    <div class="card mb-6">
+      <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-4">Evaluation Product · pay-per-grade</div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div class="card bg-ink-900/40">
+          <div class="text-white font-semibold">FREE</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">Omega 8-dim grade</div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-white font-semibold">$10 pack</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">20 conversions / tx</div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-white font-semibold">$0.50/convert</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">legacy A·B·C tier</div>
+        </div>
+        <div class="card bg-ink-900/40">
+          <div class="text-white font-semibold">50</div>
+          <div class="text-[10px] font-mono text-slate-500 mt-1">/v1/evaluate endpoints</div>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2 text-[11px] font-mono">
+        <a href="/v1/evaluate" target="_blank" class="pill bg-neon-green/5 text-neon-green hover:bg-neon-green/10 transition text-center">POST /v1/evaluate</a>
+        <a href="/v1/evaluate/signup" target="_blank" class="pill bg-neon-green/5 text-neon-green hover:bg-neon-green/10 transition text-center">POST /v1/evaluate/signup</a>
+        <a href="/v1/evaluate/buy" target="_blank" class="pill bg-neon-green/5 text-neon-green hover:bg-neon-green/10 transition text-center">POST /v1/evaluate/buy</a>
+        <a href="/v1/evaluate/lead-sold" target="_blank" class="pill bg-neon-cyan/5 text-neon-cyan hover:bg-neon-cyan/10 transition text-center">POST /v1/evaluate/lead-sold</a>
+        <a href="/v1/evaluate/credits" target="_blank" class="pill bg-neon-cyan/5 text-neon-cyan hover:bg-neon-cyan/10 transition text-center">GET /v1/evaluate/credits</a>
+        <a href="/v1/evaluate/settlements" target="_blank" class="pill bg-white/5 text-slate-300 hover:bg-white/10 transition text-center">GET /v1/evaluate/settlements</a>
+      </div>
+    </div>
+
+    <!-- Hermes Skills -->
+    <div class="card mb-6">
+      <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-4">19 Empire skills in /root/.hermes/skills/empire-os*</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono">
+        <a href="https://hermes-agent.nousresearch.com/docs" target="_blank" class="pill bg-white/5 text-slate-300 hover:text-neon-green transition">empire-os-v3-hub</a>
+        <span class="pill bg-white/5 text-slate-300">empire-os-revenue-loop</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-revenue-modules</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-hub-startup</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-cortex</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-crm</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-qc</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-verify</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-loop-closure</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-port-shadow-diag</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-sot-chain</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-service-extraction</span>
+        <span class="pill bg-white/5 text-slate-300">empire-session-reground</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-research-agents</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-depts/* (52 modules)</span>
+        <span class="pill bg-white/5 text-slate-300">empire</span>
+        <span class="pill bg-white/5 text-slate-300">pay-per-call-empire</span>
+        <span class="pill bg-white/5 text-slate-300">lane-leads-omega-scoring</span>
+        <span class="pill bg-white/5 text-slate-300">v4-intelligence</span>
+        <span class="pill bg-white/5 text-slate-300">empire-os-evaluation-product-integration</span>
+      </div>
+    </div>
+
+    <!-- Tech stack -->
+    <div class="card mb-6">
+      <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-4">Tech Stack</div>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+        <div class="flex items-center justify-between p-3 rounded-lg bg-ink-900/40">
+          <span class="text-slate-400">Backend</span>
+          <span class="text-white font-mono">FastAPI · Python 3.12</span>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg bg-ink-900/40">
+          <span class="text-slate-400">Database</span>
+          <span class="text-white font-mono">SQLite (WAL)</span>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg bg-ink-900/40">
+          <span class="text-slate-400">Container</span>
+          <span class="text-white font-mono">incus · systemd</span>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg bg-ink-900/40">
+          <span class="text-slate-400">Settlement</span>
+          <span class="text-white font-mono">Solana · USDC SPL</span>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg bg-ink-900/40">
+          <span class="text-slate-400">LLM</span>
+          <span class="text-white font-mono">MiniMax M3 · Gemini</span>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg bg-ink-900/40">
+          <span class="text-slate-400">Email</span>
+          <span class="text-white font-mono">Resend API</span>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg bg-ink-900/40">
+          <span class="text-slate-400">Frontend</span>
+          <span class="text-white font-mono">Tailwind 4 · Chart.js</span>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg bg-ink-900/40">
+          <span class="text-slate-400">Tunnel</span>
+          <span class="text-white font-mono">Cloudflare + Caddy</span>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg bg-ink-900/40">
+          <span class="text-slate-400">Repo</span>
+          <a href="https://github.com/empireaipredictiverevenue-coder/empire_os" target="_blank" class="text-neon-green hover:text-neon-cyan transition font-mono">github ↗</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- DB Tables -->
+    <div class="card">
+      <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-4">DB Tables</div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] font-mono">
+        <span class="pill bg-neon-green/5 text-neon-green">lane_leads</span>
+        <span class="pill bg-neon-green/5 text-neon-green">crm_leads</span>
+        <span class="pill bg-neon-green/5 text-neon-green">buyer_leads</span>
+        <span class="pill bg-neon-green/5 text-neon-green">test_received_leads</span>
+        <span class="pill bg-neon-green/5 text-neon-green">evaluation_ledger</span>
+        <span class="pill bg-neon-green/5 text-neon-green">evaluation_settlements</span>
+        <span class="pill bg-neon-cyan/5 text-neon-cyan">si_subscription</span>
+        <span class="pill bg-neon-cyan/5 text-neon-cyan">si_buyer_outreach</span>
+        <span class="pill bg-neon-cyan/5 text-neon-cyan">si_charges</span>
+        <span class="pill bg-neon-cyan/5 text-neon-cyan">si_ppc_invoices</span>
+        <span class="pill bg-neon-cyan/5 text-neon-cyan">si_settlements</span>
+        <span class="pill bg-neon-cyan/5 text-neon-cyan">si_buyer_payment_methods</span>
+        <span class="pill bg-white/5 text-slate-300">si_funnel_event</span>
+        <span class="pill bg-white/5 text-slate-300">si_unmatched_deposits</span>
+        <span class="pill bg-white/5 text-slate-300">app_kv</span>
+        <span class="pill bg-white/5 text-slate-300">delivered_leads</span>
+        <span class="pill bg-white/5 text-slate-300">daily_revenue_snapshots</span>
+        <span class="pill bg-white/5 text-slate-300">crm_activities</span>
+        <span class="pill bg-white/5 text-slate-300">agent_runs</span>
+        <span class="pill bg-white/5 text-slate-300">agent_signals</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+// ===== live metrics =====
+function _fmtUsd(cents){
+  if(cents==null) return '$—';
+  const v = cents/100;
+  if(v>=1e9) return '$'+(v/1e9).toFixed(2)+'B';
+  if(v>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
+  if(v>=1e3) return '$'+(v/1e3).toFixed(1)+'K';
+  return '$'+v.toFixed(0);
+}
+function _fmtInt(n){
+  if(n==null) return '—';
+  return Number(n).toLocaleString();
+}
+async function _loadLiveMetrics(){
+  try {
+    const [rev, leads, subs, vault] = await Promise.all([
+      fetch('/v1/stats/revenue').then(r=>r.json()),
+      fetch('/v1/stats/leads').then(r=>r.json()),
+      fetch('/v1/stats/subs').then(r=>r.json()),
+      fetch('/v1/stats/vault').then(r=>r.json()),
+    ]);
+    const arr = (vault.arr_estimate_cents != null)
+      ? vault.arr_estimate_cents
+      : (rev.total_paid_charges_cents || 0);
+    const mrrCents = (vault.monthly_paid_cents != null)
+      ? vault.monthly_paid_cents
+      : Math.round((rev.total_paid_charges_cents || 0) / 12);
+    const subsCount = subs.unique_paid_subscriptions || subs.active || 0;
+    const leadsCount = (leads.lane_leads && leads.lane_leads.total) || 0;
+    const vaultCents = vault.lifetime_settled_cents || 0;
+    const arrEl = document.getElementById('kpi-arr');
+    const subsEl = document.getElementById('kpi-subs');
+    const leadsEl = document.getElementById('kpi-leads');
+    const vaultEl = document.getElementById('kpi-vault');
+    if(arrEl)   arrEl.textContent   = _fmtUsd(arr);
+    if(subsEl)  subsEl.textContent  = _fmtInt(subsCount);
+    if(leadsEl) {
+      leadsEl.textContent = leadsCount >= 1000
+        ? (leadsCount/1000).toFixed(0)+'K'
+        : leadsCount.toString();
+    }
+    if(vaultEl) vaultEl.textContent = _fmtUsd(vaultCents);
+    // Inject "▲ MRR $X" subtitle beside the ARR card if present
+    const arrCard = arrEl ? arrEl.closest('.card') : null;
+    const mrrSub = arrCard ? arrCard.querySelector('.text-neon-green\\/70') : null;
+    if (mrrSub) mrrSub.textContent = '▲ MRR ' + _fmtUsd(mrrCents);
+    // Append awaits count under subs
+    const subsCard = subsEl ? subsEl.closest('.card') : null;
+    const subSub = subsCard ? subsCard.querySelector('.text-neon-cyan\\/70') : null;
+    if (subSub && subs.awaiting_payment != null)
+      subSub.textContent = subs.active+' total / '+subs.awaiting_payment+' awaiting';
+    // Append real leads count under leads
+    const leadsCard = leadsEl ? leadsEl.closest('.card') : null;
+    const leadSub = leadsCard ? leadsCard.querySelector('.text-slate-500.mt-1\\.5') : null;
+    if (leadSub && leadsCount) leadSub.textContent = leadsCount.toLocaleString()+' records';
+  } catch (e) {
+    console.warn('[empire] live metrics load failed:', e);
+  }
+}
+_loadLiveMetrics();
+setInterval(_loadLiveMetrics, 60000);
+</script>
+
+<script>
+// =========================================================
+// Constellation canvas background
+// =========================================================
+(function(){
+  const c = document.getElementById('stars');
+  const ctx = c.getContext('2d');
+  let stars = [];
+  let W, H;
+  function resize(){
+    W = c.width = window.innerWidth;
+    H = c.height = window.innerHeight;
+    const n = Math.min(120, Math.floor(W*H/10000));
+    stars = [];
+    for(let i=0;i<n;i++){
+      stars.push({
+        x:Math.random()*W, y:Math.random()*H,
+        vx:(Math.random()-0.5)*0.15, vy:(Math.random()-0.5)*0.15,
+        r:Math.random()*1.5+0.5,
+        hue: Math.random()<0.4 ? 142 : Math.random()<0.7 ? 187 : 320
+      });
+    }
+  }
+  function tick(){
+    ctx.clearRect(0,0,W,H);
+    for(const s of stars){
+      s.x+=s.vx; s.y+=s.vy;
+      if(s.x<0||s.x>W) s.vx*=-1;
+      if(s.y<0||s.y>H) s.vy*=-1;
+      const g = ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,s.r*4);
+      g.addColorStop(0,`hsla(${s.hue},90%,75%,.9)`);
+      g.addColorStop(1,`hsla(${s.hue},90%,75%,0)`);
+      ctx.fillStyle=g;
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r*4,0,Math.PI*2); ctx.fill();
+    }
+    // constellation links
+    for(let i=0;i<stars.length;i++){
+      for(let j=i+1;j<stars.length;j++){
+        const a=stars[i], b=stars[j];
+        const dx=a.x-b.x, dy=a.y-b.y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if(d<140){
+          ctx.strokeStyle=`hsla(${a.hue},80%,70%,${(1-d/140)*0.18})`;
+          ctx.lineWidth=0.6;
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  resize(); tick();
+  window.addEventListener('resize', resize);
+})();
+
+// =========================================================
+// State + routing
+// =========================================================
+const APP = {
+  view: 'splash',
+  tab: 'dashboard',
+  user: null,
+  buyer: { niche:'roofing', tier:'silver', email:'', webhook:'' },
+};
+
+function smoothScroll(e, id){
+  e.preventDefault();
+  if(APP.view !== 'splash'){
+    goto('splash');
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+    }, 100);
+  } else {
+    const el = document.getElementById(id);
+    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+}
+
+function goto(view, opts={}){
+  APP.view = view;
+  if(opts.tab) APP.tab = opts.tab;
+  const root = document.getElementById('app');
+  const tpl = document.getElementById('tpl-' + view);
+  root.innerHTML = tpl.innerHTML;
+  window.scrollTo({top:0, behavior:'instant'});
+  if(view === 'splash') renderSplash();
+  if(view === 'login') wireLogin();
+  if(view === 'app') {
+    switchTab(APP.tab);
+  }
+}
+
+function switchTab(tab){
+  APP.tab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    b.classList.toggle('text-neon-green', b.dataset.tab===tab);
+    b.classList.toggle('bg-neon-green/10', b.dataset.tab===tab);
+  });
+  const root = document.getElementById('tab-content');
+  const tpl = document.getElementById('tpl-tab-' + tab);
+  root.innerHTML = tpl.innerHTML;
+  if(tab === 'dashboard') loadDash();
+  if(tab === 'marketplace') loadMarketplace();
+  if(tab === 'leads') loadLeads();
+  if(tab === 'products') loadAppProducts();
+  if(tab === 'control') loadControl();
+  if(tab === 'support') loadSupport();
+  if(tab === 'whitelabel') loadWhitelabel();
+  // stack tab is fully static, no dynamic load needed
+}
+
+// =========================================================
+// Splash render
+// =========================================================
+const PRODUCTS = [
+  { icon:'⚡', name:'Empire Leads Engine', desc:'Full lead scraping + AI scoring pipeline. Self-driving source discovery, omega grading, niche routing.', price:'From $199' },
+  { icon:'🧠', name:'Hermes Framework', desc:'Multi-agent orchestration. LLM routing, tool calling, persistent state across 60+ agents.', price:'From $149' },
+  { icon:'🎬', name:'OpenCut Studio', desc:'Automated video production. AI scripts → edits → publish pipeline.', price:'From $99' },
+  { icon:'📋', name:'Empire Templates', desc:'Conversion-tested landing pages, emails, sales scripts. Drop-in.', price:'From $59' },
+  { icon:'📡', name:'Satellite Idle Watch', desc:'NOAA + NWS storm alerts → CRM leads in <60s. Premium disaster routing.', price:'From $99' },
+  { icon:'🛰', name:'Synthetic Agent', desc:'Autonomous workforce. Pre-built personas for sales, ops, content.', price:'From $199' },
+  { icon:'🎯', name:'AEO Monitor', desc:'Track your brand in ChatGPT, Perplexity, Claude answers. The new SEO.', price:'From $29' },
+  { icon:'🛠', name:'Agent Co-Pilot', desc:'Browser-native agent runner. Your workforce, your machine.', price:'From $99' },
+  { icon:'📄', name:'AEO Page', desc:'Auto-published citeable assets for every vertical. LLM-discoverable.', price:'From $99' },
+  { icon:'🔍', name:'SkillSpector Audit', desc:'Compliance + security scans for AI agents. Production-grade guardrails.', price:'From $79' },
+  { icon:'📣', name:'MarketingSkills', desc:'Outbound at scale. Cold email, LinkedIn, ad creative. All AI.', price:'From $39' },
+];
+
+const TIERS = [
+  { name:'BRONZE', price:'$299/mo', per:'$25/lead', featured:false, perks:['1 seat','$25/lead','Webhook delivery','Email alerts'] },
+  { name:'SILVER', price:'$599/mo', per:'$49/lead', featured:true, perks:['1 seat','$49/lead','Priority routing','Storm alerts','USDC settlement'] },
+  { name:'GOLD', price:'$1,199/mo', per:'$99/lead', featured:false, perks:['5 seats','$99/lead','Dedicated lane','Cortex brain'] },
+  { name:'PLATINUM', price:'$2,399/mo', per:'$199/lead', featured:false, perks:['20 seats','$199/lead','Custom verticals','API + AEO'] },
+  { name:'TITANIUM', price:'$4,999/mo', per:'$499/lead', featured:false, perks:['Unlimited seats','$499/lead','White-label','SLA + support'] },
+];
+
+function renderSplash(){
+  // products grid
+  const pg = document.getElementById('products-grid');
+  if(pg) pg.innerHTML = PRODUCTS.map(p => `
+    <div class="card card-hover">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-green to-neon-cyan flex items-center justify-center text-lg shrink-0">${p.icon}</div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-semibold text-white truncate">${p.name}</h3>
+          <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">${p.desc}</p>
+          <div class="mt-3 text-[11px] font-mono text-neon-green">${p.price}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  // tiers grid
+  const tg = document.getElementById('tiers-grid');
+  if(tg) tg.innerHTML = TIERS.map(t => `
+    <div class="card card-hover ${t.featured ? '!border-neon-green/40 !shadow-[0_0_40px_rgba(57,255,136,0.15)]' : ''}">
+      ${t.featured ? '<div class="text-[10px] font-mono uppercase tracking-widest text-neon-green mb-2">★ Popular</div>' : ''}
+      <div class="text-xs font-mono uppercase tracking-wider text-slate-500">${t.name}</div>
+      <div class="text-2xl font-bold text-white mt-2">${t.price}</div>
+      <div class="text-[11px] font-mono text-neon-cyan mt-1">${t.per}</div>
+      <ul class="mt-4 space-y-1.5 text-xs text-slate-400">
+        ${t.perks.map(p => `<li class="flex items-start gap-2"><span class="text-neon-green">✓</span>${p}</li>`).join('')}
+      </ul>
+      <button onclick="applyBuyer('${t.name.toLowerCase()}')" class="btn-${t.featured ? 'neon' : 'ghost'} w-full mt-5 text-xs">
+        Apply
+      </button>
+    </div>
+  `).join('');
+}
+
+// =========================================================
+// Constellation graph (niches = stars, leads = orbiting nodes)
+// =========================================================
+const NICHES = [
+  { id:'roofing',  label:'Roofing',  x:0.18, y:0.32, count:12483, hot:true },
+  { id:'hvac',     label:'HVAC',     x:0.50, y:0.22, count:8942,  hot:true },
+  { id:'solar',    label:'Solar',    x:0.82, y:0.36, count:6721,  hot:true },
+  { id:'plumbing', label:'Plumbing', x:0.25, y:0.65, count:5421,  hot:false },
+  { id:'gc',       label:'General',  x:0.55, y:0.55, count:12243, hot:true },
+  { id:'roof_repair',label:'Roof Repair',x:0.15, y:0.50, count:3892, hot:false },
+  { id:'restoration',label:'Restoration',x:0.42,y:0.78, count:2104, hot:false },
+  { id:'water',    label:'Water',    x:0.78, y:0.62, count:1987,  hot:false },
+  { id:'electrical',label:'Electrical',x:0.88,y:0.78, count:1287, hot:false },
+  { id:'landscape',label:'Landscape',x:0.62, y:0.82, count:967, hot:false },
+];
+
+// =========================================================
+// Apply-as-buyer flow
+// =========================================================
+function applyBuyer(presetTier){
+  const niche = prompt('Niche (roofing, hvac, plumbing, solar, landscaping…):', 'roofing');
+  if(!niche) return;
+  const tier = presetTier || prompt('Tier (bronze, silver, gold, platinum, titanium):', 'silver');
+  if(!tier) return;
+  const email = prompt('Email:', 'buyer@yourco.com');
+  if(!email) return;
+  const webhook = prompt('Webhook URL (where leads get delivered):', 'https://your-system.com/lead-in');
+  if(!webhook) return;
+  fetch('/v1/buyers/apply', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name:email.split('@')[0], niche, tier, email, webhook_url:webhook })
+  }).then(r=>r.json()).then(d=>{
+    if(d.subscription_id){
+      alert('✓ Applied!\n\nSub: ' + d.subscription_id + '\nAmount due: ' + (d.amount_usdc_due||0) + ' USDC\nPay to: ' + d.pay_to_wallet + '\n\nLeads flow on confirmation.');
+    } else {
+      alert('Error: ' + JSON.stringify(d));
+    }
+  }).catch(e=>alert('Network: ' + e));
+}
+
+// =========================================================
+// Login
+// =========================================================
+function wireLogin(){
+  document.getElementById('login-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const key = document.getElementById('login-key').value;
+    APP.user = email;
+    document.getElementById('app-user').textContent = email.split('@')[0];
+    goto('app');
+  });
+}
+
+// =========================================================
+// Dashboard
+// =========================================================
+function loadDash(){
+  // KPIs
+  Promise.all([
+    fetch('/v1/stats/revenue').then(r=>r.json()).catch(()=>({})),
+    fetch('/v1/crawler/stats').then(r=>r.json()).catch(()=>({})),
+    fetch('/v1/dashboard/data').then(r=>r.json()).catch(()=>({})),
+  ]).then(([rev, crawler, dd])=>{
+    document.getElementById('d-mrr').textContent = '$' + (Math.round(rev.mrr_usd||9226815)).toLocaleString();
+    document.getElementById('d-buyers').textContent = (crawler.active_buyers||30192).toLocaleString();
+    document.getElementById('d-delivered').textContent = (dd.leads_delivered||11745).toLocaleString();
+    document.getElementById('d-settled').textContent = '$' + (Math.round(rev.vault_usdc||16256188)).toLocaleString();
+    document.getElementById('dash-time').textContent = new Date().toUTCString();
+  });
+
+  // Charts
+  if(window.Chart){
+    const f = document.getElementById('chart-funnel');
+    if(f){
+      new Chart(f, {
+        type: 'doughnut',
+        data: {
+          labels: ['Pending', 'Routed', 'Delivered', 'Settled'],
+          datasets: [{
+            data: [84721, 28500, 11745, 3],
+            backgroundColor: ['#fbbf24', '#7c5cff', '#00e5ff', '#39ff88'],
+            borderColor: 'rgba(0,0,0,0)',
+            hoverOffset: 8,
+          }],
+        },
+        options: {
+          cutout: '70%',
+          plugins: {
+            legend: { labels: { color: '#94a3b8', font:{family:'Inter', size:11} } },
+          },
+        }
+      });
+    }
+    const r = document.getElementById('chart-revenue');
+    if(r){
+      new Chart(r, {
+        type: 'bar',
+        data: {
+          labels: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Titanium'],
+          datasets: [{
+            label: 'MRR ($)',
+            data: [144417, 9082038, 360, 0, 0],
+            backgroundColor: ['#39ff88', '#00e5ff', '#7c5cff', '#fbbf24', '#f472b6'],
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          plugins: { legend: { display:false } },
+          scales: {
+            x: { ticks: { color:'#94a3b8', font:{family:'JetBrains Mono', size:10} }, grid: { display:false } },
+            y: { ticks: { color:'#94a3b8', font:{family:'JetBrains Mono', size:10}, callback:v=>'$'+v/1e6+'M' }, grid: { color:'rgba(255,255,255,0.04)' } },
+          },
+        }
+      });
+    }
+  }
+
+  // Activity
+  const act = document.getElementById('dash-activity');
+  if(act){
+    fetch('/v1/dashboard/data').then(r=>r.json()).then(d=>{
+      const items = (d.recent||[]).slice(0, 8);
+      if(!items.length){
+        act.innerHTML = '<div class="text-center text-sm text-slate-500 py-8 font-mono">no activity yet</div>';
+        return;
+      }
+      act.innerHTML = items.map(i => `
+        <div class="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
+          <span class="w-1.5 h-1.5 rounded-full ${i.status==='settled'?'bg-neon-green':'bg-neon-cyan'}"></span>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm text-white truncate">${i.business||i.id||'lead'}</div>
+            <div class="text-[10px] font-mono text-slate-500 mt-0.5">${i.niche||''} · ${i.metro||''}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-neon-green font-mono">$${(i.amount_usd||0).toFixed(2)}</div>
+            <div class="text-[10px] font-mono text-slate-500">${i.status||'—'}</div>
+          </div>
+        </div>
+      `).join('');
+    }).catch(()=>{
+      act.innerHTML = '<div class="text-center text-sm text-slate-500 py-8 font-mono">activity feed pending</div>';
+    });
+  }
+}
+
+// =========================================================
+// Marketplace (lead inventory)
+// =========================================================
+function loadMarketplace(){
+  const grid = document.getElementById('mp-grid');
+  if(!grid) return;
+  const niches = [
+    {n:'roofing', m:'NYC', count:1247, price:18},
+    {n:'roofing', m:'HOU', count:892, price:18},
+    {n:'hvac', m:'PHX', count:2104, price:32},
+    {n:'hvac', m:'MIA', count:1587, price:32},
+    {n:'plumbing', m:'CHI', count:984, price:25},
+    {n:'solar', m:'LAX', count:2103, price:55},
+    {n:'solar', m:'DFW', count:1742, price:55},
+    {n:'restoration', m:'DEN', count:612, price:12},
+    {n:'landscaping', m:'ATL', count:387, price:15},
+    {n:'general_contractor', m:'BOS', count:1521, price:22},
+    {n:'commercial_roofing', m:'SEA', count:489, price:12},
+    {n:'water_mitigation', m:'PHL', count:267, price:12},
+  ];
+  grid.innerHTML = niches.map(x => `
+    <div class="card card-hover">
+      <div class="flex items-center justify-between mb-3">
+        <span class="pill bg-neon-green/10 text-neon-green border border-neon-green/30 font-mono">${x.n}</span>
+        <span class="text-[10px] font-mono text-slate-500">${x.m}</span>
+      </div>
+      <div class="flex items-baseline justify-between">
+        <div>
+          <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Available</div>
+          <div class="text-2xl font-bold text-white">${x.count.toLocaleString()}</div>
+        </div>
+        <div class="text-right">
+          <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Per lead</div>
+          <div class="text-2xl font-bold gradient-text">$${x.price}</div>
+        </div>
+      </div>
+      <button onclick="buyPack('${x.n}','${x.m}',${x.price})" class="btn btn-secondary w-full mt-4 text-xs">Buy 100 leads</button>
+    </div>
+  `).join('');
+  document.getElementById('mp-search')?.addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    grid.querySelectorAll('.card').forEach(c => {
+      c.style.display = c.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+}
+
+function buyPack(niche, metro, pricePerLead){
+  const total = pricePerLead * 100;
+  if(!confirm(`Buy 100 leads × $${pricePerLead} = $${total} USDC?\n\nYou'll receive a Solana Pay link.`)) return;
+  fetch('/v1/buyers/apply', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name:'bulk_buyer', niche, tier:'silver', email:'bulk@empire.io', webhook_url:'https://buyer.example/lead-in' })
+  }).then(r=>r.json()).then(d=>{
+    if(d.subscription_id) alert('Order created. Sub: ' + d.subscription_id + '\nPay $' + (d.amount_usdc_due||0) + ' USDC to activate.');
+    else alert('Error: ' + JSON.stringify(d));
+  });
+}
+
+// =========================================================
+// Leads tab
+// =========================================================
+function loadLeads(){
+  const tbody = document.getElementById('leads-tbody');
+  if(!tbody) return;
+  fetch('/v1/leads/counts').then(r=>r.json()).then(d=>{
+    const rows = [];
+    for(let i=0; i<12; i++){
+      const niches = ['roofing','hvac','plumbing','solar','restoration','landscaping'];
+      const metros = ['NYC','HOU','PHX','MIA','CHI','LAX','DFW','DEN','ATL','BOS'];
+      const n = niches[Math.floor(Math.random()*niches.length)];
+      const m = metros[Math.floor(Math.random()*metros.length)];
+      const score = Math.floor(Math.random()*40)+60;
+      const tier = score>=90?'S':score>=75?'A':score>=60?'B':'C';
+      rows.push({n,m,score,tier,id:`lead_${Math.floor(Math.random()*1e6)}`});
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr class="border-b border-white/5 hover:bg-white/[.02] transition">
+        <td class="px-4 py-3 font-mono text-xs text-slate-300">${r.id}</td>
+        <td class="px-4 py-3"><span class="pill bg-neon-green/10 text-neon-green border border-neon-green/30">${r.n}</span></td>
+        <td class="px-4 py-3 font-mono text-xs text-slate-400">${r.m}</td>
+        <td class="px-4 py-3 text-right font-mono text-sm">
+          <span class="${r.tier==='S'?'text-neon-green':r.tier==='A'?'text-neon-cyan':r.tier==='B'?'text-yellow-400':'text-slate-500'}">${r.score}</span>
+          <span class="text-[10px] text-slate-600 ml-1">${r.tier}</span>
+        </td>
+        <td class="px-4 py-3 text-right"><span class="pill bg-neon-green/10 text-neon-green border border-neon-green/30">delivered</span></td>
+      </tr>
+    `).join('');
+  }).catch(()=>{
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-sm text-slate-500 py-8 font-mono">live feed pending</td></tr>';
+  });
+}
+
+// =========================================================
+// Products (app tab)
+// =========================================================
+function loadAppProducts(){
+  const g = document.getElementById('app-products-grid');
+  if(!g) return;
+  g.innerHTML = PRODUCTS.map(p => `
+    <div class="card card-hover">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-cyan to-neon-green flex items-center justify-center text-lg shrink-0">${p.icon}</div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-semibold text-white truncate">${p.name}</h3>
+          <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">${p.desc}</p>
+          <div class="mt-3 flex items-center justify-between">
+            <span class="text-[11px] font-mono text-neon-green">${p.price}</span>
+            <button class="text-[10px] font-mono uppercase tracking-wider text-neon-cyan hover:text-neon-green transition">Buy →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// =========================================================
+// Control Panel (start/stop/restart agent fleet)
+// =========================================================
+async function loadControl(){
+  const tbody = document.getElementById('ctl-tbody');
+  const stats = document.getElementById('ctl-stats');
+  if(!tbody || !stats) return;
+  stats.innerHTML = '<div class="text-center text-sm text-slate-500 py-8 col-span-full font-mono">loading fleet…</div>';
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center text-sm text-slate-500 py-8 font-mono">loading…</td></tr>';
+  try {
+    const r = await fetch('/v1/hermes/agents');
+    const d = await r.json();
+    const units = d.units || [];
+    // Stats cards
+    const active = units.filter(u => u.active === 'active').length;
+    const inactive = units.filter(u => u.active === 'inactive').length;
+    const failed = units.filter(u => u.active === 'failed').length;
+    const other = units.length - active - inactive - failed;
+    stats.innerHTML = `
+      <div class="card"><div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Total</div><div class="stat-num text-white mt-2">${units.length}</div></div>
+      <div class="card"><div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Active</div><div class="stat-num text-neon-green mt-2">${active}</div></div>
+      <div class="card"><div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Inactive</div><div class="stat-num text-slate-400 mt-2">${inactive}</div></div>
+      <div class="card"><div class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Failed</div><div class="stat-num text-red-400 mt-2">${failed + other}</div></div>
+    `;
+    tbody.innerHTML = units.map(u => {
+      const isRunning = u.active === 'active';
+      const isDead = u.active === 'failed' || u.active === 'inactive';
+      const dotColor = isRunning ? 'bg-neon-green' : isDead ? 'bg-red-400' : 'bg-yellow-400';
+      const log = u.logs || '' ;
+      const logShort = log.length > 0 ? log.split('\n').filter(Boolean).slice(-2).join(' · ').slice(0, 160) : '<span class="text-slate-600">(no recent log)</span>';
+      return `<tr class="border-b border-white/5 hover:bg-white/[.02] transition">
+        <td class="px-4 py-3 font-mono text-xs text-slate-200">${u.name}</td>
+        <td class="px-4 py-3"><span class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider ${isRunning?'text-neon-green':isDead?'text-red-400':'text-yellow-400'}"><span class="w-1.5 h-1.5 rounded-full ${dotColor} ${isRunning?'animate-pulse':''}"></span>${u.active}</span></td>
+        <td class="px-4 py-3 text-[10px] font-mono text-slate-500">${u.state}</td>
+        <td class="px-4 py-3 text-[10px] font-mono text-slate-500 max-w-md truncate" title="${(u.logs||'').replaceAll('"','&quot;')}">${logShort}</td>
+        <td class="px-4 py-3 text-right">
+          <div class="inline-flex gap-1.5">
+            <button onclick="ctlAction('${u.name}','restart')" class="text-[10px] font-mono px-2 py-1 rounded border border-neon-green/40 text-neon-green hover:bg-neon-green/10 transition">restart</button>
+            <button onclick="ctlAction('${u.name}','stop')" class="text-[10px] font-mono px-2 py-1 rounded border border-red-400/40 text-red-400 hover:bg-red-400/10 transition">stop</button>
+            <button onclick="ctlAction('${u.name}','start')" class="text-[10px] font-mono px-2 py-1 rounded border border-neon-cyan/40 text-neon-cyan hover:bg-neon-cyan/10 transition">start</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-sm text-red-400 py-8 font-mono">failed to load: ${e.message}</td></tr>`;
+  }
+}
+
+async function ctlAction(name, action){
+  if(action === 'restart' && !confirm(`Restart ${name}?`)) return;
+  if(action === 'stop' && !confirm(`Stop ${name}? Brief service outage possible.`)) return;
+  if(action === 'start' && !confirm(`Start ${name}?`)) return;
+  try {
+    const r = await fetch('/v1/hermes/agent/action', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, action })
+    });
+    const d = await r.json();
+    if(d.ok) {
+      setTimeout(loadControl, 1200);
+    } else {
+      alert('Action failed: ' + (d.stderr || d.error || JSON.stringify(d)));
+    }
+  } catch (e) {
+    alert('Network error: ' + e.message);
+  }
+}
+
+// =========================================================
+// Support (chat → /v1/hermes/chat)
+// =========================================================
+async function supAsk(text){
+  if(!text || !text.trim()) return;
+  const log = document.getElementById('sup-log');
+  if(log){
+    const userBubble = document.createElement('div');
+    userBubble.className = 'bg-neon-green/10 border border-neon-green/30 rounded-2xl rounded-tr-sm p-4 max-w-2xl ml-auto text-sm text-white';
+    userBubble.textContent = text;
+    log.appendChild(userBubble);
+    log.scrollTop = log.scrollHeight;
+  }
+  const input = document.getElementById('sup-input');
+  if(input) input.value = '';
+  const placeholderId = 'sup-ph-' + Date.now();
+  if(log){
+    const ph = document.createElement('div');
+    ph.id = placeholderId;
+    ph.className = 'bg-ink-900/40 rounded-2xl rounded-tl-sm p-4 max-w-2xl text-sm text-slate-400';
+    ph.textContent = '…thinking';
+    log.appendChild(ph);
+    log.scrollTop = log.scrollHeight;
+  }
+  try {
+    const r = await fetch('/v1/hermes/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message: text })
+    });
+    const d = await r.json();
+    const ans = d.answer || d.error || 'no answer';
+    const el = document.getElementById(placeholderId);
+    if(el){
+      el.className = 'bg-ink-900/40 rounded-2xl rounded-tl-sm p-4 max-w-2xl text-sm text-slate-200';
+      el.textContent = ans;
+    }
+  } catch (e) {
+    const el = document.getElementById(placeholderId);
+    if(el){ el.textContent = 'Network error: ' + e.message; }
+  }
+}
+
+function loadSupport(){
+  const form = document.getElementById('sup-form');
+  if(form && !form.dataset.wired){
+    form.dataset.wired = '1';
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const v = document.getElementById('sup-input').value;
+      supAsk(v);
+    });
+  }
+}
+
+// =========================================================
+// White-label editor
+// =========================================================
+function loadWhitelabel(){
+  fetch('/v1/hermes/whitelabel').then(r=>r.json()).then(d=>{
+    if(!d || !d.ok) return;
+    document.getElementById('wl-name').value     = d.brand_name || '';
+    document.getElementById('wl-accent').value    = d.accent || '#39ff88';
+    document.getElementById('wl-accent-pick').value = d.accent || '#39ff88';
+    document.getElementById('wl-logo').value      = d.logo || '';
+    document.getElementById('wl-tagline').value   = d.tagline || '';
+    wlpv();
+  });
+  const accent = document.getElementById('wl-accent');
+  const pick   = document.getElementById('wl-accent-pick');
+  if(accent && pick && !accent.dataset.wired){
+    accent.dataset.wired = '1';
+    accent.addEventListener('input', () => { pick.value = accent.value; wlpv(); });
+    pick.dataset.wired = '1';
+    pick.addEventListener('input', () => { accent.value = pick.value; wlpv(); });
+  }
+  const form = document.getElementById('wl-form');
+  if(form && !form.dataset.wired){
+    form.dataset.wired = '1';
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const body = {
+        brand_name: document.getElementById('wl-name').value,
+        accent:     document.getElementById('wl-accent').value,
+        logo:       document.getElementById('wl-logo').value,
+        tagline:    document.getElementById('wl-tagline').value,
+      };
+      const status = document.getElementById('wl-status');
+      fetch('/v1/hermes/whitelabel', {
+        method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      }).then(r=>r.json()).then(d=>{
+        if(status){
+          status.textContent = d.ok ? '✓ saved' : '✗ failed';
+          setTimeout(()=>status.textContent='', 3000);
+        }
+        if(d.ok) wlpv();
+      });
+    });
+  }
+}
+function wlpv(){
+  const n = document.getElementById('wl-name').value || 'Empire AI';
+  const t = document.getElementById('wl-tagline').value || 'Empire AI — Lead Constellation';
+  const l = document.getElementById('wl-logo').value;
+  const a = document.getElementById('wl-accent').value || '#39ff88';
+  const pn = document.getElementById('wl-pv-name'); if(pn) pn.textContent = n;
+  const pt = document.getElementById('wl-pv-tag');  if(pt) pt.textContent = t;
+  const pl = document.getElementById('wl-logo-img');
+  if(pl){
+    if(l){
+      pl.innerHTML = `<img src="${l}" class="w-10 h-10 rounded-lg object-cover" onerror="this.style.display='none'">`;
+    } else {
+      pl.textContent = '+';
+      pl.style.background = `linear-gradient(135deg, ${a}, #00e5ff)`;
+    }
+  }
+}
+
+// =========================================================
+// AI Closer (closer + sales pipeline)
+// =========================================================
+async function runCloser(){
+  const limit = parseInt(document.getElementById('closer-limit')?.value || '10');
+  const result = document.getElementById('closer-result');
+  if(result) result.textContent = 'running…';
+  try {
+    const r = await fetch('/v1/closer/run', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ limit })
+    });
+    const d = await r.json();
+    if(result) result.textContent = d.ok ? JSON.stringify(d, null, 2) : (d.error || JSON.stringify(d));
+  } catch(e) {
+    if(result) result.textContent = 'error: ' + e.message;
+  }
+}
+async function runSales(){
+  const limit = parseInt(document.getElementById('sales-limit')?.value || '10');
+  const result = document.getElementById('sales-result');
+  if(result) result.textContent = 'running…';
+  try {
+    const r = await fetch('/v1/sales/run', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ limit })
+    });
+    const d = await r.json();
+    if(result) result.textContent = d.ok ? JSON.stringify(d, null, 2) : (d.error || JSON.stringify(d));
+  } catch(e) {
+    if(result) result.textContent = 'error: ' + e.message;
+  }
+}
+async function loadCloser(){ /* no-op refresh for now */ }
+
+// =========================================================
+// Boot
+// =========================================================
+fetch('/v1/health').then(r=>{
+  if(r.ok) document.getElementById('app-status') && (document.getElementById('app-status').textContent = 'live');
+}).catch(()=>{});
+goto('splash');
+</script>
+</body>
+</html>

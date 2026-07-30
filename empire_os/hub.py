@@ -47,7 +47,7 @@ if _ENV_PATH.exists():
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from fastapi.staticfiles import StaticFiles
@@ -102,6 +102,9 @@ from empire_os.payout_batch import PayoutBatchStore, build_payout_batch
 from empire_os.revenue_notify import paid as _rev_paid
 from empire_os.waterfall import build_default_waterfall
 from empire_os.lanes import ensure_schema as ensure_lane_schema, seed_lanes
+from empire_os.agents.satellite_damage_agent import run_scan as _damage_scan
+from empire_os.agents.warehouse_sniper import run_scan as _warehouse_scan
+from empire_os.agents.logistics_scanner import run_scan as _logistics_scan
 from empire_os.lanes import CATEGORIES, METROS, build_lanes, all_sub_niches
 from empire_os.lane_router import route_lead, match_niche
 from empire_os.omega_os import qualify_prospect, OmegaScore
@@ -234,6 +237,14 @@ async def lifespan(app: FastAPI):
     _HM_BACKEND = backend
     backend.ensure_schema()
 
+    # Bind dashboard backend explicitly inside lifespan (import-time init is too
+    # early — hub.backend is still None when the module loads).
+    try:
+        app.state.empire_backend = backend
+        init_dashboard(backend)
+    except Exception as e:
+        logger.warning("dashboard init error: %s", e)
+
     # ── CRM schema ──
     try:
         crm_ensure_schema(backend)
@@ -283,24 +294,26 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("agi-marketing not reachable")
     # AGI Sales — runs in-process (no separate container needed).
-    # Ollama box (10.218.156.211:11434) is down; route through OpenRouter
-    # (tencent/hy3:free — same brain model) so loops run instead of dying.
-    # Guarded: a throttle on hy3:free must NOT block hub startup/loop.
+    # Use local Ollama (qwen2.5:3b) — sovereign, no per-call cost.
+    # Set OLLAMA_HOST in env to override; defaults to 127.0.0.1:11434.
+    # Guarded: a bad Ollama must NOT block hub startup/loop.
     try:
         agi_sales = AgiSalesAgent(
             backend=backend,
-            llm=OpenRouterClient(model="tencent/hy3:free", timeout=8))
-        logger.info("agi-sales initialized in-process (OpenRouter hy3)")
+            llm=None)  # rule-based closer: LLM too slow on CPU host
+        logger.info("agi-sales initialized in-process (Ollama %s)",
+                    os.environ.get("OLLAMA_MODEL") or os.environ.get("LLM_MODEL") or "qwen2.5:3b")
     except Exception as e:
         logger.warning("agi-sales init skipped (LLM unreachable): %s", str(e)[:120])
         agi_sales = None
-    # AGI Closer — last-mile closer, also in-process
+    # AGI Closer — last-mile closer, also in-process. Same Ollama brain.
     global agi_closer
     try:
         agi_closer = AgiCloserAgent(
             backend=backend,
-            llm=OpenRouterClient(model="tencent/hy3:free", timeout=8))
-        logger.info("agi-closer initialized in-process (OpenRouter hy3)")
+            llm=None)  # rule-based closer: LLM too slow on CPU host
+        logger.info("agi-closer initialized in-process (Ollama %s)",
+                    os.environ.get("OLLAMA_MODEL") or os.environ.get("LLM_MODEL") or "qwen2.5:3b")
     except Exception as e:
         logger.warning("agi-closer init skipped (LLM unreachable): %s", str(e)[:120])
         agi_closer = None
@@ -414,6 +427,15 @@ async def lifespan(app: FastAPI):
     if not _own_loops:
         logger.info("Worker did not win loop lock — request-handler only "
                     "(agi_loop + auto_pilot skipped)")
+
+    # ── Hub Loop: in-process asyncio task. Defaults ON (HUB_LOOP_INPROC=1).
+    # Owns enrichment + outreach + self-health ticks. Replaces the
+    # standalone hub_loop service + previously-running agent daemons.
+    if _own_loops and os.environ.get("HUB_LOOP_INPROC", "1") == "1":
+        from empire_os import hub_loop as _hub_loop
+        asyncio.create_task(_hub_loop.run(backend))
+        logger.info("Hub Loop spawned in-process — enrich + outreach + health")
+
     if _own_loops and os.environ.get("EMPIRE_OS_TEST_MODE") != "1" and os.environ.get("EMPIRE_INPROC_AGENTS") == "1":
         # Wrap CEO tick so the loop can call it as a no-arg method
         class _CeoBriefProxy:
@@ -591,8 +613,11 @@ app.include_router(dashboard_v2_router)
 if email_intelligence_router is not None:
     app.include_router(email_intelligence_router)
 
-# Initialize dashboard backend reference
-init_dashboard(backend)
+# NOTE: dashboard backend binding happens inside the FastAPI lifespan
+# startup hook (see above) — the global ``backend`` is still None at
+# module-import time, so calling ``init_dashboard(backend)`` here would
+# pin a None into dashboard_v2._backend and break every dashboard route.
+
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
@@ -636,6 +661,38 @@ def health_deep():
     silent-break pattern."""
     from empire_os import health_deep as _hd
     return _hd.deep_health()
+
+
+# --- Predictive Revenue Report ---
+# Reads the latest cached JSON written by empire_os.predictive.generate_daily_report()
+# Path matches where the predictive agent writes inside this container:
+#   /root/empire_os/feedback/predictive_revenue_latest.json
+PREDICTIVE_REVENUE_PATH = "/root/empire_os/feedback/predictive_revenue_latest.json"
+
+
+@app.get("/v1/predictive/revenue")
+def predictive_revenue():
+    """Latest cached predictive revenue report (revenue, market gaps, leaks, waste).
+    File is regenerated by the predictive agent (24h tick) or by an explicit refresh.
+    Returns 200 with JSON content; returns 503 with reason if the file is missing/stale."""
+    try:
+        with open(PREDICTIVE_REVENUE_PATH, "r") as f:
+            data = json.load(f)
+        return JSONResponse(content=data)
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "predictive_revenue_report_missing",
+                "path": PREDICTIVE_REVENUE_PATH,
+                "detail": "predictive_revenue_latest.json not found — run empire_os.predictive.generate_daily_report()",
+            },
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "predictive_revenue_read_failed", "detail": str(e)[:500]},
+        )
 
 
 # --- Neural Scout / Lead Pipeline ---
@@ -858,6 +915,21 @@ METRO_ZIPS: dict[str, str] = {
 }
 
 
+
+@app.post("/v1/logistics/scan")
+def logistics_scan(req: DamageScanRequest):
+    try:
+        return _logistics_scan(postcode=req.postcode or None, bbox=req.bbox, metro_code=req.metro_code or None)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:300])
+
+@app.get("/v1/logistics/scan/recent")
+def logistics_scan_recent(limit: int = 5):
+    p=Path("/root/feedback/logistics_scanner.jsonl")
+    if not p.exists(): return {"ok":True,"events":[]}
+    rows=p.read_text().splitlines()
+    return {"ok":True,"events":[json.loads(x) for x in rows[-max(1,min(limit,50)):]]}
+
 @app.post("/v1/damage/scan")
 def damage_scan(req: DamageScanRequest):
     """Run a satellite damage scan.
@@ -927,6 +999,58 @@ def damage_scan_all():
     return {"ok": True, "metros": len(results),
             "ok_metros": n_ok, "error_metros": n_err,
             "totals": totals, "details": results}
+
+
+class WarehouseScanRequest(BaseModel):
+    postcode: str = ""
+    bbox: Optional[dict] = None
+    metro_code: str = ""
+    threshold: float = 0.30
+    use_bda: bool = True
+    bda_checkpoint: str = ""
+
+
+@app.post("/v1/warehouse/scan")
+def warehouse_scan(req: WarehouseScanRequest):
+    """Run a warehouse / waste-hauling scan.
+
+    Body: {"postcode": "75201"} or {"bbox": {...}, "metro_code": "DFW"}.
+    Optional: {"use_bda": true, "bda_checkpoint": "/path/to/ckpt.pt",
+               "threshold": 0.45}.
+    Returns scan_id, bbox, parcel count, top vacant parcels, db counts.
+    """
+    try:
+        kwargs = {}
+        if req.postcode:
+            kwargs["postcode"] = req.postcode
+            kwargs["country"] = "us"
+        if req.metro_code:
+            kwargs["metro_code"] = req.metro_code
+        if req.bbox:
+            kwargs["bbox"] = req.bbox
+        kwargs["threshold"] = float(req.threshold)
+        if req.use_bda:
+            kwargs["use_bda"] = True
+        if req.bda_checkpoint:
+            kwargs["bda_checkpoint"] = req.bda_checkpoint
+        result = _warehouse_scan(**kwargs)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:300])
+
+
+@app.get("/v1/warehouse/scan/recent")
+def warehouse_scan_recent(limit: int = 5):
+    """Tail the most recent warehouse_sniper.jsonl entries."""
+    p = Path("/root/empire_os/feedback/warehouse_sniper.jsonl")
+    if not p.exists():
+        return {"events": []}
+    try:
+        lines = p.read_text().splitlines()[-limit:]
+        events = [json.loads(l) for l in lines if l.strip()]
+        return {"events": events}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:300])
 
 
 @app.get("/v1/damage/optin-landing/{prospect_id}", response_class=HTMLResponse)
@@ -2830,6 +2954,35 @@ def a2a_list_quotes(status: str = None, limit: int = 50):
     """List quotes (optionally filter by status)."""
     from empire_os.a2a_marketplace import list_quotes
     return list_quotes(limit=limit, status=status)
+
+
+@app.post("/v1/a2a/backfill-seats")
+def a2a_backfill_seats():
+    """One-shot: provision si_seat for all released a2a_quotes missing one.
+    Idempotent. Safe to call repeatedly.
+    """
+    from empire_os.a2a_marketplace import backfill_seats_for_released
+    try:
+        return backfill_seats_for_released()
+    except Exception as e:
+        raise HTTPException(500, f"backfill failed: {e}")
+
+
+@app.get("/v1/a2a/seats")
+def a2a_list_seats(limit: int = 50):
+    """List provisioned seats (newest first)."""
+    import sqlite3 as _sq
+    try:
+        c = _sq.connect("/root/empire_os/empire_os.db", timeout=10)
+        c.row_factory = _sq.Row
+        rows = [dict(r) for r in c.execute(
+            "SELECT * FROM si_seat ORDER BY created_at DESC LIMIT ?",
+            (int(limit),),
+        ).fetchall()]
+        c.close()
+        return {"seats": rows, "count": len(rows)}
+    except Exception as e:
+        raise HTTPException(500, f"list_seats failed: {e}")
 
 
 @app.post("/v1/leases")
@@ -5052,6 +5205,27 @@ def stats_leads():
     return lead_stats(_hm_backend())
 
 
+@app.get("/v1/stats/subs")
+def stats_subs():
+    """Aggregate subscription metrics (for landing-page hero KPI)."""
+    from empire_os.empire_stats import subs_stats
+    return subs_stats(_hm_backend())
+
+
+@app.get("/v1/stats/vault")
+def stats_vault():
+    """Live vault USDC balance + lifetime settled (landing-page hero KPI)."""
+    from empire_os.empire_stats import vault_stats
+    return vault_stats(_hm_backend())
+
+
+@app.get("/v1/stats/funnel")
+def stats_funnel():
+    """Funnel-state distribution for the landing-page funnel panel."""
+    from empire_os.empire_stats import funnel_stats
+    return funnel_stats(_hm_backend())
+
+
 @app.get("/sitemap.xml")
 def serve_sitemap():
     """Serve sitemap.xml for search engines."""
@@ -5301,6 +5475,70 @@ def outbox_recent(n: int = 50):
                           "resend_id": r[4]} for r in rows]}
     finally:
         cnx.close()
+
+
+# --- Inbound Replies (Gmail webhook + manual parse) ---
+
+@app.post("/v1/inbound/gmail")
+def inbound_gmail(req: dict):
+    """Gmail Pub/Sub webhook stub. Body:
+      { message_id, from_email, from_name, to_email,
+        subject, body_text, body_html, headers, raw_size }
+    Reply-To is expected to be flavag83@gmail.com (founder inbox).
+    """
+    try:
+        from empire_os import inbound_replies
+        return inbound_replies.insert_inbound(req)
+    except Exception as e:
+        raise HTTPException(500, f"inbound_gmail failed: {e}")
+
+
+@app.post("/v1/inbound/parse")
+def inbound_parse(req: dict):
+    """Manual parse path — accepts raw RFC822 or pre-parsed JSON.
+    Same payload shape as /v1/inbound/gmail.
+    """
+    try:
+        from empire_os import inbound_replies
+        return inbound_replies.insert_inbound(req)
+    except Exception as e:
+        raise HTTPException(500, f"inbound_parse failed: {e}")
+
+
+@app.get("/v1/replies")
+def list_replies(limit: int = 50, status: str = "", sender: str = ""):
+    """List recent inbound replies, optionally filtered."""
+    try:
+        from empire_os import inbound_replies
+        return inbound_replies.list_replies(limit=limit, status=status, sender=sender)
+    except Exception as e:
+        raise HTTPException(500, f"list_replies failed: {e}")
+
+
+@app.get("/v1/replies/unprocessed")
+def replies_unprocessed():
+    """Count + first 20 new replies awaiting triage."""
+    try:
+        from empire_os import inbound_replies
+        n = inbound_replies.unprocessed_count()
+        rows = inbound_replies.list_replies(limit=20, status="new")
+        return {"unprocessed": n, "preview": rows}
+    except Exception as e:
+        raise HTTPException(500, f"replies_unprocessed failed: {e}")
+
+
+@app.get("/v1/replies/{inbox_id}")
+def get_reply(inbox_id: int):
+    try:
+        from empire_os import inbound_replies
+        out = inbound_replies.get_reply(inbox_id)
+        if not out.get("ok", True):
+            raise HTTPException(404, "reply not found")
+        return out
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"get_reply failed: {e}")
 
 
 @app.post("/v1/innovator/ship")
@@ -6954,13 +7192,12 @@ def auto_pilot_status():
 
 
 # --- Agent Registry (cross-container communication) ---
+# Only the hub itself is currently alive. The storm/satellite/reddit/filter
+# containers were decommissioned; their IPs no longer respond. Removed
+# 2026-07-29 during cleanup. Re-add only when those agents come back online.
 
 AGENT_REGISTRY = {
-    "hub":       {"host": "10.118.155.218", "port": 8080,  "type": "hub"},
-    "storm":     {"host": "10.118.155.65",  "port": 9101, "type": "agent", "container": "storm-agent"},
-    "satellite": {"host": "10.118.155.27",  "port": 9102, "type": "agent", "container": "satellite-agent"},
-    "reddit":    {"host": "10.118.155.116", "port": 9103, "type": "agent", "container": "reddit-sniper"},
-    "filter":    {"host": "10.118.155.241", "port": 9104, "type": "agent", "container": "lead-filter"},
+    "hub": {"host": "10.118.155.218", "port": 8081, "type": "hub"},
 }
 
 
@@ -9281,16 +9518,20 @@ def founder_onboard_page_route():
 
 if __name__ == "__main__":
     import uvicorn
-    host = os.environ.get("EMPIRE_HOST", "0.0.0.0")
-    port = int(os.environ.get("EMPIRE_PORT", "8080"))
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default=os.environ.get("EMPIRE_HOST", "0.0.0.0"))
+    parser.add_argument("--port", type=int, default=int(os.environ.get("EMPIRE_PORT", "8080")))
+    parser.add_argument("--workers", type=int, default=1)  # workers=1 for systemd-managed process
+    args = parser.parse_args()
     log_level = os.environ.get("EMPIRE_LOG_LEVEL", "info").lower()
     uvicorn.run(
         "empire_os.hub:app",
-        host=host,
-        port=port,
+        host=args.host,
+        port=args.port,
         log_level=log_level,
         reload=bool(os.environ.get("EMPIRE_RELOAD", "0") == "1"),
-        workers=int(os.environ.get("EMPIRE_WORKERS", "2")),
+        workers=args.workers,
     )
 
 # ─────────────────────────────────────────────────────────────────
