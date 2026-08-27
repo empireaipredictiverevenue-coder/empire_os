@@ -4,7 +4,7 @@
 The 49 seats minted by the founder loop have a stored payment_ref memo but
 never received their pay link by email (ppc_router only fires on a NEW charge
 event, not for already-awaiting subs). This reconstructs the exact original
-Solana Pay URL from the stored memo + price_cents + vault, and emails it,
+BSC Pay URL from the stored memo + price_cents + vault, and emails it,
 so the buyer can fund and the loop closes.
 
 Usage:
@@ -13,29 +13,49 @@ Usage:
 """
 import os, sys, sqlite3, argparse
 
-# load .env
-for ln in open("/root/empire_os/.env"):
-    ln = ln.strip()
-    if ln and "=" in ln and not ln.startswith("#"):
-        k, v = ln.split("=", 1)
-        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+# load env files (.env first, then llm.env + secret files override)
+def _load_env(p):
+    try:
+        for ln in open(p):
+            ln = ln.strip()
+            if ln and "=" in ln and not ln.startswith("#"):
+                k, v = ln.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except FileNotFoundError:
+        pass
+
+_load_env("/root/empire_os/.env")
+_load_env("/root/empire_secrets/llm.env")
+# direct secret files
+for nm, envk in (("bsc_wallet_address", "BSC_WALLET_ADDRESS"),
+                 ("bsc_usdt_contract", "BSC_USDT_CONTRACT")):
+    sp = f"/root/empire_secrets/{nm}"
+    if os.path.exists(sp) and not os.environ.get(envk):
+        os.environ[envk] = open(sp).read().strip()
 
 sys.path.insert(0, "/root/empire_os")
 from empire_os import mail_sender as ms
 
 DB = "/root/empire_os/empire_os.db"
-VAULT = os.environ.get("SOLANA_VAULT_WALLET", "")
-MINT = os.environ.get("USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+VAULT = os.environ.get("BSC_WALLET_ADDRESS", "")
+MINT = os.environ.get("BSC_USDT_CONTRACT", "0x55d398326f99059fF775485246999027B3197955")
 
 def build_pay_url(price_cents, memo):
     usdc = price_cents / 100.0
-    return f"solana:{VAULT}?amount={usdc:.6f}&spl-token={MINT}&memo={memo}"
+    sol = f"bsc:{VAULT}?amount={usdc:.6f}&contract={MINT}&memo={memo}"
+    bsc_addr = os.environ.get("BSC_WALLET_ADDRESS", "")
+    bsc = ""
+    if bsc_addr:
+        bsc = f"\nOr pay {usdc:.2f} USDT (BEP20) to: {bsc_addr}\nMemo: {memo}"
+    return f'{sol}{bsc}'
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry", action="store_true")
     a = ap.parse_args()
-    c = sqlite3.connect(DB); c.row_factory = sqlite3.Row
+    c = sqlite3.connect(DB, timeout=30.0); c.row_factory = sqlite3.Row
+    c.execute("PRAGMA busy_timeout=30000")
+    c.execute("PRAGMA journal_mode=WAL")
 
     # 1. purge stale 'failed' outbox rows (old contamination)
     before = c.execute("SELECT COUNT(*) FROM si_outbox WHERE status='failed'").fetchone()[0]
@@ -77,21 +97,21 @@ def main():
         body = (
             f"Hi,<br><br>Your Empire OS buyer seat is reserved.<br><br>"
             f"Amount due: <b>{usd}/mo</b> (exclusive leads in your lane).<br>"
-            f'<a href="{pay_url}">Pay now with USDC on Solana</a><br><br>'
+            f'<a href="{pay_url}">Pay now with USDT on BSC</a><br><br>'
             f"<small>Seat ref: {r['payment_ref']} — include this memo so we "
             f"activate your seat automatically on payment.</small>")
         if a.dry:
             print(f"  [dry] {r['email']} -> {pay_url[:60]}...")
             continue
-        res = ms._send(r["email"], subject, body)
-        status = "sent" if res.get("ok") else "failed"
+        # enqueue to outbox; mail_sender daemon delivers (Brevo/Resend/SMTP)
+        status = "pending"
         c.execute(
             "INSERT INTO si_outbox (to_email, subject, body, lane, tier, source, status, recipient_kind, meta_json, created_at) "
             "VALUES (?,?,?,?,?, 'pay_nudge', ?, 'buyer', ?, datetime('now'))",
             (r["email"], subject, body, r["plan"], "founder",
              status, f'{{"tenant_id":"{r["tenant_id"]}"}}'))
         c.commit()
-        sent += 1 if res.get("ok") else 0
+        sent += 1
         print(f"  {status}: {r['email']}")
     print(f"[done] nudged {sent}/{len(rows)} seats")
 

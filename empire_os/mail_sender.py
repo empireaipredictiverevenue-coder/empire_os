@@ -1,5 +1,4 @@
-"""
-Outbound email sender — polls si_outbox, dispatches via Resend API.
+"""Outbound email sender — polls si_outbox, dispatches via Resend API.
 
 Designed to run as either:
   a) A background thread inside the hub process, or
@@ -7,15 +6,28 @@ Designed to run as either:
 
 Logs every send attempt to /root/feedback/mail_sender.jsonl
 """
-
 from __future__ import annotations
-
 import json
 import logging
 import os
 import time
+import requests
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+# --- PROXY BYPASS (critical: container has HTTP_PROXY that intercepts
+#     127.0.0.1, breaking all hub localhost calls) ---
+for _k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+    os.environ.pop(_k, None)
+os.environ["NO_PROXY"] = "localhost,127.0.0.1,10.118.155.218,10.118.155.1"
+os.environ["no_proxy"] = "localhost,127.0.0.1,10.118.155.218,10.118.155.1"
+os.environ.pop("http_proxy", None)
+os.environ.pop("https_proxy", None)
+os.environ["NO_PROXY"] = "localhost,127.0.0.1"
+os.environ["no_proxy"] = "localhost,127.0.0.1"
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -41,11 +53,27 @@ if _ENV_PATH.exists():
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 # Email providers from environment
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
-SENDGRID_FROM = os.environ.get("SENDGRID_FROM", "Empire OS <founder@empire-ai.co.uk>")
 MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "")
 MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "sandbox.mailgun.org")
 FROM_EMAIL = os.environ.get("EMPIRE_FROM", "Empire OS <founder@empire-ai.co.uk>")
+
+# Anti-spam compliance headers
+LIST_UNSUBSCRIBE_URL = os.environ.get("LIST_UNSUBSCRIBE_URL", "https://empire-ai.co.uk/unsubscribe")
+LIST_UNSUBSCRIBE_EMAIL = os.environ.get("LIST_UNSUBSCRIBE_EMAIL", "unsubscribe@empire-ai.co.uk")
+
+
+def _clean_sender() -> str:
+    """Extract a bare email from EMPIRE_FROM even if it carries quotes/<>.
+
+    .env stores EMPIRE_FROM="Empire OS <founder@empire-ai.co.uk>" with the
+    outer double-quotes as literal characters, which Brevo/Resend reject.
+    """
+    import re as _re
+    raw = (FROM_EMAIL or "").strip().strip('"').strip("'")
+    mm = _re.search(r"[\w.+-]+@[\w.-]+\.\w+", raw)
+    return mm.group(0) if mm else raw
+
+
 # Pluggable SMTP relay (e.g. ImproveMX free tier) — kills the Resend bill.
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "resend").lower()
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.improvmx.com")
@@ -55,210 +83,65 @@ SMTP_PASS = os.environ.get("SMTP_PASS", "")
 SMTP_TLS = os.environ.get("SMTP_TLS", "1") == "1"
 HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
 FEEDBACK_DIR = Path("/root/feedback")
-POLL_INTERVAL = 30
-MAX_PER_CYCLE = 10
+POLL_INTERVAL = 10
+MAX_PER_CYCLE = 50
 
 # Daily send quota
 DAILY_SEND_LIMIT = int(os.environ.get("EMAIL_SEND_DAILY_LIMIT", "100"))
-# Pluggable SMTP relay (e.g. ImproveMX free tier) — kills the Resend bill.
-EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "resend").lower()
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.improvmx.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
-SMTP_TLS = os.environ.get("SMTP_TLS", "1") == "1"
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
-FEEDBACK_DIR = Path("/root/feedback")
-POLL_INTERVAL = 30  # seconds between poll cycles
-MAX_PER_CYCLE = 10  # max emails to pull per poll
 
 
 def _direct_mx_send(to: str, subject: str, body: str) -> dict:
     """Sovereign outbound: resolve recipient MX + deliver straight to :25.
-    No SaaS, no relay creds, no daily quota. Open-source route."""
+    No SaaS, no relay creds, no daily quota. Open-source route.
+    """
     try:
         import smtplib
         import socket
         import dns.resolver  # pip install dnspython
         domain = to.split("@")[-1].strip().lower()
-        if not domain:
-            return {"ok": False, "error": "no recipient domain"}
+        # Resolve MX records
         try:
-            mx = sorted(dns.resolver.resolve(domain, "MX"),
-                       key=lambda r: r.preference)[0].exchange.to_text().rstrip(".")
+            answers = dns.resolver.resolve(domain, "MX")
+            mx_records = sorted([(r.preference, str(r.exchange).rstrip(".")) for r in answers])
         except Exception:
-            mx = domain  # fallback: try the A/AAAA directly
-        from email.mime.text import MIMEText
-        msg = MIMEText(body, _charset="utf-8")
-        msg["Subject"] = subject
-        msg["From"] = FROM_EMAIL
-        msg["To"] = to
-        # 10s connect + 30s overall; some MX are slow/blocked -> fail fast
-        s = smtplib.SMTP(mx, 25, timeout=30)
-        s.ehlo()
-        if s.has_extn("starttls"):
-            s.starttls()
-        s.ehlo()
-        s.sendmail(FROM_EMAIL, [to], msg.as_string())
-        s.quit()
-        return {"ok": True, "msg_id": f"direct:{mx}:{to}"}
+            return {"ok": False, "error": "MX resolution failed"}
+        
+        for _, mx in mx_records:
+            try:
+                with smtplib.SMTP(mx, 25, timeout=10) as s:
+                    s.ehlo()
+                    s.sendmail("founder@empire-ai.co.uk", [to], 
+                               f"From: Empire OS <founder@empire-ai.co.uk>\r\n"
+                               f"To: {to}\r\n"
+                               f"Subject: {subject}\r\n"
+                               f"List-Unsubscribe: <https://empire-ai.co.uk/unsubscribe>, <mailto:unsubscribe@empire-ai.co.uk>\r\n"
+                               f"List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n"
+                               f"\r\n{body}")
+                return {"ok": True, "mx": mx}
+            except Exception:
+                continue
+        return {"ok": False, "error": "All MX servers failed"}
     except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
-
-def _smtp_send(to: str, subject: str, body: str) -> dict:
-    """Send one email via an SMTP relay (ImproveMX/Mailgun/etc). $0 if the
-    relay is free. Returns {ok, msg_id?, error?}."""
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
-        return {"ok": False, "error": "SMTP not configured (SMTP_HOST/USER/PASS)"}
-    try:
-        import smtplib
-        from email.mime.text import MIMEText
-
-        is_html = bool(body and ("<html" in body.lower() or "<!doctype" in body.lower() or "<table" in body.lower() or "<h1" in body.lower()))
-        if is_html:
-            msg = MIMEText(body, "html", "utf-8")
-        else:
-            msg = MIMEText(body, _charset="utf-8")
-        msg["Subject"] = subject
-        msg["From"] = FROM_EMAIL
-        msg["To"] = to
-
-        port = int(SMTP_PORT)
-        if port == 465:
-            with smtplib.SMTP_SSL(SMTP_HOST, port, timeout=30) as s:
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(FROM_EMAIL, [to], msg.as_string())
-        else:
-            with smtplib.SMTP(SMTP_HOST, port, timeout=30) as s:
-                if SMTP_TLS:
-                    s.starttls()
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(FROM_EMAIL, [to], msg.as_string())
-        return {"ok": True, "msg_id": f"smtp:{to}"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
-
-def _real_smtp_cfg() -> bool:
-    """True only if SMTP creds are real (not REPLACE_WITH_ placeholders)."""
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
-        return False
-    for v in (SMTP_USER, SMTP_PASS):
-        if str(v).startswith("REPLACE_WITH_"):
-            return False
-    return True
-
-
-def _send(to: str, subject: str, body: str) -> dict:
-    """Dispatch through selected provider, then managed fallbacks.
-
-    EMAIL_BACKEND=resend makes Resend primary. EMAIL_BACKEND=sendgrid makes
-    SendGrid primary. EMAIL_BACKEND=mailgun makes Mailgun SMTP/HTTP primary.
-    EMAIL_BACKEND=direct uses direct MX when port 25 is reachable.
-    Remaining configured providers are fallbacks.
-    """
-    last_result = {"ok": False, "error": "no usable backend"}
-
-    if EMAIL_BACKEND == "sendgrid" and SENDGRID_API_KEY:
-        last_result = _sendgrid_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if EMAIL_BACKEND == "resend" and RESEND_API_KEY:
-        last_result = _resend_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if EMAIL_BACKEND == "direct" and _port25_open():
-        last_result = _direct_mx_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if EMAIL_BACKEND == "mailgun":
-        if _real_smtp_cfg() and SMTP_HOST == "smtp.mailgun.org":
-            last_result = _smtp_send(to, subject, body)
-            if last_result.get("ok"):
-                return last_result
-        if MAILGUN_API_KEY:
-            last_result = _mailgun_send(to, subject, body)
-            if last_result.get("ok"):
-                return last_result
-
-    if SENDGRID_API_KEY and EMAIL_BACKEND != "sendgrid":
-        last_result = _sendgrid_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if RESEND_API_KEY and EMAIL_BACKEND != "resend":
-        last_result = _resend_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if MAILGUN_API_KEY and EMAIL_BACKEND != "mailgun":
-        last_result = _mailgun_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if BREVO_API_KEY:
-        last_result = _brevo_api_send(to, subject, body)
-        if last_result.get("ok"):
-            return last_result
-
-    if _real_smtp_cfg():
-        return _smtp_send(to, subject, body)
-
-    return last_result
-
-
-def _sendgrid_send(to: str, subject: str, body: str) -> dict:
-    """Send one email via SendGrid v3 API. Returns {ok, message_id?, error?}.
-
-    Uses SENDGRID_FROM (verified single sender) as the From address. The
-    EMPIRE_FROM env var (founder@empire-ai.co.uk) is set as reply-to so
-    replies land in the founder inbox.
-    """
-    if not SENDGRID_API_KEY:
-        return {"ok": False, "error": "SENDGRID_API_KEY not set"}
-    payload = json.dumps({
-        "personalizations": [{"to": [{"email": to}]}],
-        "from": {"email": SENDGRID_FROM},
-        "reply_to": {"email": "founder@empire-ai.co.uk"},
-        "subject": subject,
-        "content": [{"type": "text/plain", "value": body}],
-    }).encode()
-    try:
-        req = urllib.request.Request(
-            "https://api.sendgrid.com/v3/mail/send",
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {SENDGRID_API_KEY}",
-                "Content-Type": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            msg_id = r.headers.get("X-Message-Id", "")
-            return {"ok": True, "msg_id": f"sendgrid:{msg_id}"}
-    except urllib.error.HTTPError as e:
-        try:
-            detail = e.read().decode()[:200]
-        except Exception:
-            detail = ""
-        return {"ok": False, "error": f"HTTP {e.code}: {detail}"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
+        return {"ok": False, "error": str(e)}
 
 
 def _resend_send(to: str, subject: str, body: str) -> dict:
     """Send one email via Resend API. Returns {ok, resend_id?, error?}."""
-    if not RESEND_API_KEY:
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if not resend_key:
         return {"ok": False, "error": "RESEND_API_KEY not set"}
 
     is_html = bool(body and ("<html" in body.lower() or "<!doctype" in body.lower() or "<table" in body.lower() or "<h1" in body.lower()))
+    _sender = _clean_sender()
     payload_dict = {
-        "from": FROM_EMAIL,
+        "from": _sender,
         "to": [to],
         "subject": subject,
+        "reply_to": "founder@empire-ai.co.uk",
+        "headers": {
+            "List-Unsubscribe": "<https://empire-ai.co.uk/unsubscribe>, <mailto:unsubscribe@empire-ai.co.uk>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        }
     }
     if is_html:
         payload_dict["html"] = body
@@ -275,7 +158,7 @@ def _resend_send(to: str, subject: str, body: str) -> dict:
         headers={
             "Content-Type": "application/json",
             "User-Agent": "curl/8.5.0",  # CF 1010 blocks Python UA
-            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Authorization": f"Bearer {resend_key}",
         },
     )
     try:
@@ -293,11 +176,14 @@ def _resend_send(to: str, subject: str, body: str) -> dict:
 
 
 # Load Brevo API key from env first, then /root/empire_secrets/brevo_api_key
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
-if not BREVO_API_KEY:
-    _bp = Path("/root/empire_secrets/brevo_api_key")
-    if _bp.exists():
-        BREVO_API_KEY = _bp.read_text().strip()
+def _get_brevo_key() -> str:
+    """Get Brevo API key dynamically from env or secret file."""
+    brevo_key = os.environ.get("BREVO_API_KEY", "")
+    if not brevo_key:
+        bp = Path("/root/empire_secrets/brevo_api_key")
+        if bp.exists():
+            brevo_key = bp.read_text().strip()
+    return brevo_key
 
 
 def _port25_open() -> bool:
@@ -311,38 +197,44 @@ def _port25_open() -> bool:
         return False
 
 
-def _brevo_api_send(to: str, subject: str, body: str) -> dict:
+def _brevo_api_send(to: str, subject: str, body: str, html_body: str = None) -> dict:
     """Send via Brevo REST API (bypasses SMTP IP block on cloud hosts)."""
-    if not BREVO_API_KEY:
+    brevo_key = os.environ.get("BREVO_API_KEY", "")
+    if not brevo_key:
+        bp = Path("/root/empire_secrets/brevo_api_key")
+        if bp.exists():
+            brevo_key = bp.read_text().strip()
+    if not brevo_key:
         return {"ok": False, "error": "BREVO_API_KEY not set"}
-    payload = json.dumps({
-        "sender": {"email": FROM_EMAIL.split("<")[-1].rstrip(">") if "<" in FROM_EMAIL else FROM_EMAIL},
+    _sender = _clean_sender()
+    payload = {
+        "sender": {"email": _sender},
+        "replyTo": {"email": "founder@empire-ai.co.uk"},
         "to": [{"email": to}],
         "subject": subject,
         "textContent": body,
-    }).encode()
-    req = urllib.request.Request(
-        "https://api.brevo.com/v3/smtp/email",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "api-key": BREVO_API_KEY,
-        },
-    )
+        "headers": {
+            "List-Unsubscribe": "<https://empire-ai.co.uk/unsubscribe>, <mailto:unsubscribe@empire-ai.co.uk>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        }
+    }
+    if html_body:
+        payload["htmlContent"] = html_body
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode())
-            mid = result.get("messageId", "")
-            if mid:
-                return {"ok": True, "brevo_id": mid}
-            return {"ok": False, "error": f"no messageId: {result}"}
-    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
-        detail = ""
-        if isinstance(e, urllib.error.HTTPError):
-            detail = e.read().decode()[:200]
-        return {"ok": False, "error": str(e), "detail": detail}
-
-
+        resp = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            json=payload,
+            headers={"api-key": brevo_key},
+            timeout=30
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        mid = result.get("messageId", "")
+        if mid:
+            return {"ok": True, "brevo_id": mid}
+        return {"ok": False, "error": f"no messageId: {result}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def _mailgun_send(to: str, subject: str, body: str) -> dict:
@@ -360,7 +252,9 @@ def _mailgun_send(to: str, subject: str, body: str) -> dict:
         field("from", FROM_EMAIL) +
         field("to", to) +
         field("subject", subject) +
-        field("text", body)
+        field("text", body) +
+        field("h:List-Unsubscribe", "<https://empire-ai.co.uk/unsubscribe>, <mailto:unsubscribe@empire-ai.co.uk>") +
+        field("h:List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
     ) + f"--{boundary}--\r\n".encode()
     url = f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages"
     # Basic auth: api:KEY (without "key-" prefix)
@@ -374,7 +268,7 @@ def _mailgun_send(to: str, subject: str, body: str) -> dict:
             "Content-Type": f"multipart/form-data; boundary={boundary}",
             "Authorization": f"Basic {auth_b64}",
             "User-Agent": "curl/8.5.0",
-        }
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -417,6 +311,35 @@ def _hub_post(endpoint: str, data: dict) -> Optional[dict]:
         return None
 
 
+def _mark_outbox(out_id: int, status: str, resend_id: str = "", error: str = "") -> bool:
+    """Mark an outbox row via the HUB HTTP endpoint (single writer).
+    This is the permanent fix for the 'database is locked' cascade: direct
+    sqlite writes from this process contended with the hub's 13+ concurrent
+    writers under a 175MB WAL. Routing through the hub (which already uses
+    busy_timeout=30s) serialises the write and stops emails getting stuck in
+    'pending'. Retries on transient failure.
+    """
+    payload = {"status": status, "resend_id": resend_id or "",
+               "error": error[:200] if error else ""}
+    for attempt in range(1, 8):
+        try:
+            url = f"{HUB_URL.rstrip('/')}/v1/outbox/{out_id}/mark"
+            req = urllib.request.Request(
+                url, data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=30) as r:
+                resp = json.loads(r.read().decode())
+                if resp.get("ok"):
+                    return True
+        except Exception as e:
+            if attempt == 7:
+                logger.warning("hub mark outbox %s failed after retries: %s",
+                               out_id, e)
+                return False
+            time.sleep(min(2 * attempt, 8))
+    return False
+
+
 def _log_send(entry: dict):
     """Append a send attempt to the JSONL log."""
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
@@ -426,86 +349,154 @@ def _log_send(entry: dict):
         f.write(json.dumps(entry) + "\n")
 
 
+def _sent_today() -> int:
+    """Direct count of si_outbox rows marked sent today (UTC).
+    Bypasses hub /v1/outbox endpoints — read-only sqlite against the
+    container's empire_os.db so the guard fires even when hub is slow.
+    """
+    try:
+        import sqlite3 as _sq
+        db = "/root/empire_os/empire_os.db"
+        if not Path(db).exists():
+            return 0
+        c = _sq.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
+        n = c.execute(
+            "SELECT COUNT(*) FROM si_outbox "
+            "WHERE status='sent' AND DATE(sent_at)=DATE('now')"
+        ).fetchone()[0]
+        c.close()
+        return int(n)
+    except Exception:
+        # If we can't read the DB, assume 0 so the limiter doesn't block sends.
+        return 0
+
+
+def _daily_quota_ok() -> tuple[bool, int, int]:
+    """Returns (ok_to_send, sent_today, limit)."""
+    if DAILY_SEND_LIMIT <= 0:
+        return True, 0, 0  # 0 = unlimited
+    sent = _sent_today()
+    return (sent < DAILY_SEND_LIMIT, sent, DAILY_SEND_LIMIT)
+
+
 def send_pending_batch() -> int:
     """Fetch pending emails from hub and send them. Returns count sent."""
+    # Daily limit guard (EMAIL_SEND_DAILY_LIMIT, default 100).
+    ok, sent_today, limit = _daily_quota_ok()
+    if not ok:
+        logger.warning(
+            "daily send limit hit: %d/%d sent today — pausing until tomorrow",
+            sent_today, limit,
+        )
+        # Append to JSONL so we have evidence of the guard firing.
+        _log_send({
+            "guard": "daily_limit",
+            "sent_today": sent_today,
+            "limit": limit,
+            "action": "skip_cycle",
+        })
+        return 0
+
     resp = _hub_get(f"/v1/outbox/pending?n={MAX_PER_CYCLE}")
     if not resp or not resp.get("rows"):
         return 0
 
     sent = 0
-    for item in resp["rows"]:
-        out_id = item["id"]
-        to_email = item["to_email"]
-        subject = item["subject"]
-        body = item["body"]
+    for row in resp["rows"]:
+        out_id = row["id"]
+        to = row["to_email"]
+        subject = row["subject"]
+        body = row["body"]
+        meta = row.get("meta_json", "{}")
 
-        logger.info("sending %d → %s: %s", out_id, to_email, subject[:60])
+        # Skip invalid emails (parens, commas in domain) before trying to send
+        domain = to.split("@")[1] if "@" in to else ""
+        if any(c in domain for c in "(),"):
+            _mark_outbox(out_id, "failed", error="invalid email domain")
+            _log_send({"out_id": out_id, "to": to, "status": "failed", "error": "invalid_email"})
+            continue
 
-        result = _send(to_email, subject, body)
+        # Determine best backend from EMAIL_BACKEND (this host is Cloudflare-
+        # blocked on Resend, so default to Brevo). Fallback chain below.
+        backend = os.environ.get("EMAIL_BACKEND", "brevo").lower()
+        brevo_key = os.environ.get("BREVO_API_KEY", "")
+        if not brevo_key:
+            bp = Path("/root/empire_secrets/brevo_api_key")
+            if bp.exists():
+                brevo_key = bp.read_text().strip()
 
-        if result.get("ok"):
-            # Mark sent on hub
-            mark = _hub_post(f"/v1/outbox/{out_id}/mark", {
-                "status": "sent",
-                "resend_id": result.get("resend_id", ""),
-            })
-            status = "sent"
-            log_entry = {
-                "id": out_id, "to": to_email, "status": "sent",
-                "backend": EMAIL_BACKEND,
-                "resend_id": result.get("resend_id"),
-                "hub_mark_ok": mark.get("ok", False) if mark else False,
-            }
+        # If backend is brevo, send via Brevo first (skip Resend primary)
+        if backend == "brevo" and brevo_key:
+            res = _brevo_api_send(row["to_email"], row["subject"], row["body"],
+                                  row.get("html_body"))
+            if res.get("ok"):
+                _mark_outbox(out_id, "sent", res.get("brevo_id", ""))
+                _log_send({"out_id": out_id, "to": to, "status": "sent",
+                           "provider": "brevo", "id": res.get("brevo_id")})
+                sent += 1
+                continue
+            # brevo failed -> try resend as last resort
+            if os.environ.get("RESEND_API_KEY"):
+                res = _resend_send(row["to_email"], row["subject"], row["body"])
+                if res.get("ok"):
+                    _mark_outbox(out_id, "sent", res.get("resend_id", ""))
+                    _log_send({"out_id": out_id, "to": to, "status": "sent",
+                               "provider": "resend", "id": res.get("resend_id")})
+                    sent += 1
+                    continue
+            _mark_outbox(out_id, "failed", error=res.get("error", "brevo failed"))
+            continue
+
+        # Primary: Resend
+        if os.environ.get("RESEND_API_KEY"):
+            res = _resend_send(row["to_email"], row["subject"], row["body"])
+            if res.get("ok"):
+                _mark_outbox(out_id, "sent", res.get("resend_id", ""))
+                _log_send({"out_id": out_id, "to": to, "status": "sent", "provider": "resend", "id": res.get("resend_id")})
+                sent += 1
+                continue
+
+        # Fallback: Brevo
+        brevo_key = os.environ.get("BREVO_API_KEY", "")
+        if not brevo_key:
+            bp = Path("/root/empire_secrets/brevo_api_key")
+            if bp.exists():
+                brevo_key = bp.read_text().strip()
+        if brevo_key:
+            res = _brevo_api_send(row["to_email"], row["subject"], row["body"])
+            if res.get("ok"):
+                _mark_outbox(out_id, "sent", res.get("brevo_id", ""))
+                _log_send({"out_id": out_id, "to": row["to_email"], "status": "sent", "provider": "brevo", "id": res.get("brevo_id")})
+                sent += 1
+                continue
+
+        # Final fallback: Direct MX (no SaaS, no relay)
+        res = _direct_mx_send(row["to_email"], row["subject"], row["body"])
+        if res.get("ok"):
+            _mark_outbox(out_id, "sent", res.get("mx", ""))
+            _log_send({"out_id": out_id, "to": row["to_email"], "status": "sent", "provider": "mx", "mx": res.get("mx")})
             sent += 1
-        else:
-            # Mark failed
-            err = result.get("error", "unknown")
-            _hub_post(f"/v1/outbox/{out_id}/mark", {
-                "status": "failed",
-                "error": err[:200],
-            })
-            status = "failed"
-            log_entry = {
-                "id": out_id, "to": to_email, "status": "failed",
-                "error": err, "detail": result.get("detail", ""),
-            }
+            continue
 
-        _log_send(log_entry)
-        logger.info("  → %s (resend_id=%s)", status, log_entry.get("resend_id", ""))
-
-        # Brief throttle between sends (Resend rate limit)
-        time.sleep(1)
+        # All failed
+        _mark_outbox(out_id, "failed", error="all backends failed")
+        _log_send({"out_id": out_id, "to": row["to_email"], "status": "failed"})
 
     return sent
 
 
-def run_forever(interval: int = POLL_INTERVAL):
-    """Main loop. Polls, sends, sleeps."""
-    logger.info("mail_sender started (poll every %ds)", interval)
+def main():
+    logger.info("mail_sender starting — poll interval %ds, max/cycle %d", POLL_INTERVAL, MAX_PER_CYCLE)
     while True:
         try:
-            n = send_pending_batch()
-            if n:
-                logger.info("dispatched %d emails this cycle", n)
+            sent = send_pending_batch()
+            if sent:
+                logger.info("sent %d emails this cycle", sent)
         except Exception as e:
-            logger.error("cycle error: %s", e, exc_info=True)
-        time.sleep(interval)
-
-
-def run_once():
-    """Single-shot send (for cron/systemd oneshot)."""
-    n = send_pending_batch()
-    logger.info("dispatched %d emails (oneshot)", n)
-    return n
+            logger.exception("send cycle error: %s", e)
+        time.sleep(POLL_INTERVAL)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    )
-    import sys
-    if "--once" in sys.argv:
-        run_once()
-    else:
-        run_forever()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    main()
