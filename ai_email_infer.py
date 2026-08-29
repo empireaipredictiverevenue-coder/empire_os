@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-"""ai_email_infer.py — LLM email-pattern inference via OpenRouter (fast, hosted).
+"""ai_email_infer.py — LLM email-pattern inference via llm_gateway (one brain).
 
-Local Ollama 7b was a partial/broken download + CPU-slow. Use hosted LLM
-(OpenRouter gpt-4o-mini) to PREDICT the most likely valid business email for
-a domain from business name + domain. No browser, no proxy, no SMTP.
-
-Filter: MX must exist for predicted domain (free DNS). Brevo hard-bounces bad
-ones (we track + flag). This is the AI approach: infer the pattern, don't crawl.
+Predicts the most likely valid business email for a domain from business
+name + domain. No browser, no proxy, no SMTP. Provider chain (Bai -> Groq)
+lives in llm_gateway.py — this module only does prompt + MX filter + DB.
 """
 from __future__ import annotations
 import sys, re, sqlite3, json, urllib.request, os, time
@@ -62,36 +59,15 @@ def _key() -> str:
 
 
 def infer(name: str, domain: str) -> str:
-    body = json.dumps({
-        "model": MODEL,
-        "messages": [{"role": "user", "content": PROMPT.format(name=name, domain=domain)}],
-        "max_tokens": 80, "temperature": 0.1,
-    }).encode()
-    for attempt in range(3):
-        try:
-            req = urllib.request.Request(OR_URL, data=body,
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {_key()}"})
-            with urllib.request.urlopen(req, timeout=25) as r:
-                resp = json.loads(r.read().decode())
-            msg = resp["choices"][0]["message"]
-            txt = (msg.get("content") or "") + " " + (msg.get("reasoning_content") or "")
-            m = EMAIL_RE.search(txt)
-            if m:
-                em = m.group(0).lower().strip()
-                d = em.split("@")[-1]
-                if any(b in d for b in BAD) or not mx_exists(d):
-                    return ""
-                return em
+    import llm_gateway
+    txt = llm_gateway.llm("bulk", PROMPT.format(name=name, domain=domain))
+    m = EMAIL_RE.search(txt)
+    if m:
+        em = m.group(0).lower().strip()
+        d = em.split("@")[-1]
+        if any(b in d for b in BAD) or not mx_exists(d):
             return ""
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                time.sleep(3 * (attempt + 1))
-                continue
-            log(f"  infer err {domain}: {e}")
-            return ""
-        except Exception as e:
-            log(f"  infer err {domain}: {e}")
-            return ""
+        return em
     return ""
 
 
