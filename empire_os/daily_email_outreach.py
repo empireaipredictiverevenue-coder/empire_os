@@ -9,8 +9,9 @@ BREVO_KEY = open("/root/empire_secrets/brevo_api_key").read().strip()
 FROM_EMAIL = "empireaipredictiverevenue@gmail.com"
 from empire_os.mail_sender import _brevo_api_send as _ms_send
 
-BATCH = 50  # max emails per daily run
+BATCH = 500  # daily cap; under EMAIL_SEND_DAILY_LIMIT (2000). 7-day cooldown paces the 16K pool.
 PRODUCTS = ["cortex", "lead_grader", "evaluate"]
+COOLDOWN_DAYS = 7
 
 def send_brevo(to_email, subject, body):
     """Send via canonical mail_sender._send (Resend/Brevo/SendGrid/Mailgun/SMTP/MX fallback)."""
@@ -71,54 +72,76 @@ Redeem: https://empire-ai.co.uk/v1/evaluate/signup?source=empire""" + _usdt_cta(
     return subject, body
 
 def main():
-    db = sqlite3.connect(DB, timeout=30)
+    db = sqlite3.connect(DB, timeout=60)
     db.row_factory = sqlite3.Row
-    db.execute("PRAGMA busy_timeout=30000")
+    db.execute("PRAGMA busy_timeout=60000")
+    # ensure cooldown column exists
+    try:
+        db.execute("ALTER TABLE si_buyer_outreach ADD COLUMN last_emailed TEXT")
+        db.commit()
+    except sqlite3.OperationalError:
+        pass  # already exists
     c = db.cursor()
-    
-    # Get next batch of leads with emails, not yet emailed today
+
+    # Next batch: valid email, not emailed within cooldown. Includes COLD leads
+    # (the 22K untapped pool) — not just already-contacted. Paces via last_emailed.
+    # GROUP BY email so we hit UNIQUE addresses (table has many duplicate-row emails).
     c.execute("""
-        SELECT prospect_id, business_name, email, niche, metro, payout_per_lead
-        FROM si_buyer_outreach 
+        SELECT MIN(prospect_id) AS prospect_id, business_name, email, niche, metro,
+               MIN(payout_per_lead) AS payout_per_lead
+        FROM si_buyer_outreach
         WHERE email IS NOT NULL AND email != ''
-        AND email NOT LIKE '%test%' AND email NOT LIKE '%example%' AND email NOT LIKE '%@v.co'
-        AND reply_state IN ('contacted', 'nurture_ready')
-        ORDER BY CASE reply_state WHEN 'contacted' THEN 0 ELSE 1 END, touch_count DESC
+        AND email NOT LIKE '%test%' AND email NOT LIKE '%example%' AND email NOT LIKE '%@v.co%'
+        AND (last_emailed IS NULL OR last_emailed < datetime('now', ?))
+        GROUP BY email
+        ORDER BY CASE reply_state WHEN 'cold' THEN 0 ELSE 1 END,
+                 MIN(touch_count) ASC, MIN(last_touch_at) ASC
         LIMIT ?
-    """, (BATCH * 3,))
-    
+    """, (f"-{COOLDOWN_DAYS} days", BATCH * 3))
+
     leads = c.fetchall()
-    db.close()
-    
+
     if not leads:
         print("No leads to email")
+        db.close()
         return
-    
+
     print(f"Emailing {len(leads)} leads (max {BATCH} will be sent)")
-    
+
     sent = 0
     skipped = 0
-    
+    seen_emails = set()
+
     for i, lead in enumerate(leads):
         if sent >= BATCH:
             break
-            
+
         lead_dict = dict(lead)
         email = lead_dict["email"]
+        if email in seen_emails:  # dedupe within batch
+            continue
+        seen_emails.add(email)
         product = PRODUCTS[i % len(PRODUCTS)]
         subject, body = get_template(product, lead_dict)
-        
+
         ok, result = send_brevo(email, subject, body)
         if ok:
             print(f"  {sent+1}. OK: {email} ({product}) [{result}]")
             sent += 1
+            db.execute(
+                "UPDATE si_buyer_outreach SET last_emailed=datetime('now'), "
+                "touch_count=touch_count+1, reply_state='contacted', "
+                "last_touch_at=datetime('now') WHERE prospect_id=?",
+                (lead_dict["prospect_id"],))
+            db.commit()
         else:
             print(f"  FAIL: {email} -> {result}")
             skipped += 1
-        
+
         time.sleep(0.3)
-    
+
     print(f"\nSENT: {sent}, SKIPPED: {skipped}")
+    db.close()
 
 if __name__ == "__main__":
     main()

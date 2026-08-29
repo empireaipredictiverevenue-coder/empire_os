@@ -1,5 +1,5 @@
 [Unit]
-Description=Empire OS daily BD outreach (50/day via Brevo)
+Description=Empire OS daily BD outreach (500/day cap, 7-day cooldown, dedup; scales to full unique pool)
 After=network-online.target
 Wants=network-online.target
 

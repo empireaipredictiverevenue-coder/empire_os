@@ -108,18 +108,21 @@ class PageAudit:
 
 
 def _fetch(url: str):
-    """Fetch a URL. Cloudflare blocks Python's urllib UA (403) — use curl,
-    which resolves cleanly from the container."""
-    import subprocess
+    """Fetch a URL via curl. Cloudflare blocks Python's urllib UA (403).
+    Honors SEO_PROXY env (set to a residential proxy URL to defeat Cloudflare
+    datacenter blocks on our own/protected domains)."""
+    import subprocess, os
+    cmd = ["curl", "-sL", "--max-time", str(TIMEOUT),
+           "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                 "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+           "-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+           "-H", "Accept-Language: en-US,en;q=0.9"]
+    proxy = os.environ.get("SEO_PROXY")
+    if proxy:
+        cmd += ["-x", proxy]
+    cmd.append(url)
     try:
-        out = subprocess.run(
-            ["curl", "-sL", "--max-time", str(TIMEOUT),
-             "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-             "-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-             "-H", "Accept-Language: en-US,en;q=0.9",
-             url],
-            capture_output=True, timeout=TIMEOUT + 5)
+        out = subprocess.run(cmd, capture_output=True, timeout=TIMEOUT + 5)
         if out.returncode != 0 or not out.stdout:
             return 0, ""
         return 200, out.stdout.decode("utf-8", "ignore")
