@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS daily BD outreach (09:00 daily)
+
+[Timer]
+OnCalendar=09:00
+Persistent=true
+Unit=empire-daily-outreach.service
+
+[Install]
+WantedBy=timers.target

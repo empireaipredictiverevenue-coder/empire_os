@@ -1,0 +1,15 @@
+[Unit]
+Description=Empire OS daily BD outreach (50/day via Brevo)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/daily_email_outreach.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empire-daily-outreach
+
+[Install]
+WantedBy=multi-user.target

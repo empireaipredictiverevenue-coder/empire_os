@@ -9,6 +9,9 @@ BREVO_KEY = open("/root/empire_secrets/brevo_api_key").read().strip()
 FROM_EMAIL = "empireaipredictiverevenue@gmail.com"
 from empire_os.mail_sender import _brevo_api_send as _ms_send
 
+BATCH = 50  # max emails per daily run
+PRODUCTS = ["cortex", "lead_grader", "evaluate"]
+
 def send_brevo(to_email, subject, body):
     """Send via canonical mail_sender._send (Resend/Brevo/SendGrid/Mailgun/SMTP/MX fallback)."""
     res = _ms_send(to_email, subject, body)
