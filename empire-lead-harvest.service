@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire OS lead harvest (market_sweep --all + free enrich + bridge to BD pool)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 /root/empire_os/lead_harvest.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empire-lead-harvest
+# bounded: market_sweep --all (~462 OSM queries) + up to 300 enrich + 500 bridge
+
+[Install]
+WantedBy=multi-user.target

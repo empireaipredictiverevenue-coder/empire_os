@@ -92,6 +92,7 @@ def main():
         FROM si_buyer_outreach
         WHERE email IS NOT NULL AND email != ''
         AND email NOT LIKE '%test%' AND email NOT LIKE '%example%' AND email NOT LIKE '%@v.co%'
+        AND (email_status IS NULL OR email_status != 'junk')
         AND (last_emailed IS NULL OR last_emailed < datetime('now', ?))
         GROUP BY email
         ORDER BY CASE reply_state WHEN 'cold' THEN 0 ELSE 1 END,

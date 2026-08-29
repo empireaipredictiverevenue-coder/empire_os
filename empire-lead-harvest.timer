@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS lead harvest (daily 05:00)
+
+[Timer]
+OnCalendar=05:00
+Persistent=true
+Unit=empire-lead-harvest.service
+
+[Install]
+WantedBy=timers.target
