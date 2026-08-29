@@ -262,9 +262,9 @@ class ApiClient:
         if os.environ.get("OPENROUTER_API_KEY"):
             self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
             base_url = base_url or "https://openrouter.ai/api/v1"
-            # Force a known-good OpenRouter model (env LLM_MODEL may point at
-            # MiniMax and be inherited from a systemd Environment= override).
-            model = model or "openai/gpt-4o-mini"
+            # Honor LLM_MODEL env (free models like meta-llama/llama-3.1-8b-instruct:free);
+            # fall back to a known-good paid model only if unset.
+            model = model or os.environ.get("LLM_MODEL", "openai/gpt-4o-mini")
         else:
             self.api_key = api_key or os.environ.get("MINIMAX_API_KEY", "")
             # When MINIMAX is configured, any passed Ollama URL is ignored

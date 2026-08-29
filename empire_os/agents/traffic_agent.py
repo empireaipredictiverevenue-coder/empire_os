@@ -18,7 +18,7 @@ sys.path.insert(0, "/root/empire_os")
 from empire_os.agent_core import OllamaClient
 from empire_os.synthetic_agents import SyntheticAgent
 
-HUB = "http://127.0.0.1:8080"
+HUB = "http://127.0.0.1:8081"
 TICK_INTERVAL = 1800  # 30 min
 
 
@@ -89,10 +89,19 @@ class TrafficSpecialistAgent(SyntheticAgent):
 if __name__ == "__main__":
     import os
     os.makedirs("/root/traffic", exist_ok=True)
+    # Drive the LLM backend from env so we never hit the hardcoded
+    # dead remote-Ollama IP in synthetic_agents. OpenRouter key (if present)
+    # wins; otherwise local Ollama / LLM_BASE_URL.
+    # NOTE: pass "" (not None) so SyntheticAgent's dead default IP is bypassed
+    # and OllamaClient falls through to OpenRouter via OPENROUTER_API_KEY.
+    _llm_url = os.environ.get("LLM_BASE_URL", "") or os.environ.get("OLLAMA_URL", "")
+    _llm_model = os.environ.get("LLM_MODEL", "") or os.environ.get("OLLAMA_MODEL", "")
     agent = TrafficSpecialistAgent(
         name="traffic-agent",
         role="traffic",
         health_url="http://localhost:9105/health",
+        llm_url=_llm_url,
+        llm_model=_llm_model,
     )
     print("Traffic specialist agent starting — tick interval %ds" % TICK_INTERVAL)
     consecutive_failures = 0
