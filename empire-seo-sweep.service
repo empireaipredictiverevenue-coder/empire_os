@@ -1,0 +1,15 @@
+[Unit]
+Description=Empire OS SEO sweep loop (organic lead-gen via empire_seo.matrix)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 /root/.hermes/scripts/seo_sweep_loop.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empire-seo-sweep
+
+[Install]
+WantedBy=multi-user.target

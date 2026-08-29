@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS SEO sweep loop (daily 19:00)
+
+[Timer]
+OnCalendar=19:00
+Persistent=true
+Unit=empire-seo-sweep.service
+
+[Install]
+WantedBy=timers.target

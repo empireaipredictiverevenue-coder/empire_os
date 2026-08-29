@@ -108,12 +108,21 @@ class PageAudit:
 
 
 def _fetch(url: str):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    """Fetch a URL. Cloudflare blocks Python's urllib UA (403) — use curl,
+    which resolves cleanly from the container."""
+    import subprocess
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-            return r.status, r.read(600_000).decode("utf-8", "ignore")
-    except urllib.error.HTTPError as e:
-        return e.code, ""
+        out = subprocess.run(
+            ["curl", "-sL", "--max-time", str(TIMEOUT),
+             "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+             "-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+             "-H", "Accept-Language: en-US,en;q=0.9",
+             url],
+            capture_output=True, timeout=TIMEOUT + 5)
+        if out.returncode != 0 or not out.stdout:
+            return 0, ""
+        return 200, out.stdout.decode("utf-8", "ignore")
     except Exception:
         return 0, ""
 
