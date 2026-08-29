@@ -1,0 +1,55 @@
+{
+  "id": "youtube-1784549777",
+  "platform": "youtube",
+  "topic": "AI agents that close deals while you sleep",
+  "video": "/root/empire_os/empire_os/social_render/youtube_1784549771.mp4",
+  "script": {
+    "title": "This AI Closes Deals While You Sleep",
+    "hook": "While you were dreaming, your AI agent closed three deals.",
+    "beats": [
+      {
+        "text": "Most founders lose 80% of leads because they reply too slow. By morning, the money's gone.",
+        "sec": 6
+      },
+      {
+        "text": "Empire OS deploys AI agents that respond in 30 seconds, qualify leads, and book calls on autopilot.",
+        "sec": 8
+      },
+      {
+        "text": "They negotiate. They follow up. They close. Twenty-four hours a day. Zero coffee breaks.",
+        "sec": 8
+      },
+      {
+        "text": "Our top user woke up to $12,400 in new revenue and didn't lift a finger.",
+        "sec": 6
+      },
+      {
+        "text": "Your competition is already running this. Every night you wait is a night they win.",
+        "sec": 6
+      },
+      {
+        "text": "Stop grinding. Start scaling. Empire OS builds the agent, you keep the empire.",
+        "sec": 6
+      },
+      {
+        "text": "DM us 'SLEEP' and we'll deploy your AI closer this week.",
+        "sec": 5
+      }
+    ],
+    "cta": "DM 'SLEEP' to deploy your AI closer today.",
+    "hashtags": [
+      "#empireos",
+      "#aiagents",
+      "#salesautomation",
+      "#entrepreneur",
+      "#passiveincome",
+      "#leadgen",
+      "#aitools",
+      "#founderlife",
+      "#automation",
+      "#closedeals"
+    ]
+  },
+  "status": "draft",
+  "ts": "2026-07-20T12:16:17.664192+00:00"
+}

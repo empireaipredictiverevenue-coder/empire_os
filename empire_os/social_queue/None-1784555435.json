@@ -1,0 +1,66 @@
+{
+  "topic": "marketing marketing leads",
+  "niche": "marketing",
+  "sub_niche": "marketing",
+  "video": "/root/empire_os/empire_os/social_render/youtube_shorts_1784555422.mp4",
+  "thumbnail": "/root/empire_os/empire_os/social_thumbs/thumb_1784555433.jpg",
+  "script": {
+    "title": "Stop Hunting Leads. Let Them Hunt You.",
+    "hook": "You're posting 7 days a week and your calendar is still empty. That's not a hustle problem \u2014 that's a system problem.",
+    "beats": [
+      {
+        "text": "You're posting, DMing, cold-emailing... and crickets. While your competitors close 30 deals a month on autopilot.",
+        "sec": 7
+      },
+      {
+        "text": "Every minute you spend chasing leads is a minute you're not scaling. Time is the only asset you can't buy back.",
+        "sec": 8
+      },
+      {
+        "text": "Empire OS deploys AI agents that find, qualify, and book your buyers \u2014 while you sleep, eat, or close warm leads.",
+        "sec": 9
+      },
+      {
+        "text": "One founder went from 2 calls a week to 47 booked demos in 30 days. Same product. Same offer. Different engine.",
+        "sec": 10
+      },
+      {
+        "text": "We only onboard 12 founders this month. The link is in bio. Don't scroll past this one.",
+        "sec": 11
+      }
+    ],
+    "cta": "DM 'AUTOPILOT' or tap the link in bio \u2014 12 founder slots left this month.",
+    "hashtags": [
+      "#empireos",
+      "#aiagents",
+      "#leadgen",
+      "#marketingautomation",
+      "#founders",
+      "#saas",
+      "#growthhacks",
+      "#sales",
+      "#b2bmarketing",
+      "#entrepreneur"
+    ],
+    "_critic": "PASSED",
+    "_retry": 0
+  },
+  "metadata": {
+    "title": "Stop Hunting Leads. Let Them Hunt You.",
+    "description": "Call: CALL-TRACKING-NOT-CONFIGURED\nCall now and we book the job while you sleep.\n\nYou're posting, DMing, cold-emailing... and crickets. While your competitors close 30 deals a month on autopilot. Every minute you spend chasing leads is a minute you're not scaling. Time is the only asset you can't buy back.\n\nEmpire OS drops AI agents into your marketing business. They find leads, qualify them, handle objections, and close \u2014 24/7.\n\n#ai #automation #marketing\n[AEO] Stop Hunting Leads. Let Them Hunt You. \u2014 You're posting, DMing, cold-emailing... and crickets. While your competitors close 30 deals a month on autopilot. Every minute you spend chasing leads is a minute you're not scaling. Time is the only asset you can't buy back.",
+    "tags": [
+      "ai agents",
+      "lead generation",
+      "marketing",
+      "automation",
+      "empire os"
+    ],
+    "phone": "CALL-TRACKING-NOT-CONFIGURED"
+  },
+  "critic": "PASSED",
+  "aeo": "/root/empire_os/empire_os/_aeo_pages/marketing-stop-hunting-leads-let-them-hunt-you.md",
+  "created": "2026-07-20T13:50:35.132373+00:00",
+  "ts": "2026-07-20T13:50:35.132478+00:00",
+  "status": "draft",
+  "id": "None-1784555435"
+}

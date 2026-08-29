@@ -1,0 +1,59 @@
+{
+  "id": "youtube-1784554515",
+  "platform": "youtube",
+  "topic": "AI agents that close deals while you sleep",
+  "video": "/root/empire_os/empire_os/social_render/youtube_1784554502.mp4",
+  "script": {
+    "title": "My AI Closed 3 Deals While I Slept",
+    "hook": "While you slept last night, my AI agent closed three deals and banked $8,400. Here's how.",
+    "beats": [
+      {
+        "text": "POV: You wake up to closed contracts, paid invoices, and a calendar full of booked calls. This is not a fantasy. This is Empire OS.",
+        "sec": 5
+      },
+      {
+        "text": "Most founders grind 80-hour weeks chasing leads that ghost, follow up that flops, and deals that die in DMs. There is a better way.",
+        "sec": 6
+      },
+      {
+        "text": "Empire OS drops AI agents into your business that find leads, qualify them, handle objections, and close \u2014 on autopilot. 24/7. No sleep required.",
+        "sec": 7
+      },
+      {
+        "text": "They reply in seconds. They never forget. They never quit. While you're at dinner, gym, or bed \u2014 they are selling.",
+        "sec": 6
+      },
+      {
+        "text": "Proof: One founder went from 2 booked calls a week to 23 in 30 days. Same product. Zero extra hours worked.",
+        "sec": 6
+      },
+      {
+        "text": "Your competitors are already deploying AI. Every single day you wait, they close another deal that should be yours.",
+        "sec": 5
+      },
+      {
+        "text": "Scarcity alert: Empire OS is invite-only this month. 47 spots left. Once they're gone, the door closes.",
+        "sec": 5
+      },
+      {
+        "text": "CTA: DM us the word 'EMPIRE' right now \u2014 or grab the link in bio. Your AI sales team goes live tonight. While your competition sleeps, you close.",
+        "sec": 5
+      }
+    ],
+    "cta": "DM 'EMPIRE' or tap the link in bio \u2014 your AI sales team deploys tonight.",
+    "hashtags": [
+      "#empireos",
+      "#aiagents",
+      "#aiautomation",
+      "#salesautomation",
+      "#leadgen",
+      "#founderlife",
+      "#entrepreneur",
+      "#passiveincome",
+      "#buildinpublic",
+      "#aitools"
+    ]
+  },
+  "status": "draft",
+  "ts": "2026-07-20T13:35:15.969266+00:00"
+}

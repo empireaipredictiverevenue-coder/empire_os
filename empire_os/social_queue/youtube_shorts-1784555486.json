@@ -1,0 +1,69 @@
+{
+  "platform": "youtube_shorts",
+  "topic": "hvac hvac leads",
+  "niche": "hvac",
+  "sub_niche": "hvac",
+  "video": "/root/empire_os/empire_os/social_render/youtube_shorts_1784555475.mp4",
+  "thumbnail": "/root/empire_os/empire_os/social_thumbs/thumb_1784555486.jpg",
+  "script": {
+    "title": "HVAC companies are DYING without this \ud83d\udd25",
+    "hook": "Your HVAC phones aren't ringing because your competitors are using AI to steal every lead in your zip code.",
+    "beats": [
+      {
+        "text": "Stop chasing cold leads. Empire OS deploys AI agents that book HVAC jobs on autopilot \u2014 24/7, zero payroll.",
+        "sec": 7
+      },
+      {
+        "text": "It texts every form fill in under 60 seconds. Speed-to-lead = money. The average HVAC company replies in 5 hours. We reply in 5 seconds.",
+        "sec": 8
+      },
+      {
+        "text": "One client added $47K in booked installs in 30 days \u2014 with the same trucks, same techs, just a smarter front door.",
+        "sec": 8
+      },
+      {
+        "text": "The AI qualifies the lead, books the slot, and upsells maintenance plans \u2014 while you sleep, while you're on a roof, while you're with family.",
+        "sec": 8
+      },
+      {
+        "text": "Summer is coming. Your competitors are already booked. DM us 'HVAC' and we'll plug Empire OS into your business this week.",
+        "sec": 9
+      }
+    ],
+    "cta": "DM us 'HVAC' right now \u2014 we'll show you how to plug Empire OS into your business this week.",
+    "hashtags": [
+      "#empireos",
+      "#aiagents",
+      "#hvac",
+      "#hvacleads",
+      "#hvacbusiness",
+      "#leadgeneration",
+      "#automation",
+      "#smallbusiness",
+      "#entrepreneur",
+      "#aiautomation",
+      "#contractor",
+      "#hvactech"
+    ],
+    "_critic": "PASSED",
+    "_retry": 0
+  },
+  "metadata": {
+    "title": "HVAC companies are DYING without this \ud83d\udd25",
+    "description": "Call: CALL-TRACKING-NOT-CONFIGURED\nCall now and we book the job while you sleep.\n\nStop chasing cold leads. Empire OS deploys AI agents that book HVAC jobs on autopilot \u2014 24/7, zero payroll. It texts every form fill in under 60 seconds. Speed-to-lead = money. The average HVAC company replies in 5 hours. We reply in 5 seconds.\n\nEmpire OS drops AI agents into your hvac business. They find leads, qualify them, handle objections, and close \u2014 24/7.\n\n#ai #automation #hvac\n[AEO] HVAC companies are DYING without this \ud83d\udd25 \u2014 Stop chasing cold leads. Empire OS deploys AI agents that book HVAC jobs on autopilot \u2014 24/7, zero payroll. It texts every form fill in under 60 seconds. Speed-to-lead = money. The average HVAC company replies in 5 hours. We reply in 5 seconds.",
+    "tags": [
+      "ai agents",
+      "lead generation",
+      "hvac",
+      "automation",
+      "empire os"
+    ],
+    "phone": "CALL-TRACKING-NOT-CONFIGURED"
+  },
+  "critic": "PASSED",
+  "aeo": "/root/empire_os/empire_os/_aeo_pages/hvac-hvac-companies-are-dying-without-this.md",
+  "created": "2026-07-20T13:51:26.845878+00:00",
+  "ts": "2026-07-20T13:51:26.845949+00:00",
+  "status": "draft",
+  "id": "youtube_shorts-1784555486"
+}

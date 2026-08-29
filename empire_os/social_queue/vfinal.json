@@ -1,0 +1,55 @@
+{
+  "id": "vfinal",
+  "platform": "youtube",
+  "topic": "t",
+  "video": "/root/empire_os/empire_os/social_render/youtube_1784550551.mp4",
+  "script": {
+    "title": "AI Sales Agents Are Closing Deals on Autopilot",
+    "hook": "Your best salesperson quit last week. This AI replaced him \u2014 and closed $47K by Friday.",
+    "beats": [
+      {
+        "text": "Sales reps are expensive. They ghost leads. They take PTO. They sleep.",
+        "sec": 5
+      },
+      {
+        "text": "Empire OS AI agents don't. They prospect, qualify, and close \u2014 24/7, zero excuses.",
+        "sec": 7
+      },
+      {
+        "text": "It finds leads, runs the convo, books the call, seals the deal. Hands off.",
+        "sec": 7
+      },
+      {
+        "text": "One founder ran it for 7 days. Pipeline tripled. No new hires. No overhead.",
+        "sec": 7
+      },
+      {
+        "text": "While you're watching this, your competitor's AI just closed another deal.",
+        "sec": 6
+      },
+      {
+        "text": "The founders winning right now aren't grinding harder. They're deploying agents.",
+        "sec": 6
+      },
+      {
+        "text": "DM 'CLOSE' and we'll build your AI closer in 48 hours. Empire OS.",
+        "sec": 7
+      }
+    ],
+    "cta": "DM 'CLOSE' to deploy your AI closer today \u2014 link in bio.",
+    "hashtags": [
+      "#EmpireOS",
+      "#AIAgents",
+      "#SalesAutomation",
+      "#AICloseDeals",
+      "#StartupFounder",
+      "#AutonomousAI",
+      "#LeadGen",
+      "#ScaleYourBusiness",
+      "#AITools",
+      "#FutureOfSales"
+    ]
+  },
+  "status": "draft",
+  "ts": "2026-07-20T12:29:16.259620+00:00"
+}

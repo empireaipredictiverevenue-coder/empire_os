@@ -1,0 +1,67 @@
+{
+  "id": "youtube-1784550534",
+  "platform": "youtube",
+  "topic": "AI agents that close deals while you sleep",
+  "video": "/root/empire_os/empire_os/social_render/youtube_1784550528.mp4",
+  "script": {
+    "title": "I Slept 8 Hours. Closed $47K.",
+    "hook": "I went to bed broke. I woke up with $47,000 in closed deals.",
+    "beats": [
+      {
+        "text": "I went to bed broke. I woke up with $47,000 in closed deals.",
+        "sec": 4
+      },
+      {
+        "text": "No team. No hustle. Just an AI agent working while I slept.",
+        "sec": 5
+      },
+      {
+        "text": "Empire OS doesn't just find leads \u2014 it talks to them.",
+        "sec": 5
+      },
+      {
+        "text": "Qualifies. Objection-handles. Books the call.",
+        "sec": 4
+      },
+      {
+        "text": "All while you're dreaming about your next move.",
+        "sec": 5
+      },
+      {
+        "text": "Other founders are grinding 14 hours. You're closing in your pajamas.",
+        "sec": 5
+      },
+      {
+        "text": "This is the unfair advantage they don't want you to have.",
+        "sec": 5
+      },
+      {
+        "text": "AI agents that prospect, pitch, and close \u2014 on autopilot.",
+        "sec": 5
+      },
+      {
+        "text": "Empire OS. Your sales team that never sleeps, never quits, never asks for a raise.",
+        "sec": 4
+      },
+      {
+        "text": "DM us 'SLEEP' and we'll build your first agent free this week.",
+        "sec": 4
+      }
+    ],
+    "cta": "DM us 'SLEEP' and we'll build your first AI closer free this week. Link in bio.",
+    "hashtags": [
+      "#empireos",
+      "#aiagents",
+      "#aiautomation",
+      "#salestips",
+      "#entrepreneurlife",
+      "#passiveincome",
+      "#ai",
+      "#buildinpublic",
+      "#founder",
+      "#agencylife"
+    ]
+  },
+  "status": "draft",
+  "ts": "2026-07-20T12:28:54.930440+00:00"
+}

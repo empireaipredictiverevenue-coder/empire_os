@@ -1,17 +1,13 @@
-.env
-empire_os.db
-empire_os.db-wal
-empire_os.db-shm
+logs/
+feedback/
+backups/
+*.db
+*.db-wal
+*.db-shm
+data/*.db
 __pycache__/
 *.pyc
-
-# Archived/fabricated content (preserved data, not active code)
-.archive/
-
-anthropic-skills/
-claude-code/
-superpowers/
-
-# social engine draft artifacts
-empire_os/social_queue/
-empire_os/social_render/
+*.log
+*.jsonl
+node_modules/
+.env

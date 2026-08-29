@@ -1,0 +1,59 @@
+{
+  "id": "v3",
+  "platform": "youtube",
+  "topic": "t",
+  "video": "/root/empire_os/empire_os/social_render/youtube_1784549987.mp4",
+  "script": {
+    "title": "AI Agents That Close Deals While You Sleep",
+    "hook": "Your competitor just hired 100 sales reps who never sleep, never quit, and cost less than your coffee. Here's the unfair advantage.",
+    "beats": [
+      {
+        "text": "AI agents aren't chatbots. They're autonomous closers.",
+        "sec": 4
+      },
+      {
+        "text": "They find leads. Qualify them. Book calls. Follow up. Negotiate.",
+        "sec": 6
+      },
+      {
+        "text": "Empire OS runs the entire funnel on autopilot \u2014 from cold outreach to signed contract.",
+        "sec": 7
+      },
+      {
+        "text": "One founder closed $47K in 14 days with a single agent.",
+        "sec": 5
+      },
+      {
+        "text": "Another replaced a 5-person SDR team. Same pipeline. 90% lower cost.",
+        "sec": 6
+      },
+      {
+        "text": "While you sleep, the agent is sending DMs, answering objections, closing deals.",
+        "sec": 6
+      },
+      {
+        "text": "Every hour you wait, your competitor closes another customer you never even talked to.",
+        "sec": 6
+      },
+      {
+        "text": "Stop trading hours for revenue. Let the agent trade results for you.",
+        "sec": 5
+      }
+    ],
+    "cta": "DM 'AGENT' right now and watch Empire OS close a deal live in your inbox.",
+    "hashtags": [
+      "#empireos",
+      "#aiagents",
+      "#salesautomation",
+      "#leadgen",
+      "#aiautomation",
+      "#founderlife",
+      "#startup",
+      "#saas",
+      "#autoclose",
+      "#aitools"
+    ]
+  },
+  "status": "draft",
+  "ts": "2026-07-20T12:19:53.025227+00:00"
+}

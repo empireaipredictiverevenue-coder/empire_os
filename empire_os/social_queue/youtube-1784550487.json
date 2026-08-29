@@ -1,0 +1,57 @@
+{
+  "id": "youtube-1784550487",
+  "platform": "youtube",
+  "topic": "How to book 10 calls a day on autopilot",
+  "video": "/root/empire_os/empire_os/social_render/youtube_1784550483.mp4",
+  "script": {
+    "title": "10 calls/day on autopilot (no team needed)",
+    "hook": "I haven't booked a call manually in 90 days \u2014 here's the system that did it for me.",
+    "beats": [
+      {
+        "text": "You're posting content, chasing DMs, and still ending the week with 2 calls booked. That's not hustle \u2014 that's a broken system.",
+        "sec": 5
+      },
+      {
+        "text": "Empire OS deploys an AI agent that does what your BDR refuses to do \u2014 14 hours a day, no complaints, no excuses.",
+        "sec": 7
+      },
+      {
+        "text": "It finds the lead, warms them up over DM, qualifies the budget, and only drops a call link when intent is hot.",
+        "sec": 8
+      },
+      {
+        "text": "One founder in SaaS booked 11 calls yesterday. Another in coaching closed $14K while he was at the gym.",
+        "sec": 7
+      },
+      {
+        "text": "The pipeline runs whether you're live or not. While you sleep, it's selling.",
+        "sec": 6
+      },
+      {
+        "text": "We only onboard 10 operators this week. After that, the door closes.",
+        "sec": 6
+      },
+      {
+        "text": "Comment 'AUTOPILOT' and we'll DM you the setup.",
+        "sec": 6
+      }
+    ],
+    "cta": "Comment 'AUTOPILOT' \u2014 we'll DM you the playbook and lock your spot.",
+    "hashtags": [
+      "#empireos",
+      "#aiagents",
+      "#salesautomation",
+      "#leadgen",
+      "#bookedcalls",
+      "#saasfounder",
+      "#coachingbusiness",
+      "#autopilot",
+      "#aitools",
+      "#founders",
+      "#b2bsales",
+      "#closedeals"
+    ]
+  },
+  "status": "draft",
+  "ts": "2026-07-20T12:28:07.497607+00:00"
+}

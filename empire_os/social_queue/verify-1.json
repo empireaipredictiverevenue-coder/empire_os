@@ -1,0 +1,27 @@
+{
+  "id": "verify-1",
+  "platform": "youtube",
+  "topic": "test",
+  "video": "/root/empire_os/empire_os/social_render/youtube_1784549831.mp4",
+  "script": {
+    "title": "Test",
+    "hook": "h",
+    "beats": [
+      {
+        "text": "Leads go cold fast"
+      },
+      {
+        "text": "Agents reply in 8s"
+      },
+      {
+        "text": "They book. You close."
+      }
+    ],
+    "cta": "Follow",
+    "hashtags": [
+      "#empireos"
+    ]
+  },
+  "status": "draft",
+  "ts": "2026-07-20T12:17:13.748385+00:00"
+}

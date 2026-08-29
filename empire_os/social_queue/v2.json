@@ -1,0 +1,51 @@
+{
+  "id": "v2",
+  "platform": "youtube",
+  "topic": "t",
+  "video": "/root/empire_os/empire_os/social_render/youtube_1784549891.mp4",
+  "script": {
+    "title": "AI Just Replaced Your Sales Team",
+    "hook": "Your best closer just got replaced by code \u2014 and it's closing 3x more deals while you sleep.",
+    "beats": [
+      {
+        "text": "POV: It's 3am. While you're dreaming, an AI agent is qualifying leads, booking calls, and closing deals.",
+        "sec": 5
+      },
+      {
+        "text": "Empire OS doesn't just chat. It hunts. It follows up 7x faster than any human ever could.",
+        "sec": 7
+      },
+      {
+        "text": "One founder. Zero sales hires. $47K closed in 14 days \u2014 fully automated.",
+        "sec": 8
+      },
+      {
+        "text": "It reads intent, handles objections, and books the call before your coffee gets cold.",
+        "sec": 7
+      },
+      {
+        "text": "Your competitors are already deploying. Every day you wait is revenue you'll never recover.",
+        "sec": 8
+      },
+      {
+        "text": "DM 'EMPIRE' to deploy your AI closer this week. Limited spots \u2014 we onboard 5 founders at a time.",
+        "sec": 10
+      }
+    ],
+    "cta": "DM 'EMPIRE' now \u2014 link in bio to deploy your AI closer today.",
+    "hashtags": [
+      "#empireos",
+      "#aiagents",
+      "#aiautomation",
+      "#salesautomation",
+      "#closeddeals",
+      "#leadgen",
+      "#founderlife",
+      "#aitools",
+      "#solopreneur",
+      "#saas"
+    ]
+  },
+  "status": "draft",
+  "ts": "2026-07-20T12:18:15.983451+00:00"
+}

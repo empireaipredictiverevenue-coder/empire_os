@@ -1,0 +1,27 @@
+{
+  "id": "yt-test-1",
+  "platform": "youtube",
+  "topic": "test",
+  "video": "/root/empire_os/empire_os/social_render/youtube_1784549590.mp4",
+  "script": {
+    "title": "AI Agents That Close While You Sleep",
+    "hook": "x",
+    "beats": [
+      {
+        "text": "Most leads go cold in 5 mins"
+      },
+      {
+        "text": "Our agents reply in 8 seconds"
+      },
+      {
+        "text": "They book the call. You close."
+      }
+    ],
+    "cta": "Follow",
+    "hashtags": [
+      "#empireos"
+    ]
+  },
+  "status": "draft",
+  "ts": "2026-07-20T12:13:13.063896+00:00"
+}
