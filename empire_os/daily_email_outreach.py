@@ -7,7 +7,7 @@ sys.path.insert(0, "/root/empire_os/empire_os")
 DB = "/root/empire_os/empire_os.db"
 BREVO_KEY = open("/root/empire_secrets/brevo_api_key").read().strip()
 FROM_EMAIL = "empireaipredictiverevenue@gmail.com"
-from empire_os.mail_sender import _send as _ms_send
+from empire_os.mail_sender import _brevo_api_send as _ms_send
 
 def send_brevo(to_email, subject, body):
     """Send via canonical mail_sender._send (Resend/Brevo/SendGrid/Mailgun/SMTP/MX fallback)."""
@@ -16,12 +16,26 @@ def send_brevo(to_email, subject, body):
         return True, res.get("brevo_id") or res.get("resend_id") or res.get("msg_id") or ""
     return False, res.get("error", "unknown")
 
+# Trust Wallet (BSC USDT) — zero-friction payment rail
+_VAULT = "0x1339b487046B0ad924a10c20b1791608EA8595a8"
+_USDT = "0x55d398326f99059fF775485246999027B3197955"
+
+def _usdt_cta():
+    return (
+        "\n\n--\n"
+        "PAY IN USDT (BSC) — no card, no calls:\n"
+        f"  bsc:{_VAULT}?amount=10&contract={_USDT}&memo=EMPIRE-OUTREACH\n"
+        "  or reply 'YES' and we send your pay link.\n"
+        "  verify: https://bscscan.com/token/" + _USDT + "?a=" + _VAULT + "#transfer\n"
+        "Empire AI — empire-ai.co.uk"
+    )
+
 def get_template(product, lead):
     name = lead["business_name"] or lead["prospect_id"] or "there"
     niche = lead["niche"] or "your industry"
     metro = lead["metro"] or "your area"
     ppl = lead.get("payout_per_lead") or 0
-    
+
     if product == "cortex":
         subject = f"AI Lead Intelligence for {niche} companies"
         body = f"""Hi {name},
@@ -30,15 +44,8 @@ Empire AI is launching a lead intelligence product that predicts which businesse
 
 It monitors 16 data sources in real time — weather events, insurance filings, permit applications, job postings, and more — to surface high-intent leads first.
 
-Our Cortex Intelligence dashboard runs $299/month.
-First 10 companies get a free evaluation (worth $200).
-
-Sign up: https://empire-ai.co.uk/v1/cortex/signup?source=outreach
-
-No contracts. Cancel anytime.
-
---
-Empire AI Intelligence"""
+Cortex Intelligence: $299/month. First 10 companies get a free evaluation (worth $200).
+Start: https://empire-ai.co.uk/v1/cortex/signup?source=outreach""" + _usdt_cta()
     elif product == "lead_grader":
         eval_price = round(ppl * 0.4, 2) if ppl and ppl > 0 else 9.99
         subject = f"Know which {niche} leads are worth your time"
@@ -48,32 +55,16 @@ We built a tool that grades incoming {niche} leads on quality — so you stop ch
 
 Each lead is scored against 14 signals (timing, intent, budget window, decision-maker status, and more).
 
-Lead Grader: $49/month.
-Each grade costs ${eval_price} per lead. You can patch it into your intake form in <5 minutes.
-
-API key: https://factory-ai.co.uk/v1/lead-grader/signup?source=empire
-
-Free plan gives you 3 grades per day. Upgrade when you see the signal.
-
-Test Empire / OS"""
+Lead Grader: $49/month. Each grade ${eval_price}/lead. Patch into your intake form in <5 minutes.
+API key: https://empire-ai.co.uk/v1/lead-grader/signup?source=empire""" + _usdt_cta()
     else:
         subject = f"Free {niche} lead evaluation credits"
         body = f"""Hi {name},
 
-We're onboarding {niche} companies in {metro} onto our lead evaluation engine, and you have 4 free credits waiting (each worth $10 when purchased).
+We're onboarding {niche} companies in {metro} onto our lead evaluation engine, and you have 4 free credits waiting (each worth $10).
 
-This is the same engine the large lead brokers use to price leads — now available for the first time via API.
-
-Your credits: 4 x $10 = $40 value
-Get started: $10/month for 10 additional credits
-
-One API call, instant evaluation.
-
-Redeem: https://factory-ai.co.uk/v1/evaluate/signup?source=empire
-
-Why groups are taking these early seats: first 20 companies get the current pricing forever. After that, $49/month for 10 credits.
-
-Empire / OS"""
+Same engine the large lead brokers use to price leads — now via API. $10/month for 10 credits.
+Redeem: https://empire-ai.co.uk/v1/evaluate/signup?source=empire""" + _usdt_cta()
     return subject, body
 
 def main():
