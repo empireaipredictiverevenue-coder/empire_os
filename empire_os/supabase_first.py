@@ -159,7 +159,7 @@ class SQLiteReplica:
                 score_breakdown TEXT,
                 outreach_attempted INTEGER,
                 outreach_at TEXT,
-                vapi_call_id TEXT,
+                vapi_call_id TEXT,  -- legacy col, phone outreach removed 2026-08-29
                 email_sent INTEGER,
                 audit_generated INTEGER,
                 audit_token TEXT,
@@ -236,7 +236,7 @@ class SQLiteReplica:
                 enrichment_score REAL,
                 outreach_attempted INTEGER,
                 outreach_at TEXT,
-                vapi_call_id TEXT,
+                vapi_call_id TEXT,  -- legacy col, phone outreach removed 2026-08-29
                 email_sent INTEGER,
                 audit_generated INTEGER,
                 audit_token TEXT,

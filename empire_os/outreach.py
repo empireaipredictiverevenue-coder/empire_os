@@ -50,48 +50,12 @@ def get_qualified_leads(limit: int = 50) -> List[Dict]:
     return [dict(r) for r in rows]
 
 def vapi_make_call(lead: Dict, script_config: Dict = None) -> Dict:
-    """Trigger Vapi AI call to lead."""
-    # Vapi API integration
-    vapi_key = os.environ.get("VAPI_API_KEY", "")
-    if not vapi_key:
-        return {"success": False, "error": "VAPI_API_KEY not set"}
-    
-    phone = lead.get("phone", "").strip()
-    if not phone:
-        return {"success": False, "error": "No phone number"}
-    
-    # Vapi API call
-    url = "https://api.vapi.ai/call"
-    headers = {
-        "Authorization": f"Bearer {os.environ.get('VAPI_API_KEY', '')}",
-        "Content-Type": "application/json",
-    }
-    
-    payload = {
-        "phoneNumber": phone,
-        "assistant": {
-            "firstMessage": f"Hi {lead.get('first_name', 'there')}, this is an automated call from Empire AI regarding {lead.get('company', 'your business')}. We found significant revenue opportunities on your website. Would you like to hear about them?",
-            "model": {
-                "provider": "openai",
-                "model": "gpt-4",
-                "systemPrompt": "You are a revenue optimization specialist calling businesses to help them fix revenue leaks on their website. Be helpful, not pushy. Focus on specific revenue opportunities you found."
-            },
-            "voice": {"provider": "11labs", "voiceId": "pNInz6obpgDQGcFmaJgB"},
-        }
-    }
-    
-    try:
-        data = json.dumps(payload).encode()
-        req = urllib.request.Request(
-            "https://api.vapi.ai/call",
-            data=data,
-            headers={"Authorization": f"Bearer {os.environ.get('VAPI_API_KEY', '')}", "Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode())
-            return {"success": True, "call_id": data.get("id")}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    """AI voice calls REMOVED per founder (2026-08-29) — phone/Vapi out.
+    Kept as no-op stub so callers (trigger_lead_outreach, hub imports)
+    don't break. Outreach = email-only via send_outreach_email().
+    Do NOT re-add Vapi: founder decision is permanent."""
+    return {"success": False, "error": "phone_outreach_disabled_by_founder"}
+
 
 def send_outreach_email(lead: Dict) -> Dict:
     """Send outcome-based email via Resend/Brevo."""
