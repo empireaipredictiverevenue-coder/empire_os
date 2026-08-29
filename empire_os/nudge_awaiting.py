@@ -110,6 +110,11 @@ def main():
             "VALUES (?,?,?,?,?, 'pay_nudge', ?, 'buyer', ?, datetime('now'))",
             (r["email"], subject, body, r["plan"], "founder",
              status, f'{{"tenant_id":"{r["tenant_id"]}"}}'))
+        # record expected payment so payment_matcher can match incoming USDT by amount
+        c.execute(
+            "INSERT INTO expected_payments (amount_usd, email, tenant_id, ref, status, created_at) "
+            "VALUES (?,?,?,?,'pending',datetime('now'))",
+            (r["price_cents"] / 100.0, r["email"], r["tenant_id"], r["payment_ref"]))
         c.commit()
         sent += 1
         print(f"  {status}: {r['email']}")

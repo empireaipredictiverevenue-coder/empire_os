@@ -1,0 +1,17 @@
+[Unit]
+Description=Empire OS Payment Matcher — USDT(BSC) Transfer → seat activation
+After=network-online.target empire-bsc-listener.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/payment_matcher.py --daemon
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empire-payment-matcher
+
+[Install]
+WantedBy=multi-user.target
