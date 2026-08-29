@@ -74,7 +74,13 @@ class TrafficSpecialistAgent(SyntheticAgent):
 
     def act(self, decision: str) -> dict:
         try:
-            d = json.loads(decision)
+            raw = (decision or "").strip()
+            # LLM often wraps JSON in ```json ... ``` fences — unwrap before parse.
+            if raw.startswith("```"):
+                raw = raw.split("```", 2)[1]
+                if raw.lower().startswith("json"):
+                    raw = raw[4:]
+            d = json.loads(raw)
             out = Path("/root/traffic/recommendations.jsonl")
             out.parent.mkdir(parents=True, exist_ok=True)
             d["ts"] = time.time()
