@@ -11,6 +11,7 @@ crm_leads = source of truth. si_buyer_outreach = derived.
 """
 import sys, time
 sys.path.insert(0, "/root/empire_os")
+sys.path.insert(0, "/root/empire_os/empire_os")  # daily_email_outreach lives here
 import lead_harvest, daily_email_outreach
 
 if __name__ == "__main__":
