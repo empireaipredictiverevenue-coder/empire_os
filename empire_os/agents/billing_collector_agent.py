@@ -8,11 +8,15 @@ Runs as daemon every 6h. Idempotent. Never edits amounts.
 import os, time, sqlite3, sys
 sys.path.insert(0, "/root/empire_os")
 import empire_os.hermes_gateway as g
-from empire_os.agents.solana_listener_agent import VAULT
+from empire_os.agents.solana_listener_agent import VAULT as _OLD_VAULT
+
+# BSC USDT wallet — correct settlement address (new trust wallet)
+VAULT = "0x1339b487046B0ad924a10c20b1791608EA8595a8"
+BSC_USDT_CONTRACT = "0x55d398326f99059fF775485246999027B3197955"
 
 DB = "/root/empire_os/empire_os.db"
-POLL = 6 * 3600
-REMINDER_AGE_H = 24
+POLL = 1 * 3600
+REMINDER_AGE_H = 1
 
 def alert(msg):
     try:
@@ -43,10 +47,10 @@ def mark_reminded(inv_id):
               (inv_id,))
     c.commit(); c.close()
 
-def remind(inv_id, buyer, micro):
-    usd = micro / 1e6
-    alert(f"INVOICE {inv_id[:8]} for {buyer}: ${usd:.2f} open >24h. "
-          f"Pay USDC to {VAULT}. Auto-confirmed on arrival.")
+def remind(inv_id, buyer, usd_amount):
+    usd = usd_amount or 0
+    alert(f"INVOICE {inv_id[:16]} for {buyer}: ${usd:.2f} open >1h. "
+          f"Pay USDT (BEP20) to {VAULT}. Include memo 'LEAD_<id>'. Auto-confirmed on arrival.")
     mark_reminded(inv_id)
 
 def digest():
@@ -67,17 +71,18 @@ def digest():
     c.execute("INSERT OR REPLACE INTO _meta (k,v) VALUES ('last_digest', ?)",
               (_dt.datetime.now().isoformat(),))
     c.commit(); c.close()
-    alert(f"DAILY BILLING DIGEST — open: {open_n[0]} (${open_n[1]/1e6:.2f}) | "
-          f"paid: {paid_n[0]} (${paid_n[1]/1e6:.2f}) | vault: {VAULT}")
+    alert(f"DAILY BILLING DIGEST — open: {open_n[0]} (${open_n[1]:.2f}) | "
+          f"paid: {paid_n[0]} (${paid_n[1]:.2f}) | BSC USDT wallet: {VAULT}")
 
 def collect():
     rows = open_invoices()
     sent = 0
-    for inv_id, buyer, micro, created in rows:
-        remind(inv_id, buyer or "buyer", micro or 0)
+    for inv_id, buyer, amount_usdc, created in rows:
+        remind(inv_id, buyer or "buyer", amount_usdc or 0)
         sent += 1
     if sent:
-        alert(f"{sent} open invoices reminded (total open: {len(rows)})")
+        alert(f"{sent} open invoices reminded (total open in batch: {len(rows)})")
+        digest()
     else:
         digest()  # nothing to remind -> still send daily totals
     return sent

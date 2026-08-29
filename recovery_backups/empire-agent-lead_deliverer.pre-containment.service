@@ -1,0 +1,17 @@
+[Unit]
+Description=Empire OS agent: lead_deliverer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/root/empire_secrets/llm.env
+Type=simple
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/lead_deliverer_agent.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -182,7 +182,7 @@ def render_cinematic(voice_wav: str, portrait_path: Path, beats: list[str],
       - animated subscribe button (last 12s of video)
       - end screen (last 12s, fade-in)
     """
-    from video_branding import (
+    from empire_os.video_branding import (
         make_logo_watermark, make_name_plate, make_end_screen,
         make_broll_dashboard, make_broll_data_table,
         make_subscribe_button_frames, OUT_DIR,

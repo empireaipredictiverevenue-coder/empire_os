@@ -183,8 +183,8 @@ def deploy_own():
         "general_contractor": ["Commercial + residential GC leads", "Project-intent businesses", "Verified decision-makers"],
         "plumbing": ["Emergency + retrofit plumbing leads", "High-intent local calls", "Exclusive zip coverage"],
         "ai_automation": ["AI workflow automation for SMBs", "Agentic lead routing + follow-up", "No-code deployment, live in days"],
-        "ai_consulting": ["AI strategy + deployment consulting", "LLM ops, RAG, agent design", "Fractional AI team on USDC"],
-        "ai_lead_gen": ["AI-driven B2B lead generation", "Autonomous agent supply layer", "Verified, exclusive, settle in USDC"],
+        "ai_consulting": ["AI strategy + deployment consulting", "LLM ops, RAG, agent design", "Fractional AI team on USDT"],
+        "ai_lead_gen": ["AI-driven B2B lead generation", "Autonomous agent supply layer", "Verified, exclusive, settle in USDT"],
         "machine_learning": ["Custom ML models + inference", "Synthetic intelligence pipelines", "Edge + cloud deployment"],
     }
     out = []
@@ -200,7 +200,7 @@ def deploy_next_products():
     """AEO pages for the NEXT products (DB SKUs not yet surfaced).
     Every shippable SKU gets a citation-optimized page."""
     skus = {
-        "empire_leads_engine": ["Autonomous B2B lead engine", "Lane/seat-corridor model", "Settle in USDC, no Stripe"],
+        "empire_leads_engine": ["Autonomous B2B lead engine", "Lane/seat-corridor model", "Settle in USDT, no Stripe"],
         "hermes_framework": ["Agent orchestration framework", "C-suite autonomous agents", "Open-source, self-host"],
         "opencut_studio": ["AI video + creative studio", "Render farm on demand", "White-label output"],
         "empire_templates": ["Done-for-you agent templates", "Deploy in minutes", "Brandable"],

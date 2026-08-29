@@ -172,7 +172,7 @@ class OllamaClient:
         self.base_url = (base_url or os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")).rstrip("/")
         # Use OLLAMA_MODEL for local ollama, fall back to LLM_MODEL for cross-compat,
         # then hard default
-        self.model = model or os.environ.get("OLLAMA_MODEL") or os.environ.get("LLM_MODEL") or "qwen2.5:3b"
+        self.model = model or os.environ.get("OLLAMA_MODEL") or os.environ.get("LLM_MODEL") or "qwen3:8b"
         self.timeout = timeout
         self._session = None
 

@@ -1,0 +1,19 @@
+[
+  {
+    "source": "/root/empire_os/feedback/verify_2026-08-15.txt",
+    "posts": [
+      {
+        "platform": "LinkedIn",
+        "content": "12 of 13 automated system checks passed this morning. One failure? A writable insert carrying a charge_id without a memo.\n\nThe takeaway: automated verification isn't just about catching bugs—it enforces architectural discipline. The one failing test is now our highest priority.\n\nWhat does your verification suite catch?"
+      },
+      {
+        "platform": "X/Twitter",
+        "content": "Ran a 13-point system verification today.\n\n12 passed. 1 failed.\n\nThe failure? A DB insert carrying a charge_id without a memo.\n\nAutomated checks don't just find bugs. They enforce architectural discipline.\n\nThread on building verification gauntlets 🧵👇"
+      },
+      {
+        "platform": "YouTube Short",
+        "content": "Title: Why 1 Failed Test is Better Than 12 Passed\n\n[0-3s] Visual: Code terminal showing '12/13 PASSED' in green, one red [FAIL]\n[3-7s] Text: '12 checks passed. 1 failed. Guess which one matters most?'\n[7-12s] Visual: Zoom into the failing line: 'writable insert has charge_id (no memo)'\n[12-15s] Text: 'Passing tests prove what works. Failing tests show you where to build next.'"
+      }
+    ]
+  }
+]

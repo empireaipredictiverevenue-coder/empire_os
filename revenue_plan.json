@@ -1,0 +1,152 @@
+{
+  "generated_at": "2026-08-28T11:35:12.155918+00:00",
+  "source_db": "/root/empire_os/empire_os.db",
+  "current": {
+    "active_buyers": 65,
+    "awaiting_buyers": 498,
+    "active_seat_mrr": 2189.0,
+    "active_seat_arr": 26268.0,
+    "awaiting_seat_mrr_pipeline": 318148.0,
+    "modelled_per_lead_mrr": 110260.0,
+    "total_mrr": 112449.0,
+    "total_arr": 1349388.0,
+    "tier_mix_active": {
+      "bronze": 1,
+      "silver": 64,
+      "gold": 0,
+      "platinum": 0
+    },
+    "tier_mix_awaiting": {
+      "bronze": 1,
+      "silver": 484,
+      "gold": 12,
+      "platinum": 1
+    },
+    "collected_lifetime_usd": 500.02
+  },
+  "collect_blocker": {
+    "awaiting_seat_mrr_pipeline": 318148.0,
+    "root_cause": "apply flow minted empty/vault-mismatched pay URLs; fix BSC_WALLET_ADDRESS on hub + auto_onboard default.",
+    "fixed": true
+  },
+  "forecast": {
+    "conservative": {
+      "converted_buyers_total": 49.8,
+      "d30": {
+        "day": 30,
+        "seat_mrr": 12422.4,
+        "per_lead_mrr": 140456.0,
+        "total_mrr": 152878.4,
+        "total_arr": 1834540.8,
+        "converted_buyers": 16.6
+      },
+      "d60": {
+        "day": 60,
+        "seat_mrr": 22655.8,
+        "per_lead_mrr": 170652.0,
+        "total_mrr": 193307.8,
+        "total_arr": 2319693.6,
+        "converted_buyers": 33.2
+      },
+      "d90": {
+        "day": 90,
+        "seat_mrr": 32889.2,
+        "per_lead_mrr": 200848.0,
+        "total_mrr": 233737.2,
+        "total_arr": 2804846.4,
+        "converted_buyers": 49.8
+      }
+    },
+    "base": {
+      "converted_buyers_total": 149.4,
+      "d30": {
+        "day": 30,
+        "seat_mrr": 32889.2,
+        "per_lead_mrr": 200848.0,
+        "total_mrr": 233737.2,
+        "total_arr": 2804846.4,
+        "converted_buyers": 49.8
+      },
+      "d60": {
+        "day": 60,
+        "seat_mrr": 63589.4,
+        "per_lead_mrr": 291436.0,
+        "total_mrr": 355025.4,
+        "total_arr": 4260304.8,
+        "converted_buyers": 99.6
+      },
+      "d90": {
+        "day": 90,
+        "seat_mrr": 94289.6,
+        "per_lead_mrr": 382024.0,
+        "total_mrr": 476313.6,
+        "total_arr": 5715763.2,
+        "converted_buyers": 149.4
+      }
+    },
+    "aggressive": {
+      "converted_buyers_total": 298.8,
+      "d30": {
+        "day": 30,
+        "seat_mrr": 63589.4,
+        "per_lead_mrr": 291436.0,
+        "total_mrr": 355025.4,
+        "total_arr": 4260304.8,
+        "converted_buyers": 99.6
+      },
+      "d60": {
+        "day": 60,
+        "seat_mrr": 124989.8,
+        "per_lead_mrr": 472612.0,
+        "total_mrr": 597601.8,
+        "total_arr": 7171221.6,
+        "converted_buyers": 199.2
+      },
+      "d90": {
+        "day": 90,
+        "seat_mrr": 186390.2,
+        "per_lead_mrr": 653788.0,
+        "total_mrr": 840178.2,
+        "total_arr": 10082138.4,
+        "converted_buyers": 298.8
+      }
+    }
+  },
+  "assumptions": {
+    "tier_rates": {
+      "bronze": {
+        "monthly": 299.0,
+        "per_lead": 25.0
+      },
+      "silver": {
+        "monthly": 599.0,
+        "per_lead": 49.0
+      },
+      "gold": {
+        "monthly": 1199.0,
+        "per_lead": 99.0
+      },
+      "platinum": {
+        "monthly": 2399.0,
+        "per_lead": 199.0
+      }
+    },
+    "assumed_leads_per_buyer": {
+      "bronze": 20,
+      "silver": 35,
+      "gold": 50,
+      "platinum": 80
+    },
+    "scenarios": {
+      "conservative": 0.1,
+      "base": 0.3,
+      "aggressive": 0.6
+    }
+  },
+  "access": {
+    "cli": "python3 empire_os/revenue_plan.py",
+    "hub": "GET http://127.0.0.1:8081/v1/revenue/plan",
+    "buyer_apply": "GET https://empire-ai.co.uk/buy-leads  (POST /v1/buyers/apply)",
+    "dashboard": "empire_os.revenue_dashboard.RevenueDashboard().get_dashboard_data()"
+  }
+}

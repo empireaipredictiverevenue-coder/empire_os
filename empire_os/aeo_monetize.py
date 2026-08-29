@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """aeo_monetize — AEO page dynamic pricing + CTA injection + attribution.
 
-Adds USDC price + per-request Solana Pay deeplink + ref-cookie attribution
+Adds USDT price + per-request BSC Pay deeplink + ref-cookie attribution
 to every AEO page served by hub.py at /aeo/{niche}/.
 
 Tables:
@@ -110,13 +110,13 @@ def get_or_create_ref(c: sqlite3.Connection, ref_code: str) -> Optional[dict]:
 
 
 def build_pay_url(niche: str, price_usdc: float, ref_code: Optional[str] = None) -> str:
-    """Build a Solana Pay deeplink for the niche + price + ref."""
-    vault = os.getenv("SOLANA_VAULT_WALLET", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+    """Build a BSC Pay deeplink for the niche + price + ref."""
+    vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
     memo = f"aeo:{niche}"
     if ref_code:
         memo += f":ref:{ref_code}"
     return (
-        f"solana:{vault}"
+        f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb"
         f"?amount={price_usdc:.2f}"
         f"&label=Empire%20OS%20{niche}"
         f"&memo={memo}"
@@ -144,9 +144,9 @@ def render_cta(niche: str, price_usdc: float, pay_url: str, ref_code: Optional[s
     ref_note = f" <span style='opacity:.7'>(ref: {ref_code})</span>" if ref_code else ""
     return f"""
 <div class="aeo-cta" style="background:#0a3d62;color:#fff;padding:1.5rem;border-radius:8px;margin:2rem 0;text-align:center">
-  <h3 style="margin:0 0 .5rem">Get {niche.title()} Leads Delivered in USDC</h3>
-  <p style="margin:0 0 1rem;opacity:.9">Pay per lead. Delivered to your CRM. Settled on Solana.</p>
-  <p style="margin:0 0 1rem"><strong>${price_usdc:.2f} USDC / lead</strong>{ref_note}</p>
+  <h3 style="margin:0 0 .5rem">Get {niche.title()} Leads Delivered in USDT</h3>
+  <p style="margin:0 0 1rem;opacity:.9">Pay per lead. Delivered to your CRM. Settled on BSC.</p>
+  <p style="margin:0 0 1rem"><strong>${price_usdc:.2f} USDT / lead</strong>{ref_note}</p>
   <a href="{pay_url}" class="aeo-buy-btn"
      style="display:inline-block;background:#fff;color:#0a3d62;padding:.75rem 1.5rem;border-radius:4px;text-decoration:none;font-weight:600">
     Buy Leads Now →

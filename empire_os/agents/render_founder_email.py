@@ -15,6 +15,9 @@ fully inline-CSS for maximum email client compatibility.
 """
 import re
 from pathlib import Path
+import sys
+sys.path.insert(0, '/root/empire_os')
+from empire_os.whitelabel import get_brand
 
 TEMPLATE_DIR = Path("/root/empire_os/email_templates")
 
@@ -29,7 +32,7 @@ def _strip_html(html: str) -> str:
     text = re.sub(r"&gt;", ">", text)
     text = re.sub(r"&#39;", "'", text)
     text = re.sub(r"&quot;", chr(34), text)
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\\s+", " ", text)
     return text.strip()
 
 
@@ -50,6 +53,15 @@ def render_email(
     """
     html = (TEMPLATE_DIR / "founder_pricing_dark.html").read_text()
     text = (TEMPLATE_DIR / "founder_pricing_dark.txt").read_text()
+
+    # Get brand colors for Empire AI (tenant_id='empire')
+    brand = get_brand('empire')
+    primary_color = brand.get('primary_color', '#39ff88') if brand else '#39ff88'
+    secondary_color = brand.get('config', {}).get('secondary_color', '#00ffff') if brand and brand.get('config') else '#00ffff'
+
+    # Replace color placeholders in the templates
+    html = html.replace('{{primary_color}}', primary_color).replace('{{secondary_color}}', secondary_color)
+    text = text.replace('{{primary_color}}', primary_color).replace('{{secondary_color}}', secondary_color)
 
     business_short = re.sub(r"[^A-Za-z0-9]", "",
                              (business_name or "team").split()[0])[:12] or "team"

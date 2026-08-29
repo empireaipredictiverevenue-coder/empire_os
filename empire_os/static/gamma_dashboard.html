@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Empire OS — Gamma OS Dashboard</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0e14;color:#e6e6e6;line-height:1.5;padding:20px 16px}
+  .wrap{max-width:1200px;margin:0 auto}
+  h1{font-size:28px;background:linear-gradient(90deg,#7c5cff,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:8px}
+  .sub{color:#9aa0aa;margin-bottom:24px;font-size:14px}
+  .note{background:#151a23;border:1px solid #232a36;border-radius:12px;padding:16px;color:#cfd6e0;font-size:13px;margin-bottom:24px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;margin-bottom:32px}
+  .stat{background:#151a23;border:1px solid #232a36;border-radius:16px;padding:24px;text-align:center}
+  .stat .n{font-size:32px;font-weight:700;color:#22d3ee;margin-bottom:8px}
+  .stat .l{font-size:12px;color:#9aa0aa;text-transform:uppercase;letter-spacing:1px}
+  .stat .n2{font-size:18px;color:#7c5cff;margin-top:4px}
+  .stat .n3{font-size:14px;color:#fbbf24;margin-top:4px}
+  .card{background:#151a23;border:1px solid #232a36;border-radius:12px;padding;20px;margin-bottom:16px}
+  .card h3{font-size:13px;color:#9aa0aa;margin-bottom;12px;border-bottom:1px solid #232a36;padding-bottom:8px}
+  table{width:100%;border-collapse:collapse;background:#151a23;border:1px solid #232a36;border-radius:12px;overflow:hidden}
+  th,td{padding:10px 12px;font-size:13px;border-bottom:1px solid #232a36}
+  th{color:#9aa0aa;font-weight:600;background:#10141c;text-align:left}
+  .g-A{color:#34d399}.g-B{color:#22d3ee}.g-C{color:#fbbf24}.g-D{color:#f87171}
+  code{background:#1d2330;padding:2px 6px;border-radius:4px;font-size:12px;color:#7c5cff}
+  pre{background:#0b0e14;border:1px solid #232a36;border-radius:8px;padding:12px;margin-top:12px;font-size:12px;overflow:auto;max-height:300px;white-space:pre-wrap}
+  a{color:#22d3ee}
+  .badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:2px}
+  .badge-BRONZE{background:#c9a86c;color:#111}
+  .badge-SILVER{background:#94a3b8;color:#111}
+  .badge-GOLD{background:#fbbf24;color:#111}
+  .badge-PLATINUM{background:#7c5cff;color:#fff}
+  .toggle{padding:6px 12px;border:1px solid #232a36;border-radius:8px;background:#1d2736;color:#e6e6e6;font-size:12px;cursor:pointer;margin:4px 2px 0 0}
+  .toggle.active{background:#7c5cff;color:#0b0e14}
+  .disaster{background:#f87171;color:#fff;animation:pulse 2s infinite}
+  @keyframes pulse{0%{opacity:1}50%{opacity:0.5}100%{opacity:1}}
+  .status-ok{color:#34d399}.status-low{color:#f87171}.status-med{color:#fbbf24}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Empire OS — Gamma OS Dashboard</h1>
+  <div class="sub">Real-time revenue intelligence · Conversion funnel · Predictive scoring · Source ROI</div>
+
+  <!-- MRR Overview -->
+  <div class="note" id="mrr-overview">Loading dashboard data...</div>
+
+  <div class="grid">
+    <!-- Self-Serve Stats -->
+    <div class="card">
+      <h3>Self-Serve Pipeline</h3>
+      <div class="grid" id="self-serve-stats">
+        <div class="stat"><div class="n" id="ss-leads">–</div><div class="l">Total graded leads</div></div>
+        <div class="stat"><div class="n" id="ss-bronze">0</div><div class="l badge badge-BRONZE">BRONZE</div></div>
+        <div class="stat"><div class="n" id="ss-silver">0</div><div class="l badge badge-SILVER">SILVER</div></div>
+        <div class="stat"><div class="n" id="ss-gold">0</div><div class="l badge badge-GOLD">GOLD</div></div>
+        <div class="stat"><div class="n" id="ss-plat">0</div><div class="l badge badge-PLATINUM">PLATINUM</div></div>
+      </div>
+      <div class="stat"><div class="n2" id="ss-mrr">$0</div><div class="l">Self-Serve MRR (15m cycle)</div></div>
+    </div>
+
+    <!-- Enterprise Stats -->
+    <div class="card">
+      <h3>Enterprise Tier</h3>
+      <div class="grid" id="enterprise-stats">
+        <div class="stat"><div class="n" id="ent-clients">0</div><div class="l">Active enterprise clients</div></div>
+        <div class="stat"><div class="n" id="ent-mrr">$0</div><div class="l">Enterprise MRR ($5K base + $3/lead)</div></div>
+      </div>
+      <div class="stat"><div class="n2" id="ent-conv">0%</div><div class="l">Conversion rate (lead→settled)</div></div>
+    </div>
+
+    <!-- Whale Stats -->
+    <div class="card">
+      <h3>Whale Tier</h3>
+      <div class="grid" id="whale-stats">
+        <div class="stat"><div class="n" id="whale-clients">0</div><div class="l">Active whale clients</div></div>
+        <div class="stat"><div class="n" id="whale-mrr">$0</div><div class="l">Whale MRR ($100-500/lead)</div></div>
+      </div>
+      <div class="stat"><div class="n2" id="whale-conv">0%</div><div class="l">Conversion rate</div></div>
+    </div>
+
+    <!-- Disaster Stats -->
+    <div class="card">
+      <h3>Disaster Mode</h3>
+      <div class="grid" id="disaster-stats">
+        <div class="stat"><span class="toggle active" onclick="toggleDisaster(false)">Base Mode</span><span class="toggle disaster" onclick="toggleDisaster(true)">3x DISASTER</span></div>
+        <div class="stat"><div class="n" id="base-mrr">$0</div><div class="l">Base MRR/cycle</div></div>
+        <div class="stat"><div class="n" id="dis-mrr">$0</div><div class="l">Disaster MRR/cycle (3x)</div></div>
+      </div>
+      <div class="stat"><div class="n3" id="dis-increment">+$0</div><div class="l">Incremental revenue</div></div>
+    </div>
+  </div>
+
+  <!-- Conversion Funnel -->
+  <div class="card" style="margin-top:32px">
+    <h3>Conversion Funnel</h3>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Leads</th><th>% of Start</th><th>Median Days</th><th>Drop-Off %</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Discovered</td><td><input type="number" id="funnel-discovered" value="1000" style="width:80px"></td><td id="funnel-discovered-pct">100%</td><td>–</td><td>–</td></tr>
+          <tr><td>Matched</td><td><input type="number" id="funnel-matched" value="600" style="width:80px"></td><td id="funnel-matched-pct">60%</td><td id="funnel-matched-days">3</td><td id="funnel-matched-dropoff">40%</td></tr>
+          <tr><td>Contacted</td><td><input type="number" id="funnel-contacted" value="350" style="width:80px"></td><td id="funnel-contacted-pct">35%</td><td id="funnel-contacted-days">10</td><td id="funnel-contacted-dropoff">42%</td></tr>
+          <tr><td>Settled</td><td><input type="number" id="funnel-settled" value="85" style="width:80px"></td><td id="funnel-settled-pct">8.5%</td><td id="funnel-settled-days">45</td><td id="funnel-settled-dropoff">76%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:#9aa0aa">
+      Overall conversion: <span id="funnel-overall">8.5%</span> | Median time-to-settlement: <span id="funnel-median">45 days</span>
+    </div>
+  </div>
+
+  <!-- Source ROI Heatmap (simplified) -->
+  <div class="card" style="margin-top:32px">
+    <h3>Source ROI Heatmap (Top 10)</h3>
+    <div style="overflow-x:auto;font-size:12px">
+      <table>
+        <thead>
+          <tr><th>Source</th><th>Leads</th><th>Conversion</th><th>ROI</th><th>Settle Prob</th><th>Time-to-Settle</th></tr>
+        </thead>
+        <tbody id="source-roi">
+          <tr><td colspan="7" style="color:#666">Loading source ROI data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="card" style="margin-top:32px;position:sticky;top:20px;background:#151a23;border:1px solid #232a36;border-radius:12px;padding:16px;padding-bottom:8px;margin-top:-24px;z-index:10">
+    <h3 style="margin-bottom:12px;">⚠️ Alerts</h3>
+    <div id="alerts" style="max-height:120px;overflow-y:auto;font-size:13px"></div>
+  </div>
+</div>
+
+<script>
+  // Dashboard state
+  let disasterActive = false;
+  let apiKey = new URLSearchParams(location.search).get('key') || '';
+
+  // Toggle disaster mode
+  function toggleDisaster(active) {
+    disasterActive = active;
+    document.querySelectorAll('.toggle').forEach(t => t.classList.toggle('active', t.classList.contains('disaster') === active));
+    updateMRR();
+    showAlert(`Disaster mode ${active ? 'ACTIVE' : 'inactive'} — 3x pricing enabled`, active ? 'disaster' : 'ok');
+  }
+
+  // Show alert
+  function showAlert(msg, type) {
+    const container = document.getElementById('alerts');
+    const div = document.createElement('div');
+    div.style.cssText = `background:${type === 'disaster' ? '#2a1a1a' : '#1a2a1f'};color:${type === 'disaster' ? '#ff8888' : '#88ff88'};padding:8px;margin:4px 0;border-radius:4px;border-left:4px solid:${type === 'disaster' ? '#ff7171' : '#34d399'}`;
+    div.textContent = msg;
+    container.insertBefore(div, container.firstChild);
+    if (div.parentNode) setTimeout(() => div.remove(), 5000);
+  }
+
+  // Format currency
+  function fmt(n) { return '$' + (n||0).toFixed(2); }
+
+  // Update all MRR and dashboard data
+  async function updateMRR() {
+    const headers = {'X-API-Key': apiKey};
+
+    try {
+      // Fetch pipeline data from Empire OS backend
+      const [ms, ent, whale, disco] = await Promise.all([
+        fetch('/v1/gamma/mrr', {headers}).then(r => r.json()).catch(() => ({})),
+        fetch('/v1/gamma/enterprise', {headers}).then(r => r.json()).catch(() => ({})),
+        fetch('/v1/gamma/whale', {headers}).then(r => r.json()).catch(() => ({})),
+        fetch('/v1/gamma/funnel', {headers}).then(r => r.json()).catch(() => ({})),
+      ]);
+
+      // Update self-serve pipeline
+      const pipeline = ms.pipeline || {};
+      document.getElementById('ss-leads').textContent = pipeline.total_leads || '–';
+      document.getElementById('ss-bronze').textContent = pipeline.bronze_count || 0;
+      document.getElementById('ss-silver').textContent = pipeline.silver_count || 0;
+      document.getElementById('ss-gold').textContent = pipeline.gold_count || 0;
+      document.getElementById('ss-plat').textContent = pipeline.platinum_count || 0;
+
+      // Calculate self-serve MRR
+      const b = (pipeline.bronze_count||0) * 8;
+      const s = (pipeline.silver_count||0) * 15;
+      const g = (pipeline.gold_count||0) * 25;
+      const p = (pipeline.platinum_count||0) * 45;
+      const total = b + s + g + p;
+      document.getElementById('ss-mrr').textContent = fmt(total);
+
+      // Update enterprise
+      const e = ent.enterprise || {};
+      document.getElementById('ent-clients').textContent = e.active_clients || 0;
+      document.getElementById('ent-mrr').textContent = fmt(e.mrr || 0);
+      document.getElementById('ent-conv').textContent = ((e.conversion_rate||0) * 100).toFixed(1) + '%';
+
+      // Update whale
+      const w = whale.whale || {};
+      document.getElementById('whale-clients').textContent = w.active_clients || 0;
+      document.getElementById('whale-mrr').textContent = fmt(w.mrr || 0);
+      document.getElementById('whale-conv').textContent = ((w.conversion_rate||0) * 100).toFixed(1) + '%';
+
+      // Update disaster
+      if (disasterActive) {
+        const base = (pipeline.base_mrr||0);
+        const disc = base * 3;
+        document.getElementById('base-mrr').textContent = fmt(base);
+        document.getElementById('dis-mrr').textContent = fmt(disc);
+        document.getElementById('dis-increment').textContent = fmt(disc - base);
+      } else {
+        document.getElementById('base-mrr').textContent = fmt(ms.base_mrr||0);
+        document.getElementById('dis-mrr').textContent = fmt(ms.disaster_mrr||0);
+        document.getElementById('dis-increment').textContent = fmt((ms.disaster_mrr||0) - (ms.base_mrr||0));
+      }
+
+      // Update funnel
+      const f = disco.funnel || {};
+      document.getElementById('funnel-discovered').value = f.discovered || 1000;
+      document.getElementById('funnel-discovered-pct').textContent = f.discovered ? (f.discovered/f.discovered*100).toFixed(1) : '--';
+      document.getElementById('funnel-matched').value = f.matched || 600;
+      document.getElementById('funnel-matched-pct').textContent = f.matched ? (f.matched/f.discovered*100).toFixed(1) : '--';
+      document.getElementById('funnel-matched-days').textContent = f.matched_days || 3;
+      document.getElementById('funnel-matched-dropoff').textContent = ((1 - f.matched/f.discovered||0)*100).toFixed(0) + '%';
+      document.getElementById('funnel-contacted').value = f.contacted || 350;
+      document.getElementById('funnel-contacted-pct').textContent = f.contacted ? (f.contacted/f.discovered*100).toFixed(1) : '--';
+      document.getElementById('funnel-contacted-days').textContent = f.contacted_days || 10;
+      document.getElementById('funnel-contacted-dropoff').textContent = ((f.matched/f.discovered||0) - (f.contacted/f.discovered||0) || 0 * 100).toFixed(0) + '%';
+      document.getElementById('funnel-settled').value = f.settled || 85;
+      document.getElementById('funnel-settled-pct').textContent = f.settled ? (f.settled/f.discovered*100).toFixed(1) : '--';
+      document.getElementById('funnel-settled-days').textContent = f.settled_days || 45;
+      document.getElementById('funnel-settled-dropoff').textContent = ((f.contacted/f.discovered||0) - (f.settled/f.discovered||0) || 0 * 100).toFixed(0) + '%';
+
+      const overall = f.settled ? (f.settled/f.discovered*100).toFixed(1) : '0';
+      document.getElementById('funnel-overall').textContent = overall + '%';
+      document.getElementById('funnel-median').textContent = f.median_days || 45;
+
+      // Source ROI (mock data - would fetch from backend in production)
+      const sources = [
+        {name: 'permits', leads: 420, conv: 0.12, roi: 4.5, prob: 0.18, time: '180d'},
+        {name: 'court_docket', leads: 310, conv: 0.15, roi: 5.2, prob: 0.22, time: '120d'},
+        {name: 'search_api', leads: 580, conv: 0.06, roi: 2.1, prob: 0.10, time: '240d'},
+        {name: 'overpass', leads: 350, conv: 0.09, roi: 3.8, prob: 0.14, time: '200d'},
+        {name: 'international', leads: 210, conv: 0.08, roi: 3.2, prob: 0.12, time: '300d'},
+        {name: 'insurance_claim', leads: 190, conv: 0.11, roi: 4.1, prob: 0.16, time: '150d'},
+        {name: 'social_media', leads: 140, conv: 0.03, roi: 1.5, prob: 0.05, time: '365d'},
+        {name: 'medical_db', leads: 280, conv: 0.14, roi: 4.8, prob: 0.20, time: '100d'},
+        {name: 'regulatory', leads: 110, conv: 0.10, roi: 3.9, prob: 0.15, time: '180d'},
+      ];
+      const tbody = document.getElementById('source-roi');
+      tbody.innerHTML = '';
+      sources.forEach(s => {
+        const tr = document.createElement('tr');
+        const color = s.roi >= 4 ? '#34d399' : s.roi >= 3 ? '#fbbf24' : '#f87171';
+        tr.innerHTML = `<td>${s.name}</td><td>${s.leads}</td><td>${s.conv*100}%</td><td><span style="color:${color}">${s.roi}×</span></td><td>${s.prob*100}%</td><td>${s.time}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      showAlert('Dashboard updated successfully', 'ok');
+
+    } catch (err) {
+      showAlert('Error updating dashboard: ' + err.message, 'error');
+    }
+  }
+
+  // Initialize
+  document.getElementById('funnel-discovered').addEventListener('input', () => {
+    const discovered = parseInt(document.getElementById('funnel-discovered').value) || 1000;
+    const matched = parseInt(document.getElementById('funnel-matched').value) || 600;
+    document.getElementById('funnel-matched-pct').textContent = (matched/discovered*100).toFixed(1) + '%';
+  });
+  document.getElementById('funnel-matched').addEventListener('input', () => {
+    const discovered = parseInt(document.getElementById('funnel-discovered').value) || 1000;
+    const matched = parseInt(document.getElementById('funnel-matched').value) || 600;
+    document.getElementById('funnel-matched-pct').textContent = (matched/discovered*100).toFixed(1) + '%';
+    document.getElementById('funnel-matched-dropoff').textContent = ((1-matched/discovered)*100).toFixed(0) + '%';
+  });
+  document.getElementById('funnel-contacted').addEventListener('input', () => {
+    const discovered = parseInt(document.getElementById('funnel-discovered').value) || 1000;
+    const contacted = parseInt(document.getElementById('funnel-contacted').value) || 350;
+    document.getElementById('funnel-contacted-pct').textContent = (contacted/discovered*100).toFixed(1) + '%';
+    document.getElementById('funnel-contacted-dropoff').textContent = ((1-contacted/discovered)*100).toFixed(0) + '%';
+  });
+  document.getElementById('funnel-settled').addEventListener('input', () => {
+    const discovered = parseInt(document.getElementById('funnel-discovered').value) || 1000;
+    const settled = parseInt(document.getElementById('funnel-settled').value) || 85;
+    document.getElementById('funnel-settled-pct').textContent = (settled/discovered*100).toFixed(1) + '%';
+    document.getElementById('funnel-settled-dropoff').textContent = ((1-settled/discovered)*100).toFixed(0) + '%';
+    const overall = (settled/discovered*100).toFixed(1);
+    document.getElementById('funnel-overall').textContent = overall + '%';
+  });
+
+  // Initial load
+  if (apiKey) updateMRR();
+  else showAlert('No API key — running in demo mode with mock data', 'ok');
+</script>
+</body>
+</html>

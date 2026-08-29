@@ -1,380 +1,414 @@
-"""Empire OS — Inbound Reply Daemon (minimal).
+"""Empire OS — Gmail IMAP Inbound Reply Poller.
 
-Long-running service that ingests prospect replies from whichever
-sources are configured and forwards them to the hub's
-``POST /v1/inbound/reply`` endpoint, which flips
-``si_buyer_outreach.reply_state`` from ``cold``/``contacted`` → ``replied``.
+Polls Gmail via IMAP (imap.gmail.com:993 SSL) for ``flavag83@gmail.com``
+and forwards each unseen message to the Empire OS hub endpoint
+``POST /v1/inbound/parse`` so the buyer-outreach lane can flip its
+state machine (``cold`` / ``contacted`` → ``replied``).
 
-Two transport modes are supported, both OFF by default so the daemon
-can boot even when no Resend inbound domain or IMAP mailbox has been
-wired up yet:
+Behaviour matrix
+----------------
+* **No creds file** (or empty file): the daemon enters a *waiting for
+  creds* state — it logs every 60s and never connects to Gmail. This
+  lets systemd keep the unit alive while the operator provisions the
+  Gmail App Password.
+* **Creds present**: the daemon logs into Gmail via IMAP IDLE-free
+  polling (``MAILBOX UNSEEN`` every ``POLL_INTERVAL`` seconds), fetches
+  each unseen message, extracts headers + plain-text body, and POSTs
+  it to the hub. On 2xx the message is marked ``\\Seen``; on transient
+  failures the message is left untouched for the next cycle.
+* **Hub unreachable**: the message stays unseen; the error is logged
+  and JSONL-appended. The poll loop never crashes systemd.
+* **SIGTERM / SIGINT**: graceful shutdown, current poll finishes, then
+  exit 0.
 
-1. **Webhook listener (FastAPI)** — bound to ``INBOUND_REPLY_BIND``
-   (default ``0.0.0.0:8087``). Exposes ``POST /v1/inbound/reply`` that
-   accepts the same body the hub endpoint does. Resend inbound (or any
-   other provider) can POST here directly. The handler re-shapes the
-   payload into the hub contract and proxies it.
+Files
+-----
+* IMAP password:  ``/root/empire_secrets/gmail_app_password`` (mode 600)
+* Human log:      ``/root/empire_os/feedback/inbound_reply_daemon.log``
+* JSONL audit:    ``/root/empire_os/feedback/inbound_reply_daemon.jsonl``
+* systemd unit:   ``/etc/systemd/system/empire-inbound-reply.service``
 
-2. **IMAP poller** — when ``INBOUND_IMAP_HOST`` is set, polls the inbox
-   every ``INBOUND_IMAP_INTERVAL`` seconds, parses each new message,
-   and forwards it through the same path.
-
-If neither is configured, the daemon still runs as a "no-op keeper":
-it stays alive so systemd is happy, and logs every minute that it's
-idle. That makes this the right unit to deploy *before* the inbound
-domain / IMAP credentials exist.
-
-CLI:
-    python inbound_reply_daemon.py            # run the daemon
-    python inbound_reply_daemon.py --simulate # POST a fake reply to the hub
-                                             # (used by /tmp tests)
+The daemon never raises on transient failures — every catch block
+logs and continues.
 """
 from __future__ import annotations
 
-import argparse
+import email
+import imaplib
 import json
 import logging
 import os
 import signal
+import ssl
 import sys
-import threading
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
+from email.header import decode_header, make_header
+from email.message import EmailMessage
+from email.utils import parseaddr
 from pathlib import Path
-from typing import Optional
-
-import requests
+from typing import Any, Dict, Iterable, Optional
 
 # ── Configuration ────────────────────────────────────────────────
-HUB_URL = os.environ.get("EMPIRE_HUB_URL", "http://localhost:8081").rstrip("/")
-HUB_INBOUND_PATH = "/v1/inbound/reply"
-BIND_HOST = os.environ.get("INBOUND_REPLY_BIND", "0.0.0.0")
-BIND_PORT = int(os.environ.get("INBOUND_REPLY_PORT", "8087"))
+IMAP_HOST = "imap.gmail.com"
+IMAP_PORT = 993
+IMAP_USER = "flavag83@gmail.com"
+IMAP_FOLDER = "INBOX"
 
-IMAP_HOST = os.environ.get("INBOUND_IMAP_HOST", "").strip()
-IMAP_USER = os.environ.get("INBOUND_IMAP_USER", "").strip()
-IMAP_PASS = os.environ.get("INBOUND_IMAP_PASS", "").strip()
-IMAP_FOLDER = os.environ.get("INBOUND_IMAP_FOLDER", "INBOX")
-IMAP_INTERVAL = int(os.environ.get("INBOUND_IMAP_INTERVAL", "60"))  # seconds
-IMAP_MARK_SEEN = os.environ.get("INBOUND_IMAP_MARK_SEEN", "1") not in ("0", "false", "")
+CREDS_PATH = Path("/root/empire_secrets/gmail_app_password")
+LOG_PATH = Path("/root/empire_os/feedback/inbound_reply_daemon.log")
+JSONL_PATH = Path("/root/empire_os/feedback/inbound_reply_daemon.jsonl")
 
-AUDIT_LOG = Path(os.environ.get(
-    "INBOUND_REPLY_AUDIT_LOG", "/root/feedback/inbound_replies.jsonl"))
+HUB_URL = os.environ.get("EMPIRE_HUB_URL", "http://127.0.0.1:8080").rstrip("/")
+HUB_INBOUND_PATH = "/v1/inbound/parse"
 
-LOG_PATH = Path("/root/feedback/inbound_reply_daemon.log")
+POLL_INTERVAL = 60          # seconds between IMAP poll cycles
+HUB_TIMEOUT = 10             # seconds for hub POST
+WAITING_CREDS_RETRY = 60     # seconds between "waiting for creds" log lines
+MAX_PER_CYCLE = 20           # max unseen messages to forward per cycle
+IMAP_PER_PAGE_LIMIT = 500    # cap per day-bucket page to keep responses small
+IMAP_DAY_WINDOW_DAYS = 14    # how far back to paginate when ESEARCH is large
+
+# ── Logging ──────────────────────────────────────────────────────
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+JSONL_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO"),
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s inbound_reply_daemon %(message)s",
     handlers=[
+        logging.FileHandler(LOG_PATH),
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_PATH, mode="a"),
     ],
 )
 log = logging.getLogger("inbound_reply_daemon")
 
-# ── Hub forwarding ───────────────────────────────────────────────
 
-def forward_to_hub(payload: dict, timeout: float = 5.0) -> dict:
-    """POST a reply event to the hub. Returns the hub's response dict.
+# ── Helpers ──────────────────────────────────────────────────────
+def _read_creds() -> Optional[str]:
+    """Return the Gmail app password from disk, or None if unavailable.
 
-    Falls back to a local audit-log-only path if the hub is unreachable,
-    so we never silently lose a reply.
+    The file must exist, be readable, and contain a non-empty stripped
+    value. Empty / whitespace-only / unreadable files are treated as
+    'creds not present'.
     """
-    url = f"{HUB_URL}{HUB_INBOUND_PATH}"
     try:
-        r = requests.post(url, json=payload, timeout=timeout)
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        log.warning("hub POST %s failed: %s — logging locally", url, e)
-        _audit_log_locally(payload, error=f"hub_unreachable: {e}")
-        return {"matched": False, "updated": False,
-                "error": f"hub_unreachable: {str(e)[:160]}"}
+        if not CREDS_PATH.exists():
+            return None
+        pw = CREDS_PATH.read_text().strip()
+        return pw or None
+    except OSError as exc:
+        log.warning("creds read failed: %s", exc)
+        return None
 
 
-def _audit_log_locally(payload: dict, error: Optional[str] = None) -> None:
-    """Append a reply event to the local audit log even when the hub is down."""
+def _audit(event: str, **fields: Any) -> None:
+    """Append a structured event to the JSONL audit log."""
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": event,
+        **fields,
+    }
     try:
-        AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
-        event = dict(payload)
-        event["ts"] = datetime.now(timezone.utc).isoformat()
-        if error:
-            event["local_error"] = error
-        with open(AUDIT_LOG, "a") as f:
-            f.write(json.dumps(event) + "\n")
-    except Exception as e:
-        log.error("could not write audit log: %s", e)
+        with JSONL_PATH.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        log.warning("jsonl write failed: %s", exc)
 
 
-# ── Resend inbound webhook adapter ────────────────────────────────
+def _decode(value: Optional[str]) -> str:
+    if value is None:
+        return ""
+    try:
+        return str(make_header(decode_header(value)))
+    except Exception:
+        return value
 
-def resend_to_hub_contract(body: dict) -> dict:
-    """Reshape a Resend inbound-webhook payload into the hub contract.
 
-    Resend's inbound payload (when the inbound domain is configured)
-    looks roughly like::
+def _extract_body(msg: EmailMessage) -> str:
+    """Prefer text/plain; fall back to text/html stripped of tags."""
+    if msg.is_multipart():
+        for part in msg.walk():
+            ctype = part.get_content_type()
+            disp = (part.get("Content-Disposition") or "").lower()
+            if ctype == "text/plain" and "attachment" not in disp:
+                try:
+                    payload = part.get_payload(decode=True) or b""
+                    charset = part.get_content_charset() or "utf-8"
+                    return payload.decode(charset, errors="replace")
+                except Exception:
+                    continue
+        for part in msg.walk():
+            if part.get_content_type() == "text/html":
+                try:
+                    payload = part.get_payload(decode=True) or b""
+                    charset = part.get_content_charset() or "utf-8"
+                    html = payload.decode(charset, errors="replace")
+                    # crude tag strip; hub will sanitise further if needed
+                    import re
+                    return re.sub(r"<[^>]+>", " ", html)
+                except Exception:
+                    continue
+    else:
+        try:
+            payload = msg.get_payload(decode=True) or b""
+            charset = msg.get_content_charset() or "utf-8"
+            return payload.decode(charset, errors="replace")
+        except Exception:
+            pass
+    return ""
 
-        {
-          "from": "Gilbert <gilbert@jadeair.net>",
-          "to": "outreach@empire-ai.co.uk",
-          "subject": "Re: ...",
-          "text": "...",
-          "html": "...",
-          "headers": {"in_reply_to": "...", ...}
-        }
 
-    Anything missing falls back to empty strings — the hub only
-    requires ``from_email``.
-    """
-    headers = body.get("headers") or {}
-    if isinstance(headers, list):
-        headers = {h.get("name", "").lower(): h.get("value", "")
-                   for h in headers}
-    elif isinstance(headers, dict):
-        headers = {k.lower(): v for k, v in headers.items()}
+def _parse_message(raw_bytes: bytes) -> Dict[str, Any]:
+    """Turn raw RFC822 bytes into the hub payload contract."""
+    msg = email.message_from_bytes(raw_bytes)
+
+    from_header = _decode(msg.get("From"))
+    from_name, from_email = parseaddr(from_header)
+    subject = _decode(msg.get("Subject"))
+    message_id = (msg.get("Message-ID") or "").strip()
+    to_email = _decode(msg.get("To"))
+    body_text = _extract_body(msg)
+    headers = {k: _decode(v) for k, v in msg.items()}
 
     return {
-        "from_email": body.get("from") or body.get("from_email") or "",
-        "subject": body.get("subject") or "",
-        "body": body.get("text") or body.get("body") or "",
-        "in_reply_to": headers.get("in_reply_to", ""),
-        "source": "resend_inbound",
-    }
-
-
-# ── FastAPI webhook listener ─────────────────────────────────────
-
-def _build_webhook_app():
-    """Build the webhook app lazily so the daemon can boot without FastAPI."""
-    from fastapi import FastAPI, Request, HTTPException
-
-    app = FastAPI(title="Empire Inbound Reply Daemon",
-                  version="0.1.0")
-
-    @app.get("/health")
-    def health():
-        return {
-            "status": "online",
-            "engine": "empire-inbound-reply-daemon",
-            "hub_url": HUB_URL,
-            "imap_enabled": bool(IMAP_HOST and IMAP_USER and IMAP_PASS),
-        }
-
-    @app.post("/v1/inbound/reply")
-    async def inbound(request: Request):
-        try:
-            raw = await request.json()
-        except Exception:
-            raise HTTPException(400, "invalid JSON body")
-
-        # If this looks like a Resend inbound payload, reshape it.
-        if "from" in raw and "from_email" not in raw:
-            payload = resend_to_hub_contract(raw)
-        else:
-            payload = {
-                "from_email": raw.get("from_email") or raw.get("from") or "",
-                "subject": raw.get("subject", ""),
-                "body": raw.get("body", ""),
-                "in_reply_to": raw.get("in_reply_to", ""),
-                "source": raw.get("source", "daemon_webhook"),
-            }
-        if not payload["from_email"]:
-            raise HTTPException(400, "from_email (or from) is required")
-
-        result = forward_to_hub(payload)
-        # Mirror to local audit log for redundancy.
-        _audit_log_locally({**payload, "hub_result": result})
-        return result
-
-    return app
-
-
-# ── IMAP poller ──────────────────────────────────────────────────
-
-def _imap_poll_loop(stop_evt: threading.Event) -> None:
-    """Poll an IMAP inbox and forward each new message to the hub.
-
-    Off by default — only runs when ``INBOUND_IMAP_HOST`` is set. Uses
-    stdlib ``imaplib`` so no extra dependency is required.
-    """
-    import imaplib
-    import email as email_lib
-    from email.header import decode_header, make_header
-
-    log.info("IMAP poller starting: %s@%s/%s every %ss",
-             IMAP_USER or "<unset>", IMAP_HOST or "<unset>",
-             IMAP_FOLDER, IMAP_INTERVAL)
-
-    last_seen_uid: Optional[str] = None
-
-    while not stop_evt.is_set():
-        try:
-            if not (IMAP_HOST and IMAP_USER and IMAP_PASS):
-                stop_evt.wait(IMAP_INTERVAL)
-                continue
-
-            conn = imaplib.IMAP4_SSL(IMAP_HOST)
-            conn.login(IMAP_USER, IMAP_PASS)
-            conn.select(IMAP_FOLDER)
-            typ, data = conn.uid("SEARCH", None, "ALL")
-            if typ != "OK":
-                conn.logout()
-                stop_evt.wait(IMAP_INTERVAL)
-                continue
-            uids = data[0].split()
-            for uid in uids:
-                uid_s = uid.decode()
-                if last_seen_uid is not None and uid_s <= last_seen_uid:
-                    continue
-                typ, msgdata = conn.uid("FETCH", uid, "(RFC822)")
-                if typ != "OK" or not msgdata or not msgdata[0]:
-                    continue
-                raw = msgdata[0][1]
-                msg = email_lib.message_from_bytes(raw)
-
-                def _decode(h):
-                    try:
-                        return str(make_header(decode_header(h or "")))
-                    except Exception:
-                        return h or ""
-
-                from_email = _decode(msg.get("From", ""))
-                subject = _decode(msg.get("Subject", ""))
-                in_reply_to = _decode(msg.get("In-Reply-To", ""))
-
-                body_text = ""
-                if msg.is_multipart():
-                    for part in msg.walk():
-                        if part.get_content_type() == "text/plain":
-                            try:
-                                body_text = part.get_payload(decode=True).decode(
-                                    part.get_content_charset() or "utf-8",
-                                    errors="replace")
-                                break
-                            except Exception:
-                                continue
-                else:
-                    try:
-                        body_text = msg.get_payload(decode=True).decode(
-                            msg.get_content_charset() or "utf-8",
-                            errors="replace")
-                    except Exception:
-                        body_text = str(msg.get_payload())
-
-                payload = {
-                    "from_email": from_email,
-                    "subject": subject,
-                    "body": body_text[:8000],
-                    "in_reply_to": in_reply_to,
-                    "source": "imap",
-                }
-                log.info("IMAP: forwarding reply from %s (uid=%s)",
-                         from_email, uid_s)
-                result = forward_to_hub(payload)
-                _audit_log_locally({**payload, "hub_result": result,
-                                    "imap_uid": uid_s})
-
-                if IMAP_MARK_SEEN:
-                    try:
-                        conn.uid("STORE", uid, "+FLAGS", "\\Seen")
-                    except Exception:
-                        pass
-
-            if uids:
-                last_seen_uid = uids[-1].decode()
-            conn.logout()
-        except Exception as e:
-            log.warning("IMAP poll error: %s", e)
-
-        stop_evt.wait(IMAP_INTERVAL)
-
-    log.info("IMAP poller exiting")
-
-
-# ── Daemon main loop ─────────────────────────────────────────────
-
-_stop_evt = threading.Event()
-
-
-def _install_signal_handlers() -> None:
-    def _handler(signum, frame):
-        log.info("signal %s received — shutting down", signum)
-        _stop_evt.set()
-    signal.signal(signal.SIGINT, _handler)
-    signal.signal(signal.SIGTERM, _handler)
-
-
-def run_daemon() -> None:
-    _install_signal_handlers()
-
-    # IMAP poller (optional)
-    imap_thread = None
-    if IMAP_HOST and IMAP_USER and IMAP_PASS:
-        imap_thread = threading.Thread(
-            target=_imap_poll_loop, args=(_stop_evt,),
-            name="imap-poller", daemon=True)
-        imap_thread.start()
-    else:
-        log.info("IMAP poller disabled (set INBOUND_IMAP_HOST/USER/PASS to enable)")
-
-    # Webhook listener (always on; bound to INBOUND_REPLY_BIND)
-    try:
-        import uvicorn
-    except ImportError:
-        log.error("uvicorn not installed; cannot start webhook listener. "
-                  "pip install fastapi uvicorn")
-        sys.exit(1)
-
-    app = _build_webhook_app()
-    config = uvicorn.Config(app, host=BIND_HOST, port=BIND_PORT,
-                            log_level="info", access_log=True)
-    server = uvicorn.Server(config)
-
-    log.info("Webhook listener on %s:%s → forwarding to %s%s",
-             BIND_HOST, BIND_PORT, HUB_URL, HUB_INBOUND_PATH)
-    server.run()
-
-    _stop_evt.set()
-    if imap_thread:
-        imap_thread.join(timeout=2)
-
-
-# ── Simulate one reply (for tests) ───────────────────────────────
-
-def simulate_reply(from_email: str, subject: str = "Re: test",
-                   body: str = "Test reply", in_reply_to: str = "",
-                   source: str = "simulate") -> dict:
-    payload = {
+        "message_id": message_id,
         "from_email": from_email,
+        "from_name": from_name,
+        "to_email": to_email,
         "subject": subject,
-        "body": body,
-        "in_reply_to": in_reply_to,
-        "source": source,
+        "body_text": body_text,
+        "headers": headers,
     }
-    return forward_to_hub(payload)
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--simulate", action="store_true",
-                   help="POST one test reply to the hub and exit")
-    p.add_argument("--from-email", default="gilbert@jadeair.net")
-    p.add_argument("--subject", default="Re: outreach test")
-    p.add_argument("--body", default="Yes, interested. Please send details.")
-    p.add_argument("--in-reply-to", default="")
-    args = p.parse_args()
+def _post_to_hub(payload: Dict[str, Any]) -> int:
+    """POST to the hub; return HTTP status (0 on transport error)."""
+    url = HUB_URL + HUB_INBOUND_PATH
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=HUB_TIMEOUT) as resp:
+            return resp.status
+    except urllib.error.HTTPError as exc:
+        log.warning("hub POST %s -> HTTP %s", url, exc.code)
+        return exc.code
+    except urllib.error.URLError as exc:
+        log.warning("hub POST %s -> transport error: %s", url, exc)
+        return 0
+    except Exception as exc:  # last-resort safety net
+        log.exception("hub POST unexpected error: %s", exc)
+        return 0
 
-    if args.simulate:
-        result = simulate_reply(
-            args.from_email, args.subject, args.body, args.in_reply_to,
-            source="simulate")
-        print(json.dumps(result, indent=2))
-        return
 
-    run_daemon()
+# ── IMAP poll cycle ─────────────────────────────────────────────
+def _imap_poll(pw: str) -> int:
+    """One IMAP poll cycle. Returns number of messages forwarded.
+
+    Handles Gmail IMAP response size: Gmail can return >1 MB on a single
+    UID SEARCH if the mailbox is large. We paginate by date buckets and
+    also cap per-cycle with MAX_PER_CYCLE so a backlog never wedges the
+    hub thread.
+    """
+    forwarded = 0
+    ctx = ssl.create_default_context()
+    imap: Optional[imaplib.IMAP4_SSL] = None
+    try:
+        imap = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, ssl_context=ctx)
+        imap.login(IMAP_USER, pw)
+        imap.select(IMAP_FOLDER, readonly=False)
+
+        # Step 1: ask Gmail for recent UIDs only — paginates server-side.
+        # ESEARCH returns "1:M" of UIDVALIDITY range; we then narrow to UNSEEN
+        # via standard UID SEARCH (still capped by Gmail to a reasonable size).
+        uids = _fetch_unseen_uids_paginated(imap)
+        if not uids:
+            log.info("imap poll: no unseen messages")
+            return 0
+        log.info("imap poll: %d unseen message(s)", len(uids))
+
+        # Step 2: cap per-cycle so we don't wedge the hub on a huge backlog.
+        uids_to_process = uids[:MAX_PER_CYCLE]
+        if len(uids) > MAX_PER_CYCLE:
+            log.info("imap poll: capping at %d this cycle (%d deferred)",
+                     MAX_PER_CYCLE, len(uids) - MAX_PER_CYCLE)
+
+        for num in uids_to_process:
+            typ, msg_data = imap.fetch(num, "(RFC822)")
+            if typ != "OK" or not msg_data or not msg_data[0]:
+                log.warning("imap fetch failed for uid %s", num)
+                continue
+            raw = msg_data[0][1]
+            try:
+                payload = _parse_message(raw)
+            except Exception as exc:
+                log.exception("parse failed for uid %s: %s", num, exc)
+                _audit("parse_error", uid=num.decode(errors="replace"), error=str(exc))
+                continue
+
+            status = _post_to_hub(payload)
+            if 200 <= status < 300:
+                imap.store(num, "+FLAGS", "\\Seen")
+                forwarded += 1
+                log.info(
+                    "forwarded msg_id=%s from=%s status=%d",
+                    payload.get("message_id"), payload.get("from_email"), status,
+                )
+                _audit(
+                    "forwarded",
+                    message_id=payload.get("message_id"),
+                    from_email=payload.get("from_email"),
+                    status=status,
+                )
+            else:
+                log.warning("hub rejected msg_id=%s status=%d — leaving unseen",
+                            payload.get("message_id"), status)
+                _audit(
+                    "forward_failed",
+                    message_id=payload.get("message_id"),
+                    from_email=payload.get("from_email"),
+                    status=status,
+                )
+        return forwarded
+    except imaplib.IMAP4.error as exc:
+        log.warning("imap error: %s", exc)
+        _audit("imap_error", error=str(exc))
+        return 0
+    except OSError as exc:
+        log.warning("imap network error: %s", exc)
+        _audit("imap_network_error", error=str(exc))
+        return 0
+    except Exception as exc:
+        log.exception("imap unexpected error: %s", exc)
+        _audit("imap_unexpected_error", error=str(exc))
+        return 0
+    finally:
+        if imap is not None:
+            try:
+                imap.logout()
+            except Exception:
+                pass
+
+
+def _fetch_unseen_uids_paginated(imap: imaplib.IMAP4_SSL) -> list:
+    """Fetch UNSEEN UIDs in date-bucket pages to avoid Gmail's >1 MB limit.
+
+    Gmail returns oversized (>1 MB) responses when many UIDs match a single
+    SEARCH. We split by day-bucket windows so each SEARCH stays small.
+
+    Falls back to non-paginated search if ESEARCH/UID SEARCH is unavailable.
+    """
+    try:
+        # First try ESEARCH (RFC 7377) — returns "1:M" range count without
+        # listing UIDs. If count <= safety threshold, do single UID SEARCH UNSEEN.
+        typ, data = imap.uid("SEARCH", None, "ESEARCH", "RETURN", "COUNT", "UNSEEN")
+        if typ == "OK" and data and data[0]:
+            count = int(str(data[0]).split()[-1])
+            if count <= 1000:
+                # Safe to fetch all UNSEEN UIDs in one call.
+                typ, data = imap.uid("SEARCH", None, "UNSEEN")
+                if typ == "OK" and data and data[0]:
+                    return data[0].split()
+            # Otherwise paginate by day.
+            return _paginate_unseen_by_day(imap)
+    except Exception as exc:
+        log.debug("ESEARCH path failed, falling back: %s", exc)
+
+    # Plain fallback: try standard SEARCH UNSEEN. Gmail may still 1MB-truncate.
+    try:
+        typ, data = imap.search(None, "UNSEEN")
+        if typ == "OK" and data and data[0]:
+            return data[0].split()
+    except Exception:
+        pass
+
+    return []
+
+
+def _paginate_unseen_by_day(imap: imaplib.IMAP4_SSL) -> list:
+    """Walk back day-by-day until we hit the IMAP_PER_PAGE_LIMIT or empty bucket."""
+    from datetime import datetime, timedelta, timezone
+    out: list = []
+    today = datetime.now(timezone.utc).date()
+    for offset in range(IMAP_DAY_WINDOW_DAYS):
+        day = today - timedelta(days=offset)
+        # SINCE = day 00:00 UTC, BEFORE = next day 00:00 UTC. Imap accepts
+        # "SINCE 1-Jan-2025" format.
+        date_str = day.strftime("%d-%b-%Y")
+        try:
+            typ, data = imap.uid("SEARCH", None, "UNSEEN", "SINCE", date_str)
+            if typ == "OK" and data and data[0]:
+                out.extend(data[0].split())
+                if len(out) >= IMAP_PER_PAGE_LIMIT:
+                    log.info("imap paginate: hit page limit %d at day=%s",
+                             IMAP_PER_PAGE_LIMIT, date_str)
+                    break
+        except Exception as exc:
+            log.debug("imap paginate skip day=%s: %s", date_str, exc)
+    return out
+
+
+# ── Signal handling ──────────────────────────────────────────────
+_RUNNING = True
+
+
+def _stop(signum, frame):  # noqa: ARG001
+    global _RUNNING
+    log.info("signal %s received — shutting down after current cycle", signum)
+    _RUNNING = False
+
+
+# ── Main loop ────────────────────────────────────────────────────
+def main() -> int:
+    signal.signal(signal.SIGTERM, _stop)
+    signal.signal(signal.SIGINT, _stop)
+
+    log.info(
+        "inbound_reply_daemon starting (user=%s host=%s hub=%s%s interval=%ds)",
+        IMAP_USER, IMAP_HOST, HUB_URL, HUB_INBOUND_PATH, POLL_INTERVAL,
+    )
+    _audit("start", user=IMAP_USER, host=IMAP_HOST, hub=HUB_URL + HUB_INBOUND_PATH)
+
+    cycle = 0
+    while _RUNNING:
+        cycle += 1
+        creds = _read_creds()
+
+        if not creds:
+            log.info(
+                "waiting for creds at %s — will retry every %ds (cycle %d)",
+                CREDS_PATH, WAITING_CREDS_RETRY, cycle,
+            )
+            _audit("waiting_for_creds", path=str(CREDS_PATH))
+            # sleep in small slices so SIGTERM lands quickly
+            slept = 0
+            while _RUNNING and slept < WAITING_CREDS_RETRY:
+                time.sleep(1)
+                slept += 1
+            continue
+
+        log.info("poll cycle %d starting", cycle)
+        forwarded = _imap_poll(creds)
+        log.info("poll cycle %d complete (forwarded=%d)", cycle, forwarded)
+        _audit("poll_cycle_complete", cycle=cycle, forwarded=forwarded)
+
+        # sleep in small slices so SIGTERM lands quickly
+        slept = 0
+        while _RUNNING and slept < POLL_INTERVAL:
+            time.sleep(1)
+            slept += 1
+
+    log.info("inbound_reply_daemon stopped cleanly")
+    _audit("stop")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

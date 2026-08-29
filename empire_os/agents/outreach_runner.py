@@ -59,9 +59,9 @@ _enricher = EmpireEnricher()  # singleton
 
 # ─── Config ───────────────────────────────────────────────────────────
 RESEND_OWNER = os.environ.get("RESEND_OWNER", "Founder <founder@empire-ai.co.uk>")
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 INTERVAL_SECONDS = int(os.environ.get("INTERVAL", "3600"))
-CYCLE_PROSPECT_LIMIT = int(os.environ.get("LIMIT", "20"))
+CYCLE_PROSPECT_LIMIT = int(os.environ.get("LIMIT", "2000"))
 
 # Sequence spacing
 STEP_GAP_DAYS = {0: 0, 1: 3, 2: 4, 3: 7}
@@ -86,25 +86,64 @@ _http.trust_env = False
 
 # ─── Rate Limiter ─────────────────────────────────────────────────────
 class RateLimiter:
-    """Token bucket rate limiter for Resend free tier (100/day)."""
-    def __init__(self, max_per_day: int = 90):
+    """Hard daily quota guardrail for Resend free tier (100/day).
+
+    Hard-cap at 95/day so we never trip Resend's 550 quota error mid-cycle.
+    Counter persists in /root/feedback/resend_daily_counter.json so the
+    count survives process restarts. Auto-resets at UTC midnight.
+
+    Both send_via_resend and send_via_smtp check this — when the cap is hit,
+    sends short-circuit with a clear "quota_exhausted" status and the
+    cycle ends early (next attempt waits for tomorrow).
+    """
+    def __init__(self, max_per_day: int = 95, state_path: str = "/root/feedback/resend_daily_counter.json"):
         self.max_per_day = max_per_day
-        self.sent_today = 0
-        self.day = datetime.now(timezone.utc).date()
-        self._lock = None  # single-threaded, no lock needed
-    
+        self.state_path = Path(state_path)
+        self.day, self.sent_today = self._load()
+
+    def _load(self):
+        """Load persisted counter; reset if it's from a different day."""
+        today = datetime.now(timezone.utc).date().isoformat()
+        try:
+            if self.state_path.exists():
+                d = json.loads(self.state_path.read_text())
+                if d.get("day") == today:
+                    return today, int(d.get("sent", 0))
+        except Exception:
+            pass
+        return today, 0
+
+    def _save(self):
+        try:
+            self.state_path.parent.mkdir(parents=True, exist_ok=True)
+            self.state_path.write_text(json.dumps({
+                "day": self.day, "sent": self.sent_today,
+                "max_per_day": self.max_per_day,
+            }))
+        except Exception:
+            pass
+
     def can_send(self) -> bool:
-        now = datetime.now(timezone.utc).date()
-        if now != self.day:
-            self.day = now
+        """Return True if under the daily cap. Auto-resets at UTC midnight."""
+        today = datetime.now(timezone.utc).date().isoformat()
+        if today != self.day:
+            self.day = today
             self.sent_today = 0
+            self._save()
         return self.sent_today < self.max_per_day
-    
+
+    def remaining(self) -> int:
+        today = datetime.now(timezone.utc).date().isoformat()
+        if today != self.day:
+            return self.max_per_day
+        return max(0, self.max_per_day - self.sent_today)
+
     def record_send(self):
         self.sent_today += 1
+        self._save()
 
-_rate_limiter = RateLimiter(max_per_day=90)
 
+_rate_limiter = RateLimiter(max_per_day=95)
 # ─── Logging ──────────────────────────────────────────────────────────
 def _log(level: str, msg: str, **fields):
     event = {
@@ -166,7 +205,17 @@ def find_sample_lead(niche: str, metro: str) -> Optional[dict]:
 
 # ─── Email Enrichment (Hunter.io + Enrichment Webhook) ─────────────────
 def enrich_email(prospect: dict) -> str:
-    """Try Hunter.io free tier (50 req/mo), then enrichment webhook, then skip."""
+    """Real-domain email discovery: try Hunter.io → live-site scrape → webhook → skip.
+
+    Priority:
+      1. Hunter.io (paid, accurate) — skipped if no key
+      2. domain_personalize.py: fetch the prospect's actual homepage and parse
+         mailto: links from there. This is the biggest deliverability win —
+         a real `owner@<their-domain>` beats guessed `info@<slug>.com`.
+      3. Enrichment webhook (cheap pattern guess)
+      4. Skip
+    """
+    # 1. Hunter.io if configured
     hunter_key = os.environ.get("HUNTER_API_KEY", "")
     url = prospect.get("url", "")
     if hunter_key and url:
@@ -186,8 +235,21 @@ def enrich_email(prospect: dict) -> str:
                 return emails[0]["value"] if emails else ""
         except Exception:
             pass
-    
-    # Try enrichment webhook for email discovery (fast /enrich/email endpoint)
+
+    # 2. Live-site scrape (the new real-domain enricher)
+    if url:
+        try:
+            sys.path.insert(0, "/root/empire_os")
+            from scripts.domain_personalize import enrich as _live_enrich
+            result = _live_enrich(prospect)
+            if result.get("emails"):
+                # Pick the highest-scored email (best deliverability)
+                top = sorted(result["emails"], key=lambda x: -x[1])[0][0]
+                return top
+        except Exception:
+            pass
+
+    # 3. Webhook pattern guess (cheap fallback)
     wh = (os.environ.get("ENRICHMENT_WEBHOOK") or "").strip()
     if wh and wh.startswith("http"):
         try:
@@ -204,7 +266,7 @@ def enrich_email(prospect: dict) -> str:
                     return data["emails"][0]
         except Exception:
             pass
-    
+
     return ""
 
 # ─── AEO Content ──────────────────────────────────────────────────────
@@ -243,7 +305,7 @@ def draft_email(prospect: dict, sample: Optional[dict], step: int = 0) -> tuple[
     name = prospect.get("business_name", "there")
     raw_niche = prospect.get("niche", "your specialty") or ""
     niche = raw_niche.replace("_", " ") if raw_niche != "b2b" else "your business"
-    metro = prospect.get("metro", "") or "your area"
+    metro = prospect.get("metro", "your area") or ""
 
     if sample:
         sample_text = (
@@ -254,51 +316,57 @@ def draft_email(prospect: dict, sample: Optional[dict], step: int = 0) -> tuple[
     else:
         sample_text = f"We're delivering fresh {niche} leads into {metro} daily. Reply 'sample' and I'll wire you the next one free.\n"
 
+    # Payment page instead of raw wallet address
+    payment_page = "https://empire-ai.co.uk/pay-leads"
+
     if step == 0:
-        subject = f"Exclusive {niche} leads — pay in USDC, no cards, no KYC"
+        # Branded, professional subject line
+        subject = f"Exclusive {niche} leads — delivered to {metro}"
         body = (
             f"Hi {name},\n\n"
             f"Quick one - I run a lead exchange for {niche} contractors in {metro}. "
-            f"Exclusive leads delivered real-time, settled in USDC - no credit cards, no KYC, no processor.\n\n"
-            f"{sample_text}\n"
-            f"How it works: grab a seat (pay-per-lead in USDC to our Solana vault), "
+            f"Exclusive leads delivered real-time, settled in USDC on BSC - no credit cards, no KYC, no processor.\n\n"
+            f"{sample_text}"
+            f"How it works: grab a seat (pay-per-lead in USDC), "
             f"we deliver verified {niche} leads to your dashboard + email + webhook. "
             f"You only pay when seated.\n\n"
-            f"See + claim a lane: https://empire-ai.co.uk/buy-leads\n"
-            f"Vault: egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM\n\n"
+            f"See + claim a lane: {payment_page}\n\n"
+            f"Your payment portal is secured and private - no wallet addresses in email.\n\n"
             f"Reply 'sample' for a free live lead.\n\n- Empire OS"
             f"{b2b_block()}"
         )
     elif step == 1:
         insight = pick_aeo(niche, metro)
+        # Branded, professional subject line - no wallet references
         subject = f"{niche.title()} in {metro}: what's converting right now"
         body = (
             f"Hi {name},\n\n"
             f"Following up with something useful, no ask. We track {niche} demand across {metro} daily. "
             f"One pattern we're seeing:\n  {insight}\n\n"
-            f"{sample_text}\n"
+            f"{sample_text}"
             f"When you're ready to put that demand to work, seats are open "
-            f"at https://empire-ai.co.uk/buy-leads (USDC settle, no card).\n\n"
+            f"at {payment_page} (USDC settle, no card).\n\n"
             f"- Empire OS"
             f"{b2b_block()}"
         )
     else:
-        subject = f"Your {niche} lane in {metro} is still open"
+        subject = f"Your {niche} lane in {metro} is still available"
         body = (
             f"Hi {name},\n\n"
             f"Last one - your {niche} seat for {metro} is still available. "
             f"Exclusive leads, USDC settlement, cancel anytime.\n\n"
-            f"Claim it: https://empire-ai.co.uk/buy-leads\n"
-            f"Vault: egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM\n\n"
-            f"If the timing's off, just reply 'later' and I'll close your "
-            f"file. No hard feelings.\n\n- Empire OS"
+            f"Claim it: {payment_page}\n\n"
+            f"If the timing's off, just reply 'later' and I'll close your file. "
+            f"No hard feelings.\n\n- Empire OS"
             f"{b2b_block()}"
         )
     return subject, body
 
 # ─── SMTP Sender (Resend SMTP) ────────────────────────────────────────
 def send_via_smtp(to: str, subject: str, html_body: str) -> tuple[bool, str]:
-    """Send via Resend SMTP (smtp.resend.com:465, user=resend, pass=API_KEY)."""
+    """Send via SMTP relay. Honors the daily quota guardrail."""
+    if not _rate_limiter.can_send():
+        return False, f"quota_exhausted ({_rate_limiter.remaining()} left today)"
     if not SMTP_PASS:
         return False, "smtp_not_configured"
     if f"@{ALLOWED_SEND_DOMAIN}" not in RESEND_OWNER:
@@ -313,9 +381,19 @@ def send_via_smtp(to: str, subject: str, html_body: str) -> tuple[bool, str]:
         msg.attach(MIMEText(html_body, "html", "utf-8"))
         
         context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context, timeout=15) as server:
-            server.login(SMTP_USER, SMTP_PASS)
-            server.send_message(msg)
+        # Port 465 = implicit TLS (SMTP_SSL). Other ports = STARTTLS upgrade.
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context, timeout=15) as server:
+                server.login(SMTP_USER, SMTP_PASS)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+                server.ehlo()
+                if SMTP_TLS:
+                    server.starttls(context=context)
+                    server.ehlo()
+                server.login(SMTP_USER, SMTP_PASS)
+                server.send_message(msg)
         return True, f"smtp_sent via {SMTP_HOST}:{SMTP_PORT}"
     except smtplib.SMTPAuthenticationError as e:
         return False, f"smtp_auth_failed: {e}"
@@ -394,10 +472,14 @@ def process_prospect(p: dict, dry_run: bool = False) -> tuple[int, int]:
     if step > MAX_STEP:
         return 0, 1
     
+    _log("TRACE", "before_register", prospect_id=p.get("prospect_id"))
     register_prospect(p)
+    _log("TRACE", "after_register", prospect_id=p.get("prospect_id"))
     email = p.get("email", "")
     if not email:
+        _log("TRACE", "before_enrich", prospect_id=p.get("prospect_id"))
         email = enrich_email(p)
+        _log("TRACE", "after_enrich", prospect_id=p.get("prospect_id"), email=email[:30])
         if email:
             p["email"] = email
             register_prospect(p)
@@ -409,9 +491,11 @@ def process_prospect(p: dict, dry_run: bool = False) -> tuple[int, int]:
     sample_id = ""
     # Smart routing: deep AGI for high-value prospects, lightweight for bulk
     score = p.get("score", 0) or 0
-    use_deep = score >= 80 or p.get("tier") in ("gold", "platinum") or p.get("source") == "goldmine_prospects"
+    use_deep = (score >= 80 or p.get("tier") in ("gold", "platinum") or p.get("source") == "goldmine_prospects") and os.environ.get("OUTREACH_FORCE_LIGHTWEIGHT", "0") != "1"
+    _log("TRACE", "before_enricher", prospect_id=p.get("prospect_id"), score=score, use_deep=use_deep)
     try:
         intelligence = _enricher.get_nurture_ready(p, lightweight=not use_deep)
+        _log("TRACE", "after_enricher", prospect_id=p.get("prospect_id"))
         email_data = intelligence["emails"]
         step_data = email_data[step] if step < len(email_data) else email_data[-1]
         subject = step_data["subject"]
@@ -446,14 +530,20 @@ def process_prospect(p: dict, dry_run: bool = False) -> tuple[int, int]:
     ok, info = False, ""
     
     wh = (os.environ.get("LEAD_WEBHOOK") or "").strip()
+    _log("TRACE", "before_send", prospect_id=p.get("prospect_id"), webhook=wh[:40])
     if wh and wh.startswith("http"):
         ok, info = send_via_webhook(email, subject, html_body, meta)
+        _log("TRACE", "after_webhook", ok=ok, info=info[:60])
     
     if not ok:
+        _log("TRACE", "before_resend")
         ok, info = send_via_resend(email, subject, html_body, meta)
+        _log("TRACE", "after_resend", ok=ok, info=info[:60])
     
     if not ok:
+        _log("TRACE", "before_smtp")
         ok, info = send_via_smtp(email, subject, html_body)
+        _log("TRACE", "after_smtp", ok=ok, info=info[:60])
     
     try:
         _http.post(f"{HUB_URL}/v1/outreach/prospect/touched", json={
@@ -477,10 +567,20 @@ def process_prospect(p: dict, dry_run: bool = False) -> tuple[int, int]:
 # ─── Cycle Runner ─────────────────────────────────────────────────────
 def run_cycle(dry_run: bool = False):
     _log("INFO", "cycle_start", dry_run=dry_run)
-    
+
     health = hub_get("/health")
     if not health or health.get("status") not in ("ok", "online"):
         _log("ERROR", "hub_unhealthy", body=health)
+        return
+
+    # Guardrail: hard cap at 95/day on Resend free tier. Short-circuit the
+    # cycle if we're at the cap — no point enriching + iterating through
+    # prospects if every send is going to fail with 550 quota exceeded.
+    if not _rate_limiter.can_send():
+        _log("INFO", "cycle_skipped_quota_exhausted",
+             sent_today=_rate_limiter.sent_today,
+             max_per_day=_rate_limiter.max_per_day,
+             reset_at_utc="00:00")
         return
     
     metros = ["Houston", "Dallas-Fort Worth", "Austin", "Wichita", "San Antonio", "Oklahoma City", "New Orleans", "Nashville", "El Paso", "Birmingham", "Atlanta", "ATL", "Amarillo"]

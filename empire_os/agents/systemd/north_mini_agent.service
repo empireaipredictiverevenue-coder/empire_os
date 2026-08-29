@@ -1,0 +1,23 @@
+[Unit]
+Description=Empire OS North Mini Agent - Strategic Planner (reads live DB state)
+After=network.target
+StartLimitBurst=5
+StartLimitInterval=60
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/empire_os
+Environment=PYTHONUNBUFFERED=1
+Environment=NORTH_MINI_TICK=1800
+Environment=NORTH_MINI_MODEL=tencent/hy3:free
+Environment=NORTH_MINI_CAP=40
+Environment=EMPIRE_DB=/root/empire_os/empire_os.db
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/north_mini_agent.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

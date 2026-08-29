@@ -1,0 +1,25 @@
+flowchart TD
+    A[Crawler/Scraper] --> B[crm_leads raw]
+    B --> C[Enrichment Waterfall 50+ sources]
+    C --> D{Enriched?}
+    D -->|Yes| E[Omega Scoring]
+    D -->|No| F[Dead lead]
+    E --> G[omega_tier: BRONZE/SILVER/GOLD]
+    G --> H{ICP Tier}
+    H -->|High| I[Campaign B: Enterprise Direct]
+    H -->|Standard| J[Campaign A: Value-First]
+    I --> K[Buyer Claims Lead]
+    J --> K
+    K --> L[si_invoice Created]
+    L --> M[Buyer Pays USDT BSC]
+    M --> N[BSC Listener Confirms]
+    N --> O[Payout to Vault]
+    O --> P[Lead Delivered Email/Webhook]
+    P --> Q[Revenue Recognized]
+    Q --> R[MRR Updated]
+    
+    style A fill:#00BFFF,color:#0a0a12
+    style C fill:#0D47A1,color:#fff
+    style E fill:#39FF14,color:#0a0a12
+    style L fill:#FFD700,color:#0a0a12
+    style O fill:#FF4444,color:#fff

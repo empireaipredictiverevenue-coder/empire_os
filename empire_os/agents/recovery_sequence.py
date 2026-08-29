@@ -63,8 +63,9 @@ def get_pay_url(tenant_id):
     """
     import os
     try:
-        c = sqlite3.connect(DB)
+        c = sqlite3.connect(DB, timeout=30)
         c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=30000")
         c.execute("PRAGMA busy_timeout=30000")
         row = c.execute(
             "SELECT payment_ref, price_cents FROM si_subscription "
@@ -100,15 +101,19 @@ def main():
     ap.add_argument("--max", type=int, default=50)
     args = ap.parse_args()
 
-    c = sqlite3.connect(DB)
+    c = sqlite3.connect(DB, timeout=30)
+    c.execute("PRAGMA busy_timeout=30000")
     try:
         c.execute("PRAGMA journal_mode=WAL")
         c.execute("PRAGMA busy_timeout=30000")
     except Exception:
         pass
     c.row_factory = sqlite3.Row
+    # Use si_subscription instead of crm_deals (which doesn't exist)
     awaiting = c.execute(
-        "SELECT * FROM crm_deals WHERE stage='awaiting_payment'").fetchall()
+        "SELECT s.*, t.email as contact_email FROM si_subscription s "
+        "JOIN si_tenant t ON t.tenant_id = s.tenant_id "
+        "WHERE s.status='awaiting_payment'").fetchall()
 
     # NEW: A2A pending quotes (signed but unpaid in 30 min window)
     a2a_pending = c.execute(
@@ -150,8 +155,8 @@ def main():
         )
         ok = queue_email(email, next_touch["subject"], body, tenant_id)
         if ok:
-            c.execute(f"UPDATE crm_deals SET touch_{next_touch['n']}_sent=1, "
-                      f"updated_at=? WHERE id=?", (now_iso(), d["id"]))
+            c.execute(f"UPDATE si_subscription SET touch_{next_touch['n']}_sent=1, "
+                      f"updated_at=? WHERE subscription_id=?", (now_iso(), d["subscription_id"]))
             c.commit()
             sent_total += 1
             print(f"[sent] touch {next_touch['n']} -> {email}")

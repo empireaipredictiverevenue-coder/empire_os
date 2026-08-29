@@ -84,12 +84,14 @@ TIER_PER_LEAD_CENTS = {
     "silver":   4900,   # $49
     "gold":     9900,   # $99
     "platinum": 19900,  # $199
+    "titanium": 49900,  # $499
 }
 TIER_SEAT_CENTS = {
-    "bronze":   29900,
-    "silver":   59900,
-    "gold":     119900,
-    "platinum": 239900,
+    "bronze":   29900,   # $299/mo
+    "silver":   59900,   # $599/mo
+    "gold":     119900,  # $1,199/mo
+    "platinum": 239900,  # $2,399/mo
+    "titanium": 499900,  # $4,999/mo
 }
 
 

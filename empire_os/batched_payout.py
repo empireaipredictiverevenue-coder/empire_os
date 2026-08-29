@@ -1,9 +1,9 @@
 """
-Batched Payouts — combine all pending payouts into ONE Solana transaction.
+Batched Payouts — combine all pending payouts into ONE BSC transaction.
 
 Instead of 45 separate transfers (45 signatures, 45 fees, 45 clicks
 in TokenPocket), build a single VersionedTransaction with 45 inner
-USDC transfers, encoded as a Solana Pay deeplink that TokenPocket
+USDT transfers, encoded as a BSC Pay deeplink that TokenPocket
 opens and signs in one tap.
 
 The transaction is unsigned — TokenPocket (or Phantom, Solflare)
@@ -22,7 +22,7 @@ from typing import Optional
 logger = logging.getLogger("batched_payout")
 
 
-# Minimal Solana transaction builder using solders / solders-message
+# Minimal BSC transaction builder using solders / solders-message
 # We avoid requiring the user to install solders by constructing the
 # transaction message bytes manually if the lib is missing.
 def _try_import_solders():
@@ -55,7 +55,7 @@ class BatchedPayout:
     payout_id: str = ""
     destination: str = ""      # receiver wallet
     amount_usdc: float = 0.0
-    amount_raw: int = 0        # USDC base units (6 decimals)
+    amount_raw: int = 0        # USDT base units (6 decimals)
     memo: str = ""
 
 
@@ -83,7 +83,7 @@ SPL_TRANSFER_DISCRIMINATOR = bytes([12])
 
 
 def _decode_base58(s: str) -> bytes:
-    """Decode a base58 string to bytes (Solana addresses)."""
+    """Decode a base58 string to bytes (BSC addresses)."""
     try:
         import base58
         return base58.b58decode(s)
@@ -219,11 +219,11 @@ def build_batched_payout_tx(
     payouts: list,
     sender_wallet: str,
     mint: str,
-    rpc_url: str = "https://api.mainnet-beta.solana.com",
+    rpc_url: str = "https://api.bsc.solana.com",
     batch_id: str = "",
     blockhash: str = None,
 ) -> BatchPayoutResult:
-    """Build ONE Solana transaction containing all USDC transfers.
+    """Build ONE BSC transaction containing all USDT transfers.
 
     Returns a serialized (unsigned) transaction + a deeplink the user
     can open in TokenPocket to sign and submit.
@@ -345,12 +345,12 @@ def build_batched_payout_tx(
     else:
         logger.info("solders not installed — returning deeplink only")
 
-    # Solana Pay deeplink (TokenPocket will open and sign)
+    # BSC Pay deeplink (TokenPocket will open and sign)
     if total_cents > 0:
         result.solana_pay_url = (
-            f"solana:{sender_wallet}"
+            f"bsc:{sender_wallet}"
             f"?amount={total_usdc:.6f}"
-            f"&spl-token={mint}"
+            f"&contract={mint}"
             f"&label=Empire%20OS%20Payouts"
             f"&message={len(instructions)}%20payouts"
         )
@@ -360,7 +360,7 @@ def build_batched_payout_tx(
 
 def verify_batched_payout_tx(
     tx_signature: str,
-    rpc_url: str = "https://api.mainnet-beta.solana.com",
+    rpc_url: str = "https://api.bsc.solana.com",
     expected_amount_cents: int = 0,
     expected_memos: Optional[list] = None,
 ) -> dict:
@@ -368,7 +368,7 @@ def verify_batched_payout_tx(
 
     Checks:
       - Transaction is confirmed
-      - Total USDC transferred >= expected_amount_cents
+      - Total USDT transferred >= expected_amount_cents
       - All expected memos are present in inner instructions
     """
     import urllib.request
@@ -392,19 +392,19 @@ def verify_batched_payout_tx(
     if result.get("meta", {}).get("err"):
         return {"verified": False, "error": "tx_failed_on_chain"}
 
-    # Sum USDC transferred (delta from sender's USDC account)
+    # Sum USDT transferred (delta from sender's USDT account)
     pre = result.get("meta", {}).get("preTokenBalances", [])
     post = result.get("meta", {}).get("postTokenBalances", [])
     sent_total = 0
     for p, q in zip(pre, post):
         if (p.get("owner") == "" or  # we'd need the sender
-            q.get("mint") != "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"):
+            q.get("mint") != "0x55d398326f99059fF775485246999027B3197955"):
             continue
         delta = int(p["uiTokenAmount"]["amount"]) - int(q["uiTokenAmount"]["amount"])
         if delta > 0:
             sent_total += delta
 
-    sent_cents = sent_total // 10000  # USDC has 6 decimals
+    sent_cents = sent_total // 10000  # USDT has 6 decimals
     return {
         "verified": True,
         "tx_signature": tx_signature,

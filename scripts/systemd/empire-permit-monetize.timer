@@ -1,0 +1,11 @@
+[Unit]
+Description=Run permit monetization every 6h
+
+[Timer]
+OnBootSec=300
+OnCalendar=*-*-* */6:00:00
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Empire OS DB backup timer (hourly)
+
+[Timer]
+OnBootSec=5min
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

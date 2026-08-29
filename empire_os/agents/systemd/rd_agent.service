@@ -1,0 +1,23 @@
+[Unit]
+Description=Empire OS R&D Agent - Continuous Revenue Loop Orchestrator
+After=network.target empire-hub.service
+Requires=empire-hub.service
+StartLimitBurst=5
+StartLimitInterval=60
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/empire_os
+Environment=PYTHONUNBUFFERED=1
+Environment=RND_TICK=900
+Environment=RND_MODEL=tencent/hy3:free
+Environment=EMPIRE_DB=/root/empire_os/empire_os.db
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/rd_agent.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

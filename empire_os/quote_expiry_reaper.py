@@ -49,34 +49,13 @@ def _log(record: dict) -> None:
 
 
 def send_email(to_email: str, subject: str, body: str) -> dict:
-    """Send via Brevo API (same path as a2a_sales_agent)."""
-    api_key = os.getenv("BREVO_API_KEY", "")
-    if not api_key:
-        from pathlib import Path as P
-        bp = P("/root/empire_secrets/brevo_api_key")
-        if bp.exists():
-            api_key = bp.read_text().strip()
-    if not api_key:
-        return {"sent": False, "error": "no_brevo_key"}
-    sender = os.getenv("EMPIRE_FROM", "Empire OS <founder@empire-ai.co.uk>")
-    sender_email = sender.split("<")[-1].rstrip(">") if "<" in sender else sender
-    try:
-        payload = {
-            "sender": {"name": "Empire OS", "email": sender_email},
-            "to": [{"email": to_email}],
-            "subject": subject,
-            "textContent": body,
-        }
-        req = urllib.request.Request(
-            "https://api.brevo.com/v3/smtp/email",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json", "api-key": api_key},
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            resp = json.loads(r.read())
-            return {"sent": True, "brevo_id": resp.get("messageId", "")}
-    except Exception as e:
-        return {"sent": False, "error": str(e)[:200]}
+    """Send via canonical mail_sender._send (Resend/Brevo/SendGrid/Mailgun/SMTP/MX fallback)."""
+    from empire_os.mail_sender import _send as _ms_send
+    res = _ms_send(to_email, subject, body)
+    # Normalize to expected format
+    if res.get("ok"):
+        return {"sent": True, "brevo_id": res.get("brevo_id") or res.get("resend_id") or res.get("msg_id") or ""}
+    return {"sent": False, "error": res.get("error", "unknown")}
 
 
 def get_due_quotes(c: sqlite3.Connection) -> list:
@@ -133,9 +112,9 @@ def extract_pay_url(meta_json: str, quote_id: str, amount_usdc: float) -> str:
         except Exception:
             pass
     # Reconstruct: vault + amount + memo a2a:q_xxx
-    vault = os.getenv("SOLANA_VAULT_WALLET", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+    vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
     return (
-        f"solana:{vault}?amount={amount_usdc:.2f}"
+        f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb?amount={amount_usdc:.2f}"
         f"&label=Empire%20A2A&memo=a2a:{quote_id}"
     )
 
@@ -164,10 +143,10 @@ def run(batch: int = DEFAULT_BATCH, dry_run: bool = False) -> dict:
                 continue
             amount = q.get("amount_usdc", 0)
             pay_url = extract_pay_url(q.get("meta", ""), q["quote_id"], amount)
-            subject = f"Reminder: your ${amount:.0f} USDC offer expires in ~{REMINDER_MIN_BEFORE_EXPIRY} min"
+            subject = f"Reminder: your ${amount:.0f} USDT offer expires in ~{REMINDER_MIN_BEFORE_EXPIRY} min"
             body = (
                 f"Hi,\n\nYour Empire OS offer is still pending:\n\n"
-                f"  Amount: ${amount:.2f} USDC\n"
+                f"  Amount: ${amount:.2f} USDT\n"
                 f"  Quote: {q['quote_id']}\n"
                 f"  Product: {q.get('product','?')}\n\n"
                 f"Pay here before it expires:\n{pay_url}\n\n"

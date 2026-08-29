@@ -45,7 +45,7 @@ def derive_proposals():
         a2a_pending_n, a2a_pending_usd, lease_active_n, lease_active_usd, aff_pending_cents = 0, 0, 0, 0, 0
     try:
         pages = len(json.loads(urllib.request.urlopen(
-            "http://127.0.0.1:8081/v1/aeo/pages", timeout=10).read()).get("pages", []))
+            "http://127.0.0.1:8080/v1/aeo/pages", timeout=10).read()).get("pages", []))
     except Exception:
         pages = 0
 

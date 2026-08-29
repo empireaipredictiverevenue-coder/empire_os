@@ -1,0 +1,18 @@
+[Unit]
+Description=Empire OS Business Agent — Strategy Layer
+After=network.target empire-hub-8081.service
+Wants=empire-hub-8081.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 -m empire_os.agents.business_agent
+Restart=always
+RestartSec=60
+Environment=PYTHONUNBUFFERED=1 OLLAMA_HOST=http://127.0.0.1:11434 LLM_MODEL=gemma2:9b
+StandardOutput=append:/root/empire_os/logs/business_agent.log
+StandardError=append:/root/empire_os/logs/business_agent.log
+
+[Install]
+WantedBy=multi-user.target

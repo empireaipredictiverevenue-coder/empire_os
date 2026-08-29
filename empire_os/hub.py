@@ -960,6 +960,33 @@ def web_search_endpoint(q: str, num: int = 5, backend: str = "auto"):
         return {"query": q, "error": str(e)[:300], "results": []}
 
 
+@app.get("/v1/browser/fetch")
+def browser_fetch_endpoint(url: str, wait: str = "domcontentloaded", timeout: int = 30):
+    """Real-browser page fetch (Playwright Chromium) for agents.
+
+    Returns {"ok", "url", "status", "title", "length", "html"(truncated 200k)}.
+    Use when static HTTP fetch fails (JS-rendered SPA, bot walls, portals).
+    """
+    from empire_os.browser_tool import get_tool
+    try:
+        t = get_tool()
+        html = t.get_html(url, wait=wait) or ""
+        if not html or html.startswith("<error>"):
+            return {"ok": False, "url": url,
+                    "error": (html or "empty render")[:300], "length": 0}
+        # crude title extraction
+        tl = html.lower()
+        title = ""
+        if "<title>" in tl and "</title>" in tl:
+            s = tl.index("<title>") + 7
+            e = tl.index("</title>", s)
+            title = html[s:e][:300]
+        return {"ok": True, "url": url, "title": title,
+                "length": len(html), "html": html[:200000]}
+    except Exception as e:
+        return {"ok": False, "url": url, "error": str(e)[:300], "length": 0}
+
+
 @app.get("/v1/health/deep")
 def health_deep():
     """Revenue-path preconditions: env, db, chain, hub, listener.
@@ -3756,12 +3783,30 @@ PRODUCT_CATALOG = {
     "leadflow_saas_t2": "LeadFlow SaaS Tier 2 — Enterprise lead qualification + AI scoring + automated seller outreach. 13K leads/day pipeline, buyer_marketplace targeting, MiniMax intelligence.",
     "imperium_conversion_os": "Imperium Conversion OS (ICO) — Full revenue loop: crawler → AI segmentation → buyer push → USDT settlement. 30K pre-funded wallets, Solana listener, auto vault reconciliation.",
     "empire_os_v4_beta": "Empire OS v4 Beta — Self-driving empire operations. Lead scraping, AI scoring, buyer marketplace, multi-chain settlements. 30K+ leads active.",
+    "deep_intel_report": "Deep Intel Report — AI competitor + revenue-leak analysis for one business: niche positioning, local SERP gaps, 90-day attack plan. Delivered as PDF within 24h of payment.",
+    "lead_pack_50": "Lead Pack 50 — 50 exclusive, enrichment-complete leads in your niche+metro (Omega-scored, emails+phones). One-time delivery in 48h.",
+    "lead_pack_250": "Lead Pack 250 — 250 exclusive, enrichment-complete leads in your niche+metro (Omega-scored, emails+phones). One-time delivery in 72h.",
+    "serp_sweep_100": "SERP Intent Sweep 100 — Google SERP (Serper) sweep of one niche+metro: 100 hiring/expansion-intent businesses discovered, deduped, Omega-scored, delivered as CSV. 24h.",
+    "serp_sweep_250": "SERP Intent Sweep 250 — Google SERP (Serper) sweep of one niche+metro: 250 hiring/expansion-intent businesses discovered, deduped, Omega-scored, delivered as CSV. 48h.",
+    "serp_lane_feeder": "SERP Lane Feeder — monthly automated SERP intent sweep feeding your exclusive lane with fresh Omega-scored leads weekly (niche+metro locked).",
+    "seo_audit_report": "SEO Audit Report — 5-page technical SEO audit of one site: score /100, missing titles/meta/H1/canonical, thin content. Engine-generated, delivered 1h after payment.",
+    "seo_content_brief": "SEO Content Brief — landing page brief for one niche+metro built from real autocomplete search demand: title, meta, H1, sections, FAQ, CTA, keywords. Delivered 1h after payment.",
+    "cortex_blueprint_pack": "Cortex Blueprint Pack — AI campaign blueprints for one niche: niche heat score /100, campaign type, visual DNA, script DNA from Cortex Intelligence engine. Delivered 1h after payment.",
 }
 PRODUCT_PRICES = {"satellite_wastage": 99.0, "warehouse_asset": 79.0,
                   "strike_pack": 199.0, "ai_closer": 299.0,
                   "leadflow_saas_t2": 497.0,
                   "imperium_conversion_os": 2999.0,
-                  "empire_os_v4_beta": 9999.0}
+                  "empire_os_v4_beta": 9999.0,
+                  "deep_intel_report": 997.0,
+                  "lead_pack_50": 497.0,
+                  "lead_pack_250": 1997.0,
+                  "serp_sweep_100": 297.0,
+                  "serp_sweep_250": 597.0,
+                  "serp_lane_feeder": 897.0,
+                  "seo_audit_report": 149.0,
+                  "seo_content_brief": 97.0,
+                  "cortex_blueprint_pack": 299.0}
 
 
 def ensure_products_table():
@@ -3807,6 +3852,134 @@ def load_product_catalog():
     except Exception:
         pass
     return cat, prices
+
+
+@app.post("/v1/seo/audit")
+def seo_audit_ep(req: dict):
+    """EmpireSEO engine: audit a site, store in site_audits, auto-feed
+    crm_leads when score<=70. Body: {url, niche, metro, feed_crm}."""
+    url = (req.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "url required")
+    import sys as _sys
+    if "/root/empire_os" not in _sys.path:
+        _sys.path.insert(0, "/root/empire_os")
+    from empire_seo import audit_site, _store_audited_domain
+    a = audit_site(url, max_pages=int(req.get("max_pages") or 5))
+    domain = url.split("//")[-1].split("/")[0]
+    _store_audited_domain(
+        f"{req.get('niche') or 'general'} {req.get('metro') or ''}".strip(),
+        domain, a)
+    fed = bool(req.get("feed_crm", True)) and 0 < a.get("avg_score", 0) <= 70
+    return {"ok": True, "domain": domain, "score": a.get("avg_score"),
+            "issues": a.get("issues"), "pages_audited": a.get("pages_audited"),
+            "lead_fed": fed}
+
+
+@app.get("/v1/seo/leads")
+def seo_leads_ep(min_score: int = 0, max_score: int = 70, limit: int = 25):
+    """SEO-weak prospect list from site_audits (for market agent / outreach)."""
+    import sqlite3 as _sq
+    con = _sq.connect("/root/empire_os/empire_os.db", timeout=30)
+    con.execute("PRAGMA busy_timeout=30000")
+    rows = con.execute(
+        "SELECT domain, avg_score, issues, query, ts FROM site_audits "
+        "WHERE avg_score BETWEEN ? AND ? ORDER BY avg_score ASC LIMIT ?",
+        (min_score, max_score, limit)).fetchall()
+    con.close()
+    return {"ok": True, "count": len(rows),
+            "prospects": [{"domain": r[0], "score": r[1],
+                           "issues": json.loads(r[2] or "[]"),
+                           "found_via": r[3], "audited_at": r[4]}
+                          for r in rows]}
+
+
+@app.post("/v1/serp/sweep")
+def serp_sweep(req: dict):
+    """Ops endpoint: run a SERP intent sweep (serper via /v1/web/search).
+
+    Body: niche, metro, limit (default 20), score (default true).
+    Returns {added, seen, scored, niche, metro}.
+    """
+    niche = (req.get("niche") or "").strip().lower()
+    metro = (req.get("metro") or "").strip()
+    if not niche or not metro:
+        raise HTTPException(400, "niche + metro required")
+    limit = int(req.get("limit") or 20)
+    want_score = bool(req.get("score", True))
+    from empire_os.lead_engine import serp_discovery
+    if want_score:
+        stats = serp_discovery.discover_and_score(niche, metro, limit)
+    else:
+        stats = serp_discovery.discover(niche, metro, limit)
+    # enrichment pass (free waterfall) — fills email/phone on new leads
+    try:
+        stats["enrich"] = serp_discovery.enrich_pending(
+            niche, metro, limit=int(req.get("enrich_limit") or 15))
+    except Exception as e:
+        stats["enrich"] = {"error": str(e)[:160]}
+    return {"ok": True, **stats}
+
+
+@app.post("/v1/products/{sku}/order")
+def product_order(sku: str, req: dict):
+    """Self-serve one-shot order: mints a BSC USDT payment instruction.
+
+    Body:
+      email    str  required — delivery target
+      niche    str  optional — lead packs / intel targeting
+      metro    str  optional
+      url      str  optional — deep_intel_report target site
+
+    Flow: POST → { invoice_id, payment_url, memo }. Buyer sends USDT with
+    memo; bsc listener matches amount (funnel_state invoice.SKU_* pending)
+    → flips paid → _handle_sku_delivery emails the product.
+    """
+    email = (req.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(400, "email required")
+    cat, prices = load_product_catalog()
+    if sku not in cat:
+        raise HTTPException(404, "sku not found")
+    price = float(prices.get(sku, 0))
+    if price <= 0:
+        raise HTTPException(400, "sku not priced for self-serve")
+    vault = os.environ.get("BSC_WALLET_ADDRESS", "")
+    if not vault:
+        raise HTTPException(500, "vault not configured")
+
+    invoice_id = f"SKU_{sku.upper()}_{int(time.time())}_{email.split('@')[0]}"
+    state = {
+        "invoice_id": invoice_id, "sku": sku, "email": email,
+        "niche": (req.get("niche") or "").strip().lower(),
+        "metro": (req.get("metro") or "").strip().upper(),
+        "url": (req.get("url") or "").strip().lower(),
+        "amount_usdc": price, "product": sku, "status": "pending",
+        "ts": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        backend.execute(
+            "INSERT OR REPLACE INTO funnel_state (key_id, state_json, updated_at) "
+            "VALUES (?, ?, ?)",
+            (f"invoice.{invoice_id}",
+             json.dumps(state), time.time()))
+        backend.commit()
+    except Exception as e:
+        raise HTTPException(500, f"invoice persist failed: {str(e)[:160]}")
+
+    return {
+        "ok": True, "invoice_id": invoice_id,
+        "sku": sku, "amount_usdc": price,
+        "vault_wallet": vault, "memo": invoice_id,
+        "chain": "BSC", "token": "USDT",
+        "payment_url": (
+            f"bsc:{vault}?amount={price:.6f}"
+            f"&contract=0x55d398326f99059fF775485246999027B3197955"
+            f"&label={invoice_id}&message=Empire+OS"
+        ),
+        "note": "Send exact USDT with memo. Delivery is automatic on-chain "
+                "confirmation (PDF / lead CSV to your email).",
+    }
 
 
 @app.get("/v1/a2a/catalog")
@@ -4262,13 +4435,14 @@ def product_detail(sku: str):
     if sku in PRODUCT_PRICES:
         sp = specs.get(sku, {})
         price = PRODUCT_PRICES[sku]
-        return {"sku": sku, "name": sku,
+        return {"sku": sku, "name": PRODUCT_CATALOG.get(sku, sku),
                 "tiers": {"T1": price, "T2": price * 2.5, "T3": price * 5,
                           "T4_titanium": price * 10},
                 "setup_fee_usdt": 0.0, "whitelabel": False,
                 "features": sp.get("features", []), "benefits": sp.get("benefits", []),
                 "deliverables": sp.get("deliverables", []),
-                "vault": os.environ.get("BSC_WALLET_ADDRESS", VAULT), "settlement": "bsc_usdt"}
+                "description": PRODUCT_CATALOG.get(sku, ""),
+                "vault": os.environ.get("BSC_WALLET_ADDRESS", ""), "settlement": "bsc_usdt"}
     raise HTTPException(404, "sku not found")
 
 
@@ -5525,7 +5699,47 @@ def finance_replay(req: dict):
                     matched_to = f"eval credit pack {m}"
             # --- A2A: SKU_ memo activates a product subscription ---
             if m.startswith("SKU_"):
+                # Prefer the self-serve order record (funnel_state, has the
+                # real buyer email + niche/metro); fall back to bare memo.
+                import uuid as _uuid
                 sku = m.replace("SKU_", "", 1).strip().lower()
+                _mem_parts = m.split("_")
+                _sku_maybe = None
+                _ord_row = cnx.execute(
+                    "SELECT state_json FROM funnel_state WHERE key_id = ?",
+                    (f"invoice.{m}",)).fetchone()
+                if _ord_row:
+                    try:
+                        _ord = json.loads(_ord_row[0])
+                        _sku_maybe = _ord.get("sku", "")
+                        _buyer_email = _ord.get("email", "")
+                        _niche = _ord.get("niche", "")
+                        _metro = _ord.get("metro", "")
+                    except Exception:
+                        _ord = {}
+                else:
+                    _ord = {}
+                if _ord.get("sku"):
+                    sku = _ord["sku"]
+                # resolve/create a real tenant (FK requires si_tenant row)
+                _tid = wallet or ""
+                _buyer_email = _buyer_email or ""
+                _ex = None
+                if _buyer_email:
+                    _ex = cnx.execute(
+                        "SELECT tenant_id FROM si_tenant WHERE email=?",
+                        (_buyer_email,)).fetchone()
+                if _ex:
+                    _tid = _ex[0]
+                elif not _tid or not cnx.execute(
+                        "SELECT 1 FROM si_tenant WHERE tenant_id=?",
+                        (_tid,)).fetchone():
+                    _tid = "tenant_" + _uuid.uuid4().hex[:10]
+                    cnx.execute(
+                        "INSERT INTO si_tenant (tenant_id, name, email, "
+                        "status, created_at, updated_at) VALUES (?,?,?,?,datetime('now'),datetime('now'))",
+                        (_tid, _ord.get("sku") or sku,
+                         _buyer_email or f"{_tid}@sku.a2a", "active"))
                 sub_id = f"sku_{sku}_{int(datetime.now().timestamp())}"
                 # price: dynamic from si_products, else static fallback
                 prow = cnx.execute(
@@ -5536,14 +5750,15 @@ def finance_replay(req: dict):
                     "INSERT OR REPLACE INTO si_subscription "
                     "(subscription_id, tenant_id, plan, billing_cycle, seats, "
                     "price_cents, status, payment_method, payment_ref, "
-                    "started_at, current_period_end, created_at) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (sub_id, wallet or "a2a", f"sku_{sku}", "usdc_prepaid",
+                    "started_at, current_period_end, created_at, source, niche) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (sub_id, _tid, f"sku_{sku}", "usdc_prepaid",
                      1, int(price * 100),
                      "active", "bsc", sig,
                      datetime.now(timezone.utc).isoformat(),
                      datetime.now(timezone.utc).isoformat(),
-                     datetime.now(timezone.utc).isoformat()))
+                     datetime.now(timezone.utc).isoformat(),
+                     "sku_order", _niche or ""))
                 matched_to = f"si_subscription {sub_id}"
                 paid_sub = sub_id
             # --- Seat subscription activation (select-serve / auto_onboard) ---
@@ -5645,7 +5860,7 @@ def finance_replay(req: dict):
                 if not best:
                     cand2 = cnx.execute(
                         "SELECT invoice_id, amount_cents, status "
-                        "FROM si_invoice WHERE status = 'pending'"
+                        "FROM si_invoice WHERE status IN ('pending','issued')"
                     ).fetchall()
                     for iid, ac, st in cand2:
                         try:
@@ -6553,6 +6768,7 @@ def outbox_pending(n: int = 10):
             "WHERE o.status='pending' "
             "AND (o.recipient_kind IS NULL OR o.recipient_kind='buyer' "
             "     OR o.recipient_kind='prospect' "
+            "     OR o.recipient_kind='tenant' "
             "     OR (o.recipient_kind='owner' "
             "         AND EXISTS (SELECT 1 FROM si_prospect_consent c "
             "                     WHERE c.prospect_id = o.lead_id "
@@ -11790,3 +12006,58 @@ async def permits_state_route(term: str = Query(...), state: str = Query(...), c
     import anyio
     results = await anyio.to_thread.run_sync(lambda: bing_state(term, state, city, limit))
     return {"ok": True, "results": results}
+
+
+# ===================== ENTERPRISE TIER (white-label Omega) =====================
+from empire_os import enterprise_tier as _ent  # noqa: E402
+
+
+@_catch
+@app.post("/v1/enterprise/register")
+def enterprise_register(req: dict):
+    """Register white-label enterprise client. Body: firm_name, email, plan
+    (enterprise_base|enterprise_plus|elite), subdomain, omega_weights, brand."""
+    return _ent.register_client(req)
+
+
+@_catch
+@app.post("/v1/enterprise/quote")
+def enterprise_quote(req: dict):
+    """Tiered lead quote w/ disaster multiplier. Body: niche, metro, count."""
+    return _ent.quote_leads(req)
+
+
+@_catch
+@app.post("/v1/enterprise/assign")
+def enterprise_assign(req: dict):
+    """Assign top-scored leads to client dedicated pool. Body: client_id, count."""
+    return _ent.assign_leads(req)
+
+
+@_catch
+@app.get("/v1/enterprise/client/{client_id}")
+def enterprise_client(client_id: str):
+    """Client config + dedicated pool stats (white-label view)."""
+    return _ent.client_config(client_id)
+
+
+@_catch
+@app.post("/v1/enterprise/disaster")
+def enterprise_disaster(req: dict):
+    """Toggle 3x disaster pricing. Body: active(bool), reason(str)."""
+    return _ent.set_disaster(bool(req.get("active")), req.get("reason", ""))
+
+
+@_catch
+@app.get("/v1/enterprise/disaster")
+def enterprise_disaster_get():
+    import sqlite3 as _sq3
+    cx = _sq3.connect("/root/empire_os/empire_os.db", timeout=30.0)
+    try:
+        row = cx.execute("SELECT active, reason, activated_at FROM si_disaster_mode LIMIT 1").fetchone()
+        return {"ok": True, "disaster_active": bool(row and row[0]),
+                "multiplier": 3.0 if row and row[0] else 1.0,
+                "reason": row[1] if row else "", "activated_at": row[2] if row else None}
+    finally:
+        cx.close()
+# ================== END ENTERPRISE TIER =====================

@@ -1,0 +1,121 @@
+# Empire OS v3 - Kong API Gateway Configuration (Declarative)
+# Alternative to Caddy for more advanced rate limiting, plugins
+
+_format_version: "3.0"
+_transform: true
+
+# Services
+services:
+  - name: empire-hub
+    url: http://127.0.0.1:8081
+    routes:
+      - name: empire-hub-routes
+        paths:
+          - /v1
+        strip_path: false
+    plugins:
+      # Rate limiting by consumer (buyer tier)
+      - name: rate-limiting
+        config:
+          minute: 1000
+          hour: 10000
+          policy: local
+          fault_tolerant: true
+          hide_client_headers: false
+      # API key authentication
+      - name: key-auth
+        config:
+          key_names: ["x-api-key"]
+          hide_credentials: false
+      # Request validation
+      - name: request-validator
+        config:
+          body_schema:
+            type: object
+            required: []
+
+  # Regional hub services (for geo-routing)
+  - name: regional-hub-east
+    url: http://usa-east-hub:8081
+    routes:
+      - name: regional-east
+        paths:
+          - /v1
+        headers:
+          x-region: ["usa-east"]
+        strip_path: false
+
+  - name: regional-hub-central
+    url: http://usa-central-hub:8081
+    routes:
+      - name: regional-central
+        paths:
+          - /v1
+        headers:
+          x-region: ["usa-central"]
+        strip_path: false
+
+  - name: regional-hub-west
+    url: http://usa-west-hub:8081
+    routes:
+      - name: regional-west
+        paths:
+          - /v1
+        headers:
+          x-region: ["usa-west"]
+        strip_path: false
+
+# Consumers (buyer tiers)
+consumers:
+  - username: bronze-buyer
+    custom_id: bronze-tier
+    tags: ["tier:bronze", "rate:100/min"]
+  - username: silver-buyer
+    custom_id: silver-tier
+    tags: ["tier:silver", "rate:500/min"]
+  - username: gold-buyer
+    custom_id: gold-tier
+    tags: ["tier:gold", "rate:2000/min"]
+
+# Plugins for consumers
+plugins:
+  - name: rate-limiting
+    route: empire-hub-routes
+    config:
+      minute: 100
+      hour: 1000
+      policy: redis
+      redis_host: redis
+      redis_port: 6379
+      key_type: consumer
+      fault_tolerant: true
+
+# Upstreams for regional hubs
+upstreams:
+  - name: regional-east
+    targets:
+      - target: usa-east-hub:8081
+        weight: 100
+  - name: regional-central
+    targets:
+      - target: usa-central-hub:8081
+        weight: 100
+  - name: regional-west
+    targets:
+      - target: usa-west-hub:8081
+        weight: 100
+
+# Certificates (auto-TLS via ACME)
+certificates:
+  - cert: |
+      -----BEGIN CERTIFICATE-----
+      ...
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      ...
+      -----END PRIVATE KEY-----
+    snis:
+      - api.empire-ai.co.uk
+      - cortex.empire-ai.co.uk
+      - intake.empire-ai.co.uk

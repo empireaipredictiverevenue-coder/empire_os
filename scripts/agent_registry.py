@@ -129,8 +129,7 @@ def create_agent_container(name, role, python_deps="requests beautifulsoup4 lxml
                 fingerprint = line.split(",")[0]
                 break
     if not fingerprint:
-        print("No Ubuntu image found")
-        return False
+        fingerprint = "debian/12"
 
     rc, out = incus(f"launch {fingerprint} {name}", timeout=120)
     if rc != 0:

@@ -38,13 +38,20 @@ from empire_os.ai_intelligence import process_lead
 # ── hub URL: point at the REAL container hub (not the dead 8081 stub) ──
 HUB_URL = os.environ.get(
     "EMPIRE_HUB_URL",
-    "http://10.118.155.218:8081/v1/leads/direct",
+    "http://127.0.0.1:8081/v1/leads/direct",
 )
-LOG_PATH = Path("/root/feedback/crawler_runs.jsonl")
+LOG_PATH = Path("/root/empire_os/feedback/crawler_runs.jsonl")
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 # hard global timeout (seconds) — process dies if running longer
 MAX_RUN_SEC = int(os.environ.get("CRAWLER_TIMEOUT", "1800"))
+
+# ── rate-limit knobs (env-tunable) ──
+PER_LEAD_DELAY   = float(os.environ.get("PER_LEAD_DELAY",   "0.05"))  # 50ms between POSTs
+PER_SOURCE_DELAY = float(os.environ.get("PER_SOURCE_DELAY", "1.0"))   # 1s between sources
+BATCH_SIZE       = int(os.environ.get("BATCH_SIZE",         "100"))   # flush every 100 leads
+BATCH_PAUSE      = float(os.environ.get("BATCH_PAUSE",     "2.0"))   # 2s pause between batches
+MAX_LEADS_CYCLE  = int(os.environ.get("MAX_LEADS_CYCLE",    "2500"))  # global cap per cycle
 
 
 def _die_on_hang(signum, frame):
@@ -127,7 +134,18 @@ def run_source_safe(src, metro, dry_run, args):
     try:
         for cand in src.run_fn(metro=metro):
             candidates += 1
+            if posted >= MAX_LEADS_CYCLE:
+                log("INFO", "max_leads_reached", cap=MAX_LEADS_CYCLE)
+                break
+            time.sleep(PER_LEAD_DELAY)
             
+            # Normalize shared helper output; infer_niche returns (canonical, sub, confidence).
+            if isinstance(cand.niche, (tuple, list)):
+                cand.niche = str(cand.niche[0] or "general_contractor")
+            elif not isinstance(cand.niche, str):
+                cand.niche = str(cand.niche or "general_contractor")
+            if not cand.niche:
+                cand.niche = "general_contractor"
             # Cortex intake enrichment: boost lead_score based on niche/metro intelligence
             try:
                 boosted = get_niche_score(cand.niche, cand.metro)
@@ -223,7 +241,16 @@ def main():
                         help="Don't POST to /v1/leads/direct")
     parser.add_argument("--source", default=None,
                         help="Run only one source by name")
+    parser.add_argument("--verify-sources", action="store_true",
+                        help="Run the verify-gate: probe every source endpoint, "
+                             "print GREEN/RED, exit non-zero if any fails. "
+                             "Dead/placeholder endpoints are rejected here.")
     args = parser.parse_args()
+
+    if args.verify_sources:
+        from empire_os.lead_sources import verify_sources
+        fails = verify_sources()
+        sys.exit(1 if fails else 0)
 
     # ── global dead-man's switch: process dies at MAX_RUN_SEC ──
     signal.signal(signal.SIGALRM, _die_on_hang)
@@ -239,9 +266,9 @@ def main():
 
     sources = list_sources() if not args.source else None
     if sources is None:
-        from empire_os.lead_sources import get_source, _REGISTRY
         _import_sources()
-        sources = [_REGISTRY[args.source]] if args.source in _REGISTRY else []
+        requested_sources = {s.strip() for s in args.source.split(",") if s.strip()}
+        sources = [src for src in list_sources() if src.name in requested_sources]
     else:
         from empire_os.lead_sources import _import_sources as _do_import
         _do_import()
@@ -256,6 +283,15 @@ def main():
             sources_err += 1
         else:
             sources_ok += 1
+        # polite per-source delay (public portals, Cloudflare rate limits)
+        time.sleep(PER_SOURCE_DELAY)
+        # batch-level pause every BATCH_SIZE leads posted
+        if posted_total > 0 and posted_total % BATCH_SIZE < (p or 0):
+            log("INFO", "batch_pause", posted=posted_total, pause_s=BATCH_PAUSE)
+            time.sleep(BATCH_PAUSE)
+        if posted_total >= MAX_LEADS_CYCLE:
+            log("INFO", "global_cap_reached", posted=posted_total, cap=MAX_LEADS_CYCLE)
+            break
 
     # disarm timeout (we finished within limit)
     signal.alarm(0)

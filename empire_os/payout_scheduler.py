@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""payout_scheduler — Hourly USDC sweep from vault → founder wallet.
+"""payout_scheduler — Hourly USDT sweep from vault → founder wallet.
 
 Reconciles the French cortex vision ($121+/hr flowing to YOUR WALLET)
 with real code. Runs every hour via systemd timer.
 
 Flow:
   1. Query si_settlements for amounts not yet paid out
-  2. Calculate total pending USDC
-  3. If >= MIN_PAYOUT_CENTS, send USDC from vault_ata → founder_wallet
+  2. Calculate total pending USDT
+  3. If >= MIN_PAYOUT_CENTS, send USDT from vault_ata → founder_wallet
   4. Record payout in payout_log table (prevents double-payouts)
   5. Log everything to stdout for journald
 
 Env vars:
-  SOLANA_RPC_URL          — RPC endpoint (default devnet)
-  SOLANA_VAULT_WALLET     — vault wallet pubkey (source of USDC)
-  SOLANA_VAULT_ATA        — vault's USDC token account (default derived)
+  BSC_RPC          — RPC endpoint (default devnet)
+  BSC_WALLET_ADDRESS     — vault wallet pubkey (source of USDT)
+  SOLANA_VAULT_ATA        — vault's USDT token account (default derived)
   FOUNDER_WALLET          — recipient wallet for payouts
-  FOUNDER_ATA             — recipient's USDC token account (default derived)
+  FOUNDER_ATA             — recipient's USDT token account (default derived)
   SOLANA_PAYER_SECRET     — base58 keypair for signing (must own vault)
   MIN_PAYOUT_CENTS        — minimum trigger amount (default 100 = $1)
   DB_PATH                 — empire db path
@@ -37,20 +37,20 @@ logger = logging.getLogger("payout_scheduler")
 
 DB_PATH = os.getenv("DB_PATH", "/root/empire_os/empire_os.db")
 MIN_PAYOUT_CENTS = int(os.getenv("MIN_PAYOUT_CENTS", "100"))  # $1 default
-SOLANA_VAULT_WALLET = os.getenv("SOLANA_VAULT_WALLET", "")
-FOUNDER_WALLET = os.getenv("FOUNDER_WALLET", SOLANA_VAULT_WALLET)
+BSC_WALLET_ADDRESS = os.getenv("BSC_WALLET_ADDRESS", "")
+FOUNDER_WALLET = os.getenv("FOUNDER_WALLET", BSC_WALLET_ADDRESS)
 SOLANA_PAYER_SECRET = os.getenv("SOLANA_PAYER_SECRET", "")
-USDC_MINT_STR = os.getenv("USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+BSC_USDT_CONTRACT_STR = os.getenv("BSC_USDT_CONTRACT", "0x55d398326f99059fF775485246999027B3197955")
 
 
 def _derive_ata(owner: str) -> str:
-    """Derive associated token account for owner + USDC mint."""
+    """Derive associated token account for owner + USDT mint."""
     try:
         from solders.pubkey import Pubkey
         from solders.associated_token_account import get_associated_token_address
 
         owner_pk = Pubkey.from_string(owner)
-        mint_pk = Pubkey.from_string(USDC_MINT_STR)
+        mint_pk = Pubkey.from_string(BSC_USDT_CONTRACT_STR)
         ata = get_associated_token_address(owner_pk, mint_pk)
         return str(ata)
     except ImportError:
@@ -122,7 +122,7 @@ def _get_paid_ppc_total(c: sqlite3.Connection) -> int:
 
 
 def _get_a2a_released_total(c: sqlite3.Connection) -> int:
-    """Get total USDC from A2A escrow-releases not yet swept."""
+    """Get total USDT from A2A escrow-releases not yet swept."""
     try:
         # Quote IDs already swept
         swept = set()
@@ -139,7 +139,7 @@ def _get_a2a_released_total(c: sqlite3.Connection) -> int:
 
 
 def _get_lease_active_total(c: sqlite3.Connection) -> int:
-    """Get total USDC from active lease payments not yet swept."""
+    """Get total USDT from active lease payments not yet swept."""
     try:
         swept = set()
         for row in c.execute("SELECT DISTINCT meta FROM payout_log WHERE meta LIKE 'lease:%'"):
@@ -232,8 +232,8 @@ async def run_sweep(dry_run: bool = False) -> dict:
         c.close()
         return result
 
-    if not SOLANA_VAULT_WALLET:
-        logger.error("SOLANA_VAULT_WALLET not set — can't sweep")
+    if not BSC_WALLET_ADDRESS:
+        logger.error("BSC_WALLET_ADDRESS not set — can't sweep")
         result["error"] = "no_vault_wallet"
         c.close()
         return result
@@ -245,7 +245,7 @@ async def run_sweep(dry_run: bool = False) -> dict:
         return result
 
     # 3. Execute the payout
-    vault_ata = os.getenv("SOLANA_VAULT_ATA") or _derive_ata(SOLANA_VAULT_WALLET)
+    vault_ata = os.getenv("SOLANA_VAULT_ATA") or _derive_ata(BSC_WALLET_ADDRESS)
     founder_ata = os.getenv("FOUNDER_ATA") or _derive_ata(FOUNDER_WALLET)
     amount_usd = total_cents / 100
 

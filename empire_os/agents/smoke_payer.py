@@ -27,7 +27,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-HUB_INTERNAL = "http://127.0.0.1:8081"  # inside-container URL
+HUB_INTERNAL = "http://127.0.0.1:8080"  # inside-container URL
 RPC = "https://mainnet.helius-rpc.com/?api-key=585a5f3f-1fbc-4f0d-869c-2d3e981341e1"
 USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 SOL_USD = 150.0  # static estimate; we only need ~0.00001 SOL for gas

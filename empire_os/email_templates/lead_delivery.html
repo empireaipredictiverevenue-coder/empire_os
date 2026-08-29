@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{subject}}</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+:root {
+  --bg: #0a0f1a;
+  --bg-elevated: #111827;
+  --border: #1e2a3a;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --neon-green: #00ff88;
+  --neon-blue: #00d4ff;
+  --neon-cyan: #00fff7;
+  --accent-gold: #ffd700;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 20px; }
+.wrapper { max-width: 600px; margin: 0 auto; }
+.card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.header { background: linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 100%); border-bottom: 1px solid var(--border); padding: 32px 24px; text-align: center; position: relative; overflow: hidden; }
+.header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 30% 20%, rgba(0, 255, 136, 0.08) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(0, 212, 255, 0.06) 0%, transparent 50%); pointer-events: none; }
+.logo { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--neon-green), var(--neon-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; position: relative; z-index: 1; }
+.logo-sub { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; position: relative; z-index: 1; }
+.content { padding: 32px 24px; }
+.lead-badge { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 212, 255, 0.15)); border: 1px solid var(--neon-green); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 24px; font-size: 14px; font-weight: 500; color: var(--neon-green); }
+.lead-badge .pulse { width: 8px; height: 8px; background: var(--neon-green); border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.lead-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 16px; }
+.lead-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+.lead-name { font-size: 18px; font-weight: 600; color: var(--text); }
+.lead-score { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
+.score-gold { background: rgba(255, 215, 0, 0.2); color: var(--accent-gold); border: 1px solid var(--accent-gold); }
+.score-silver { background: rgba(0, 212, 255, 0.2); color: var(--neon-blue); border: 1px solid var(--neon-blue); }
+.score-bronze { background: rgba(205, 127, 50, 0.2); color: #cd7f32; border: 1px solid #cd7f32; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.detail-item { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
+.detail-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 4px; }
+.detail-value { font-size: 14px; font-weight: 500; color: var(--text); word-break: break-word; }
+.description { margin-top: 16px; padding: 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.cta-row { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 24px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+.btn-primary { background: linear-gradient(135deg, var(--neon-green), #00cc6a); color: #0a0f1a; border: none; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0, 255, 136, 0.3); }
+.btn-secondary { background: transparent; color: var(--neon-blue); border: 1px solid var(--neon-blue); }
+.btn-secondary:hover { background: rgba(0, 212, 255, 0.1); }
+.footer { background: var(--bg); border-top: 1px solid var(--border); padding: 24px; text-align: center; }
+.footer-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
+.footer-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+.footer-links a:hover { color: var(--neon-blue); }
+.footer-copy { font-size: 12px; color: var(--text-muted); }
+.divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 24px 0; }
+@media (max-width: 480px) {
+  .detail-grid { grid-template-columns: 1fr; }
+  .btn { flex: 1; }
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="card">
+    <div class="header">
+      <div class="logo">EMPIRE OS</div>
+      <div class="logo-sub">Lead Intelligence</div>
+    </div>
+    <div class="content">
+      <div class="lead-badge">
+        <span class="pulse"></span>
+        New Lead Delivered — {{niche}} in {{metro}}
+      </div>
+      
+      <div class="lead-card">
+        <div class="lead-header">
+          <span class="lead-name">{{business_name}}</span>
+          <span class="lead-score score-{{omega_tier|lower}}">{{omega_tier}}</span>
+        </div>
+        
+        <div class="detail-grid">
+          <div class="detail-item">
+            <div class="detail-label">Niche</div>
+            <div class="detail-value">{{niche}}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Metro</div>
+            <div class="detail-value">{{metro}}, {{state}}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Phone</div>
+            <div class="detail-value">{{phone}}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Omega Score</div>
+            <div class="detail-value">{{omega_score}}/100</div>
+          </div>
+        </div>
+        
+        {% if email %}
+        <div class="detail-item" style="grid-column: 1 / -1; margin-top: 12px;">
+          <div class="detail-label">Email</div>
+          <div class="detail-value">{{email}}</div>
+        </div>
+        {% endif %}
+        
+        <div class="description">
+          {{details}}
+        </div>
+      </div>
+      
+      <div class="cta-row">
+        <a href="{{webhook_url}}" class="btn btn-primary" target="_blank">View in Dashboard</a>
+        <a href="mailto:leads@empire-ai.co.uk?subject=Re:%20Lead%20{{lead_ref}}" class="btn btn-secondary">Reply to Empire OS</a>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <p style="font-size: 13px; color: var(--text-muted); text-align: center;">
+        This lead was matched via Empire OS AI scoring (Omega {{omega_score}}/100). 
+        <strong>Tier {{omega_tier}}</strong> — {{tier_description}}.
+      </p>
+    </div>
+    
+    <div class="footer">
+      <div class="footer-links">
+        <a href="https://empire-ai.co.uk">Dashboard</a>
+        <a href="https://empire-ai.co.uk/docs">API Docs</a>
+        <a href="mailto:support@empire-ai.co.uk">Support</a>
+        <a href="https://empire-ai.co.uk/unsubscribe">Unsubscribe</a>
+      </div>
+      <p class="footer-copy">
+        Empire OS — AI Lead Intelligence Platform<br>
+        <span style="color: var(--neon-green);">■</span> Delivered via encrypted webhook + email<br>
+        © 2026 Empire AI. All rights reserved.
+      </p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

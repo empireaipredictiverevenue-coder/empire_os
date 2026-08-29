@@ -1,24 +1,13 @@
 """
-Empire OS v3 — contractor scraper.
+Empire OS v3 — contractor scraper agent (browser-enabled).
 
-Pulls licensed contractors from public state DBs and insurance carrier
-DRP rosters. Today shipped:
-  - Texas RAGIGA / TDI (open data)
-  - California CSLB lookup (state license board)
-  - Florida DBPR (Department of Business and Professional Regulation)
-  - Carrier DRP rosters (State Farm, Allstate, Farmers, etc.)
+1. State SOS business/license search (browser-rendered, no key)
+   - Texas SOS / TDI
+   - Florida DBPR
+   - California CSLB
+2. Carrier DRP rosters (browser-rendered via empire_os.carrier_rosters)
 
-Output = structured contractor rows:
-  {name, license_no, license_type, state, city, phone, email,
-   specialties[], issue_date, expiration_date, source}
-
-Cadence: 24h.
-
-Note: Some state DBs require API keys or have rate limits.
-The sources used here are deliberately the ones that publish via
-Socrata-style open data portals or HTML scrapes without auth.
-Carrier rosters are mostly JS-rendered; scrapers return empty lists
-deferred to a headless browser phase.
+Posts to /v1/contractors/direct on hub (port 8081).
 """
 import json, os, sys, time
 from datetime import datetime, timezone
@@ -32,13 +21,12 @@ FB   = Path("/root/feedback")
 LOG  = FB / "contractor_log.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(24 * 3600)))
 
-# Public open-data endpoints (no API key required)
-SOURCES = {
-    "tx_tdi":      "https://data.texas.gov/resource/.../...json",
-    "ca_cslb":     "https://www.cslb.ca.gov/Online_Services/.../JSON",  # stub - real URL differs
-    "fl_dbpr":     "https://data.fl.gov/resource/.../...json",
+# State contractor discovery — custom per-portal flows (see state_contractor_portals)
+STATE_FLOWS = {
+    "fl_dbpr": ("FL", "https://www.myfloridalicense.com/wl11.asp"),
+    "ca_cslb": ("CA", "https://www.cslb.ca.gov/onlineservices/checklicense.aspx"),
+    "tx_sos":  ("TX", "https://mycpa.cpa.state.tx.us/fo/Search/SearchEntities.aspx"),
 }
-
 
 def log(level, msg, **fields):
     e = {"ts": datetime.now(timezone.utc).isoformat(), "level": level, "msg": msg, **fields}
@@ -48,71 +36,70 @@ def log(level, msg, **fields):
     if level in ("ERROR", "EVENT"):
         print(json.dumps(e), flush=True)
 
-
-def socrata_pull(url: str, params: dict, limit: int = 200) -> list:
-    """Generic Socrata-style API puller. Many state open-data APIs use this."""
+def state_search(src_name: str, url: str, niche: str = "contractor") -> list:
+    """Dispatch to custom per-portal flow; fall back to Bing-state."""
+    st = {"fl_dbpr": "FL", "ca_cslb": "CA", "tx_sos": "TX"}.get(src_name, "")
     try:
-        r = requests.get(url, params={**params, "$limit": limit}, timeout=20)
-        if r.status_code != 200: return []
-        return r.json()
+        from empire_os import state_contractor_portals as p
+        if src_name == "fl_dbpr":
+            rows = p.fl_dbpr(niche, "")
+        else:
+            # CA CSLB is license-number based; TX SOS namefile is not discovery.
+            # Use Bing-rendered state discovery for real rows.
+            rows = p.bing_state(niche, st)
+        log("INFO", "state_search", source=src_name, rows=len(rows))
+        return rows
     except Exception as e:
-        log("ERROR", "socrata_fail", url=url, err=str(e)[:150])
+        log("ERROR", "state_search_fail", source=src_name, err=str(e)[:150])
         return []
 
+# Top-tier endpoint: only HOT/WARM pre-qualified leads go here
+TOP_TIER = f"{HUB}/v1/contractors/top-tier"
+STATE_NICHE = os.environ.get("NICHE", "roofing")
+STATE_GEO = os.environ.get("GEO", "FL")
 
-def cslb_lookup(license_no: str) -> dict:
-    """CA CSLB single-license lookup via their public JSON endpoint.
-    Real URL: https://www.cslb.ca.gov/Online_Services/Verify_License_JSON/.well-known/
-    For this first cut, we'll document the path and probe it lazily.
-    """
-    # CSLB exposes JSON for some license queries under
-    # https://www.cslb.ca.gov/Resources/Forms/Contractor_License_Check.pdf
-    # Not always JSON. Skipping live for now until user provides URL.
-    return {}
+def post_contractor(row):
+    try:
+        return requests.post(f"{HUB}/v1/contractors/direct", json=row, timeout=8).json().get("ok", False)
+    except Exception:
+        return False
 
+def post_top_tier(row):
+    """Only pre-qualified HOT/WARM leads reach top-tier buyers.
+    hub contractor_top_tier_intake expects a single dict."""
+    try:
+        return requests.post(TOP_TIER, json=row, timeout=8).json().get("ok", False)
+    except Exception:
+        return False
 
 def cycle_state_db():
-    """State DB contractor scrape cycle."""
     log("STATE_DB_CYCLE_START", "state contractor cycle")
     posted = 0
-    for src_name in SOURCES:
-        rows = socrata_pull(SOURCES[src_name], {})
-        log("INFO", "src_loaded", source=src_name, rows=len(rows))
-        for row in rows[:30]:
-            try:
-                r = requests.post(f"{HUB}/v1/contractors/direct",
-                                  json={"source": src_name,
-                                        "raw": row,
-                                        "scraped_at": datetime.now(timezone.utc).isoformat()},
-                                  timeout=8).json()
-                if r.get("ok"):
-                    posted += 1
-            except Exception as e:
-                log("ERROR", "post_fail", src=src_name, err=str(e)[:100])
+    from empire_os.lead_qualifier import Qualifier
+    q = Qualifier(target_niche=STATE_NICHE, target_geo=STATE_GEO)
+    for src_name, (st, url) in STATE_FLOWS.items():
+        rows = state_search(src_name, url)
+        out = q.qualify(rows)
+        # only HOT/WARM to top tier (single dict per call)
+        for lead in out["hot"] + out["warm"]:
+            lead["source"] = src_name
+            if post_top_tier(lead):
+                posted += 1
+        log("STATE_DB_QUALIFIED", src_name, **out["metrics"])
     log("STATE_DB_CYCLE_END", "state DB contractor cycle complete", posted=posted)
     return posted
 
-
 def cycle_carrier_rosters():
-    """Carrier DRP roster scrape cycle.
-
-    Delegates to empire_os.carrier_rosters.run_all_scrapers() which
-    hits all 8 carriers, stores results locally in the carrier_rosters
-    table, and POSTs to the hub for centralised storage.
-    """
     log("CARRIER_CYCLE_START", "carrier roster cycle")
     try:
-        from empire_os.carrier_rosters import run_all_scrapers
-        result = run_all_scrapers(hub_url=HUB)
-        total = result.get("total_new_rows", 0)
+        from empire_os.carrier_rosters import run_all, _ensure_tables
+        _ensure_tables()
+        result = run_all(store=True)
+        # result: {slug: {"ok": bool, "count": int}}
+        total = sum(v.get("count", 0) for v in result.values() if isinstance(v, dict))
+        carriers = len(result)
         log("CARRIER_CYCLE_END", "carrier roster cycle complete",
-            carriers=result.get("total_carriers", 0),
-            new_rows=total,
-            results_by_carrier={
-                k: f"{v['status']} ({v['found']} found, {v['inserted']} new)"
-                for k, v in result.get("results", {}).items()
-            },
-        )
+            carriers=carriers, new_rows=total)
         return total
     except ImportError:
         log("WARN", "carrier_rosters module not available — skipping")
@@ -121,28 +108,18 @@ def cycle_carrier_rosters():
         log("ERROR", "carrier_cycle_fail", err=str(e)[:200])
         return 0
 
-
 def cycle():
     log("CYCLE_START", "contractor cycle")
-
-    # 1. State DB scraper
     state_posted = cycle_state_db()
-
-    # 2. Carrier DRP roster scraper
     carrier_new = cycle_carrier_rosters()
-
     log("CYCLE_END", "contractor cycle complete",
-        state_db_posted=state_posted,
-        carrier_roster_new=carrier_new)
-
+        state_db_posted=state_posted, carrier_roster_new=carrier_new)
 
 if __name__ == "__main__":
-    print(f"[{datetime.now(timezone.utc).isoformat()}] contractor-scraper starting - {INTERVAL}s",
-          flush=True)
-    # Initial bootstrap: ensure carrier_rosters table on startup
+    print(f"[{datetime.now(timezone.utc).isoformat()}] contractor-scraper starting - {INTERVAL}s", flush=True)
     try:
-        from empire_os.carrier_rosters import ensure_schema
-        ensure_schema()
+        from empire_os.carrier_rosters import _ensure_tables
+        _ensure_tables()
         log("INFO", "carrier_rosters_schema_ensured")
     except Exception as e:
         log("WARN", "carrier_rosters_schema_init", err=str(e)[:100])

@@ -219,18 +219,18 @@ def _render_email(prospect: dict, quote: dict, variant: str) -> tuple:
             f"Hi,\n\n"
             f"We built something for {niche} in {metro}:\n\n"
             f"  Quote: {quote_id}\n"
-            f"  Amount: ${amount:.2f} USDC\n"
+            f"  Amount: ${amount:.2f} USDT\n"
             f"  Good for: {niche} ops\n\n"
             f"Pay here:\n{pay_url}\n\n"
             f"-- Empire OS\n"
         )
     else:
-        subject = f"Your Empire OS offer -- ${amount:.0f} USDC"
+        subject = f"Your Empire OS offer -- ${amount:.0f} USDT"
         body = (
             f"Hi,\n\n"
             f"Empire OS has prepared a tailored offer for your business:\n\n"
             f"  Product: {product}\n"
-            f"  Amount: ${amount:.2f} USDC\n"
+            f"  Amount: ${amount:.2f} USDT\n"
             f"  Quote ID: {quote_id}\n"
             f"  Expires: {expires}\n\n"
             f"Pay here:\n{pay_url}\n\n"
@@ -439,7 +439,7 @@ def run_once() -> dict:
             email_result = send_quote_email({
                 "product": decision["product"],
                 "amount_usdc": 0,
-                "pay_url": f"solana:{os.getenv('SOLANA_VAULT_WALLET','?')}?amount=0&memo=DRY",
+                "pay_url": f"bsc:{os.getenv('BSC_WALLET_ADDRESS','?')}?amount=0&memo=DRY",
                 "quote_id": "DRY_RUN",
                 "expires_at": "n/a",
             }, p)

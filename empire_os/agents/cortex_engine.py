@@ -4,12 +4,12 @@
 Built from the original north-mini 90-day plan (g-brain/build/90_day_plan.md):
  - W4 "Daily revenue snapshot pipeline" + "KPI dashboard"
  - Recurrence guards (empire_coder flags) = self-healing cortex
- - predictive.py 4 pillars: revenue / market-gap / leak / waste
+ - predictive.py 5 pillars: revenue / market-gap / leak / waste / funnel_velocity
 
 Runs INSIDE the container (live DB + hub on localhost). No `incus` shell-out.
 Every 15 min it:
   1. Computes the 4 pillars from REAL tables (lanes, si_subscription,
-     crm_deals, si_buyer_outreach, si_charges, si_settlements).
+     crm_lead_pipeline, si_buyer_outreach, si_charges, si_settlements).
   2. Runs omega_os.qualify_prospect on a batch of un-qualified prospects.
   3. Runs asi.py self-improvement on north-mini's recent decisions.
   4. Writes /root/feedback/cortex_report.json (single live intelligence view).
@@ -22,8 +22,8 @@ Run: python3 cortex_engine.py [--once]
 import sqlite3, json, os, sys, time, datetime, subprocess, shutil
 sys.path.insert(0, "/root/empire_os")
 DB = "/root/empire_os/empire_os.db"
-HUB = "http://127.0.0.1:8081"
-FEED = "/root/feedback"
+HUB = "http://127.0.0.1:8080"
+FEED = "/root/empire_os/feedback"
 GBRAIN = "/root/g-brain"
 os.makedirs(FEED, exist_ok=True)
 
@@ -56,18 +56,16 @@ def pillar_revenue(c):
     """Predictive revenue from live funnel state."""
     import empire_os.predictive as P
     lanes = c.execute("SELECT COUNT(*) FROM lanes").fetchone()[0]
-    # occupied = lanes that are actually owned by a tenant (real occupancy).
-    # The legacy code used `ON s.tenant_id IS NOT NULL` which is an
-    # always-true JOIN and returns lanes.max for any non-empty si_subscription
-    # table (the 462/462 hallucination in cortex_report.json). Compute real
-    # occupancy by counting lanes whose occupied_by column is set.
     occupied = c.execute(
         "SELECT COUNT(*) FROM lanes WHERE occupied_by IS NOT NULL "
         "AND occupied_by != ''").fetchone()[0]
     leads_total = c.execute("SELECT COUNT(*) FROM si_buyer_outreach").fetchone()[0]
-    # funnel_by_state from subscription statuses + crm_deals stages
+    # funnel_by_state from subscription statuses + crm_lead_pipeline stages
     subs = c.execute("SELECT status, COUNT(*) FROM si_subscription GROUP BY status").fetchall()
-    deals = c.execute("SELECT stage, COUNT(*) FROM crm_deals GROUP BY stage").fetchall()
+    deals = c.execute(
+        "SELECT s.name as stage, COUNT(*) FROM crm_lead_pipeline p "
+        "JOIN crm_pipeline_stages s ON s.id = p.stage_id "
+        "GROUP BY s.name").fetchall()
     funnel = {}
     for st, n in subs:
         funnel[st] = n
@@ -91,15 +89,18 @@ def pillar_leaks(c):
     funnel = {}
     for st, n in c.execute("SELECT status, COUNT(*) FROM si_subscription GROUP BY status").fetchall():
         funnel[st] = n
-    for st, n in c.execute("SELECT stage, COUNT(*) FROM crm_deals GROUP BY stage").fetchall():
+    for st, n in c.execute(
+        "SELECT s.name as stage, COUNT(*) FROM crm_lead_pipeline p "
+        "JOIN crm_pipeline_stages s ON s.id = p.stage_id "
+        "GROUP BY s.name").fetchall():
         funnel[st] = funnel.get(st, 0) + n
     try:
         leaks = P.detect_leaks(funnel)
     except Exception as e:
         leaks = {"error": str(e)[:120]}
-    # enrich with real $ uncollected
+    # enrich with real $ uncollected - use si_subscription price_cents for awaiting_payment
     uncollected = c.execute(
-        "SELECT COUNT(*), COALESCE(SUM(amount_usdc),0) FROM crm_deals WHERE stage='awaiting_payment'").fetchone()
+        "SELECT COUNT(*), COALESCE(SUM(price_cents/100.0),0) FROM si_subscription WHERE status='awaiting_payment'").fetchone()
     charges = c.execute("SELECT COUNT(*) FROM si_charges").fetchone()[0]
     settlements = c.execute("SELECT COUNT(*) FROM si_settlements").fetchone()[0]
     return {"leaks": leaks, "uncollected_seats": uncollected[0],

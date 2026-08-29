@@ -54,6 +54,16 @@ PLANS = {
         max_seats=1, max_cycles_per_month=100,
         features=["core_dashboard", "funnel_view"],
     ),
+    "trial": PlanTier(
+        # 7-day free trial — 0 cost, 10 lead credits, 1 niche + 1 metro.
+        # Convert at end of trial via auto-charge to the wallet that funded
+        # the trial (or via manual upgrade). Designed to remove the
+        # "$99-before-you-see-anything" friction that blocks 80% of buyers.
+        name="trial", price_cents_per_seat=0,
+        max_seats=1, max_cycles_per_month=10,
+        features=["core_dashboard", "funnel_view", "sample_leads",
+                  "trial_period_days"],
+    ),
     "starter": PlanTier(
         name="starter", price_cents_per_seat=9900,
         max_seats=1, max_cycles_per_month=1000,
@@ -96,6 +106,39 @@ PLANS = {
                   "hybrid_whale_backend", "carrier_drp_roster", "sovereign_desk"],
         annual_discount_bps=2500,
         backend_bps=700,   # 7% backend on closed deals (Head 2 hybrid whale)
+    ),
+    # ── Legacy lane_* plans (PPC buyer marketplace tiers) ──
+    "lane_bronze": PlanTier(
+        name="lane_bronze", price_cents_per_seat=4900,   # $49/seat/mo
+        max_seats=-1, max_cycles_per_month=-1,
+        features=["core_dashboard", "agi_workforce", "sample_leads"],
+        annual_discount_bps=1500,
+    ),
+    "lane_silver": PlanTier(
+        name="lane_silver", price_cents_per_seat=14900,  # $149/seat/mo
+        max_seats=-1, max_cycles_per_month=-1,
+        features=["core_dashboard", "agi_workforce", "storm_radar",
+                  "satellite_scanner", "lead_filter"],
+        annual_discount_bps=1500,
+    ),
+    "lane_gold": PlanTier(
+        name="lane_gold", price_cents_per_seat=49900,    # $499/seat/mo
+        max_seats=-1, max_cycles_per_month=-1,
+        features=["*", "white_label", "dedicated_support", "priority_routing"],
+        annual_discount_bps=2000,
+    ),
+    "enterprise_base": PlanTier(
+        name="enterprise_base", price_cents_per_seat=500000,  # $5000/mo
+        max_seats=-1, max_cycles_per_month=-1,
+        features=["*", "white_label", "agi_workforce", "dedicated_infra",
+                  "sla_99_9", "priority_routing"],
+        annual_discount_bps=2000,
+    ),
+    "hnw_platinum": PlanTier(
+        name="hnw_platinum", price_cents_per_seat=199900,  # $1999/mo
+        max_seats=-1, max_cycles_per_month=-1,
+        features=["*", "agi_workforce", "hnw_lanes", "concierge"],
+        annual_discount_bps=1500,
     ),
 }
 
@@ -375,6 +418,36 @@ class TenantStore:
             f"UPDATE si_subscription SET {sets} WHERE subscription_id=?", vals
         )
         self._conn.commit()
+        # Notify buyer of payment confirmation
+        try:
+            sub = self._conn.execute(
+                "SELECT tenant_id, plan, billing_cycle, price_cents FROM si_subscription WHERE subscription_id=?",
+                (subscription_id,)
+            ).fetchone()
+            if sub:
+                tenant = self._conn.execute(
+                    "SELECT email, name FROM si_tenant WHERE tenant_id=?",
+                    (sub["tenant_id"],)
+                ).fetchone()
+                if tenant and tenant["email"]:
+                    # Queue notification via hub outbox
+                    import json, urllib.request
+                    hub_url = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+                    payload = {
+                        "to_email": tenant["email"],
+                        "subject": "Payment confirmed - subscription active",
+                        "body": f"Your {sub['plan']} subscription ({sub['billing_cycle']}) is now active. Amount: ${sub['price_cents']/100:.2f}. Payment ref: {payment_ref}",
+                        "source": "payment_confirmation"
+                    }
+                    req = urllib.request.Request(
+                        f"{hub_url}/v1/outbox/enqueue",
+                        data=json.dumps(payload).encode(),
+                        headers={"Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    urllib.request.urlopen(req, timeout=5)
+        except Exception:
+            pass  # Non-blocking
 
     def get_active_subscription(self, tenant_id: str) -> Optional[Subscription]:
         row = self._conn.execute(

@@ -1,0 +1,167 @@
+{
+  "session_date": "2026-07-31",
+  "session_goal": "BSC USDT migration + Brevo email + 6-month revenue blitz plan + Week 1 execution",
+  "handoff_file": "/root/empire_os/SESSION_HANDOFF_2026-07-31.md",
+  "blitz_plan": "/root/empire_os/REVENUE_BLITZ_6MONTH_2026-07-31.md",
+  "key_state": {
+    "bsc_wallet": "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb",
+    "usdt_contract": "0x55d398326f99059fF775485246999027B3197955",
+    "brevo_key_path": "/root/empire_secrets/brevo_api_key",
+    "brevo_quota_daily": 300,
+    "brevo_quota_used_today": 50,
+    "revenue_collected": 0,
+    "pipeline_value": 53271,
+    "leads_total": 665057,
+    "total_buyers": 30601,
+    "buyers_with_emails": 1981,
+    "buyers_missing_emails": 28957,
+    "subscriptions_active": 15562,
+    "subscriptions_awaiting": 3789,
+    "invoices_pending": 559,
+    "invoices_value": 53271,
+    "cortex_blueprints": 49578,
+    "hot_targets": 89213,
+    "crm_deals_value": 298901,
+    "evaluation_credits_issued": 53,
+    "active_leases": 4,
+    "lease_revenue_monthly": 880
+  },
+  "completed": [
+    {
+      "id": "bsc-migration",
+      "task": "Switch payment rail from Solana USDC to BSC USDT across all 20+ files"
+    },
+    {
+      "id": "solana-stop",
+      "task": "Stop + disable BOTH solana listener services"
+    },
+    {
+      "id": "brevo-wire",
+      "task": "Wire Brevo as primary email provider"
+    },
+    {
+      "id": "payout-fix",
+      "task": "Fix payout_per_lead=0 (30601 buyers, avg $21.04)"
+    },
+    {
+      "id": "trial-cron",
+      "task": "Wire trial auto-convert cron (daily 09:30)"
+    },
+    {
+      "id": "payment-emails",
+      "task": "Send 50 payment-required emails via Brevo"
+    },
+    {
+      "id": "lease-invoices",
+      "task": "Create 4 lease invoices ($880/mo)"
+    },
+    {
+      "id": "affiliate-settle",
+      "task": "Record $134 affiliate settlement"
+    },
+    {
+      "id": "eval-onboard",
+      "task": "Onboard 50 buyers for evaluation product (4 credits each)"
+    },
+    {
+      "id": "blitz-plan",
+      "task": "Build 6-month revenue blitz plan (16 products)"
+    },
+    {
+      "id": "outreach-scale",
+      "task": "Scale outreach batch 500 to 2000 (already set)"
+    },
+    {
+      "id": "cortex-api",
+      "task": "Build Cortex Intelligence API ($299/mo) \u2014 subagent dispatched"
+    },
+    {
+      "id": "lead-grader-api",
+      "task": "Build Lead Grader API ($49/mo) \u2014 subagent dispatched"
+    },
+    {
+      "id": "affiliate-dash",
+      "task": "Wire affiliate dashboard \u2014 subagent dispatched"
+    },
+    {
+      "id": "nurture-scale",
+      "task": "Scale nurture 8/day to 30/day (nurture_daemon.py line 20 daily_cap()) (ALREADY DONE: daily_cap=30)"
+    }
+  ],
+  "in_progress": [
+    {
+      "id": "enrichment-batch",
+      "task": "Run enrichment batch on 28,957 missing emails \u2014 running in container"
+    }
+  ],
+  "todo": [
+    {
+      "id": "email-remaining",
+      "priority": "high",
+      "task": "Send payment emails to 4,112 awaiting_payment subs + 1,886 buyers (Brevo quota exhausted - need Pro upgrade)"
+    },
+    {
+      "id": "affiliate-usdt",
+      "priority": "medium",
+      "task": "Affiliate test data purged. Real affiliates need wallet + real conversions."
+    },
+    {
+      "id": "eval-push",
+      "priority": "high",
+      "task": "Evaluation credits purged (all 53 test). Real eval buyers will buy credit packs."
+    },
+    {
+      "id": "crm-nurture",
+      "priority": "high",
+      "task": "CRM deals purged (all 499 test). Real deals will come from actual buyer payments."
+    },
+    {
+      "id": "aeo-scale",
+      "priority": "medium",
+      "task": "Scale AEO pages 3,854 to 10,000+ (38 niches x 19 metros). North-mini reads real state now."
+    },
+    {
+      "id": "bsc-webhook",
+      "priority": "high",
+      "task": "Wire BSC payment confirmation webhook - DONE (tenants.py activate_subscription queues notification via outbox)"
+    }
+  ],
+  "backlog": [
+    {
+      "id": "ppc-marketplace",
+      "task": "Build Pay-Per-Call marketplace MVP ($15-50/call)"
+    },
+    {
+      "id": "voice-agent",
+      "task": "Build Empire Voice Agent ($299 setup + $49/mo)"
+    },
+    {
+      "id": "white-label",
+      "task": "Build White-Label Empire OS ($999 + $299/mo)"
+    },
+    {
+      "id": "mega-reports",
+      "task": "Build Niche Mega Reports ($499/yr)"
+    },
+    {
+      "id": "data-licensing",
+      "task": "Build Data Licensing Feed ($499/mo)"
+    },
+    {
+      "id": "hourly-retainer",
+      "task": "Launch hourly intelligence retainer ($150/hr)"
+    },
+    {
+      "id": "storm-alerts",
+      "task": "Build Storm Event Intelligence alerts ($99/alert)"
+    },
+    {
+      "id": "mass-tort-feed",
+      "task": "Build Mass Tort Case Feed ($50/case)"
+    },
+    {
+      "id": "hot-target-alerts",
+      "task": "Build Hot Target Alerts subscription ($49/mo/pro)"
+    }
+  ]
+}

@@ -52,7 +52,7 @@ def _vault_balance() -> dict:
             chain = d.get("checks", {}).get("chain", {})
             rpc = chain.get("rpc", {})
             return {
-                "vault_balance_usdc": rpc.get("vault_balance_usdc", 0.0),
+                "vault_balance_usdc": rpc.get("vault_balance_usdc", rpc.get("vault_balance_usdt", 0.0)),
                 "token_accounts": rpc.get("token_accounts", 0),
             }
     except Exception as e:

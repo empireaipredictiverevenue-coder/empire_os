@@ -47,9 +47,9 @@ DB_PATH = "/root/empire_os/empire_os.db"
 BDA_WEIGHTS_PATH = "/opt/bda_ckpt/unet_xview2.weights.json"
 
 DAMAGE_NICHE_MAP = {
-    "residential": ["residential_roofing", "roof_repair", "storm_damage"],
-    "commercial":  ["commercial_roofing", "general_contractor"],
-    "industrial":  ["general_contractor", "water_damage"],
+    "residential": ["residential_roofing", "roof_repair", "roofing_restoration"],
+    "commercial":  ["commercial_roofing", "roofing_restoration", "general_contractor"],
+    "industrial":  ["roofing_restoration", "general_contractor"],
 }
 
 UA = {"User-Agent": "EmpireOS/satellite-damage (ops@empire-ai.co.uk)"}
@@ -157,17 +157,39 @@ def _seed_damage(bbox: dict) -> list[dict]:
 
 
 def _niches_for_damage(damage_score: float) -> list[str]:
-    """Map damage severity to the niche lanes that should be alerted."""
+    """Map damage severity to the niche lanes that should be alerted.
+
+    Storm damage routes to roofing + roofing restoration (the buyer-side lanes
+    that actually buy post-storm restoration leads), not to generic
+    storm_damage / water_damage sub-niches.
+    """
     if damage_score >= 0.85:
-        return ["residential_roofing", "water_damage", "storm_damage",
+        return ["residential_roofing", "roofing_restoration", "roof_repair",
                 "tree_service", "general_contractor"]
     if damage_score >= 0.65:
-        return ["residential_roofing", "roof_repair", "storm_damage"]
+        return ["residential_roofing", "roofing_restoration", "roof_repair"]
     if damage_score >= 0.45:
-        return ["residential_roofing", "roof_repair"]
+        return ["residential_roofing", "roofing_restoration"]
     if damage_score >= 0.25:
         return ["roof_repair"]
     return []
+
+
+def _replace_legacy_damage_niches(niches: list[str]) -> list[str]:
+    """Compat shim: keep storm_damage/water_damage IDs working until buyer seats
+    rotate to the roofing_restoration lane. After migration, drop the legacy
+    entries from the lanes table.
+    """
+    out = []
+    for n in niches:
+        out.append(n)
+        if n == "storm_damage":
+            out.append("roofing_restoration")
+        if n == "water_damage":
+            out.append("roof_repair")
+    # Preserve original order, dedupe.
+    seen = set()
+    return [n for n in out if not (n in seen or seen.add(n))] if False else list(dict.fromkeys(out))
 
 
 def _lane_ids_for(niches: list[str], metro_code: str, lanes: dict[str, dict]) -> list[str]:
@@ -190,6 +212,7 @@ def _load_lanes() -> dict[str, dict]:
 
 def _persist_scan(bbox: dict, parcels: list[dict], niches_by_parcel: dict[str, list[str]],
                   lane_ids_by_parcel: dict[str, list[str]],
+                  metro_code: str = "",
                   damage_threshold: float = 0.3) -> dict:
     """Insert prospect/lane_leads/outbox rows for damaged parcels.
 
@@ -197,6 +220,7 @@ def _persist_scan(bbox: dict, parcels: list[dict], niches_by_parcel: dict[str, l
     """
     c = sqlite3.connect(DB_PATH)
     counts = {"prospects": 0, "lane_leads": 0, "outbox": 0, "skipped": 0}
+    _mc = metro_code or bbox.get("metro_code", "") or ""
     ts = dt.datetime.now(dt.timezone.utc).isoformat()
     for p in parcels:
         score = p["damage_score"]
@@ -232,7 +256,7 @@ def _persist_scan(bbox: dict, parcels: list[dict], niches_by_parcel: dict[str, l
                      "tier_a" if score >= 0.85 else "tier_b",
                      f"satellite_damage score={score} parcel={p['parcel_id']}",
                      niches[0] if niches else "general",
-                     metro_code or "",
+                     _mc,
                      ts),
                 )
                 counts["lane_leads"] += 1
@@ -343,7 +367,8 @@ def run_scan(*, postcode: str | None = None,
         niches_by_parcel[p["parcel_id"]], metro_code or "DFW", lanes)
         for p in parcels}
 
-    counts = _persist_scan(bb, parcels, niches_by_parcel, lane_ids_by_parcel)
+    counts = _persist_scan(bb, parcels, niches_by_parcel, lane_ids_by_parcel,
+                           metro_code=metro_code or "")
     _log("EVENT", "scan_complete", scan_id=scan_id,
          bbox=bb, parcels=len(parcels),
          prospects=counts["prospects"], lane_leads=counts["lane_leads"],

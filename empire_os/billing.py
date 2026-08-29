@@ -3,7 +3,7 @@ Billing — PayPal + Crypto subscription engine.
 
 NO Stripe. Two payment rails:
   - PayPal Subscriptions API (requires PAYPAL_CLIENT_ID + PAYPAL_SECRET)
-  - Crypto USDC on Solana (requires SOLANA_RPC_URL + signer)
+  - Crypto USDT on BSC (BEP20) (requires BSC_RPC + signer)
 
 If neither is configured, subscriptions stay in 'pending' status until
 manually marked paid via the dashboard / API.
@@ -154,22 +154,26 @@ def paypal_create_plan(cfg: PayPalConfig, plan_name: str, price_cents: int,
     return _paypal_request(cfg, "POST", "/v1/billing/plans", payload)
 
 
-# ── Crypto (Solana USDC) ──────────────────────────────────────────
+# ── Crypto (BSC USDT BEP20) ───────────────────────────────────────
+# Authoritative revenue vault (must match the live bsc_listener). Never
+# default to the banned placeholder — that silently mints uncollectable links.
+BSC_WALLET_ADDR = os.environ.get("BSC_WALLET_ADDRESS",
+    "0x1339b487046B0ad924a10c20b1791608EA8595a8")
 
 @dataclass
 class CryptoConfig:
-    rpc_url: str = "https://api.mainnet-beta.solana.com"
-    usdc_mint: str = "Gh9Zg8P2xT2F8YhT49h27fFj2x8z8z8z8z8z8z8z8z"
+    rpc_url: str = "https://bsc-dataseed.binance.org"
+    usdt_contract: str = "0x55d398326f99059fF775485246999027B3197955"
     vault_wallet: str = ""        # Empire OS receiving wallet
-    network: str = "mainnet-beta"  # or "devnet" for testing
+    network: str = "bsc"          # BSC mainnet
 
     @classmethod
     def from_env(cls) -> "CryptoConfig":
         return cls(
-            rpc_url=os.environ.get("SOLANA_RPC_URL", cls.rpc_url),
-            usdc_mint=os.environ.get("USDC_MINT_ADDRESS", cls.usdc_mint),
-            vault_wallet=os.environ.get("VAULT_WALLET_ADDRESS", ""),
-            network=os.environ.get("SOLANA_NETWORK", "mainnet-beta"),
+            rpc_url=os.environ.get("BSC_RPC", cls.rpc_url),
+            usdt_contract=os.environ.get("BSC_USDT_CONTRACT", cls.usdt_contract),
+            vault_wallet=BSC_WALLET_ADDR,
+            network="bsc",
         )
 
     def configured(self) -> bool:
@@ -180,33 +184,32 @@ def crypto_payment_request(
     cfg: CryptoConfig, amount_cents: int, tenant_id: str,
     plan: str, billing_cycle: str = "monthly",
 ) -> dict:
-    """Build a crypto payment request for a tenant.
+    """Build a crypto payment request for a tenant (BSC USDT BEP20).
 
     Returns:
-        payment_request_id — unique ID to identify this payment
-        amount_usdc       — the amount to send (USDC, 6 decimals on chain)
+        amount_usdt       — the amount to send (USDT, 18 decimals on BSC)
         vault_wallet      — destination address
-        usdc_mint         — token mint address
-        memo              — memo to include in the on-chain transfer
+        usdt_contract     — token contract address
+        memo              — memo to include in the transfer
         expires_at        — deadline for payment
     """
-    amount_usdc = amount_cents / 100  # USDC is 1:1 with USD
+    amount_usdt = amount_cents / 100  # USDT is 1:1 with USD
     request_id = str(uuid.uuid4())[:12]
     memo = f"empire-os:{tenant_id}:{plan}:{request_id}"
     expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
 
     return {
         "payment_request_id": request_id,
-        "amount_usdc": amount_usdc,
+        "amount_usdt": amount_usdt,
         "amount_cents": amount_cents,
         "vault_wallet": cfg.vault_wallet,
-        "usdc_mint": cfg.usdc_mint,
+        "usdt_contract": cfg.usdt_contract,
         "memo": memo,
         "network": cfg.network,
         "expires_at": expires_at,
         "qr_data": (
-            f"solana:{cfg.vault_wallet}?amount={amount_usdc:.6f}"
-            f"&spl-token={cfg.usdc_mint}&memo={memo}"
+            f"bsc:{cfg.vault_wallet}?amount={amount_usdt:.6f}"
+            f"&contract={cfg.usdt_contract}&memo={memo}"
         ),
     }
 
@@ -214,23 +217,20 @@ def crypto_payment_request(
 def verify_crypto_payment(cfg: CryptoConfig, tx_signature: str,
                           expected_amount_cents: int, expected_memo: str,
                           sender_wallet: str) -> dict:
-    """Verify a Solana transaction paid the right amount with the right memo.
+    """Verify a BSC USDT (BEP20) transfer.
 
-    Calls Solana RPC getTransaction to fetch the tx details, then:
-      1. Confirms the tx is confirmed/finalized
-      2. Parses inner instructions for an SPL token transfer
-      3. Verifies amount + destination + memo + sender
+    Uses BSC RPC eth_getTransactionReceipt to fetch the tx, then:
+      1. Confirms the tx was successful (status=0x1)
+      2. Parses Transfer event logs from the USDT contract
+      3. Verifies amount + destination (vault)
 
-    Returns: {"verified": bool, "amount_usdc": float, "details": ...}
+    Returns: {"verified": bool, "amount_usdt": float, "details": ...}
     """
     payload = {
         "jsonrpc": "2.0",
         "id": 1,
-        "method": "getTransaction",
-        "params": [
-            tx_signature,
-            {"encoding": "json", "commitment": "confirmed"},
-        ],
+        "method": "eth_getTransactionReceipt",
+        "params": [tx_signature],
     }
     try:
         req = urllib.request.Request(
@@ -246,52 +246,43 @@ def verify_crypto_payment(cfg: CryptoConfig, tx_signature: str,
     if not result:
         return {"verified": False, "error": "tx_not_found"}
 
-    # Walk meta + transaction for the transfer details
-    meta = result.get("meta", {})
-    if meta.get("err"):
+    # Check status (0x1 = success)
+    status = result.get("status", "0x0")
+    if status != "0x1":
         return {"verified": False, "error": "tx_failed_on_chain"}
 
-    pre_balances = meta.get("preTokenBalances", [])
-    post_balances = meta.get("postTokenBalances", [])
+    # Parse Transfer event logs (USDT BEP20 Transfer: 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df8896efa)
+    transfer_topic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df8896efa"
+    vault_hex = "0x" + ("0" * 24) + cfg.vault_wallet[2:].lower()
+    logs = result.get("logs", [])
 
-    # Find the USDC transfer to the vault
-    for pre, post in zip(pre_balances, post_balances):
-        if (post.get("owner") == cfg.vault_wallet
-                and post.get("mint") == cfg.usdc_mint):
-            delta = (int(post["uiTokenAmount"]["amount"])
-                     - int(pre["uiTokenAmount"]["amount"]))
-            if delta <= 0:
-                continue
-            amount_usdc = delta / 1_000_000  # USDC has 6 decimals
-            amount_cents_onchain = int(amount_usdc * 100)
-            if amount_cents_onchain < expected_amount_cents:
+    for log in logs:
+        topics = log.get("topics", [])
+        if len(topics) < 3:
+            continue
+        if topics[0].lower() == transfer_topic:
+            to_addr = topics[2].lower()
+            if to_addr == vault_hex.lower():
+                # USDT has 18 decimals on BSC
+                raw_amount = int(log.get("data", "0x0"), 16)
+                amount_usdt = raw_amount / 1e18
+                amount_cents_onchain = int(amount_usdt * 100)
+                if amount_cents_onchain < expected_amount_cents:
+                    return {
+                        "verified": False,
+                        "error": "amount_too_low",
+                        "received_cents": amount_cents_onchain,
+                        "expected_cents": expected_amount_cents,
+                    }
                 return {
-                    "verified": False,
-                    "error": "amount_too_low",
-                    "received_cents": amount_cents_onchain,
-                    "expected_cents": expected_amount_cents,
+                    "verified": True,
+                    "amount_usdt": amount_usdt,
+                    "amount_cents": amount_cents_onchain,
+                    "sender": sender_wallet,
+                    "tx_hash": tx_signature,
                 }
-            # Check memo in transaction message
-            message = result.get("transaction", {}).get("message", {})
-            instructions = message.get("instructions", [])
-            memo_found = False
-            for ix in instructions:
-                parsed = ix.get("parsed", {})
-                if (isinstance(parsed, dict)
-                        and parsed.get("type") == "memo"
-                        and parsed.get("info", {}).get("memo") == expected_memo):
-                    memo_found = True
-                    break
 
-            return {
-                "verified": memo_found,
-                "amount_usdc": amount_usdc,
-                "amount_cents": amount_cents_onchain,
-                "memo_match": memo_found,
-                "sender": sender_wallet,
-            }
-
-    return {"verified": False, "error": "no_usdc_transfer_to_vault"}
+    return {"verified": False, "error": "no_usdt_transfer_to_vault"}
 
 
 # ── Billing orchestrator ─────────────────────────────────────────
@@ -299,7 +290,7 @@ def verify_crypto_payment(cfg: CryptoConfig, tx_signature: str,
 @dataclass
 class PaymentMethod:
     """A billing/payment method attached to a tenant."""
-    method: str  # "paypal" | "crypto_usdc"
+    method: str  # "paypal" | "crypto_usdt"
     enabled: bool = False
     reference: str = ""  # PayPal subscription ID or wallet address
     last_payment_at: str = ""
@@ -317,9 +308,12 @@ class BillingEngine:
         if self.paypal.configured():
             methods.append({"method": "paypal", "mode": self.paypal.mode})
         if self.crypto.configured():
-            methods.append({"method": "crypto_usdc",
+            methods.append({"method": "crypto_usdt",
                            "vault": self.crypto.vault_wallet,
-                           "network": self.crypto.network})
+                           "network": "BSC",
+                           "token": "USDT",
+                           "contract": os.environ.get("BSC_USDT_CONTRACT",
+                               "0x55d398326f99059fF775485246999027B3197955")})
         return methods
 
     def start_subscription(
@@ -357,14 +351,16 @@ class BillingEngine:
                 }
             return {"error": "paypal_create_failed", "details": result}
 
-        elif method == "crypto_usdc":
+        elif method in ("crypto_usdt", "crypto_usdc"):
+            # Accept both names — crypto_usdt is current (BSC USDT BEP20),
+            # crypto_usdc kept as legacy alias for existing callers.
             if not self.crypto.configured():
                 return {"error": "crypto_not_configured"}
             req = crypto_payment_request(
                 self.crypto, amount_cents, tenant_id, plan, billing_cycle,
             )
             return {
-                "method": "crypto_usdc",
+                "method": "crypto_usdt",
                 "amount_cents": amount_cents,
                 "plan": plan,
                 "billing_cycle": billing_cycle,

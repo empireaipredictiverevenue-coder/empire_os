@@ -1,0 +1,19 @@
+[
+  {
+    "source": "/root/empire_os/feedback/verify_2026-08-15.txt",
+    "posts": [
+      {
+        "platform": "LinkedIn",
+        "content": "12/13 tests passed. The one failure? A missing memo field on a DB insert.\n\nIn fintech, a 92% pass rate is a warning, not a win. One unhandled edge case in a payment reconciliation loop can quietly bleed trust and capital.\n\nTakeaway: Ship fast, but verify the silent failures. The best engineers obsess over the 1 failing test, not the 12 passing."
+      },
+      {
+        "platform": "X/Twitter",
+        "content": "12/13 tests passed. 🧵\n\nThe 1 failure? A silent DB insert missing a charge_id memo.\n\nIn crypto infra, 92% isn't a win—it's a ticking time bomb. \n\nHere's why silent failures are more dangerous than crashes 👇\n\n1/3"
+      },
+      {
+        "platform": "YouTube Short",
+        "content": "Title: Why 12/13 Passing Tests is a FAILURE\n\n[0-3s] Hook: \"12 out of 13 tests passed. That's a failure.\"\n[3-8s] Context: \"A crypto payment listener was reconciling perfectly. But one DB insert was missing a charge_id memo.\"\n[8-12s] Insight: \"Silent failures don't crash your system. They just bleed money and trust until someone audits the database.\"\n[12-15s] CTA: \"Want to build resilient systems? Obsess over the 1 failing test, not the 12 passing ones.\""
+      }
+    ]
+  }
+]

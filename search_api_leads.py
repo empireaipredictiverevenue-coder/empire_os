@@ -322,6 +322,39 @@ def register(prospect):
     except Exception:
         return False
 
+def _hunt_self_hosted(vertical, skus, limit):
+    """Self-hosted lead hunt using empire_os.lead_sources.search_api — no API keys needed."""
+    try:
+        sys.path.insert(0, "/root/empire_os")
+        from empire_os.lead_sources.search_api import search, search_domains
+    except ImportError:
+        print(f"[self-hosted] search_api not importable, skipping {vertical}")
+        return 0
+    query, _ = VERTICALS[vertical]
+    print(f"[self-hosted] {vertical}: searching via Bing/DDG/Mojeek...")
+    domains = search_domains(f"{query} contact email", num=limit)
+    posted = 0
+    for dom in domains[:limit]:
+        email = f"info@{dom}" if "@" not in dom else dom
+        try:
+            payload = json.dumps({
+                "business_name": dom.split(".")[0].replace("-", " ").title(),
+                "email": email,
+                "niche": vertical,
+                "source": "self_hosted_search",
+            }).encode()
+            r = urllib.request.Request(
+                "http://10.118.155.218:8081/v1/outreach/prospect/register",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            urllib.request.urlopen(r, timeout=8)
+            posted += 1
+        except Exception:
+            pass
+    print(f"[self-hosted] {vertical}: {posted} leads posted")
+    return posted
+
 def hunt(vertical, skus, limit, key, serpapi_key="", parallel_key="",
          serply_key="", serpstack_key="", use_free=True):
     query, _ = VERTICALS[vertical]
@@ -387,8 +420,10 @@ def main():
     parallel_key = os.environ.get("PARALLEL_KEY", "")
     serply_key = os.environ.get("SERPLY_KEY", "")
     serpstack_key = os.environ.get("SERPSTACK_KEY", "")
+    use_self_hosted = False
     if not (key or serpapi_key or parallel_key or serply_key or serpstack_key):
-        print("no search API key set"); return
+        print("no external search API key — using self-hosted search_api (Bing/DDG/Mojeek)")
+        use_self_hosted = True
     cycle = 0
     while True:
         cycle += 1
@@ -396,8 +431,11 @@ def main():
         for v in a.verticals:
             if v not in VERTICALS:
                 continue
-            total += hunt(v, VERTICALS[v][1], a.limit, key, serpapi_key,
-                          parallel_key, serply_key, serpstack_key)
+            if use_self_hosted:
+                total += _hunt_self_hosted(v, VERTICALS[v][1], a.limit)
+            else:
+                total += hunt(v, VERTICALS[v][1], a.limit, key, serpapi_key,
+                              parallel_key, serply_key, serpstack_key)
         print(f"[cycle {cycle}] {total} leads this pass @ {time.strftime('%H:%M:%S')}")
         if not a.loop:
             break

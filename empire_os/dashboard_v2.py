@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Optional
@@ -47,6 +48,37 @@ def get_backend() -> SQLiteBackend:
 def set_backend(backend: SQLiteBackend) -> None:
     global _backend
     _backend = backend
+
+
+def get_backend_dep(request: Request) -> SQLiteBackend:
+    """FastAPI dependency: resolve the live backend at request time.
+
+    Prefers the value already bound via ``set_backend`` (the normal path on
+    hub startup); falls back to ``request.app.state.empire_backend`` if the
+    hub stored it there; finally tries the ``hub.backend`` module global so
+    the dashboard works even if ``init_dashboard`` was never invoked (the
+    classic import-vs-lifespan race that produced "Dashboard backend not
+    initialized" 503s).
+    """
+    if _backend is not None:
+        return _backend
+
+    state_backend = getattr(request.app.state, "empire_backend", None)
+    if state_backend is not None:
+        return state_backend
+
+    try:
+        from empire_os import hub as hub_module  # noqa: PLC0415
+        hub_backend = getattr(hub_module, "backend", None)
+        if hub_backend is not None:
+            # Cache so we don't re-import on every request.
+            set_backend(hub_backend)
+            logger.info("Dashboard v2 backend lazily bound from hub.backend")
+            return hub_backend
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug("hub fallback lookup failed: %s", exc)
+
+    raise HTTPException(503, "Dashboard backend not initialized")
 
 
 # ── Data Models ─────────────────────────────────────────────────────────
@@ -109,9 +141,49 @@ class DashboardData(BaseModel):
 # ── Data Access Functions ───────────────────────────────────────────────
 
 
+# Default tolerance for short, non-blocking agent write bursts holding
+# SQLite's single connection. With multiple background loops (enrich,
+# outreach, auto_pilot) and concurrent HTTP traffic, reads may see
+# ``database is locked`` for a few hundred ms — wait, retry, succeed.
+_DB_LOCK_RETRIES = 8
+_DB_LOCK_BACKOFF_S = 0.05
+
+
+def _retry_on_lock(fn, retries: int = _DB_LOCK_RETRIES):
+    """Run ``fn``; on ``sqlite3.OperationalError('database is locked')``
+    back off briefly and retry. Any other error propagates."""
+    import sqlite3 as _sqlite3
+
+    last: Exception | None = None
+    for attempt in range(retries):
+        try:
+            return fn()
+        except _sqlite3.OperationalError as exc:
+            last = exc
+            if "locked" not in str(exc).lower():
+                raise
+            if attempt == retries - 1:
+                break
+            import time as _time
+            _time.sleep(_DB_LOCK_BACKOFF_S * (attempt + 1))
+    assert last is not None
+    raise last
+
+
+def _safe(fn, default):
+    """Run ``fn``; return ``default`` on any sqlite OperationalError so
+    schema-drift in optional tables (e.g. si_buyer_outreach) doesn't
+    take down the whole dashboard JSON response."""
+    try:
+        return fn()
+    except Exception as exc:  # noqa: BLE001 - dashboard has to be resilient
+        logger.warning("dashboard query soft-failed: %s", exc)
+        return default
+
+
 def get_funnel_data(backend: SQLiteBackend) -> FunnelData:
     """Get funnel counts mapped to pending→routed→delivered→settled states."""
-    counts = count_by_state(backend)
+    counts = _retry_on_lock(lambda: count_by_state(backend))
 
     # Map funnel states to dashboard states
     # discovered → pending
@@ -167,12 +239,12 @@ def get_revenue_data(backend: SQLiteBackend) -> RevenueData:
     lane_count = lane_row["total"] or 0
     occupied_lanes = lane_row["occupied"] or 0
 
-    # Get leads total
-    cursor = backend.execute(
-        "SELECT COUNT(*) as c FROM lane_leads WHERE (buyer_id IS NOT NULL AND buyer_id != '') OR buyer_id IS NULL"
+    # Get leads total — lane_leads has no buyer_id column (see lanes.py
+    # schema), so count rows directly. Lock-protected to survive brief
+    # writer contention from background agents.
+    leads_total = _retry_on_lock(
+        lambda: backend.execute("SELECT COUNT(*) as c FROM lane_leads").fetchone()["c"] or 0
     )
-    leads_row = cursor.fetchone()
-    leads_total = leads_row["c"] or 0
 
     # Get revenue prediction
     pred = predict_revenue(
@@ -233,8 +305,19 @@ def get_revenue_data(backend: SQLiteBackend) -> RevenueData:
 
 
 def get_buyer_performance(backend: SQLiteBackend) -> list[BuyerPerformance]:
-    """Get buyer performance metrics from si_buyer_outreach and lane_leads."""
-    buyers = []
+    """Get buyer performance metrics from si_buyer_outreach and lane_leads.
+
+    Resilience: the buyer / tenant / subscription tables are managed by
+    downstream agents and have drifted from this module's expectations.
+    Any schema drift in those tables must NOT 500 the dashboard — return
+    an empty list and let the rest of the dashboard payload render.
+    """
+    return _safe(_get_buyer_performance_impl, [])
+
+
+def _get_buyer_performance_impl(backend: SQLiteBackend) -> list[BuyerPerformance]:
+    """Implementation of get_buyer_performance (assumes tables exist)."""
+    buyers = []  # type: list[BuyerPerformance]
 
     # Get buyers from si_buyer_outreach
     cursor = backend.execute(
@@ -253,13 +336,19 @@ def get_buyer_performance(backend: SQLiteBackend) -> list[BuyerPerformance]:
         status = row["status"]
         lead_count = row["lead_count"]
 
-        # Get delivered leads count
-        cursor = backend.execute(
-            "SELECT COUNT(*) as c FROM lane_leads WHERE buyer_id = ?",
-            (buyer_id,),
-        )
-        delivered_row = cursor.fetchone()
-        delivered = delivered_row["c"] or 0
+        # Get delivered leads count (lane_leads has no buyer_id — count via
+        # lanes.niche join instead, or fall back to 0 for unfiltered totals).
+        try:
+            cursor = backend.execute(
+                "SELECT COUNT(*) as c FROM lane_leads ll "
+                "JOIN lanes l ON l.id = ll.lane_id "
+                "WHERE l.niche = ?",
+                (niche,),
+            )
+            delivered_row = cursor.fetchone()
+            delivered = delivered_row["c"] or 0
+        except Exception:
+            delivered = 0
 
         # Get pending (in outreach but not delivered)
         pending = lead_count - delivered
@@ -319,36 +408,39 @@ def get_market_heat_map(backend: SQLiteBackend) -> list[MarketHeatPoint]:
     """Generate market heat map: niche × metro occupancy + lead demand."""
     heat_points = []
 
-    # Get lane data grouped by niche + metro
-    cursor = backend.execute(
-        """
-        SELECT sub_niche, metro,
-               COUNT(*) as lane_count,
-               SUM(CASE WHEN occupied_by IS NOT NULL THEN 1 ELSE 0 END) as occupied_count
-        FROM lanes
-        GROUP BY sub_niche, metro
-        """
+    # Get lane data grouped by niche + metro. Bounded retries around
+    # ``database is locked`` so concurrent agent writers can't wedge reads.
+    lane_data = _retry_on_lock(
+        lambda: backend.execute(
+            """
+            SELECT sub_niche, metro,
+                   COUNT(*) as lane_count,
+                   SUM(CASE WHEN occupied_by IS NOT NULL THEN 1 ELSE 0 END) as occupied_count
+            FROM lanes
+            GROUP BY sub_niche, metro
+            """
+        ).fetchall()
     )
-    lane_data = cursor.fetchall()
 
-    # Get lead counts by niche + metro from lane_leads
-    cursor = backend.execute(
-        """
-        SELECT
-            COALESCE(
-                (SELECT sub_niche FROM lanes l WHERE l.id = ll.lead_ref),
-                'unknown'
-            ) as niche,
-            COALESCE(
-                (SELECT metro FROM lanes l WHERE l.id = ll.lead_ref),
-                'unknown'
-            ) as metro,
-            COUNT(*) as lead_count
-        FROM lane_leads ll
-        GROUP BY niche, metro
-        """
+    # Get lead counts by niche + metro via JOIN (fast even on large
+    # lane_leads) instead of correlated subqueries per row.
+    lead_data = _retry_on_lock(
+        lambda: backend.execute(
+            """
+            SELECT l.sub_niche as niche, l.metro as metro,
+                   COUNT(ll.id) as lead_count
+            FROM lanes l
+            LEFT JOIN lane_leads ll ON ll.lane_id = l.id
+            GROUP BY l.sub_niche, l.metro
+            """
+        ).fetchall()
     )
-    lead_data = {f"{r['niche']}:{r['metro']}": r["lead_count"] for r in cursor.fetchall()}
+    lead_idx = {(r["niche"] or "unknown"): r["lead_count"] for r in lead_data}
+    # Aggregate per (niche, metro) because the JOIN groups by lane attributes.
+    lead_map: dict[str, int] = {}
+    for r in lead_data:
+        key = f"{r['niche']}:{r['metro']}"
+        lead_map[key] = lead_map.get(key, 0) + (r["lead_count"] or 0)
 
     for row in lane_data:
         niche = row["sub_niche"]
@@ -357,7 +449,7 @@ def get_market_heat_map(backend: SQLiteBackend) -> list[MarketHeatPoint]:
         occupied = row["occupied_count"]
         occupancy = round(occupied / lane_count * 100, 1) if lane_count > 0 else 0
 
-        lead_count = lead_data.get(f"{niche}:{metro}", 0)
+        lead_count = lead_map.get(f"{niche}:{metro}", 0)
 
         # Determine lead intensity
         if lead_count >= 10 and occupancy >= 70:
@@ -405,9 +497,14 @@ def get_market_gaps(backend: SQLiteBackend) -> dict:
     )
     lane_data = [dict(r) for r in cursor.fetchall()]
 
-    # Get lead data
+    # Get lead data — join to lanes so the gap detector has niche+metro
+    # even though lane_leads itself only carries lane_id.
     cursor = backend.execute(
-        "SELECT lead_ref, niche, metro FROM lane_leads"
+        """
+        SELECT ll.id, ll.lane_id, l.sub_niche as niche, l.metro as metro
+        FROM lane_leads ll
+        LEFT JOIN lanes l ON l.id = ll.lane_id
+        """
     )
     lead_data = [dict(r) for r in cursor.fetchall()]
 
@@ -427,14 +524,19 @@ async def dashboard_page(request: Request):
 
 
 @router.get("/api/data")
-async def dashboard_data(backend: SQLiteBackend = Depends(get_backend)):
+async def dashboard_data(backend: SQLiteBackend = Depends(get_backend_dep)):
     """Get all dashboard data as JSON."""
-    funnel = get_funnel_data(backend)
-    revenue = get_revenue_data(backend)
-    buyers = get_buyer_performance(backend)
-    market_heat = get_market_heat_map(backend)
-    leaks = get_leak_data(backend)
-    gaps = get_market_gaps(backend)
+    # Each accessor may run lock-heavy SQL while enrich/outreach loops
+    # are holding the writer lock — offload to a thread so concurrent
+    # dashboard requests don't pile up on uvicorn's single event loop.
+    funnel, revenue, buyers, market_heat, leaks, gaps = await asyncio.gather(
+        asyncio.to_thread(get_funnel_data, backend),
+        asyncio.to_thread(get_revenue_data, backend),
+        asyncio.to_thread(get_buyer_performance, backend),
+        asyncio.to_thread(get_market_heat_map, backend),
+        asyncio.to_thread(get_leak_data, backend),
+        asyncio.to_thread(get_market_gaps, backend),
+    )
 
     return DashboardData(
         funnel=funnel,
@@ -448,39 +550,39 @@ async def dashboard_data(backend: SQLiteBackend = Depends(get_backend)):
 
 
 @router.get("/api/funnel")
-async def funnel_endpoint(backend: SQLiteBackend = Depends(get_backend)):
+async def funnel_endpoint(backend: SQLiteBackend = Depends(get_backend_dep)):
     """Get funnel data for real-time updates."""
-    return get_funnel_data(backend)
+    return await asyncio.to_thread(get_funnel_data, backend)
 
 
 @router.get("/api/revenue")
-async def revenue_endpoint(backend: SQLiteBackend = Depends(get_backend)):
+async def revenue_endpoint(backend: SQLiteBackend = Depends(get_backend_dep)):
     """Get revenue data for real-time updates."""
-    return get_revenue_data(backend)
+    return await asyncio.to_thread(get_revenue_data, backend)
 
 
 @router.get("/api/buyers")
-async def buyers_endpoint(backend: SQLiteBackend = Depends(get_backend)):
+async def buyers_endpoint(backend: SQLiteBackend = Depends(get_backend_dep)):
     """Get buyer performance data."""
-    return get_buyer_performance(backend)
+    return await asyncio.to_thread(get_buyer_performance, backend)
 
 
 @router.get("/api/heatmap")
-async def market_heat_endpoint(backend: SQLiteBackend = Depends(get_backend)):
+async def market_heat_endpoint(backend: SQLiteBackend = Depends(get_backend_dep)):
     """Get market heat map data."""
-    return get_market_heat_map(backend)
+    return await asyncio.to_thread(get_market_heat_map, backend)
 
 
 @router.get("/api/leaks")
-async def leaks_endpoint(backend: SQLiteBackend = Depends(get_backend)):
+async def leaks_endpoint(backend: SQLiteBackend = Depends(get_backend_dep)):
     """Get funnel leak data."""
-    return get_leak_data(backend)
+    return await asyncio.to_thread(get_leak_data, backend)
 
 
 @router.get("/api/gaps")
-async def market_gaps_endpoint(backend: SQLiteBackend = Depends(get_backend)):
+async def market_gaps_endpoint(backend: SQLiteBackend = Depends(get_backend_dep)):
     """Get market gap data."""
-    return get_market_gaps(backend)
+    return await asyncio.to_thread(get_market_gaps, backend)
 
 
 # ── Fallback HTML (in case template file missing) ───────────────────────

@@ -153,7 +153,7 @@ def _per_metro_breakdown() -> list:
             metro,
             COUNT(*) AS total,
             SUM(CASE WHEN status IN ('pending','new') OR status IS NULL THEN 1 ELSE 0 END) AS pending,
-            SUM(CASE WHEN status='delivered' THEN 1 ELSE 0 END) AS delivered
+            SUM(CASE WHEN status IN ('delivered','delivered_processed') THEN 1 ELSE 0 END) AS delivered
         FROM lane_leads
         WHERE metro IS NOT NULL AND metro != ''
         GROUP BY metro
@@ -263,7 +263,7 @@ def _saturation_alerts() -> list:
         rows = con.execute("""
             SELECT metro,
                    COUNT(*) AS total,
-                   SUM(CASE WHEN status='delivered' THEN 1 ELSE 0 END) AS delivered
+                   SUM(CASE WHEN status IN ('delivered','delivered_processed') THEN 1 ELSE 0 END) AS delivered
             FROM lane_leads
             WHERE metro IS NOT NULL AND metro != ''
             GROUP BY metro

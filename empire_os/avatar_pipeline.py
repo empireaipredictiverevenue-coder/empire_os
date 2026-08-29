@@ -207,6 +207,46 @@ def talking_head(audio_wav: str, out_mp4: str) -> str:
         )
         return "fallback"
 
+def _make_thumbnail(title: str, out_path: str) -> str | None:
+    """Generate a branded 1280x720 thumbnail (PIL) for YouTube. Returns path or None."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        W, H = 1280, 720
+        img = Image.new("RGB", (W, H), (13, 17, 23))
+        draw = ImageDraw.Draw(img)
+        draw.rectangle([0, 0, W, 12], fill=(255, 92, 0))
+        draw.rectangle([0, H - 12, W, H], fill=(255, 92, 0))
+        def font(sz):
+            try:
+                return ImageFont.truetype(FONT, sz)
+            except Exception:
+                return ImageFont.load_default()
+        words = title.split()
+        lines, cur = [], ""
+        for w in words:
+            if len(cur + " " + w) > 22:
+                lines.append(cur); cur = w
+            else:
+                cur = (cur + " " + w).strip()
+        if cur:
+            lines.append(cur)
+        lines = lines[:3]
+        fs = 72 if len(lines) <= 2 else 56
+        f = font(fs)
+        lh = fs + 12
+        y = H // 2 - (len(lines) * lh) // 2
+        for ln in lines:
+            bbox = draw.textbbox((0, 0), ln, font=f)
+            tw = bbox[2] - bbox[0]
+            draw.text(((W - tw) // 2, y), ln, font=f, fill=(255, 255, 255))
+            y += lh
+        draw.text((40, H - 70), "EMPIRE AI", font=font(40), fill=(255, 92, 0))
+        img.save(out_path)
+        return out_path if Path(out_path).exists() else None
+    except Exception as e:
+        print(f"⚠️ thumbnail gen failed: {e}")
+        return None
+
 def _upload_to_youtube(video_path: str, script: dict) -> dict:
     """Upload Empire OS video to YouTube via real Data API v3.
 
@@ -219,33 +259,37 @@ def _upload_to_youtube(video_path: str, script: dict) -> dict:
 
         from empire_os.youtube_uploader import upload_video
 
-        title = (script.get("title") or "Empire AI — Predictive Revenue Intelligence")[:100]
-        answer = script.get("answer", "")
-        hook = script.get("hook", "")
-        body = " ".join(b.get("text", "") for b in script.get("beats", []))
+        # queue items nest script under "script"; nested dict beats/title live there
+        nested = script.get("script") if isinstance(script.get("script"), dict) else script
+        title = (nested.get("title") or script.get("title") or "Empire AI — Predictive Revenue Intelligence")[:100]
+        answer = nested.get("answer", "")
+        hook = nested.get("hook", "")
+        body = " ".join(b.get("text", "") for b in nested.get("beats", []))
+        cta = nested.get("cta", "")
+        hashtags = " ".join(f"#{h.lstrip('#')}" for h in nested.get("hashtags", []))
+        # clean description: real hook/answer/body + cta, NO dead links, NO LinkedIn
         description = f"""{hook}
 
 {answer}
 
 {body}
 
-🎯 Free Empire AI discovery call (video lead): https://track.empire-ai.co.uk/u/discovery_call?ref=youtube
-🚀 Join Empire AI beta (50% off + free setup): https://track.empire-ai.co.uk/u/beta_signup?ref=youtube
-📊 Download case study + ROI breakdown: https://track.empire-ai.co.uk/u/case_study?ref=youtube
-🔗 Connect with Phillip on LinkedIn: https://track.empire-ai.co.uk/u/networking?ref=youtube
-🎥 Schedule Empire AI platform demo: https://track.empire-ai.co.uk/u/demo_request?ref=youtube
+{cta}
 
-#EmpireAI #RevenueIntelligence #B2BSaaS #AIautomation #SalesTech"""
+{hashtags}""".strip()
 
-        tags = ["EmpireAI", "RevenueIntelligence", "B2BSaaS", "AIautomation",
-                "SalesTech", "LeadGeneration", "PredictiveRevenue", "AIAvatar",
-                "FounderStory", "B2BConversion"]
+        tags = [t for t in (nested.get("hashtags") or []) if t] or ["EmpireAI", "RevenueIntelligence", "B2BSaaS", "AIautomation", "SalesTech", "LeadGeneration"]
+
+        # branded thumbnail (generated from title, no fake image)
+        thumb = _make_thumbnail(title, str(empireos_video.with_suffix(".thumb.png")))
 
         print(f"🚀 Empire OS Uploading to YouTube via Data API v3...")
         print(f"   📁 Video: {empireos_video.name} ({empireos_video.stat().st_size} bytes)")
         print(f"   📺 Title: {title}")
+        if thumb:
+            print(f"   🖼️  Thumbnail: {thumb}")
 
-        youtube_id, status = upload_video(str(empireos_video), title, description, tags)
+        youtube_id, status = upload_video(str(empireos_video), title, description, tags, thumbnail_path=thumb)
         url = f"https://youtu.be/{youtube_id}" if youtube_id else None
         print(f"✅ Empire OS YouTube upload complete: {url} (status={status})")
         return {"success": True, "youtube_id": youtube_id, "url": url, "upload_status": status}
@@ -268,12 +312,15 @@ def run(script: dict, out_path: str = "", upload_to_youtube: bool = False) -> di
     out = Path(out_path) if out_path else Path("/root/empire_os/empire_os/social_render") / f"empireos_{int(time.time())}.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    # Empire OS text extraction from script
+    # Empire OS text extraction from script (queue items nest under "script")
+    nested = script.get("script") if isinstance(script.get("script"), dict) else script
     text = " ".join([
-        script.get("answer", ""),
-        script.get("hook", ""),
-        *[b.get("text", "") for b in script.get("beats", [])]
-    ])
+        nested.get("answer", ""),
+        nested.get("hook", ""),
+        *[b.get("text", "") for b in nested.get("beats", [])]
+    ]).strip()
+    if not text:
+        text = nested.get("title", "Empire AI")
 
     # Empire OS voice synthesis
     wav = str(out.with_suffix(".wav"))
@@ -292,6 +339,8 @@ def run(script: dict, out_path: str = "", upload_to_youtube: bool = False) -> di
         from empire_os.video_quality import render_cinematic
         cinematic_out = out.with_suffix(".cinematic.mp4")
         res = render_cinematic(wav, portrait, beats, str(cinematic_out), script=script)
+        if not res.get("ok"):
+            print(f"⚠️ Cinematic render failed: {res.get('error','')[:120]} | {res.get('stderr_tail','')[-300:]}")
         if res.get("ok"):
             # replace the bare talking-head render with the cinematic one
             shutil.move(str(cinematic_out), str(out))

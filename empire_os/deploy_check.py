@@ -5,7 +5,7 @@ Run after any push+restart. Asserts the core revenue path is live:
   - hub /health -> 200
   - /v1/buyers/apply -> ok:True (no 502)
   - TELEGRAM_MONEY_ONLY gate drops non-revenue send
-  - Solana RPC getHealth -> ok
+  - BSC RPC getHealth -> ok
 Exits non-zero on any failure so a broken deploy is caught, not shipped.
 """
 import os, sys, json, sqlite3, urllib.request
@@ -61,16 +61,16 @@ else:
     else:
         print("money-only gate: drops non-revenue OK")
 
-# 4) Solana RPC healthy
+# 4) BSC RPC healthy
 try:
-    req = urllib.request.Request("https://api.mainnet-beta.solana.com",
+    req = urllib.request.Request("https://api.bsc.solana.com",
         data=json.dumps({"jsonrpc":"2.0","id":1,"method":"getHealth"}).encode(),
         headers={"Content-Type":"application/json"})
     d = json.loads(urllib.request.urlopen(req, timeout=10).read())
     if d.get("result") != "ok":
         fails.append(f"RPC unhealthy: {d}")
     else:
-        print("Solana RPC: ok")
+        print("BSC RPC: ok")
 except Exception as e:
     fails.append(f"RPC down: {e}")
 

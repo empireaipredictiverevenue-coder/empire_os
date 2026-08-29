@@ -1,0 +1,11 @@
+[Unit]
+Description=Empire OS permit monetization (NYC permit leads -> buyer intros)
+After=network-online.target empire-hub.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/venv/bin/python3 -B /root/empire_os/scripts/permit_monetize.py --apply
+WorkingDirectory=/root/empire_os
+TimeoutStartSec=300
+Nice=10

@@ -283,7 +283,7 @@ code {
       <div class="nav-label">Account</div>
       <div class="nav-item">API keys</div>
       <div class="nav-item">Settlements</div>
-      <div class="nav-item">Wallet <span class="nav-badge gray">USDC</span></div>
+      <div class="nav-item">Wallet <span class="nav-badge gray">USDT</span></div>
     </div>
 
     <div class="nav-section">
@@ -469,8 +469,8 @@ function render() {
   const titles = { available: 'Lead Marketplace', claims: 'My Claims', sold: 'Sold Leads' };
   const subs = {
     available: 'Pre-graded prospects from Empire Cortex. Claim with your API key, settle on conversion.',
-    claims: 'Prospects you have claimed. Mark them sold to trigger a $2.50 USDC charge.',
-    sold: 'Settled conversions. Settlement via Solana Pay memo.',
+    claims: 'Prospects you have claimed. Mark them sold to trigger a $2.50 USDT charge.',
+    sold: 'Settled conversions. Settlement via BSC Pay memo.',
   };
   document.querySelector('.page-title').textContent = titles[state.view];
   document.querySelector('.page-sub').textContent = subs[state.view];
@@ -577,7 +577,7 @@ async function sell(ref, btn) {
     if (r.ok && r.charged) {
       const demand = r.demand_usd || r.amount_usd;
       const memoTxt = r.pay_memo ? `\nMemo: ${r.pay_memo}` : '';
-      toast(`Charged $${r.amount_usd} (${r.grade}) — settle $${demand} via Solana Pay${memoTxt}`, 'ok');
+      toast(`Charged $${r.amount_usd} (${r.grade}) — settle $${demand} via BSC Pay${memoTxt}`, 'ok');
       loadClaims();
     } else {
       toast('Sell failed: ' + (r.reason || r.error || 'unknown'), 'err');

@@ -22,7 +22,7 @@ import os, sys, json, time, sqlite3, urllib.request, urllib.error
 
 sys.path.insert(0, "/root/empire_os")
 DB = "/root/empire_os/empire_os.db"
-HUB = "http://127.0.0.1:8081"
+HUB = "http://127.0.0.1:8080"
 DELIVERY_INTERVAL = int(os.environ.get("DELIVERY_INTERVAL", "120"))
 DELIVERY_PER_BUYER = int(os.environ.get("DELIVERY_PER_BUYER", "5"))
 LOG_PATH = "/root/empire_os/logs/buyer_delivery.jsonl"

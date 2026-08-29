@@ -43,58 +43,41 @@ def _log(record: dict) -> None:
 
 
 def send_email(to_email: str, subject: str, body: str) -> dict:
-    """Send via Brevo API (same path as everything else)."""
-    api_key = os.getenv("BREVO_API_KEY", "")
-    if not api_key:
-        from pathlib import Path as P
-        bp = P("/root/empire_secrets/brevo_api_key")
-        if bp.exists():
-            api_key = bp.read_text().strip()
-    if not api_key:
-        return {"sent": False, "error": "no_brevo_key"}
-    sender = os.getenv("EMPIRE_FROM", "Empire OS <founder@empire-ai.co.uk>")
-    sender_email = sender.split("<")[-1].rstrip(">") if "<" in sender else sender
-    try:
-        payload = {
-            "sender": {"name": "Empire OS", "email": sender_email},
-            "to": [{"email": to_email}],
-            "subject": subject,
-            "textContent": body,
-        }
-        req = urllib.request.Request(
-            "https://api.brevo.com/v3/smtp/email",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json", "api-key": api_key},
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            resp = json.loads(r.read())
-            return {"sent": True, "brevo_id": resp.get("messageId", "")}
-    except Exception as e:
-        return {"sent": False, "error": str(e)[:200]}
+    """Send via canonical mail_sender._send (Resend/Brevo/SendGrid/Mailgun/SMTP/MX fallback)."""
+    from empire_os.mail_sender import _send as _ms_send
+    res = _ms_send(to_email, subject, body)
+    # Normalize to expected format
+    if res.get("ok"):
+        return {"sent": True, "brevo_id": res.get("brevo_id") or res.get("resend_id") or res.get("msg_id") or ""}
+    return {"sent": False, "error": res.get("error", "unknown")}
 
 
 def get_expiring_leases(c: sqlite3.Connection, days: int = DEFAULT_DAYS) -> list:
     """Active leases expiring within N days, that haven't been renewed yet."""
     now = datetime.now(timezone.utc)
     cutoff = (now + timedelta(days=days)).isoformat()
+    # Use lanes table which has occupied_by and seat_expires_at
     rows = c.execute("""
-        SELECT lease_id, buyer_wallet, niche, max_leads, used_leads,
-               price_usdc, expires_at
-        FROM lead_leases
-        WHERE status = 'active'
-          AND expires_at IS NOT NULL
-          AND expires_at < ?
+        SELECT l.id as lease_id, t.crypto_wallet as buyer_wallet,
+               l.category as niche, l.sub_niche, 1 as max_leads, 0 as used_leads,
+               l.seat_price as price_usdc,
+               l.seat_expires_at as expires_at
+        FROM lanes l
+        JOIN si_tenant t ON t.tenant_id = l.occupied_by
+        WHERE l.occupied_by IS NOT NULL AND l.occupied_by != ''
+          AND l.seat_expires_at IS NOT NULL
+          AND l.seat_expires_at < ?
     """, (cutoff,)).fetchall()
     return [dict(r) for r in rows]
 
 
 def build_renewal_pay_url(lease: dict) -> str:
     """Reconstruct a pay_url pointing to a fresh quote via the lease owner."""
-    vault = os.getenv("SOLANA_VAULT_WALLET", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+    vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
     amount = lease.get("price_usdc", 0)
     lease_id = lease.get("lease_id", "")
     return (
-        f"solana:{vault}?amount={amount:.2f}"
+        f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb?amount={amount:.2f}"
         f"&label=Empire%20Lease%20Renewal&memo=lease:{lease_id}"
     )
 
@@ -137,13 +120,13 @@ def run(days: int = DEFAULT_DAYS, dry_run: bool = False) -> dict:
             pay_url = build_renewal_pay_url(lease)
             used = lease.get("used_leads", 0) or 0
             max_l = lease.get("max_leads", 0) or 0
-            subject = f"Renew your Empire OS lease — ${amount:.0f} USDC"
+            subject = f"Renew your Empire OS lease — ${amount:.0f} USDT"
             body = (
                 f"Hi,\n\n"
                 f"Your Empire OS lease is expiring soon:\n\n"
                 f"  Lease: {lease['lease_id']}\n"
                 f"  Niche: {lease.get('niche','?')}\n"
-                f"  Renewal price: ${amount:.2f} USDC\n"
+                f"  Renewal price: ${amount:.2f} USDT\n"
                 f"  Used {used} of {max_l} leads this term\n\n"
                 f"Renew here (same terms, 30 days):\n{pay_url}\n\n"
                 f"— Empire OS"
@@ -162,7 +145,7 @@ def run(days: int = DEFAULT_DAYS, dry_run: bool = False) -> dict:
                     "ts": _now(),
                     "event": "renewal_sent",
                     "lease_id": lease["lease_id"],
-                    "tenant_id": tenant_id,
+                    "tenant_id": wallet,
                     "email": email,
                     "brevo_id": result.get("brevo_id"),
                     "expires_at": lease.get("expires_at"),

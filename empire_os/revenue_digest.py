@@ -24,7 +24,7 @@ DIGEST_PATH = FEEDBACK_DIR / "revenue_digest.jsonl"
 def fetch_snapshot() -> dict:
     """Pull live snapshot from hub."""
     try:
-        with urllib.request.urlopen("http://127.0.0.1:8081/v1/revenue/snapshot", timeout=10) as r:
+        with urllib.request.urlopen("http://127.0.0.1:8080/v1/revenue/snapshot", timeout=10) as r:
             return json.loads(r.read())
     except Exception as e:
         return {"error": str(e)}

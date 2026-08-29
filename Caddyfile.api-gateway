@@ -1,0 +1,124 @@
+# Empire OS v3 - Caddy API Gateway Configuration
+# Routes all traffic through single entry point with:
+# - Rate limiting per buyer tier
+# - API key validation (HMAC + JWT)
+# - Geo-routing to regional hubs (CF Workers)
+# - TLS termination (auto-ACME)
+
+{
+	"admin": {
+		"listen": "0.0.0.0:2019"
+	},
+	"apps": {
+		"http": {
+			"servers": {
+				"api": {
+					"listen": [":443", ":80"],
+					"routes": [
+						# Health check - no auth
+						{
+							"match": [{"path": "/health"}],
+							"handle": [{
+								"handler": "static_response",
+								"body": "{\"status\":\"online\",\"engine\":\"empire-os-v3\",\"version\":\"0.1.0\"}",
+								"headers": {"Content-Type": ["application/json"]}
+							}]
+						},
+						# Cortex Intelligence API - tiered rate limits
+						{
+							"match": [{"path_prefix": "/v1/cortex"}],
+							"handle": [{
+								"handler": "reverse_proxy",
+								"upstreams": [{"dial": "127.0.0.1:8081"}],
+								"transport": {
+									"protocol": "http"
+								}
+							}],
+							"terminal": true
+						},
+						# Lead Intake - public endpoint with geo-routing
+						{
+							"match": [{"path_prefix": "/v1/leads/intake"}],
+							"handle": [{
+								"handler": "reverse_proxy",
+								"upstreams": [{"dial": "127.0.0.1:8081"}],
+								"transport": {
+									"protocol": "http"
+								}
+							}]
+						},
+						# Buyer-facing endpoints - require API key + rate limiting
+						{
+							"match": [{"path_prefix": "/v1/buyers"}, {"path_prefix": "/v1/leads"}, {"path_prefix": "/v1/crm"}],
+							"handle": [
+								{
+									"handler": "header",
+									"fields": {
+										"X-API-Key": ["{http.request.header.X-API-Key}"]
+									}
+								},
+								{
+									"handler": "rate_limit",
+									"zone": "buyer_tier",
+									"key": "{http.request.header.X-API-Key}",
+									"events": 100,
+									"window": "1m"
+								},
+								{
+									"handler": "reverse_proxy",
+									"upstreams": [{"dial": "127.0.0.1:8081"}],
+									"transport": {
+										"protocol": "http"
+									}
+								}
+							]
+						},
+						# Admin/internal endpoints - restrict by IP
+						{
+							"match": [{"path_prefix": "/v1/admin"}, {"path_prefix": "/v1/outreach"}, {"path_prefix": "/v1/swarm"}],
+							"handle": [
+								{
+									"handler": "ip_filter",
+									"allowed_ranges": ["10.0.0.0/8", "127.0.0.1/32"]
+								},
+								{
+									"handler": "reverse_proxy",
+									"upstreams": [{"dial": "127.0.0.1:8081"}]
+								}
+							]
+						},
+						# Default - deny
+						{
+							"handle": [{
+								"handler": "static_response",
+								"status_code": 404,
+								"body": "Not Found"
+							}]
+						}
+					]
+				}
+			},
+			"rate_limit": {
+				"buyer_tier": {
+					"events": 100,
+					"window": "1m",
+					"key": "{http.request.header.X-API-Key}"
+				}
+			}
+		},
+		"layer4": {
+			"servers": {
+				"api-tcp": {
+					"listen": [":443", ":80"],
+					"routes": [{
+						"match": [{"destination": [":443", ":80"]}],
+						"handle": [{
+							"handler": "proxy",
+							"upstreams": [{"dial": "127.0.0.1:443"}]
+						}]
+					}]
+				}
+			}
+		}
+	}
+}

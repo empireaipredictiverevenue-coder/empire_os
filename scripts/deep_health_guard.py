@@ -19,8 +19,8 @@ import urllib.request
 HUB_URL = "http://127.0.0.1:8081/v1/health/deep"
 LOG_PATH = "/run/empire-deep-last.json"
 MAX_WAIT_SECONDS = 60
-PER_CALL_TIMEOUT = 10
-RETRY_INTERVAL = 1
+PER_CALL_TIMEOUT = 30  # Helius RPC can be slow; don't penalise hub for that
+RETRY_INTERVAL = 2
 
 
 def main() -> int:
@@ -37,7 +37,14 @@ def main() -> int:
                 body = r.read().decode("utf-8", errors="replace")
             data = json.loads(body)
             last = data
-            if data.get("revenue_path_ready") is True:
+            # Accept either:
+            #   - revenue_path_ready=True (everything green), OR
+            #   - top-level ok=True + hub responding (RPC outage is best-effort, not fatal)
+            # This prevents the death loop when Helius is down — the hub stays up,
+            # health dashboard flags revenue_path_not_ready, but service is alive.
+            if data.get("revenue_path_ready") is True or (
+                data.get("ok") is True and "checks" in data
+            ):
                 ok = True
                 break
         except (urllib.error.URLError, ConnectionError, TimeoutError,

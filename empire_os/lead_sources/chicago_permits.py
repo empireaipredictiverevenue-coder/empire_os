@@ -93,6 +93,7 @@ SOURCE = SourceInfo(
     requires=[],
     description="Chicago building permits (issued) — public, free.",
     run_fn=run,
+    probe=lambda: __import__("empire_os.lead_sources.models", fromlist=["http_probe"]).http_probe(ENDPOINT, {"$limit": "1"}),
 )
 
 

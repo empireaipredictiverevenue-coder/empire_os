@@ -61,7 +61,7 @@
   <div id="cmp" class="cmp"></div>
 
   <div id="pay" class="pay">
-    <h3>Complete payment — Solana Pay</h3>
+    <h3>Complete payment — BSC Pay</h3>
     <div id="paymeta" class="muted"></div>
     <code id="payurl"></code>
     <a id="paylink" href="#" target="_blank" rel="noopener">Open in wallet ↗</a>
@@ -129,7 +129,7 @@ async function subscribe(sku,amount){
     document.getElementById('payurl').textContent=res.pay_url;
     document.getElementById('paylink').href=res.pay_url;
     document.getElementById('paymeta').textContent=
-      `charge ${(res.amount_cents||amount_cents)/100} USDC · status ${res.status} · ${sku}`;
+      `charge ${(res.amount_cents||amount_cents)/100} USDT · status ${res.status} · ${sku}`;
     pay.classList.add('show');
     pay.scrollIntoView({behavior:'smooth'});
     toast('Pay link ready — complete in wallet');
@@ -145,7 +145,7 @@ async function buildCompare(){
   for(const s of sel) html+='<th>'+s+'</th>';
   html+='</tr>';
   const rows=['T1','T2','T3','T4_titanium','setup'];
-  const labels={T1:'Tier 1 USDC',T2:'Tier 2 USDC',T3:'Tier 3 USDC',T4_titanium:'T4 Titanium',setup:'Setup fee'};
+  const labels={T1:'Tier 1 USDT',T2:'Tier 2 USDT',T3:'Tier 3 USDT',T4_titanium:'T4 Titanium',setup:'Setup fee'};
   for(const r of rows){
     html+='<tr><td>'+labels[r]+'</td>';
     for(const s of sel){

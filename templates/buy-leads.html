@@ -5,12 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Buy Exclusive Leads — Empire OS</title>
 <meta property="og:title" content="Exclusive Local Leads, Delivered Live — Empire OS">
-<meta property="og:description" content="Roofing, HVAC, water damage, legal & more. Real-time leads to your CRM or inbox. Pay per lead in USDC on Solana. No contracts, no cards.">
+<meta property="og:description" content="Roofing, HVAC, water damage, legal & more. Real-time leads to your CRM or inbox. Pay per lead in USDC on BSC. No contracts, no cards.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://empire-ai.co.uk/buy-leads">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Exclusive Local Leads — Empire OS">
-<meta name="twitter:description" content="Pay per lead. USDC on Solana. No contracts.">
+<meta name="twitter:description" content="Pay per lead. USDC on BSC. No contracts.">
+<!-- Web3Modal + Ethers v6 -->
+<script src="https://cdn.jsdelivr.net/npm/@web3modal/ethers@4.1.11/dist/web3modal.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@web3modal/ethers@4.1.11/dist/web3modal.min.css">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.11.1/dist/ethers.umd.min.js"></script>
 <style>
  body{background:#050810;color:#e6f1ff;font-family:system-ui,sans-serif;margin:0}
  .wrap{max-width:780px;margin:0 auto;padding:48px 20px}
@@ -26,6 +30,7 @@
  input,select{width:100%;padding:11px;border-radius:8px;border:1px solid #1c2a3a;background:#050810;color:#e6f1ff;font-size:1rem}
  button{margin-top:20px;width:100%;padding:14px;border:0;border-radius:10px;background:#39ff88;color:#050810;font-weight:700;font-size:1.05rem;cursor:pointer}
  button:hover{background:#22e3ff}
+ button:disabled{background:#1c2a3a;color:#555;cursor:not-allowed}
  .note{margin-top:16px;color:#9fb3c8;font-size:.85rem}
  .wallet{margin-top:18px;padding:14px;background:#050810;border-radius:8px;border:1px solid #1c2a3a;font-family:monospace;color:#22e3ff;word-break:break-all}
  .ok{color:#39ff88}.err{color:#ff6b6b}
@@ -36,12 +41,25 @@
  .tier{flex:1;min-width:130px;background:#0b1220;border:1px solid #1c2a3a;border-radius:10px;padding:12px;text-align:center}
  .tier b{color:#39ff88;font-size:1.25rem}
  .tier span{color:#9fb3c8;font-size:.8rem;display:block}
+ .step{display:none;margin-top:20px;padding:16px;background:#0b1220;border:1px solid #1c2a3a;border-radius:10px}
+ .step.active{display:block}
+ .step-title{color:#39ff88;font-weight:700;margin-bottom:8px}
+ .qr-box{margin:16px 0;text-align:center}
+ .qr-box img{max-width:240px;border-radius:8px;background:#fff;padding:8px}
+ .address-box{font-family:monospace;font-size:.9rem;color:#22e3ff;word-break:break-all;background:#050810;padding:12px;border-radius:8px;border:1px solid #1c2a3a;margin:8px 0}
+ .memobox{font-family:monospace;font-size:.85rem;color:#9fb3c8;background:#050810;padding:8px;border-radius:6px;border:1px dashed #1c2a3a;margin:8px 0}
+ .progress{height:6px;background:#1c2a3a;border-radius:3px;overflow:hidden;margin:12px 0}
+ .progress-bar{height:100%;width:0%;background:#39ff88;transition:width .3s}
+ .wallet-btn{margin-top:12px;padding:12px;border-radius:8px;border:1px solid #39ff88;background:transparent;color:#39ff88;font-weight:600;cursor:pointer}
+ .wallet-btn:hover{background:#39ff88;color:#050810}
+ .wallet-btn.connected{border-color:#22e3ff;color:#22e3ff}
+ .hidden{display:none!important}
 </style>
 </head>
 <body>
 <div class="wrap">
  <h1>Exclusive Local Leads.<br><span class="cy">Paid Only When They Convert.</span></h1>
- <div class="sub">Real homeowners and businesses raising their hand in your niche — roofing, HVAC, water damage, legal, and more. Delivered to your CRM or inbox the moment they're captured. Pay a monthly seat fee, then per delivered lead in USDC on Solana. No contracts. No card. No KYC.</div>
+ <div class="sub">Real homeowners and businesses raising their hand in your niche — roofing, HVAC, water damage, legal, and more. Delivered to your CRM or inbox the moment they're captured. Pay a monthly seat fee, then per delivered lead in USDC on BSC. No contracts. No card. No KYC.</div>
 
  <div class="stat">
   <div><b>2,700+</b><span>live leads in network</span></div>
@@ -57,57 +75,229 @@
  </div>
 
  <div class="card">
-  <form id="f">
-   <label>Business name</label><input name="name" required placeholder="Apex Roofing Co">
-   <label>Niche</label><input name="niche" required placeholder="roof_repair">
-   <label>Email</label><input name="email" type="email" required placeholder="buyer@company.com">
-   <label>Tier</label>
-   <select name="tier">
-    <option value="bronze">Bronze — $299/mo + $25/lead</option>
-    <option value="silver" selected>Silver — $599/mo + $49/lead</option>
-    <option value="gold">Gold — $1,199/mo + $99/lead</option>
-    <option value="platinum">Platinum — $2,399/mo + $199/lead</option>
-   </select>
-   <label>Webhook (optional)</label><input name="webhook_url" placeholder="https://your-crm.com/hook">
-   <input type="hidden" name="source" id="src">
-   <button type="submit">Get Matched Leads</button>
-  </form>
-  <div id="msg" class="note"></div>
-  <div id="pay" class="paybox" style="display:none"></div>
+  <div class="step active" id="step-apply">
+   <div class="step-title">Step 1: Apply for Your Seat</div>
+   <form id="f">
+    <label>Business name</label><input name="name" required placeholder="Apex Roofing Co">
+    <label>Niche</label><input name="niche" required placeholder="roof_repair">
+    <label>Email</label><input name="email" type="email" required placeholder="buyer@company.com">
+    <label>Tier</label>
+    <select name="tier">
+     <option value="bronze">Bronze — $299/mo + $25/lead</option>
+     <option value="silver" selected>Silver — $599/mo + $49/lead</option>
+     <option value="gold">Gold — $1,199/mo + $99/lead</option>
+     <option value="platinum">Platinum — $2,399/mo + $199/lead</option>
+    </select>
+    <label>Webhook (optional)</label><input name="webhook_url" placeholder="https://your-crm.com/hook">
+    <input type="hidden" name="source" id="src">
+    <button type="submit" id="btn-apply">Get Matched Leads</button>
+   </form>
+   <div id="msg" class="note"></div>
+  </div>
+
+  <div class="step" id="step-fund">
+   <div class="step-title">Step 2: Fund Your Seat (USDC on BSC)</div>
+   <div class="paybox" id="paybox"></div>
+   <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+   <p class="note" id="fund-status">Connect wallet to continue</p>
+   <button class="wallet-btn" id="wallet-btn" onclick="connectWallet()">Connect Wallet</button>
+  </div>
+
+  <div class="step" id="step-verify">
+   <div class="step-title">Step 3: Verifying On-Chain Payment</div>
+   <div class="qr-box" id="qr-box"></div>
+   <div class="address-box" id="vault-display"></div>
+   <div class="memobox">Memo: <span id="memo-display"></span></div>
+   <div class="progress"><div class="progress-bar" id="verify-progress"></div></div>
+   <p class="note" id="verify-status">Waiting for transaction confirmation...</p>
+  </div>
+
+  <div class="step" id="step-active">
+   <div class="step-title">✅ Seat Activated</div>
+   <p class="ok">Your seat is funded and active. Leads will start flowing to your CRM/webhook.</p>
+   <p class="note">Monthly seat auto-renews. Per-lead billing on delivery. Cancel anytime.</p>
+  </div>
  </div>
- <div class="note">Settlements in USDC on Solana. Fund your seat with the link below to start receiving leads. Cancel anytime — no lock-in.</div>
+ <div class="note">Settlements in USDC on BSC. Fund your seat to start receiving leads. Cancel anytime — no lock-in.</div>
 </div>
 
 <script>
- document.getElementById('f').onsubmit = async function(e){
+// Config
+const BSC_CHAIN_ID = 56;
+const USDT_CONTRACT = "0x55d398326f99059fF775485246999027B3197955";
+const VAULT_ADDRESS = "0x1339b487046B0ad924a10c20b1791608EA8595a8";
+const RPC_URL = "https://bsc-dataseed.binance.org/";
+
+// Web3Modal init
+let web3Modal, provider, signer, userAddress;
+async function initWeb3Modal() {
+  const projectId = "empire-os-buy-leads";
+  web3Modal = new Web3Modal.default({
+    projectId,
+    chains: [BSC_CHAIN_ID],
+    walletConnectVersion: 2,
+    theme: "dark",
+    enableWalletConnect: true,
+    enableInjected: true,
+    enableCoinbase: true,
+    disableProviderSelection: false,
+  });
+}
+initWeb3Modal();
+
+// Step management
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// Wallet connect
+async function connectWallet() {
+  const btn = document.getElementById('wallet-btn');
+  try {
+    btn.disabled = true;
+    btn.textContent = 'Connecting...';
+    const instance = await web3Modal.connect();
+    provider = new ethers.BrowserProvider(instance);
+    signer = await provider.getSigner();
+    userAddress = await signer.getAddress();
+    
+    // Switch to BSC if needed
+    const network = await provider.getNetwork();
+    if (Number(network.chainId) !== BSC_CHAIN_ID) {
+      try {
+        await provider.send("wallet_switchEthereumChain", [{ chainId: "0x38" }]);
+      } catch (e) {
+        if (e.code === 4902) {
+          await provider.send("wallet_addEthereumChain", [{
+            chainId: "0x38",
+            chainName: "BSC Mainnet",
+            nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+            rpcUrls: [RPC_URL],
+            blockExplorerUrls: ["https://bscscan.com"]
+          }]);
+        } else throw e;
+      }
+    }
+    
+    btn.classList.add('connected');
+    btn.textContent = `Connected: ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`;
+    btn.onclick = null;
+    document.getElementById('fund-status').textContent = 'Wallet connected. Ready to pay.';
+    
+    // Auto-submit payment
+    paySeat();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Connect Wallet';
+    document.getElementById('fund-status').className = 'note err';
+    document.getElementById('fund-status').textContent = 'Connection failed: ' + err.message;
+  }
+}
+
+// Step 1: Apply
+document.getElementById('f').onsubmit = async function(e) {
   e.preventDefault();
+  const btn = document.getElementById('btn-apply');
+  btn.disabled = true;
+  btn.textContent = 'Applying...';
+  
   var p = new URLSearchParams(location.search);
   document.getElementById('src').value = p.get('ref') || 'direct';
   var d = Object.fromEntries(new FormData(e.target));
   var m = document.getElementById('msg');
-  var pay = document.getElementById('pay');
   m.className = 'note'; m.textContent = '';
-  pay.style.display = 'none';
+  
   try {
-   var r = await fetch('/v1/buyers/apply', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)});
-   var j = await r.json();
-   if (j.ok) {
-    m.className = 'note ok';
-    m.textContent = 'Seated as ' + j.tier + ' buyer. Fund your seat to start collection:';
-    var amt = (j.payment && j.payment.amount_usdc) ? j.payment.amount_usdc : j.amount_usdc_due;
-    var url = (j.payment && j.payment.pay_url) ? j.payment.pay_url : '';
-    pay.style.display = 'block';
-    pay.innerHTML = '<b>Fund ' + amt + ' USDC to activate</b><br>' +
-      '<a href="' + url + '" target="_blank">' + url + '</a>';
-   } else {
-    m.className = 'note err';
-    m.textContent = 'Error: ' + (j.detail || 'unknown');
-   }
+    var r = await fetch('/v1/buyers/apply', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)});
+    var j = await r.json();
+    if (j.ok) {
+      m.className = 'note ok';
+      m.textContent = 'Seated as ' + j.tier + ' buyer. Fund your seat to start collection.';
+      window.paymentData = j.payment || {
+        asset: "USDT", network: "BSC", vault_wallet: j.pay_to_wallet,
+        amount_usdc: j.amount_usdc_due, memo: j.payment?.memo,
+        pay_url: j.payment?.pay_url
+      };
+      window.tenantId = j.tenant_id;
+      window.subscriptionId = j.subscription_id;
+      showStep('step-fund');
+      document.getElementById('wallet-btn').disabled = false;
+    } else {
+      m.className = 'note err';
+      m.textContent = 'Error: ' + (j.detail || 'unknown');
+      btn.disabled = false;
+      btn.textContent = 'Get Matched Leads';
+    }
   } catch (err) {
-   m.className = 'note err';
-   m.textContent = 'Network error — try again.';
+    m.className = 'note err';
+    m.textContent = 'Network error — try again.';
+    btn.disabled = false;
+    btn.textContent = 'Get Matched Leads';
   }
- };
+};
+
+// Step 2: Pay via Web3Modal + ethers
+async function paySeat() {
+  const pay = window.paymentData;
+  if (!pay) return;
+  
+  const amountWei = ethers.parseUnits(pay.amount_usdc.toString(), 18); // USDT = 18 decimals on BSC
+  const usdt = new ethers.Contract(USDT_CONTRACT, [
+    "function transfer(address to, uint256 amount, bytes data) returns (bool)"
+  ], signer);
+  
+  const memo = pay.memo || `INV_${window.subscriptionId}`;
+  
+  document.getElementById('fund-status').textContent = 'Sending transaction...';
+  document.getElementById('progress-bar').style.width = '25%';
+  
+  try {
+    const tx = await usdt.transfer(VAULT_ADDRESS, amountWei, ethers.toUtf8Bytes(memo));
+    
+    document.getElementById('fund-status').textContent = 'Transaction sent. Waiting for confirmation...';
+    document.getElementById('progress-bar').style.width = '50%';
+    showStep('step-verify');
+    
+    document.getElementById('vault-display').textContent = VAULT_ADDRESS;
+    document.getElementById('memo-display').textContent = memo;
+    
+    // Generate QR for pay_url
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(pay.pay_url)}`;
+    document.getElementById('qr-box').innerHTML = `<img src="${qrUrl}" alt="Payment QR">`;
+    
+    // Wait for confirmation
+    const receipt = await tx.wait(1);
+    document.getElementById('verify-progress').style.width = '75%';
+    document.getElementById('verify-status').textContent = `Confirmed in block ${receipt.blockNumber}. Verifying on backend...`;
+    
+    // Notify backend to verify
+    const verify = await fetch('/v1/billing/crypto/verify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        subscription_id: window.subscriptionId,
+        tx_signature: receipt.hash,
+        sender_wallet: userAddress
+      })
+    });
+    const vj = await verify.json();
+    
+    if (vj.ok) {
+      document.getElementById('verify-progress').style.width = '100%';
+      showStep('step-active');
+    } else {
+      document.getElementById('verify-status').className = 'note err';
+      document.getElementById('verify-status').textContent = 'Verification failed: ' + (vj.error || vj.detail || 'unknown');
+    }
+  } catch (err) {
+    document.getElementById('fund-status').className = 'note err';
+    document.getElementById('fund-status').textContent = 'Payment failed: ' + err.message;
+    document.getElementById('wallet-btn').disabled = false;
+    document.getElementById('wallet-btn').textContent = 'Retry Payment';
+    document.getElementById('wallet-btn').onclick = paySeat;
+  }
+}
 </script>
 </body>
 </html>

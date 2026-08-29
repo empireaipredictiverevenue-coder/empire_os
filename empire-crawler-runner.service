@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire OS v3 — Lead Crawler Runner (all real sources)
+After=network.target empire-revenue.service empire-hub.service
+
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 -m empire_os.crawler_runner
+Environment=PYTHONPATH=/root/empire_os
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=7200
+
+[Install]
+WantedBy=multi-user.target

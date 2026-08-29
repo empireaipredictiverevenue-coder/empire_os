@@ -223,6 +223,19 @@ def score_leads(batch_size: int = 500) -> dict:
             else:
                 icp_tier = "C"
 
+            # staleness guard: if omega_score already set and older than 30d, skip re-score
+            staleness_cutoff = _now().timestamp() - (30 * 86400)  # 30 days ago
+            con.execute("SELECT MAX(COALESCE(updated_at, created_at)) FROM lane_leads WHERE id=?", (r["id"],))
+            last_update = con.fetchone()[0]
+            if last_update and isinstance(last_update, str) and last_update.strip():
+                try:
+                    last_ts = datetime.fromisoformat(last_update.replace("Z", "+" + _now().astimezone().tzinfo.strftime("%z"))).timestamp()
+                    if last_ts > staleness_cutoff:
+                        # recently updated, skip re-score to avoid thrashing
+                        continue
+                except (ValueError, TypeError):
+                    pass  # stale format, proceed with normal score
+
             con.execute(
                 "UPDATE lane_leads SET omega_score=?, omega_tier=?, "
                 "icp_fit_score=?, icp_tier=? WHERE id=?",

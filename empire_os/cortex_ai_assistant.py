@@ -153,6 +153,31 @@ def get_snapshot() -> Dict:
 
 # ─── LLM prompt ───────────────────────────────────────────────────────
 
+SOULS_DIR = Path("/root/empire_os/empire_os/agents/souls")
+
+
+def build_skills_context() -> str:
+    """Feed the brain the agent skills roster: name + role line per soul."""
+    lines = []
+    if SOULS_DIR.exists():
+        for p in sorted(SOULS_DIR.glob("*_SOUL.md")):
+            name = p.name.replace("_SOUL.md", "")
+            if name.startswith("_") or "test" in name.lower():
+                continue
+            try:
+                first = next(
+                    (l.strip() for l in p.read_text(errors="ignore").splitlines()
+                     if l.strip() and not l.strip().startswith("#")),
+                    "",
+                )
+            except OSError:
+                first = ""
+            lines.append(f"- {name}: {first[:90]}")
+    if not lines:
+        return ""
+    return "Agent skills roster:\n" + "\n".join(lines)
+
+
 BRAIN_PROMPT = """
 You are **Cortex**, the AI business operator for Empire OS v3 — an autonomous
 B2B lead-generation + lead-marketplace platform. The system scrapes leads
@@ -161,6 +186,8 @@ leads to buyers for a pay-per-lead fee. Revenue is settled in USDC on Solana.
 
 Snapshot (live state):
 {snapshot}
+
+{skills}
 
 Operator signal (Philipp, founder):
 - Aggressive revenue framing, real verification (no fabrication), concise.
@@ -175,7 +202,9 @@ Keep answer under 350 words. Plain text, executive tone.
 
 
 def _get_key(env_name: str, secret_file: str) -> str:
-    """Pull key from env or /root/empire_secrets/<file>."""
+    """Pull key from env or /root/empire_secrets/<file>. Returns '' if unset."""
+    if not env_name and not secret_file:
+        return ""
     k = os.environ.get(env_name, "").strip()
     if not k:
         p = Path(f"/root/empire_secrets/{secret_file}")
@@ -185,34 +214,77 @@ def _get_key(env_name: str, secret_file: str) -> str:
 
 
 def _ask_provider(api_key: str, base_url: str, model: str, snapshot: Dict,
-                  max_tokens: int = 900) -> Dict:
-    """Single-provider LLM call. Returns dict with content/error/usage."""
+                  max_tokens: int = 900, timeout: float = 60.0) -> Dict:
+    """Single-provider LLM call using requests directly to bypass OpenAI proxy issues."""
     try:
-        client = OpenAI(api_key=api_key, base_url=base_url, timeout=60.0)
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[{
-                "role": "user",
-                "content": BRAIN_PROMPT.format(snapshot=json.dumps(snapshot, indent=2))
-            }],
-            temperature=0.2,
-            max_tokens=max_tokens,
+        # Import requests and clear proxy environment variables
+        import os
+        import json
+        import requests
+        
+        # Clear proxy environment variables that interfere with requests
+        # Remove all proxy-related environment variables
+        for proxy_var in ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY']:
+            os.environ.pop(proxy_var, None)
+        
+        # Prepare the prompt
+        prompt = BRAIN_PROMPT.format(
+            snapshot=json.dumps(snapshot, indent=2),
+            skills=build_skills_context(),
         )
-        content = resp.choices[0].message.content
-        usage = resp.usage
-        return {
-            "model": model,
-            "content": content,
-            "tokens": usage.total_tokens if usage else 0,
-            "ok": True,
-        }
+        
+        # Make direct request to Ollama endpoint
+        api_key = api_key or "no-key-required"
+        
+        response = requests.post(
+            f"{base_url}/chat/completions",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            },
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2,
+                "max_tokens": max_tokens,
+            },
+            timeout=timeout
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            usage = result.get("usage", {})
+            return {
+                "model": model,
+                "content": content,
+                "tokens": usage.get("total_tokens", 0),
+                "ok": True,
+            }
+        else:
+            return {
+                "error": f"HTTP {response.status_code}: {response.text}",
+                "ok": False
+            }
     except Exception as e:
         return {"error": str(e), "ok": False}
 
 
 # Provider chain — tried in order; first OK wins. Skip providers with no key.
-# Order: free/cheap first, paid last.
+# Order: local ollama (free, always available if configured), then API providers.
 PROVIDERS = [
+    # 0. Local Ollama — free, no API key needed, configured via env
+    #    CPU brain is slow (60% steal) → long timeout, small max_tokens.
+    {
+        "name": "ollama",
+        "key_env": "",            # no key needed
+        "key_file": "",
+        "base_url": (os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
+                     ).rstrip("/") + "/v1",
+        "model": (os.environ.get("OLLAMA_MODEL") or "qwen3:8b"),
+        "max_tokens": 400,
+        "timeout": 3600.0,
+    },
     {
         "name": "gemini",
         "key_env": "GOOGLE_API_KEY",
@@ -367,7 +439,8 @@ def ask_brain(snapshot: Dict, model: str = None) -> Dict:
             # Allow caller to pin a specific provider by substring
             continue
         key = _get_key(prov["key_env"], prov["key_file"])
-        if not key:
+        # Providers with no key_env/key_file (e.g. local ollama) don't need auth
+        if not key and prov.get("key_env", ""):
             tried.append({"provider": prov["name"], "skip": "no_key"})
             continue
         result = _ask_provider(
@@ -376,6 +449,7 @@ def ask_brain(snapshot: Dict, model: str = None) -> Dict:
             model=prov["model"],
             snapshot=snapshot,
             max_tokens=prov["max_tokens"],
+            timeout=prov.get("timeout", 60.0),
         )
         tried.append({"provider": prov["name"], "model": prov["model"],
                       "ok": result.get("ok"), "err": result.get("error", "")[:120]})

@@ -1,5 +1,5 @@
 """
-Crypto charge - USDC-on-Solana payment collector.
+Crypto charge - USDT-on-BSC payment collector.
 
 Different than Stripe/PayPal: cards are pushed to us. Crypto must
 be PUSHED by the buyer. Our job is to reconcile + record.
@@ -12,8 +12,8 @@ Flow for Head 2 / Head 1 / Head 4 crypto billing:
   3. We POST it to the hub at /v1/ppc/expect_payment so other
      listeners (vendor agent, /products, /outreach emails) can
      send the buyer the request-to-pay link
-  4. We poll the Solana RPC for incoming USDC transfers to the
-     vault (using the SOLANA_VAULT_WALLET + USDC_MINT env vars)
+  4. We poll the BSC RPC for incoming USDT transfers to the
+     vault (using the BSC_WALLET_ADDRESS + BSC_USDT_CONTRACT env vars)
      matching our memo
   5. When the transfer arrives, we mark si_charges.paid_at +
      si_ppc_invoices.status='paid' + emit a 'settled' event.
@@ -58,12 +58,12 @@ def assert_no_simulated(status: str) -> None:
 
 DB = "/root/empire_os/empire_os.db"
 SOLANA_RPC = os.environ.get(
-    "SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
-USDC_MINT = os.environ.get(
-    "USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+    "BSC_RPC", "https://api.bsc.solana.com")
+BSC_USDT_CONTRACT = os.environ.get(
+    "BSC_USDT_CONTRACT", "0x55d398326f99059fF775485246999027B3197955")
 SOLANA_VAULT = os.environ.get(
-    "SOLANA_VAULT_WALLET",
-    "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+    "BSC_WALLET_ADDRESS",
+    "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
 TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
 
@@ -72,7 +72,7 @@ def now_iso() -> str:
 
 
 def _rpc(method: str, params: list) -> dict:
-    """Call Solana JSON-RPC. Returns dict with 'result' or 'error'."""
+    """Call BSC JSON-RPC. Returns dict with 'result' or 'error'."""
     body = json.dumps(
         {"jsonrpc": "2.0", "id": 1, "method": method,
          "params": params}).encode()
@@ -93,9 +93,9 @@ def build_expected_payment(buyer_wallet: str, amount_usdc: float,
                           memo: str) -> dict:
     """Return the payment request that we'd send to the buyer.
 
-    Buyer authorizes by sending one USDC transfer to our vault
+    Buyer authorizes by sending one USDT transfer to our vault
     with the memo in the SPL token transfer's `memo` instruction
-    (Solana memo program) OR by using invoice_id in the
+    (BSC memo program) OR by using invoice_id in the
     reference.
     """
     return {
@@ -103,12 +103,12 @@ def build_expected_payment(buyer_wallet: str, amount_usdc: float,
         "to": SOLANA_VAULT,
         "amount_usdc": round(amount_usdc, 6),
         "amount_micro": int(round(amount_usdc * 1_000_000)),
-        "token_mint": USDC_MINT,
+        "token_mint": BSC_USDT_CONTRACT,
         "memo": memo,
         "solana_pay_url": (
-            f"solana:{SOLANA_VAULT}"
+            f"bsc:{SOLANA_VAULT}"
             f"?amount={int(round(amount_usdc * 1_000_000))}"
-            f"&spl-token={USDC_MINT}"
+            f"&contract={BSC_USDT_CONTRACT}"
             f"&label={urllib.parse.quote(memo)}"
             f"&message=Empire+OS"
         ),
@@ -128,7 +128,7 @@ def get_buyer_wallet(buyer_id: str) -> Optional[str]:
 
 
 def fetch_token_accounts(owner: str) -> list[dict]:
-    """RPC: getTokenAccountsByOwner for USDC mint.
+    """RPC: getTokenAccountsByOwner for USDT mint.
 
     Returns list of {pubkey, mint, amount, decimals}.
     """
@@ -183,11 +183,11 @@ def _decode_memo(ix: dict) -> str:
 
 def fetch_vault_recent_inbound(memo_contains: str = "",
                                lookback_seconds: int = 86400 * 7) -> list[dict]:
-    """Fetch recent transfers INTO the vault (SOL or USDC) and parse memo.
+    """Fetch recent transfers INTO the vault (SOL or USDT) and parse memo.
 
     The Empire vault receives payments as native SOL `system transfer`
     instructions (with the invoice id in a spl-memo instruction) OR as
-    USDC SPL `transferChecked` instructions. We match BOTH so real
+    USDT SPL `transferChecked` instructions. We match BOTH so real
     on-chain payments actually reconcile.
 
     Filters by memo_contains (e.g. 'INV_inv_crypto_') if provided.
@@ -241,7 +241,7 @@ def fetch_vault_recent_inbound(memo_contains: str = "",
                         "currency": "SOL",
                         "memo": memo_str,
                     })
-        # 2) USDC transferChecked INTO vault
+        # 2) USDT transferChecked INTO vault
         for ix in msg.get("instructions", []):
             parsed = ix.get("parsed", {})
             if parsed.get("type") == "transferChecked":
@@ -256,7 +256,7 @@ def fetch_vault_recent_inbound(memo_contains: str = "",
                         "block_time": block_time,
                         "from": info.get("authority") or info.get("source"),
                         "amount": amt,
-                        "currency": "USDC",
+                        "currency": "USDT",
                         "memo": memo_str,
                     })
     return out
@@ -278,7 +278,7 @@ def charge_crypto(buyer_id: str, head: int, reason: str,
     invoice_id = "inv_crypto_" + os.urandom(4).hex()
     charge_id = charge_id or ("chg_crypto_" + os.urandom(4).hex())
     memo = f"INV_{invoice_id}"
-    # Solana Pay is push-to-vault: the buyer sends USDC/SOL to OUR vault
+    # BSC Pay is push-to-vault: the buyer sends USDT/SOL to OUR vault
     # with the memo. A stored buyer wallet is NOT required to generate the
     # payment request link — only the vault address matters. Requiring it
     # silently killed 99% of charges (no pay_url -> no payment -> no revenue).
@@ -319,7 +319,7 @@ def charge_crypto(buyer_id: str, head: int, reason: str,
         "status": status,
         "processor": "usdc",
         "amount_cents": int(amount_usdc * 100),
-        "currency": "USDC",
+        "currency": "USDT",
         "wallet": wallet,
         "memo": memo,
         "pay_url": pay_req["solana_pay_url"],
@@ -405,9 +405,9 @@ def reconcile_open_invoices(lookback_seconds: int = 86400 * 7) -> list[dict]:
             if memo not in (tx.get("memo") or ""):
                 continue
             # amount check: SOL amount should cover USD value at SOL_USD
-            # or USDC amount covers directly
+            # or USDT amount covers directly
             ok = False
-            if tx.get("currency") == "USDC" and tx.get("amount", 0) >= amt_usdc * 0.99:
+            if tx.get("currency") == "USDT" and tx.get("amount", 0) >= amt_usdc * 0.99:
                 ok = True
             elif tx.get("currency") == "SOL":
                 approx_usd = tx.get("amount", 0) * SOL_USD
@@ -428,7 +428,7 @@ def reconcile_open_invoices(lookback_seconds: int = 86400 * 7) -> list[dict]:
 if __name__ == "__main__":
     print("[crypto_charge] config:")
     print(f"  SOLANA_VAULT:    {SOLANA_VAULT}")
-    print(f"  USDC_MINT:       {USDC_MINT}")
+    print(f"  BSC_USDT_CONTRACT:       {BSC_USDT_CONTRACT}")
     print(f"  SOLANA_RPC:      {SOLANA_RPC[:60]}...")
     print(f"\n[crypto_charge] testing RPC connectivity...")
     r = _rpc("getHealth", [])

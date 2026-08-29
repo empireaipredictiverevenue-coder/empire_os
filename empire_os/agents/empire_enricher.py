@@ -39,7 +39,7 @@ for _ln in (Path("/root/empire_os/.env").read_text(encoding="utf-8").splitlines(
 
 # ─── Config ──────────────────────────────────────────────────────────
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 DB_PATH = "/root/empire_os/empire_os.db"
 FEEDBACK_DIR = Path("/root/feedback")
 FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
@@ -552,8 +552,9 @@ def cortex_predict_revenue(prospect: dict) -> dict:
 # ─── Outreach Integration ───────────────────────────────────────────
 
 def draft_nurture_email(prospect: dict, intelligence: dict, step: int = 0) -> tuple[str, str]:
-    """Draft value-first nurture email using all intelligence - BRANDED TEMPLATE."""
-    from empire_os.agents.empire_enricher import _render_branded_email
+    """Draft value-first audit email using all intelligence - BRANDED TEMPLATE."""
+    # _render_branded_email is defined in this same module
+    pass
     
     name = prospect.get("business_name", "there")
     raw_niche = prospect.get("niche", "your specialty") or "your specialty"
@@ -565,43 +566,44 @@ def draft_nurture_email(prospect: dict, intelligence: dict, step: int = 0) -> tu
     signals = intelligence.get("signals", {})
     cortex = intelligence.get("cortex", {})
     
-    # Sample lead from our pipeline
-    sample_text = f"We're delivering fresh {niche} leads into {metro} daily. Reply 'sample' and I'll wire you the next one free."
+    # Audit-specific links
+    audit_portal = prospect.get("audit_portal_url", f"https://empire-ai.co.uk/audit/{prospect.get('prospect_id', '')}")
+    trial_url = "https://empire-ai.co.uk/audit/trial"
     
     if step == 0:
-        subject = f"Exclusive {niche} leads — pay in USDC, no cards, no KYC"
+        subject = f"Your {niche.title()} Efficiency Audit — Confidential"
         body_text = (
             f"Hi {name},\n\n"
-            f"Quick one - I run a lead exchange for {niche} contractors in {metro}. "
-            f"Exclusive leads delivered real-time, settled in USDC - no credit cards, no KYC, no processor.\n\n"
-            f"{sample_text}\n\n"
-            f"How it works: grab a seat (pay-per-lead in USDC to our Solana vault), "
-            f"we deliver verified {niche} leads to your dashboard + email + webhook. "
-            f"You only pay when seated.\n\n"
-            f"See + claim a lane: https://empire-ai.co.uk/buy-leads\n"
-            f"Vault: egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM\n\n"
-            f"Reply 'sample' for a free live lead.\n\n- Empire OS"
+            f"Quick one - I've analyzed {prospect.get('business_name', 'your company')}'s {niche} operations in {metro}.\n\n"
+            f"Found significant revenue leak from inefficient lead handling and missed opportunities.\n\n"
+            f"Your personalized audit is ready: {audit_portal}\n\n"
+            f"It shows:\n"
+            f"  • Daily revenue leak estimate\n"
+            f"  • Fleet/crew utilization gaps\n"
+            f"  • Competitor comparison\n"
+            f"  • 90-day recovery roadmap\n\n"
+            f"Ready to fix these issues? Start a $10 trial — we'll implement the top fixes and monitor weekly.\n"
+            f"Get Started: {trial_url}\n\n"
+            f"Done-for-you implementation · Weekly monitoring · USDT (BSC) accepted\n\n- Empire OS"
         )
     elif step == 1:
         insight = agi.split("\n")[0] if agi else f"We track {niche} demand across {metro} daily."
-        subject = f"{niche.title()} in {metro}: what's converting right now"
+        subject = f"{niche.title()} in {metro}: Your Revenue Leak Analysis"
         body_text = (
             f"Hi {name},\n\n"
-            f"Following up with something useful, no ask. We track {niche} demand across {metro} daily. "
+            f"Following up with your audit insight, no ask.\n\n"
             f"One pattern we're seeing:\n  {insight}\n\n"
-            f"{sample_text}\n\n"
-            f"When you're ready to put that demand to work, seats are open "
-            f"at https://empire-ai.co.uk/buy-leads (USDC settle, no card).\n\n"
-            f"- Empire OS"
+            f"Your full audit with recovery roadmap: {audit_portal}\n\n"
+            f"Start a $10 trial to fix the top issues: {trial_url}\n\n"
+            f"Done-for-you implementation · Weekly monitoring · USDT (BSC) accepted\n\n- Empire OS"
         )
     else:
-        subject = f"Your {niche} lane in {metro} is still open"
+        subject = f"Your {niche} Audit — Still Available for 48 Hours"
         body_text = (
             f"Hi {name},\n\n"
-            f"Last one - your {niche} seat for {metro} is still available. "
-            f"Exclusive leads, USDC settlement, cancel anytime.\n\n"
-            f"Claim it: https://empire-ai.co.uk/buy-leads\n"
-            f"Vault: egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM\n\n"
+            f"Last one - your {niche} efficiency audit for {metro} is still available.\n\n"
+            f"View it here: {audit_portal}\n\n"
+            f"Start $10 trial: {trial_url}\n\n"
             f"If the timing's off, just reply 'later' and I'll close your file. No hard feelings.\n\n- Empire OS"
         )
     

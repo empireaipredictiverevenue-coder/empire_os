@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Empire OS v3 — Idle-Asset / Waste / Logistics Sniper.
+"""Empire OS v3 -- Idle-Asset / Waste / Logistics Sniper.
 
 Detects business opportunities from idle assets, waste leakage, and
 logistics wastage. Data-feed driven (NO satellite imagery needed, NO LLM).
@@ -11,7 +11,7 @@ Scope (what it hunts):
   - logistics wastage (empty warehouses, disused distribution centers,
     abandoned cold storage)
 
-Guard rails (same as lead_sniper — operator-review mode):
+Guard rails (same as lead_sniper -- operator-review mode):
   - FIND ONLY. Never auto-emails. Finds -> empire_tasks
     (task_type='idle_asset_review') for human promotion.
   - NO si_outbox writes. NO spam.
@@ -24,7 +24,7 @@ import os, json, time, urllib.request, xml.etree.ElementTree as ET
 from pathlib import Path
 from datetime import datetime, timezone
 
-# ── paths / config ────────────────────────────────────────────────────────
+# -- paths / config --------------------------------------------------------
 AGENT_HOME = Path(os.environ.get("AGENT_HOME", "/root/empire_os/empire_os/agents"))
 ROLE_DIR = AGENT_HOME / "feedback" / "idle_asset"
 ROLE_DIR.mkdir(parents=True, exist_ok=True)
@@ -54,11 +54,10 @@ SIGNAL_KEYWORDS = {
                         "abandoned cold storage", "vacant industrial"],
 }
 
-# Data-feed sources (public RSS — free, no API key)
+# Data-feed sources (public RSS -- free, no API key)
 FEEDS = [
-    ("travis_county_permits", "https://www.traviscountytx.gov/news/rss.xml"),
-    ("austin_permits", "https://www.austintexas.gov/feed/permits"),
-    ("logistics_rss", "https://www.freightwaves.com/news/feed"),
+    ("logistics_rss", "https://www.freightwaves.com/feed"),
+    ("industrial_rss", "https://feeds.arstechnica.com/arstechnica/technology-lab"),
 ]
 
 
@@ -88,7 +87,7 @@ def _load_rules(path=None):
 
 RULES = _load_rules()
 
-# ── Supabase (PostgREST) ────────────────────────────────────────────────────
+# -- Supabase (PostgREST) ----------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL",
     "https://owbeinlfcfdtwcwrttjy.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
@@ -108,12 +107,15 @@ def _already_reviewed(url):
     if not url or url in _seen_urls:
         return True
     try:
-        q = (f"{SUPABASE_URL}/rest/v1/{REVIEW_TABLE}?"
-             f"task_type=eq.idle_asset_review&status=eq.pending"
-             f"&payload->>url=eq.{urllib.parse.quote(url, safe='')}")
-        req = urllib.request.Request(q, headers=_HEADERS)
-        with urllib.request.urlopen(req, timeout=10) as r:
-            return len(json.loads(r.read())) > 0
+        import sqlite3
+        cnx = sqlite3.connect('/root/empire_os/empire_os.db')
+        cnx.execute('PRAGMA busy_timeout=30000')
+        row = cnx.execute(
+            "SELECT 1 FROM empire_tasks WHERE task_type='idle_asset_review' "
+            "AND status='pending' AND json_extract(payload_json, '$.url')=?",
+            (url,)).fetchone()
+        cnx.close()
+        return row is not None
     except Exception:
         return False
 
@@ -124,19 +126,27 @@ def _queue_review(asset, asset_type, score):
     if _already_reviewed(url):
         return {"status": "dup"}
     try:
-        row = {
-            "task_type": "idle_asset_review",
-            "status": "pending",
-            "payload": {
-                "asset_type": asset_type,
-                "title": asset.get("title", "")[:200],
-                "url": url,
-                "source": asset.get("source", ""),
-                "score": round(score, 3),
-                "detected_at": datetime.now(timezone.utc).isoformat(),
-            },
+        import sqlite3
+        import json
+        cnx = sqlite3.connect('/root/empire_os/empire_os.db')
+        cnx.execute('PRAGMA busy_timeout=30000')
+        payload = {
+            "asset_type": asset_type,
+            "title": asset.get("title", "")[:200],
+            "url": url,
+            "source": asset.get("source", ""),
+            "score": round(score, 3),
+            "detected_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
         }
-        _sb_insert(REVIEW_TABLE, row)
+        import uuid
+        task_id = str(uuid.uuid4())
+        cnx.execute(
+            "INSERT INTO empire_tasks (task_id, task_type, status, payload_json, created_at) "
+            "VALUES (?,?,?,?,?)",
+            (task_id, "idle_asset_review", "pending", json.dumps(payload),
+             __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()))
+        cnx.commit()
+        cnx.close()
         _seen_urls.add(url)
         return {"status": "review_queued"}
     except Exception as e:
@@ -171,13 +181,13 @@ def _score(asset):
     return score, hit_type or "logistics_waste"
 
 
-# ── Scopes (data feeds) ─────────────────────────────────────────────────────
+# -- Scopes (data feeds) -----------------------------------------------------
 def _scan_feed(name, url):
     """Fetch an RSS feed, extract idle/waste/logistics signals."""
     out = []
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "EmpireOS-idle/1.0"})
-        with urllib.request.urlopen(req, timeout=12) as r:
+        with urllib.request.urlopen(req, timeout=8) as r:
             xml = r.read()
         root = ET.fromstring(xml)
         for item in root.iter("item"):
@@ -191,12 +201,12 @@ def _scan_feed(name, url):
                                      "empty", "leak", "dump", "waste"]):
                 out.append({"title": title, "url": link or url,
                             "source": f"feed:{name}"})
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[idle-asset] feed {name} error: {type(e).__name__}: {e}")
     return out
 
 
-# ── Tick ─────────────────────────────────────────────────────────────────────
+# -- Tick ---------------------------------------------------------------------
 def tick():
     queued = 0
     kills = 0
@@ -234,7 +244,7 @@ def tick():
 
 
 if __name__ == "__main__":
-    print(f"[{datetime.now(timezone.utc).isoformat()}] idle-asset sniper online — tick {TICK_INTERVAL}s")
+    print(f"[{datetime.now(timezone.utc).isoformat()}] idle-asset sniper online -- tick {TICK_INTERVAL}s")
     while True:
         try:
             r = tick()

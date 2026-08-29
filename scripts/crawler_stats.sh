@@ -46,7 +46,7 @@ TIER_MAP = {
     None: "D",
 }
 
-# ── Strategy mapping: icp_name → one of {nurture, buyer_marketplace, ignore}
+# ── Strategy mapping: icp_tier → one of {nurture, buyer_marketplace, ignore}
 STRATEGY_MAP_KEYWORDS = {
     "buyer_marketplace": ["ready to buy", "high-value homeowner", "buyer", "immediate"],
     "nurture": ["expansion", "growing", "nurture"],
@@ -57,15 +57,15 @@ def normalize_tier(raw):
     return TIER_MAP.get(raw, "D")
 
 
-def classify_strategy(icp_name, lead_score, icp_fit_score):
-    name = (icp_name or "").lower()
+def classify_strategy(icp_tier, omega_score, icp_fit_score):
+    name = (icp_tier or "").lower()
     if any(k in name for k in STRATEGY_MAP_KEYWORDS["buyer_marketplace"]):
         return "buyer_marketplace"
     if any(k in name for k in STRATEGY_MAP_KEYWORDS["nurture"]):
         return "nurture"
-    if (lead_score or 0) >= 70 or (icp_fit_score or 0) >= 70:
+    if (omega_score or 0) >= 70 or (icp_fit_score or 0) >= 70:
         return "buyer_marketplace"
-    if (lead_score or 0) >= 40 or (icp_fit_score or 0) >= 40:
+    if (omega_score or 0) >= 40 or (icp_fit_score or 0) >= 40:
         return "nurture"
     return "ignore"
 
@@ -73,7 +73,7 @@ def classify_strategy(icp_name, lead_score, icp_fit_score):
 def fetch_table_leads(cur, table, date_col):
     """Return list of dicts for leads posted today from a given table."""
     rows = cur.execute(
-        f"SELECT id, omega_tier, icp_name, lead_score, icp_fit_score, "
+        f"SELECT id, omega_tier, icp_tier, omega_score, icp_fit_score, "
         f"       metro, niche, source FROM {table} WHERE date({date_col})=?",
         (today,),
     ).fetchall()
@@ -129,7 +129,7 @@ for table, date_col in TABLE_DATE_COL.items():
         # top5 from crm_leads
         top5_rows = cur.execute(
             "SELECT id, source, business_name, metro, omega_tier, icp_tier, "
-            "       icp_name, lead_score, created_at "
+            "       icp_tier, omega_score, created_at "
             "FROM crm_leads WHERE date(created_at)=? ORDER BY id DESC LIMIT 5",
             (today,),
         ).fetchall()
@@ -138,21 +138,21 @@ for table, date_col in TABLE_DATE_COL.items():
     elif table == "lane_leads":
         rows = cur.execute(
             "SELECT id, omega_tier, icp_tier, icp_fit_score, metro, niche, "
-            "       lead_score, omega_score "
+            "       omega_score, omega_score "
             "FROM lane_leads WHERE date(created_at)=?",
             (today,),
         ).fetchall()
         for (lid, ot, icp_tier, ifs, metro, niche, ls, omega_score) in rows:
             total_today += 1
             tier_counts[normalize_tier(ot)] += 1
-            # lane_leads has no icp_name — derive strategy from icp_tier + scores
+            # lane_leads has no icp_tier — derive strategy from icp_tier + scores
             strat_counts[classify_strategy(icp_tier, ls or omega_score, ifs)] += 1
             expected_rev += (ls or omega_score or 0) * 1.0 + (ifs or 0) * 0.5
             by_source[niche or "unknown"] = by_source.get(niche or "unknown", 0) + 1
         # top5 from lane_leads
         top5_rows = cur.execute(
             "SELECT id, niche, metro, omega_tier, icp_tier, icp_fit_score, "
-            "       icp_name, omega_score, created_at "
+            "       icp_tier, omega_score, created_at "
             "FROM lane_leads WHERE date(created_at)=? ORDER BY id DESC LIMIT 5",
             (today,),
         ).fetchall()
@@ -190,7 +190,7 @@ out.append("")
 out.append(f"## Expected revenue today: ${expected_rev:,.2f}")
 out.append("")
 out.append("## Top 5 latest leads")
-out.append("| id | source | business | metro | omega_tier | icp_tier | icp_name | score | created_at |")
+out.append("| id | source | business | metro | omega_tier | icp_tier | icp_tier | score | created_at |")
 out.append("|---:|---|---|---|---|---|---|---:|---|")
 for r in top5:
     rid, src, biz, metro, ot, it, inm, score, ts = r

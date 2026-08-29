@@ -1,0 +1,102 @@
+"""Outbound email sender — polls si_outbox, dispatches via Resend API.
+
+Designed to run as either:
+  a) A background thread inside the hub process, or
+  b) A standalone cron job / systemd service
+
+Logs every send attempt to /root/feedback/mail_sender.jsonl
+"""
+from __future__ import annotations
+import json
+import logging
+import os
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+# --- PROXY BYPASS (critical: container has HTTP_PROXY that intercepts
+#     127.0.0.1, breaking all hub localhost calls) ---
+for _k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+    os.environ.pop(_k, None)
+os.environ["NO_PROXY"] = "localhost,127.0.0.1,10.118.155.218,10.118.155.1"
+os.environ["no_proxy"] = "localhost,127.0.0.1,10.118.155.218,10.118.155.1"
+os.environ.pop("http_proxy", None)
+os.environ.pop("https_proxy", None)
+os.environ["NO_PROXY"] = "localhost,127.0.0.1"
+os.environ["no_proxy"] = "localhost,127.0.0.1"
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+logger = logging.getLogger("mail_sender")
+
+# Load /root/empire_os/.env if not already in process env (so standalone
+# mail_sender_runner.py works without systemd-passed env). Mirrors hub.py.
+_ENV_PATH = Path("/root/empire_os/.env")
+if _ENV_PATH.exists():
+    try:
+        for _line in _ENV_PATH.read_text().splitlines():
+            _line = _line.strip()
+            if not _line or _line.startswith("#") or "=" not in _line:
+                continue
+            _k, _v = _line.split("=", 1)
+            _k = _k.strip()
+            _v = _v.strip()
+            if _k and _k not in os.environ:
+                os.environ[_k] = _v
+    except Exception:
+        pass
+
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+# Email providers from environment
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+SENDGRID_FROM = os.environ.get("SENDGRID_FROM", "Empire OS <founder@empire-ai.co.uk>")
+MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "")
+MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "sandbox.mailgun.org")
+FROM_EMAIL = os.environ.get("EMPIRE_FROM", "Empire OS <founder@empire-ai.co.uk>")
+
+# Anti-spam compliance headers
+LIST_UNSUBSCRIBE_URL = os.environ.get("LIST_UNSUBSCRIBE_URL", "https://empire-ai.co.uk/unsubscribe")
+LIST_UNSUBSCRIBE_EMAIL = os.environ.get("LIST_UNSUBSCRIBE_EMAIL", "unsubscribe@empire-ai.co.uk")
+
+
+def _clean_sender() -> str:
+    """Extract a bare email from EMPIRE_FROM even if it carries quotes/<>.
+
+    .env stores EMPIRE_FROM="Empire OS <founder@empire-ai.co.uk>" with the
+    outer double-quotes as literal characters, which Brevo/Resend reject.
+    """
+    import re as _re
+    raw = (FROM_EMAIL or "").strip().strip('"').strip("'")
+    mm = _re.search(r"[\w.+-]+@[\w.-]+\.\w+", raw)
+    return mm.group(0) if mm else raw
+
+
+# Pluggable SMTP relay (e.g. ImproveMX free tier) — kills the Resend bill.
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "resend").lower()
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.improvmx.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+SMTP_TLS = os.environ.get("SMTP_TLS", "1") == "1"
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+FEEDBACK_DIR = Path("/root/feedback")
+POLL_INTERVAL = 30
+MAX_PER_CYCLE = 10
+
+# Daily send quota
+DAILY_SEND_LIMIT = int(os.environ.get("EMAIL_SEND_DAILY_LIMIT", "100"))
+
+
+def _direct_mx_send(to: str, subject: str, body: str) -> dict:
+    """Sovereign outbound: resolve recipient MX + deliver straight to :25.
+    No SaaS, no relay creds, no daily quota. Open-source route.
+    """
+    try:
+        import smtplib
+        import socket
+        import dns.resolver  # pip install dnspython
+        domain = to.split("@")[-1].strip().lower()

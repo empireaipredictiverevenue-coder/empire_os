@@ -70,3 +70,9 @@ Failure modes:
 - PM2 jlist slow: degrade to reading last-seen-uptime from logs
 - Hub unreachable: skip revenue observation, log "hub_unreachable"
 - /root/feedback readable but degraded: skip affected source
+
+## Planning Discipline
+Before orchestrating multi-agent ops: load
+`/root/empire_os/empire_os/agents/souls/superpowers_protocol.md` and run
+brainstorm → plan → execute → verify → reflect. Verify each sub-agent outcome
+with real proof before declaring the op complete.

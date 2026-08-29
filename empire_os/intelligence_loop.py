@@ -40,7 +40,7 @@ DB = "/root/empire_os/empire_os.db"
 LOG_DIR = Path("/root/feedback/intelligence_loop")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-HUB_URL = "http://127.0.0.1:8081"
+HUB_URL = "http://127.0.0.1:8080"
 TICK_INTERVAL = int(os.environ.get("INTELLIGENCE_TICK", "60"))
 BATCH_SIZE = int(os.environ.get("INTELLIGENCE_BATCH", "50"))
 
@@ -58,7 +58,8 @@ def get_synthetic_intelligence():
         except Exception:
             ai_client = None
     if ai_client is not None:
-        si = SyntheticIntelligence(ai_client)
+        # SyntheticIntelligence class doesn't exist - skip for now
+        si = None
     return si
 
 
@@ -82,7 +83,7 @@ def get_pending_leads(limit: int = BATCH_SIZE):
     cur = con.cursor()
     rows = cur.execute(
         """
-        SELECT lead_ref AS id, omega_score, omega_tier, buyer_id
+        SELECT id, omega_score, omega_tier, buyer_id
         FROM lane_leads
         WHERE (buyer_id IS NULL OR buyer_id = '')
         ORDER BY omega_score DESC
@@ -112,10 +113,15 @@ def get_active_buyers():
         """
     ).fetchall()
     
-    # Build wallet -> payment_method lookup for crypto (USDC) buyers only
+    # Build wallet -> payment_method lookup for crypto (USDT) buyers only
     wallet_payments = {}
-    for row in cur.execute("SELECT buyer_id, processor, customer_ref, payment_ref FROM si_buyer_payment_methods WHERE processor='usdc'"):
-        wallet_payments[row["buyer_id"]] = dict(row)
+    for row in cur.execute("SELECT prospect_id, wallet, payout_per_lead, endpoint_url FROM si_buyer_outreach WHERE active=1 AND wallet IS NOT NULL AND wallet != ''"):
+        wallet_payments[row["prospect_id"]] = {
+            "processor": "usdt_bsc",
+            "wallet": row["wallet"],
+            "payout_per_lead": row["payout_per_lead"],
+            "endpoint_url": row["endpoint_url"]
+        }
     
     con.close()
     
@@ -123,7 +129,7 @@ def get_active_buyers():
     result = []
     for b in buyers:
         bdict = dict(b)
-        bdict["payment_method"] = {"processor": "usdc", "wallet": b["prospect_id"]}
+        bdict["payment_method"] = {"processor": "usdt_bsc", "wallet": b["prospect_id"]}
         result.append(bdict)
     
     return result
@@ -174,17 +180,51 @@ def match_buyer_intelligently(lead: dict, buyers: list) -> dict | None:
     except Exception as e:
         log("WARN", "semantic_match_failed", error=str(e))
     
-    # Fallback: Simple rule-based first pass: niche + metro match
-    niche = lead.get("niche", "").lower()
+    # Fallback: Simple rule-based first pass: niche + metro match with normalization
+    niche = lead.get("niche", "").lower().replace("_", " ")
+    sub_niche = lead.get("sub_niche", "").lower().replace("_", " ")
     metro = lead.get("metro", "").lower()
+    state = lead.get("state", "").lower()
+    
+    # Niche mapping for cross-matching
+    niche_aliases = {
+        "general_contractor": ["general contractor", "contractor", "construction", "build", "remodel", "renovation"],
+        "plumbing": ["plumbing", "plumb"],
+        "roof_repair": ["roof repair", "roofing", "roof"],
+        "residential_roofing": ["roofing", "roof", "residential roofing"],
+        "water_damage_restoration": ["water damage", "restoration", "flood", "mold"],
+        "hvac": ["hvac", "heating", "cooling", "air conditioning"],
+        "solar": ["solar"],
+        "weight_loss": ["weight loss", "weight_loss"],
+        "roofing": ["roofing", "roof"],
+    }
+    
+    # Find all relevant niche terms for this lead
+    lead_niche_terms = set([niche, sub_niche])
+    for key, aliases in niche_aliases.items():
+        if key in lead_niche_terms or any(a in lead_niche_terms for a in aliases):
+            lead_niche_terms.update(aliases)
+            lead_niche_terms.add(key)
     
     scored = []
     for b in buyers:
         score = 0
-        if niche and niche in b.get("niche", "").lower():
+        buyer_niche = b.get("niche", "").lower()
+        buyer_metro = b.get("metro", "").lower()
+        
+        # Check niche match with aliases
+        niche_match = False
+        for term in lead_niche_terms:
+            if term in buyer_niche:
+                niche_match = True
+                break
+        
+        if niche_match:
             score += 10
-        if metro and metro in b.get("metro", "").lower():
+        if metro and metro in buyer_metro:
             score += 5
+        elif state and state in buyer_metro:
+            score += 3
         score += b.get("payout_per_lead", 0) / 10  # prefer higher payout
         
         scored.append((score, b))
@@ -194,12 +234,14 @@ def match_buyer_intelligently(lead: dict, buyers: list) -> dict | None:
 
 
 def deliver_lead(lead: dict, buyer: dict) -> bool:
-    """POST lead to buyer webhook with HMAC + record in buyer_leads."""
+    """POST lead to buyer webhook with HMAC + record in buyer_leads.
+    Primary: email delivery (works without webhook).
+    Fallback: webhook if endpoint_url configured and email fails."""
     import hmac
     import hashlib
     
     # Ensure we have a valid prospect_id
-    prospect_id = buyer.get("prospect_id")
+    prospect_id = buyer.get("prospect_id") or buyer.get("id")
     if not prospect_id:
         log("WARN", "lead_delivery_skipped_no_prospect_id", lead_id=lead["id"])
         return False
@@ -221,41 +263,86 @@ def deliver_lead(lead: dict, buyer: dict) -> bool:
     api_key = prospect_id  # Use prospect_id as HMAC key
     sig = hmac.new(api_key.encode(), body, hashlib.sha256).hexdigest()
     
-    endpoint_url = buyer.get("endpoint_url", "")
-    if not endpoint_url:
-        log("WARN", "lead_delivery_no_endpoint", buyer=prospect_id)
-        # Record as failed delivery
-        con = sqlite3.connect(DB)
-        cur = con.cursor()
-        cur.execute(
-            "INSERT INTO buyer_leads (buyer_id, lane_lead_id, prospect_id, niche, metro, omega_tier, match_score, payout_usd, endpoint_status, endpoint_response) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (prospect_id, lead["id"], prospect_id, "", "", "", 0, buyer.get("payout_per_lead", 0), "no_endpoint", "buyer has no endpoint_url")
-        )
-        con.commit()
-        con.close()
-        return False
+    # PRIMARY: Email delivery (works without webhook)
+    email_success = False
+    email = buyer.get("email") or buyer.get("contact_email")
+    if email:
+        try:
+            # Build lead email
+            subject = f"New {lead.get('niche', 'lead')} lead for {lead.get('metro', 'your area')}"
+            
+            email_body = f"""
+New lead delivered via Empire OS
+
+Lead Details:
+- Name: {lead.get('name', 'N/A')}
+- Phone: {lead.get('phone', 'N/A')}
+- Email: {lead.get('email', 'N/A')}
+- Niche: {lead.get('niche', 'N/A')}
+- Sub-niche: {lead.get('sub_niche', 'N/A')}
+- Metro: {lead.get('metro', 'N/A')}
+- State: {lead.get('state', 'N/A')}
+- Omega Score: {lead.get('omega_score', 'N/A')}
+- Omega Tier: {lead.get('omega_tier', 'N/A')}
+- Details: {lead.get('details', 'N/A')}
+
+Payout: ${buyer.get('payout_per_lead', 0):.2f} per lead
+Lead ID: {lead.get('id', 'N/A')}
+
+Log into your Empire OS buyer portal to accept/decline.
+            """.strip()
+            
+            # Use mail_sender's _send function
+            from empire_os.mail_sender import _send
+            result = _send(email, subject, email_body)
+            email_success = result.get("ok", False)
+            if email_success:
+                endpoint_status = "email_sent"
+                endpoint_response = "lead delivered via email"
+            else:
+                endpoint_status = "email_failed"
+                endpoint_response = json.dumps(result)
+        except Exception as e:
+            endpoint_status = "email_error"
+            endpoint_response = str(e)[:200]
+            email_success = False
+    else:
+        endpoint_status = "no_email"
+        endpoint_response = "buyer has no email configured"
+        email_success = False
     
-    req = urllib.request.Request(
-        endpoint_url,
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "X-Empire-OS-Signature": sig,
-            "X-Empire-OS-Lead-Id": str(lead["id"]),
-            "X-Empire-OS-Event": "lead.delivered",
-        },
-        method="POST",
-    )
+    # FALLBACK: Webhook if email failed and endpoint configured
+    webhook_success = False
+    if not email_success:
+        endpoint_url = buyer.get("endpoint_url", "")
+        if endpoint_url:
+            req = urllib.request.Request(
+                endpoint_url,
+                data=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Empire-OS-Signature": sig,
+                    "X-Empire-OS-Lead-Id": str(lead["id"]),
+                    "X-Empire-OS-Event": "lead.delivered",
+                },
+                method="POST",
+            )
+            
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    webhook_success = resp.status == 200
+                    endpoint_status = f"http_{resp.status}"
+                    endpoint_response = resp.read().decode()[:200]
+            except Exception as e:
+                webhook_success = False
+                endpoint_status = "network_error"
+                endpoint_response = str(e)[:200]
+        else:
+            endpoint_status = "no_webhook"
+            endpoint_response = "no endpoint_url configured"
+            webhook_success = False
     
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            success = resp.status == 200
-            endpoint_status = f"http_{resp.status}"
-            endpoint_response = resp.read().decode()[:200]
-    except Exception as e:
-        success = False
-        endpoint_status = "network_error"
-        endpoint_response = str(e)[:200]
+    success = email_success or webhook_success
     
     # Record in buyer_leads
     con = sqlite3.connect(DB)
@@ -284,9 +371,43 @@ def deliver_lead(lead: dict, buyer: dict) -> bool:
     # Update lane_leads status
     new_status = "delivered" if success else "pending"  # keep pending on failure for retry
     cur.execute(
-        "UPDATE lane_leads SET status = ?, buyer_id = ? WHERE lead_ref = ?",
+        "UPDATE lane_leads SET status = ?, buyer_id = ? WHERE id = ?",
         (new_status, prospect_id, lead["id"]),
     )
+    
+    # Create si_ppc_invoice on successful delivery (for settlement bridge)
+    if success:
+        import uuid
+        import time
+        ts = int(time.time())
+        amount_cents = int(round(buyer.get("payout_per_lead", 0) * 100))
+        payout_usd = buyer.get("payout_per_lead", 0)
+        niche = lead.get("niche", "") or ""
+        metro = lead.get("metro", "") or ""
+        prospect_id_lead = lead.get("prospect_id", "") or ""
+        
+        invoice_id = f"inv_lead_{lead['id']}_{ts}"
+        charge_id = f"chg_lead_{lead['id']}_{ts}"
+        head = f"lead_delivery:{niche}:{metro}"
+        
+        cur.execute("""
+            INSERT INTO si_ppc_invoices
+            (invoice_id, charge_id, buyer_id, head, lead_id, amount_cents, amount_usdc, status, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
+        """, (invoice_id, charge_id, prospect_id, head, lead["id"], amount_cents, payout_usd,
+              json.dumps({"source": "intelligence_loop", "lead_id": lead["id"], "prospect_id": prospect_id_lead}), 
+              datetime.now(timezone.utc).isoformat()))
+        
+        cur.execute("""
+            INSERT INTO si_charges
+            (charge_id, buyer_id, prospect_id, processor, customer_ref, payment_ref, head, reason, amount_cents, currency, status, processor_response, attempt_count, created_at)
+            VALUES (?, ?, ?, 'usdt_bsc', ?, ?, ?, ?, ?, 'USDT', 'pending', ?, 1, ?)
+        """, (charge_id, prospect_id, prospect_id, invoice_id, head, f"Settlement for lead {lead['id']} ({niche}/{metro})",
+              amount_cents, json.dumps({"source": "intelligence_loop", "lead_id": lead["id"]}), datetime.now(timezone.utc).isoformat(), datetime.now(timezone.utc).isoformat()))
+        
+        cur.execute("UPDATE buyer_leads SET settlement_status='invoiced', invoice_id=? WHERE lane_lead_id=?",
+                     (invoice_id, lead["id"]))
+    
     con.commit()
     con.close()
     
@@ -295,11 +416,6 @@ def deliver_lead(lead: dict, buyer: dict) -> bool:
         status=endpoint_status, payout=buyer.get("payout_per_lead"))
     
     return success
-
-
-def run_waterfall(lead: dict, buyers: list) -> list:
-    """Run waterfall: try primary buyer, then fallbacks by payout desc."""
-    # Sort buyers by payout descending
     buyers_sorted = sorted(buyers, key=lambda b: b.get("payout_per_lead", 0), reverse=True)
     
     for buyer in buyers_sorted:

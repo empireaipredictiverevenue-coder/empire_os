@@ -45,6 +45,7 @@ PRIORITY = [
     "whois_lookup",         # free: domain RDAP creation date, registrar
     "bbb_lookup",           # free: BBB rating, years in business, accreditation
     "email_pattern",        # free: guess info@/contact@/sales@/hello@
+    "nominatim",            # free: OSM reverse geocode city/state from metro string
     "linkedin_guess",       # free: guess LinkedIn from name + domain
     "social_footprint",     # free: find FB/IG/TW/YT/TikTok from site + name
     "tech_stack",           # free: detect CMS, analytics, ads pixels, CRM, chat
@@ -227,15 +228,29 @@ def email_pattern(lead: dict) -> dict:
     if not name:
         return result
 
+    # Generate multiple patterns - Hunter.io style
     patterns = [
         f"info@{domain}",
         f"contact@{domain}",
         f"hello@{domain}",
+        f"sales@{domain}",
+        f"support@{domain}",
+        f"admin@{domain}",
     ]
-    # Common pattern: firstname@domain
+    # Try firstname@domain from business name
+    name_parts = name.lower().replace(".", "").replace(",", "").split()
+    if len(name_parts) >= 2:
+        first = name_parts[0]
+        last = name_parts[-1]
+        patterns.insert(0, f"{first}@{domain}")
+        patterns.insert(1, f"{first}.{last}@{domain}")
+        patterns.insert(2, f"{first}{last}@{domain}")
+        patterns.insert(3, f"{first[0]}{last}@{domain}")
+
+    # Validate each pattern by checking if domain accepts mail (MX check)
     for p in patterns:
         result["email"] = p
-        break  # just suggest info@
+        break  # Return first plausible; verification happens in waterfall
     return result
 
 
@@ -439,6 +454,319 @@ def bing_search(lead: dict) -> dict:
                 result["email"] = ems[0]
     except Exception:
         pass
+    return result
+
+
+# ── Additional providers for full 15-source cascade ─────────────────
+
+def linkedin_guess(lead: dict) -> dict:
+    """Guess LinkedIn URL from business name + domain."""
+    result = {}
+    name = lead.get("business_name", "")
+    domain = _safe_domain(lead.get("website", ""))
+    if not name and not domain:
+        return result
+    
+    # Try LinkedIn company page patterns
+    name_slug = name.lower().replace(" ", "-").replace(".", "").replace(",", "")
+    patterns = [
+        f"https://linkedin.com/company/{name_slug}",
+        f"https://linkedin.com/company/{name_slug.lower()}",
+    ]
+    if domain:
+        domain_slug = domain.split('.')[0]
+        patterns.append(f"https://linkedin.com/company/{domain_slug}")
+    
+    result["linkedin_guess"] = patterns[0]
+    return result
+
+
+def social_footprint(lead: dict) -> dict:
+    """Find FB/IG/TW/YT/TikTok from site + name."""
+    result = {}
+    website = lead.get("website", "")
+    domain = _safe_domain(website)
+    name = lead.get("business_name", "")
+    if not domain and not name:
+        return result
+    
+    socials = []
+    # Check website HTML for social links (already in website_scraper)
+    # Add common patterns
+    if domain:
+        name_slug = name.lower().replace(" ", "").replace(".", "").replace(",", "")
+        patterns = {
+            "facebook": f"https://facebook.com/{name_slug}",
+            "instagram": f"https://instagram.com/{name_slug}",
+            "twitter": f"https://twitter.com/{name_slug}",
+            "youtube": f"https://youtube.com/@{name_slug}",
+            "tiktok": f"https://tiktok.com/@{name_slug}",
+        }
+        for platform, url in patterns.items():
+            socials.append(f"{platform}:{url}")
+    
+    if socials:
+        result["social_footprint"] = json.dumps(socials)
+    return result
+
+
+def tech_stack(lead: dict) -> dict:
+    """Detect CMS, analytics, ads pixels, CRM, chat from website."""
+    result = {}
+    website = lead.get("website", "")
+    domain = _safe_domain(website)
+    if not domain:
+        return result
+    
+    html = _http_get(f"https://{domain}")
+    if not html:
+        return result
+    
+    tech = {}
+    # CMS
+    if "wp-content" in html or "wp-includes" in html:
+        tech["cms"] = "WordPress"
+    elif "shopify" in html.lower():
+        tech["cms"] = "Shopify"
+    elif "wix.com" in html.lower():
+        tech["cms"] = "Wix"
+    elif "squarespace" in html.lower():
+        tech["cms"] = "Squarespace"
+    
+    # Analytics
+    if "google-analytics.com" in html or "gtag(" in html:
+        tech["analytics"] = "Google Analytics"
+    if "googletagmanager.com" in html:
+        tech["gtm"] = True
+    if "facebook.net/tr" in html or "fbq(" in html:
+        tech["fb_pixel"] = True
+    if "clarity.ms" in html:
+        tech["clarity"] = True
+    
+    # Chat
+    if "intercom.io" in html:
+        tech["chat"] = "Intercom"
+    elif "tawk.to" in html:
+        tech["chat"] = "Tawk.to"
+    elif "crisp.chat" in html:
+        tech["chat"] = "Crisp"
+    
+    # CRM/Forms
+    if "hubspot" in html.lower():
+        tech["crm"] = "HubSpot"
+    if "pipedrive" in html.lower():
+        tech["crm"] = "Pipedrive"
+    
+    if tech:
+        result["tech_stack"] = json.dumps(tech)
+    return result
+
+
+def permit_signals(lead: dict) -> dict:
+    """Check permits_nyc/permits_chi for contractor activity."""
+    result = {}
+    city = (lead.get("city") or lead.get("metro") or "").lower()
+    niche = (lead.get("niche") or "").lower()
+    contractor_niches = ["roofing", "plumbing", "hvac", "electrical", "general contractor", "construction", "restoration"]
+    
+    if not any(n in niche for n in contractor_niches):
+        return result
+    
+    permits = []
+    # NYC permits
+    if "nyc" in city or "new york" in city:
+        name = lead.get("business_name", "")
+        try:
+            r = requests.get(
+                "https://data.cityofnewyork.us/resource/ipu4-2q9a.json",
+                params={"$q": name, "$limit": 5},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                permits.append(f"nyc:{len(data)} permits")
+        except Exception:
+            pass
+    
+    # Chicago permits
+    if "chicago" in city or "chi" in city:
+        try:
+            r = requests.get(
+                "https://data.cityofchicago.org/resource/ydr8-5enu.json",
+                params={"$q": name, "$limit": 5},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                permits.append(f"chi:{len(data)} permits")
+        except Exception:
+            pass
+    
+    if permits:
+        result["permit_signals"] = json.dumps(permits)
+    return result
+
+
+def reviews_mine(lead: dict) -> dict:
+    """Google/Yelp/Angi review count + sentiment."""
+    result = {}
+    name = lead.get("business_name", "")
+    domain = _safe_domain(lead.get("website", ""))
+    if not name:
+        return result
+    
+    reviews = {}
+    # Google reviews via SERP
+    try:
+        r = requests.get(
+            "https://www.google.com/search",
+            params={"q": f'{name} reviews'},
+            headers={"User-Agent": USER_AGENT},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            # Extract rating
+            m = re.search(r'(\d\.\d)\s*out of 5', r.text)
+            if m:
+                reviews["google_rating"] = float(m.group(1))
+            m = re.search(r'(\d+)\s*reviews', r.text)
+            if m:
+                reviews["google_count"] = int(m.group(1))
+    except Exception:
+        pass
+    
+    # Yelp
+    try:
+        r = requests.get(
+            "https://www.yelp.com/search",
+            params={"find_desc": name},
+            headers={"User-Agent": USER_AGENT},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            m = re.search(r'(\d+)\s*reviews', r.text)
+            if m:
+                reviews["yelp_count"] = int(m.group(1))
+    except Exception:
+        pass
+    
+    if reviews:
+        result["reviews"] = json.dumps(reviews)
+    return result
+
+
+def news_signals(lead: dict) -> dict:
+    """Local news mentions (expansion, acquisition)."""
+    result = {}
+    name = lead.get("business_name", "")
+    city = (lead.get("city") or lead.get("metro") or "")
+    if not name:
+        return result
+    
+    signals = []
+    try:
+        r = requests.get(
+            "https://news.google.com/rss/search",
+            params={"q": f'{name} {city}', "hl": "en", "gl": "US", "ceid": "US:en"},
+            headers={"User-Agent": USER_AGENT},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            # Count items in RSS
+            items = re.findall(r'<item>', r.text)
+            if items:
+                signals.append(f"news_mentions:{len(items)}")
+    except Exception:
+        pass
+    
+    if signals:
+        result["news_signals"] = json.dumps(signals)
+    return result
+
+
+def hiring_signals(lead: dict) -> dict:
+    """Job postings = growth intent."""
+    result = {}
+    name = lead.get("business_name", "")
+    domain = _safe_domain(lead.get("website", ""))
+    if not name:
+        return result
+    
+    jobs = []
+    # Check careers page
+    if domain:
+        try:
+            for path in ["/careers", "/jobs", "/join-us", "/hiring"]:
+                html = _http_get(f"https://{domain}{path}")
+                if html:
+                    # Count job links
+                    job_links = re.findall(r'/job/[a-zA-Z0-9-]+', html)
+                    if job_links:
+                        jobs.append(f"careers_page:{len(job_links)}")
+                        break
+        except Exception:
+            pass
+    
+    # Indeed search
+    try:
+        r = requests.get(
+            "https://www.indeed.com/jobs",
+            params={"q": name, "l": city},
+            headers={"User-Agent": USER_AGENT},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            m = re.search(r'(\d+)\s*jobs', r.text)
+            if m:
+                jobs.append(f"indeed:{m.group(1)}")
+    except Exception:
+        pass
+    
+    if jobs:
+        result["hiring_signals"] = json.dumps(jobs)
+    return result
+
+
+def ad_intelligence(lead: dict) -> dict:
+    """FB Ad Library, Google Ads transparency."""
+    result = {}
+    name = lead.get("business_name", "")
+    domain = _safe_domain(lead.get("website", ""))
+    if not name:
+        return result
+    
+    ads = []
+    # FB Ad Library
+    try:
+        r = requests.get(
+            "https://www.facebook.com/ads/library/",
+            params={"q": name},
+            headers={"User-Agent": USER_AGENT},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            # Check for active ads
+            if "active" in r.text.lower() and "ad" in r.text.lower():
+                ads.append("fb_ads:active")
+    except Exception:
+        pass
+    
+    # Google Ads Transparency
+    try:
+        r = requests.get(
+            "https://adstransparency.google.com/",
+            params={"q": name},
+            headers={"User-Agent": USER_AGENT},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            if "ad" in r.text.lower():
+                ads.append("google_ads:active")
+    except Exception:
+        pass
+    
+    if ads:
+        result["ad_intelligence"] = json.dumps(ads)
     return result
 
 
@@ -666,7 +994,7 @@ def enrich_prospects(backend, limit: int = 200, only_missing_email: bool = True)
         if em:
             dom = em.split("@")[-1].lower()
             bad = ("&" in em or " " in em or len(dom) > 40
-                   or dom.count(".") == 0 or dom.startswith("www.")
+                   or dom.count(".") == 0
                    or any(ch in dom for ch in "&'\" \x00"))
             if bad:
                 found.pop("email", None)

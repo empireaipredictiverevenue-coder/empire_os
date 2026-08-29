@@ -23,10 +23,11 @@ for ln in open("/root/empire_os/.env"):
 
 import importlib.util
 spec = importlib.util.spec_from_file_location("en", "/root/empire_os/empire_os/enrichment.py")
-en = importlib.util.module_from_spec(spec); spec.loader.exec_module(en)
+en = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(en)
 
 DB = "/root/empire_os/empire_os.db"
-HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 
 # Branded dark-theme HTML templates (see render_founder_email.py)
 # Generated per-row using the empire_os.agents.render_founder_email module.
@@ -51,11 +52,8 @@ def _render_branded(niche: str, name: str, metro: str, email: str) -> tuple[str,
         body = f"<p>Hi {name},</p><p>Founder pricing for Empire OS — your first 5 leads free, then $10 in USDC per lead.</p><p><a href='https://empire-ai.co.uk/buy-leads'>Claim free leads</a></p>"
         return subj, body
 
-
-
-
 def _mint_pay_url(name, niche, to_email, tier="bronze"):
-    """Mint a per-prospect Solana Pay link via hub /v1/buyer_apply.
+    """Mint a per-prospect USDT BSC Pay link via hub /v1/buyer_apply.
 
     Returns (pay_url, memo) or ("", "") on failure. Non-fatal: a prospect
     still gets the pitch even if pay-link minting fails (loop_closure alerts
@@ -65,8 +63,10 @@ def _mint_pay_url(name, niche, to_email, tier="bronze"):
     try:
         payload = json.dumps({
             "name": name or to_email.split("@")[0],
-            "niche": niche, "tier": tier,
-            "email": to_email, "source": "founder_outreach",
+            "niche": niche,
+            "tier": tier,
+            "email": to_email,
+            "source": "founder_outreach",
         }).encode()
         req = urllib.request.Request(
             f"{HUB}/v1/buyers/apply", data=payload,
@@ -77,7 +77,6 @@ def _mint_pay_url(name, niche, to_email, tier="bronze"):
         return pay.get("pay_url", ""), pay.get("memo", "")
     except Exception:
         return "", ""
-
 
 def queue_email(cur, to_email, name, niche, metro=""):
     subj, body = _render_branded(niche, name, metro, to_email)

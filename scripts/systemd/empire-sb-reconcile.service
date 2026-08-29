@@ -1,0 +1,6 @@
+[Unit]
+Description=Empire OS Supabase->SQLite reconcile (SoR mirror)
+
+[Service]
+Type=oneshot
+ExecStart=/root/venv/bin/python3 /root/empire_os/scripts/supabase_reconcile.py --apply

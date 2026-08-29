@@ -188,6 +188,10 @@ def run(metro: str = None, verticals: list = None, limit: int = 40) -> Iterator[
     yield from _run_nyc()
 
 
+def _probe():
+    from empire_os.lead_sources.models import http_probe
+    return http_probe("https://data.cityofnewyork.us/resource/ipu4-2q9a.json", {"$limit": "1"})
+
 def register_source(reg):
     reg(SourceInfo(
         name="permits",
@@ -195,4 +199,5 @@ def register_source(reg):
         requires=[],
         description="NYC DOB permit filings (last 7 days) — public SODA, no key",
         run_fn=run,
+        probe=_probe,
     ))

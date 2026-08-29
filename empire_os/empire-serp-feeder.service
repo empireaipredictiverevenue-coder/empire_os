@@ -1,0 +1,6 @@
+[Unit]
+Description=Empire OS weekly SERP lane feeder sweep
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /root/empire_os/empire_os/serp_lane_feeder.sh

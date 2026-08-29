@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s: %(message)
 log = logging.getLogger("empire-agents")
 
 DB_PATH = os.environ.get("EMPIRE_DB_PATH", "/root/empire_os/empire_os.db")
-HUB_URL = os.environ.get("EMPIRE_HUB_URL", "http://127.0.0.1:8081")
+HUB_URL = os.environ.get("EMPIRE_HUB_URL", "http://127.0.0.1:8080")
 PORT = int(os.environ.get("EMPIRE_PORT", "8000"))
 
 

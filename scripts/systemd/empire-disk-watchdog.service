@@ -1,0 +1,6 @@
+[Unit]
+Description=Empire OS disk watchdog
+
+[Service]
+Type=oneshot
+ExecStart=/root/venv/bin/python3 /root/empire_os/scripts/disk_watchdog.py

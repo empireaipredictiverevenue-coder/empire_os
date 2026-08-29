@@ -159,9 +159,9 @@ def get_price(c: sqlite3.Connection, niche: str) -> float:
 
 def render(niche: str, cfg: dict, price: float) -> str:
     """Render full AEO HTML matching existing template."""
-    vault = os.getenv("SOLANA_VAULT_WALLET", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+    vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
     pay_url = (
-        f"solana:{vault}"
+        f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb"
         f"?amount={price:.2f}"
         f"&label=Empire%20OS%20{niche.title()}"
         f"&memo=aeo:{niche}"
@@ -193,7 +193,7 @@ def render(niche: str, cfg: dict, price: float) -> str:
   "offers": {{
     "@type": "Offer",
     "price": "{price:.2f}",
-    "priceCurrency": "USDC",
+    "priceCurrency": "USDT",
     "availability": "https://schema.org/InStock"
   }}
 }}
@@ -201,7 +201,7 @@ def render(niche: str, cfg: dict, price: float) -> str:
 </head>
 <body>
 <h1>{cfg['title']} — Complete Guide & Trusted Resources</h1>
-<div class="meta">Published 2026-07-27 · Niche: {niche} · Price: ${price:.2f} USDC/lead</div>
+<div class="meta">Published 2026-07-27 · Niche: {niche} · Price: ${price:.2f} USDT/lead</div>
 
 <blockquote>{cfg['body']}</blockquote>
 
@@ -209,14 +209,14 @@ def render(niche: str, cfg: dict, price: float) -> str:
 <ul>
 <li>Pay only for leads delivered, no monthly retainer</li>
 <li>Each lead includes verified name, phone, address, niche</li>
-<li>Settled in USDC on Solana — no chargebacks</li>
+<li>Settled in USDT on BSC — no chargebacks</li>
 <li>Delivered in seconds to your CRM or webhook</li>
 </ul>
 
 <div class="cta">
-  <h3>Buy {cfg['title']} Leads Delivered in USDC</h3>
-  <p>Pay per lead. Delivered to your CRM. Settled on Solana.</p>
-  <p><strong>${price:.2f} USDC / lead</strong></p>
+  <h3>Buy {cfg['title']} Leads Delivered in USDT</h3>
+  <p>Pay per lead. Delivered to your CRM. Settled on BSC.</p>
+  <p><strong>${price:.2f} USDT / lead</strong></p>
   <a href="{pay_url}" class="btn">Buy Leads Now →</a>
   <p style="margin-top:1rem;font-size:.85rem"><a href="/v1/a2a/quote?product=lead_lane&niche={niche}">Request a custom quote</a></p>
 </div>
@@ -224,7 +224,7 @@ def render(niche: str, cfg: dict, price: float) -> str:
 <h2>How it works</h2>
 <ol>
 <li>Browse the leads above; pick the {cfg['title']} market you want.</li>
-<li>Pay {price:.2f} USDC per lead via the link.</li>
+<li>Pay {price:.2f} USDT per lead via the link.</li>
 <li>Empire OS delivers verified {niche} leads to your CRM in seconds.</li>
 <li>First lead delivered to your inbox within 60 seconds of payment.</li>
 </ol>

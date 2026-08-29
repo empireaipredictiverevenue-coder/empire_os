@@ -1,0 +1,24 @@
+[Unit]
+Description=Empire OS Hub (revenue loop, port 8081)
+After=network.target
+
+[Service]
+EnvironmentFile=-/root/empire_os/.env
+Environment=EMPIRE_PORT=8081
+Environment=EMPIRE_HOST=0.0.0.0
+Environment=HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= no_proxy=*
+Type=simple
+WorkingDirectory=/root/empire_os
+ExecStartPre=/bin/bash -c "for p in $(ss -ltnp 2>/dev/null | grep \":8081\" | grep -oP \"pid=\\K[0-9]+\" | sort -u); do kill -9 $p 2>/dev/null; done; sleep 1"
+ExecStart=/root/venv/bin/python3 -m empire_os.hub
+ExecStartPost=/bin/bash -c "for i in $(seq 1 30); do ss -ltn 2>/dev/null | grep -q :8081 && break; sleep 1; done; /root/venv/bin/python3 /root/empire_os/empire_os/deploy_check.py"
+TimeoutStopSec=15
+KillSignal=SIGTERM
+FinalKillSignal=SIGKILL
+Restart=always
+RestartSec=3
+Environment=EMPIRE_WORKERS=0
+User=root
+
+[Install]
+WantedBy=multi-user.target

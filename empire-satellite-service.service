@@ -1,0 +1,19 @@
+[Unit]
+Description=Empire OS Satellite Service (warehouse scanner daemon :9102)
+After=network.target empire-hub-8081.service
+Wants=empire-hub-8081.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os
+Environment=SATELLITE_AGENT_PORT=9102
+Environment=SATELLITE_POLL_INTERVAL=600
+Environment=CACHE_DIR=/root/.empire/satellite_cache
+Environment=EMPIRE_HUB_URL=http://10.118.155.218:8081
+ExecStart=/root/venv/bin/python3 -m empire_os.satellite_service
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

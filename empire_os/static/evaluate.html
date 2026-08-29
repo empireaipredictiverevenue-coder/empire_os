@@ -43,18 +43,18 @@
     <div class="card">
       <h3>Credit Pack — On-Chain</h3>
       <div class="big">$10<span style="font-size:14px;color:#9aa0aa">/pack (20)</span></div>
-      <ul><li>One USDC tx = 20 conversions</li><li>Fees amortised, not per-lead</li><li>Draw down off-chain</li></ul>
+      <ul><li>One USDT tx = 20 conversions</li><li>Fees amortised, not per-lead</li><li>Draw down off-chain</li></ul>
     </div>
     <div class="card">
       <h3>Legacy — Per Convert</h3>
       <div class="big">$0.50<span style="font-size:14px;color:#9aa0aa">/A·B·C convert</span></div>
-      <ul><li>Falls back if no pack</li><li>Separate USDC tx each</li><li>$10 min enforced</li></ul>
+      <ul><li>Falls back if no pack</li><li>Separate USDT tx each</li><li>$10 min enforced</li></ul>
     </div>
   </div>
 
   <div class="box">
     <strong>0 · Why a credit pack? (blockchain fees)</strong>
-    <p style="font-size:13px;color:#b8bfc9;margin-top:8px">Selling per-lead on-chain means a Solana tx for every $0.50 — fee-friction kills it. Instead you buy ONE on-chain credit pack ($10 = 20 conversions). Each conversion then draws down a credit <em>off-chain</em>. The chain sees a single $10 tx; fees are amortised across 20 leads.</p>
+    <p style="font-size:13px;color:#b8bfc9;margin-top:8px">Selling per-lead on-chain means a BSC tx for every $0.50 — fee-friction kills it. Instead you buy ONE on-chain credit pack ($10 = 20 conversions). Each conversion then draws down a credit <em>off-chain</em>. The chain sees a single $10 tx; fees are amortised across 20 leads.</p>
   </div>
 
   <div class="box">
@@ -63,20 +63,20 @@
       <div><label>Business name</label><input id="bname" placeholder="Acme Roofing"/></div>
       <div><label>Niche</label><input id="bniche" placeholder="roofing"/></div>
     </div>
-    <label>USDC wallet (where we settle payouts to you)</label>
-    <input id="bwallet" placeholder="YourSolanaWallet…"/>
+    <label>USDT wallet (where we settle payouts to you)</label>
+    <input id="bwallet" placeholder="YourBSCWallet…"/>
     <button onclick="signup()">Create account + key</button>
     <pre id="signout">// your api_key appears here</pre>
   </div>
 
   <div class="box">
     <strong>1b · Buy a credit pack (one on-chain tx)</strong>
-    <p style="font-size:13px;color:#b8bfc9;margin:6px 0">Fund 20 conversions with a single $10 USDC payment. Conversions then auto-debit off-chain — no per-lead fees.</p>
+    <p style="font-size:13px;color:#b8bfc9;margin:6px 0">Fund 20 conversions with a single $10 USDT payment. Conversions then auto-debit off-chain — no per-lead fees.</p>
     <div class="row">
       <div><label>API key</label><input id="bkey" placeholder="evk_… (from step 1)"/></div>
       <div><label>Amount USD (min $10)</label><input id="bamt" placeholder="10"/></div>
     </div>
-    <button onclick="buyPack()">Buy pack → Solana Pay URL</button>
+    <button onclick="buyPack()">Buy pack → BSC Pay URL</button>
     <pre id="buyout">// pay URL + credits appear here</pre>
   </div>
 
@@ -90,19 +90,19 @@
 
   <div class="box">
     <strong>3 · Mark a lead "sold" → auto-debit</strong>
-    <p style="font-size:13px;color:#b8bfc9;margin:6px 0">If you hold credits: debits 1 off-chain (no tx). Otherwise falls back to a $0.50 USDC charge + pay link.</p>
+    <p style="font-size:13px;color:#b8bfc9;margin:6px 0">If you hold credits: debits 1 off-chain (no tx). Otherwise falls back to a $0.50 USDT charge + pay link.</p>
     <div class="row">
       <div><label>API key</label><input id="skey" placeholder="evk_… (from step 1)"/></div>
       <div><label>Lead ref</label><input id="sref" placeholder="lead1"/></div>
     </div>
     <button onclick="markSold()">Lead sold → debit / charge</button>
-    <pre id="soldout">// conversion + (if no credits) Solana Pay URL appears here</pre>
+    <pre id="soldout">// conversion + (if no credits) BSC Pay URL appears here</pre>
   </div>
 
   <div class="api">
     <p><strong>API:</strong> <code>POST /v1/evaluate/signup</code> → key · <code>POST /v1/evaluate</code> (header <code>X-API-Key</code>) · <code>POST /v1/evaluate/buy</code> (header <code>X-API-Key</code>, body <code>{"usd":10}</code> → credit pack) · <code>POST /v1/evaluate/lead-sold</code> (header <code>X-API-Key</code>, body <code>{"lead_ref":"…"}</code>)</p>
     <p>Wallet: <code>GET /v1/evaluate/credits?key=&lt;api_key&gt;</code> · Ledger: <code>GET /v1/evaluate/ledger?buyer=&lt;id&gt;</code> · Settlements: <code>GET /v1/evaluate/settlements</code> · Dashboard: <code>/dashboard?key=&lt;api_key&gt;</code></p>
-    <p>On-chain purchase: one USDC tx with memo <code>EVALBUY_&lt;tenant&gt;_&lt;pack&gt;</code> credits your balance (our listener settles it automatically). Per-lead fallback memo: <code>EVAL_&lt;tenant&gt;__&lt;ref&gt;</code>.</p>
+    <p>On-chain purchase: one USDT tx with memo <code>EVALBUY_&lt;tenant&gt;_&lt;pack&gt;</code> credits your balance (our listener settles it automatically). Per-lead fallback memo: <code>EVAL_&lt;tenant&gt;__&lt;ref&gt;</code>.</p>
   </div>
 </div>
 <script>

@@ -33,11 +33,37 @@ def _render_html(spec: AeoSpecDraft) -> str:
     now = datetime.utcnow().strftime("%Y-%m-%d")
     niche_display = spec.niche.replace("_", " ").title()
 
+    # GSC site-verification (owner: Philip Livesley — done GSC before)
+    gsc = '<meta name="google-site-verification" content="e99cfe58e9f5208c02cc677a5d97ce6860750f44">'
+
+    # "mix up" rotation so templated pages aren't byte-identical (dedupe aid)
+    angles = [
+        f"Local {niche_display} pros vetted by Empire OS — get matched free.",
+        f"Compare trusted {niche_display} providers in your metro. No spam, ever.",
+        f"{niche_display} buyers + verified suppliers, connected by AI.",
+        f"Skip the directory noise — direct {niche_display} quotes from screened pros.",
+    ]
+    # deterministic pick from niche name so it's stable per-page
+    pick = sum(ord(c) for c in spec.niche) % len(angles)
+    mixed_angle = angles[pick]
+
+    # roofing flavor injected on roofing niches
+    is_roof = "roof" in spec.niche.lower()
+    roof_block = ""
+    if is_roof:
+        roof_block = (
+            '<div class="cta"><h3>Roofing Quote — Flat-Rate, No Surprises</h3>'
+            "<p>Get a reroof or repair estimate from insured local roofers. "
+            "Emergency leak? We route you to a 24/7 crew.</p>"
+            "<p><a href=\"/v1/buyers/signup-seat\">Get My Roofing Quote →</a></p></div>"
+        )
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{gsc}
 <title>{niche_display} — AEO Authority Page</title>
 <meta name="description" content="{spec.meta_description or spec.content_angle}">
 <style>
@@ -63,8 +89,10 @@ def _render_html(spec: AeoSpecDraft) -> str:
 
 <h2>Our Approach</h2>
 <p>{spec.content_angle}</p>
+<p>{mixed_angle}</p>
 
 {spec.body_html}
+{roof_block}
 
 <h2>Related Resources</h2>
 <ul>

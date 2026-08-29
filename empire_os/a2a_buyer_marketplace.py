@@ -175,11 +175,11 @@ def ensure_schema(conn: sqlite3.Connection) -> dict:
 def _split_csv(value: str) -> list[str]:
     if not value:
         return []
-    return [v.strip().lower() for v in value.replace("|", ",").split(",") if v.strip()]
+    return [_norm(v) for v in value.replace("|", ",").split(",") if v.strip()]
 
 
 def _norm(value: str | None) -> str:
-    return (value or "").strip().lower()
+    return (value or "").strip().lower().replace(" ", "_")
 
 
 def _overlap(a: str, b: str) -> bool:
@@ -203,10 +203,10 @@ def score_match(buyer: dict, lead: dict) -> float:
     b_niches = _split_csv(buyer.get("niches", "")) or [_norm(buyer.get("niche", ""))]
     b_metros = _split_csv(buyer.get("metros", "")) or [_norm(buyer.get("metro", ""))]
     lead_niche = _norm(lead.get("niche"))
-    lead_metro = _norm(lead.get("metro"))
+    lead_metro = _metro_code(_norm(lead.get("metro")))
 
     niche_hit = any(_overlap(bn, lead_niche) for bn in b_niches if bn)
-    metro_hit = any(_overlap(bm, lead_metro) for bm in b_metros if bm)
+    metro_hit = any(_overlap(_metro_code(bm), lead_metro) for bm in b_metros if bm)
 
     if not niche_hit and not metro_hit:
         return 0.0
@@ -215,6 +215,55 @@ def score_match(buyer: dict, lead: dict) -> float:
     if niche_hit and metro_hit:
         return 1.0
     return 0.7
+
+
+# Map common city names to lead metro codes so buyer metro "Dallas-Fort Worth"
+# matches lead metro "DFW". Both sides are normalized through this function
+# before comparison.
+METRO_ALIASES: dict[str, str] = {
+    "dallas": "dfw", "dallas_fort_worth": "dfw", "dallas-ft_worth": "dfw",
+    "dallas_fort": "dfw", "fort_worth": "dfw",
+    "houston": "hou",
+    "atlanta": "atl",
+    "chicago": "chi",
+    "los_angeles": "lax", "la": "lax",
+    "new_york": "nyc", "new_york_city": "nyc", "manhattan": "nyc",
+    "philadelphia": "phl", "philly": "phl",
+    "washington": "wdc", "washington_dc": "wdc", "dc": "wdc",
+    "miami": "mia",
+    "san_francisco": "sfo", "sf": "sfo",
+    "boston": "bos",
+    "orlando": "atl",  # FL bay area, closest code
+    "tampa": "mia",
+    "austin": "dfw",
+    "san_antonio": "dfw",
+    "nashville": "dfw",
+    "kansas_city": "dfw",
+    "oklahoma_city": "dfw",
+    "tulsa": "dfw",
+    "el_paso": "dfw",
+    "corpus_christi": "hou",
+    "birmingham": "atl",
+    "charlotte": "atl",
+    "memphis": "dfw",
+    "little_rock": "dfw",
+    "baton_rouge": "hou",
+    "waco": "dfw",
+    "tyler": "dfw",
+    "lubbock": "dfw",
+    "amarillo": "dfw",
+    "wichita": "dfw",
+    "temple": "dfw",
+    "bryan_college_station": "dfw", "bryan/college_station": "dfw",
+}
+
+
+def _metro_code(metro: str) -> str:
+    """Normalize a metro string to its canonical 3-letter code."""
+    m = metro.strip().lower().replace("-", "_").replace(" ", "_").replace("/", "_")
+    if m in METRO_ALIASES:
+        return METRO_ALIASES[m]
+    return m
 
 
 def fetch_active_buyers(conn: sqlite3.Connection) -> list[dict]:
@@ -369,7 +418,8 @@ def push_cycle(conn: sqlite3.Connection,
         }
         assignments.append(assignment)
 
-    # Write to DB.
+    # Write to DB. Commit per assignment so we don't hold the WAL writer
+    # lock for the entire batch (which starves the hub + hub_loop_standalone).
     written = 0
     if not dry_run and assignments:
         for a in assignments:
@@ -390,14 +440,31 @@ def push_cycle(conn: sqlite3.Connection,
                     "UPDATE lane_leads SET buyer_id = ? WHERE id = ? AND buyer_id IS NULL",
                     (a["buyer_id"], a["lane_lead_id"]),
                 )
+                conn.commit()  # release WAL writer immediately
                 written += 1
+                # Fire-and-forget Pinecone upsert so semantic search
+                # picks up newly-routed leads. Never blocks on Pinecone.
+                try:
+                    from empire_os.pinecone_intel import upsert_lead
+                    from empire_os.pinecone_client import get_client
+                    with get_client() as pc:
+                        upsert_lead(a["lane_lead_id"], {
+                            "niche": a["niche"], "metro": a["metro"],
+                            "omega_tier": a["omega_tier"],
+                            "buyer_id": a["buyer_id"],
+                            "match_score": a["match_score"],
+                        }, client=pc)
+                except Exception:
+                    pass  # Pinecone optional — never break A2A on it
             except sqlite3.Error as e:
                 print(f"  db error lead={a['lane_lead_id']}: {e}", file=sys.stderr)
-        conn.commit()
+                conn.rollback()
 
     # Fire webhooks (only after DB write so we don't claim a lead we couldn't
-    # claim).
+    # claim). Commit per webhook so the WAL writer isn't held across the
+    # whole batch.
     webhooks_sent = 0
+    emails_sent = 0
     if post_webhook and not dry_run:
         for a in assignments:
             # Resolve endpoint: 1) explicit endpoint_url, 2) generated local
@@ -406,12 +473,47 @@ def push_cycle(conn: sqlite3.Connection,
             if not ep and a["payout_usd"] > 0:
                 ep = "http://10.118.155.218:8081/v1/buyers/test_receive"
             if not ep:
-                # No endpoint — mark as such so downstream dashboards see it.
+                # No endpoint — try email fallback
+                buyer_email = a.get("buyer_email", "")
+                if buyer_email:
+                    try:
+                        from empire_os.mail_sender import _send as _ms_send
+                        subject = f"New {a['niche']} Lead in {a['metro']} — ${a['payout_usd']:.0f}"
+                        body = f"""Hi {a.get('buyer_name', 'Buyer')},
+
+New lead assigned to you:
+- Niche: {a['niche']}
+- Metro: {a['metro']}
+- Tier: {a['omega_tier']}
+- Match Score: {a['match_score']:.2f}
+- Payout: ${a['payout_usd']:.2f}
+- Prospect ID: {a['prospect_id']}
+- Lane Lead ID: {a['lane_lead_id']}
+
+This lead is exclusive to you. Contact the prospect directly or reply to this email for support.
+
+— Empire OS A2A Marketplace
+"""
+                        res = _ms_send(buyer_email, subject, body)
+                        if res.get("ok") or res.get("sent"):
+                            emails_sent += 1
+                            conn.execute(
+                                "UPDATE buyer_leads SET endpoint_status='email_sent' "
+                                "WHERE buyer_id=? AND lane_lead_id=? AND endpoint_status='pending'",
+                                (a["buyer_id"], a["lane_lead_id"]),
+                            )
+                            conn.commit()
+                            continue
+                    except Exception as e:
+                        print(f"  email fallback failed for {buyer_email}: {e}", file=sys.stderr)
+                
+                # No endpoint and no email - mark as such
                 conn.execute(
                     "UPDATE buyer_leads SET endpoint_status='no_endpoint' "
                     "WHERE buyer_id=? AND lane_lead_id=? AND endpoint_status='pending'",
                     (a["buyer_id"], a["lane_lead_id"]),
                 )
+                conn.commit()
                 continue
             status, body = post_to_buyer(ep, {
                 "buyer_id": a["buyer_id"],
@@ -429,8 +531,8 @@ def push_cycle(conn: sqlite3.Connection,
                 "WHERE buyer_id=? AND lane_lead_id=?",
                 (status, body[:500], a["buyer_id"], a["lane_lead_id"]),
             )
+            conn.commit()  # release WAL writer immediately
             webhooks_sent += 1
-        conn.commit()
 
     summary = {
         "ts": datetime.now(timezone.utc).isoformat(),
@@ -470,6 +572,10 @@ def main() -> int:
                          "want to rely on the systemd timer)")
     ap.add_argument("--interval", type=int, default=300,
                     help="Daemon loop interval in seconds (default 300 = 5min)")
+    ap.add_argument("--lead-limit", type=int, default=50,
+                    help="Max leads per push cycle (default 50 — keeps WAL "
+                         "writer lock windows under ~50ms so it doesn't "
+                         "starve hub_loop_standalone in-process ticks)")
     args = ap.parse_args()
 
     if not DB_PATH.exists():
@@ -483,7 +589,14 @@ def main() -> int:
     conn.execute("PRAGMA busy_timeout=30000")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.row_factory = None
-    schema_report = ensure_schema(conn)
+    try:
+        schema_report = ensure_schema(conn)
+    except sqlite3.OperationalError as e:
+        if "locked" in str(e):
+            print("schema check skipped: DB locked, continuing", file=sys.stderr)
+            schema_report = {"columns_added": [], "tables_created": [], "skipped": []}
+        else:
+            raise
     if schema_report["columns_added"] or schema_report["tables_created"]:
         print(f"schema: +{len(schema_report['columns_added'])} cols, "
               f"+{len(schema_report['tables_created'])} tables; "
@@ -494,7 +607,7 @@ def main() -> int:
         while True:
             try:
                 s = push_cycle(conn,
-                               lead_limit=args.limit,
+                               lead_limit=args.lead_limit,
                                per_buyer_cap=args.per_buyer_cap,
                                dry_run=args.dry_run,
                                post_webhook=not args.no_webhook)
@@ -506,7 +619,7 @@ def main() -> int:
             time.sleep(args.interval)
 
     s = push_cycle(conn,
-                   lead_limit=args.limit,
+                   lead_limit=args.lead_limit,
                    per_buyer_cap=args.per_buyer_cap,
                    dry_run=args.dry_run,
                    post_webhook=not args.no_webhook)

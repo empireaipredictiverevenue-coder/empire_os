@@ -52,7 +52,7 @@ def run(metro: str = None, verticals: list = None, limit: int = 40) -> Iterator[
             desc = row.get("work_description") or ""
             ptype = row.get("permit_type") or ""
             sub = row.get("permit_sub_type") or ""
-            niche = NICHE_HINTS.get(ptype) or NICHE_HINTS.get(sub) or infer_niche(desc)
+            niche = NICHE_HINTS.get(ptype) or NICHE_HINTS.get(sub) or infer_niche(desc)[0]
             yield LeadCandidate(
                 name=f"LAX Permit {pn}".strip() if pn else f"LAX Permit {addr}",
                 email="",
@@ -75,6 +75,7 @@ SOURCE = SourceInfo(
     requires=[],
     description="LA Building & Safety permits — public, free.",
     run_fn=run,
+    probe=lambda: __import__("empire_os.lead_sources.models", fromlist=["http_probe"]).http_probe(ENDPOINT, {"$limit": "1"}),
 )
 
 

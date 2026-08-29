@@ -85,6 +85,7 @@ CATEGORIES = {
             "residential_roofing": "Residential Roofing",
             "commercial_roofing": "Commercial Roofing",
             "roof_repair": "Roof Repair & Leak Services",
+            "general_contractor": "General Contractor / Remodeling",
         },
     },
     "restoration": {
@@ -129,6 +130,14 @@ CATEGORIES = {
             "investing": "Investment & Wealth Management",
             "debt_relief": "Debt Relief & Settlement",
             "tax_prep": "Tax Preparation & Planning",
+        },
+    },
+    "logistics": {
+        "label": "Logistics & Freight",
+        "subs": {
+            "logistics": "Courier Depots & Last-Mile Logistics",
+            "freight": "Freight Brokerage & Forwarding",
+            "trucking": "Trucking & Fleet Operations",
         },
     },
     "technology": {

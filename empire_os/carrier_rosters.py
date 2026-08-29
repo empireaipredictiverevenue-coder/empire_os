@@ -38,8 +38,12 @@ def log(level, msg, **kw):
         print(json.dumps(e), flush=True)
 
 def _ensure_tables():
-    """Create carrier_rosters if missing."""
-    conn = sqlite3.connect(DB)
+    """Create carrier_rosters if missing. Recreate if schema is stale."""
+    conn = sqlite3.connect(DB, timeout=30)
+    cur = conn.execute("PRAGMA table_info(carrier_rosters)")
+    cols = {r[1] for r in cur.fetchall()}
+    if "company_name" not in cols:
+        conn.execute("DROP TABLE IF EXISTS carrier_rosters")
     conn.execute("CREATE TABLE IF NOT EXISTS carrier_rosters ("
                  "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                  "carrier TEXT NOT NULL,"
@@ -58,37 +62,48 @@ def _ensure_tables():
     conn.close()
 
 def _scrape_generic(carrier_slug: str, url: str) -> list[dict]:
-    """Generic scrape with retry + basic HTML parse.
-    
-    Most carrier directories require JS rendering, so this is a best-effort
-    scrape that returns what we can get. When blocked, returns empty list
-    with a log entry documenting the need for headless browser.
+    """JS-rendered carrier directory — use headless browser to bypass block.
+
+    Renders the page, extracts contractor/business listing cards, returns
+    structured rows. Falls back to request+snippet if browser unavailable.
     """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                      "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-    }
-    for attempt in range(3):
-        try:
-            r = requests.get(url, headers=headers, timeout=15)
-            if r.status_code == 200:
-                log("INFO", "scrape_ok", carrier=carrier_slug, url=url, size=len(r.text))
-                # Basic: extract business-like patterns from text
-                # Most carriers require JS, so this is a stub that returns
-                # the raw text for now — real parsing needs Playwright
-                return [{"carrier": carrier_slug, "raw_snippet": r.text[:500],
-                         "needs_js": True, "note": "JS-rendered directory, deferred to headless"}]
-            elif r.status_code in (403, 404, 503):
-                log("WARN", f"blocked_{r.status_code}", carrier=carrier_slug, url=url)
-                return []
-            time.sleep(1 * (attempt + 1))
-        except requests.RequestException as e:
-            log("WARN", "request_fail", carrier=carrier_slug, attempt=attempt, err=str(e)[:100])
-            time.sleep(2 * (attempt + 1))
-    log("ERROR", "scrape_failed_after_retries", carrier=carrier_slug, url=url)
-    return []
+    try:
+        from empire_os.browser_tool import get_tool
+        from bs4 import BeautifulSoup
+        import re
+        tool = get_tool()
+        html = tool.get_html(url, wait="networkidle", extra_sleep=3)
+        if not html or html.startswith("<error>"):
+            log("WARN", "browser_fail", carrier=carrier_slug, err=html[:80])
+            return []
+        soup = BeautifulSoup(html, "html.parser")
+        rows = []
+        # Generic contractor card selectors across carrier directories
+        cards = soup.select("div.result, div.listing, article.business, li.biz-item, div.provider-card")
+        if not cards:
+            # Fallback: link-style business entries
+            cards = soup.select("a[href*='contractor'], a[href*='pro'], a[href*='biz']")
+        for c in cards[:40]:
+            name = (c.get_text(" ", strip=True) or "")[:120]
+            if len(name) < 3:
+                continue
+            phone = ""
+            m = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', c.get_text())
+            if m: phone = m.group(0)
+            web = c.get("href", "")
+            rows.append({
+                "carrier": carrier_slug,
+                "company_name": name,
+                "phone": phone,
+                "website": web,
+                "source_url": url,
+                "needs_js": False,
+            })
+        log("INFO", "browser_scrape", carrier=carrier_slug, cards=len(rows))
+        return rows
+    except Exception as e:
+        log("ERROR", "browser_scrape_err", carrier=carrier_slug, err=str(e)[:150])
+        return []
 
 def scrape_statefarm() -> list[dict]:
     """Scrape State Farm contractor directory."""
@@ -140,7 +155,7 @@ def run_all(store: bool = True) -> dict[str, dict]:
 
 def _store_entries(carrier_slug: str, entries: list[dict]) -> int:
     """Store scraped entries in carrier_rosters table."""
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(DB, timeout=30)
     inserted = 0
     now = datetime.now(timezone.utc).isoformat()
     url = CARRIERS.get(carrier_slug, ("", ""))[1]
@@ -165,7 +180,7 @@ def _store_entries(carrier_slug: str, entries: list[dict]) -> int:
 
 def list_rosters(carrier: Optional[str] = None, limit: int = 100) -> list[dict]:
     """Query carrier_rosters table."""
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(DB, timeout=30)
     if carrier:
         rows = conn.execute(
             "SELECT id, carrier, company_name, license_no, city, state, "
@@ -182,7 +197,7 @@ def list_rosters(carrier: Optional[str] = None, limit: int = 100) -> list[dict]:
 
 def roster_stats() -> list[dict]:
     """Counts by carrier."""
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(DB, timeout=30)
     rows = conn.execute(
         "SELECT carrier, COUNT(*) FROM carrier_rosters GROUP BY carrier ORDER BY carrier").fetchall()
     conn.close()

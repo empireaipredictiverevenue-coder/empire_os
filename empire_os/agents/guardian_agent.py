@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, "/root/empire_os")
 
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 DB_PATH = os.environ.get("DB_PATH", "/root/empire_os/empire_os.db")
 FB_DIR = Path("/root/feedback")
 GUARDIAN_LOG = FB_DIR / "guardian.jsonl"

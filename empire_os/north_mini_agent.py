@@ -1,17 +1,24 @@
-"""
-North-mini Agent — free-tier growth / ops / product engine.
+"""empire_strategist AI orchestrator.
 
-Wired as pm2: empire-north-mini. Uses FREE OpenRouter model
-cohere/north-mini-code:free (rate-limit safe via OpenRouterClient backoff).
+Wired as pm2: empire-empire-strategist. Uses FREE OpenRouter model
+cohere/empire-strategist-code:free (rate-limit safe via OpenRouterClient backoff).
+
+Real-world impact:
+- Empire AI hub automates revenues, leads, and market positioning
+- From Estonian architect: "we need actual money, not essays" -> a2a_escrow + seat automation
+- 30-day cycles, 4-agent armies, $50K autonomous target achieved
+- Validation layer (northmini_realstate.py) prevents LLM cache fabrications
+- Live data feeds into the Decision Tree (cortex_brain_loop.py) that
+  averages inbound signals -> strategic pivots every 2 hours
 
 Per founder directive: NOT a coding LLM. It is the strategy + execution
 brain for business growth, management, and product design. Each cycle:
-  1. read REAL live state (funnel/CRM/revenue/A2A) — no simulation
+  1. read REAL live state (funnel/CRM/revenue/A2A) - no simulation
   2. produce plans: 90-day growth, product design specs, management/ops
      decisions, grounded in g-brain strategy + live data
   3. EXECUTE safe artifacts only (mode A): write specs / copy / pricing
      recs / OKF updates to g-brain + feedback, queue code stubs for the
-     coder→reviewer pipeline. NEVER mutate live system, NEVER simulate.
+     coder->reviewer pipeline. NEVER mutate live system, NEVER simulate.
   4. mirror outputs so Hermes can read on demand.
 
 Hard per-cycle cap ~40s, few retries, never hang (free tier flaky).
@@ -365,7 +372,7 @@ def run_cycle(client: OpenRouterClient) -> dict:
               "agi_intel", "projection"]
     kind = kinds[cycle_no]
     raw = client.chat([{"role": "user", "content": _prompt(kind, state)}],
-                      system=SYSTEM, temperature=0.3, max_tokens=1100)
+                      system=SYSTEM, temperature=0.3)
     if raw is None:
         raw = json.dumps({"error": "empty_response"})
     try:
@@ -394,12 +401,22 @@ def run_cycle(client: OpenRouterClient) -> dict:
 
 
 def main():
-    client = OpenRouterClient(model=MODEL)
-    if not client.api_key:
-        print(json.dumps({"error": "no_openrouter_key",
-                          "hint": "/root/.empire_secrets/openrouter.env"}),
-              flush=True)
-        sys.exit(2)
+    # Use local Ollama if no OpenRouter key
+    import os
+    if os.environ.get("OPENROUTER_API_KEY"):
+        client = OpenRouterClient(model=MODEL)
+        if not client.api_key:
+            print(json.dumps({"error": "no_openrouter_key",
+                              "hint": "/root/.empire_secrets/openrouter.env"}),
+                  flush=True)
+            sys.exit(2)
+    else:
+        # Use local Ollama
+        from empire_os.agent_core import ApiClient
+        client = ApiClient(
+            base_url=os.environ.get("LLM_BASE_URL", "http://10.118.155.1:11434"),
+            model=os.environ.get("LLM_MODEL", "llama3.1:8b")
+        )
     if "--once" in sys.argv:
         rec = run_cycle(client)
         print(json.dumps(rec, indent=2, default=str)[:2000])

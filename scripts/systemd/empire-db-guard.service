@@ -1,0 +1,6 @@
+[Unit]
+Description=Empire OS DB integrity guard
+
+[Service]
+Type=oneshot
+ExecStart=/root/venv/bin/python3 /root/empire_os/scripts/db_integrity_guard.py

@@ -85,15 +85,16 @@ NICHE_SOURCES = {
 
 def _ingest_one(c: sqlite3.Connection, lc, niche: str, source_tag: str) -> int:
     """Insert a LeadCandidate into si_buyer_outreach. Returns 1 if inserted, 0 if duplicate."""
-    if not lc or not lc.name:
+    if not lc or not getattr(lc, "name", None):
         return 0
     try:
-        name = lc.name[:120]
-        email = (lc.email or "")[:200]
-        metro = lc.metro or ""
-        state = lc.state or ""
-        details = lc.details or ""
-        contact = lc.url or ""
+        name = getattr(lc, "name", "")[:120]
+        email = getattr(lc, "email", "") or ""
+        email = email[:200]
+        metro = getattr(lc, "metro", "") or ""
+        state = getattr(lc, "state", "") or ""
+        details = getattr(lc, "details", "") or ""
+        contact = getattr(lc, "url", "") or ""
         if not metro and state:
             metro = state  # fall back so the funnel can route
         # dedupe on (name, source)

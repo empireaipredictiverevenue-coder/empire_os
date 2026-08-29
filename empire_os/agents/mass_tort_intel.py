@@ -31,7 +31,7 @@ sys.path.insert(0, "/root/empire_os")
 sys.path.insert(0, "/root/empire_os/empire_os")
 import requests
 
-HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 DB = "/root/empire_os/empire_os.db"
 # Use a path the in-container user owns; host bind-mount at /root/feedback
 # is uid 1000000 and refuses writes from this process.

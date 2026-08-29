@@ -1,0 +1,10 @@
+[Unit]
+Description=Empire OS disk watchdog timer (every 30 min)
+
+[Timer]
+OnBootSec=2min
+OnCalendar=*:0/30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -264,21 +264,21 @@ def subs_stats(backend) -> dict[str, Any]:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# Vault Stats (live on-chain USDC balance)
+# Vault Stats (live on-chain USDT balance)
 # ══════════════════════════════════════════════════════════════════════
 
 
 def vault_stats(backend) -> dict[str, Any]:
-    """Vault USDC + lifetime settled (for landing-page hero KPIs).
+    """Vault USDT + lifetime settled (for landing-page hero KPIs).
 
     Combines the live RPC vault balance with lifetime settled total from
     si_settlements + si_charges. Returns in BOTH raw cents/usdc and the
     compact numeric fields used by the front-end formatter.
     """
     import os
-    rpc = os.environ.get("SOLANA_RPC_URL", "")
-    vault = os.environ.get("SOLANA_VAULT_WALLET", "")
-    usdc_mint = os.environ.get("USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+    rpc = os.environ.get("BSC_RPC", "")
+    vault = os.environ.get("BSC_WALLET_ADDRESS", "")
+    usdc_mint = os.environ.get("BSC_USDT_CONTRACT", "0x55d398326f99059fF775485246999027B3197955")
 
     # Live RPC balance (best-effort, short timeout)
     live_usdc = 0.0
@@ -297,7 +297,7 @@ def vault_stats(backend) -> dict[str, Any]:
             with urlopen(req, timeout=4) as resp:
                 data = _json.loads(resp.read())
             sol_lamports = data.get("result", {}).get("value", 0)
-            # SOL balance; USDC needs getTokenAccountsByOwner (out of scope here)
+            # SOL balance; USDT needs getTokenAccountsByOwner (out of scope here)
             live_sol = sol_lamports / 1e9
         except Exception as e:
             live_sol = 0.0
@@ -305,7 +305,7 @@ def vault_stats(backend) -> dict[str, Any]:
     else:
         live_sol = 0.0
 
-    # Lifetime settled: sum of paid charges (real USDC that flowed)
+    # Lifetime settled: sum of paid charges (real USDT that flowed)
     settled_row = dict(backend.execute(
         "SELECT COALESCE(SUM(amount_cents), 0) AS total "
         "FROM si_settlements"

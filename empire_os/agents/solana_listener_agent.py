@@ -27,7 +27,7 @@ from empire_os.agents.settlement_gateway import process_settlement
 
 # Load .env (same pattern as charge.py) so HUB_URL + keys resolve from
 # /root/empire_os/.env at startup. Without this, pm2-launched processes
-# fall back to the hardcoded dead default (127.0.0.1:8081) and the
+# fall back to the hardcoded dead default (127.0.0.1:8080) and the
 # /v1/finance/replay call silently times out -> USDC never settles.
 for _ln in (Path("/root/empire_os/.env").read_text(encoding="utf-8").splitlines()
             if Path("/root/empire_os/.env").exists() else ()):
@@ -42,7 +42,7 @@ for _ln in (Path("/root/empire_os/.env").read_text(encoding="utf-8").splitlines(
 _session = requests.Session()
 _session.trust_env = False
 
-HUB   = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB   = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 FB    = Path("/root/empire_os/logs")
 LOG   = FB / "solana_listener.jsonl"
 SEEN  = FB / "solana_seen.jsonl"   # persistent seen cache

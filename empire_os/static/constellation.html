@@ -159,7 +159,7 @@
     <div class="pill cyan"><div class="n" id="mrr">$9.2M</div><div class="l">Annual Recurring Revenue</div></div>
     <div class="pill violet"><div class="n" id="subs">15,647</div><div class="l">Active Subscriptions</div></div>
     <div class="pill gold"><div class="n" id="leads">485K</div><div class="l">Scored Leads</div></div>
-    <div class="pill green"><div class="n" id="vault">$16.2M</div><div class="l">Vault USDC (lifetime)</div></div>
+    <div class="pill green"><div class="n" id="vault">$16.2M</div><div class="l">Vault USDT (lifetime)</div></div>
   </div>
 
   <div class="actions">
@@ -275,7 +275,7 @@
       <h4>SILVER</h4>
       <div class="big">$599</div>
       <div class="per">/ month</div>
-      <ul><li>1 seat</li><li>$49 per lead</li><li>Priority routing</li><li>Storm alerts</li><li>USDC settlement</li></ul>
+      <ul><li>1 seat</li><li>$49 per lead</li><li>Priority routing</li><li>Storm alerts</li><li>USDT settlement</li></ul>
     </div>
     <div class="tier">
       <h4>GOLD</h4>
@@ -303,20 +303,20 @@
   <div class="section-title">
     <div class="kicker">✦ THE LOOP</div>
     <h2>Constellation Flow</h2>
-    <p>Four nodes. One closed loop. USDC settles the edges.</p>
+    <p>Four nodes. One closed loop. USDT settles the edges.</p>
   </div>
   <div class="grid3" style="max-width:900px;margin:0 auto">
     <div class="pcard"><div class="icon">1</div><h3>Discover</h3><p>Satellite + crawler + AI scan. 480K+ leads graded by omega score.</p></div>
     <div class="pcard"><div class="icon">2</div><h3>Match</h3><p>30K buyers priced by niche + metro. Lane-based delivery corridors.</p></div>
     <div class="pcard"><div class="icon">3</div><h3>Deliver</h3><p>Webhook + email. HMAC signed. Pay-per-lead billed on confirmation.</p></div>
-    <div class="pcard"><div class="icon">4</div><h3>Settle</h3><p>USDC on Solana. Auto-reconciled. Vault tracked. Real money moves.</p></div>
+    <div class="pcard"><div class="icon">4</div><h3>Settle</h3><p>USDT on BSC. Auto-reconciled. Vault tracked. Real money moves.</p></div>
   </div>
 </section>
 
 <!-- ====== CTA ====== -->
 <div class="ctaband" id="apply">
   <h2>Join the Empire</h2>
-  <p>Pick a tier, pay in USDC, start receiving leads within 60 seconds.</p>
+  <p>Pick a tier, pay in USDT, start receiving leads within 60 seconds.</p>
   <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
     <a href="#" onclick="applyBuyer(event)" class="btn btn-primary">Apply as Buyer</a>
     <a href="/v1/buyers/register" class="btn btn-ghost">API Reference</a>
@@ -332,7 +332,7 @@
     <a href="/v1/crawler/stats">Crawler Stats</a>
     <a href="https://github.com/empireaipredictiverevenue-coder/empire_os">GitHub</a>
   </div>
-  <div>Empire OS v3 · Solana Mainnet · USDC settlement · <span id="uptime">99.97%</span> uptime</div>
+  <div>Empire OS v3 · BSC Mainnet · USDT settlement · <span id="uptime">99.97%</span> uptime</div>
 </footer>
 
 <script>
@@ -461,7 +461,7 @@ function applyBuyer(e){
     body:JSON.stringify({name:email.split('@')[0], niche, tier, email, webhook_url:webhook})
   }).then(r=>r.json()).then(d=>{
     if(d.subscription_id){
-      alert('Applied!\n\nSub: '+d.subscription_id+'\nAmount due: '+(d.amount_usdc_due||0)+' USDC\nPay to: '+d.pay_to_wallet+'\n\nLeads flow on confirmation.');
+      alert('Applied!\n\nSub: '+d.subscription_id+'\nAmount due: '+(d.amount_usdc_due||0)+' USDT\nPay to: '+d.pay_to_wallet+'\n\nLeads flow on confirmation.');
     } else {
       alert('Error: '+JSON.stringify(d));
     }

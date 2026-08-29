@@ -5,15 +5,15 @@
 [Unit]
 Description=Empire OS Supervisor Daemon - Monitors and Restarts Agents
 After=network.target
-StartLimitBurst=3
-StartLimitInterval=60
+StartLimitBurst=10
+StartLimitInterval=300
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/root/empire_os
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/root/empire_os/venv/bin/python3 /root/empire_os/empire_os/agents/supervisor.py
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/supervisor.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

@@ -11,11 +11,11 @@ I run Empire OS - a B2B lead marketplace matching local service businesses with 
 WHAT WE DELIVER
 * Verified buyer leads in your metro
 * Real contact info (name, phone, intent)
-* USDC payment - no card processing, no chargebacks
+* USDT payment - no card processing, no chargebacks
 * Pause anytime, no contracts
 
 THE MATH
-- Cost per lead: $10 USDC
+- Cost per lead: $10 USDT
 - Typical close rate: 1 in 5
 - Avg deal size: $500-$5,000
 - ROI per $10 spent: $50-$500
@@ -29,7 +29,7 @@ solana:egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM?amount=10&spl-token=EPjFWdd5A
 
 First 5 buyers in {city} get $5/lead for life.
 
-NO CARD * USDC INSTANT SETTLEMENT * NO CHARGEBACKS
+NO CARD * USDT INSTANT SETTLEMENT * NO CHARGEBACKS
 
 Phillip Livesley
 Empire OS, founder

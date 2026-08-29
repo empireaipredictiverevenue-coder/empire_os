@@ -1,0 +1,24 @@
+[Unit]
+Description=Empire OS Whale Harvester - High-Value Prospect Harvesting
+After=network.target
+StartLimitBurst=3
+StartLimitInterval=60
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/empire_os
+Environment=PYTHONUNBUFFERED=1
+Environment=INTERVAL_SEC=21600
+Environment=HN_TOP_N=60
+Environment=HN_ASK_N=20
+Environment=HN_SHOW_N=20
+Environment=EMPIRE_DB=/root/empire_os/empire_os.db
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/agents/whale_harvester.py
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

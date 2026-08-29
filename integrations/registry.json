@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-07-30",
+  "integrations": {
+    "ruview": {
+      "name": "Empire RuView",
+      "skill_path": "/root/empire_os/integrations/empire-ruview/SKILL.md",
+      "upstream_repo": "https://github.com/ruvnet/RuView",
+      "local_clone": "/root/empire_os/integrations/RuView",
+      "category": "iot",
+      "status": "cloned",
+      "build_status": "needs_rust_build",
+      "hub_endpoint_proposed": "/v1/ruview/sense",
+      "estimated_revenue_verticals": [
+        "elder_care_facility",
+        "office_iot_monitoring",
+        "hotel_chain_iot",
+        "insurance_underwriting"
+      ],
+      "currency_usdc_per_seat": [599, 999, 2399]
+    },
+    "openship": {
+      "name": "Empire OpenShip",
+      "skill_path": "/root/empire_os/integrations/empire-openship/SKILL.md",
+      "upstream_repo": "https://github.com/openshiporg/openship",
+      "local_clone": "/root/empire_os/integrations/openship",
+      "category": "fulfillment",
+      "status": "cloned",
+      "build_status": "needs_npm_build",
+      "hub_endpoint_proposed": "/v1/openship/connect_shop",
+      "estimated_revenue_verticals": [
+        "shopify_merchant",
+        "amazon_seller",
+        "woocommerce_store",
+        "3pl_fulfillment"
+      ],
+      "currency_usdc_per_seat": [299, 499, 1999]
+    },
+    "adhd": {
+      "name": "Empire ADHD",
+      "skill_path": "/root/empire_os/integrations/empire-adhd/SKILL.md",
+      "upstream_repo": "https://github.com/UditAkhourii/adhd",
+      "local_clone": "/root/empire_os/integrations/adhd",
+      "category": "agent_reasoning",
+      "status": "cloned",
+      "build_status": "needs_npm_build",
+      "hub_endpoint_proposed": "/v1/adhd/ideate",
+      "cognitive_frames": [
+        "regulator",
+        "biology",
+        "speedrunner",
+        "10-year-old",
+        "0-budget"
+      ],
+      "cost_per_invocation_llm_calls": 10,
+      "best_for": [
+        "design_decisions",
+        "architecture",
+        "naming",
+        "api_surface_design",
+        "fuzzy_debugging"
+      ]
+    }
+  },
+  "totals": {
+    "cloned": 3,
+    "estimated_total_seats": 1500,
+    "estimated_total_mrr_usdc": 1100000
+  }
+}

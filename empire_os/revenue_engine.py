@@ -57,7 +57,7 @@ def snapshot() -> dict:
             d = json.loads(r.read())
             rpc = d.get("checks", {}).get("chain", {}).get("rpc", {})
             s["vault"] = {
-                "balance_usdc": rpc.get("vault_balance_usdc", 0),
+                "balance_usdc": rpc.get("vault_balance_usdc", rpc.get("vault_balance_usdt", 0)),
                 "token_accounts": rpc.get("token_accounts", 0),
             }
     except Exception as e:
@@ -231,20 +231,20 @@ def awaiting_subs_outreach(batch: int = 10, dry_run: bool = False) -> dict:
                 continue
             # Build a pay_url directly — skip the create_quote signing flow for speed
             # (awaiting subs already have known price; just email them the price + memo)
-            vault = os.getenv("SOLANA_VAULT_WALLET", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+            vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
             amount = (rd.get("price_cents") or 0) / 100.0
             if amount <= 0:
                 amount = 599.0  # silver default
             sub_id = rd.get("sub_id", "")
             memo = f"sub:{sub_id}"
-            pay_url = f"solana:{vault}?amount={amount:.2f}&label=Empire%20OS&memo={memo}"
+            pay_url = f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb?amount={amount:.2f}&label=Empire%20OS&memo={memo}"
 
-            subject = f"Complete your Empire OS subscription — ${amount:.0f} USDC"
+            subject = f"Complete your Empire OS subscription — ${amount:.0f} USDT"
             body = (
                 f"Hi,\n\n"
                 f"You started an Empire OS subscription but didn't complete payment.\n\n"
                 f"  Plan: {rd.get('plan','silver')}\n"
-                f"  Amount: ${amount:.2f} USDC\n"
+                f"  Amount: ${amount:.2f} USDT\n"
                 f"  Subscription: {sub_id}\n\n"
                 f"Complete payment here:\n{pay_url}\n\n"
                 f"After payment, your seat activates immediately and leads start flowing.\n\n"

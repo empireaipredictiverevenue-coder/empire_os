@@ -40,11 +40,15 @@ POST /v1/leads/direct-intake
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import subprocess
 import sys
 from datetime import datetime, timezone
 from typing import Optional
+
+# placeholder domains that never resolve to a human inbox
+_BAD_EMAIL_DOMAINS = {'v.co', 'example.com', 'buyer.com', 'guerrillamail.org', 'mailinator.com', 'tempmail.org'}
 
 HUB_CONTAINER = "empire-hub"
 DB_PATH = "/root/empire_os/empire_os.db"
@@ -57,6 +61,12 @@ def _hub_exec_write_lead(payload: dict) -> dict:
     metro = payload.get("metro", "").strip().upper()
     if not niche or not metro:
         return {"error": "niche and metro required", "ok": False}
+
+    # REJECT placeholder emails — they never reach a human inbox
+    email = payload.get("email", "") or ""
+    email_low = email.lower()
+    if any(d in email_low for d in _BAD_EMAIL_DOMAINS):
+        return {"error": f"placeholder email rejected: {email}", "ok": False}
 
     score = int(payload.get("lead_score", 50))
     score = max(0, min(100, score))

@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0a0a0a;
+  --color-card: #12121a;
+  --color-border: #2a2a3e;
+  --color-text: #e8e8e8;
+  --color-muted: #9a9a9a;
+  --color-accent: #00d4aa;
+  --color-accent-hover: #00b894;
+  --color-badge-bg: #1a1a2e;
+  --color-badge-border: #3a3a5e;
+  --color-badge-text: #8b9fff;
+  --color-result-bg: #0a1a12;
+  --color-result-border: #00d4aa;
+  --color-error-bg: #2a0a0a;
+  --color-error-border: #5a1a1a;
+  --color-error-text: #ff6b6b;
+}
+
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--color-bg); color: var(--color-text); min-height: 100vh; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.3s ease-out; }

@@ -1,0 +1,18 @@
+[Unit]
+Description=Empire OS Settlement Gateway — USDC vault watcher (60s)
+Documentation=https://hermes-agent.nousresearch.com/docs
+After=network-online.target empire-hub-8081.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/empire_os
+Environment=PYTHONPATH=/root/empire_os:/root/empire_os/empire_os
+EnvironmentFile=/root/empire_os/.env
+ExecStart=/root/empire_os/scripts/settlement_gateway_run.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empire-settlement-gateway
+TimeoutStartSec=120
+TimeoutStopSec=15

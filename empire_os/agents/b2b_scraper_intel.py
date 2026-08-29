@@ -26,7 +26,7 @@ sys.path.insert(0, "/root/empire_os")
 sys.path.insert(0, "/root/empire_os/empire_os")
 import requests
 
-HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 # Write to in-container path; host bind-mount at /root/feedback is uid 1000000.
 FB = Path("/root/empire_os/logs/b2b_intel")
 LOG = FB / "cycle.jsonl"

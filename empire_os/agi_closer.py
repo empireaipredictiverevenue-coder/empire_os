@@ -112,7 +112,10 @@ class AgiCloserAgent(Agent):
         }
 
     def reason(self, state: dict) -> str:
-        """LLM decides which prospect to advance in the closing pipeline."""
+        """Decide which prospect to advance. LLM if available, else rule-based."""
+        if self.llm is None:
+            return json.dumps(self._rule_based_decision(state))
+
         prompt = f"""Closing pipeline status:
 - Outreach sent (awaiting reply): {state['sent_count']}
 - Replied (ready to claim): {state['replied_count']}
@@ -123,20 +126,37 @@ Prospects (up to 15):
 {json.dumps(state['snapshots_preview'], indent=2)}
 
 Decide one action:
-1. "claim" — a REPLIED prospect is interested; advance to CLAIMED
-2. "settle" — a CLAIMED prospect has committed; advance to SETTLED
-3. "follow_up" — an OUTREACH_SENT prospect is going cold; generate follow-up
-4. "skip" — pipeline is healthy, no action needed
+1. "claim" - a REPLIED prospect is interested; advance to CLAIMED
+2. "settle" - a CLAIMED prospect has committed; advance to SETTLED
+3. "follow_up" - an OUTREACH_SENT prospect is going cold
+4. "skip" - pipeline healthy
 
-Output JSON: {{"action": "...", "prospect_id": "...", "reasoning": "..."}}
-If action is "settle", also include "amount_cents" (a realistic home-services deal: 50000-500000).
-If action is "follow_up", also include "angle"."""
+Output JSON: {{"action": "...", "prospect_id": "...", "reasoning": "..."}}"""
 
         return json.dumps(self.llm.structured_chat(
             messages=[{"role": "user", "content": prompt}],
             system=CLOSER_SYSTEM_PROMPT,
             temperature=0.3,
         ))
+
+    def _rule_based_decision(self, state: dict) -> dict:
+        """Deterministic closer: oldest REPLIED -> claim, oldest CLAIMED -> settle."""
+        for s in state.get("snapshots_preview", []):
+            if s.get("current_state") == "replied":
+                return {
+                    "action": "claim",
+                    "prospect_id": s.get("prospect_id", ""),
+                    "reasoning": "rule-based: oldest replied promoted to claim",
+                }
+        for s in state.get("snapshots_preview", []):
+            if s.get("current_state") == "claimed":
+                return {
+                    "action": "settle",
+                    "prospect_id": s.get("prospect_id", ""),
+                    "amount_cents": 150000,
+                    "reasoning": "rule-based: oldest claimed promoted to settle ($1,500)",
+                }
+        return {"action": "skip", "reasoning": "rule-based: pipeline idle"}
 
     def act(self, decision: str) -> dict:
         """Execute the closer's decision."""

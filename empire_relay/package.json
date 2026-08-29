@@ -1,0 +1,25 @@
+{
+  "name": "empire-relay",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Empire AI — Multi-strategy marketing agent with closed-loop learning",
+  "main": "src/orchestrator.js",
+  "scripts": {
+    "start": "node src/orchestrator.js",
+    "relay": "node src/routes/relay-server.js",
+    "ingestor": "node src/workers/lead-ingestor.js",
+    "gauntlet": "node src/workers/gauntlet-loop.js",
+    "learn": "node src/workders/learning-engine.js",
+    "dev": "node --watch src/orchestrator.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "ioredis": "^6.0.0",
+    "node-fetch": "^3.3.2",
+    "pg": "^8.23.0",
+    "resend": "^6.18.1"
+  }
+}

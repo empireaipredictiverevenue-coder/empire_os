@@ -1,0 +1,29 @@
+flowchart TD
+    A[Lead Enriched + Scored] --> B{Omega Tier}
+    B -->|BRONZE/SILVER| C[Campaign A: Value-First]
+    B -->|GOLD| D[Campaign B: Enterprise]
+    
+    C --> C1[Day 0: Audit + Portal Link]
+    C1 --> C2[Day 3: Case Study + $10 Trial]
+    C2 --> C3[Day 7: Objection Handling]
+    C3 --> C4[Day 14: Final Notice]
+    C4 --> C5{Trial Converted?}
+    C5 -->|Yes| C6[USDT Payment $10]
+    C5 -->|No| C7[Nurture List]
+    C6 --> C8[Done-for-You Implementation]
+    
+    D --> D1[Executive Brief]
+    D1 --> D2[Demo Call]
+    D2 --> D3[Pilot Agreement]
+    D3 --> D4[Contract $5K+/mo]
+    
+    C6 --> E[BSC USDT Listener]
+    D4 --> E
+    E --> F[si_invoice Paid]
+    F --> G[Payout]
+    G --> H[MRR +2189]
+    
+    style C fill:#00BFFF,color:#0a0a12
+    style D fill:#0D47A1,color:#fff
+    style E fill:#39FF14,color:#0a0a12
+    style H fill:#FFD700,color:#0a0a12

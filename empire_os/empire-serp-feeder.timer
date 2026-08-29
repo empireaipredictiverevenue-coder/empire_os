@@ -1,0 +1,9 @@
+[Unit]
+Description=Empire OS weekly SERP lane feeder sweep
+
+[Timer]
+OnCalendar=Mon *-*-* 06:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -41,7 +41,7 @@ HUB_CONTAINER = "empire-hub"
 DB_PATH = "/root/empire_os/empire_os.db"
 
 LOG_PATH = Path("/root/feedback/lead_deliveries.jsonl")
-HUB = os.environ.get("HUB_URL", "http://localhost:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 POLL_INTERVAL = 30  # seconds
@@ -91,6 +91,100 @@ STORM_BUYER_NICHES = ("roofing", "roofing restoration", "restoration",
 # Keywords that flag a storm lead as a billable disaster event (flood/water).
 _DISASTER_KEYWORDS = ("flood", "water", "storm", "tornado", "hurricane",
                       "hail", "wind", "fire")
+
+# Metro aliases — many outreach/subscription rows carry long-form metro
+# names ("New York City", "Dallas-Fort Worth") while lanes use IATA codes
+# ("NYC", "DFW"). Normalize both sides before filtering so a NYC lane lead
+# actually matches a NYC outreach buyer. Keys are the canonical (lanes-style)
+# IATA codes used everywhere downstream; values are the long-form aliases
+# we accept.
+METRO_ALIASES = {
+    "NYC": ("nyc", "new york", "new york city", "ny", "manhattan", "brooklyn",
+            "queens", "bronx", "staten island", "long island"),
+    "LAX": ("lax", "los angeles", "la", "san fernando", "hollywood",
+            "long beach", "pasadena", "santa monica", "beverly hills"),
+    "CHI": ("chi", "chicago", "chi-town"),
+    "DFW": ("dfw", "dallas", "fort worth", "dallas-fort worth", "ft worth"),
+    "HOU": ("hou", "houston"),
+    "WDC": ("wdc", "washington dc", "washington", "dc", "arlington",
+            "alexandria", "bethesda"),
+    "PHL": ("phl", "philadelphia", "philly"),
+    "ATL": ("atl", "atlanta"),
+    "MIA": ("mia", "miami", "fort lauderdale", "south florida"),
+    "BOS": ("bos", "boston"),
+    "SFO": ("sfo", "san francisco", "bay area", "sf", "oakland",
+            "san jose", "silicon valley"),
+    "SEA": ("sea", "seattle"),
+    "PHX": ("phx", "phoenix"),
+    "DEN": ("den", "denver"),
+    "LAS": ("las", "las vegas", "vegas"),
+    "SAN": ("san", "san diego"),
+    "PDX": ("pdx", "portland"),
+    "MSP": ("msp", "minneapolis", "saint paul", "twin cities"),
+    "DTW": ("dtw", "detroit"),
+    "CLT": ("clt", "charlotte"),
+    "AUS": ("aus", "austin"),
+    "TPA": ("tpa", "tampa"),
+    "ORL": ("orl", "orlando"),
+    "PIT": ("pit", "pittsburgh"),
+    "STL": ("stl", "st louis", "saint louis"),
+    "IND": ("ind", "indianapolis"),
+    "CMH": ("cmh", "columbus"),
+    "BNA": ("bna", "nashville"),
+    "MCI": ("mci", "kansas city"),
+    "SLC": ("slc", "salt lake city"),
+}
+
+
+def normalize_metro(metro: str) -> str:
+    """Map an arbitrary metro string (IATA, city name, or alias) to the
+    canonical IATA code used by lanes. Returns '' if no match."""
+    if not metro:
+        return ""
+    s = str(metro).strip().lower()
+    # exact IATA hit
+    if s.upper() in METRO_ALIASES:
+        return s.upper()
+    # alias reverse lookup
+    for canonical, aliases in METRO_ALIASES.items():
+        if s == canonical.lower():
+            return canonical
+        for a in aliases:
+            if s == a or a in s or s in a:
+                return canonical
+    return ""
+
+
+def _niche_matches(buyer_niches: list[str], lead_niche: str) -> bool:
+    """True if lead_niche (lower-cased) is in buyer_niches list."""
+    if not lead_niche:
+        return True  # missing niche → don't over-filter
+    ln = lead_niche.strip().lower()
+    return any(ln == (n or "").strip().lower() for n in buyer_niches if n)
+
+
+def _metro_matches(buyer_metros: list[str], lead_metro: str) -> bool:
+    """True if lead_metro (after alias normalization) matches any of the
+    buyer's metros (also alias-normalized). Empty buyer_metros means the
+    buyer hasn't declared metros → treat as wildcard match (preserves
+    legacy behavior)."""
+    if not buyer_metros:
+        return True  # wildcard — preserve outreach rows with empty metros
+    lead_norm = normalize_metro(lead_metro)
+    if not lead_norm:
+        return True  # missing/unknown lead metro → don't over-filter
+    for bm in buyer_metros:
+        bmn = normalize_metro(bm)
+        if not bmn:
+            continue
+        if bmn == lead_norm:
+            return True
+    return False
+
+
+# Maximum buyers returned per (niche, metro) pair. Cap prevents a single
+# storm lead from being fanned out to hundreds of outreach buyers.
+MAX_BUYERS_PER_NICHE_METRO = 5
 
 
 def _local_db_sql(query: str, params: tuple | list | None = None) -> list:
@@ -463,44 +557,101 @@ def render_lead_delivered_email(lead: dict, buyer: dict) -> tuple[str, str, str]
     return subject, "", body_text
 
 
-def find_matching_buyers(lead: dict = None) -> list:
+def find_matching_buyers(lead: dict = None, niche: str = "", metro: str = "") -> list:
     """Find active buyers (and their subscriptions) for lead delivery.
 
-    For now: returns ALL active lane-subscription buyers + buyer_outreach buyers,
-    regardless of niche/metro. Once a si_lane_subscription table exists, this will
-    filter by matching niche+metro.
+    Filters by niche + metro when both are supplied (or when ``lead`` carries
+    those fields). Applies METRO_ALIASES to normalize long-form metro strings
+    ("New York City") to the canonical IATA code ("NYC") used by lanes.
+    Outreach rows are further constrained to ``converted=0 AND active=1`` and
+    the final list is capped at MAX_BUYERS_PER_NICHE_METRO so a single
+    storm lead is never fanned out to hundreds of outreach buyers.
 
-    Note: si_tenant lacks webhook_url/api_key/delivery_email columns.
-    We synthesize a delivery_email from t.email as a sensible default
-    so the email path is exercised end-to-end.
+    Backwards compatibility: passing ``lead=None`` (legacy call sites) returns
+    the unfiltered buyer pool — used by ``observe()`` / health probes.
     """
     buyers = []
-    
-    # 1. Lane subscription buyers (existing logic)
+
+    # Pull niche/metro from lead dict if not passed explicitly
+    if lead and (not niche or not metro):
+        niche = niche or (lead.get("niche") or lead.get("sub_niche") or "")
+        metro = metro or (lead.get("metro") or "")
+    lead_niche = (niche or "").strip().lower()
+    lead_metro = (metro or "").strip()
+
+    # 1. Lane subscription buyers — filter by niche on si_subscription
     rows = _hub_sql("""
         SELECT t.tenant_id, t.name, t.email, t.plan AS tenant_plan,
-               s.subscription_id, s.plan, s.seats, s.per_lead_cents
+               s.subscription_id, s.plan, s.seats, s.per_lead_cents,
+               s.niche AS sub_niche, s.webhook_url AS sub_webhook
         FROM si_tenant t
         JOIN si_subscription s ON s.tenant_id = t.tenant_id
         WHERE s.status = 'active'
           AND s.plan LIKE 'lane_%'
           AND (s.payment_ref IS NOT NULL AND s.payment_ref != '')
     """)
+    lane_matched = 0
     for r in rows:
+        sub_niche = (r.get("sub_niche") or "").strip().lower()
+        # Apply niche filter — only filter when both sides declare a niche
+        if lead_niche and sub_niche and sub_niche != lead_niche:
+            continue
         # Default the email-path fields from t.email when columns don't exist
-        r.setdefault("webhook_url", None)
+        r.setdefault("webhook_url", r.get("sub_webhook") or None)
         r.setdefault("api_key", "")
         r.setdefault("delivery_email", r.get("email", ""))
+        r.setdefault("niches", [sub_niche] if sub_niche else [])
+        r.setdefault("metros", [])
         buyers.append(r)
-    
-    # 2. Buyer outreach buyers (30K+ real buyers with webhooks/emails/payouts)
+        lane_matched += 1
+
+    # 2. Buyer outreach buyers — already filters on active+endpoint+email
     try:
-        outreach_buyers = find_buyer_outreach_buyers()
+        all_outreach = find_buyer_outreach_buyers()
+        # Re-filter for converted=0 and (niche + metro) when supplied
+        outreach_buyers = []
+        for ob in all_outreach:
+            # Hard rule from spec: converted must be 0, active must be 1
+            if ob.get("_converted", 0) != 0:
+                continue
+            if ob.get("_active", 1) != 1:
+                continue
+            # Niche filter — only when buyer actually declared a niche
+            if lead_niche and ob.get("niches"):
+                if not _niche_matches(ob["niches"], lead_niche):
+                    continue
+            # Metro filter — alias-normalized; empty buyer metros = wildcard
+            if lead_metro and ob.get("metros"):
+                if not _metro_matches(ob["metros"], lead_metro):
+                    continue
+            outreach_buyers.append(ob)
+
+        # Cap at MAX_BUYERS_PER_NICHE_METRO so we don't fan a lead out
+        # to the entire outreach table. Prefer buyers with declared metros
+        # (they're more likely to be relevant); fall back to whatever fits.
+        if len(outreach_buyers) > MAX_BUYERS_PER_NICHE_METRO:
+            with_decl = [b for b in outreach_buyers if b.get("metros")]
+            without_decl = [b for b in outreach_buyers if not b.get("metros")]
+            outreach_buyers = (
+                with_decl[:MAX_BUYERS_PER_NICHE_METRO]
+                + without_decl[: max(0, MAX_BUYERS_PER_NICHE_METRO - len(with_decl))]
+            )[:MAX_BUYERS_PER_NICHE_METRO]
+
         buyers.extend(outreach_buyers)
-        _log_event("INFO", f"find_matching_buyers: {len(rows)} lane buyers + {len(outreach_buyers)} outreach buyers")
+        _log_event(
+            "INFO",
+            "find_matching_buyers: %d lane buyers + %d outreach buyers "
+            "(niche=%s metro=%s)" % (
+                lane_matched, len(outreach_buyers), lead_niche or "*", lead_metro or "*",
+            ),
+        )
     except Exception as e:
         _log_event("WARN", "could not load buyer_outreach buyers", err=str(e)[:160])
-    
+
+    # Final safety cap on the combined list
+    if len(buyers) > MAX_BUYERS_PER_NICHE_METRO:
+        buyers = buyers[:MAX_BUYERS_PER_NICHE_METRO]
+
     return buyers
 
 
@@ -554,27 +705,30 @@ def find_buyer_outreach_buyers() -> list:
 
     These are the goldmine prospects loaded from outreach campaigns.
     Returns buyer dicts shaped for deliver_lead() with webhook, email, payout_per_lead.
+
+    Also exposes ``_active`` and ``_converted`` flags so callers can apply
+    the active=1, converted=0 filter that find_matching_buyers() enforces.
     """
     rows = _hub_sql("""
         SELECT prospect_id, business_name, email, endpoint_url, hmac_secret,
-               payout_per_lead, niches, metros
+               payout_per_lead, niches, metros, active, converted
         FROM si_buyer_outreach
         WHERE active = 1
           AND (endpoint_url IS NOT NULL AND endpoint_url != '')
           AND (email IS NOT NULL AND email != '')
     """)
-    
+
     matched = []
     for r in rows:
         # niche from niches field (comma-separated)
         niches = [n.strip().lower() for n in (r.get("niches") or "").split(",") if n.strip()]
         metros = [m.strip() for m in (r.get("metros") or "").split(",") if m.strip()]
-        
+
         # Use payout_per_lead as the base_payout (already in dollars)
         base_payout = float(r.get("payout_per_lead") or 0)
         # fee_rate = 1.0 since payout_per_lead is the full price
         fee_rate = 1.0
-        
+
         buyer = {
             "tenant_id": r.get("prospect_id"),
             "buyer_name": r.get("business_name", ""),
@@ -588,6 +742,9 @@ def find_buyer_outreach_buyers() -> list:
             "fee_rate": fee_rate,
             "seat_price": base_payout / fee_rate,
             "per_lead_cents": int(base_payout * 100),
+            # expose raw SQL flags so find_matching_buyers() can re-filter
+            "_active": int(r.get("active") or 0),
+            "_converted": int(r.get("converted") or 0),
         }
         matched.append(buyer)
     return matched

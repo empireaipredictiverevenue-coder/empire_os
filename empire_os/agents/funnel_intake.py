@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, "/root/empire_os")
 DB = os.environ.get("EMPIRE_DB", "/root/empire_os/empire_os.db")
-HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 
 
 def _db():

@@ -12,11 +12,20 @@ import os, time, subprocess, sys, json, re
 import empire_os.hermes_gateway as g
 
 POLL = 60
-UNITS = ["empire-hub-service", "empire-ppc-router", "empire-agent-lead_deliverer",
-         "empire-agent-idle_asset", "empire-agent-satellite_strike",
-         "empire-agent-solana_listener", "empire-agent-warehouse-report",
-         "empire-agent-outreach_runner", "empire-agent-supervisor",
-         "empire-ppc-sentry", "empire-ppc-billing-collector"]
+UNITS = ["empire-hub-8081.service", "empire-ppc-router.service",
+         "empire-agent-lead_deliverer.service",
+         "empire-agent-solana_listener.service",
+         "empire-ppc-billing-collector.service",
+         "empire-agent-lead_sniper.service",
+         "empire-hub-loop.service",
+         "empire-a2a-buyer-marketplace.service"]
+# Back-compat: also probe the old names so legacy code referring to them
+# doesn't silently no-op. If unit doesn't exist, unit_active() returns False
+# and we'd loop restarting a non-existent unit — guard against that:
+def _unit_exists(unit: str) -> bool:
+    r = subprocess.run(["systemctl", "cat", unit],
+                       capture_output=True, text=True)
+    return r.returncode == 0
 REQUIRED_ENV = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "SUPABASE_URL",
                 "SUPABASE_SERVICE_KEY", "SOLANA_VAULT_WALLET", "MINIMAX_API_KEY"]
 

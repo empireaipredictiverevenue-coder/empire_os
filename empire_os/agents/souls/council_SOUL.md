@@ -26,3 +26,9 @@ Daily: lightweight check for emergency proposals from founder.
 - If a voter is unavailable, vote is rolled to next cycle. Don't
   ship on a 2/3 with 2 voters; quorum is 3.
 - Tie -> finance breaks tie.
+
+## Planning Discipline
+Before ratifying strategy: load
+`/root/empire_os/empire_os/agents/souls/superpowers_protocol.md` and run
+brainstorm → plan → execute → verify → reflect. Every council decision must
+trace to a revenue or risk signal; verify claims with proof before voting.

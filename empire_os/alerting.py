@@ -60,33 +60,13 @@ def _log(level, msg, **fields):
 
 
 def send_email(subject: str, body: str, to: str = "founder@empire-ai.co.uk") -> tuple[bool, str]:
-    env = _read_env()
-    api_key = env.get("RESEND_API_KEY", "")
-    if not api_key:
-        return False, "no_resend_key"
-    if f"@{ALLOWED_SEND_DOMAIN}" not in RESEND_FROM:
-        return False, f"from '{RESEND_FROM}' not on allowed domain @{ALLOWED_SEND_DOMAIN}"
-
+    """Send via canonical mail_sender._send (Resend/Brevo/SendGrid/Mailgun/SMTP/MX fallback)."""
     try:
-        r = requests.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": RESEND_FROM,
-                "to": [to],
-                "reply_to": ["founder@empire-ai.co.uk"],
-                "subject": subject,
-                "text": body,
-                "metadata": {"source": "alert"},
-            },
-            timeout=10,
-        )
-        if r.status_code < 300:
-            return True, f"sent {r.status_code}: {r.text[:200]}"
-        return False, f"HTTP {r.status_code}: {r.text[:200]}"
+        from empire_os.mail_sender import _send as _ms_send
+        res = _ms_send(to, subject, body)
+        if res.get("ok"):
+            return True, f"sent via {res.get('brevo_id') or res.get('resend_id') or res.get('msg_id') or 'mail_sender'}"
+        return False, res.get("error", "unknown")
     except Exception as e:
         return False, str(e)[:200]
 

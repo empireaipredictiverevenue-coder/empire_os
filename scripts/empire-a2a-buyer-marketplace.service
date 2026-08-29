@@ -1,0 +1,23 @@
+[Unit]
+Description=Empire OS A2A Buyer Marketplace Pusher (assigner loop)
+After=network-online.target empire-hub-8081.service
+Wants=empire-hub-8081.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/empire_os
+Environment=PYTHONPATH=/root/empire_os:/root/empire_os/empire_os
+EnvironmentFile=-/root/empire_os/.env
+ExecStart=/root/empire_os/scripts/a2a_push.sh --daemon --interval 300
+Restart=always
+RestartSec=30
+TimeoutStopSec=30
+KillSignal=SIGTERM
+FinalKillSignal=SIGKILL
+# Cap memory so a runaway a2a doesn't OOM the container
+MemoryMax=512M
+MemoryHigh=384M
+
+[Install]
+WantedBy=multi-user.target

@@ -23,6 +23,41 @@ FEEDBACK = Path("/root/feedback")
 FEEDBACK.mkdir(parents=True, exist_ok=True)
 
 
+def mrr_breakdown(c) -> dict:
+    """Compute MRR from active subscriptions grouped by plan/tier.
+
+    MRR = sum(price_cents) / 100 for active subscriptions.
+    ARR = MRR × 12.
+    """
+    rows = c.execute("""
+        SELECT plan, billing_cycle, price_cents,
+               COUNT(*) AS subs
+        FROM si_subscription
+        WHERE status = 'active' AND price_cents > 0
+        GROUP BY plan, billing_cycle, price_cents
+    """).fetchall()
+
+    by_plan = {}
+    total_cents = 0
+    total_subs = 0
+    for plan, cycle, price_cents, subs in rows:
+        # Normalize to monthly (annual = /12)
+        if cycle == "annual":
+            monthly = (price_cents / 12.0)
+        else:
+            monthly = price_cents
+        monthly_cents = int(monthly)
+        by_plan[plan] = by_plan.get(plan, 0) + monthly_cents * subs
+        total_cents += monthly_cents * subs
+        total_subs += subs
+
+    return {
+        "total_usd": round(total_cents / 100.0, 2),
+        "total_subs": total_subs,
+        "by_plan": {k: round(v / 100.0, 2) for k, v in by_plan.items()},
+    }
+
+
 def snapshot() -> dict:
     c = sqlite3.connect(DB_PATH)
     c.row_factory = sqlite3.Row
@@ -36,8 +71,8 @@ def snapshot() -> dict:
         "last_24h": c.execute("SELECT COUNT(*) FROM lane_leads WHERE created_at > datetime('now','-1 day')").fetchone()[0],
         "by_tier": {r["omega_tier"]: r["COUNT(*)"] for r in c.execute("SELECT omega_tier, COUNT(*) AS 'COUNT(*)' FROM lane_leads GROUP BY omega_tier").fetchall() if r["omega_tier"]},
         "avg_fit_score": c.execute(
-            "SELECT ROUND(AVG(MIN(100, MAX(0, icp_fit_score))), 1) "
-            "FROM lane_leads WHERE icp_fit_score IS NOT NULL"
+            "SELECT ROUND(AVG(MIN(100, MAX(0, omega_score))), 1) "
+            "FROM lane_leads WHERE omega_score IS NOT NULL"
         ).fetchone()[0] or 0,
     }
 
@@ -93,6 +128,12 @@ def snapshot() -> dict:
     except Exception:
         snap["settlements"] = {"rows": 0, "note": "table missing"}
 
+    # MRR (Monthly Recurring Revenue) — from active subscriptions
+    snap["mrr"] = mrr_breakdown(c)
+
+    # ARR (Annual Recurring Revenue) — MRR × 12
+    snap["arr"] = snap["mrr"]["total_usd"] * 12
+
     # CORPUS BRAIN
     brain_path = FEEDBACK / "cortex_brain.json"
     if brain_path.exists():
@@ -107,10 +148,22 @@ def render_text(snap: dict) -> str:
     """Compact ASCII report for message body."""
     L, A, B = snap["leads"], snap["a2a"], snap["buyers"]
     CH = snap["charges"]
+    M = snap["mrr"]
 
     lines = [
-        "📊 EMPIRE OS v3 — REVENUE SNAPSHOT",
-        f"⏱ {snap['ts'][:19]} UTC",
+        "EMPIRE OS v3 — REVENUE SNAPSHOT",
+        f"{snap['ts'][:19]} UTC",
+        "",
+        "MRR (Monthly Recurring Revenue)",
+        f"  total MRR:    ${M['total_usd']:,.2f}",
+        f"  ARR:          ${snap['arr']:,.2f}",
+        f"  active subs:  {M['total_subs']:,}",
+        "  by plan:",
+    ]
+    for plan, amt in sorted(M["by_plan"].items(), key=lambda x: -x[1]):
+        lines.append(f"    {plan:25s} ${amt:>10,.2f}")
+
+    lines += [
         "",
         "LEADS",
         f"  total:        {L['total']:,}",

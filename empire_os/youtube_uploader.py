@@ -54,7 +54,35 @@ def upload_bytes(upload_url, video_path, token):
     r.raise_for_status()
     return r.json()
 
-def upload_video(video_path, title, description, tags=None, privacy=None):
+def delete_video(video_id, token=None):
+    """Delete a YouTube video by ID. (Quota for the original insert is NOT recovered.)"""
+    if not token:
+        token = get_access_token()
+    r = requests.delete(
+        f"https://www.googleapis.com/youtube/v3/videos?id={video_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30,
+    )
+    return r.status_code in (204, 200)
+
+def set_thumbnail(video_id, image_path, token=None):
+    """Upload a custom thumbnail for a video. Returns True on success."""
+    if not token:
+        token = get_access_token()
+    try:
+        with open(image_path, "rb") as f:
+            r = requests.post(
+                f"https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId={video_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                files={"image": ("thumb.png", f, "image/png")},
+                timeout=60,
+            )
+        return r.status_code in (200, 201, 204)
+    except Exception as e:
+        print(f"⚠️ set_thumbnail failed: {e}")
+        return False
+
+def upload_video(video_path, title, description, tags=None, privacy=None, thumbnail_path=None):
     if tags is None:
         tags = ["EmpireAI", "RevenueIntelligence", "B2BSaaS", "AIautomation"]
     if privacy is None:
@@ -62,7 +90,10 @@ def upload_video(video_path, title, description, tags=None, privacy=None):
     token = get_access_token()
     upload_url = initiate_resumable_upload(video_path, title, description, tags, privacy, token)
     result = upload_bytes(upload_url, video_path, token)
-    return result.get("id"), result.get("status", {}).get("uploadStatus")
+    vid = result.get("id")
+    if vid and thumbnail_path and Path(thumbnail_path).exists():
+        set_thumbnail(vid, thumbnail_path, token)
+    return vid, result.get("status", {}).get("uploadStatus")
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:

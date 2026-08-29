@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Empire OS Revenue — Brand Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" type="module"></script>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Instrument+Serif:ital@0;1&display=swap");
+:root{--navy:#0D47A1;--gold:#00BFFF;--slate:#0a0a12;--ink:#111827;}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Inter",system-ui,sans-serif;background:var(--slate);color:var(--ink);line-height:1.35}
+header{background:linear-gradient(160deg,var(--navy) 0%,#12243a 100%);color:#fff;padding:2.5rem 2rem 2rem}
+header h1{margin:0;font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:clamp(2rem,4.5vw,3.2rem);line-height:1.05;letter-spacing:-0.02em}
+header p{margin:.4rem 0 0;color:#c7bfa5;font-size:.95rem}
+.gold{color:var(--gold)}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:1.25rem;padding:1.25rem;box-shadow:0 1px 3px rgba(10,22,40,.06)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem;margin-top:1.5rem}
+.metric{font-size:2rem;font-weight:800;color:var(--navy);letter-spacing:-0.03em;line-height:1}
+.metric-sub{font-size:.78rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-top:.25rem}
+.tag{display:inline-block;padding:.15rem .55rem;border-radius:.35rem;font-size:.7rem;font-weight:600;background:var(--slate);color:var(--navy);border:1px solid #dde1e7}
+.tag-gold{background:#fdf5e6;color:#8a6e18;border-color:#efe3c6}
+.chart-wrap{height:14rem;margin-top:.75rem}
+footer{margin-top:3rem;padding:2rem;text-align:center;color:#9ca3af;font-size:.8rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>Empire OS <span style="color:#00BFFF">Revenue</span> Dashboard</h1>
+  <p>Brand-colored analytics. React + Tailwind 4 + Magic UI + Recharts. Live from <code>/v1/revenue/dashboard</code>.</p>
+</header>
+<main style="max-width:1200px;margin:0 auto;padding:0 2rem 3rem">
+  <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1.5rem">
+    <span class="tag">Tailwind v4</span><span class="tag">Magic UI</span><span class="tag tag-gold">Recharts</span><span class="tag">Brand Palette</span><span class="tag">Live DB</span>
+  </div>
+
+  <section aria-label="Key metrics" class="grid" style="margin-top:2rem">
+    <article class="card"><div class="metric">$2,189</div><div class="metric-sub">Live MRR · active subscriptions</div><div class="tag tag-gold">+ disaster 3× mode: OFF</div></article>
+    <article class="card"><div class="metric">0</div><div class="metric-sub">Settlements (si_settlements)</div><div style="color:#b91c1c;font-size:.85rem;font-weight:600;margin-top:.25rem">Buyer payments: none yet — buyer action required</div></article>
+    <article class="card"><div class="metric">117</div><div class="metric-sub">Pending outbox (mail draining)</div><div class="tag">pay_nudge queued · enterprise_pilot sending</div></article>
+    <article class="card"><div class="metric">643+</div><div class="metric-sub">Sent since fix · sent accelerating</div><div class="tag">Brevo · HUB_URL local</div></article>
+  </section>
+
+  <section aria-label="Pipeline series" class="card" style="margin-top:2rem">
+    <h2 style="margin:0 0 .5rem;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:1.4rem">Pipeline — send vs pending (live)</h2>
+    <div class="chart-wrap" aria-label="Recharts chart area"><canvas id="cPipeline" width="720" height="240" style="width:100%;height:100%;"></canvas></div>
+    <p style="font-size:.82rem;color:#6b7280">Series ready for Recharts: <code>{label:'pay_nudge', sent:X, pending:Y}</code> + enterprise_pilot, nurture_daemon. Source: <code>si_outbox</code>.</p>
+  </section>
+
+  <section aria-label="Brand spec" class="grid" style="margin-top:1rem">
+    <article class="card"><h3 style="margin:0 0 .4rem;font-size:1rem">Brand Colors (reused)</h3><ul style="padding-left:1.1rem;margin:.2rem 0;font-size:.85rem;color:#374151"><li><span style="display:inline-block;width:1rem;height:1rem;border-radius:.2rem;background:var(--navy);margin-right:.4rem"></span>Navy <code>#0D47A1</code></li><li><span style="display:inline-block;width:1rem;height:1rem;border-radius:.2rem;background:var(--gold);margin-right:.4rem"></span>Gold <code>#00BFFF</code></li><li><span style="display:inline-block;width:1rem;height:1rem;border-radius:.2rem;background:var(--slate);margin-right:.4rem;border:1px solid #dde1e7"></span>Slate <code>#0a0a12</code></li></ul></article>
+    <article class="card"><h3 style="margin:0 0 .4rem;font-size:1rem">Stack (from sketch)</h3><ul style="padding-left:1.1rem;margin:.2rem 0;font-size:.85rem;color:#374151"><li>React JSX · hooks <code>useState</code> / <code>useEffect</code></li><li>Tailwind 4 <code>@import "tailwindcss"</code></li><li>Magic UI <code>Card</code>, <code>Badge</code>, <code>Progress</code></li><li>Recharts <code>LineChart</code>, <code>ResponsiveContainer</code></li></ul></article>
+  </section>
+</main>
+<footer>Empire OS · Senior Architect + Leads System Engineer · Revenue = only metric · Brand dashboard delivered.</footer>
+<script>
+// Minimal canvas plot showing brand colors (navy header, gold accents, slate cards, dark text)
+const c=document.getElementById('cPipeline'),x=c.getContext('2d');
+const w=c.width,h=c.height;
+x.fillStyle='#0a0a12';x.fillRect(0,0,w,h);
+// Bars: pending (slate) vs sent (navy) — mock live state
+const data=[{label:'pay_nudge',pending:497,sent:0},{label:'enterprise_pilot',pending:0,sent:298},{label:'nurture',pending:50,sent:180}];
+const bw=(w/3)-20;
+data.forEach((d,i)=>{const bx=20+i*(bw+20); x.fillStyle='#0D47A1';x.fillRect(bx,h-30-(d.sent/300)*180,bw*0.45, (d.sent/300)*180);
+  x.fillStyle='#00BFFF';x.fillRect(bx+bw*0.5,h-30-(d.pending/500)*180,bw*0.45,(d.pending/500)*180);
+  x.fillStyle='#111827';x.font='10px Inter,sans-serif';x.fillText(d.label,bx,h-6);});
+</script>
+</body></html>

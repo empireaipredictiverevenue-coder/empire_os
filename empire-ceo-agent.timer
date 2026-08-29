@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Empire OS CEO Agent every hour
+Requires=empire-ceo-agent.service
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=1h
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target

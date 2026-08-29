@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Empire OS Strategist Agent weekly
+Requires=empire-strategist-agent.service
+
+[Timer]
+OnBootSec=10m
+OnCalendar=Mon *-*-* 08:00:00
+RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target

@@ -13,17 +13,13 @@ import argparse, json, os, sqlite3, sys, time
 from datetime import datetime, timezone, timedelta
 
 DB = "/root/empire_os/empire_os.db"
-HUB = "http://127.0.0.1:8081"
+HUB = "http://127.0.0.1:8080"
 
-# warm-up: daily cap derived from days since START_DATE
+# warm-up complete Jul 31 — full 30/day
 START_DATE = datetime(2026, 7, 20, tzinfo=timezone.utc)
 def daily_cap(now=None):
     now = now or datetime.now(timezone.utc)
-    days = (now - START_DATE).days
-    if days < 7:   return 5
-    if days < 14:  return 8
-    if days < 21:  return 12
-    return 30  # bumped to 30/day once warmed up — Brevo free = 300/day
+    return 30  # 30/day — Brevo free = 300/day, well within quota
 
 # sequence steps: (day_offset, kind)
 SEQUENCE = [
@@ -45,7 +41,7 @@ NUDGE_TPL = (
 )
 ASK_TPL = (
     "5-minute call. I'll show you the feed. "
-    "You pay per seated lead in USDC. "
+    "You pay per seated lead in USDT. "
     "Reply 'yes' and I'll send the link."
 )
 

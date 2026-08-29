@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 import requests
 
-HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8081")
+HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 FB   = Path("/root/feedback")
 LOG  = FB / "cinematic_lp_log.jsonl"
 RENDER = FB / "rendered_lps"

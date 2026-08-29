@@ -79,18 +79,28 @@ def _direct_seat(conn, name: str, niche: str, tier: str,
     # can drift from the real lanes table). Match the buyer niche against the
     # set of sub_niche prefixes that exist, so seating always targets real lanes.
     prefixes = [r[0] for r in conn.execute(
-        "SELECT DISTINCT substr(id,1,instr(id,':')-1) FROM lanes").fetchall()]
+        "SELECT DISTINCT substr(id,1,instr(id,':')-1) FROM lanes WHERE id IS NOT NULL").fetchall()]
     n_slug = n.replace(" ", "_")
     subs = set()
     # 1) exact prefix match (e.g. niche "hvac" -> prefix "hvac")
     if n_slug in prefixes:
         subs.add(n_slug)
     # 2) substring containment both ways (e.g. "roof" -> residential_roofing,
-    #    commercial_roofing, roof_repair; "debt" -> debt_relief; "tort"/"legal"
-    #    -> camp_lejeune, paraquat, roundup, zantac, afff, legal_services)
+    #    commercial_roofing, roof_repair; "debt" -> debt_relief)
     for pre in prefixes:
         if n_slug in pre or pre in n_slug:
             subs.add(pre)
+    # 3) vertical-aware mapping (legal/mass-tort lanes are FLAT prefixes like
+    #    camp_lejeune:DFW, not under a mass_torts: parent, so substring match
+    #    above misses them — a buyer would pay and get ZERO lanes).
+    for cat, sub, _m in _map_niche_to_lanes(n, ""):
+        # _map_niche_to_lanes returns category+sub; the real lane prefix is the sub
+        if sub in prefixes:
+            subs.add(sub)
+        # also catch the mapped sub's known flat prefixes (mass_tort subs)
+        for pre in prefixes:
+            if sub in pre or pre in sub:
+                subs.add(pre)
     if not subs:
         subs.add(nslug)
 
@@ -163,7 +173,7 @@ def ensure_schema(conn):
 def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
             webhook_url: str = "", delivery_email: str = "",
             min_deposit: float = 50.0, source: str = "") -> dict:
-    """Clean buyer signup -> rate -> seat -> immediate Solana Pay invoice.
+    """Clean buyer signup -> rate -> seat -> immediate BSC Pay invoice.
 
     Single connection from the lock-safe WAL pool. No ALTER in the request
     path (schema ensured at import). Supabase is best-effort and never blocks
@@ -171,7 +181,7 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
 
     Flow:
       tenant + subscription (status=awaiting_payment)
-        -> crypto_payment_request() builds Solana Pay URL
+        -> crypto_payment_request() builds BSC Pay URL
         -> subscription.payment_ref = memo, status stays awaiting_payment
       solana_listener confirms the memo on-chain -> activates subscription.
     """
@@ -187,8 +197,11 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
     per_lead_cents = rate["per_lead"]
     seat_price = round(monthly_cents / 100, 2)   # monthly seat billed upfront
     per_lead_usdc = round(per_lead_cents / 100, 2)
-    amount_cents = monthly_cents                 # Solana Pay link = monthly seat
-    MERCHANT_WALLET = os.environ.get("SOLANA_VAULT_WALLET", "")
+    amount_cents = monthly_cents                 # BSC Pay link = monthly seat
+    # Authoritative revenue vault = the one the live bsc_listener watches
+    # (0x1339...). Default to it so a missing env var never mints a dead link.
+    MERCHANT_WALLET = os.environ.get(
+        "BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
 
     conn = _db.get_conn()           # shared WAL pool, 30s busy_timeout
     ensure_schema(conn)
@@ -258,14 +271,14 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
                           tenant_id=tenant.tenant_id)
     _log_seat(name, niche, seated, source)
 
-    # Immediate Solana Pay invoice so the buyer can fund now
+    # Immediate BSC Pay invoice so the buyer can fund now
     payment = {}
     try:
         from empire_os.billing import crypto_payment_request, CryptoConfig
         cfg = CryptoConfig(
             vault_wallet=MERCHANT_WALLET,
-            usdc_mint=os.environ.get("USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
-            network="solana")
+            usdt_contract=os.environ.get("BSC_USDT_CONTRACT", "0x55d398326f99059fF775485246999027B3197955"),
+            network="bsc")
         req = crypto_payment_request(cfg, amount_cents, tenant.tenant_id, f"lane_{tier}")
         memo = req["memo"]
         conn.execute(
@@ -273,12 +286,12 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
             "WHERE subscription_id=?", (memo, sub_id))
         conn.commit()
         payment = {
-            "asset": "USDC", "network": "Solana",
+            "asset": "USDT", "network": "BSC",
             "vault_wallet": MERCHANT_WALLET,
             "amount_usdc": seat_price,
             "memo": memo,
             "pay_url": req["qr_data"],
-            "note": "Send USDC to this address with the memo to activate your seat.",
+            "note": "Send USDT to this address with the memo to activate your seat.",
         }
     except Exception as _e:
         payment = {"error": str(_e)[:120], "vault_wallet": MERCHANT_WALLET}
@@ -286,6 +299,7 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
     return {"ok": True, "tenant_id": tenant.tenant_id,
             "subscription_id": sub_id, "tier": tier,
             "seat_price": seat_price, "per_lead_usdc": per_lead_usdc,
+            "per_lead_usdt": per_lead_usdc,
             "funded": False, "reused": reused,
             "pay_to_wallet": MERCHANT_WALLET,
             "amount_usdc_due": seat_price,

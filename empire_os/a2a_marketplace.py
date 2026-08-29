@@ -28,7 +28,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 DB_PATH = os.getenv("DB_PATH", "/root/empire_os/empire_os.db")
-VAULT_WALLET = os.getenv("SOLANA_VAULT_WALLET", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+VAULT_WALLET = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
 QUOTE_TTL_MINUTES = int(os.getenv("A2A_QUOTE_TTL_MINUTES", "30"))
 PLATFORM_FEE_BPS = int(os.getenv("A2A_PLATFORM_FEE_BPS", "1500"))  # 15%
 
@@ -69,6 +69,16 @@ def ensure_tables(c: sqlite3.Connection) -> None:
             created_at TEXT DEFAULT (datetime('now')),
             meta TEXT
         )""")
+    # si_seat: buyer-side provisioning. Created here (not by billing_collector)
+    # so a release_escrow() never races with the seat-creator.
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS si_seat (
+            seat_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'operator',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )""")
     c.execute("""
         CREATE TABLE IF NOT EXISTS a2a_escrow (
             quote_id TEXT PRIMARY KEY,
@@ -83,7 +93,7 @@ def ensure_tables(c: sqlite3.Connection) -> None:
 
 
 def compute_amount(product: str, quantity: int = 1) -> float:
-    """Total USDC for product + qty, including platform fee."""
+    """Total USDT for product + qty, including platform fee."""
     cfg = PRODUCT_PRICING.get(product)
     if not cfg:
         raise ValueError(f"Unknown product: {product}")
@@ -135,7 +145,7 @@ def create_quote(product: str, buyer_wallet: str, quantity: int = 1,
 
         memo = f"a2a:{quote_id}"
         pay_url = (
-            f"solana:{VAULT_WALLET}"
+            f"bsc:{VAULT_WALLET}"
             f"?amount={amount:.2f}"
             f"&label=Empire%20A2A%20{product}"
             f"&memo={memo}"
@@ -214,8 +224,77 @@ def fund_quote(quote_id: str, deposit_tx: str) -> dict:
         c.close()
 
 
+def _provision_seat_for_quote(c: sqlite3.Connection, q) -> dict:
+    """Provision (or fetch existing) si_seat row for a released quote.
+
+    Idempotent on quote_id — same buyer wallet + product → same seat.
+    Tenant id is the buyer wallet (anonymous buyer → wallet-as-tenant).
+    User id is the quote_id so each purchase is its own user row.
+    Returns {seat_id, tenant_id, user_id, role, created_at}.
+    """
+    quote_id = q["quote_id"]
+    buyer_wallet = q["buyer_wallet"]
+    product = q["product"]
+
+    # Idempotency check: has this exact quote already provisioned a seat?
+    existing = c.execute(
+        "SELECT seat_id, tenant_id, user_id, role, created_at FROM si_seat WHERE user_id=?",
+        (quote_id,),
+    ).fetchone()
+    if existing:
+        return dict(existing)
+
+    seat_id = f"seat_{quote_id[:12]}"
+    tenant_id = f"tenant_{buyer_wallet[:14]}"
+    role = "operator"
+
+    c.execute(
+        """
+        INSERT OR IGNORE INTO si_seat (seat_id, tenant_id, user_id, role, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (seat_id, tenant_id, quote_id, role, _now()),
+    )
+    c.commit()
+    return {
+        "seat_id": seat_id,
+        "tenant_id": tenant_id,
+        "user_id": quote_id,
+        "role": role,
+        "created_at": _now(),
+    }
+
+
+def backfill_seats_for_released() -> dict:
+    """One-shot: provision seats for all already-released quotes that have none.
+    Safe to run repeatedly — idempotent via quote_id → user_id.
+    """
+    c = db()
+    try:
+        ensure_tables(c)
+        rows = c.execute(
+            """
+            SELECT q.* FROM a2a_quotes q
+            LEFT JOIN si_seat s ON s.user_id = q.quote_id
+            WHERE q.status='released' AND s.seat_id IS NULL
+            """
+        ).fetchall()
+        results = []
+        for q in rows:
+            seat = _provision_seat_for_quote(c, q)
+            results.append({
+                "quote_id": q["quote_id"],
+                "product": q["product"],
+                "seat_id": seat["seat_id"],
+                "tenant_id": seat["tenant_id"],
+            })
+        return {"ok": True, "backfilled": len(results), "seats": results}
+    finally:
+        c.close()
+
+
 def release_escrow(quote_id: str, delivery_proof: Optional[str] = None) -> dict:
-    """Mark escrow released after delivery. Triggers payout."""
+    """Mark escrow released after delivery. Triggers payout + provisions seat."""
     c = db()
     try:
         ensure_tables(c)
@@ -230,7 +309,15 @@ def release_escrow(quote_id: str, delivery_proof: Optional[str] = None) -> dict:
             (_now(), delivery_proof, quote_id),
         )
         c.commit()
-        return {"ok": True, "status": "released", "delivery_proof": delivery_proof}
+        # Provision a seat for the buyer (idempotent — same quote_id → same seat).
+        seat = _provision_seat_for_quote(c, q)
+        return {
+            "ok": True,
+            "status": "released",
+            "delivery_proof": delivery_proof,
+            "seat_id": seat.get("seat_id"),
+            "tenant_id": seat.get("tenant_id"),
+        }
     finally:
         c.close()
 

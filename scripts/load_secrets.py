@@ -45,6 +45,9 @@ from pathlib import Path
 VAULT_DIR = Path("/root/empire_secrets")
 
 REQUIRED = (
+    "BSC_WALLET_ADDRESS",
+    "BSC_RPC",
+    "BSC_USDT_CONTRACT",
     "SOLANA_VAULT_WALLET",
     "SOLANA_RPC_URL",
     "SOLANA_PAYER_SECRET",
@@ -60,6 +63,8 @@ OPTIONAL = (
     "TELEGRAM_CHAT_ID",
     "OPENROUTER_API_KEY",
     "GROQ_API_KEY",
+    "OLLAMA_HOST",
+    "OLLAMA_MODEL",
 )
 
 

@@ -1,0 +1,7 @@
+[Unit]
+Description=Empire OS DB hourly backup
+
+[Service]
+Type=oneshot
+ExecStart=/root/venv/bin/python3 /root/empire_os/scripts/db_backup.py
+Nice=10

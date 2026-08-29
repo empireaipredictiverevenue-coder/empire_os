@@ -83,10 +83,10 @@
     </div>
     <div class="card" id="paycard" style="display:none">
       <h2>Step 2 — Pay to Activate</h2>
-      <p class="muted">Send the exact USDC amount below to the Solana wallet. Leads start flowing on confirmation.</p>
+      <p class="muted">Send the exact USDT amount below to the BSC wallet. Leads start flowing on confirmation.</p>
       <div class="grid2">
-        <div><label>Amount Due (USDC)</label><div class="wallet" id="amt" style="color:var(--txt);border-color:var(--line)"></div></div>
-        <div><label>Your Solana Wallet</label><div class="wallet" id="vault"></div></div>
+        <div><label>Amount Due (USDT)</label><div class="wallet" id="amt" style="color:var(--txt);border-color:var(--line)"></div></div>
+        <div><label>Your BSC Wallet</label><div class="wallet" id="vault"></div></div>
       </div>
       <div class="row" style="margin-top:14px">
         <button class="ghost" onclick="copyVault()">Copy Wallet</button>
@@ -136,7 +136,7 @@
     </div>
   </section>
 </main>
-<footer>Empire OS v3 · Leads are the product · Pay in USDC (Solana) · Delivery via webhook</footer>
+<footer>Empire OS v3 · Leads are the product · Pay in USDT (BSC) · Delivery via webhook</footer>
 
 <script>
 const API=location.origin;
@@ -163,7 +163,7 @@ async function apply(){
     const d=await r.json();
     if(!r.ok){document.getElementById('applymsg').innerHTML='<span class="err">'+JSON.stringify(d)+'</span>';return;}
     curSub=d.subscription_id;
-    document.getElementById('amt').textContent=(d.amount_usdc_due||0)+' USDC';
+    document.getElementById('amt').textContent=(d.amount_usdc_due||0)+' USDT';
     document.getElementById('vault').textContent=(d.pay_to_wallet||'n/a');
     document.getElementById('paycard').style.display='block';
     document.getElementById('applymsg').innerHTML='<span class="ok">Applied ✓ — sub '+d.subscription_id+'</span>';
@@ -185,11 +185,11 @@ async function checkStatus(){
     '<div><div class="muted">Tier</div>'+(d.tier||'-')+'</div>'+
     '<div><div class="muted">Niche</div>'+(d.niche||'-')+'</div>'+
     '<div><div class="muted">Leads Delivered</div>'+(d.leads_delivered||0)+'</div>'+
-    '<div><div class="muted">Amount Due</div>'+(d.amount_usdc_due||0)+' USDC</div>'+
+    '<div><div class="muted">Amount Due</div>'+(d.amount_usdc_due||0)+' USDT</div>'+
     '</div></div>';
   document.getElementById('statusmsg').innerHTML=d.status==='active'
     ? '<span class="ok">✓ Active — leads are being delivered to your webhook</span>'
-    : '<span class="err">Still pending — send '+(d.amount_usdc_due||0)+' USDC to the vault, then re-check</span>';
+    : '<span class="err">Still pending — send '+(d.amount_usdc_due||0)+' USDT to the vault, then re-check</span>';
 }
 // dashboard
 async function loadDash(){
@@ -202,7 +202,7 @@ async function loadDash(){
       ['Total Leads',(lc&&lc.total)||(dd&&dd.funnel_total)||'?'],
       ['Active Buyers',(dd&&dd.active_buyers)||'?'],
       ['Pending Buyers',(dd&&dd.pending_buyers)||'?'],
-      ['Revenue',(((rev&&rev.revenue_cents)||0)/100).toFixed(2)+' USDC'],
+      ['Revenue',(((rev&&rev.revenue_cents)||0)/100).toFixed(2)+' USDT'],
       ['Leads Delivered',(dd&&dd.leads_delivered)||'?']];
     document.getElementById('kpi').innerHTML=kpis.map(k=>'<div class="stat"><div class="n">'+k[1]+'</div><div class="l">'+k[0]+'</div></div>').join('');
     if(dd&&dd.funnel){const f=dd.funnel;const rows=Object.entries(f).map(([k,v])=>'<tr><td>'+k+'</td><td>'+v+'</td></tr>').join('');

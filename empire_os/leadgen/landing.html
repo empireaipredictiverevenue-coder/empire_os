@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Empire AI — Your Revenue Leak Audit</title>
+<style>
+  :root { --bg:#0a0e17; --card:#111827; --accent:#f5a623; --txt:#e6edf3; --mut:#8b949e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+         background:var(--bg); color:var(--txt); line-height:1.5; }
+  .wrap { max-width:680px; margin:0 auto; padding:48px 20px; }
+  h1 { font-size:2rem; margin:0 0 8px; }
+  .sub { color:var(--mut); margin-bottom:32px; }
+  .card { background:var(--card); border:1px solid #1f2937; border-radius:14px; padding:28px; }
+  label { display:block; font-size:.85rem; color:var(--mut); margin:14px 0 6px; }
+  input, select { width:100%; padding:12px 14px; border-radius:10px; border:1px solid #2d3748;
+                  background:#0d1421; color:var(--txt); font-size:1rem; }
+  button { margin-top:24px; width:100%; padding:14px; border:0; border-radius:10px;
+           background:var(--accent); color:#1a1205; font-weight:700; font-size:1.05rem; cursor:pointer; }
+  button:disabled { opacity:.5; }
+  .result { margin-top:22px; padding:18px; border-radius:10px; background:#0d1421;
+            border:1px solid #1f2937; display:none; }
+  .result.show { display:block; }
+  .leak { font-size:1.6rem; font-weight:800; color:var(--accent); }
+  .err { color:#ff6b6b; }
+  footer { margin-top:40px; color:var(--mut); font-size:.8rem; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Find your daily revenue leak.</h1>
+  <div class="sub">Home-service operators lose $500 per truck, per day, to dispatch gaps and no-shows. See your number in 10 seconds.</div>
+  <div class="card">
+    <form id="leadForm">
+      <label for="name">Company name</label>
+      <input id="name" required placeholder="AmeriTech AC" />
+      <label for="email">Work email</label>
+      <input id="email" type="email" required placeholder="owner@company.com" />
+      <label for="niche">Trade</label>
+      <select id="niche">
+        <option value="hvac">HVAC</option>
+        <option value="plumbing">Plumbing</option>
+        <option value="roofing">Roofing</option>
+        <option value="solar">Solar</option>
+        <option value="landscaping">Landscaping</option>
+      </select>
+      <label for="fleet">Fleet size (trucks)</label>
+      <input id="fleet" type="number" min="1" value="8" />
+      <button type="submit" id="submitBtn">Get my free audit</button>
+    </form>
+    <div id="result" class="result"></div>
+  </div>
+  <footer>Empire AI · audits are confidential · no spam, ever.</footer>
+</div>
+<script>
+const HUB = (location.protocol === "https:" ? "https:" : "http:") + "//" + location.host;
+const form = document.getElementById("leadForm");
+const result = document.getElementById("result");
+const btn = document.getElementById("submitBtn");
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  btn.disabled = true; btn.textContent = "Analyzing…";
+  const payload = {
+    company: document.getElementById("name").value,
+    email: document.getElementById("email").value,
+    niche: document.getElementById("niche").value,
+    fleet_size: parseInt(document.getElementById("fleet").value, 10) || 1,
+  };
+  try {
+    const r = await fetch(HUB + "/v1/leads/capture", {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    const leak = d.leak_range || "$?,???";
+    result.innerHTML = '<div>Your estimated leak:</div><div class="leak">' + leak +
+      ' /day</div><div style="margin-top:12px">Your private audit: <a style="color:var(--accent)" href="' +
+      (d.portal_url || "#") + '">open it here</a></div>';
+    result.classList.add("show");
+  } catch (err) {
+    result.innerHTML = '<div class="err">Could not generate audit: ' + err.message + '</div>';
+    result.classList.add("show");
+  } finally {
+    btn.disabled = false; btn.textContent = "Get my free audit";
+  }
+});
+</script>
+</body>
+</html>
