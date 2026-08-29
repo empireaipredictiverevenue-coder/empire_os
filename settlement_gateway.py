@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
 """
-USDC SETTLEMENT GATEWAY — white-label wrapper for agentic commerce.
+USDT (BSC) SETTLEMENT GATEWAY — white-label wrapper for agentic commerce.
 
-Any agent commerce settles THROUGH Empire in USDC (no Stripe/KYC). Empire takes a
-cut like Stripe-but-crypto. This module is the white-label settlement layer:
+Any agent commerce settles THROUGH Empire in USDT on BSC (no Stripe/KYC). Empire
+takes a cut like Stripe-but-crypto. This module is the white-label settlement layer:
 
   1. quote(amount_usd, tier)   -> Empire's take + net to merchant.
   2. create_invoice(amount_usd, memo) -> settlement payload (address placeholder +
-                                     memo + amount in USDC micros; NOT a real tx).
+                                     memo + amount in USDT micros; NOT a real tx).
   3. webhook stub              -> receives Settlement-Webhook posts (out-of-band TS-5).
 
 Settlement itself is TS-5 (trade secret, out-of-band) — this file does NOT build
-or broadcast on-chain transactions. USDC mainnet RPC + mint live in .env and are
-never imported/printed here.
+or broadcast on-chain transactions. USDT BEP-20 contract + BSC RPC live in .env and
+are never imported/printed here.
 
 Style: terse, stdlib, KISS/DRY. No credentials in output.
 """
 import json, hashlib, time, secrets
 
-# 1 USDC = 1_000_000 micros (6-decimal SPL token, like Stripe-style integer money).
-USDC_MICROS = 1_000_000
+# 1 USDT = 1_000_000 micros (6-decimal BEP-20 token, like Stripe-style integer money).
+USDT_MICROS = 1_000_000
+
+# Public BSC USDT (BEP-20) contract — no secret.
+USDT_BSC_CONTRACT = "0x55d398326f99059fF775485246999027B3197955"
+BSC_CHAIN_ID = 56
 
 # Placeholder settlement address — replaced at provisioning (TS-5). NEVER a real key/secret.
-SETTLEMENT_ADDRESS_PLACEHOLDER = "EMPIRE_USDC_VAULT_PLACEHOLDER"
+SETTLEMENT_ADDRESS_PLACEHOLDER = "EMPIRE_USDT_VAULT_PLACEHOLDER"
 
 # Empire take-rate config per tier (Stripe-like: pct of amount + flat fixed fee).
 # Configurable here; surfaced to MCP clients via the settle_quote tool.
@@ -43,7 +47,7 @@ def quote(amount_usd, tier="T1"):
     """Compute Empire's take + net to merchant for a USD-denominated sale.
 
     Returns dict: amount_usd, tier, pct, fixed_usd, empire_fee, net_to_merchant,
-                  currency ('USDC').
+                  currency ('USDT'), chain ('bsc').
     """
     cfg, t = _tier(tier)
     amount_usd = float(amount_usd)
@@ -59,25 +63,30 @@ def quote(amount_usd, tier="T1"):
         "fixed_usd": cfg["fixed_usd"],
         "empire_fee": empire_fee,
         "net_to_merchant": net,
-        "currency": "USDC",
+        "currency": "USDT",
+        "chain": "bsc",
+        "chain_id": BSC_CHAIN_ID,
+        "contract": USDT_BSC_CONTRACT,
     }
 
 
 def create_invoice(amount_usd, memo="", tier="T1"):
     """Return a settlement payload (NOT a real on-chain tx).
 
-    amount is expressed in USDC micros (integer) so downstream settlement is
+    amount is expressed in USDT micros (integer) so downstream settlement is
     exact. Address is a placeholder — real vault address injected at provisioning (TS-5).
     """
     q = quote(amount_usd, tier)
-    micros = int(round(q["amount_usd"] * USDC_MICROS))
+    micros = int(round(q["amount_usd"] * USDT_MICROS))
     invoice_id = hashlib.sha256(
         f"{memo}:{micros}:{secrets.token_hex(8)}".encode()).hexdigest()[:24]
     return {
         "invoice_id": invoice_id,
         "settlement_address": SETTLEMENT_ADDRESS_PLACEHOLDER,
-        "asset": "USDC",
-        "usdc_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # public mainnet mint, no secret
+        "asset": "USDT",
+        "chain": "bsc",
+        "chain_id": BSC_CHAIN_ID,
+        "usdt_contract": USDT_BSC_CONTRACT,
         "amount_usd": q["amount_usd"],
         "amount_micros": micros,
         "memo": memo,

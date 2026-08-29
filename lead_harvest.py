@@ -41,16 +41,18 @@ def run_market_sweep():
 
 def run_serp():
     from empire_os.lead_engine import serp_discovery as sd
-    METROS = ["Dallas, TX", "Houston, TX", "New York, NY", "Los Angeles, CA",
-              "Chicago, IL", "Atlanta, GA", "Miami, FL", "Phoenix, AZ",
-              "Philadelphia, PA", "Boston, MA", "San Francisco, CA"]
+    METROS = ["Dallas, TX", "Houston, TX", "Austin, TX", "San Antonio, TX",
+              "New York, NY", "Los Angeles, CA", "Chicago, IL", "Atlanta, GA",
+              "Miami, FL", "Phoenix, AZ", "Philadelphia, PA", "Boston, MA",
+              "San Francisco, CA", "Seattle, WA", "Denver, CO", "Las Vegas, NV",
+              "Orlando, FL", "Charlotte, NC", "Nashville, TN", "Kansas City, MO"]
     niches = list(sd.NICHE_KW.keys())
     log(f"step1: serp_discovery across {len(niches)} niches x {len(METROS)} metros")
     for n in niches:
         for m in METROS:
             try:
-                sd.discover_and_score(n, m, 6)
-                sd.enrich_pending(n, m, 8)
+                sd.discover_and_score(n, m, 10)
+                sd.enrich_pending(n, m, 12)
             except Exception as e:
                 log(f"  serp err {n}/{m}: {e}")
 

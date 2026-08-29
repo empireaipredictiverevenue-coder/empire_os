@@ -9425,6 +9425,8 @@ def payouts_batch_tx(req: BatchTxRequest = None):
             "amount_usdc": result.total_amount_usdc,
             "amount_cents": result.total_amount_cents,
             "transaction_base64": result.transaction_base64 or "",
+            "bsc_pay_url": result.bsc_pay_url or "",
+            "instructions": result.instructions,
             "tx_bytes": len(tx_bytes),
         })
         total_ix += len(chunk)
