@@ -35,7 +35,7 @@ FLEET_REPORT = Path("/root/empire_os/config/fleet_report.json")
 # Mirrors scripts/gen_agent_skills.py DEPARTMENTS so skills + fleet stay in sync.
 DEPARTMENTS = {
     "revenue":          (["seat_payment_onboarding", "founder_outreach", "settlement_gateway",
-                           "solana_listener", "revenue_reasoner", "eval_connect_sweeps",
+                           "bsc_listener", "revenue_reasoner", "eval_connect_sweeps",
                            "build_buy_page", "migrate_prospects"], 300),
     "growth-marketing":   (["advertising_agent", "outreach", "cold_outreach_worker", "campaigns",
                            "run_market_sweeps", "host_b2b_hunter", "search_api_leads",
@@ -84,7 +84,7 @@ def _beat(name, status, detail):
 # Calling main() on some (e.g. seat_payment_onboarding) triggers LIVE
 # side effects (email flush) — must be excluded from the tick loop.
 SERVICES = {
-    "seat_payment_onboarding", "solana_listener", "mcp_lead_server",
+    "seat_payment_onboarding", "bsc_listener", "mcp_lead_server",
     "revenue_reasoner", "agi_agent_service", "synthetic_service",
     "storm_strike", "satellite_strike", "founder_outreach",
     "advertising_agent", "outreach", "cold_outreach_worker",

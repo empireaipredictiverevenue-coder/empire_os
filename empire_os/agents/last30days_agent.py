@@ -36,7 +36,7 @@ TOPICS = [
     "open source lead generation tools",
     "AI sales outreach automation",
     "B2B lead generation market trends",
-    "Solana payments adoption",
+    "BSC payments adoption",
     "AI agent frameworks production",
 ]
 

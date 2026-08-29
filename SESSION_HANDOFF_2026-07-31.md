@@ -8,10 +8,10 @@
 ## WHAT WAS DONE THIS SESSION
 
 ### 1. BSC USDT MIGRATION — COMPLETE
-- Removed Solana USDC from all 20+ files
+- Removed BSC USDT from all 20+ files
 - BSC wallet 0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb
 - USDT contract 0x55d398326f99059fF775485246999027B3197955
-- Both Solana listeners stopped + masked
+- Both BSC listeners stopped + masked
 - BSC listener active (empire-bsc-listener.service)
 - Trial endpoint verified: method=crypto_usdt, network=bsc
 - Website shows "USDT on BSC"
@@ -87,7 +87,7 @@ Check if these completed. If timed out, build manually.
 - empire-cortex-ai.service — Cortex intelligence scoring
 - empire-revenue-engine.service — revenue automation
 - All other agent services (outreach, crawler, scanner, etc.)
-- NOT running: empire-solana-listener.service (stopped+masked)
+- NOT running: empire-bsc-listener.service (stopped+masked)
 
 ### Database Numbers
 - 665,057 leads scored (lane_leads)

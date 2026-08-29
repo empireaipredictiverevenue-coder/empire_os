@@ -9,7 +9,7 @@ Walks all pending payouts in the store, and for each one:
 Operator flow:
   1. POST /v1/payouts/process-all
   2. Receive batch with N payment requests (each a USDT transfer deeplink)
-  3. Open first deeplink in TokenPocket → approve
+  3. Open first deeplink in Trust Wallet → approve
   4. Submit TX signature back via POST /v1/payouts/verify/{id}
   5. Repeat for each payout
   6. Dashboard updates show "paid" as each is verified
@@ -89,7 +89,7 @@ def build_payout_batch(
 ) -> PayoutBatch:
     """Build a payout batch with one payment request per pending payout.
 
-    Returns a PayoutBatch with deeplinks ready to open in TokenPocket.
+    Returns a PayoutBatch with deeplinks ready to open in Trust Wallet.
     """
     batch = PayoutBatch(
         batch_id=str(uuid.uuid4())[:12],
@@ -105,10 +105,10 @@ def build_payout_batch(
         amount_usdc = amount_cents / 100
 
         # Build a deeplink the operator can click
-        # TokenPocket uses bsc:<addr>?amount=X&contract=Y&memo=Z format
+        # Trust Wallet uses bsc:<addr>?amount=X&contract=Y&memo=Z format
         memo = f"empire-payout:{p['payout_id']}"
         deeplink = (
-            f"https://app.tokenpocket.io/solana/{crypto_cfg.vault_wallet}"
+            f"bsc:{crypto_cfg.vault_wallet}"
             f"?amount={amount_usdc:.6f}"
             f"&contract={crypto_cfg.usdc_mint}"
             f"&memo={memo}"

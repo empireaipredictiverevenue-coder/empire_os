@@ -12,7 +12,7 @@
 
 ## What runs
 - 20 empire systemd units inside empire-hub (hub + 14 agents + ppc-router +
-  mail-sender + billing-collector + sentry + solana-listener + lanes).
+  mail-sender + billing-collector + sentry + bsc-listener + lanes).
   All `Restart=always` → self-healing. NO separate supervisor needed.
 - `empire-agent-supervisor.service` is **masked/disabled** (was a pm2
   respawn hydra — see below). Do not re-enable without removing pm2 calls.

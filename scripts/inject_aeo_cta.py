@@ -28,7 +28,7 @@ DB_PATH = Path("/root/empire_os/empire_os.db")
 # Container DB has the authoritative lane_leads (with niche/metro/status cols)
 CONTAINER_DB_PATH = Path("/root/empire_os/empire_os.db")
 LOG_PATH = Path("/root/feedback/aeo_cta_injected.jsonl")
-VAULT = "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM"
+VAULT = "0x1339b487046B0ad924a10c20b1791608EA8595a8"
 USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 SUBSCRIBE_URL = "https://empire-ai.co.uk/v1/billing/subscribe"
 
@@ -50,7 +50,7 @@ CTA_BLOCK_TEMPLATE = """{marker}
       <div><strong>Amount:</strong> $99 USDC</div>
       <div><strong>Memo:</strong> empire-os:{niche}:seat</div>
     </div>
-    <p style="margin-top:0.75rem;font-size:0.85rem;opacity:0.85;">Send from Phantom, Solflare, or any BSC wallet via our bridge. Receipt settles in &lt;60s. No login. No paperwork.</p>
+    <p style="margin-top:0.75rem;font-size:0.85rem;opacity:0.85;">Send from Trust Wallet via our bridge. Receipt settles in &lt;60s. No login. No paperwork.</p>
   </details>
 </div>
 {end_marker}

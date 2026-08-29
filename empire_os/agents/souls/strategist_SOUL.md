@@ -31,7 +31,7 @@ Synthesize Cortex intelligence + CEO decisions + Business actions + Innovator pr
   "revenue_target_usd": 5000,
   "moves": [
     {
-      "move": "Deploy solana-listener watchdog cron",
+      "move": "Deploy bsc-listener watchdog cron",
       "owner": "engineering",
       "deadline": "2026-08-25",
       "expected_usd": 12000,

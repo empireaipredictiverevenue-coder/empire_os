@@ -14,7 +14,7 @@ router lives in switchboard.py. This sits behind it and decides:
   - which head to bill under
   - how much
   - which invoice line gets a charge_id
-  - when to settle on Solana
+  - when to settle on BSC
 
 Routes:
   POST /v1/ppc/lead-intake    {lead_id, source}        -> head chosen, invoiced
@@ -22,7 +22,7 @@ Routes:
   POST /v1/ppc/appointment    {lead_id, time}          -> PPS $150
   POST /v1/ppc/close-deal     {call_id, contract_value} -> 5-10% backend
   GET  /v1/ppc/pending        what is mid-flight
-  POST /v1/ppc/settle         {invoice_id, source}     -> mark paid (USDC)
+  POST /v1/ppc/settle         {invoice_id, source}     -> mark paid (USDT)
 """
 from __future__ import annotations
 import json, os, secrets, sqlite3, sys, time
@@ -115,7 +115,7 @@ def log(level, msg, **fields):
 
 def _deliver_pay_link(buyer_id: str, pay_url: str, memo: str,
                       amount_cents: int) -> None:
-    """Email the Solana Pay link to the buyer's inbox.
+    """Email the BSC Pay link to the buyer's inbox.
 
     The charge generates pay_url + memo but nothing forwarded it before,
     so buyers never received the link and never paid. We look up the buyer's
@@ -141,7 +141,7 @@ def _deliver_pay_link(buyer_id: str, pay_url: str, memo: str,
     body = (
         f"Your Empire OS seat is ready.<br><br>"
         f"Amount due: <b>{usd}</b><br>"
-        f'<a href="{pay_url}">Pay now (USDC on Solana)</a><br><br>'
+        f'<a href="{pay_url}">Pay now (USDT on BSC)</a><br><br>'
         f"<small>Memo: {memo} — include it so we can activate your seat automatically.</small>"
     )
     if email and "@" in email and "example" not in email:
@@ -192,7 +192,7 @@ def _invoiced(invoice_id: str, amount_cents: int, head: int,
         status = hub_res.get("status", "failed")
         processor = hub_res.get("processor", "")
         # DELIVER the payment link to the buyer — previously missing,
-        # so buyers never received the Solana Pay URL and never paid.
+        # so buyers never received the BSC Pay URL and never paid.
         raw = hub_res.get("raw", {}) or {}
         pay_url = raw.get("pay_url") or hub_res.get("pay_url")
         memo = raw.get("memo") or hub_res.get("memo")

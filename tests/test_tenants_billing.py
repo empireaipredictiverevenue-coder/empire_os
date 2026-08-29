@@ -167,7 +167,7 @@ class TestCryptoConfig:
         assert cfg.configured() is False
 
     def test_configured(self, monkeypatch):
-        monkeypatch.setenv("VAULT_WALLET_ADDRESS", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+        monkeypatch.setenv("VAULT_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
         cfg = CryptoConfig.from_env()
         assert cfg.configured() is True
 
@@ -259,8 +259,8 @@ class TestBuildPayoutBatch:
         assert len(batch.payment_requests) == 2  # skipped paid
         assert batch.total_amount_cents == 15000
         assert batch.payment_requests[0]["payout_id"] == "p1"
-        # Deeplink should reference TokenPocket
-        assert "tokenpocket" in batch.payment_requests[0]["deeplink"]
+        # Deeplink should reference Trust Wallet
+        assert "bsc:" in batch.payment_requests[0]["deeplink"]
 
 
 # ── Billing Webhooks ──────────────────────────────────────────────

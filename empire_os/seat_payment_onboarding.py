@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""seat_payment_onboarding — mint founder-discount USDC pay links for seated
+"""seat_payment_onboarding — mint founder-discount USDT pay links for seated
 buyers who never attached a payment method, and queue a "complete your seat"
 email so $31K of billed invoices can actually collect.
 
@@ -28,7 +28,7 @@ FOUNDER_DEADLINE = "2026-08-01"
 
 
 def _qr_png(uri: str) -> str:
-    """Solana Pay QR as base64 PNG (CTO fix: wallet-readable from email)."""
+    """BSC Pay QR as base64 PNG (CTO fix: wallet-readable from email)."""
     import qrcode
     img = qrcode.make(uri)
     buf = io.BytesIO()
@@ -37,7 +37,7 @@ def _qr_png(uri: str) -> str:
 
 
 def mint_pay_url(name, niche, email, tier="silver"):
-    """Mint a Solana Pay USDC link in-process via auto_onboard.onboard.
+    """Mint a BSC Pay USDT link in-process via auto_onboard.onboard.
     Returns (pay_url, memo, vault) or ('', '', '')."""
     import empire_os.auto_onboard as ao
     try:
@@ -89,12 +89,12 @@ def main():
                 f"({t['plan']}). We're honoring founder pricing for your cohort: "
                 f"<b>${FOUNDER_SEAT_USD:.0f} seat</b> (standard ${599:.0f}).<br><br>"
                 f"<b>Founder price expires {FOUNDER_DEADLINE}.</b> After that it's ${599:.0f}.<br><br>"
-                f"Scan to pay instantly (Solana Pay):<br>"
-                f'<img src="data:image/png;base64,{qr}" alt="Solana Pay QR" width="220" height="220"/><br><br>'
-                f'<a href="{pay_url}">Or tap here to pay ${FOUNDER_SEAT_USD:.0f} USDC</a><br><br>'
-                f"<small>Secured by Solana &middot; instant settlement to vault "
+                f"Scan to pay instantly (BSC Pay):<br>"
+                f'<img src="data:image/png;base64,{qr}" alt="BSC Pay QR" width="220" height="220"/><br><br>'
+                f'<a href="{pay_url}">Or tap here to pay ${FOUNDER_SEAT_USD:.0f} USDT</a><br><br>'
+                f"<small>Secured by BSC &middot; instant settlement to vault "
                 f"<code>{vault}</code>.<br>"
-                f"If scan fails, send {FOUNDER_SEAT_USD:.0f} USDC to <code>{vault}</code> "
+                f"If scan fails, send {FOUNDER_SEAT_USD:.0f} USDT to <code>{vault}</code> "
                 f"with memo <code>{memo}</code>.</small>"
             )
             c.execute(

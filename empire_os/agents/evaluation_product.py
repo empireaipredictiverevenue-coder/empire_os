@@ -11,12 +11,12 @@ HYBRID PRICING (best of both worlds):
   - PER_SCORE mode (opt-in, casual buyers): charge per lead scored.
         EVAL_PRICE_USD = 0.20     # volume rate
   - MINIMUM DEAL SIZE: a single settlement is only worth it at >= $10.
-        EVAL_MIN_USD = 10.00      # floor on any USDC charge / pay link
-    Below $10 the deal isn't worth the rail + support cost, so the Solana
+        EVAL_MIN_USD = 10.00      # floor on any USDT charge / pay link
+    Below $10 the deal isn't worth the rail + support cost, so the BSC
     Pay link always demands >= $10 (covers the conversion + future ones,
     or a buyer prepays the $10 floor to activate).
 No invented unit prices, no phantom payouts. Settlement records to
-evaluation_ledger; the existing USDC activation chain (solana_listener)
+evaluation_ledger; the existing USDT activation chain (bsc_listener)
 collects payment against the invoice.
 """
 from __future__ import annotations
@@ -129,7 +129,7 @@ def signup(name: str, niche: str = "", wallet: str = "", email: str = "") -> dic
     """Self-serve buyer onboarding: create an si_tenant + issue an API key.
 
     Returns {tenant_id, api_key}. Idempotent-ish: a repeat name gets a fresh key
-    only if none active exists. Wallet (USDC) is stored for settlement lookups.
+    only if none active exists. Wallet (USDT) is stored for settlement lookups.
     """
     import secrets, re
     name = (name or "").strip()
@@ -168,7 +168,7 @@ def signup(name: str, niche: str = "", wallet: str = "", email: str = "") -> dic
 
 
 def _buyer_wallet(c, buyer: str) -> str:
-    """Best-effort lookup of a buyer's USDC wallet for settlement."""
+    """Best-effort lookup of a buyer's USDT wallet for settlement."""
     try:
         row = c.execute(
             "SELECT crypto_wallet FROM si_tenant WHERE tenant_id=?", (buyer,)
@@ -316,7 +316,7 @@ def record_conversion(buyer: str, lead_ref: str) -> dict:
             (buyer, lead_ref, CONVERT_USD,
              time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
         )
-        # record a pending USDC settlement obligation (real payout rail wires later)
+        # record a pending USDT settlement obligation (real payout rail wires later)
         wallet = _buyer_wallet(c, buyer)
         c.execute(
             "INSERT INTO evaluation_settlements (buyer, lead_ref, amount_usd, wallet, "
@@ -328,13 +328,14 @@ def record_conversion(buyer: str, lead_ref: str) -> dict:
     finally:
         c.close()
     memo = f"EVAL_{buyer}__{lead_ref}"
-    vault = os.environ.get("SOLANA_VAULT_WALLET", "").strip()
+    vault = os.environ.get("BSC_WALLET_ADDRESS", "").strip() or os.environ.get("BSC_WALLET_ADDRESS", "").strip()
     pay_url = ""
     demand = max(CONVERT_USD, MIN_USD)   # enforce $10 floor: deal < $10 not worth it
     if vault:
         import urllib.parse
-        pay_url = (f"solana:{vault}?amount={demand:.2f}"
-                   f"&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        usdt_mint = "0x55d398326f99059fF775485246999027B3197955"
+        pay_url = (f"bsc:{vault}?amount={demand:.2f}"
+                   f"&contract={usdt_mint}"
                    f"&memo={urllib.parse.quote(memo)}&label={urllib.parse.quote(memo)}")
     return {
         "charged": True,
@@ -362,7 +363,7 @@ def credit_balance(buyer: str) -> int:
 
 
 def buy_pack(buyer: str, usd: float = None) -> dict:
-    """Fee-aware on-chain purchase: ONE Solana Pay tx funds a credit pack.
+    """Fee-aware on-chain purchase: ONE BSC Pay tx funds a credit pack.
 
     Credits = floor(usd / CONVERT_USD) (e.g. $10 -> 20 conversions). The buyer
     pays once on-chain; conversions then draw down credits OFF-CHAIN, so blockchain
@@ -386,12 +387,12 @@ def buy_pack(buyer: str, usd: float = None) -> dict:
         c.commit()
     finally:
         c.close()
-    vault = os.environ.get("SOLANA_VAULT_WALLET", "").strip()
+    vault = os.environ.get("BSC_WALLET_ADDRESS", "").strip()
     pay_url = ""
     if vault:
         import urllib.parse
-        pay_url = (f"solana:{vault}?amount={demand:.2f}"
-                   f"&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        pay_url = (f"bsc:{vault}?amount={demand:.2f}"
+                   f"&contract=0x55d398326f99059fF775485246999027B3197955"
                    f"&memo={urllib.parse.quote(memo)}&label={urllib.parse.quote(memo)}")
     return {
         "buyer": buyer,

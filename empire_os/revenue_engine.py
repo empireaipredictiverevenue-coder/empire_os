@@ -231,13 +231,13 @@ def awaiting_subs_outreach(batch: int = 10, dry_run: bool = False) -> dict:
                 continue
             # Build a pay_url directly — skip the create_quote signing flow for speed
             # (awaiting subs already have known price; just email them the price + memo)
-            vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
+            vault = os.getenv("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
             amount = (rd.get("price_cents") or 0) / 100.0
             if amount <= 0:
                 amount = 599.0  # silver default
             sub_id = rd.get("sub_id", "")
             memo = f"sub:{sub_id}"
-            pay_url = f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb?amount={amount:.2f}&label=Empire%20OS&memo={memo}"
+            pay_url = f"bsc:0x1339b487046B0ad924a10c20b1791608EA8595a8?amount={amount:.2f}&label=Empire%20OS&memo={memo}"
 
             subject = f"Complete your Empire OS subscription — ${amount:.0f} USDT"
             body = (

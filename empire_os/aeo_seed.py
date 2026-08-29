@@ -159,9 +159,9 @@ def get_price(c: sqlite3.Connection, niche: str) -> float:
 
 def render(niche: str, cfg: dict, price: float) -> str:
     """Render full AEO HTML matching existing template."""
-    vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
+    vault = os.getenv("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
     pay_url = (
-        f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb"
+        f"bsc:0x1339b487046B0ad924a10c20b1791608EA8595a8"
         f"?amount={price:.2f}"
         f"&label=Empire%20OS%20{niche.title()}"
         f"&memo=aeo:{niche}"

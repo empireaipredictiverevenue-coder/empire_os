@@ -18,20 +18,20 @@
 - **Config**: `RESEND_API_KEY=re_...` + `SMTP_PASS=re_...` in `.env`
 - **ETA**: 5 min once key obtained
 
-### [ ] Onboard 3 Pilot Buyers — USDC Deposits
-- **Impact**: $0 revenue until buyers deposit USDC
+### [ ] Onboard 3 Pilot Buyers — USDT Deposits
+- **Impact**: $0 revenue until buyers deposit USDT
 - **Targets**: 
   1. Plumbing contractor (Dallas/Atlanta)
   2. Roofing company (NYC/LA)
   3. General Contractor (Chicago/PHX)
-- **Deposit**: 100 USDC each = 2,000 credits (Silver tier, $20/lead)
+- **Deposit**: 100 USDT each = 2,000 credits (Silver tier, $20/lead)
 - **Webhook**: Register at `/v1/buyers/register` with delivery endpoint
 - **ETA**: 1-2 days outreach
 
-### [ ] Fund Solana Vault — Payout Liquidity
-- **Address**: `egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM`
-- **Amount**: 500 USDC (covers ~100 lead payouts)
-- **ETA**: 5 min once USDC available
+### [ ] Fund BSC Vault — Payout Liquidity
+- **Address**: `0x1339b487046B0ad924a10c20b1791608EA8595a8`
+- **Amount**: 500 USDT (covers ~100 lead payouts)
+- **ETA**: 5 min once USDT available
 
 ---
 
@@ -63,14 +63,14 @@
 
 ### [ ] Buyer Onboarding Flow
 - POST `/v1/buyers/register` with niche, metro, webhook_url
-- Buyer deposits USDC to vault address
-- Auto-credit: 100 USDC = 2,000 credits (Silver)
+- Buyer deposits USDT to vault address
+- Auto-credit: 100 USDT = 2,000 credits (Silver)
 
 ### [ ] Lead Delivery → Claim → Payout Loop
 - Lead matched to buyer niche/metro
 - Delivered via webhook + email + dashboard
-- Buyer claims → credits deducted → USDC auto-payout to vendor
-- Solana listener confirms → marks settled
+- Buyer claims → credits deducted → USDT auto-payout to vendor
+- BSC listener confirms → marks settled
 
 ### [ ] Scale to 5 Buyers → $10K/day
 - Add HVAC, Electrical, Water Mitigation buyers
@@ -86,7 +86,7 @@
 | Leads/day | 13K | 15K | 25K |
 | Emails sent/day | 0 | 500 | 2,000 |
 | Replies/day | 0 | 5 | 50 |
-| Buyers with USDC | 0 | 3 | 10 |
+| Buyers with USDT | 0 | 3 | 10 |
 | Leads delivered/day | 0 | 100 | 500 |
 | Leads claimed/day | 0 | 10 | 100 |
 | **Revenue/day** | **$0** | **$2,000** | **$20,000** |
@@ -105,7 +105,7 @@
 # - buyer_hunter_agent (30min)
 # - lead_sniper_agent
 # - founder_outreach
-# - solana_listener
+# - bsc_listener
 ```
 
 ---
@@ -131,8 +131,8 @@ The system runs autonomously:
 3. **Buyer Hunter** → Finds new buyers (every 30min)
 4. **Outreach Runner** → Nurtures prospects → sends branded emails (hourly)
 5. **Enrichment Webhook** → Provides emails + intelligence when Hunter fails
-6. **Solana Listener** → Confirms USDC deposits → triggers credits
+6. **BSC Listener** → Confirms USDT deposits → triggers credits
 7. **Lead Sniper** → Matches leads to buyers → delivers via webhook
 8. **Payout Agent** → Auto-pays vendors when leads claimed
 
-**You only need to unblock**: Hunter key, Resend key, 3 pilot buyers, 500 USDC vault fund.
+**You only need to unblock**: Hunter key, Resend key, 3 pilot buyers, 500 USDT vault fund.

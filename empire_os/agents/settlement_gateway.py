@@ -2,8 +2,8 @@
 """
 Empire OS v3 — Settlement Gateway
 
-Handles USDC settlement for delivered leads.
-- Receives lead_id from solana_listener (via memo matching)
+Handles USDT settlement for delivered leads.
+- Receives lead_id from bsc_listener (via memo matching)
 - Marks si_funnel_event for that lead as 'settled'
 - Writes si_settlements row for audit trail
 - Idempotent on (tx_signature, lead_id)
@@ -54,8 +54,8 @@ def settle_lead_by_id(lead_id: str, tx_signature: str, amount_usdc: float, memo:
 
     Args:
         lead_id: The lead identifier from lane_leads or crm_leads
-        tx_signature: Solana transaction signature
-        amount_usdc: USDC amount received
+        tx_signature: BSC transaction signature
+        amount_usdc: USDT amount received
         memo: Original memo from the transaction
 
     Returns:
@@ -141,7 +141,7 @@ def settle_lead_by_id(lead_id: str, tx_signature: str, amount_usdc: float, memo:
                     prospect_id,
                     current_state["to_state"] if current_state else "claimed",
                     "settled",
-                    "solana_listener",
+                    "bsc_listener",
                     json.dumps({
                         "lead_id": lead_id,
                         "amount_usdc": amount_usdc,
@@ -165,8 +165,8 @@ def settle_lead_by_id(lead_id: str, tx_signature: str, amount_usdc: float, memo:
                     "",  # tenant_id unknown at this stage; could be looked up
                     amount_cents,
                     occurred_at,
-                    "solana_listener",
-                    f"USDC settlement for lead {lead_id} via tx {tx_signature[:20]}",
+                    "bsc_listener",
+                    f"USDT settlement for lead {lead_id} via tx {tx_signature[:20]}",
                 ),
             )
             settlement_id = cursor.lastrowid
@@ -340,7 +340,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Settlement Gateway CLI")
     parser.add_argument("--memo", required=True, help="Transaction memo")
     parser.add_argument("--tx", required=True, help="Transaction signature")
-    parser.add_argument("--amount", type=float, required=True, help="USDC amount")
+    parser.add_argument("--amount", type=float, required=True, help="USDT amount")
     parser.add_argument("--check", help="Check settlement status for lead_id")
     args = parser.parse_args()
 

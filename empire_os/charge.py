@@ -2,13 +2,13 @@
 Charge adapter - processor-agnostic buyer charging.
 
 Processors (in priority order):
-  USDC (Solana) - real money, on-chain reconciliation via memo
+  USDT (BSC) - real money, on-chain reconciliation via memo
   PayPal       - if PAYPAL_CLIENT_ID + PAYPAL_CLIENT_SECRET are set
   (no simulated fallback — if no real processor is available the charge
    FAILS. The NO-SIM lock forbids the 'simulated' status entirely.)
 
 Stripe was removed from this layer because (a) we have a working
-USDC path that doesn't need a third party, and (b) Stripe-card
+USDT path that doesn't need a third party, and (b) Stripe-card
 charges require the buyer to have set up a saved card in our Stripe
 Customer object which we don't operate.
 
@@ -22,7 +22,7 @@ Returns ChargeResult shape:
     "status":      "succeeded" | "open" | "failed",
     "processor":   "usdc" | "paypal" | "failed",
     "amount_cents": 1500,
-    "currency":    "USDC" | "USD",
+    "currency":    "USDT" | "USD",
     "fallback":    bool,
     "processor_response": <truncated dict>,
     "pay_url":     <only when usdc>,
@@ -117,9 +117,9 @@ def _has_paypal() -> bool:
 
 
 def _has_crypto(buyer_id: str = "") -> bool:
-    """USDC-on-Solana is available if Solana deps + vault are configured.
+    """USDT-on-BSC is available if BSC deps + vault are configured.
 
-    NOTE: a buyer-side wallet is NOT required — Solana Pay pushes funds
+    NOTE: a buyer-side wallet is NOT required — BSC Pay pushes funds
     TO the empire vault, so the payment request link is generated from
     the vault address alone. We only need the capability (deps + vault),
     independent of any stored buyer wallet. Requiring a buyer wallet here
@@ -128,11 +128,11 @@ def _has_crypto(buyer_id: str = "") -> bool:
     if not _HAS_CRYPTO:
         return False
     return bool(os.environ.get("EMPIRE_WALLET") or
-                os.environ.get("SOLANA_VAULT_WALLET"))
+                os.environ.get("BSC_WALLET_ADDRESS"))
 
 
 def pick_processor(buyer_id: str = "") -> str:
-    """Priority: crypto (real USDC) > paypal.
+    """Priority: crypto (real USDT) > paypal.
     NO simulated fallback — if no processor, charge fails.
     """
     if _has_crypto(buyer_id):
@@ -375,7 +375,7 @@ def charge(buyer_id: str, head: int, reason: str,
     # A charge that generates a pay_url but never delivers it is dead:
     # the buyer can't pay, the on-chain reconcile never matches, and the
     # charge sits "open" forever. So: if we produced a pay_url AND we can
-    # resolve the buyer's email, email the Solana Pay link. No email ->
+    # resolve the buyer's email, email the BSC Pay link. No email ->
     # log a hard failure + alert so it can NEVER silently sit open again.
     _pay_url = (safe.get("raw", {}).get("pay_url")
                 or safe.get("pay_url") or "")
@@ -387,10 +387,10 @@ def charge(buyer_id: str, head: int, reason: str,
                 _amt = amount_cents / 100.0
                 _sent = mail_sender._send(
                     _buyer_email,
-                    f"Empire OS — payment request ({_amt:.2f} USDC)",
-                    f"Please complete payment via Solana Pay:\n\n"
+                    f"Empire OS — payment request ({_amt:.2f} USDT)",
+                    f"Please complete payment via BSC Pay:\n\n"
                     f"{_pay_url}\n\nMemo: {safe.get('raw', {}).get('memo') or safe.get('memo') or ''}\n"
-                    f"Amount: {_amt:.2f} USDC\n\n"
+                    f"Amount: {_amt:.2f} USDT\n\n"
                     f"This request was generated for: {reason[:120]}")
                 if not _sent.get("ok"):
                     sys.stderr.write(
@@ -452,7 +452,7 @@ def settle_ppc_invoice(invoice_id: str) -> dict:
 if __name__ == "__main__":
     print("[charge] active processors:")
     print("  Stripe:    removed from buyer-charges (use /v1/finance/payout for vendor payouts)")
-    print(f"  USDC:      {'yes' if _HAS_CRYPTO else 'no (solana deps missing)'}")
+    print(f"  USDT:      {'yes' if _HAS_CRYPTO else 'no (bsc deps missing)'}")
     print(f"  PayPal:    {'yes' if _has_paypal() else 'no'}")
     print(f"  Simulated:  "
           f"{'default' if not (_has_paypal() or _HAS_CRYPTO) else 'fallback'}")

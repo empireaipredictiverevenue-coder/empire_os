@@ -111,12 +111,12 @@ def get_or_create_ref(c: sqlite3.Connection, ref_code: str) -> Optional[dict]:
 
 def build_pay_url(niche: str, price_usdc: float, ref_code: Optional[str] = None) -> str:
     """Build a BSC Pay deeplink for the niche + price + ref."""
-    vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
+    vault = os.getenv("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
     memo = f"aeo:{niche}"
     if ref_code:
         memo += f":ref:{ref_code}"
     return (
-        f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb"
+        f"bsc:0x1339b487046B0ad924a10c20b1791608EA8595a8"
         f"?amount={price_usdc:.2f}"
         f"&label=Empire%20OS%20{niche}"
         f"&memo={memo}"

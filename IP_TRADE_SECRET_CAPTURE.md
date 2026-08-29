@@ -51,12 +51,12 @@ search-API enrichment. Rotates multiple Overpass public mirrors + multi-region
 bbox to avoid per-IP rate limits.
 Code: empire_lead_crawler.py overpass_domains() (4 endpoints × 8 US regions).
 
-### TS-5 — Crypto-Native B2B Lead Settlement (Solana USDC)
-A payment rail where lead buyers deposit/settle in USDC on Solana mainnet — no
+### TS-5 — Crypto-Native B2B Lead Settlement (BSC USDT)
+A payment rail where lead buyers deposit/settle in USDT on BSC mainnet — no
 Stripe, no KYC, no traditional merchant account. Lead royalties flow programmatically.
 Payment processor is the vault; settlement is on-chain. Novel for B2B lead
 marketplaces which are traditionally card/KYC gated.
-Code: empire_os/solana_listener_agent.py; vault logic.
+Code: empire_os/bsc_listener_agent.py; vault logic.
 
 ### TS-6 — Lane / Seat-Corridor Monetization Model
 Business method: lead inventory is organized as "lanes" (verticals/corridors);
@@ -74,7 +74,7 @@ File                                      Lines  Protectable element
 /root/empire_os/empire_lead_crawler.py     244   TS-4 Overpass fusion + loop
 /root/empire_os/captcha_farm.py            131   Multi-browser CAPTCHA harness
 /root/g-brain/revenue/pricing.md            —     TS-6 tier model
-/root/empire_os/empire_os/solana_listener_agent.py — TS-5 settlement
+/root/empire_os/empire_os/bsc_listener_agent.py — TS-5 settlement
 
 Action: keep these under version control (private repo). Add LICENSE + copyright
 header. Do NOT publish keys/config in commits.

@@ -2,7 +2,7 @@
 """A2A settlement bridge: turn a2a_mesh agent quotes into payable charges.
 
 Reads /root/feedback/a2a_mesh.jsonl, for each quote without a settled
-charge, runs charge.charge(buyer_id=wallet, ...) to mint a Solana Pay
+charge, runs charge.charge(buyer_id=wallet, ...) to mint a BSC Pay
 pay_url. Writes results to /root/feedback/a2a_settled.jsonl.
 
 Idempotent-ish: skips quotes already in a2a_settled.jsonl by (ts,sku).

@@ -15,7 +15,7 @@ no auto-commit).
 Polled surfaces:
   /root/feedback/crawler_runs.jsonl   — source adapter health
   /root/feedback/lead_deliveries.jsonl — buyer delivery outcomes
-  /root/feedback/solana_payments.jsonl — payment flow
+  /root/feedback/bsc_payments.jsonl — payment flow
   /root/feedback/alerts.jsonl         — alerts that fired
   /root/feedback/outreach_log.jsonl    — outreach agent outcomes
   /root/feedback/lane_monitor.jsonl   — lane-monitor observations
@@ -361,7 +361,7 @@ def council_status() -> dict:
 
 
 def vault_status() -> dict:
-    """Read vault USDC balance via Helius RPC. Skipped silently if RPC down."""
+    """Read vault USDT balance via Helius RPC. Skipped silently if RPC down."""
     try:
         env_path = Path("/root/empire_os/.env")
         env = {}
@@ -370,8 +370,8 @@ def vault_status() -> dict:
                 if "=" in ln and not ln.startswith("#"):
                     k, v = ln.split("=", 1)
                     env[k.strip()] = v.strip()
-        rpc = env.get("SOLANA_RPC_URL", "")
-        vault = env.get("SOLANA_VAULT_WALLET", "")
+        rpc = env.get("BSC_RPC", "")
+        vault = env.get("BSC_WALLET_ADDRESS", "")
         if not (rpc and vault):
             return {"usdc": "unknown", "sol_usd": "unknown"}
         r_bal = requests.post(rpc, json={
@@ -396,7 +396,7 @@ def money_projection() -> dict:
         # count pending leads per lane, sorted
         subs = json.loads(json.dumps({"none":0}))
         # for now: simplistic - 0 paying so MRR = 0
-        return {"mrr_usd": 0, "next_action": "send SEAT_/INV_ USDC to settle"}
+        return {"mrr_usd": 0, "next_action": "send SEAT_/INV_ USDT to settle"}
     except Exception:
         return {"mrr_usd": 0}
 
@@ -423,8 +423,8 @@ def write_daily_brief():
         f"_Generated {now.strftime('%H:%M UTC')}_",
         "",
         "## Money",
-        f"- MRR (USDC): ${money.get('mrr_usd', 0):,}",
-        f"- Vault USDC: {vault.get('usdc', 'unknown')}",
+        f"- MRR (USDT): ${money.get('mrr_usd', 0):,}",
+        f"- Vault USDT: {vault.get('usdc', 'unknown')}",
         f"- Next: {money.get('next_action', '')}",
         "",
         "## Fleet",

@@ -46,7 +46,7 @@ def queue_pay_email(conn, inv_id, tid, amt, pay_url, period):
         f"Your Empire OS subscription invoice for {period} is ready.\n\n"
         f"Amount: ${usdc:.2f} USDT on BSC\n"
         f"Pay here: {pay_url}\n\n"
-        f"Scan the link with Trust Wallet / MetaMask (BSC network) and send the "
+        f"Scan the link with Trust Wallet (BSC network) and send the "
         f"exact USDT amount. Your memo is attached automatically. The subscription "
         f"activates on confirmation.\n\n"
         f"Invoice: {inv_id}\n"

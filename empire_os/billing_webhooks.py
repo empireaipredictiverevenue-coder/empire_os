@@ -11,7 +11,7 @@ PayPal events handled:
   - BILLING.SUBSCRIPTION.SUSPENDED — mark past_due
 
 Crypto: we poll instead of receiving webhooks (no inbound webhook
-support on most Solana RPC). The poll loop runs every 5 min and
+support on most BSC RPC). The poll loop runs every 5 min and
 checks pending payment requests.
 """
 from __future__ import annotations

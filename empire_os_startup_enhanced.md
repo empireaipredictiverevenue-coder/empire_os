@@ -21,7 +21,7 @@
 │        ▼                                 ▼          │
 │  ┌──────────┐                     ┌──────────────┐  │
 │  │CAMPAIGNS │                     │CHARGE ADAPTER│  │
-│  │(8 live)  │                     │(Stripe→USDC) │  │
+│  │(8 live)  │                     │(Stripe→USDT) │  │
 │  └──────────┘                     └──────────────┘  │
 │                                                      │
 │  ┌──────────────────────────────────────────────┐   │
@@ -42,7 +42,7 @@
 | Empire Hub | :8081 | ✅ LIVE | Main API gateway, revenue loop |
 | PPC Router | :9200 | ✅ LIVE | 5-headed billing engine |
 | Switchboard | :9100 | ✅ LIVE | AGI + SI routing |
-| Solana Listener | — | ⚠️ DUPLICATE | 2 PIDs (9865, 9872) — kill one |
+| BSC Listener | — | ⚠️ DUPLICATE | 2 PIDs (9865, 9872) — kill one |
 | Crawler/Leads | — | ✅ LIVE | 78K+ leads/day |
 | Intelligence Loop | — | ✅ LIVE | Host-level agents |
 | Supervisor Daemon | — | ✅ 3x | Auto-restart verified |
@@ -118,10 +118,10 @@ curl -X POST http://10.118.155.218:8081/v1/ppc/charge \
 | Head | Rate | Target | Settlement |
 |------|------|--------|------------|
 | 1. Pay-Per-Call (90s) | $15/call | Roofing, plumbing, HVAC | Instant card |
-| 2. Hybrid Whale | $200 + 7% | Storm, solar, mass tort | USDC on close |
-| 3. Pay-Per-Lead | $45/lead (×3 max) | AEO form-fills | USDC |
-| 4. Pay-Per-Schedule | $150/appt | Busy contractors | USDC |
-| 5. Native PPC Arbitrage | $8/CPC | Cheap clicks → phone/form | USDC |
+| 2. Hybrid Whale | $200 + 7% | Storm, solar, mass tort | USDT on close |
+| 3. Pay-Per-Lead | $45/lead (×3 max) | AEO form-fills | USDT |
+| 4. Pay-Per-Schedule | $150/appt | Busy contractors | USDT |
+| 5. Native PPC Arbitrage | $8/CPC | Cheap clicks → phone/form | USDT |
 
 **Subscription Tiers** (buyer-facing):
 | Tier | Monthly | Lanes | Per Call | Hybrid Connect | Backend |
@@ -153,7 +153,7 @@ incus exec empire-hub -- bash -c "
   nohup /root/venv/bin/python3 /root/empire_os/empire_os/lane_monitor.py > /root/empire_os/logs/lane_monitor.log 2>&1 &
   nohup /root/venv/bin/python3 /root/empire_os/empire_os/agents/lead_sniper_agent.py > /root/empire_os/logs/lead_sniper.log 2>&1 &
   nohup /root/venv/bin/python3 -m empire_os.agents.predictive_agent > /root/empire_os/logs/predictive_agent.log 2>&1 &
-  nohup /root/venv/bin/python3 /root/empire_os/empire_os/agents/solana_listener_agent.py > /root/empire_os/logs/solana_listener.log 2>&1 &
+  nohup /root/venv/bin/python3 /root/empire_os/empire_os/agents/bsc_listener_agent.py > /root/empire_os/logs/bsc_listener.log 2>&1 &
 "
 
 # 4. Verify
@@ -189,8 +189,8 @@ ExecStart=/root/venv/bin/python3 -m empire_os.hub
 
 | Issue | Severity | Fix |
 |-------|----------|-----|
-| Solana RPC DNS resolution fails in container | Medium | Fix `/etc/resolv.conf` or use IP in Helius URL |
-| Duplicate `solana_listener_agent` (2 PIDs) | Low | Kill one, ensure single systemd unit |
+| BSC RPC DNS resolution fails in container | Medium | Fix `/etc/resolv.conf` or use IP in Helius URL |
+| Duplicate `bsc_listener_agent` (2 PIDs) | Low | Kill one, ensure single systemd unit |
 | `/v1/buyers/apply` timeout on deep health | Low | Increase timeout or fix downstream |
 | `/v1/ppc/charge` timeout on deep health | Low | Same as above |
 

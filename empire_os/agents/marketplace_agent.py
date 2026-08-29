@@ -3,23 +3,23 @@ Marketplace Agent — Fiverr-style marketplace for agents.
 
 Why: agents have capabilities that other agents need. Without a
 marketplace they steal/copy each other. With one, they pay each
-other in USDC, building a real revenue stream for the Empire OS
+other in USDT, building a real revenue stream for the Empire OS
 vault.
 
 Flow:
   1. Each agent auto-lists services on init (e.g. "scout: discover
-     10 leads in <niche> = 0.50 USDC, ETA 5 min")
+     10 leads in <niche> = 0.50 USDT, ETA 5 min")
   2. Other agents submit orders via hub POST /v1/marketplace/order
   3. Marketplace agent polls pending orders, assigns to provider,
      waits for completion
-  4. On completion: simulate USDC transfer provider→vault
+  4. On completion: simulate USDT transfer provider→vault
      (real settlement once we have a funded vault)
   5. Provider agent's wallet credited; vault ledger updated
 
 State:
   /root/marketplace/services.json  — list of services (id, provider, name, price, eta, active)
   /root/marketplace/orders.json    — pending + completed orders
-  /root/marketplace/wallets.json   — per-agent USDC credit balances
+  /root/marketplace/wallets.json   — per-agent USDT credit balances
   /root/marketplace/ledger.jsonl   — append-only audit (every tx)
 
 Cycle: 5 min — fast enough to feel "live" to ordering agents.
@@ -55,7 +55,7 @@ HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 HERMES_GATEWAY_URL = os.environ.get(
     "HERMES_GATEWAY_URL", "http://10.118.155.156:9100")
 USDC_VAULT = os.environ.get("USDC_VAULT",
-                            "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+                            "0x1339b487046B0ad924a10c20b1791608EA8595a8")
 
 # Default service catalog — what every agent offers. Each agent
 # auto-registers its services on first cycle.
@@ -234,7 +234,7 @@ class MarketplaceAgent(SyntheticAgent):
         return self._snapshot_revenue()
 
     def _process_orders(self) -> dict:
-        """Fulfill pending orders: simulate provider work + USDC settle."""
+        """Fulfill pending orders: simulate provider work + USDT settle."""
         orders = load_json(ORDERS_PATH, [])
         wallets = load_json(WALLETS_PATH, {})
         processed = 0
@@ -243,10 +243,10 @@ class MarketplaceAgent(SyntheticAgent):
                 continue
             # Simulate provider work — in production the provider
             # agent would actually do the work. Here we just mark
-            # complete + transfer USDC vault credit.
+            # complete + transfer USDT vault credit.
             o["status"] = "complete"
             o["completed_at"] = datetime.now(timezone.utc).isoformat()
-            o["tx_hash"] = "solana-mock-" + uuid.uuid4().hex[:16]
+            o["tx_hash"] = "bsc-mock-" + uuid.uuid4().hex[:16]
             # Wallet updates
             provider = o.get("provider", "?")
             price = o.get("price_usdc", 0)
@@ -296,7 +296,7 @@ class MarketplaceAgent(SyntheticAgent):
                 requests.post(
                     f"{HERMES_GATEWAY_URL}/v1/notify/alert",
                     json={
-                        "title": f"marketplace: ${total:.2f} USDC cumulative",
+                        "title": f"marketplace: ${total:.2f} USDT cumulative",
                         "body": f"prev=${prev:.2f} now=${total:.2f}",
                         "severity": "info",
                         "source": "marketplace-agent",
@@ -304,7 +304,7 @@ class MarketplaceAgent(SyntheticAgent):
             except Exception:
                 pass
         prev_path.write_text(json.dumps({"total": total}))
-        return {"summary": f"revenue=${total:.2f} USDC"}
+        return {"summary": f"revenue=${total:.2f} USDT"}
 
 
 if __name__ == "__main__":

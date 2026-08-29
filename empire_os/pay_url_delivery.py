@@ -1,6 +1,6 @@
 """W2 pay_url auto-delivery.
 
-The hub's POST /v1/ppc/charge mints a real Solana Pay URL and writes
+The hub's POST /v1/ppc/charge mints a real BSC Pay URL and writes
 si_charges + si_ppc_invoices, but historically the URL never reached the
 buyer. This module closes that loop: after a successful crypto charge
 (status='open' or 'succeeded' with a non-empty pay_url), resolve a buyer
@@ -90,18 +90,18 @@ def resolve_buyer_email(buyer_id: str) -> tuple[str | None, str]:
 
 
 _PAY_URL_TEMPLATE = """\
-Pay {dollars:.2f} USDC to activate your head {head} lead delivery.
+Pay {dollars:.2f} USDT to activate your head {head} lead delivery.
 
 Buyer: {buyer_id}
 Reason: {reason}
 Charge: {charge_id}
 
-Click the link below (or copy into any Solana wallet) to pay:
+Click the link below (or copy into any BSC wallet) to pay:
 {pay_url}
 
 Memo: {memo}
 
-Once on-chain USDC is detected by solana_listener, your charge will be
+Once on-chain USDT is detected by bsc_listener, your charge will be
 marked paid and lead delivery starts within minutes.
 
 — Empire AI
@@ -113,7 +113,7 @@ def _render_pay_url_email(pay_url: str, memo: str,
                           buyer_id: str, reason: str,
                           charge_id: str) -> tuple[str, str]:
     dollars = max(0.01, amount_cents / 100)
-    subject = f"Empire AI — pay ${dollars:.2f} USDC (head {head})"
+    subject = f"Empire AI — pay ${dollars:.2f} USDT (head {head})"
     body = _PAY_URL_TEMPLATE.format(
         pay_url=pay_url, memo=memo, head=head, buyer_id=buyer_id,
         reason=reason, charge_id=charge_id, dollars=dollars)

@@ -6,6 +6,7 @@ Reconciles with si_charges/si_settlements by polling balance.
 Runs every 60s via systemd. Zero gas needed to receive USDT on BSC.
 """
 import os, sys, json, time, logging, urllib.request
+from pathlib import Path
 
 sys.path.insert(0, "/root/empire_os")
 for _ln in open("/root/empire_os/.env"):
@@ -47,7 +48,7 @@ def reconcile_settlement(delta, cycle):
     """Notify hub of inbound USDT payment via /v1/finance/replay.
 
     Hub expects: amount_usdc, memo, wallet_from, tx_signature.
-    memo is OPTIONAL — TokenPocket/Trust USDT transfers carry none, so
+    memo is OPTIONAL — Trust Wallet/Trust USDT transfers carry none, so
     hub falls back to amount-match on awaiting invoices.
     """
     payload = json.dumps({
@@ -68,9 +69,28 @@ def reconcile_settlement(delta, cycle):
         log.warning(f"hub reconcile failed: {e}")
         return None
 
+BASELINE_FILE = "/root/empire_os/logs/bsc_last_balance.txt"
+
+def load_last_balance() -> float:
+    """Persisted balance from previous run. Prevents restarts from
+    re-counting the whole vault balance as INBOUND (phantom revenue)."""
+    try:
+        with open(BASELINE_FILE) as f:
+            return float(f.read().strip() or 0.0)
+    except Exception:
+        return 0.0
+
+def save_last_balance(bal: float) -> None:
+    try:
+        Path(BASELINE_FILE).parent.mkdir(parents=True, exist_ok=True)
+        with open(BASELINE_FILE, "w") as f:
+            f.write(f"{bal:.6f}")
+    except Exception:
+        pass
+
 def main():
     log.info(f"BSC USDT listener started — wallet={BSC_WALLET} interval={POLL_INTERVAL}s")
-    last_balance = 0.0
+    last_balance = load_last_balance()
     cycle = 0
     RPC_ENDPOINTS = [
         "https://bsc-dataseed.binance.org",
@@ -90,6 +110,11 @@ def main():
                 if result:
                     log.info(f"settled: {json.dumps(result)[:200]}")
                 last_balance = current_balance
+                save_last_balance(current_balance)
+            elif delta < 0:
+                # Outbound payout — just move baseline, never settle negatives
+                last_balance = current_balance
+                save_last_balance(current_balance)
             log.info(f"cycle_end ok=true balance={current_balance} delta={delta}")
             rpc_idx = 0
         except Exception as e:

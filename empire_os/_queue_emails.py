@@ -49,7 +49,7 @@ for iid, tid, amt, url, email in todo:
     body = (
         f"Your Empire OS subscription invoice for 2026-07 is ready.\n\n"
         f"Amount: ${usdc:.2f} USDT on BSC\nPay here: {url}\n\n"
-        f"Scan with Trust Wallet / MetaMask (BSC network). The memo is attached "
+        f"Scan with Trust Wallet (BSC network). The memo is attached "
         f"automatically. Your subscription activates on confirmation.\n\n"
         f"Invoice: {iid}\n"
     )

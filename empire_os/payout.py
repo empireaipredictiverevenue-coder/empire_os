@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("empire_payout")
 
 BSC_WALLET = os.getenv("BSC_WALLET_ADDRESS",
-    "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
+    "0x1339b487046B0ad924a10c20b1791608EA8595a8")
 BSC_USDT_CONTRACT = os.getenv("BSC_USDT_CONTRACT",
     "0x55d398326f99059fF775485246999027B3197955")
 BSC_RPC = os.getenv("BSC_RPC", "https://bsc-dataseed.binance.org")

@@ -120,7 +120,7 @@ Output JSON: {{
   "revenue_target_usd": 5000,
   "moves": [
     {{
-      "move": "Deploy solana-listener watchdog cron",
+      "move": "Deploy bsc-listener watchdog cron",
       "owner": "engineering",
       "deadline": "2026-08-25",
       "expected_usd": 12000,
@@ -155,7 +155,7 @@ def fallback_moves(data: dict) -> list:
     # Move 1: Always need settlement bridge if no settlements
     if settlement.get("settlements_7d", 0) == 0:
         moves.append({
-            "move": "Deploy solana-listener watchdog cron (every 60s)",
+            "move": "Deploy bsc-listener watchdog cron (every 60s)",
             "owner": "engineering",
             "deadline": (datetime.now(timezone.utc)).strftime("%Y-%m-%d"),
             "expected_usd": 12000,

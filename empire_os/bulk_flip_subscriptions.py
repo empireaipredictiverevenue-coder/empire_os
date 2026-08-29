@@ -15,7 +15,7 @@ Two-stage sweep that consumes the real deposit ledger one-for-one:
   2. EXPIRE — for anything still awaiting_payment after step 1 AND created
      older than `STALE_DAYS` days, mark 'expired' with reason='no_payment_30d'.
      Anything recent (< STALE_DAYS) is left alone so /v1/finance/replay or
-     the solana_listener can still pick it up on the next cycle.
+     the bsc_listener can still pick it up on the next cycle.
 
 Each deposit is consumed exactly once: we mark si_charges.payment_ref with
 the matched subscription_id so a future run (or the live listener) won't

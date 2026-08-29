@@ -4,7 +4,7 @@ Generated: 2026-07-26T04:08:05Z
 ---
 
 ## REVENUE STATUS: $0.00
-All revenue metrics are currently zero — no buyers have deposited USDC, no payouts processed.
+All revenue metrics are currently zero — no buyers have deposited USDT, no payouts processed.
 
 | Metric | Value |
 |--------|-------|
@@ -89,8 +89,8 @@ All revenue metrics are currently zero — no buyers have deposited USDC, no pay
 
 | Blocker | Status | Resolution |
 |---------|--------|------------|
-| **0 Buyers with USDC** | Critical | Need to onboard 3-5 pilot buyers with USDC deposits |
-| **No USDC in Vault** | Critical | Vault has 0.52 USDC (insufficient for payouts) |
+| **0 Buyers with USDT** | Critical | Need to onboard 3-5 pilot buyers with USDT deposits |
+| **No USDT in Vault** | Critical | Vault has 0.52 USDT (insufficient for payouts) |
 | **Hunter.io Key Missing** | High | Email enrichment failing — need API key |
 | **Resend API Key** | Medium | Outreach runner falls back to webhook (no email sent) |
 | **Buyer Webhooks** | High | No buyer endpoints registered for delivery |
@@ -100,7 +100,7 @@ All revenue metrics are currently zero — no buyers have deposited USDC, no pay
 ## IMMEDIATE ACTIONS (Next 48 Hours)
 
 1. **Onboard 3 Pilot Buyers** (Plumbing, Roofing, GC)
-   - Each deposits 100 USDC → 2,000 credits (Silver tier)
+   - Each deposits 100 USDT → 2,000 credits (Silver tier)
    - Register webhook endpoints for lead delivery
 
 2. **Add Hunter.io API Key** to `.env`
@@ -113,8 +113,8 @@ All revenue metrics are currently zero — no buyers have deposited USDC, no pay
    RESEND_API_KEY=<your_key>
    ```
 
-4. **Fund Vault** with 500 USDC for initial payouts
-   - Address: `egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM`
+4. **Fund Vault** with 500 USDT for initial payouts
+   - Address: `0x1339b487046B0ad924a10c20b1791608EA8595a8`
 
 5. **Register Buyer Webhooks** via `/v1/buyers/register`
 
@@ -126,7 +126,7 @@ All revenue metrics are currently zero — no buyers have deposited USDC, no pay
 |-----------|--------|
 | Hub (8081) | ✅ Online |
 | Deep Health | ✅ All checks pass |
-| Solana RPC | ✅ Connected (0.52 USDC in vault) |
+| BSC RPC | ✅ Connected (0.52 USDT in vault) |
 | DB | ✅ Writable, all tables OK |
 | Listener | ✅ PID 2207, alive |
 | 9 Containers | ✅ All RUNNING |

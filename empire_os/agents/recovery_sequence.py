@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""recovery_sequence.py — 3-touch USDC pay-link recovery on awaiting deals.
+"""recovery_sequence.py — 3-touch USDT pay-link recovery on awaiting deals.
 
 The biggest uncollected-revenue lever: 496 buyer seats minted (awaiting_payment)
 but never paid = $297k. This runs a 3-touch nudge:
   T1 (day 0):  "Your Empire OS seat is reserved — pay $X to activate"
   T2 (day 3):  "Reminder: your pay link expires soon"
   T3 (day 7):  "Final notice + limited offer (2 months free on annual)"
-Each touch emails the buyer their exact Solana Pay link (re-derived from the
+Each touch emails the buyer their exact BSC Pay link (re-derived from the
 live tenant), logs to crm_deals.touch_N, and queues via the outbox (Brevo).
 
 Run: python3 recovery_sequence.py [--dry-run] [--max N]
@@ -18,7 +18,7 @@ sys.path.insert(0, "/root/empire_os")
 DB = "/root/empire_os/empire_os.db"
 HUB = "http://127.0.0.1:8081"
 
-# ── load .env so SOLANA_VAULT_WALLET + secrets are available ──
+# ── load .env so BSC_WALLET_ADDRESS + secrets are available ──
 _ENV_PATH = "/root/empire_os/.env"
 if os.path.exists(_ENV_PATH):
     try:
@@ -55,11 +55,11 @@ def days_since(iso):
         return 99
 
 def get_pay_url(tenant_id):
-    """Reconstruct the Solana Pay link for an existing tenant from the DB.
+    """Reconstruct the BSC Pay link for an existing tenant from the DB.
 
-    The apply flow stores payment_ref (Solana memo) in si_subscription and the
-    vault wallet in SOLANA_VAULT_WALLET. The pay_url is the standard Solana Pay
-    URI: solana:<vault>?memo=<ref>&amount=<usdc>. No new hub endpoint needed.
+    The apply flow stores payment_ref (BSC memo) in si_subscription and the
+    vault wallet in BSC_WALLET_ADDRESS. The pay_url is the standard BSC Pay
+    URI: bsc:<vault>?memo=<ref>&amount=<usdc>. No new hub endpoint needed.
     """
     import os
     try:
@@ -73,9 +73,12 @@ def get_pay_url(tenant_id):
         c.close()
         if not row or not row[0]:
             return None
-        vault = os.environ.get("SOLANA_VAULT_WALLET", "")
+        vault = os.environ.get("BSC_WALLET_ADDRESS", "")
+        if not vault:
+            vault = os.environ.get("BSC_WALLET_ADDRESS", "")
         usdc = (row[1] or 0) / 100.0
-        return f"solana:{vault}?memo={row[0]}&amount={usdc}"
+        usdt_mint = "0x55d398326f99059fF775485246999027B3197955"
+        return f"bsc:{vault}?amount={usdc}&contract={usdt_mint}&memo={row[0]}"
     except Exception:
         return None
 
@@ -150,7 +153,7 @@ def main():
         body = (
             f"Hi {email},\n\n"
             f"Your Empire OS buyer seat is reserved but not yet activated.\n\n"
-            f"Pay your balance in USDC to go live:\n{pay_url}\n\n"
+            f"Pay your balance in USDT to go live:\n{pay_url}\n\n"
             f"(Touch {next_touch['n']}/3)\n"
         )
         ok = queue_email(email, next_touch["subject"], body, tenant_id)
@@ -188,16 +191,16 @@ def main():
                     pass
             if not prospect_email or "@" not in prospect_email:
                 continue
-            vault = os.environ.get("SOLANA_VAULT_WALLET",
-                                   "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
+            vault = os.environ.get("BSC_WALLET_ADDRESS",
+                                   "0x1339b487046B0ad924a10c20b1791608EA8595a8")
             pay_url = (
-                f"solana:{vault}?amount={amount:.2f}"
+                f"bsc:{vault}?amount={amount:.2f}"
                 f"&label=Empire%20A2A&memo=a2a:{quote_id}"
             )
-            subject = f"Reminder: your ${amount:.0f} USDC A2A offer (expires in ~15 min)"
+            subject = f"Reminder: your ${amount:.0f} USDT A2A offer (expires in ~15 min)"
             body = (
                 f"Hi,\n\nYour Empire OS A2A offer is still pending:\n\n"
-                f"  Amount: ${amount:.2f} USDC\n  Quote: {quote_id}\n\n"
+                f"  Amount: ${amount:.2f} USDT\n  Quote: {quote_id}\n\n"
                 f"Pay here: {pay_url}\n\n— Empire OS"
             )
             if args.dry_run:

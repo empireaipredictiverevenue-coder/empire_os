@@ -13,7 +13,7 @@
 - [DONE] idle_asset (satellite/idle-asset+logistics product): active, Scope-correct (idle trucks / waste leakage / logistics waste via RSS). Writes to Supabase empire_tasks (task_type=idle_asset_review). Confirmed 3 rows @11:28 post-fix. Cycles clean: scanned=12/ tick.
 - [DONE] satellite_strike (storm product): active, polls NWS alerts. NoneType crash (`"geometry":null`) FIXED (`or {}`). HUB default 10.118.155.218 (unreachable) → localhost:8081. Now cycles clean on real alerts (Tornado/Flash Flood/Red Flag Warnings).
 - [PARTIAL] storm notify: alerts detected + POSTed to /v1/satellite/strike. Hub endpoint idempotent (200 already:true, no 500). 70 crm_leads created. `notified:0` = clean dedup, not failure.
-- [PARTIAL] storm monetization bridge: deliver_storm_leads() being built — reads storm crm_leads -> matches roofing buyers -> bills 3x disaster premium via USDC invoice. PPL_DISASTER_MODE=on (.env). SUBAGENT RUNNING.
+- [PARTIAL] storm monetization bridge: deliver_storm_leads() being built — reads storm crm_leads -> matches roofing buyers -> bills 3x disaster premium via USDT invoice. PPL_DISASTER_MODE=on (.env). SUBAGENT RUNNING.
 
 ## LEAD GOLDMINE (56.6k recovered Jul 16, old Supabase owbeinlfcfdtwcwrttjy)
 - Backup CSVs HOST /root/supabase_lead_backup/: prospects 41,638 / contractors 7,348 / enriched_leads 6,822 / b2b_leads 775 / buyers 14.
@@ -56,14 +56,14 @@
   - CONCLUSION: psycopg impossible for this project. PostgREST is the only DB path.
 - [ARCHITECTURE] Hub keeps SQLite for internal CRM (si_buyer_outreach, si_outbox, si_ppc_invoices). Supabase (PostgREST) holds lead/review data. 44k prospects migrated into hub SQLite outreach table; agents use sb.py for review queues.
 
-## REVENUE LOOP (ppc / invoices / USDC)
-- [DONE] lead_deliverer: delivers leads to buyers (webhook+HMAC + email) AND invoices pay-per-lead to si_ppc_invoices (USDC = base_payout*fee_rate). VERIFIED live: POST /v1/ppc/log_invoice -> row in ledger ($12.00, status open).
+## REVENUE LOOP (ppc / invoices / USDT)
+- [DONE] lead_deliverer: delivers leads to buyers (webhook+HMAC + email) AND invoices pay-per-lead to si_ppc_invoices (USDT = base_payout*fee_rate). VERIFIED live: POST /v1/ppc/log_invoice -> row in ledger ($12.00, status open).
 - [DONE] Hub /v1/ppc/log_invoice FIXED: `int(head)` crash -> `str(head)` (was 500 on every invoice). Now 200.
 - [DONE] lead_deliverer daemonized (empire-agent-lead_deliverer.service), active.
-- [BLOCKED] Live USDC collection test: no vault funds to send (user confirmed). Code path complete: solana_listener watches vault, marks invoice paid on USDC receipt. Unverified on-chain until funded.
-- [DONE] Live USDC collection VERIFIED: user sent 0.528861 USDC to vault egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM (Phantom→TokenPocket, no memo). Listener detected via ATA balance-delta, hub /v1/finance/replay matched si_ppc_invoices by amount (528861 micro), flipped invoice to PAID. Loop closed + repeated live.
-- [DONE] Vault address corrected: was truncated 43-char (returned 0), now real 44-char egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM in hub .env + listener.
-- [DONE] solana_listener rewritten: balance-delta detection (no getTransaction dependency, robust), sends micro-USDC to match invoice schema. Handles no-memo payments (TokenPocket/Trust Wallet).
+- [BLOCKED] Live USDT collection test: no vault funds to send (user confirmed). Code path complete: bsc_listener watches vault, marks invoice paid on USDT receipt. Unverified on-chain until funded.
+- [DONE] Live USDT collection VERIFIED: user sent 0.528861 USDT to vault 0x1339b487046B0ad924a10c20b1791608EA8595a8 (Trust Wallet, no memo). Listener detected via ATA balance-delta, hub /v1/finance/replay matched si_ppc_invoices by amount (528861 micro), flipped invoice to PAID. Loop closed + repeated live.
+- [DONE] Vault address corrected: was truncated 43-char (returned 0), now real 44-char 0x1339b487046B0ad924a10c20b1791608EA8595a8 in hub .env + listener.
+- [DONE] bsc_listener rewritten: balance-delta detection (no getTransaction dependency, robust), sends micro-USDT to match invoice schema. Handles no-memo payments (Trust Wallet/Trust Wallet).
 - [DONE] Hub /v1/finance/replay: memo now optional, matches si_ppc_invoices by amount (±1 micro), uses paid_at (not nonexistent payment_ref). Hub 8081 now systemd unit empire-hub-8081.service (Restart=always).
 
 ## KNOWN GAPS / TODO
@@ -72,7 +72,7 @@
 3. Wire media_buyer ppc → Supabase invoices for 44k leads.
 4. Build idle-truck/waste/logistics detector (data-feed) → idle_asset_scans → review.
 5. Full Supabase migration (needs pooler host).
-6. Verify Solana vault address + test USDC collection.
+6. Verify BSC vault address + test USDT collection.
 7. This file was MISSING — that's why nothing was tracked. Now it exists.
 
 ## STRUCTURAL FIX (2026-07-16) — the stub problem
@@ -81,4 +81,4 @@
 - [DONE] 11 daemons launched as systemd units (empire-agent-*.service), Restart=always, survive reboot.
 - [DONE] NO-SIM gate: sim agents (satellite_damage, synthetic_*) disabled unless ALLOW_SIM=1.
 - [DONE] Fixed venv python path (was /usr/bin/python3 without requests → all crashed).
-- TODO: extend registry to all 64 agents; fix email_agent 400 + solana_listener stability.
+- TODO: extend registry to all 64 agents; fix email_agent 400 + bsc_listener stability.

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """billing_collector_agent — closes the revenue loop.
 Polls si_ppc_invoices where status='open' and age > 24h:
-  - sends buyer a reminder (Telegram/email) with amount + USDC vault address
-  - on USDC arrival (vault balance delta) marks invoice collected -> done
+  - sends buyer a reminder (Telegram/email) with amount + USDT vault address
+  - on USDT arrival (vault balance delta) marks invoice collected -> done
 Runs as daemon every 6h. Idempotent. Never edits amounts.
 """
 import os, time, sqlite3, sys
 sys.path.insert(0, "/root/empire_os")
 import empire_os.hermes_gateway as g
-from empire_os.agents.solana_listener_agent import VAULT as _OLD_VAULT
+from empire_os.agents.bsc_listener_agent import VAULT as _OLD_VAULT
 
 # BSC USDT wallet — correct settlement address (new trust wallet)
 VAULT = "0x1339b487046B0ad924a10c20b1791608EA8595a8"

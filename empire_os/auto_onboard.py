@@ -183,7 +183,7 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
       tenant + subscription (status=awaiting_payment)
         -> crypto_payment_request() builds BSC Pay URL
         -> subscription.payment_ref = memo, status stays awaiting_payment
-      solana_listener confirms the memo on-chain -> activates subscription.
+      bsc_listener confirms the memo on-chain -> activates subscription.
     """
     import uuid as _uuid
     from empire_os import db_handler as _db
@@ -206,7 +206,13 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
     conn = _db.get_conn()           # shared WAL pool, 30s busy_timeout
     ensure_schema(conn)
 
-    email = delivery_email or f"{niche}-{_uuid.uuid4().hex}@{name.split()[0].lower()}.co"
+    # Require a real, deliverable-looking email. Never mint synthetic emails —
+    # they poison the subscriber base (98% of prior subs were @v.co / probe- junk).
+    email = (delivery_email or "").strip().lower()
+    if not email or "@" not in email or email.endswith("@v.co") \
+       or email.startswith("probe") or email.startswith("roofing-") \
+       or email.split("@")[0] in ("", "test", "buyer", "lead"):
+        return {"ok": False, "error": "valid email required for onboarding (no synthetic addresses)"}
     store = _ten.TenantStore()
     # Graceful re-apply: if the email already has a tenant, reuse it and
     # re-issue a fresh pay link. Tenant dataclass now carries source/webhook_url/

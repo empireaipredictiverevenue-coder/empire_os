@@ -22,7 +22,7 @@
 | Tenants (with active or stale seats) | 5,942 (66 active) | `si_tenant` |
 | Lane-silver subs (active, $25/mo) | 63 | `si_subscription` |
 | Annualized MRR run-rate | ~$315 (63 × $5) | derived from `lane_silver` ($25/subscription × 63) |
-| **Cumulative revenue settled (real USDC)** | **~$0.70 across 7 test charges** | `finance_log.jsonl` (3 mock + 4 organic 'open'=$0.10 each) |
+| **Cumulative revenue settled (real USDT)** | **~$0.70 across 7 test charges** | `finance_log.jsonl` (3 mock + 4 organic 'open'=$0.10 each) |
 | `si_charges` total created | 16 ($200.50 USD-equivalent in `open`) | `si_charges` |
 | `si_settlements` rows | **0** | `si_settlements` |
 | `evaluation_credits` sold | 7 packs ($103 total, demo) | `evaluation_credits` |
@@ -69,7 +69,7 @@ From `systemctl list-units`:
 |---|---|
 | empire-crawler.service | activating (start) — leads still flow via the timer |
 | empire-a2a.service | (oneshot, runs from timer every 5 min) |
-| empire-solana_list*ener.service | **active running** |
+| empire-bsc_list*ener.service | **active running** |
 | empire-content-engine.service | **FAILED** — sitemap not being regenerated; AEO pages stale |
 | empire-nurture.service | **FAILED** — 0 nurture emails ever sent |
 | empire-seo.service | active |
@@ -136,7 +136,7 @@ Sources: HomeAdvisor internal rate card, Modernize, CraftJack, SalesHive Home Se
 **Recommendation — extend `TIER_RATES` to a 2-D lookup `NICHE_X_TIER` and apply a metro multiplier (DFW=1.0, NYC=1.4, LA=1.3, Chicago=1.15, Houston=1.05):**
 
 ```python
-# Suggested values (USDC, conservative median):
+# Suggested values (USDT, conservative median):
 NICHE_X_TIER_BASE = {
     "roofing_residential":   {"bronze":25, "silver":49, "gold":99, "platinum":199},
     "hvac_replacement":      {"bronze":35, "silver":69, "gold":129,"platinum":249},
@@ -208,7 +208,7 @@ The `deep_research_agent.py` already routes 6 free sources through AGI synth (`/
 
 ---
 
-## 3. Solana USDC Settlement Flow — Failure Modes & Optimizations
+## 3. BSC USDT Settlement Flow — Failure Modes & Optimizations
 
 ### 3.1 End-to-end pipeline (as wired today)
 ```
@@ -221,7 +221,7 @@ buyer signs up (/v1/buyers/apply)
 crawler 30min → lane_leads → A2A pusher (a2a_buyer_marketplace.py) → buyer_leads
   → POST to buyer endpoint_url  (zero buyers have one set)
 
-solana_listener_agent.py (30s)
+bsc_listener_agent.py (30s)
   → poll Helius getTokenAccountsByOwner
   → detect_incoming() compares vault_usdc_balance vs last_seen_balance
   → POST /v1/finance/replay  on hub (auto-matches si_invoice by memo)
@@ -236,17 +236,17 @@ solana_listener_agent.py (30s)
 | 1 | **No buyer has `endpoint_url` set** | `si_buyer_outreach` has 0 rows with endpoint_url; A2A writes 2,042 `buyer_leads` rows all `endpoint_status='no_endpoint'` | **P0 — kills all webhook delivery** |
 | 2 | **Demo buyer `live_crypto_e2e` has no wallet** | `si_charges` shows 8 re-issues of the same $0.10 charge in 12 minutes; pay_url is built with the vault address but the charge has no `customer_ref`/`wallet` to link the on-chain payment back | **P0 — kills all real settlement** |
 | 3 | **Memo is empty on most charges** | `finance_log.jsonl` shows `memo: ""` for 5 of last 6 `replay_deposit` events; only smoke tests have a memo (`INV_inv_crypto_…`) | **P0 — replay auto-match needs the memo** |
-| 4 | **Two parallel listeners** | `scripts/solana_listener.py` (live, PID 1208948 per SETTLEMENT_RUNBOOK) and `empire_os/agents/solana_listener_agent.py` (intended replacement). Both poll Helius. The agents/ version writes to `/root/empire_os/logs/solana_listener.jsonl` (doesn't exist on disk) | P1 — duplicate work + confusion |
+| 4 | **Two parallel listeners** | `scripts/bsc_listener.py` (live, PID 1208948 per SETTLEMENT_RUNBOOK) and `empire_os/agents/bsc_listener_agent.py` (intended replacement). Both poll Helius. The agents/ version writes to `/root/empire_os/logs/bsc_listener.jsonl` (doesn't exist on disk) | P1 — duplicate work + confusion |
 | 5 | **`pay_url` is computed but never delivered to the buyer** | `_resolve_buyer_email()` in `charge.py:189-214` checks `si_buyer_outreach.email` → `si_buyer_payment_methods.customer_ref` → `crm_leads.email`. None of these have an email for `live_crypto_e2e` | P0 — buyer never knows to pay |
 | 6 | **`si_invoice` is empty** | `si_invoice` shows 0 rows; the runbook claims 3 pending at $180 each. The auto_onboard flow writes `si_subscription` (1 bronze + 63 silver visible) but never creates an `si_invoice` row to back the per-lead charge | P1 — there's nothing for `replay()` to auto-match against |
 | 7 | **`replay` requires both `memo` and `amount_usdc`** | `hub.py:3156-3222`. Without memo, it tries an amount-proximity match but only if amount is within 5% of a known pending invoice. The $0.10 charges are too small for that fallback | P1 |
-| 8 | **No retry on hub /v1/finance/replay from the listener** | `solana_listener_agent.py:222-244` has 3 retries with exponential backoff (1s/2s/4s) — fine. But on persistent failure it returns without saving balance, so the same deposit will be retried next tick — that's correct, but if the hub is permanently down the log fills with errors | P2 |
+| 8 | **No retry on hub /v1/finance/replay from the listener** | `bsc_listener_agent.py:222-244` has 3 retries with exponential backoff (1s/2s/4s) — fine. But on persistent failure it returns without saving balance, so the same deposit will be retried next tick — that's correct, but if the hub is permanently down the log fills with errors | P2 |
 | 9 | **`/v1/finance/replay` does not insert into `si_settlements`** | Even when matched (smoke tests show `matched_to='si_ppc_invoices inv_crypto_…'`), the row goes to `si_ppc_invoices` not `si_settlements`. So the dashboards reading `si_settlements` always show 0 — and the cortex report's "0 settlements" alert is **measuring the wrong table** | **P0 — false alarm masking real bug #2** |
-| 10 | **No Jupiter integration** | Token swap path doesn't exist. Buyers paying in SOL or non-USDC SPL cannot be auto-converted to USDC. Vault holds USDC only | P2 |
+| 10 | **No Jupiter integration** | Token swap path doesn't exist. Buyers paying in SOL or non-USDT SPL cannot be auto-converted to USDT. Vault holds USDT only | P2 |
 
 ### 3.3 Optimization recommendations
 
-**A. Single-source listener** — kill `scripts/solana_listener.py` and migrate to `empire_os/agents/solana_listener_agent.py` (it has the better balance-delta detection + retry logic). Audit the systemd unit to ensure only one is running.
+**A. Single-source listener** — kill `scripts/bsc_listener.py` and migrate to `empire_os/agents/bsc_listener_agent.py` (it has the better balance-delta detection + retry logic). Audit the systemd unit to ensure only one is running.
 
 **B. Memo discipline** — every `si_charges` row MUST be created with a `memo` of the form `INV_<invoice_id>` or `SEAT_<subscription_id>:<period>`. The `charge_crypto()` call in `crypto_charge.py` already supports this; the bug is that the charge loop in `charge.py` sometimes drops it when `customer_ref` is empty.
 
@@ -261,7 +261,7 @@ SELECT 'auto:'||invoice_id,
    AND NOT EXISTS (SELECT 1 FROM si_settlements s WHERE s.notes='backfill from ppc' AND s.prospect_id='auto:'||si_ppc_invoices.invoice_id);
 ```
 
-**D. Vault/jupiter** — adding `jupiter-py` for instant SOL→USDC swap on inbound deposits is the cheapest way to widen the "what can I pay with" surface. Cost: ~$0.000005 per swap (priority fee) + 0.85% slippage. Worth it for the UX.
+**D. Vault/jupiter** — adding `jupiter-py` for instant SOL→USDT swap on inbound deposits is the cheapest way to widen the "what can I pay with" surface. Cost: ~$0.000005 per swap (priority fee) + 0.85% slippage. Worth it for the UX.
 
 **E. Endorse hub /v1/finance/replay to write to `si_settlements` even when matched to `si_ppc_invoices`** — that's the missing link in cortex's "0 settlements" reading. One-line change in `hub.py` post-match block.
 
@@ -343,11 +343,11 @@ For Empire's 5,942 dormant tenants, even a **5% reply** = **297 conversations** 
 | OpenRouter: M2.7-highspeed fallback | Same cadence as cortex | ~$0.0005/call | $0.024 | **$0.72** |
 | Crawler (NYC permits + scrape) | every 30 min = 48 runs/day | network egress only | ~$0.05 (bandwidth) | **$1.50** |
 | A2A pusher | every 5 min = 288 runs/day | SQLite + Helius (no per-call fee) | $0.00 | **$0** |
-| Solana listener (Helius RPC) | 30s poll = 2,880/day | Free tier: 100k credits/day, used ~50k | $0.00 | **$0** |
+| BSC listener (Helius RPC) | 30s poll = 2,880/day | Free tier: 100k credits/day, used ~50k | $0.00 | **$0** |
 | Container CPU/RAM (empire-hub LXC) | 24/7 | ~0.5 vCPU + 1GB RAM, ~$8/mo on typical VPS | | **$8** |
 | 6 PM2 services running 24/7 | 24/7 | ~$0.50 total RAM | | **~$0** (negligible) |
 | SendGrid email | capped at 15/day by nurture ramp | $0 (free tier 100/day) | $0 | **$0** |
-| Solana tx fees (per lead delivery settlement) | per USDC SPL transfer | 0.000005 SOL/tx ≈ $0.001/tx | | **$1–$5** depending on volume |
+| BSC tx fees (per lead delivery settlement) | per USDT SPL transfer | 0.000005 SOL/tx ≈ $0.001/tx | | **$1–$5** depending on volume |
 | **Total run-cost floor (current)** | | | | **~$13/mo** |
 | **Total run-cost at 1k leads/day delivered** | | | | **~$25/mo** |
 | **Total run-cost at 10k leads/day delivered** | | | | **~$60/mo** |
@@ -362,7 +362,7 @@ For Empire's 5,942 dormant tenants, even a **5% reply** = **297 conversations** 
 
 ### 6.3 Costs that DON'T matter at current scale
 - Helius RPC (free tier 100k credits/day is enough for 30s polling = 2,880 calls/day).
-- Solana tx fees (5,000 fee = $5 at most; revenue per settled lead = $25-$199).
+- BSC tx fees (5,000 fee = $5 at most; revenue per settled lead = $25-$199).
 - SendGrid email (free tier).
 
 ---
@@ -404,7 +404,7 @@ Effort = engineering hours. Impact = incremental $MRR/month. ROI = $MRR / hour.
 
 ### Rank 8 — **Auto-billing stale outreach** ⭐⭐
 - **Effort:** 1 week.
-- **Impact:** every `si_buyer_outreach` row with `reply_state='contacted'` and `last_touch_at < 30d` and `converted=0` → auto-issue a $5 USDC "pay-to-stay-in-loop" charge. Even at 1% conversion on 5,942 dormant tenants = 60 new charges × $5 = $300/mo.
+- **Impact:** every `si_buyer_outreach` row with `reply_state='contacted'` and `last_touch_at < 30d` and `converted=0` → auto-issue a $5 USDT "pay-to-stay-in-loop" charge. Even at 1% conversion on 5,942 dormant tenants = 60 new charges × $5 = $300/mo.
 
 ### Rank 9 — **Partnership / affiliate with vendors (HomeAdvisor, Angi, Thumbtack as upstream)** ⭐⭐
 - **Effort:** 2 weeks.
@@ -502,7 +502,7 @@ def bootstrap_payout_floor(conn: sqlite3.Connection,
 
 ### 8.2 Patch #2 — `charge.py`: memo discipline + `si_invoice` backfill
 
-**Why:** Two P0 bugs in one file. (a) `si_charges` rows are created without the `INV_<invoice_id>` memo, so `solana_listener` replay can't auto-match → deposits sit as `unmatched`. (b) `auto_onboard` writes `si_subscription` but not `si_invoice` → there's nothing to charge against for per-lead.
+**Why:** Two P0 bugs in one file. (a) `si_charges` rows are created without the `INV_<invoice_id>` memo, so `bsc_listener` replay can't auto-match → deposits sit as `unmatched`. (b) `auto_onboard` writes `si_subscription` but not `si_invoice` → there's nothing to charge against for per-lead.
 
 **File:** `/root/empire_os/empire_os/charge.py`
 **Where:**
@@ -523,7 +523,7 @@ def bootstrap_payout_floor(conn: sqlite3.Connection,
                     (invoice_id, tenant_id, subscription_id, amount_cents,
                      currency, status, method, reference, description,
                      created_at)
-                VALUES (?, ?, ?, ?, 'USDC', 'pending', 'usdc', ?, ?,
+                VALUES (?, ?, ?, ?, 'USDT', 'pending', 'usdc', ?, ?,
                         ?)
                 """,
                 (inv_id, buyer_id, "", int(round(result["amount_cents"])),
@@ -556,7 +556,7 @@ Also patch `crypto_charge.py:_charge_crypto()` to **always include `INV_<invoice
 
 ### 8.3 Patch #3 — `hub.py`: write to `si_settlements` on replay match
 
-**Why:** `si_settlements` is the table every dashboard reads. `replay()` matches to `si_ppc_invoices` and `si_subscription` but never writes to `si_settlements`. So even after organic USDC flows in (already happened — 7 smoke tests proved the path), the canonical settlement ledger stays empty and cortex keeps alerting "0 settlements".
+**Why:** `si_settlements` is the table every dashboard reads. `replay()` matches to `si_ppc_invoices` and `si_subscription` but never writes to `si_settlements`. So even after organic USDT flows in (already happened — 7 smoke tests proved the path), the canonical settlement ledger stays empty and cortex keeps alerting "0 settlements".
 
 **File:** `/root/empire_os/empire_os/hub.py`
 **Where:** `/v1/finance/replay` endpoint, lines 3156–3222. After the match is found and the matched_to is set, write a row to `si_settlements`.
@@ -612,7 +612,7 @@ Also patch `crypto_charge.py:_charge_crypto()` to **always include `INV_<invoice
 
 ## 9. The Single Biggest Missed Monetization Opportunity (Q8)
 
-### **Auto-onboard the 5,942 dormant tenants with a single USDC "reactivate" link**
+### **Auto-onboard the 5,942 dormant tenants with a single USDT "reactivate" link**
 
 **The single biggest idea Empire OS hasn't done yet, that could 3× revenue:**
 
@@ -622,7 +622,7 @@ Right now `si_tenant` has **5,942 rows** of tenants who signed up at some point 
 - Their original pricing tier (from `si_subscription.plan`).
 - Their wallet/email from `si_buyer_payment_methods` if they set one up.
 
-The current `nurture_daemon.py` is the closest thing to a re-engagement system, but it's failed and writes generic templates. **What's missing is a one-click "reactivate at your old price + 50% off for 90 days" USDC pay link, emailed to each dormant tenant.**
+The current `nurture_daemon.py` is the closest thing to a re-engagement system, but it's failed and writes generic templates. **What's missing is a one-click "reactivate at your old price + 50% off for 90 days" USDT pay link, emailed to each dormant tenant.**
 
 **Why this 3×s revenue:**
 - **0 customer acquisition cost.** The email already exists; the niche already exists; the lane is already configured.
@@ -633,8 +633,8 @@ The current `nurture_daemon.py` is the closest thing to a re-engagement system, 
 **How to implement (concrete):**
 1. Add `dormant_reactivation.py` that:
    - Selects `si_tenant WHERE status='active' AND tenant_id NOT IN (SELECT tenant_id FROM si_subscription WHERE status='active')`.
-   - Generates a Solana Pay URL with memo `REACTIVATE_<tenant_id>:<discount>`.
-   - Queues an email via `si_outbox` with subject "Welcome back — 50% off your Empire seat, one-tap USDC".
+   - Generates a BSC Pay URL with memo `REACTIVATE_<tenant_id>:<discount>`.
+   - Queues an email via `si_outbox` with subject "Welcome back — 50% off your Empire seat, one-tap USDT".
 2. Cap at 50 emails/day to preserve deliverability.
 3. Track `reactivate_count` in a new `si_reactivations` table.
 4. After 90 days, automatic sunset to standard pricing — built into the link's memo so the listener auto-restores full price.
@@ -642,7 +642,7 @@ The current `nurture_daemon.py` is the closest thing to a re-engagement system, 
 **Why nobody has done this yet:**
 - `nurture_daemon.py` was meant to do it but the service is failed.
 - The team has been focused on **top-of-funnel lead-gen** rather than **bottom-of-funnel dormant recovery**.
-- The infrastructure (Solana Pay deeplinks + listener + replay match by memo) is already built and proven by the smoke tests in `finance_log.jsonl` — it just needs the orchestrator.
+- The infrastructure (BSC Pay deeplinks + listener + replay match by memo) is already built and proven by the smoke tests in `finance_log.jsonl` — it just needs the orchestrator.
 
 **The 3× math:**
 - Current MRR run-rate: ~$1,575 (63 silver + 1 bronze subs).
@@ -700,10 +700,10 @@ for line in sys.stdin:
 | File | Lines | Purpose |
 |---|---|---|
 | `/root/empire_os/empire_os/a2a_buyer_marketplace.py` | 508 | A2A buyer matcher + webhook |
-| `/root/empire_os/empire_os/charge.py` | 459 | Charge adapter (USDC + PayPal) |
+| `/root/empire_os/empire_os/charge.py` | 459 | Charge adapter (USDT + PayPal) |
 | `/root/empire_os/empire_os/crypto_charge.py` | 439 | Crypto charge logic |
-| `/root/empire_os/empire_os/batched_payout.py` | 414 | Batched USDC payouts |
-| `/root/empire_os/empire_os/agents/solana_listener_agent.py` | 331 | On-chain listener |
+| `/root/empire_os/empire_os/batched_payout.py` | 414 | Batched USDT payouts |
+| `/root/empire_os/empire_os/agents/bsc_listener_agent.py` | 331 | On-chain listener |
 | `/root/empire_os/empire_os/agents/nurture_daemon.py` | 146 | 3-step email sequence |
 | `/root/empire_os/empire_os/agents/content_engine.py` | 112 | AEO orchestrator |
 | `/root/empire_os/empire_os/auto_onboard.py` | 297 | Buyer signup → tier pricing |

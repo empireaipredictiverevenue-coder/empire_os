@@ -112,9 +112,9 @@ def extract_pay_url(meta_json: str, quote_id: str, amount_usdc: float) -> str:
         except Exception:
             pass
     # Reconstruct: vault + amount + memo a2a:q_xxx
-    vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
+    vault = os.getenv("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
     return (
-        f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb?amount={amount_usdc:.2f}"
+        f"bsc:0x1339b487046B0ad924a10c20b1791608EA8595a8?amount={amount_usdc:.2f}"
         f"&label=Empire%20A2A&memo=a2a:{quote_id}"
     )
 

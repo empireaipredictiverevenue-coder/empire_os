@@ -135,12 +135,10 @@ async function initWeb3Modal() {
   web3Modal = new Web3Modal.default({
     projectId,
     chains: [BSC_CHAIN_ID],
-    walletConnectVersion: 2,
     theme: "dark",
-    enableWalletConnect: true,
+    enableTrustWallet: true,
     enableInjected: true,
-    enableCoinbase: true,
-    disableProviderSelection: false,
+    disableProviderSelection: true,
   });
 }
 initWeb3Modal();

@@ -34,7 +34,7 @@ def start_agent(agent_name):
 def main():
     log("INFO", "Starting supervisor - monitoring Empire agents")
     
-    agents = ["commander", "systems_engineer", "lead_deliverer", "solana_listener"]
+    agents = ["commander", "systems_engineer", "lead_deliverer", "bsc_listener"]
     
     while True:
         try:

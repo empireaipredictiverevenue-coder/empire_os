@@ -2,7 +2,7 @@
 Date: 2026-07-17
 
 ## LIVE (background, no session needed)
-- Daemons: solana_listener (USDC rail), ceo_agent, chief_of_staff, deep_research,
+- Daemons: bsc_listener (USDT rail), ceo_agent, chief_of_staff, deep_research,
   influence_engine, search_api_leads — 12 procs running.
 - Crons (local-only, output saved not delivered):
   - empire-outreach-cycle: every 6h, 7 verticals (roofing/hvac/plumbing/restoration/
@@ -29,7 +29,7 @@ Date: 2026-07-17
 - Overpass rate-limits (429) under burst — crons space calls (10s sleep, 6h/2h cadence).
 - Container CRM junk — empire-leads Overpass is the real lead source.
 - media-buying (google-meta-ads-ga4-mcp) = post-revenue paid layer (needs ad acct).
-- Vault ~0.53 USDC (listener running, no settlements yet).
+- Vault ~0.53 USDT (listener running, no settlements yet).
 
 ## NEXT LEVER (when awake)
 - Wire telegram deliver to crons for ping-on-run.

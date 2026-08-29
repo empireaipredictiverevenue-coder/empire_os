@@ -469,7 +469,7 @@ async def lifespan(app: FastAPI):
             return FileResponse(str(p), media_type="text/html")
         return Response(status_code=404)
 
-    # Same-origin static assets (avoids Phantom dApp browser blocking 3rd-party scripts)
+    # Same-origin static assets (avoids Trust Wallet dApp browser blocking 3rd-party scripts)
     _STATIC_DIR = Path(__file__).parent / "static"
     _STATIC_DIR.mkdir(parents=True, exist_ok=True)
     try:
@@ -677,8 +677,8 @@ async def _unhandled_exc_handler(request: Request, exc: Exception):
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Permissive CSP for the wallet page so Phantom's dApp browser doesn't block
-    fetch/XHR to remote Solana RPCs (Alchemy, Ankr, public-rpc, mainnet-beta)."""
+    """Permissive CSP for the wallet page so Trust Wallet's dApp browser doesn't block
+    fetch/XHR to remote BSC RPCs (Alchemy, Ankr, public-rpc, BSC mainnet)."""
     async def dispatch(self, request, call_next):
         resp: Response = await call_next(request)
         path = request.url.path
@@ -2047,6 +2047,15 @@ async def buyer_apply(req: BuyerApplyRequest):
     tier = req.tier.lower()
     if tier not in ("bronze", "silver", "gold", "platinum"):
         tier = "bronze"
+    _em = (req.email or "").strip().lower()
+    _local = _em.split("@")[0] if "@" in _em else ""
+    _BAD = ("", "test", "buyer", "lead", "probe", "roofing", "admin", "info")
+    if (not _em or "@" not in _em
+            or _em.endswith("@v.co") or _em.endswith("@example.com")
+            or _em.endswith("@buyer.com") or _em.endswith("@test.com")
+            or _em.startswith("probe") or _em.startswith("roofing-")
+            or _local in _BAD):
+        raise HTTPException(400, "valid email required (no synthetic addresses)")
     try:
         import empire_os.auto_onboard as ao
         res = await asyncio.wait_for(
@@ -2059,7 +2068,7 @@ async def buyer_apply(req: BuyerApplyRequest):
         )
         if not res.get("ok"):
             raise HTTPException(502, f"onboard failed: {res.get('error', 'unknown')}")
-        vault = os.environ.get("BSC_WALLET_ADDRESS", "")
+        vault = os.environ.get("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
         return BuyerApplyResponse(
             ok=True, buyer=req.name, niche=req.niche, tier=tier,
             seat_price_usd=res.get("seat_price"),
@@ -2276,7 +2285,7 @@ class BuyerRegisterRequest(BaseModel):
     email: str
     niches: str = ""           # comma-separated niches (e.g., "roofing,hvac")
     metros: str = ""           # comma-separated metros (e.g., "DFW,ATL")
-    wallet: str = ""           # USDT/Solana wallet address
+    wallet: str = ""           # USDT/BSC wallet address
     payout_per_lead: float = 0.0
     endpoint_url: str = ""     # buyer's webhook endpoint for lead delivery
     hmac_secret: str = ""      # HMAC secret for webhook verification
@@ -2680,6 +2689,45 @@ async def buy_leads_page():
         return HTMLResponse(html)
     except Exception:
         return HTMLResponse("<h1>Empire AI — Buy Leads</h1><p>Signup temporarily unavailable.</p>")
+
+
+# --- SEO / organic traffic (no ad spend) ---
+_SITE = "https://empire-ai.co.uk"
+_SITEMAP = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{_SITE}/buy-leads</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>{_SITE}/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+</urlset>
+"""
+
+@app.get("/sitemap.xml", response_class=PlainTextResponse)
+async def sitemap():
+    return PlainTextResponse(_SITEMAP, media_type="application/xml")
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+async def robots():
+    return PlainTextResponse(
+        f"User-agent: *\nAllow: /\nSitemap: {_SITE}/sitemap.xml\n",
+        media_type="text/plain",
+    )
+
+
+# --- Organic submit: ping search engines with sitemap ---
+@app.post("/v1/seo/submit")
+async def seo_submit():
+    import urllib.request
+    urls = [
+        f"https://www.google.com/ping?sitemap={_SITE}/sitemap.xml",
+        f"https://www.bing.com/ping?sitemap={_SITE}/sitemap.xml",
+    ]
+    results = {}
+    for u in urls:
+        try:
+            with urllib.request.urlopen(u, timeout=10) as r:
+                results[u.split('/')[2]] = r.status
+        except Exception as e:
+            results[u.split('/')[2]] = f"err:{str(e)[:60]}"
+    return {"ok": True, "pinged": results}
 
 
 
@@ -3781,7 +3829,7 @@ PRODUCT_CATALOG = {
     "strike_pack": "Tiered emergency lead burst for a niche/metro event.",
     "ai_closer": "Tiered MRR: AI closes your leads, settles in USDT.",
     "leadflow_saas_t2": "LeadFlow SaaS Tier 2 — Enterprise lead qualification + AI scoring + automated seller outreach. 13K leads/day pipeline, buyer_marketplace targeting, MiniMax intelligence.",
-    "imperium_conversion_os": "Imperium Conversion OS (ICO) — Full revenue loop: crawler → AI segmentation → buyer push → USDT settlement. 30K pre-funded wallets, Solana listener, auto vault reconciliation.",
+    "imperium_conversion_os": "Imperium Conversion OS (ICO) — Full revenue loop: crawler → AI segmentation → buyer push → USDT settlement. BSC listener, auto vault reconciliation.",
     "empire_os_v4_beta": "Empire OS v4 Beta — Self-driving empire operations. Lead scraping, AI scoring, buyer marketplace, multi-chain settlements. 30K+ leads active.",
     "deep_intel_report": "Deep Intel Report — AI competitor + revenue-leak analysis for one business: niche positioning, local SERP gaps, 90-day attack plan. Delivered as PDF within 24h of payment.",
     "lead_pack_50": "Lead Pack 50 — 50 exclusive, enrichment-complete leads in your niche+metro (Omega-scored, emails+phones). One-time delivery in 48h.",
@@ -3944,7 +3992,7 @@ def product_order(sku: str, req: dict):
     price = float(prices.get(sku, 0))
     if price <= 0:
         raise HTTPException(400, "sku not priced for self-serve")
-    vault = os.environ.get("BSC_WALLET_ADDRESS", "")
+    vault = os.environ.get("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
     if not vault:
         raise HTTPException(500, "vault not configured")
 
@@ -3986,7 +4034,7 @@ def product_order(sku: str, req: dict):
 def a2a_catalog():
     """What's for sale, machine-readable (static + GitHub-sourced)."""
     cat, _ = load_product_catalog()
-    vault = os.environ.get("BSC_WALLET_ADDRESS", "")
+    vault = os.environ.get("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
     return {"vault": vault, "products": cat, "settlement": "bsc_usdt"}
 
 
@@ -4398,7 +4446,7 @@ def products_pricing():
                         "features": sp.get("features", []),
                         "benefits": sp.get("benefits", []),
                         "deliverables": sp.get("deliverables", [])}
-    return {"vault": os.environ.get("BSC_WALLET_ADDRESS", ""), "settlement": "bsc_usdt", "chain_id": 56, "currency": "USDT", "pricing": out}
+    return {"vault": os.environ.get("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8"), "settlement": "bsc_usdt", "chain_id": 56, "currency": "USDT", "pricing": out}
 
 
 @app.get("/v1/products/{sku}")
@@ -4442,14 +4490,14 @@ def product_detail(sku: str):
                 "features": sp.get("features", []), "benefits": sp.get("benefits", []),
                 "deliverables": sp.get("deliverables", []),
                 "description": PRODUCT_CATALOG.get(sku, ""),
-                "vault": os.environ.get("BSC_WALLET_ADDRESS", ""), "settlement": "bsc_usdt"}
+                "vault": os.environ.get("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8"), "settlement": "bsc_usdt"}
     raise HTTPException(404, "sku not found")
 
 
 @app.post("/v1/a2a/negotiate")
 def a2a_negotiate(req: dict):
     """Another agent posts buy-intent -> hub quotes + returns settle instr."""
-    VAULT = os.getenv("BSC_WALLET_ADDRESS", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9yAZM")
+    VAULT = os.getenv("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
     if not backend:
         raise HTTPException(503, "backend not initialized")
     product = req.get("product", "lead_lane")
@@ -4871,7 +4919,7 @@ def email_compose(req: dict):
         f"this is the Empire OS team reaching out about your "
         f"{brief['niche']} project in {brief['metro']}. We deliver "
         f"exclusive leads to high-revenue agencies across 462 lanes. "
-        f"All billing is in USDT on Solana - no Stripe, no contracts, "
+        f"All billing is in USDT on BSC - no Stripe, no contracts, "
         f"no churn risk.\n\n"
         f"The {brief['tier'].title()} tier is the best fit. Want a "
         f"free 1-day trial of the pipeline?\n\n"
@@ -4914,7 +4962,7 @@ def copy_draft(req: dict):
         f"this is the Empire OS team reaching out about your {niche} project "
         f"in {metro}. We deliver exclusive leads (one agency per (niche x metro), "
         f"no recycled leads, real-time webhook delivery) to high-revenue agencies. "
-        f"All billing is in USDT on Solana - no Stripe, no contracts, no churn risk.\n"
+        f"All billing is in USDT on BSC - no Stripe, no contracts, no churn risk.\n"
         f"\nThe {tier.title()} tier is the best fit for agencies like yours. "
         f"Want a free 1-day trial of the pipeline?\n"
         f"\nFirst 14 days free. Cancel anytime. Empire OS\n"
@@ -5273,7 +5321,7 @@ def deep_audit_paid(data: dict, background_tasks: BackgroundTasks):
     else:
         # Generate invoice
         invoice_id = f"deep_{int(time.time())}_{email.split('@')[0]}"
-        vault = os.environ.get("BSC_WALLET_ADDRESS", "")
+        vault = os.environ.get("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
         
         # Persist invoice
         try:
@@ -5397,6 +5445,94 @@ def _handle_deep_audit_delivery(result: dict, email: str):
         logger.warning("deep audit delivery: %s", e)
 
 
+def _handle_sku_delivery(invoice_memo: str):
+    """Background: build + email the paid SKU deliverable. Zero manual steps.
+
+    Fires when a pending funnel_state invoice.SKU_* flips paid (replay or
+    live bsc listener). Longer personalized email: deliverables, onboarding,
+    what happens next — not just price. Marks state.delivered=1."""
+    try:
+        cnx = sqlite3.connect(
+            os.environ.get("EMPIRE_DB_PATH", "/root/empire_os/empire_os.db"),
+            timeout=30)
+        cnx.execute("PRAGMA busy_timeout=30000")
+        cnx.row_factory = sqlite3.Row
+        row = cnx.execute(
+            "SELECT state_json FROM funnel_state WHERE key_id = ?",
+            (f"invoice.{invoice_memo}",)).fetchone()
+        if not row:
+            cnx.close()
+            return
+        st = json.loads(row[0])
+        if st.get("delivered"):
+            cnx.close()
+            return
+        email = st.get("email", "")
+        sku = st.get("sku") or invoice_memo.replace("SKU_", "", 1).lower()
+        niche = (st.get("niche") or "").replace("_", " ") or "your market"
+        metro = (st.get("metro") or "").title() or "your area"
+        amt = float(st.get("amount_usdc") or 0)
+        # deliverable copy per SKU family
+        deliverables = {
+            "leadflow": [
+                "Your first lead pack (CSV: name, phone, email, niche, metro, score)",
+                "Audit portal login — live view of every lead and its status",
+                "CRM webhook events (pushes each lead to your pipeline automatically)",
+                "Monthly portfolio summary of performance across your lane",
+            ],
+            "lead_pack": [
+                f"Lead pack CSV — {niche} owners in {metro}, scored and deduped",
+                "First-delivery SLA: within 24h of this email",
+                "Replacement guarantee on any disconnected number",
+                "Weekly refresh drops for the duration of your pack",
+            ],
+            "serp": [
+                "Sweep results CSV (business, rank, gaps, contact paths)",
+                "Gap summary — where competitors outrank the field",
+                "Outreach-ready contact column (email where public)",
+            ],
+            "default": [
+                "Your ordered deliverable, attached or linked below",
+                "Onboarding walkthrough of anything not self-explanatory",
+                "Direct reply line to a human (this inbox) for questions",
+            ],
+        }
+        fam = "leadflow" if "leadflow" in sku else \
+              "lead_pack" if "lead_pack" in sku else \
+              "serp" if "serp" in sku else "default"
+        lines = deliverables[fam]
+        first = email.split("@")[0].replace(".", " ").title() or "there"
+        subject = (f"Payment confirmed — your {sku.replace('_', ' ')} "
+                   f"order (memo {invoice_memo[-14:]})")
+        body = (
+            f"Hi {first},\n\n"
+            f"Payment confirmed on-chain — ${amt:,.0f} in USDT received for "
+            f"the {sku.replace('_', ' ')} order.\n\n"
+            f"What you're getting:\n" +
+            "".join(f"  - {l}\n" for l in lines) +
+            f"\nTargeting locked in: {niche.title()} / {metro}"
+            + (f" / {st.get('url')}" if st.get("url") else "") + "\n\n"
+            f"What happens next:\n"
+            f"  1. Your lane is queued for the next scoring pass (today)\n"
+            f"  2. First deliverable lands in this inbox within 24 hours\n"
+            f"  3. Reply here anytime — a human reads every response\n\n"
+            f"Order reference: {invoice_memo}\n\n"
+            f"— Empire AI\nempire-ai.co.uk\n")
+        from empire_os.mail_sender import _brevo_api_send
+        res = _brevo_api_send(to=email, subject=subject, body=body)
+        cnx.execute(
+            "UPDATE funnel_state SET state_json = json_set(state_json, "
+            "'$.delivered', 1, '$.delivered_at', ?) WHERE key_id = ?",
+            (datetime.now(timezone.utc).isoformat(),
+             f"invoice.{invoice_memo}"))
+        cnx.commit()
+        cnx.close()
+        logger.info("sku delivery %s -> %s ok=%s", invoice_memo, email,
+                    res.get("ok"))
+    except Exception as e:
+        logger.warning("sku delivery %s: %s", invoice_memo, e)
+
+
 @app.post("/v1/mass-torts/direct")
 def mass_torts_direct(req: dict):
     """Mass-tort lead discovery intake — NOW PERSISTS + ROUTES TO BUYERS.
@@ -5473,6 +5609,22 @@ def mass_torts_direct(req: dict):
                     inserted_lane_leads += 1
                 except Exception:
                     pass  # schema mismatch — skip silently
+            # Mirror to masstort_leads for Line D settlement + Omega tort-score
+            try:
+                for cand in candidates[:50]:
+                    cnx.execute(
+                        "INSERT OR IGNORE INTO masstort_leads "
+                        "(case_type, claimant_name, email, state, status, "
+                        " omega_score, source, created_at) "
+                        "VALUES (?, ?, ?, ?, 'pending', ?, 'mass_tort_intel', ?)",
+                        (niche,
+                         str(cand.get("name", ""))[:120],
+                         str(cand.get("email", ""))[:160],
+                         str(cand.get("state", ""))[:8],
+                         float(cand.get("omega_score", 0) or 0),
+                         ts_now))
+            except Exception:
+                pass
             cnx.commit()
             cnx.close()
         except Exception as e:
@@ -5551,7 +5703,7 @@ def finance_replay(req: dict):
 
     if amount <= 0:
         raise HTTPException(400, "amount_usdc must be > 0")
-    # memo is OPTIONAL (TokenPocket / Trust Wallet USDT transfers carry none)
+    # memo is OPTIONAL (Trust Wallet USDT transfers carry none)
 
     matched_to = None
     paid_inv   = None
@@ -5761,6 +5913,10 @@ def finance_replay(req: dict):
                      "sku_order", _niche or ""))
                 matched_to = f"si_subscription {sub_id}"
                 paid_sub = sub_id
+                # zero-manual-steps fulfillment: email the deliverable
+                import threading as _th
+                _th.Thread(target=_handle_sku_delivery,
+                           args=(m,), daemon=True).start()
             # --- Seat subscription activation (select-serve / auto_onboard) ---
             # Memo format emitted by billing.crypto_payment_request:
             #   empire-os:<tenant>:<plan>:<uuid>
@@ -5909,7 +6065,7 @@ def finance_replay(req: dict):
                         pass
                     paid_inv = best
             # --- buyer activation: match PENDING si_subscription by seat amount ---
-            # Real USDT transfers (Trust/TokenPocket) carry no memo. A buyer who
+            # Real USDT transfers (Trust Wallet) carry no memo. A buyer who
             # applied is parked as pending_deposit OR awaiting_payment with
             # price_cents set. Match the incoming deposit (micro-USDT) to the
             # nearest pending seat price and flip to active (verified payment).
@@ -6013,7 +6169,7 @@ def finance_replay(req: dict):
 
 
 # ── UNMATCHED DEPOSIT RECONCILIATION (W2 close-the-loop) ────────────
-# Phantom/TokenPocket can't add memos to SPL transfers. bsc_listener
+# Trust Wallet can't add memos to SPL transfers. bsc_listener
 # sees the deposit land in the vault but can't auto-attribute. Without
 # these endpoints, those funds sit unallocated forever. With them, the
 # founder can review unmatched deposits and attribute each one to a
@@ -6202,7 +6358,7 @@ def swarm_ledger():
     sources = [
         "crawler_runs.jsonl",
         "lead_deliveries.jsonl",
-        "solana_payments.jsonl",
+        "bsc_payments.jsonl",
         "alerts.jsonl",
         "outreach_log.jsonl",
         "lane_monitor.jsonl",
@@ -6964,7 +7120,7 @@ def buyer_enterprise_intake(req: dict):
       contact_name str   required
       email        str   required
       phone        str   required
-      wallet       str   required  (Solana address for billing)
+      wallet       str   required  (BSC address for billing)
       target_tier  str   required  diamond | empire | titanium
       lanes        list  optional  [{niche, metro}, ...]
       notes        str   optional
@@ -7043,7 +7199,7 @@ Contract template: https://empire-ai.co.uk/contract-{tier}.pdf
         "next_steps": [
             "1. AE reviews your intake within 4 hours.",
             f"2. Contract template: https://empire-ai.co.uk/contract-{tier}.pdf",
-            "3. Sign + return via DocuSign or Solana-signed message.",
+            "3. Sign + return via DocuSign or BSC-signed message.",
             "4. KYC: provide beneficial owner info + business doc.",
             "5. Once signed, you'll receive an API key + portal link.",
         ],
@@ -7063,7 +7219,7 @@ def buyer_signup_seat(req: dict):
       agency_name    str  business name
       email          str  contact email
       phone          str  phone
-      wallet         str  Solana address (for invoice delivery)
+      wallet         str  BSC address (for invoice delivery)
       tier           str  bronze | silver | gold
       lanes          list [{"niche":"hvac","metro":"NYC"}, ...]
                       max lanes = tier's seat count
@@ -8407,14 +8563,14 @@ def rule_answer(msg: str) -> str:
                 "Service: empire-agent-lead_deliverer. Restart via "
                 "/v1/hermes/agent/action.")
     if "usdc" in m or "bsc" in m or "vault" in m or "settle" in m:
-        return ("Vault: egJ1t9...9AZM. Settlement listener: "
+        return ("Vault: 0x1339b487046B0ad924a10c20b1791608EA8595a8. Settlement listener: "
                 "empire-agent-bsc_listener. Check si_unmatched_deposits "
                 "for unmatched transfers; trigger via POST /v1/finance/replay "
                 "{amount_usdc, memo, tx_signature}.")
     if "buy" in m or "buyer" in m or "apply" in m:
         return ("POST /v1/buyers/apply {name, niche, tier, email, webhook_url} "
                 "returns subscription_id + pay URL. Pay in USDT to "
-                "egJ1t9...9AZM. Service then activates.")
+                "0x1339b487046B0ad924a10c20b1791608EA8595a8. Service then activates.")
     if "health" in m or "status" in m:
         return ("GET /v1/health = liveness. GET /v1/health/deep = env, db, "
                 "chain, hub, listener. GET /v1/hermes/agents = full systemd "
@@ -9147,13 +9303,13 @@ def crypto_verify(req: CryptoVerifyRequest):
     return result
 
 
-# --- Payouts (Crypto USDT for TokenPocket etc.) ---
+# --- Payouts (Crypto USDT for Trust Wallet etc.) ---
 
 @app.post("/v1/payouts/process-all")
 def payouts_process_all():
     """Build a payout batch with one USDT transfer per pending payout.
 
-    Returns deeplinks for TokenPocket / Phantom / Solflare.
+    Returns deeplinks for Trust Wallet / Trust Wallet.
     Operator signs each transfer, then submits the tx signature back
     via POST /v1/payouts/verify/{payout_id}.
     """
@@ -9192,9 +9348,9 @@ class BatchTxRequest(BaseModel):
 
 @app.post("/v1/payouts/batch-tx")
 def payouts_batch_tx(req: BatchTxRequest = None):
-    """Build Solana transactions for all pending payouts.
+    """Build BSC USDT transactions for all pending payouts.
     
-    Splits payouts into batches of ~4 per tx so Phantom can handle the size.
+    Splits payouts into batches of ~4 per tx so Trust Wallet can handle the size.
     Returns an array of unsigned transactions (base64) — sign each one sequentially.
     If `sender_wallet` is omitted, uses VAULT_WALLET_ADDRESS (env var).
     """
@@ -9247,7 +9403,7 @@ def payouts_batch_tx(req: BatchTxRequest = None):
     except Exception:
         bh = None
 
-    # Split into sub-batches of MAX_PER_TX for Phantom's size limit
+    # Split into sub-batches of MAX_PER_TX for Trust Wallet's size limit
     MAX_PER_TX = 4
     batch_id = payout_batch_store.batches[-1]["batch_id"] if payout_batch_store.batches else ""
     txs = []
@@ -9396,7 +9552,7 @@ def telegram_alert(payload: TelegramPayload, message: str = ""):
     return result
 
 
-# --- Wallet signing UI + Solana Pay Transaction Request ---
+# --- Wallet signing UI + BSC Pay Transaction Request ---
 
 WALLET_SIGN_HTML = (Path(__file__).parent / "templates" / "sign_tx.html").read_text()
 
@@ -9409,7 +9565,7 @@ async def wallet_sign_page():
 
 @app.get("/v1/payouts/sign-tx")
 def payouts_sign_tx_request_sync():
-    """Solana Pay Transaction Request endpoint."""
+    """BSC Pay Transaction Request endpoint."""
     import traceback, base64
     from empire_os.batched_payout import build_batched_payout_tx
     from fastapi.responses import Response
@@ -9452,11 +9608,11 @@ def payouts_sign_tx_request_sync():
         content=tx_bytes,
         media_type="application/octet-stream",
         headers={
-            "x-solana-pay-message": (
+            "x-bsc-pay-message": (
                 f"Sign to execute {result.instruction_count} payouts "
                 f"totaling ${result.total_amount_usdc:,.2f} USDT"
             ),
-            "x-solana-pay-label": "Empire OS Batched Payout",
+            "x-bsc-pay-label": "Empire OS Batched Payout",
         },
     )
 
@@ -9519,7 +9675,7 @@ class PayoutSubmitRequest(BaseModel):
 def payouts_submit(req: PayoutSubmitRequest):
     """Submit a signed transaction via the hub's server-side RPC.
 
-    The wallet page signs the transaction locally (Phantom handles this),
+    The wallet page signs the transaction locally (Trust Wallet handles this),
     then sends the signed tx back here. The hub broadcasts it server-side
     using its own RPC endpoint — no client-side RPC calls needed.
     """
@@ -9533,12 +9689,12 @@ def payouts_submit(req: PayoutSubmitRequest):
     enc = (req.encoding or "base64").lower()
     try:
         if enc == "base58":
-            # Forward base58 as-is — Phantom may serialize to base58.
+            # Forward base58 as-is — Trust Wallet may serialize to base58.
             tx_for_rpc = req.signed_tx_base64
             print(f"[submit] base58 mode, len={len(req.signed_tx_base64)}", flush=True)
         else:
             # Decode our own base64 to bytes, then re-encode WITHOUT PADDING.
-            # Solana RPC's base58 parser trips on `=` (padding) at the end
+            # BSC RPC parser trips on `=` (padding) at the end
             # when it auto-detects encoding — strip it to keep the RPC happy.
             raw = base64.b64decode(req.signed_tx_base64, validate=True)
             tx_for_rpc = base64.b64encode(raw).decode().rstrip("=")
@@ -9573,7 +9729,7 @@ def payouts_submit(req: PayoutSubmitRequest):
 def payouts_verify_batch(req: PayoutVerifyBatchRequest):
     """Verify a submitted batched tx on-chain and mark all pending payouts paid.
 
-    Polls up to 60 seconds for the tx to confirm — Solana mainnet-beta typically
+    Polls up to 60 seconds for the tx to confirm — BSC typically
     confirms in 12-20s but the first call after submit may see "not found".
     """
     if not payout_engine or not billing_engine:
@@ -10918,7 +11074,7 @@ def founder_pay_route(email: str = "founder@empireos.ai"):
         if not pay_url:
             raise HTTPException(502, detail="pay link mint failed")
         qr = spo._qr_png(pay_url)
-        # truthful price: parse the actual minted amount from the Solana Pay URI
+        # truthful price: parse the actual minted amount from the BSC Pay URI
         amt = 0.0
         import re
         m = re.search(r"amount=([0-9.]+)", pay_url)
@@ -11383,7 +11539,7 @@ def evaluate_signup(req: dict):
 
 @app.post("/v1/evaluate/buy")
 def evaluate_buy(req: dict, request: Request):
-    """Fee-aware on-chain purchase: ONE Solana Pay tx funds a credit pack.
+    """Fee-aware on-chain purchase: ONE BSC Pay tx funds a credit pack.
 
     Auth: X-API-Key (binds to real tenant). Body: usd? (default $10 floor).
     Returns {credits, charge_usd, pay_memo, pay_url}. The buyer pays once on
@@ -11449,7 +11605,7 @@ async def evaluate_lead_sold(req: dict, request: Request):
 
     Auth: X-API-Key (binds to real tenant). Body: lead_ref (str,required).
     Fires record_conversion -> charges $0.50 (if grade A/B/C + unbilled)
-    and returns the Solana Pay URL so the buyer settles in USDT.
+    and returns the BSC Pay URL so the buyer settles in USDT.
     Idempotent per lead_ref (won't double-charge).
     """
     from empire_os.agents import evaluation_product as EP
@@ -12061,3 +12217,30 @@ def enterprise_disaster_get():
     finally:
         cx.close()
 # ================== END ENTERPRISE TIER =====================
+
+
+# ================== 5-PHASE OMEGA PIPELINE (automation scheduler) ==========
+@_catch
+@app.get("/v1/automation/status")
+def automation_status():
+    """Last runs per phase + pending lead counts."""
+    from empire_os.automation_scheduler import get_automation_status
+    return get_automation_status()
+
+
+@_catch
+@app.post("/v1/automation/run")
+def automation_run(req: dict):
+    """Run one phase or all. Body: {"phase": "scoring"} or {"phase": "all"}.
+
+    discovery gates on lead_source_config.is_active (all seeded inactive —
+    no accidental external API spend). outreach = email-only omnichannel.
+    """
+    from empire_os.automation_scheduler import run_phase, run_automation_now
+    phase = (req.get("phase") or "all").lower()
+    if phase == "all":
+        return run_automation_now()
+    if phase not in ("discovery", "scoring", "outreach", "ml_loop", "reporting"):
+        return {"success": False, "error": f"unknown phase: {phase}"}
+    return run_phase(phase)
+# ================== END 5-PHASE PIPELINE ====================

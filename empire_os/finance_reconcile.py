@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-finance_reconcile.py — Unmatched USDC deposit reconciliation.
+finance_reconcile.py — Unmatched USDT deposit reconciliation.
 
-When a buyer pays via Phantom/TokenPocket (no memo support on SPL transfers),
-the solana_listener_agent sees the deposit land in the vault but cannot
+When a buyer pays via Trust Wallet (no memo support on SPL transfers),
+the bsc_listener_agent sees the deposit land in the vault but cannot
 match it to any pending si_charges row. Without this module, those funds
 sit unallocated forever. With it, every unmatched deposit is captured to
 si_unmatched_deposits and can be attributed to a buyer manually.
@@ -81,9 +81,9 @@ class UnmatchedDeposit:
 def record_unmatched(d: UnmatchedDeposit) -> dict:
     """Record an unmatched deposit. Idempotent on tx_signature (INSERT OR IGNORE)."""
     ensure_schema()
-    cents = int(round(d.amount_usdc * 1_000_000))  # USDC has 6 decimals
-    # Convert micro-USDC to "cents" (USD). For a USDC deposit where 1 USDC = $1,
-    # cents = micro_usdc / 10000. Example: 0.07 USDC = 70000 micro = 7 cents.
+    cents = int(round(d.amount_usdc * 1_000_000))  # USDT has 6 decimals
+    # Convert micro-USDT to "cents" (USD). For a USDT deposit where 1 USDT = $1,
+    # cents = micro_usdc / 10000. Example: 0.07 USDT = 70000 micro = 7 cents.
     cents_usd = cents // 10000
 
     c = _conn()
@@ -223,7 +223,7 @@ def attribute_deposit(tx_signature: str, buyer_id: str,
                    (charge_id, buyer_id, processor, customer_ref, payment_ref,
                     head, reason, amount_cents, currency, status,
                     processor_response, attempt_count, created_at, paid_at)
-                   VALUES (?, ?, 'usdc', '', ?, 2, ?, ?, 'USDC', 'succeeded',
+                   VALUES (?, ?, 'usdc', '', ?, 2, ?, ?, 'USDT', 'succeeded',
                            ?, 1, ?, ?)""",
                 (charge_id, tenant_id, tx_signature,
                  f"attributed from unmatched deposit {tx_signature[:20]} "

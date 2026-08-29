@@ -71,17 +71,49 @@ def run_phase(phase: str, config: Dict = None) -> Dict:
         
         duration = time.time() - start
         log("INFO", f"Phase {phase} completed", duration_seconds=round(duration, 2), **result)
+        try:
+            record_run(phase, "success", duration, result=result)
+        except Exception:
+            pass
         return {"success": True, "phase": phase, "duration": duration, **result}
         
     except Exception as e:
         duration = time.time() - start
         log("ERROR", f"Phase {phase} failed", duration_seconds=round(duration, 2), error=str(e))
+        try:
+            record_run(phase, "failed", duration, error=str(e))
+        except Exception:
+            pass
         return {"success": False, "phase": phase, "duration": duration, "error": str(e)}
 
 def run_discovery_phase() -> Dict:
-    """Phase 1: Lead Discovery - find new leads from sources."""
-    from empire_os.lead_sources import run_discovery_cycle
-    return run_discovery_cycle()
+    """Phase 1: Lead Discovery - find new leads from sources.
+    run_all_sources is a generator (slow network fetches). Bound it to a
+    hard wall-clock budget so the daily timer can never hang."""
+    import signal
+
+    class _Timeout(Exception):
+        pass
+
+    def _alarm(_sig, _f):
+        raise _Timeout()
+
+    out = {}
+    try:
+        signal.signal(signal.SIGALRM, _alarm)
+        signal.alarm(180)  # 3-min hard cap
+        from empire_os.lead_sources import run_all_sources
+        for step in run_all_sources():
+            if isinstance(step, dict):
+                out.update(step)
+        signal.alarm(0)
+    except _Timeout:
+        out.setdefault("note", "discovery cut at 180s budget")
+    except Exception as e:
+        out.setdefault("error", str(e)[:160])
+    out.setdefault("fetched", 0)
+    out.setdefault("saved", 0)
+    return out
 
 def run_scoring_phase() -> Dict:
     """Phase 2: Lead Scoring - score unscored leads."""
@@ -89,9 +121,10 @@ def run_scoring_phase() -> Dict:
     return run_scoring_cycle()
 
 def run_outreach_phase() -> Dict:
-    """Phase 3: Automated Outreach - Vapi calls + Resend emails."""
-    from empire_os.outreach import run_outreach_cycle
-    return run_outreach_cycle()
+    """Phase 3: Automated Outreach — email-only omnichannel 4-stage flow
+    via si_outbox (Brevo). Phone/Vapi REMOVED per founder (2026-08-29)."""
+    from empire_os.omnichannel_outreach import run_omnichannel_cycle
+    return run_omnichannel_cycle()
 
 def run_ml_loop_phase() -> Dict:
     """Phase 4: ML Learning Loop - analyze conversions, update strategy."""
@@ -164,6 +197,12 @@ def init_automation_tables():
     
     conn.commit()
     conn.close()
+
+# Idempotent: ensure tables exist when imported by hub (not just __main__).
+try:
+    init_automation_tables()
+except Exception:
+    pass
 
 def record_run(phase: str, status: str, duration: float, result: Dict = None, error: str = None):
     """Record a phase run."""

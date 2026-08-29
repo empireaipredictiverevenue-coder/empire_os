@@ -111,7 +111,7 @@ def process_cycle():
                     JOIN si_funnel_event fe ON fe.prospect_id = bl.prospect_id
                     WHERE bl.settlement_status='invoiced'
                       AND fe.to_state='settled'
-                      AND fe.actor='solana_listener'
+                      AND fe.actor='bsc_listener'
                       AND fe.notes LIKE '%' || bl.lane_lead_id || '%'
                 """).fetchall()
                 for r in settled_rows:

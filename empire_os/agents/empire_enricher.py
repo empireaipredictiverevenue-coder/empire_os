@@ -666,7 +666,7 @@ def _render_branded_email(subject: str, body_text: str, prospect: dict, intellig
                 </table>
                 
                 <p style="margin: 24px 0 0 0; font-size: 12px; color: #9aa0aa;">
-                    Vault: <code style="background: #151a23; padding: 2px 6px; border-radius: 4px; font-size: 11px;">egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM</code>
+                    Vault: <code style="background: #151a23; padding: 2px 6px; border-radius: 4px; font-size: 11px;">0x1339b487046B0ad924a10c20b1791608EA8595a8</code>
                 </p>
             </td>
         </tr>

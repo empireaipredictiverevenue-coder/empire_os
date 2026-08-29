@@ -14,7 +14,7 @@ import empire_os.hermes_gateway as g
 POLL = 60
 UNITS = ["empire-hub-8081.service", "empire-ppc-router.service",
          "empire-agent-lead_deliverer.service",
-         "empire-agent-solana_listener.service",
+         "empire-agent-bsc_listener.service",
          "empire-ppc-billing-collector.service",
          "empire-agent-lead_sniper.service",
          "empire-hub-loop.service",
@@ -27,7 +27,7 @@ def _unit_exists(unit: str) -> bool:
                        capture_output=True, text=True)
     return r.returncode == 0
 REQUIRED_ENV = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "SUPABASE_URL",
-                "SUPABASE_SERVICE_KEY", "SOLANA_VAULT_WALLET", "MINIMAX_API_KEY"]
+                "SUPABASE_SERVICE_KEY", "BSC_WALLET_ADDRESS", "MINIMAX_API_KEY"]
 
 ERR_RE = re.compile(r"(Traceback|Error|Exception|CRITICAL|FATAL)", re.I)
 

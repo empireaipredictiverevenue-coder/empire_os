@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HUB_URL = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
-VAULT = "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM"
+VAULT = "0x1339b487046B0ad924a10c20b1791608EA8595a8"
 USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 LOG_PATH = Path("/root/feedback/lane_activation.jsonl")
 TARGET = 50

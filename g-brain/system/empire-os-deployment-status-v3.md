@@ -21,7 +21,7 @@ System: LIVE — all core services operational
 │        ▼                                 ▼          │
 │  ┌──────────┐                     ┌──────────────┐  │
 │  │CAMPAIGNS │                     │CHARGE ADAPTER│  │
-│  │(8 live)  │                     │(Stripe→USDC) │  │
+│  │(8 live)  │                     │(Stripe→USDT) │  │
 │  └──────────┘                     └──────────────┘  │
 │                                                      │
 │  ┌──────────────────────────────────────────────┐   │
@@ -63,7 +63,7 @@ System: LIVE — all core services operational
 - **Upfront**: $200.00 per connect (flat)
 - **Backend**: 7% of closed contract value
 - **Target**: Storm damage, solar, mass tort (high-ticket)
-- **Settlement**: USDC on close
+- **Settlement**: USDT on close
 
 ### Head 3 — Pay-Per-Lead (PPL Data Play)
 - **Rate**: $45.00 per lead (up to 3 buyer copies = $135 max)
@@ -138,7 +138,7 @@ python3 /root/empire_os/empire_os/switchboard.py
 - POST /v1/ppc/call-tick — bill 90s sprint (Head 1)
 - POST /v1/ppc/appointment — bill PPS (Head 4)
 - POST /v1/ppc/close-deal — bill backend (Head 2)
-- POST /v1/ppc/settle — mark invoice paid (USDC)
+- POST /v1/ppc/settle — mark invoice paid (USDT)
 - GET /v1/ppc/pending — mid-flight events
 - Charge adapter: Stripe→simulated (processor-agnostic)
 
@@ -164,7 +164,7 @@ python3 /root/empire_os/empire_os/ppc_router.py
 1. **30+ coordinated AI agents** vs single-point tools
 2. **Real-time processing** with sub-2s response times
 3. **5-headed monetization engine** covering every revenue model
-4. **USDC settlement** on Solana for instant payouts
+4. **USDT settlement** on BSC for instant payouts
 5. **Incus-isolated containers** for agent resilience
 6. **Auto-restart verified** — supervisor recovers killed processes
 

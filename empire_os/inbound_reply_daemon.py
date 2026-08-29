@@ -114,10 +114,11 @@ def link_to_prospect(from_email: str):
         if r:
             return {"matched_kind": f"outbox:{r['source']}", "lead_id": r["lead_id"]}
         r = cnx.execute(
-            "SELECT id, lead_uid FROM crm_leads WHERE 1=1 LIMIT 1",
+            "SELECT lead_uid FROM crm_leads WHERE lower(email)=? ORDER BY rowid DESC LIMIT 1",
+            (from_email,),
         ).fetchone()
         if r:
-            return {"matched_kind": "crm_lead:fallback", "lead_id": f"crm:{r['id']}"}
+            return {"matched_kind": "crm_lead:fallback", "lead_id": f"crm:{r['lead_uid']}"}
         return {"matched_kind": "unmatched"}
     finally:
         cnx.close()
@@ -178,6 +179,37 @@ def link_reply(inbox_id, from_email):
             cnx.commit()
         finally:
             cnx.close()
+
+    # LOW-FRICTION BUY PATH: a reply with buy-intent auto-onboards the sender
+    # as a buyer (invoice sent after, no wallet needed up front).
+    try:
+        row = _conn().execute(
+            "SELECT body_text, subject FROM si_inbox WHERE id=?", (inbox_id,)
+        ).fetchone()
+        body = (row[0] or "") + " " + (row[1] or "")
+        intent = any(k in body.lower() for k in
+                     ("yes", "buy", "interested", "sign me", "start", "lead", "get leads"))
+        if intent and "@" in from_email:
+            try:
+                from empire_os import auto_onboard
+                res = auto_onboard.onboard(
+                    name=from_email.split("@")[0],
+                    niche="general",
+                    tier="silver",
+                    delivery_email=from_email,
+                    min_deposit=0.0,
+                    source="email_reply",
+                )
+                _conn().execute(
+                    "UPDATE si_inbox SET status='converted' WHERE id=?",
+                    (inbox_id,),
+                )
+                _conn().commit()
+                log.info(f"reply-intent auto-onboard: {from_email} -> {res.get('ok')}")
+            except Exception as e:
+                log.warning(f"reply-intent onboard failed: {e}")
+    except Exception as e:
+        log.warning(f"reply-intent check skipped: {e}")
 
 def fetch_unseen(imap):
     imap.select("INBOX")

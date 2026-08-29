@@ -55,7 +55,7 @@ def main():
     The new supervisor_daemon.py provides more robust supervisor functionality.
     
     If you need to use this legacy supervisor, ensure that:
-    1. The required agents (commander, systems_engineer, lead_deliverer, solana_listener) are installed
+    1. The required agents (commander, systems_engineer, lead_deliverer, bsc_listener) are installed
     2. This script has proper systemd supervision (not recommended)
     """
     log("WARN", "Legacy supervisor_agent.py is deprecated", 
@@ -63,10 +63,10 @@ def main():
         timestamp=time.time())
     
     log("INFO", "Starting legacy supervisor (limited functionality)", 
-        agents=["commander", "systems_engineer", "lead_deliverer", "solana_listener"])
+        agents=["commander", "systems_engineer", "lead_deliverer", "bsc_listener"])
     
     # Check key agents
-    agents_to_monitor = ["commander", "systems_engineer", "lead_deliverer", "solana_listener"]
+    agents_to_monitor = ["commander", "systems_engineer", "lead_deliverer", "bsc_listener"]
     
     while True:
         try:

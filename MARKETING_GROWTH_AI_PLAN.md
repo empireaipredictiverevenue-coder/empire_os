@@ -59,7 +59,7 @@
 | `si_buyer_outreach` active | 183 | 0 priced (`payout_per_lead = 0`) |
 | `si_settlements` confirmed | **0** | revenue loop dry |
 | `si_ppl_leads` | 4 | all `dispatch_webhook_not_configured` (HTTPError 500) |
-| `si_ppc_invoices` | 15 | all `open`, real USDC `solana:` pay_urls minted |
+| `si_ppc_invoices` | 15 | all `open`, real USDT `bsc:` pay_urls minted |
 | `evaluation_ledger` | 7,215 | 0 settled |
 | `carrier_rosters` | **0** | never ran |
 | `carrier_applications` | 0 | never ran |
@@ -247,7 +247,7 @@ One cron that:
 
 1. **LLM credits dry**: rule-based fallback covers cortex brain; if we need LLM reasoning in growth/copy/email agents, must fix `MINIMAX_API_KEY` env (per memory).
 2. **Orchestrator resurrection loop**: PM2 keeps respawning `orchestrator.py`; if we re-enable 18 agents, monitor for the same death-loop pattern.
-3. **Settlement listener**: 15 open PPC invoices never flipped to paid → solana listener not catching inbound. Separate task.
+3. **Settlement listener**: 15 open PPC invoices never flipped to paid → bsc listener not catching inbound. Separate task.
 
 ---
 

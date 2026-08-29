@@ -38,7 +38,7 @@ This document provides the complete enterprise marketing system architecture, im
 - `empire-hub-8081.service` (hub_loop in-proc)
 - `empire-ppc-router.service` (PPC routing)
 - `empire-ppc-billing-collector.service` (billing)
-- `empire-agent-solana_listener.service` (Solana payments)
+- `empire-agent-bsc_listener.service` (BSC payments)
 - `empire-agent-lead_deliverer.service` (lead delivery)
 - `empire-ppc-sentry.service` (monitoring)
 
@@ -238,7 +238,7 @@ System Services:
 ### Week 1 (Immediate)
 1. **Revenue Path Setup**
    - Execute Phase 1 B2B lead extraction
-   - Onboard 3 pilot buyers with USDC deposits
+   - Onboard 3 pilot buyers with USDT deposits
    - Test revenue automation
 
 2. **Marketing System Activation**

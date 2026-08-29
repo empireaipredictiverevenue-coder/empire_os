@@ -46,7 +46,7 @@
 - `empire-hub-8081.service` (hub_loop in-proc)
 - `empire-ppc-router.service`
 - `empire-ppc-billing-collector.service` 
-- `empire-agent-solana_listener.service`
+- `empire-agent-bsc_listener.service`
 - `empire-agent-lead_deliverer.service`
 - `empire-ppc-sentry.service`
 
@@ -220,7 +220,7 @@ Day-1 Operations:
 
 ### Phase 1 (2 Weeks)
 1. **Revenue Implementation**: Execute B2B lead extraction automation
-2. **Pilot Buyer Testing**: Onboard 3 pilot buyers with USDC deposits
+2. **Pilot Buyer Testing**: Onboard 3 pilot buyers with USDT deposits
 3. **Marketing Campaigns**: Launch enterprise marketing automation
 4. **Performance Monitoring**: Establish baseline metrics
 

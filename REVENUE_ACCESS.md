@@ -102,7 +102,7 @@ D) ENRICHMENT / LEAD GEN (feeds buyers)
    - DB:       /root/empire_os/empire_os.db  (SQLite WAL, 30s busy_timeout)
 
 E) PAYOUTS (pay your lead sources in USDT)
-   - Batch:    POST /v1/payouts/process-all  -> TokenPocket/Phantom deeplinks
+   - Batch:    POST /v1/payouts/process-all  -> Trust Wallet/Trust Wallet deeplinks
    - Verify:   POST /v1/payouts/verify/{payout_id}
    - Requires VAULT_WALLET_ADDRESS set (in llm.env, now inherited by hub)
 

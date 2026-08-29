@@ -39,10 +39,10 @@ def get_dashboard_metrics(tenant_id: str = None, period_days: int = 7) -> Dict:
     conn = get_conn()
     cur = conn.cursor()
     
-    where = ""
+    where = "WHERE 1=1"
     params = []
     if tenant_id:
-        where = "WHERE tenant_id = ?"
+        where += " AND tenant_id = ?"
         params.append(tenant_id)
     
     # Total leads
@@ -63,10 +63,11 @@ def get_dashboard_metrics(tenant_id: str = None, period_days: int = 7) -> Dict:
         SELECT COUNT(*) as cnt FROM crm_leads {where} AND status IN ('converted', 'deal_closed', 'won')
     """, params).fetchone()["cnt"]
     
-    # Revenue metrics
-    revenue = cur.execute(f"""
-        SELECT COALESCE(SUM(estimated_revenue), 0) as total FROM crm_leads {where} AND status IN ('converted', 'deal_closed', 'won')
-    """, params).fetchone()["total"]
+    # Revenue metrics — REAL settled revenue from si_settlements (USDT-BSC)
+    revenue = cur.execute(
+        "SELECT COALESCE(SUM(amount_cents), 0) as total FROM si_settlements "
+        "WHERE settled_at >= date('now', ?)",
+        (f'-{period_days} days',)).fetchone()["total"] / 100.0
     
     # Average score
     avg_score = cur.execute(f"""
@@ -97,10 +98,10 @@ def get_predictive_insights(tenant_id: str = None) -> Dict:
     conn = get_conn()
     cur = conn.cursor()
     
-    where = ""
+    where = "WHERE 1=1"
     params = []
     if tenant_id:
-        where = "WHERE tenant_id = ?"
+        where += " AND tenant_id = ?"
         params.append(tenant_id)
     
     # Top industries by conversion
@@ -179,10 +180,10 @@ def get_ai_insights(tenant_id: str = None) -> Dict:
     conn = get_conn()
     cur = conn.cursor()
     
-    where = ""
+    where = "WHERE 1=1"
     params = []
     if tenant_id:
-        where = "WHERE tenant_id = ?"
+        where += " AND tenant_id = ?"
         params.append(tenant_id)
     
     # Anomaly detection - sudden drops
@@ -192,31 +193,52 @@ def get_ai_insights(tenant_id: str = None) -> Dict:
         GROUP BY day ORDER BY day DESC LIMIT 7
     """, params)
     
-    # Key findings
+    # Key findings — derived from live funnel data
     findings = []
-    cur.execute(f"""
-        SELECT source, COUNT(*) as cnt, 
-               SUM(CASE WHEN status IN ('converted','deal_closed','won') THEN 1 ELSE 0 END) as conv
-        FROM crm_leads {where} GROUP BY source
-    """, params)
-    
-    # Top performing source
-    # ... (simplified for brevity)
-    
+    by_src = cur.execute(f"""
+        SELECT source, COUNT(*) as cnt,
+               SUM(CASE WHEN omega_score >= 15 THEN 1 ELSE 0 END) as qualified
+        FROM crm_leads {where} GROUP BY source ORDER BY cnt DESC LIMIT 5
+    """, params).fetchall()
+    for r in by_src:
+        if r["cnt"]:
+            findings.append(f"{r['source'] or 'unknown'}: {r['cnt']} leads, "
+                            f"{r['qualified']} qualified (score>=15)")
+    top_niche = cur.execute(
+        "SELECT niche, COUNT(*) as cnt FROM crm_leads WHERE niche != '' "
+        "GROUP BY niche ORDER BY cnt DESC LIMIT 1").fetchone()
+    if top_niche:
+        findings.append(f"top niche: {top_niche['niche']} "
+                        f"({top_niche['cnt']} leads)")
+    scored = cur.execute(
+        "SELECT COUNT(*) FROM crm_leads WHERE omega_score IS NOT NULL").fetchone()[0]
+    contacted = cur.execute(
+        "SELECT COUNT(*) FROM crm_leads WHERE outreach_attempted = 1").fetchone()[0]
+    findings.append(f"pipeline: {scored} scored, {contacted} contacted (email-only)")
+
+    # Anomaly: yesterday volume vs 7-day avg
+    yest = cur.execute(
+        "SELECT COUNT(*) FROM crm_leads WHERE created_at >= date('now', '-1 day') "
+        "AND created_at < date('now')").fetchone()[0]
+    avg7 = cur.execute(
+        "SELECT COUNT(*) / 7.0 FROM crm_leads WHERE created_at >= date('now', '-8 days') "
+        "AND created_at < date('now', '-1 day')").fetchone()[0]
+    anomalies = []
+    if avg7 > 0 and yest < avg7 * 0.4:
+        anomalies.append(f"lead volume dropped: yesterday {yest} vs avg {avg7:.0f}/day")
+
+    optimizations = []
+    if contacted < scored:
+        optimizations.append(f"{scored - contacted} scored leads not yet contacted — expand outreach batch")
+    if by_src and (by_src[0]["cnt"] or 0) > 0:
+        optimizations.append(f"double down on top source: {by_src[0]['source']}")
+
     insights = {
-        "key_findings": [
-            "WhatsApp outreach showing 27% conversion vs 18% email",
-            "Roofing industry converting at 3.2% vs 1.8% average",
-            "Weekend leads convert 40% better when contacted Monday AM",
-        ],
-        "anomalies": [],
-        "optimizations": [
-            "Shift 30% email budget to WhatsApp",
-            "Prioritize Roofing leads in scoring",
-            "Schedule Monday 9AM outreach for weekend leads",
-        ],
+        "key_findings": findings[:6],
+        "anomalies": anomalies,
+        "optimizations": optimizations[:4],
     }
-    
+
     return insights
 
 def get_attribution_model(tenant_id: str = None) -> Dict:
@@ -229,34 +251,58 @@ def get_attribution_model(tenant_id: str = None) -> Dict:
     }
 
 def get_roi_analysis(tenant_id: str = None) -> Dict:
-    """Get ROI analysis by channel."""
-    return {
-        "by_channel": {
-            "whatsapp": {"spend": 5000, "revenue": 125000, "roi": 24.0, "cac": 185},
-            "email": {"spend": 2000, "revenue": 45000, "roi": 21.5, "cac": 222},
-            "sms": {"spend": 3000, "revenue": 60000, "roi": 19.0, "cac": 250},
-            "call": {"spend": 4000, "revenue": 80000, "roi": 19.0, "cac": 333},
-        },
-        "total": {"spend": 14000, "revenue": 310000, "roi": 21.1, "cac": 226},
-    }
+    """Real channel volumes from si_outbox + real settled revenue."""
+    conn = get_conn()
+    cur = conn.cursor()
+    by_lane = cur.execute("""
+        SELECT lane, COUNT(*) as sent,
+               SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as delivered,
+               SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+        FROM si_outbox GROUP BY lane ORDER BY sent DESC LIMIT 6
+    """).fetchall()
+    # Real money: settled cash + recurring subscription book
+    settled = cur.execute("""
+        SELECT COALESCE(SUM(amount_cents), 0) FROM si_settlements
+    """).fetchone()[0]
+    book = cur.execute("""
+        SELECT COALESCE(SUM(price_cents), 0) FROM si_subscription
+        WHERE status = 'active'
+    """).fetchone()[0]
+    conn.close()
+    channels = {}
+    for r in by_lane:
+        channels[r["lane"] or "unknown"] = {
+            "queued": r["sent"], "delivered": r["delivered"], "failed": r["failed"],
+        }
+    return {"by_channel": channels,
+            "settled_revenue_usd": round(settled / 100.0, 2),
+            "mrr_book_usd": round(book / 100.0, 2)}
 
 def get_team_performance(tenant_id: str = None) -> List[Dict]:
-    """Get team member performance."""
-    return [
-        {"name": "Sarah Chen", "leads_assigned": 45, "contacted": 38, "converted": 4, "revenue": 250000, "conversion_rate": 10.5},
-        {"name": "Mike Rodriguez", "leads_assigned": 42, "contacted": 35, "converted": 3, "revenue": 180000, "conversion_rate": 8.6},
-        {"name": "Lisa Park", "leads_assigned": 38, "contacted": 32, "converted": 5, "revenue": 300000, "conversion_rate": 15.6},
-    ]
+    """Agent fleet activity (no human reps — agent-run org)."""
+    conn = get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT phase, COUNT(*) as runs,
+                   SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as ok,
+                   SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+            FROM automation_runs GROUP BY phase
+        """).fetchall()
+        return [dict(r) | {"name": f"phase:{r['phase']}"} for r in rows]
+    except sqlite3.OperationalError:
+        return []
+    finally:
+        conn.close()
 
 def get_funnel_analysis(tenant_id: str = None) -> Dict:
     """Get funnel analysis."""
     conn = get_conn()
     cur = conn.cursor()
     
-    where = ""
+    where = "WHERE 1=1"
     params = []
     if tenant_id:
-        where = "WHERE tenant_id = ?"
+        where += " AND tenant_id = ?"
         params.append(tenant_id)
     
     stages = [

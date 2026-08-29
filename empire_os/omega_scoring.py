@@ -53,8 +53,11 @@ SCORING_WEIGHTS = {
 
 HIGH_TICKET_INDUSTRIES = {
     "roofing": 5, "hvac": 5, "plumbing": 5, "solar": 5,
-    "medical": 4, "legal": 4, "dental": 4, "construction": 4,
-    "landscaping": 3, "pest_control": 3, "cleaning": 2,
+    "mass_tort": 5, "tort": 5, "mesothelioma": 5, "legal": 4, "law": 4,
+    "medical": 4, "dental": 4, "construction": 4, "electrical": 4,
+    "debt_relief": 4, "debt": 4, "water_damage": 4, "water": 4,
+    "landscaping": 3, "pest_control": 3, "real_estate": 3, "real estate": 3,
+    "homeowner": 3, "cleaning": 2,
 }
 
 def get_conn():
@@ -133,10 +136,16 @@ def score_lead(lead: Dict) -> Dict:
     conversion_signals = analysis.get("conversion_signals", 3)
     contact_capture = analysis.get("contact_capture", 3)
     
-    # Industry & market
-    industry = lead.get("industry", "") or lead.get("company_industry", "")
-    industry_score = calculate_industry_score(lead.get("industry", ""))
-    market_score = calculate_market_score(lead.get("location", "") or lead.get("city", ""))
+    # Industry & market — crm_leads has no industry/location cols;
+    # map niche->industry, metro->location (live sweep data 2026-08-29).
+    industry = (lead.get("industry", "")
+                or lead.get("niche", "")
+                or lead.get("sub_niche", ""))
+    location = (lead.get("location", "")
+                or lead.get("metro", "")
+                or lead.get("city", ""))
+    industry_score = calculate_industry_score(industry)
+    market_score = calculate_market_score(location)
     industry_market = min(5, (industry_score + market_score) // 2)
     
     # Weighted total
@@ -193,9 +202,9 @@ def run_scoring_cycle(limit: int = 100) -> Dict:
         cur.execute("""
             UPDATE crm_leads 
             SET omega_score = ?, omega_tier = ?, scored_at = ?, score_breakdown = ?
-            WHERE id = ?
+            WHERE lead_uid = ?
         """, (scoring["omega_score"], scoring["tier"], 
-              datetime.now(timezone.utc).isoformat(), json.dumps(scoring["breakdown"]), lead["id"]))
+              datetime.now(timezone.utc).isoformat(), json.dumps(scoring["breakdown"]), lead["lead_uid"]))
         
         scored += 1
         if scoring["tier"] == "high":

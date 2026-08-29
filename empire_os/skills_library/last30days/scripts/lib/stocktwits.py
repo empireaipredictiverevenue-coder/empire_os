@@ -50,7 +50,7 @@ _FINANCE_HINTS = re.compile(
     # Short aliases (eth, sol, ada, doge, ripple) stay OUT of the gate: they
     # collide with everyday topics (ETH Zurich, ADA compliance, doge memes);
     # they still resolve via _CRYPTO_ALIASES once the gate fires another way.
-    r"bitcoin|btc|ethereum|solana|dogecoin|cardano|xrp|"
+    r"bitcoin|btc|ethereum|bsc|dogecoin|cardano|xrp|"
     r"\$[A-Za-z]{1,5}(?:\.[A-Z])?)\b",
     re.IGNORECASE,
 )
@@ -61,7 +61,7 @@ _CASHTAG = re.compile(r"\$([A-Za-z]{1,5}(?:\.[A-Z])?)\b")
 _CRYPTO_ALIASES = {
     "bitcoin": "BTC.X", "btc": "BTC.X",
     "ethereum": "ETH.X", "eth": "ETH.X",
-    "solana": "SOL.X", "sol": "SOL.X",
+    "bsc": "SOL.X", "sol": "SOL.X",
     "dogecoin": "DOGE.X", "doge": "DOGE.X",
     "ripple": "XRP.X", "xrp": "XRP.X",
     "cardano": "ADA.X", "ada": "ADA.X",

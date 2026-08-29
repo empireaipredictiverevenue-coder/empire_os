@@ -421,8 +421,8 @@ def bill_on_delivery(buyer: dict, lead: dict) -> str | None:
 
 def _log_ppc_invoice(buyer: dict, lead: dict) -> str:
     """Bill the delivered lead to the buyer (pay-per-lead) and log it to the
-    ppc ledger so solana_listener can collect USDC against it.
-    Amount = base_payout * fee_rate (buyer's agreed rate). USDC stored in USD dollars."""
+    ppc ledger so bsc_listener can collect USDT against it.
+    Amount = base_payout * fee_rate (buyer's agreed rate). USDT stored in USD dollars."""
     import urllib.request, json, uuid
     # Prefer the agreed pay-per-lead rate; fall back to base*fee.
     per_lead = int(buyer.get("per_lead_cents") or 0)

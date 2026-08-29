@@ -28,7 +28,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 DB_PATH = os.getenv("DB_PATH", "/root/empire_os/empire_os.db")
-VAULT_WALLET = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
+VAULT_WALLET = os.getenv("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
 QUOTE_TTL_MINUTES = int(os.getenv("A2A_QUOTE_TTL_MINUTES", "30"))
 PLATFORM_FEE_BPS = int(os.getenv("A2A_PLATFORM_FEE_BPS", "1500"))  # 15%
 
@@ -104,7 +104,7 @@ def compute_amount(product: str, quantity: int = 1) -> float:
 
 def _sign_payload(payload: dict) -> str:
     """Sign payload with vault keypair (HMAC fallback if no keypair)."""
-    secret = os.getenv("SOLANA_PAYER_SECRET", "")
+    secret = os.getenv("BSC_PAYER_SECRET", "")
     body = json.dumps(payload, sort_keys=True)
     if secret:
         try:
@@ -197,7 +197,7 @@ def get_quote(quote_id: str) -> Optional[dict]:
 
 
 def fund_quote(quote_id: str, deposit_tx: str) -> dict:
-    """Mark quote as funded after solana_listener detects deposit."""
+    """Mark quote as funded after bsc_listener detects deposit."""
     c = db()
     try:
         ensure_tables(c)

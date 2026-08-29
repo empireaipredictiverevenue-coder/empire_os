@@ -11,7 +11,7 @@ Empire OS revenue stack is actually working end-to-end. Operational contract.
 3. **sitemap_served** — GET /sitemap.xml → 200 + body has `aeo/`.
 4. **robots_served** — GET /robots.txt → 200 + has `sitemap`.
 5. **money_loop_apply_payurl** — POST hub /v1/buyers/apply (container IP)
-   → response has payment.pay_url (solana: URL). PROBE INTERNALLY at
+   → response has payment.pay_url (bsc: URL). PROBE INTERNALLY at
    10.118.155.218:8081 to avoid Cloudflare 403. Cleanup probe tenant after.
 6. **outbox_flushing** — NOT(pending>20 AND sent_recent==0). Reads LIVE
    container DB via incus exec.
@@ -42,7 +42,7 @@ systemctl list-timers empire-qc-agent.timer
   repeated bot POSTs. Probe the container IP directly.
 - **Reading host /root/empire_os/empire_os.db** — STALE mirror. Always incus
   exec the container for DB counts.
-- **Wrong pay_url key** — response has payment.pay_url (a solana: string),
+- **Wrong pay_url key** — response has payment.pay_url (a bsc: string),
   NOT payment.url and NOT top-level pay_url. Check both payment.pay_url and
   top-level pay_url.
 - **Probe tenant cleanup using wrong PK** — si_tenant has no `id` column;

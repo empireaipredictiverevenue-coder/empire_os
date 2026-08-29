@@ -23,7 +23,7 @@
 | 11 | **Hot Targets** | hot_targets (89,213) | Real-time keyword/niche velocity monitoring | Feeds Neural Scout for lead discovery | 89,213 targets tracked |
 | 12 | **Lead Pipeline** | lane_leads (665,057), lanes (36), lane_seats (316) | 38 niches × 19 metros lead inventory | Core inventory — everything sells from this | 665K leads scored with Omega + Cortex scores |
 | 13 | **Buyer Outreach** | si_buyer_outreach (30,601) | Cold → contacted → nurture_ready → paid | $21.04 avg payout_per_lead | 23,460 cold, 1,030 contacted, 6,115 nurture_ready |
-| 14 | **Settlement Gateway** | si_settlements (3), si_unmatched_deposits | Crypto payment verification + payout | BSC USDT rail | 3 test settlements (Solana era), BSC now active |
+| 14 | **Settlement Gateway** | si_settlements (3), si_unmatched_deposits | Crypto payment verification + payout | BSC USDT rail | 3 test settlements (BSC era), BSC now active |
 | 15 | **Predictive Revenue** | daily_revenue_snapshots (31) | Daily revenue forecasting + market gaps + leak detection | Internal analytics | 31 snapshots, $0 revenue predicted (no collections yet) |
 | 16 | **Neural Scout** | (uses lane_leads + hot_targets) | Automated niche scanning + prospect discovery | Feeds lead pipeline | Scanning 6+ sources (DBPR, Sunbiz, BBB, permits, web) |
 | 17 | **Verbatim Agent (CRM)** | crm_deals (499), crm_contacts, crm_lead_pipeline | CRM deal tracking through pipeline stages | $298,901 in deals awaiting_payment | 499 deals, all awaiting_payment stage |
@@ -302,7 +302,7 @@ Use the existing Cortex + Predictive Revenue + Neural Scout systems.
 
 ## INFRASTRUCTURE NOTES
 
-- All 31 services running except 2 Solana listeners (stopped, BSC replaces)
+- All 31 services running except 2 BSC listeners (stopped, BSC replaces)
 - BSC USDT rail active for receiving payments (zero gas cost)
 - Brevo email active (295/300 quota, upgrade to 1,000/day needed)
 - Enrichment webhook live (:9090), 15-source cascade operational

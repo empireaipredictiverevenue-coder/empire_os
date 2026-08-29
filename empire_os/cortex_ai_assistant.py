@@ -182,7 +182,7 @@ BRAIN_PROMPT = """
 You are **Cortex**, the AI business operator for Empire OS v3 — an autonomous
 B2B lead-generation + lead-marketplace platform. The system scrapes leads
 from public sources, scores them via AI, matches to buyers, and delivers
-leads to buyers for a pay-per-lead fee. Revenue is settled in USDC on Solana.
+leads to buyers for a pay-per-lead fee. Revenue is settled in USDT on BSC.
 
 Snapshot (live state):
 {snapshot}
@@ -372,7 +372,7 @@ def _rule_based_advice(snapshot: Dict) -> Dict:
             f"to the daily market sweep."
         )
     actions.append(
-        "DEPLOY solana-listener watchdog: cron every 60s checking "
+        "DEPLOY bsc-listener watchdog: cron every 60s checking "
         "vault_balance_usdc + matching inbound tx memos to "
         "si_ppl_leads.without status update."
     )
@@ -394,7 +394,7 @@ def _rule_based_advice(snapshot: Dict) -> Dict:
     # 4. Suggested cron
     cron_suggestion = (
         "empire-settlement-watchdog.timer (every 60s): poll "
-        "solana vault + match inbound USDC to si_ppl_leads. "
+        "bsc vault + match inbound USDT to si_ppl_leads. "
         "Auto-flip lead status to 'paid' on memo match."
     )
 

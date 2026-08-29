@@ -31,7 +31,7 @@ def _hook_variants(niche: str, conv_rate: float) -> list[str]:
         # attention exists, conversion dead -> hook attacks the pay step
         return [
             f"{niche.title()} help in your area — pay $299 today, locked founder rate. Link expires soon.",
-            f"Storm season: {niche.title()} claims paid fast via USDC. Settle in minutes, not weeks.",
+            f"Storm season: {niche.title()} claims paid fast via USDT. Settle in minutes, not weeks.",
             f"Your {niche} lead is graded C (warm). Claim it now — $299 founder price won't hold.",
         ]
     return [
@@ -45,9 +45,9 @@ def _paylink_fixes(links_sent: int, confirmed: int) -> list[str]:
     """CTO pay-link friction fixes — the 0-confirmed wall."""
     return [
         f"FRICTION: {links_sent} pay links sent, {confirmed} confirmed. "
-        f"Wall = USDC confirm step. Fix: deep-link straight to Solana Pay QR "
+        f"Wall = USDT confirm step. Fix: deep-link straight to BSC Pay QR "
         f"(pre-filled amount + EVAL_/seat memo), skip intermediate landing page.",
-        "Add trust signal on CTA: 'Secured by Solana · instant settlement' + "
+        "Add trust signal on CTA: 'Secured by BSC · instant settlement' + "
         "show vault wallet address (proves real, not a form).",
         "Add urgency: founder $299 discount shows a real deadline countdown.",
         "Fail-soft: if wallet-connect errors, show copy-paste address + QR as fallback.",
@@ -87,7 +87,7 @@ def run() -> dict:
         "ts": datetime.now(timezone.utc).isoformat(),
         "action_1_ceo": f"Ship hook variants for {', '.join(TOP_NICHES)} "
                         f"(attack pay wall, conv ~0%).",
-        "action_2_cto": "Fix pay-link friction: deep-link Solana Pay QR, "
+        "action_2_cto": "Fix pay-link friction: deep-link BSC Pay QR, "
                         "trust signal, urgency, fail-soft.",
         "action_3_leak": f"Biggest leak this week: '{biggest_leak}' stage "
                          f"({od.get('conversion_pct', 0)}% conv). Move cold->contacted.",

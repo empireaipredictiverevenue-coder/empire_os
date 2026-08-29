@@ -73,11 +73,11 @@ def get_expiring_leases(c: sqlite3.Connection, days: int = DEFAULT_DAYS) -> list
 
 def build_renewal_pay_url(lease: dict) -> str:
     """Reconstruct a pay_url pointing to a fresh quote via the lease owner."""
-    vault = os.getenv("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
+    vault = os.getenv("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8")
     amount = lease.get("price_usdc", 0)
     lease_id = lease.get("lease_id", "")
     return (
-        f"bsc:0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb?amount={amount:.2f}"
+        f"bsc:0x1339b487046B0ad924a10c20b1791608EA8595a8?amount={amount:.2f}"
         f"&label=Empire%20Lease%20Renewal&memo=lease:{lease_id}"
     )
 

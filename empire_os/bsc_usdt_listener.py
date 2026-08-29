@@ -12,16 +12,22 @@ import os, sys, json, time
 from datetime import datetime, timezone
 import sqlite3 as sq
 
-# Config from env (same as crypto_charge.py conventions)
-BSC_RPC = os.environ.get(
-    "BSC_RPC", "https://api.bsc.solana.com"
-)
+# Config from env (same as crypto_charge.py conventions).
+# Default to Binance BSC dataseed RPCs (no bsc references).
+_BSC_RPC_CANDIDATES = [
+    "https://bsc-dataseed.binance.org",
+    "https://bsc-dataseed1.binance.org",
+    "https://bsc-dataseed2.binance.org",
+    "https://bsc-dataseed3.binance.org",
+    "https://bsc-dataseed4.binance.org",
+]
+BSC_RPC = os.environ.get("BSC_RPC") or _BSC_RPC_CANDIDATES[0]
 BSC_USDT_CONTRACT = os.environ.get(
     "BSC_USDT_CONTRACT", "0x55d398326f99059fF775485246999027B3197955"
 )
 # Vault address for BSC pay-to (same as before)
 BSC_WALLET = os.environ.get(
-    "BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb"
+    "BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8"
 )
 DB = "/root/empire_os/empire_os.db"
 

@@ -8,7 +8,7 @@ writes them as ad-copy assets to a JSON file for human review.
 
 This is the REAL version of the blueprint's ugly_banner_gen.py:
 - No fictional /var/www/html/ads webroot — writes to /root/feedback/ads/.
-- No Solana tracking pixel injection — just clean copy assets.
+- No BSC tracking pixel injection — just clean copy assets.
 - Hooks come from REAL engagement data, not a fabricated social_comments feed.
 
 Output asset shape:

@@ -5,11 +5,11 @@ flow and all conversion-stage engineering. You write code. You execute.
 
 ## Your Job
 - Own PAYMENT FRICTION. The behavior_engine shows 8,600+ pay links sent,
-  0 confirmed. The USDC pay-confirmation step is the wall. Fix it.
+  0 confirmed. The USDT pay-confirmation step is the wall. Fix it.
 - Concrete fixes (rule-based, auditable, no hallucinated magic):
-  1. Reduce clicks to pay: deep-link straight to Solana Pay QR, pre-filled
+  1. Reduce clicks to pay: deep-link straight to BSC Pay QR, pre-filled
      amount + memo, no intermediate landing page.
-  2. Trust signal: show "secured by Solana, instant settlement" + vault wallet
+  2. Trust signal: show "secured by BSC, instant settlement" + vault wallet
      on the CTA.
   3. Urgency: founder discount ($299) has a real deadline — show it.
   4. Fail-soft: if wallet connect fails, fall back to copy-paste address.

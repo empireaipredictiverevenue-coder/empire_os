@@ -6,13 +6,13 @@
 - Hub: empire_os.hub on :8081 (systemd empire-hub-8081.service, Restart=always). Health=200.
 - 14 daemons active (13 empire-agent-* + hub unit). All load /root/empire_os/.env via EnvironmentFile.
 - Storm crm_leads: 70 (growing ~every 5min from NWS alerts). Total crm_leads: 257.
-- Vault: egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM (44-char, CORRECT). USDC ATA 8QjhJVpQiqFMQiyySHcC.
-- Solana USDC revenue loop: VERIFIED (real 0.528861 USDC -> invoice ppc-USDC-TEST-001 marked PAID at 11:18+11:19).
+- Vault: 0x1339b487046B0ad924a10c20b1791608EA8595a8 (44-char, CORRECT). USDT ATA 8QjhJVpQiqFMQiyySHcC.
+- BSC USDT revenue loop: VERIFIED (real 0.528861 USDT -> invoice ppc-USDT-TEST-001 marked PAID at 11:18+11:19).
 
 ## PRODUCTS (status)
 - [DONE] Storm product (satellite_strike): polls NWS, creates crm_leads, clean cycles, idempotent hub endpoint. 70 leads.
 - [DONE] Idle-asset product (idle_asset): writes Supabase empire_tasks (idle_asset_review). Scope-correct.
-- [DONE] USDC collection (solana_listener + hub /v1/finance/replay): balance-delta detection, memo-optional, matches si_ppc_invoices by micro amount, paid_at.
+- [DONE] USDT collection (bsc_listener + hub /v1/finance/replay): balance-delta detection, memo-optional, matches si_ppc_invoices by micro amount, paid_at.
 - [PARTIAL] Storm monetization bridge: deliver_storm_leads() being built (3x disaster premium). PPL_DISASTER_MODE=on in .env. SUBAGENT RUNNING.
 - [IN-FLIGHT] Warehouse PDF flow (storm-damage->PDF->owner email). SUBAGENT RUNNING.
 - [IN-FLIGHT] 14k leads activation (Supabase). SUBAGENT RUNNING.
@@ -57,8 +57,8 @@ TOTAL: 56,603 rows. ~29k live, ~27.6k idle.
 - NOTE: stray bg process 'activate_idle_leads.py' FAILED (file missing) — harmless, real 14k subagent still via delegation.
 
 ## NEXT ACTIONS (user said "yes" to monetize)
-1. Storm monetization bridge -> bill 70+ storm leads at 3x premium via USDC invoice (loop proven).
+1. Storm monetization bridge -> bill 70+ storm leads at 3x premium via USDT invoice (loop proven).
 2. 14k idle leads -> Supabase active flow.
 3. Warehouse PDF -> owner email (storm-damage product completion).
 4. Container audit -> cleanup recommendations (no deletes yet).
-5. Flip PPL_DISASTER_MODE already on; verify premium billing lands as paid USDC.
+5. Flip PPL_DISASTER_MODE already on; verify premium billing lands as paid USDT.

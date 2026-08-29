@@ -100,7 +100,7 @@ code{background:#0f172a;padding:.15em .4em;border-radius:4px;font-size:.85em;col
   </div>
 </div>
 
-<script src="/static/solana-web3.iife.min.js"></script>
+<script src="/static/bsc-web3.iife.min.js"></script>
 <script>
 const HUB = '';
 let connection = null;
@@ -187,14 +187,14 @@ function numberWithCommas(x) {
 }
 
 async function connect() {
-  if (window.solana && window.solana.isPhantom) {
+  if (window.solana && window.solana.isTrust Wallet) {
     walletProvider = window.solana;
   } else if (window.backpack) {
     walletProvider = window.backpack;
   } else if (window.solana) {
     walletProvider = window.solana;
   } else {
-    log('No BSC wallet found. Install Phantom.', 'err');
+    log('No BSC wallet found. Install Trust Wallet.', 'err');
     return;
   }
   try {
@@ -202,7 +202,7 @@ async function connect() {
     publicKey = resp.publicKey;
     document.getElementById('connect-btn').style.display = 'none';
     document.getElementById('wallet-info').style.display = 'flex';
-    document.getElementById('wallet-name').textContent = walletProvider.isPhantom ? '🦊 Phantom' : '🔌 Wallet';
+    document.getElementById('wallet-name').textContent = walletProvider.isTrust Wallet ? '🦊 Trust Wallet' : '🔌 Wallet';
     document.getElementById('wallet-addr').textContent = publicKey.toBase58().slice(0,8) + '...' + publicKey.toBase58().slice(-4);
     if (batches.length > 0 && currentBatch < batches.length) {
       document.getElementById('sign-btn').disabled = false;
@@ -224,7 +224,7 @@ async function signNext() {
     log('Deserialized batch ' + (currentBatch+1) + ' (' + bytes.length + ' bytes)', 'ok');
     const signedTx = await walletProvider.signTransaction(tx);
     const rawTx = signedTx.serialize();
-    // Submit via the hub's server-side RPC — bypasses Phantom dApp browser
+    // Submit via the hub's server-side RPC — bypasses Trust Wallet dApp browser
     // blocking client-side RPC calls to external endpoints.
     const submitB64 = bytesToBase64(rawTx);
     const submitResp = await fetch('/v1/payouts/submit', {

@@ -31,7 +31,7 @@ CURRENT_STATE = {
     "pii_masking": False,
     "data_classification": False,
     "auto_deletion": False,
-    "solana_rpc": False,
+    "bsc_rpc": False,
     "bsc_usdt": True,            # REAL pay path
     "tx_verification": True,     # REAL (bsc_settlement)
     "program_audit": False,

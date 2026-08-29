@@ -22,7 +22,7 @@ stalls and self-heal the 3 known rot points. This is the operational contract.
    ('tencent/hy3:free') → UPDATE to hy3. (HOST-only: state.db lives on host.)
 2. **Dead unit restart** — for each empire-* unit, if `systemctl is-active`
    != active → `systemctl restart`. Correct unit names use UNDERSCORES
-   (empire-agent-solana_listener.service, NOT empire-agent-solana-listener).
+   (empire-agent-bsc_listener.service, NOT empire-agent-bsc-listener).
 3. **Outbox guard** — if outbox_stalled: call _ensure_brevo_backend()
    (rewrites EMAIL_BACKEND=direct → brevo in /root/empire_os/.env) then
    `systemctl restart empire-mail-sender.service`.

@@ -4,7 +4,7 @@ Senior List Building and Email Marketing Agent
 Combines lead discovery, list segmentation, email drafting, and nurture sequences.
 Incorporates SOUL copywriting guidelines and markdown guard rails.
 Integrates with Gauntlet Loop for performance feedback.
-Uses USDT BSC for payments (updated from Solana).
+Uses USDT BSC for payments (updated from BSC).
 """
 import json, os, sys, time, sqlite3, hashlib, re
 from datetime import datetime, timezone, timedelta

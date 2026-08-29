@@ -21,7 +21,7 @@ EMPIRE_FROM. Hub systemd unit also loads /root/empire_os/.env (EnvironmentFile=)
 
 ## SYSTEM STATE (verified live 2026-07-20)
 - Hub pid 795267 on :8081 (eval $2.50/conversion, 12 /v1/evaluate/* endpoints)
-- Vault egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM = 0.528861 USDC
+- Vault 0x1339b487046B0ad924a10c20b1791608EA8595a8 = 0.528861 USDT
 - 462 lanes / 4,990 lane_leads (host) / 6,490 crm_leads (container)
 - 64 si_tenant rows / 661 si_subscription / 0 si_charges EVER / 2 si_settlements
 - cortex_engine live, runs every 15min in container
@@ -49,13 +49,13 @@ EMPIRE_FROM. Hub systemd unit also loads /root/empire_os/.env (EnvironmentFile=)
 
 ### Revenue / Finance
   finance_agent.py              → /root/feedback/finance_log.jsonl
-  solana_listener_agent.py      → /root/feedback/vault_balance_usdc.txt + solana_listener.jsonl + solana_seen.jsonl + finance_log.jsonl
+  bsc_listener_agent.py      → /root/feedback/vault_balance_usdc.txt + bsc_listener.jsonl + bsc_seen.jsonl + finance_log.jsonl
   outreach_runner.py            → /root/empire_os/logs/outreach_log.jsonl
   mail_sender_agent.py          → /root/feedback/mail_sender.jsonl
   email_agent.py / email_expert_agent.py → /root/feedback/email_expert.jsonl
   inbound_reply_daemon.py       → /root/feedback/inbound_reply_daemon.log + inbound_replies.jsonl
   lead_deliverer_agent.py       → /root/feedback/lead_deliveries.jsonl
-  billing_collector_agent.py    → (built, output: si_invoice reminders via solana_listener)
+  billing_collector_agent.py    → (built, output: si_invoice reminders via bsc_listener)
   buyer_delivery.py             → /root/feedback/buyer_delivery records
   buyer_hunter_agent.py         → /root/feedback/buyer_hunter.jsonl
 
@@ -165,17 +165,17 @@ EMPIRE_FROM. Hub systemd unit also loads /root/empire_os/.env (EnvironmentFile=)
 4. Eval product: signup → key → grade → lead-sold = $2.50 + pay URL.
 5. Social: write_outline returns title + hook + sections array (not error).
 6. Thumbnail: 1280x720 jpg ≥50KB = Pollinations flux-pro worked.
-7. Any charge >$0 settled = USDC on-chain in vault via Helius RPC.
+7. Any charge >$0 settled = USDT on-chain in vault via Helius RPC.
 
 ## GITHUB REMOTES (both pushed 2026-07-20)
 - empire_os: github.com/empireaipredictiverevenue-coder/empire_os.git  → 1710390
 - g-brain:   github.com/empireaipredictiverevenue-coder/g-brain.git    → 428ffce
 
 ## BLOCKERS (real, current)
-- $0 real collected ever (only 0.528861 USDC dust)
+- $0 real collected ever (only 0.528861 USDT dust)
 - 31k+ cold buyers, 0% conv to contacted (CoS directive #3 — biggest leak)
 - pay-url delivered to buyer requires working email → SMTP locked (Vultr :25 blocked, ImprovMX free lacks SMTP)
-- solana-listener flapping (15 restarts)
+- bsc-listener flapping (15 restarts)
 - /v1/leads/direct 500 (unfixed)
 
 ## COORDINATION FILES (g-brain)

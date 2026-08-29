@@ -1,7 +1,7 @@
 """
 Audit 5 (adapted) — BSC USDT Settlement Verification
 The real pay path is BSC USDT to vault 0x1339b487046B0ad924a10c20b1791608EA8595a8.
-Verification checklist from doc, ported Solana->BSC:
+Verification checklist from doc, ported BSC->BSC:
   - verify recipient == VAULT
   - validate amount (no dust < $0.01 equivalent)
   - blockhash freshness -> block confirmations finality (>= 15 on BSC)
@@ -16,7 +16,7 @@ from empire_os.security.rate_limiter import RateLimiter, RateLimitConfig
 VAULT = "0x1339b487046B0ad924a10c20b1791608EA8595a8"
 BSC_USDT_CONTRACT = "0x55d398326f99059fF775485246999027B3197955"
 DUST_USD = 0.01
-MIN_CONFIRMATIONS = 15  # BSC finality (doc said 32 for Solana; BSC shorter)
+MIN_CONFIRMATIONS = 15  # BSC finality (doc said 32 for BSC; BSC shorter)
 MEMO_PREFIX = "LEAD_"
 
 

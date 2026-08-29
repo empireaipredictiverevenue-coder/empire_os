@@ -33,7 +33,7 @@
   "ok": true,
   "revenue_path_ready": true,
   "checks": {
-    "env": { "SOLANA_VAULT_WALLET": true, "SOLANA_RPC_URL": true, "SOLANA_PAYER_SECRET": true, "USDC_MINT": true, "SOLANA_NETWORK": true },
+    "env": { "BSC_VAULT_WALLET": true, "BSC_RPC_URL": true, "BSC_PAYER_SECRET": true, "USDC_MINT": true, "BSC_NETWORK": true },
     "db": { "si_charges": true, "si_unmatched_deposits": true, "si_tenant": true, "si_settlements": true, "si_invoice": true, "writable": true },
     "chain": { "rpc": { "ok": true, "vault_balance_usdc": 0.521861, "token_accounts": 1 } },
     "hub": { "/health": { "ok": true }, "/v1/buyers/apply": { "ok": true }, "/v1/ppc/charge": { "ok": true } },
@@ -50,7 +50,7 @@
 | Orchestrator | 1391835 | Agent coordination (systemd) |
 | Mesh Agent | 1391840 | Inter-agent messaging |
 | Lead Sniper | 2356935 | In-container (incus exec) |
-| Solana Listener | 956 | USDC settlement monitoring |
+| BSC Listener | 956 | USDT settlement monitoring |
 | PP Router | 2338859 | PPC buyer marketplace |
 | Mail Sender | 2350220 | Outbound email |
 | Founder Outreach | 2109546 | Founder campaigns |

@@ -1,14 +1,12 @@
 """
 Crypto charge - USDT-on-BSC payment collector.
 
-Different than Stripe/PayPal: cards are pushed to us. Crypto must
-be PUSHED by the buyer. Our job is to reconcile + record.
+Crypto must be PUSHED by the buyer. Our job is to reconcile + record.
 
 Flow for Head 2 / Head 1 / Head 4 crypto billing:
   1. Charge triggers (call_tick at 90s, etc.)
   2. We generate a payment-expected record:
-        amount_usdc, our memo = "INV_<head>_<inv_id>_<charge_id>"
-        buyer_wallet = si_buyer_payment_methods[customer_ref=walled]
+        amount_usdt, our memo = "INV_<head>_<inv_id>_<charge_id>"
   3. We POST it to the hub at /v1/ppc/expect_payment so other
      listeners (vendor agent, /products, /outreach emails) can
      send the buyer the request-to-pay link
@@ -18,8 +16,8 @@ Flow for Head 2 / Head 1 / Head 4 crypto billing:
   5. When the transfer arrives, we mark si_charges.paid_at +
      si_ppc_invoices.status='paid' + emit a 'settled' event.
 
-Real money actually moves because this is on-chain. No Stripe
-needed. The payer just needs SOL for gas (~0.000005 SOL = ~$0.001).
+Real money actually moves because this is on-chain. No Stripe needed.
+The payer just needs BNB for gas (~0.0002 BNB = ~$0.05).
 """
 from __future__ import annotations
 
@@ -39,16 +37,11 @@ from typing import Optional
 # ── NO-SIM LOCK ──────────────────────────────────────────────────────────
 # The 'simulated' charge status is BANNED. Any code path that would persist
 # a 'simulated' charge is a regression of the $0-revenue silent-drop bug.
-# This guard is the durable backstop: call it before every si_charges write.
 SIMULATED_BANNED = True
 
 
 def assert_no_simulated(status: str) -> None:
-    """Raise if a charge would be persisted with status='simulated'.
-
-    Real charges are 'succeeded'. Unpaid-but-requested are 'open'/'pending'.
-    'simulated' means fake — we never write fake revenue.
-    """
+    """Raise if a charge would be persisted with status='simulated'."""
     if SIMULATED_BANNED and status == "simulated":
         raise RuntimeError(
             "NO-SIM LOCK: refusing to persist status='simulated'. "
@@ -57,14 +50,18 @@ def assert_no_simulated(status: str) -> None:
 
 
 DB = "/root/empire_os/empire_os.db"
-SOLANA_RPC = os.environ.get(
-    "BSC_RPC", "https://api.bsc.solana.com")
+BSC_RPC = os.environ.get(
+    "BSC_RPC", "https://bsc-dataseed.bnbchain.org")
 BSC_USDT_CONTRACT = os.environ.get(
     "BSC_USDT_CONTRACT", "0x55d398326f99059fF775485246999027B3197955")
-SOLANA_VAULT = os.environ.get(
+BSC_VAULT = os.environ.get(
     "BSC_WALLET_ADDRESS",
-    "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb")
-TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    "0x1339b487046B0ad924a10c20b1791608EA8595a8")
+# ERC-20 Transfer(address,address,uint256) event signature
+TRANSFER_TOPIC = (
+    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+# 1:1 — USDT has 18 decimals but uiAmount is already whole USDT.
+USDT_DECIMALS = 18
 
 
 def now_iso() -> str:
@@ -77,11 +74,11 @@ def _rpc(method: str, params: list) -> dict:
         {"jsonrpc": "2.0", "id": 1, "method": method,
          "params": params}).encode()
     req = urllib.request.Request(
-        SOLANA_RPC + ("/" if "?" not in SOLANA_RPC else ""),
+        BSC_RPC,
         data=body,
         headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=12) as resp:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         return {"error": f"http {e.code}", "body": e.read().decode()[:200]}
@@ -89,181 +86,127 @@ def _rpc(method: str, params: list) -> dict:
         return {"error": str(e)[:200]}
 
 
-def build_expected_payment(buyer_wallet: str, amount_usdc: float,
+def _decode_memo(input_data: str) -> str:
+    """Decode a BSC tx input / memo blob to UTF-8 where possible."""
+    if not input_data:
+        return ""
+    raw = input_data
+    if raw.startswith("0x"):
+        raw = raw[2:]
+    try:
+        cand = bytes.fromhex(raw)
+        # strip trailing zeros, try utf-8
+        text = cand.decode("utf-8", "ignore").strip("\x00").strip()
+        return text
+    except Exception:
+        return ""
+
+
+def build_expected_payment(buyer_wallet: str, amount_usdt: float,
                           memo: str) -> dict:
-    """Return the payment request that we'd send to the buyer.
+    """Return the payment request we send to the buyer.
 
     Buyer authorizes by sending one USDT transfer to our vault
-    with the memo in the SPL token transfer's `memo` instruction
-    (BSC memo program) OR by using invoice_id in the
-    reference.
+    with the memo embedded in the tx input / reference.
     """
     return {
         "from": buyer_wallet,
-        "to": SOLANA_VAULT,
-        "amount_usdc": round(amount_usdc, 6),
-        "amount_micro": int(round(amount_usdc * 1_000_000)),
-        "token_mint": BSC_USDT_CONTRACT,
+        "to": BSC_VAULT,
+        "amount_usdt": round(amount_usdt, 6),
+        "token_contract": BSC_USDT_CONTRACT,
         "memo": memo,
-        "solana_pay_url": (
-            f"bsc:{SOLANA_VAULT}"
-            f"?amount={int(round(amount_usdc * 1_000_000))}"
-            f"&contract={BSC_USDT_CONTRACT}"
-            f"&label={urllib.parse.quote(memo)}"
-            f"&message=Empire+OS"
+        "bsc_pay_url": (
+            f"https://bscscan.com/address/{BSC_VAULT}"
+            f"?memo={urllib.parse.quote(memo)}"
+        ),
+        "note": (
+            f"Send {round(amount_usdt,6)} USDT (BEP-20) to {BSC_VAULT} "
+            f"with memo/reference '{memo}'."
         ),
     }
 
 
 def get_buyer_wallet(buyer_id: str) -> Optional[str]:
-    """Get the buyer's crypto wallet from si_buyer_payment_methods."""
+    """Get the buyer's crypto wallet from si_buyer_payment_methods.
+
+    Returns None if no real wallet is on file — caller MUST require a real
+    wallet; we never fall back to a placeholder.
+    """
     con = sqlite3.connect(DB)
     row = con.execute(
         "SELECT customer_ref FROM si_buyer_payment_methods "
-        "WHERE buyer_id=? AND processor='usdc' AND is_default=1 "
+        "WHERE buyer_id=? AND processor='usdt' AND is_default=1 "
         "AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",
         (buyer_id,)).fetchone()
     con.close()
-    return row[0] if row else None
-
-
-def fetch_token_accounts(owner: str) -> list[dict]:
-    """RPC: getTokenAccountsByOwner for USDT mint.
-
-    Returns list of {pubkey, mint, amount, decimals}.
-    """
-    res = _rpc("getTokenAccountsByOwner", [
-        owner,
-        {"programId": TOKEN_PROGRAM_ID},
-        {"encoding": "jsonParsed"},
-    ])
-    if "error" in res:
-        return []
-    out = []
-    for acct in res.get("result", {}).get("value", []):
-        info = acct.get("account", {}).get("data", {}).get(
-            "parsed", {}).get("info", {})
-        out.append({
-            "pubkey": acct.get("pubkey"),
-            "mint": info.get("mint"),
-            "amount": float(info.get("tokenAmount", {}).get(
-                "uiAmount", 0) or 0),
-            "amount_raw": int(info.get("tokenAmount", {}).get(
-                "amount", 0)),
-            "decimals": info.get("tokenAmount", {}).get("decimals"),
-            "owner": info.get("owner"),
-        })
-    return out
-
-
-def _decode_memo(ix: dict) -> str:
-    """Decode a spl-memo instruction's data to a UTF-8 string.
-
-    Handles both encodings the RPC may return: jsonParsed returns the
-    memo as a base64 string in `data`; some endpoints return it raw.
-    """
-    raw = ix.get("data")
-    if not raw:
-        return ""
-    if isinstance(raw, str):
-        # `data` may be base64 (jsonParsed spl-memo) or already-decoded text.
-        # Only treat as base64 if it round-trips back to the same string;
-        # otherwise it was raw text and we return it as-is.
-        try:
-            cand = base64.b64decode(raw, validate=True)
-            text = cand.decode("utf-8", "ignore").strip()
-            # round-trip check: re-encoding must reproduce the input
-            if text and base64.b64encode(text.encode()).decode() == raw:
-                return text
-        except Exception:
-            pass
-        return raw.strip()
-    return ""
+    w = row[0] if row else None
+    if not w or not w.startswith("0x") or len(w) < 10:
+        return None
+    return w
 
 
 def fetch_vault_recent_inbound(memo_contains: str = "",
-                               lookback_seconds: int = 86400 * 7) -> list[dict]:
-    """Fetch recent transfers INTO the vault (SOL or USDT) and parse memo.
+                              lookback_blocks: int = 6_500_000) -> list[dict]:
+    """Fetch recent USDT Transfer events INTO the vault on BSC.
 
-    The Empire vault receives payments as native SOL `system transfer`
-    instructions (with the invoice id in a spl-memo instruction) OR as
-    USDT SPL `transferChecked` instructions. We match BOTH so real
-    on-chain payments actually reconcile.
-
-    Filters by memo_contains (e.g. 'INV_inv_crypto_') if provided.
+    Uses eth_getLogs with the ERC-20 Transfer topic filtered to the vault
+    as topic[2] (to). Parses amount (uint256, 18 decimals) + memo from the
+    tx input. Returns list of {signature, block_time, from, amount,
+    currency, memo}.
     """
-    sigs = _rpc("getSignaturesForAddress", [
-        SOLANA_VAULT,
-        {"limit": 50, "commitment": "finalized"},
-    ])
-    if "error" in sigs:
+    # current block
+    head = _rpc("eth_blockNumber", [])
+    if "error" in head or "result" not in head:
+        return []
+    try:
+        latest = int(head["result"], 16)
+    except Exception:
+        return []
+    from_block = max(1, latest - lookback_blocks)
+    to_topic = "0x" + "0" * 24 + BSC_VAULT[2:].lower()
+    params = [{
+        "address": BSC_USDT_CONTRACT,
+        "topics": [TRANSFER_TOPIC, None, to_topic],
+        "fromBlock": hex(from_block),
+        "toBlock": "latest",
+    }]
+    res = _rpc("eth_getLogs", params)
+    if "error" in res or "result" not in res:
         return []
     out = []
-    for s in sigs.get("result", [])[:50]:
-        sig = s.get("signature")
-        block_time = s.get("blockTime", 0)
-        if not sig or (block_time and abs(time.time() - block_time) > lookback_seconds):
+    for log in res.get("result", []):
+        try:
+            tx_hash = log.get("transactionHash")
+            block = int(log.get("blockNumber", "0x0"), 16)
+            # amount is topic[3] (uint256, 18 decimals)
+            amt_raw = int(log["topics"][3], 16)
+            amount = amt_raw / (10 ** USDT_DECIMALS)
+            # pull memo from the tx input
+            tx = _rpc("eth_getTransactionByHash", [tx_hash])
+            memo = ""
+            if "result" in tx and tx["result"]:
+                memo = _decode_memo(tx["result"].get("input", ""))
+                from_addr = tx["result"].get("from")
+            else:
+                from_addr = None
+            if memo_contains and memo_contains not in memo:
+                continue
+            out.append({
+                "signature": tx_hash,
+                "block": block,
+                "block_time": int(time.time()),
+                "from": from_addr,
+                "amount": amount,
+                "currency": "USDT",
+                "memo": memo,
+            })
+        except Exception:
             continue
-        tx = _rpc("getTransaction", [
-            sig,
-            {"encoding": "jsonParsed",
-             "commitment": "finalized",
-             "maxSupportedTransactionVersion": 0},
-        ])
-        if "error" in tx or not tx.get("result"):
-            continue
-        msg = tx["result"].get("transaction", {}).get("message", {})
-        meta = tx["result"].get("meta", {})
-        # Decode memo from spl-memo instructions
-        memo_str = ""
-        for ix in msg.get("instructions", []):
-            if ix.get("program") == "spl-memo":
-                memo_str = _decode_memo(ix)
-                if memo_str:
-                    break
-        # 1) SOL system transfer INTO vault
-        for ix in msg.get("instructions", []):
-            parsed = ix.get("parsed", {})
-            if ix.get("program") == "system" and parsed.get("type") == "transfer":
-                info = parsed.get("info", {})
-                if info.get("destination") == SOLANA_VAULT:
-                    lamp = int(info.get("lamports", 0))
-                    amount_sol = lamp / 1_000_000_000
-                    if memo_contains and memo_contains not in memo_str:
-                        # still record but skip if filter set and no match
-                        if memo_contains:
-                            continue
-                    out.append({
-                        "signature": sig,
-                        "block_time": block_time,
-                        "from": info.get("source"),
-                        "amount": amount_sol,
-                        "currency": "SOL",
-                        "memo": memo_str,
-                    })
-        # 2) USDT transferChecked INTO vault
-        for ix in msg.get("instructions", []):
-            parsed = ix.get("parsed", {})
-            if parsed.get("type") == "transferChecked":
-                info = parsed.get("info", {})
-                if info.get("destination") == SOLANA_VAULT:
-                    amt = float(info.get("tokenAmount", {}).get(
-                        "uiAmount", 0) or 0)
-                    if memo_contains and memo_contains not in memo_str:
-                        continue
-                    out.append({
-                        "signature": sig,
-                        "block_time": block_time,
-                        "from": info.get("authority") or info.get("source"),
-                        "amount": amt,
-                        "currency": "USDT",
-                        "memo": memo_str,
-                    })
     return out
 
 
 def charge_crypto(buyer_id: str, head: int, reason: str,
-                  amount_usdc: float,
+                  amount_usdt: float,
                   call_id: str = "", lead_id: str = "",
                   charge_id: str = None) -> dict:
     """Generate a crypto payment request + reconcile if already paid.
@@ -278,18 +221,25 @@ def charge_crypto(buyer_id: str, head: int, reason: str,
     invoice_id = "inv_crypto_" + os.urandom(4).hex()
     charge_id = charge_id or ("chg_crypto_" + os.urandom(4).hex())
     memo = f"INV_{invoice_id}"
-    # BSC Pay is push-to-vault: the buyer sends USDT/SOL to OUR vault
-    # with the memo. A stored buyer wallet is NOT required to generate the
-    # payment request link — only the vault address matters. Requiring it
-    # silently killed 99% of charges (no pay_url -> no payment -> no revenue).
-    wallet = get_buyer_wallet(buyer_id) or buyer_id or ""
-    pay_req = build_expected_payment(wallet, amount_usdc, memo)
-    # Try reconcile against recent inbound (match by invoice id in memo)
-    inbound = fetch_vault_recent_inbound(memo_contains=memo,
-                                          lookback_seconds=86400 * 7)
+    # A real buyer wallet is REQUIRED. We do NOT fall back to the buyer id
+    # (that is not a wallet and silently produces an undeliverable pay link).
+    wallet = get_buyer_wallet(buyer_id)
+    if not wallet:
+        return {
+            "charge_id": charge_id,
+            "invoice_id": invoice_id,
+            "status": "blocked",
+            "reason": "no_usdt_wallet_on_file",
+            "processor": "usdt",
+            "currency": "USDT",
+            "amount_usd": amount_usdt,
+            "memo": memo,
+        }
+    pay_req = build_expected_payment(wallet, amount_usdt, memo)
+    inbound = fetch_vault_recent_inbound(memo_contains=memo)
     matched = None
     for tx in inbound:
-        if tx.get("amount", 0) >= amount_usdc * 0.99:
+        if tx.get("amount", 0) >= amount_usdt * 0.99:
             matched = tx
             break
     status = "succeeded" if matched else "open"
@@ -297,17 +247,14 @@ def charge_crypto(buyer_id: str, head: int, reason: str,
     paid_at = (datetime.fromtimestamp(
         matched["block_time"], tz=timezone.utc).isoformat()
         if matched else None)
-    # Persist locally — invoice artifact only. The si_charges row is
-    # owned by charge() (uniform across all processors), so we do NOT
-    # insert it here (would double-write + collide on charge_id).
     con = sqlite3.connect(DB)
     con.execute(
         "INSERT OR IGNORE INTO si_ppc_invoices "
         "(invoice_id, charge_id, buyer_id, head, lead_id, call_id, "
-        "amount_cents, amount_usdc, status, metadata, created_at) "
+        "amount_usd, amount_usdt, status, metadata, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (invoice_id, charge_id, buyer_id, head, lead_id, call_id,
-         int(amount_usdc * 100), amount_usdc,
+         amount_usdt, amount_usdt,
          "paid" if status == "succeeded" else "open",
          json.dumps(pay_req)[:500],
          now_iso()))
@@ -317,14 +264,14 @@ def charge_crypto(buyer_id: str, head: int, reason: str,
         "charge_id": charge_id,
         "invoice_id": invoice_id,
         "status": status,
-        "processor": "usdc",
-        "amount_cents": int(amount_usdc * 100),
+        "processor": "usdt",
         "currency": "USDT",
+        "amount_usd": amount_usdt,
+        "amount_usdt": amount_usdt,
         "wallet": wallet,
         "memo": memo,
-        "pay_url": pay_req["solana_pay_url"],
+        "pay_url": pay_req["bsc_pay_url"],
         "matched_tx": matched.get("signature") if matched else None,
-        "fallback": not bool(wallet),
     }
 
 
@@ -333,20 +280,18 @@ def settle_charge(charge_id: str, invoice_id: str, sig: str,
     """Mark a charge + invoice as paid and emit a settled funnel event.
 
     IDEMPOTENT + ATOMIC: only settles if the invoice is still 'open',
-    guarded by a transaction + busy_timeout so concurrent ticks of
-    solana_listener (20s) and billing_collector can't double-settle or
-    insert duplicate si_funnel_event rows. Returns True if it settled,
-    False if it was already paid (no-op).
+    guarded by a transaction + busy_timeout so concurrent ticks can't
+    double-settle. Returns True if it settled, False if already paid.
     """
     con = sqlite3.connect(DB, timeout=15)
     con.execute("PRAGMA busy_timeout=15000")
     try:
-        with con:  # transaction; commits on success, rolls back on error
+        with con:
             row = con.execute(
                 "SELECT status FROM si_ppc_invoices WHERE invoice_id=?",
                 (invoice_id,)).fetchone()
             if row and row[0] == "paid":
-                return False  # already settled — no double count
+                return False
             con.execute(
                 "UPDATE si_charges SET status='succeeded', paid_at=? "
                 "WHERE charge_id=? AND status!='succeeded'",
@@ -374,65 +319,47 @@ def settle_charge(charge_id: str, invoice_id: str, sig: str,
         con.close()
 
 
-# Centralized SOL→USD assumption (env-overridable; replace with a price
-# feed if/when live pricing matters for settlement accuracy).
-SOL_USD = float(os.environ.get("SOL_USD", "150.0"))
-
-
-def reconcile_open_invoices(lookback_seconds: int = 86400 * 7) -> list[dict]:
-    """Scan the vault for inbound payments matching OPEN invoices.
+def reconcile_open_invoices(lookback_blocks: int = 6_500_000) -> list[dict]:
+    """Scan the vault for inbound USDT matching OPEN invoices.
 
     Called by the settlement listener on every tick. Returns the list
-    of invoices that were just settled. Only pulls invoices still in
-    'open' state (already-paid ones are skipped), and settle_charge
+    of invoices just settled. Only pulls 'open' invoices; settle_charge
     is idempotent, so concurrent callers can't double-settle.
     """
     con = sqlite3.connect(DB, timeout=15)
     con.execute("PRAGMA busy_timeout=15000")
     open_inv = con.execute(
-        "SELECT invoice_id, charge_id, amount_usdc, buyer_id FROM "
+        "SELECT invoice_id, charge_id, amount_usdt, buyer_id FROM "
         "si_ppc_invoices WHERE status='open'").fetchall()
     con.close()
     if not open_inv:
         return []
-    # Pull every inbound tx to the vault (no memo filter) once
-    inbound = fetch_vault_recent_inbound(memo_contains="",
-                                         lookback_seconds=lookback_seconds)
+    inbound = fetch_vault_recent_inbound(memo_contains="")
     settled = []
-    for inv_id, chg_id, amt_usdc, buyer in open_inv:
+    for inv_id, chg_id, amt_usdt, buyer in open_inv:
         memo = f"INV_{inv_id}"
         for tx in inbound:
             if memo not in (tx.get("memo") or ""):
                 continue
-            # amount check: SOL amount should cover USD value at SOL_USD
-            # or USDT amount covers directly
-            ok = False
-            if tx.get("currency") == "USDT" and tx.get("amount", 0) >= amt_usdc * 0.99:
-                ok = True
-            elif tx.get("currency") == "SOL":
-                approx_usd = tx.get("amount", 0) * SOL_USD
-                if approx_usd >= amt_usdc * 0.99:
-                    ok = True
-            if not ok:
-                continue
-            paid_at = (datetime.fromtimestamp(
-                tx["block_time"], tz=timezone.utc).isoformat()
-                if tx.get("block_time") else now_iso())
-            if settle_charge(chg_id, inv_id, tx["signature"], paid_at):
-                settled.append({"invoice_id": inv_id, "charge_id": chg_id,
-                                "signature": tx["signature"], "amount": amt_usdc})
-            break
+            if tx.get("currency") == "USDT" and tx.get("amount", 0) >= amt_usdt * 0.99:
+                paid_at = (datetime.fromtimestamp(
+                    tx["block_time"], tz=timezone.utc).isoformat()
+                    if tx.get("block_time") else now_iso())
+                if settle_charge(chg_id, inv_id, tx["signature"], paid_at):
+                    settled.append({"invoice_id": inv_id, "charge_id": chg_id,
+                                    "signature": tx["signature"], "amount": amt_usdt})
+                break
     return settled
 
 
 if __name__ == "__main__":
     print("[crypto_charge] config:")
-    print(f"  SOLANA_VAULT:    {SOLANA_VAULT}")
-    print(f"  BSC_USDT_CONTRACT:       {BSC_USDT_CONTRACT}")
-    print(f"  SOLANA_RPC:      {SOLANA_RPC[:60]}...")
+    print(f"  BSC_VAULT:         {BSC_VAULT}")
+    print(f"  BSC_USDT_CONTRACT: {BSC_USDT_CONTRACT}")
+    print(f"  BSC_RPC:           {BSC_RPC[:60]}...")
     print(f"\n[crypto_charge] testing RPC connectivity...")
-    r = _rpc("getHealth", [])
-    print(f"  health: {r}")
+    r = _rpc("eth_blockNumber", [])
+    print(f"  block: {r}")
     print(f"\n[crypto_charge] reconcile open invoices:")
     settled = reconcile_open_invoices()
     print(f"  settled: {len(settled)} -> {settled}")

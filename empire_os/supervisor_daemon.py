@@ -49,9 +49,9 @@ REGISTRY_DATA = {
                             "note": "Plans ppc. Must wire invoice writes."},
     "outreach_runner":    {"file": "outreach_runner.py", "mode": "daemon",
                             "sim_risk": "low", "enabled": True},
-    "solana_listener":    {"file": "solana_listener_agent.py", "mode": "daemon",
+    "bsc_listener":    {"file": "bsc_listener_agent.py", "mode": "daemon",
                             "sim_risk": "low", "enabled": True,
-                            "note": "USDC collection listener. Online 2h+."},
+                            "note": "USDT collection listener. Online 2h+."},
     # ── SATELLITE / STORM (daemons, but SIM until real source) ──
     "satellite_damage":   {"file": "satellite_damage_agent.py", "mode": "daemon",
                             "sim_risk": "high", "enabled": False,

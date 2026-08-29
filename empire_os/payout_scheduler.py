@@ -14,10 +14,10 @@ Flow:
 Env vars:
   BSC_RPC          — RPC endpoint (default devnet)
   BSC_WALLET_ADDRESS     — vault wallet pubkey (source of USDT)
-  SOLANA_VAULT_ATA        — vault's USDT token account (default derived)
+  BSC_VAULT_ATA        — vault's USDT token account (default derived)
   FOUNDER_WALLET          — recipient wallet for payouts
   FOUNDER_ATA             — recipient's USDT token account (default derived)
-  SOLANA_PAYER_SECRET     — base58 keypair for signing (must own vault)
+  BSC_PAYER_SECRET     — base58 keypair for signing (must own vault)
   MIN_PAYOUT_CENTS        — minimum trigger amount (default 100 = $1)
   DB_PATH                 — empire db path
 """
@@ -39,7 +39,7 @@ DB_PATH = os.getenv("DB_PATH", "/root/empire_os/empire_os.db")
 MIN_PAYOUT_CENTS = int(os.getenv("MIN_PAYOUT_CENTS", "100"))  # $1 default
 BSC_WALLET_ADDRESS = os.getenv("BSC_WALLET_ADDRESS", "")
 FOUNDER_WALLET = os.getenv("FOUNDER_WALLET", BSC_WALLET_ADDRESS)
-SOLANA_PAYER_SECRET = os.getenv("SOLANA_PAYER_SECRET", "")
+BSC_PAYER_SECRET = os.getenv("BSC_PAYER_SECRET", "")
 BSC_USDT_CONTRACT_STR = os.getenv("BSC_USDT_CONTRACT", "0x55d398326f99059fF775485246999027B3197955")
 
 
@@ -226,8 +226,8 @@ async def run_sweep(dry_run: bool = False) -> dict:
         c.close()
         return result
 
-    if not SOLANA_PAYER_SECRET or SOLANA_PAYER_SECRET.startswith("CPmGjF"):
-        logger.warning("SOLANA_PAYER_SECRET appears to be test/dev — dry mode")
+    if not BSC_PAYER_SECRET or BSC_PAYER_SECRET.startswith("CPmGjF"):
+        logger.warning("BSC_PAYER_SECRET appears to be test/dev — dry mode")
         result["error"] = "test_payer_secret_no_real_sweep"
         c.close()
         return result
@@ -245,7 +245,7 @@ async def run_sweep(dry_run: bool = False) -> dict:
         return result
 
     # 3. Execute the payout
-    vault_ata = os.getenv("SOLANA_VAULT_ATA") or _derive_ata(BSC_WALLET_ADDRESS)
+    vault_ata = os.getenv("BSC_VAULT_ATA") or _derive_ata(BSC_WALLET_ADDRESS)
     founder_ata = os.getenv("FOUNDER_ATA") or _derive_ata(FOUNDER_WALLET)
     amount_usd = total_cents / 100
 
@@ -253,7 +253,7 @@ async def run_sweep(dry_run: bool = False) -> dict:
         from empire_os.payout import usdc_transfer
 
         sig = await usdc_transfer(
-            payer_secret_b58=SOLANA_PAYER_SECRET,
+            payer_secret_b58=BSC_PAYER_SECRET,
             sender_ata=vault_ata,
             recipient_ata=founder_ata,
             amount_usd=amount_usd,

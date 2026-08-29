@@ -2,7 +2,7 @@
 
 Exposes:
   GET  /v1/select-serve        -> HTML portal (free lanes + tier pricing)
-  POST /v1/select-serve/apply -> onboard buyer, return Solana Pay URL
+  POST /v1/select-serve/apply -> onboard buyer, return BSC Pay URL
 """
 from __future__ import annotations
 import sqlite3
@@ -71,7 +71,7 @@ h1{{color:#7cf}}table{{width:100%;border-collapse:collapse}}td,th{{padding:8px;b
 select,input,button{{background:#161b22;color:#e6e6e6;border:1px solid #333;padding:8px;margin:6px 0;width:100%}}
 button{{background:#1f6feb;cursor:pointer;font-weight:600}}</style></head><body>
 <h1>Empire OS — Select &amp; Serve</h1>
-<p>Claim a lane seat. Pay USDT on BSC. Get a Solana Pay link instantly.</p>
+<p>Claim a lane seat. Pay USDT on BSC. Get a BSC Pay link instantly.</p>
 <h3>Tier pricing</h3><table><tr><th>Tier</th><th>Monthly seat</th><th>Per-lead</th></tr>{tier_rows}</table>
 <h3>Apply</h3>
 <form id=f onsubmit="return apply(event)">

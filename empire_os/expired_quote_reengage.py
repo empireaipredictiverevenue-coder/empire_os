@@ -27,7 +27,7 @@ DB_PATH = os.getenv("DB_PATH", "/root/empire_os/empire_os.db")
 HUB_URL = os.getenv("EMPIRE_HUB_URL", "http://127.0.0.1:8080")
 VAULT = os.getenv(
     "BSC_WALLET_ADDRESS",
-    "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb",
+    "0x1339b487046B0ad924a10c20b1791608EA8595a8",
 )
 FROM_DISPLAY = "Empire OS <founder@empire-ai.co.uk>"
 

@@ -799,7 +799,7 @@ def get_enrichment_score(lead: dict) -> float:
 
 async def enrich_lead(backend, lead_id: int) -> dict:
     """Run the enrichment waterfall for a single lead. Returns what was found."""
-    row = backend.execute("SELECT * FROM crm_leads WHERE id = ?", (lead_id,)).fetchone()
+    row = backend.execute("SELECT * FROM crm_leads WHERE lead_uid = ?", (lead_id,)).fetchone()
     if not row:
         raise ValueError(f"Lead id={lead_id} not found")
 
@@ -874,7 +874,7 @@ async def enrich_lead(backend, lead_id: int) -> dict:
 
         params.append(lead_id)
         backend.execute(
-            f"UPDATE crm_leads SET {', '.join(setters)} WHERE id = ?",
+            f"UPDATE crm_leads SET {', '.join(setters)} WHERE lead_uid = ?",
             tuple(params),
         )
         backend.commit()

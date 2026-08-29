@@ -3,8 +3,8 @@
 
 sentry_agent watches if processes are UP. This watches if MONEY is FLOWING.
 The loop: founder_email SENT → prospect APPLIES (/v1/buyer_apply)
-→ pay_url EMAILED → USDC SETTLES → sub ACTIVE → leads DELIVERED
-→ per-lead CHARGE → USDC COLLECTED.
+→ pay_url EMAILED → USDT SETTLES → sub ACTIVE → leads DELIVERED
+→ per-lead CHARGE → USDT COLLECTED.
 
 If any stage goes silent past its SLA, alert Telegram MONEY_ONLY + open issue.
 Also self-heals the 3 known rot points so we stop re-fixing by hand:
@@ -162,7 +162,7 @@ def self_heal():
     # 2. restart dead empire units (correct unit names — underscores)
     for u in ["empire-agent-founder-outreach.service", "empire-hub-8081.service",
               "empire-ppc-router.service", "empire-mail-sender.service",
-              "empire-agent-solana_listener.service", "empire-solana-listener.service",
+              "empire-agent-bsc_listener.service", "empire-bsc-listener.service",
               "empire-cortex-swarm.service", "empire-last30days.service",
               "empire-content-engine.service", "empire-predictive-router.service"]:
         try:

@@ -8,7 +8,7 @@ Completed comprehensive fixes for Empire Agent System with stable supervision, s
 ### 1. Supervisor System Fix (`/root/empire_os/scripts/supervisor_daemon.py`)
 **Problem**: Supervisor was crashing, preventing 35+ agents from running
 **Solution**: Robust supervisor daemon that monitors and restarts critical agents
-- **Monitored agents**: commander, systems_engineer, lead_deliverer, solana_listener
+- **Monitored agents**: commander, systems_engineer, lead_deliverer, bsc_listener
 - **Auto-restart**: Every 60 seconds if agents crash
 - **Status logging**: Complete operational visibility
 
@@ -38,7 +38,7 @@ Completed comprehensive fixes for Empire Agent System with stable supervision, s
 ✅ **lead_sniper** - AI lead intelligence and sales automation
 ✅ **buyer_hunter** - Automated B2B buyer identification
 ✅ **billing_collector** - Financial tracking and payout processing
-✅ **solana_listener** - Real-time blockchain transaction monitoring
+✅ **bsc_listener** - Real-time blockchain transaction monitoring
 ✅ **marketplace** - B2B lead marketplace coordination
 
 ### Intelligence Agents Operational:
@@ -73,7 +73,7 @@ Completed comprehensive fixes for Empire Agent System with stable supervision, s
 ps aux | grep -E "(supervisor_daemon.py|agent_launch.py|intelligence_loop.py)" | grep -v grep
 
 # Check specific agents
-ps aux | grep -E "(lead_sniper|buyer_hunter|solana_listener|billing_collector|marketplace)" | grep -v grep
+ps aux | grep -E "(lead_sniper|buyer_hunter|bsc_listener|billing_collector|marketplace)" | grep -v grep
 
 # Monitor logs
 logs="/root/feedback/supervisor_current.jsonl /root/feedback/agent_launcher.log /root/feedback/intelligence_loop.jsonl"

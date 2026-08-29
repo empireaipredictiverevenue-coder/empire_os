@@ -12,7 +12,7 @@ satellite products + agents, scale revenue loop. Revenue = only metric.
   audit_api, deep_audit, hourly_retainer, evaluation_product(imported but unused),
   state_contractor_portals.
 - Agents built: 50+ files. Running: ~14 (billing_collector, lead_sniper, marketing,
-  media_buyer, mesh, satellite_strike x2, solana_listener, commander, supervisor,
+  media_buyer, mesh, satellite_strike x2, bsc_listener, commander, supervisor,
   whale_harvester, idle_asset_sniper, b2b_scraper, contractor_scraper, systems_engineer,
   code_review). NOT running: agi-scout, agi-marketing, seo-agent, lead-filter, reddit-sniper,
   scheduling, copywriting, email, predictive, growth, business, engineering.

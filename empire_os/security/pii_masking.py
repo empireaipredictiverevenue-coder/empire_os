@@ -11,7 +11,7 @@ EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(?:\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}")
 # BSC / EVM address
 ADDR_RE = re.compile(r"0x[a-fA-F0-9]{40}")
-# Solana-style (legacy) — keep for compatibility but vault is BSC
+# BSC-style (legacy) — keep for compatibility but vault is BSC
 SOL_RE = re.compile(r"\b[1-9A-HJ-NP-Za-km-z]{32,44}\b")
 # API key-ish
 KEY_RE = re.compile(r"(?i)(api[_-]?key|token|secret|privkey)[\"'\s:=]+[A-Za-z0-9_\-]{8,}")

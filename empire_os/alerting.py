@@ -11,7 +11,7 @@ Alert types:
   - PRICE_SPIKE: predictive shows demand outstripping supply
   - REVENUE_DROP: MRR dropped >15% week-over-week
   - BUYER_REPLY: a buyer replied to outreach (HOT)
-  - SOLANA_PAYMENT: invoice paid onchain
+  - BSC_PAYMENT: invoice paid onchain
   - SOURCE_ERROR: lead source failed (>3 errors in row)
 
 Each alert = one Resend email to configured recipients +
@@ -92,7 +92,7 @@ def emit(alert_type: str, subject: str, body: str,
               otherwise fall back to direct email send.
 
     Args:
-        alert_type: LANE_DRY | REVENUE_DROP | BUYER_REPLY | SOLANA_PAYMENT | SOURCE_ERROR
+        alert_type: LANE_DRY | REVENUE_DROP | BUYER_REPLY | BSC_PAYMENT | SOURCE_ERROR
         subject: alert title
         body: plain text body
         severity: info | warn | critical (also accepts high/low)

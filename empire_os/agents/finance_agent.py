@@ -2,11 +2,11 @@
 """
 Empire OS v3 - finance agent.
 
-Reconciles USDC vault balance vs pending invoices every 5 minutes.
+Reconciles USDT vault balance vs pending invoices every 5 minutes.
 Reads:
   - /v1/satellite/active (matches subscribers to alerts)
   - DB: si_ppc_invoices WHERE status = "open" (canonical)
-  - Helius RPC for current vault USDC balance
+  - Helius RPC for current vault USDT balance
 Writes:
   - /v1/swarm/audit-log entries (deposit events)
   - /root/feedback/finance_log.jsonl
@@ -27,11 +27,11 @@ DB  = os.environ.get("HUB_DB_PATH", "/root/empire_os/empire_os.db")
 FB  = Path("/root/feedback")
 LOG = FB / "finance_log.jsonl"
 
-VAULT = "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM"
-USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybafCvkRxb7Yy4dV"
+VAULT = "0x1339b487046B0ad924a10c20b1791608EA8595a8"
+USDC_MINT = "0x55d398326f99059fF775485246999027B3197955"
 
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(5 * 60)))
-RPC = os.environ.get("SOLANA_RPC_URL", "")
+RPC = os.environ.get("BSC_RPC", "")
 
 
 def log(level, msg, **fields):

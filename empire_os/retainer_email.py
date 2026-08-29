@@ -42,7 +42,7 @@ Empire AI is offering a bespoke intelligence retainer for agencies and investors
 
 **Offer:** {hours} hours at $150/hr = ${hours*150:,.2f}
 **Payment:** USDT on BSC (BEP-20)
-**Wallet:** 0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb
+**Wallet:** 0x1339b487046B0ad924a10c20b1791608EA8595a8
 
 What you get per hour:
 - Custom niche analysis (heat score, competitors, market share)

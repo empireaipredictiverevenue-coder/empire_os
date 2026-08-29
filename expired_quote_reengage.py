@@ -27,7 +27,7 @@ DB_PATH = os.getenv("DB_PATH", "/root/empire_os/empire_os.db")
 HUB_URL = os.getenv("EMPIRE_HUB_URL", "http://localhost:8081")
 VAULT = os.getenv(
     "SOLANA_VAULT_WALLET",
-    "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM",
+    "0x1339b487046B0ad924a10c20b1791608EA8595a8",
 )
 FROM_DISPLAY = "Empire OS <founder@empire-ai.co.uk>"
 

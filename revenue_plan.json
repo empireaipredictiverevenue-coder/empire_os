@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-28T11:35:12.155918+00:00",
+  "generated_at": "2026-08-29T11:01:39.494920+00:00",
   "source_db": "/root/empire_os/empire_os.db",
   "current": {
     "active_buyers": 65,
@@ -27,7 +27,7 @@
   "collect_blocker": {
     "awaiting_seat_mrr_pipeline": 318148.0,
     "root_cause": "apply flow minted empty/vault-mismatched pay URLs; fix BSC_WALLET_ADDRESS on hub + auto_onboard default.",
-    "fixed": true
+    "fixed": false
   },
   "forecast": {
     "conservative": {

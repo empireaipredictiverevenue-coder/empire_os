@@ -1534,11 +1534,6 @@
       "path": "/root/empire_os/empire_os/data/prompts/socratic_tutor.txt"
     },
     {
-      "name": "solana_blockchain_architect",
-      "slug": "solana-blockchain-architect",
-      "path": "/root/empire_os/empire_os/data/prompts/solana_blockchain_architect.txt"
-    },
-    {
       "name": "solidity_smart_contract_engineer",
       "slug": "solidity-smart-contract-engineer",
       "path": "/root/empire_os/empire_os/data/prompts/solidity_smart_contract_engineer.txt"
@@ -1719,24 +1714,24 @@
       "path": "/root/empire_os/empire_os/data/prompts/workspace_isolated_agent_os_architect.txt"
     },
     {
-      "name": "✏️All-around Writer (Professional Version)",
+      "name": "\u270f\ufe0fAll-around Writer (Professional Version)",
       "slug": "all-around-writer-professional-version",
-      "path": "/root/empire_os/empire_os/data/prompts/✏️All-around Writer (Professional Version).md"
+      "path": "/root/empire_os/empire_os/data/prompts/\u270f\ufe0fAll-around Writer (Professional Version).md"
     },
     {
-      "name": "👌Academic Assistant Pro",
+      "name": "\ud83d\udc4cAcademic Assistant Pro",
       "slug": "academic-assistant-pro",
-      "path": "/root/empire_os/empire_os/data/prompts/👌Academic Assistant Pro.md"
+      "path": "/root/empire_os/empire_os/data/prompts/\ud83d\udc4cAcademic Assistant Pro.md"
     },
     {
-      "name": "💻Professional Coder",
+      "name": "\ud83d\udcbbProfessional Coder",
       "slug": "professional-coder",
-      "path": "/root/empire_os/empire_os/data/prompts/💻Professional Coder.md"
+      "path": "/root/empire_os/empire_os/data/prompts/\ud83d\udcbbProfessional Coder.md"
     },
     {
-      "name": "📗All-around Teacher",
+      "name": "\ud83d\udcd7All-around Teacher",
       "slug": "all-around-teacher",
-      "path": "/root/empire_os/empire_os/data/prompts/📗All-around Teacher.md"
+      "path": "/root/empire_os/empire_os/data/prompts/\ud83d\udcd7All-around Teacher.md"
     }
   ]
 }

@@ -2,11 +2,11 @@
 """
 Settlement Gateway Daemon — Empire OS v3
 
-Watches the Empire USDT vault (0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb)
+Watches the Empire USDT vault (0x1339b487046B0ad924a10c20b1791608EA8595a8)
 for new incoming SPL token transfers and reconciles them against awaiting
 invoices, subscriptions, leads, and A2A escrow rows.
 
-The existing `empire_os/agents/solana_listener_agent.py` polls ATA balance
+The existing `empire_os/agents/bsc_listener_agent.py` polls ATA balance
 delta every 30s and routes through /v1/finance/replay. This daemon is the
 *tx-level* complement:
 
@@ -22,7 +22,7 @@ delta every 30s and routes through /v1/finance/replay. This daemon is the
       * LEAD_<lead_id>           -> si_funnel_event -> settled + si_settlements
       * EVAL_<buyer>__<lead_ref> -> evaluation_settlements
       * EVALBUY_<buyer>_<pack>   -> credit pack activation
-      * no-memo (Trust/TokenPocket) -> buyer activation by amount match
+      * no-memo (Trust Wallet) -> buyer activation by amount match
   - maintains a persistent `seen_signatures` cache so retried posts never
     double-fire (defence-in-depth on top of the hub's own dedup)
 
@@ -46,8 +46,8 @@ from pathlib import Path
 # BSC mainnet RPC — default to Binance seed node (public, rate-limited).
 # Override with BSC_RPC env var for your own endpoint.
 RPC      = os.environ.get("BSC_RPC", "https://bsc-dataseed.binance.org/").strip()
-VAULT    = os.environ.get("BSC_WALLET_ADDRESS", "0xe646cb6a2befc6fd88f418e7e19a32abe4aed7fb").strip()
-BSC_USDT_CONTRACT= os.environ.get("BSC_USDT_CONTRACT", "EPjFWdd5AufqSSqeM2qN1xzybafC8G4wEGGkZwyTDt1v").strip()
+VAULT    = os.environ.get("BSC_WALLET_ADDRESS", "0x1339b487046B0ad924a10c20b1791608EA8595a8").strip()
+BSC_USDT_CONTRACT= os.environ.get("BSC_USDT_CONTRACT", "0x55d398326f99059fF775485246999027B3197955").strip()
 HUB_URL  = os.environ.get("HUB_URL", "http://127.0.0.1:8080").strip()
 INTERVAL = int(os.environ.get("INTERVAL_SEC", "60"))
 SIG_LIMIT= int(os.environ.get("SIG_LIMIT", "50"))

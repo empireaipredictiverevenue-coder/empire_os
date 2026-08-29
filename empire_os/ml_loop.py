@@ -40,8 +40,8 @@ def get_converted_leads(since_hours: int = 24) -> List[Dict]:
     rows = conn.execute("""
         SELECT * FROM crm_leads 
         WHERE status IN ('converted', 'deal_closed', 'won')
-        AND converted_at >= datetime('now', ?)
-        ORDER BY converted_at DESC
+        AND sold_at >= datetime('now', ?)
+        ORDER BY sold_at DESC
     """, (f'-{since_hours} hours',)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -83,10 +83,10 @@ def analyze_conversions(converted: List[Dict]) -> Dict:
     # Time to convert
     convert_times = []
     for c in converted:
-        if c.get("created_at") and c.get("converted_at"):
+        if c.get("created_at") and c.get("sold_at"):
             try:
                 created = datetime.fromisoformat(c["created_at"].replace("Z", "+00:00"))
-                converted_dt = datetime.fromisoformat(c["converted_at"].replace("Z", "+00:00"))
+                converted_dt = datetime.fromisoformat(c["sold_at"].replace("Z", "+00:00"))
                 hours = (converted_dt - created).total_seconds() / 3600
                 convert_times.append(hours)
             except:

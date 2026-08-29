@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-smoke_payer.py — generate a throwaway Solana wallet, request a $0.01 USDC
+smoke_payer.py — generate a throwaway BSC wallet, request a $0.01 USDT
 invoice from the hub, build + sign the transfer, broadcast it, then watch
 the container DB to confirm the charge flips to status='succeeded'.
 
@@ -13,7 +13,7 @@ SAFETY:
 Usage:
   incus exec empire-hub -- /root/venv/bin/python3 /root/empire_os/empire_os/agents/smoke_payer.py [--amount-usd 0.01]
 
-Returns 0 if the inbound USDC was detected and the charge marked paid.
+Returns 0 if the inbound USDT was detected and the charge marked paid.
 """
 import argparse
 import asyncio
@@ -29,7 +29,7 @@ from pathlib import Path
 
 HUB_INTERNAL = "http://127.0.0.1:8080"  # inside-container URL
 RPC = "https://mainnet.helius-rpc.com/?api-key=585a5f3f-1fbc-4f0d-869c-2d3e981341e1"
-USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+USDC_MINT = "0x55d398326f99059fF775485246999027B3197955"
 SOL_USD = 150.0  # static estimate; we only need ~0.00001 SOL for gas
 KEY_FILE = Path("/tmp/smoke_payer.json")
 KEY_FILE_SHRED = True
@@ -96,7 +96,7 @@ def rpc_call(method, params, timeout=10):
 
 
 def find_usdc_ata(payer_kp, mint_str):
-    """Derive the associated token address for (payer, USDC)."""
+    """Derive the associated token address for (payer, USDT)."""
     from solders.pubkey import Pubkey
     ATA_PROGRAM = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
     TOKEN_PROGRAM = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
@@ -108,7 +108,7 @@ def find_usdc_ata(payer_kp, mint_str):
 
 
 def build_usdc_transfer_tx(payer_kp, src_ata, dest_ata, amount_usd):
-    """Build a signed SPL transfer_checked tx for `amount_usd` USDC."""
+    """Build a signed SPL transfer_checked tx for `amount_usd` USDT."""
     from solders.keypair import Keypair
     from solders.pubkey import Pubkey
     from solders.instruction import Instruction, AccountMeta
@@ -142,7 +142,7 @@ def build_usdc_transfer_tx(payer_kp, src_ata, dest_ata, amount_usd):
 
 def send_tx(signed_tx_bytes):
     """Broadcast a signed tx (raw bytes from txn.serialize())."""
-    # Helius accepts base64 for sendTransaction (standard Solana RPC)
+    # Helius accepts base64 for sendTransaction (standard BSC RPC)
     import base64 as _b64
     signed_b64 = _b64.b64encode(signed_tx_bytes).decode("ascii")
     resp = rpc_call("sendTransaction", [
@@ -189,9 +189,9 @@ def main():
     args = parser.parse_args()
 
     env = load_env()
-    vault_wallet = env.get("SOLANA_VAULT_WALLET")
+    vault_wallet = env.get("BSC_WALLET_ADDRESS")
     if not vault_wallet:
-        log("FATAL", "no SOLANA_VAULT_WALLET in .env")
+        log("FATAL", "no BSC_WALLET_ADDRESS in .env")
         sys.exit(1)
 
     # Step 1: get wallet — either from --key-file (funded path) or generate fresh
@@ -214,7 +214,7 @@ def main():
     else:
         payer_kp, payer_pubkey, _secret_b58 = generate_wallet()
 
-    # Step 2: request a USDC invoice from hub using the payer wallet as buyer_id
+    # Step 2: request a USDT invoice from hub using the payer wallet as buyer_id
     log("INFO", "requesting invoice from hub", buyer_id=payer_pubkey, vault=vault_wallet)
     body = {
         "buyer_id": payer_pubkey,  # use pubkey as buyer_id so resolver can find email later
@@ -237,16 +237,16 @@ def main():
             shred_key()
         return 0
 
-    # Step 3: derive our USDC ATA + vault's USDC ATA
+    # Step 3: derive our USDT ATA + vault's USDT ATA
     from solders.pubkey import Pubkey
     payer_ata = find_usdc_ata(payer_kp, USDC_MINT)
-    # The vault's USDC ATA — we don't easily know it without lookup.
+    # The vault's USDT ATA — we don't easily know it without lookup.
     # For a $0.01 smoke, we can send to vault's SOL address wrapped, or use SOL.
     # Simplest path: send native SOL ($0.01 worth ≈ 0.000067 SOL) to the vault.
-    # That still gets us a "successful" path if solana_listener watches the vault's SOL balance.
-    # BUT — the listener is set up for USDC. So we MUST send USDC.
-    # Use Helius getTokenAccountsByOwner to find vault's USDC ATA.
-    log("INFO", "looking up vault USDC ATA...")
+    # That still gets us a "successful" path if bsc_listener watches the vault's SOL balance.
+    # BUT — the listener is set up for USDT. So we MUST send USDT.
+    # Use Helius getTokenAccountsByOwner to find vault's USDT ATA.
+    log("INFO", "looking up vault USDT ATA...")
     vault_ata_resp = rpc_call("getTokenAccountsByOwner", [
         Pubkey.from_string(vault_wallet).__str__(),
         {"mint": USDC_MINT},
@@ -254,19 +254,19 @@ def main():
     ])
     accounts = vault_ata_resp["result"]["value"]
     if not accounts:
-        log("FATAL", "vault has no USDC ATA — need to send SOL to vault OR initialize ATA first")
+        log("FATAL", "vault has no USDT ATA — need to send SOL to vault OR initialize ATA first")
         shred_key()
         return 1
     vault_ata = accounts[0]["pubkey"]
-    log("INFO", "vault USDC ATA found", ata=vault_ata)
+    log("INFO", "vault USDT ATA found", ata=vault_ata)
 
     # Check our ATA exists / has balance
     payer_ata_resp = rpc_call("getAccountInfo", [payer_ata.__str__(), {"encoding": "base64"}])
     payer_ata_exists = payer_ata_resp["result"]["value"] is not None
-    log("INFO", "payer USDC ATA exists?", exists=payer_ata_exists, ata=str(payer_ata))
+    log("INFO", "payer USDT ATA exists?", exists=payer_ata_exists, ata=str(payer_ata))
 
     # Build + sign + send the transfer
-    log("INFO", "building USDC transfer tx", amount_usd=args.amount_usd,
+    log("INFO", "building USDT transfer tx", amount_usd=args.amount_usd,
         src=str(payer_ata), dst=vault_ata)
     tx_bytes = build_usdc_transfer_tx(payer_kp, payer_ata, Pubkey.from_string(vault_ata), args.amount_usd)
     sig_b64 = base64.b64encode(tx_bytes).decode()
