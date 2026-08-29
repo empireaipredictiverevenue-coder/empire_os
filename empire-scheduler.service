@@ -1,0 +1,15 @@
+[Unit]
+Description=Empire OS single orchestrator (harvest+enrich+bridge+outreach)
+After=empire-db-backup.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_scheduler.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=empire-scheduler
+
+[Install]
+WantedBy=multi-user.target

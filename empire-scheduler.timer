@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS single orchestrator (daily 05:00)
+
+[Timer]
+OnCalendar=05:00
+Persistent=true
+Unit=empire-scheduler.service
+
+[Install]
+WantedBy=timers.target

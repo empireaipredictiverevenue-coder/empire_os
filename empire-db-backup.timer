@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Empire OS nightly DB backup (daily 04:00, before scheduler)
+
+[Timer]
+OnCalendar=04:00
+Persistent=true
+Unit=empire-db-backup.service
+
+[Install]
+WantedBy=timers.target
