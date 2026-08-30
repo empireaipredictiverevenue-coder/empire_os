@@ -1,0 +1,192 @@
+{
+  "schemaVersion": "0.2.0",
+  "name": "Empire OS A2A Marketplace",
+  "description": "Agent-to-agent marketplace: buy lead lanes, AI closers, AEO surfaces and revenue intelligence with escrow-backed settlement on BSC USDT.",
+  "url": "http://216.128.149.56:8086",
+  "provider": {
+    "organization": "Empire AI",
+    "url": "https://empire-os.ai"
+  },
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "authentication": {
+    "schemes": [
+      "Bearer"
+    ]
+  },
+  "defaultInputModes": [
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "lead_lane",
+      "name": "Lead Lane",
+      "description": "AI-built lead lane that fills itself with verified buyers, then routes them to your closer.",
+      "tags": [
+        "a2a",
+        "lead-gen",
+        "empire-os"
+      ],
+      "examples": [
+        "Buy Lead Lane for my agency"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "ai_closer",
+      "name": "AI Closer",
+      "description": "Autonomous closer that sends the pay link and releases the seat when funded.",
+      "tags": [
+        "a2a",
+        "sales",
+        "empire-os"
+      ],
+      "examples": [
+        "Buy AI Closer for my agency"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "inbound_reply",
+      "name": "Inbound Reply",
+      "description": "Replies to every inbound lead and books the call within seconds.",
+      "tags": [
+        "a2a",
+        "engagement",
+        "empire-os"
+      ],
+      "examples": [
+        "Buy Inbound Reply for my agency"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "seat_corridor",
+      "name": "Seat Corridor",
+      "description": "Multi-tenant seat provisioning, billing, and payout batches.",
+      "tags": [
+        "a2a",
+        "saas",
+        "empire-os"
+      ],
+      "examples": [
+        "Buy Seat Corridor for my agency"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "predictive_rev",
+      "name": "Predictive Rev",
+      "description": "Omega-scored revenue prediction across every lane.",
+      "tags": [
+        "a2a",
+        "intelligence",
+        "empire-os"
+      ],
+      "examples": [
+        "Buy Predictive Rev for my agency"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "aeo_surface",
+      "name": "AEO Surface",
+      "description": "Answer-engine optimized pages that rank and convert.",
+      "tags": [
+        "a2a",
+        "seo",
+        "empire-os"
+      ],
+      "examples": [
+        "Buy AEO Surface for my agency"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "satellite_dma",
+      "name": "Satellite DMA",
+      "description": "Storm/satellite damage scoring for high-intent claims.",
+      "tags": [
+        "a2a",
+        "scoring",
+        "empire-os"
+      ],
+      "examples": [
+        "Buy Satellite DMA for my agency"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "mass_tort",
+      "name": "Mass Tort",
+      "description": "Mass-tort lead engine with compliant intake.",
+      "tags": [
+        "a2a",
+        "legal",
+        "empire-os"
+      ],
+      "examples": [
+        "Buy Mass Tort for my agency"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "endpoints": {
+    "quote": "http://216.128.149.56:8086/v1/a2a/quote",
+    "escrow": "http://216.128.149.56:8086/v1/a2a/escrow",
+    "release": "http://216.128.149.56:8086/v1/a2a/release",
+    "catalog": "http://216.128.149.56:8086/v1/a2a/catalog"
+  },
+  "settlement": {
+    "network": "bsc",
+    "asset": "USDT",
+    "vault": "0x1339b487046B0ad924a10c20b1791608EA8595a8"
+  }
+}

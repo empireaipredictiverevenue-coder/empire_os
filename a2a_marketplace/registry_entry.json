@@ -1,0 +1,23 @@
+{
+  "id": "a2a-marketplace",
+  "role": "a2a-marketplace",
+  "name": "Empire OS A2A Marketplace",
+  "agent_card": "http://216.128.149.56:8086/.well-known/agent.json",
+  "catalog": "http://216.128.149.56:8086/v1/a2a/catalog",
+  "products": [
+    "lead_lane",
+    "ai_closer",
+    "inbound_reply",
+    "seat_corridor",
+    "predictive_rev",
+    "aeo_surface",
+    "satellite_dma",
+    "mass_tort"
+  ],
+  "settlement": {
+    "network": "bsc",
+    "asset": "USDT",
+    "vault": "0x1339b487046B0ad924a10c20b1791608EA8595a8"
+  },
+  "registered_at": "2026-08-30T02:59:05.269126+00:00"
+}
