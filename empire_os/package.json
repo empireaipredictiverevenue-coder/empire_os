@@ -1,0 +1,14 @@
+{
+  "name": "empire-ai-omni-agent",
+  "version": "1.0.0",
+  "description": "Empire AI Master Omni-Agent Market Engine (7-module: relay, waterfall ingestor, gauntlet loop, closed-loop learning, rate-limiter/proxy, self-healing, orchestrator). Self-hosted in Incus on empire-net.",
+  "main": "market_agent_node.js",
+  "scripts": {
+    "start": "node market_agent_node.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "axios": "^1.7.0",
+    "ioredis": "^5.4.0"
+  }
+}

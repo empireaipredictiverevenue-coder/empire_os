@@ -27,8 +27,59 @@ NICHE_KW = {
     "pest_control": "pest control company", "painting": "painting contractor",
     "auto_repair": "auto repair shop", "dental": "dental clinic",
     "med_spa": "med spa", "law_firm": "law firm",
+    "mass_tort": "mass tort law firm", "legal_services": "legal services",
+    "real_estate": "real estate agent", "general_contractor": "general contractor",
+    "construction": "construction company", "residential_roofing": "residential roofing",
 }
 INTENT = ["hiring", "now hiring", "careers", "expansion", "opened new location"]
+
+# Purpose modes — the Serper product now serves ANY purpose, not just lead-gen
+PURPOSES = {
+    "lead_gen": '"{kw}" {metro} {intent}',
+    "expired_domains": "expired domain {kw} authority backlinks",
+    "trigger_words": "{kw} buy intent keyword long-tail",
+    "ad_intel": "{kw} {metro} best services near me",
+    "competitor": "{kw} {metro} competitors reviews",
+}
+
+
+def _serp_for_purpose(purpose: str, niche: str, metro: str = "", limit: int = 10) -> list[dict]:
+    """Generic SERP call for any purpose mode. Returns raw result rows."""
+    kw = NICHE_KW.get(niche, niche)
+    tmpl = PURPOSES.get(purpose, PURPOSES["lead_gen"])
+    q = tmpl.format(kw=kw, metro=metro, intent="").strip()
+    return _search(q, num=limit)
+
+
+def multi_niche_sweep(niches: list = None, metros: list = None, limit: int = 10) -> dict:
+    """Run a lead-gen SERP sweep across ALL given niches (or every niche in DB).
+
+    Multi-niche conscious: one call fans out per niche+metro, dedupes, scores,
+    returns per-niche added counts. Powers the predictive-cloud Layer 20 brain.
+    """
+    c = sqlite3.connect(DB, timeout=30)
+    c.execute("PRAGMA busy_timeout=30000")
+    if not niches:
+        niches = [r[0] for r in c.execute(
+            "SELECT DISTINCT niche FROM crm_leads WHERE niche IS NOT NULL").fetchall()]
+    if not metros:
+        metros = [r[0] for r in c.execute(
+            "SELECT DISTINCT metro FROM crm_leads WHERE metro IS NOT NULL AND metro != '' LIMIT 5").fetchall()]
+        if not metros:
+            metros = [""]
+    c.close()
+    totals = {}
+    for nic in niches:
+        added = 0
+        for metro in metros:
+            try:
+                stats = discover(nic, metro, limit=min(limit, 10))
+                added += stats.get("added", 0)
+            except Exception as e:
+                print(f"[serp_discovery] sweep {nic}/{metro}: {e}")
+        totals[nic] = added
+    return {"swept_niches": len(niches), "swept_metros": len(metros), "added_by_niche": totals,
+            "total_added": sum(totals.values())}
 
 
 def _search(q: str, num: int = 10) -> list[dict]:
@@ -75,12 +126,10 @@ def discover(niche: str, metro: str, limit: int = 20) -> dict:
     for domain, info in seen.items():
         cur = c.execute(
             "INSERT OR IGNORE INTO crm_leads "
-            "(business_name, website, niche, metro, source, notes, created_at) "
+            "(business_name, website, niche, metro, source, status, created_at) "
             "VALUES (?,?,?,?,?,?,?)",
             (info["business_name"], info["website"], niche, metro,
-             "serp_discovery",
-             json.dumps({"intent_signal": info["intent_signal"],
-                         "snippet": info["snippet"]}),
+             "serp_discovery", "raw",
              datetime.now(timezone.utc).isoformat()),
         )
         if cur.rowcount:
@@ -97,7 +146,7 @@ def discover_and_score(niche: str, metro: str, limit: int = 20) -> dict:
     c.execute("PRAGMA busy_timeout=30000")
     c.row_factory = sqlite3.Row
     rows = c.execute(
-        "SELECT id, business_name, website, niche, metro FROM crm_leads "
+        "SELECT lead_uid, business_name, website, niche, metro FROM crm_leads "
         "WHERE source='serp_discovery' AND niche=? AND metro=? "
         "AND (omega_score IS NULL OR omega_score=0) LIMIT ?",
         (niche, metro, max(stats["added"], 1) * 3),
@@ -115,13 +164,12 @@ def discover_and_score(niche: str, metro: str, limit: int = 20) -> dict:
                     "location": row["metro"],
                 })
                 c.execute(
-                    "UPDATE crm_leads SET omega_score=?, omega_tier=?, scored_at=? "
-                    "WHERE id=?",
-                    (res.get("omega_score", 0), res.get("omega_tier", ""),
-                     datetime.now(timezone.utc).isoformat(), row["id"]))
+                    "UPDATE crm_leads SET omega_score=?, omega_tier=?, status='scored' "
+                    "WHERE lead_uid=?",
+                    (res.get("omega_score", 0), res.get("omega_tier", ""), row["lead_uid"]))
                 scored += 1
             except Exception as e:
-                print(f"[serp_discovery] score err id={row['id']}: {e}")
+                print(f"[serp_discovery] score err uid={row['lead_uid']}: {e}")
     except ImportError:
         print("[serp_discovery] omega_scoring unavailable — leads stored unscored")
     c.commit()
@@ -142,10 +190,9 @@ def enrich_pending(niche: str, metro: str, limit: int = 25) -> dict:
     c.execute("PRAGMA busy_timeout=30000")
     c.row_factory = sqlite3.Row
     rows = c.execute(
-        "SELECT id, business_name, website, niche, metro FROM crm_leads "
+        "SELECT lead_uid, business_name, website, niche, metro FROM crm_leads "
         "WHERE source='serp_discovery' AND (?='' OR niche=?) AND (?='' OR metro=?) "
         "AND (email IS NULL OR email='') "
-        # skip aggregator/marketplace/job-board domains — no real contact, pollutes CSVs
         "AND website NOT LIKE '%facebook.com' AND website NOT LIKE '%google.com' "
         "AND website NOT LIKE '%yelp.com' AND website NOT LIKE '%angi.com' "
         "AND website NOT LIKE '%thumbtack.com' AND website NOT LIKE '%yellowpages.com' "
@@ -173,24 +220,21 @@ def enrich_pending(niche: str, metro: str, limit: int = 25) -> dict:
             linkedin = ((res.get("social_links") or {}).get("linkedin")
                         or (res.get("social_from_site") or {}).get("linkedin")
                         or "").split("?")[0]
-            # promote a contact candidate when scraper found none in HTML
             if not email and res.get("email_patterns"):
                 email = res["email_patterns"][0]
-            # phone sanity: real US numbers are 10-11 digits after stripping
             if phone and not _re.fullmatch(r"\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}", phone):
                 phone = ""
             if email or phone or linkedin:
                 c.execute(
                     "UPDATE crm_leads SET email=COALESCE(NULLIF(?,''),email), "
-                    "phone=COALESCE(NULLIF(?,''),phone), "
-                    "notes=json_set(notes,'$.enriched',true,'$.linkedin',?) "
-                    "WHERE id=?",
-                    (email, phone, linkedin, row["id"]))
+                    "phone=COALESCE(NULLIF(?,''),phone), enriched=1 "
+                    "WHERE lead_uid=?",
+                    (email, phone, row["lead_uid"]))
                 enriched += 1
                 if email:
                     with_email += 1
         except Exception as e:
-            print(f"[serp_discovery] enrich err id={row['id']}: {e}")
+            print(f"[serp_discovery] enrich err uid={row['lead_uid']}: {e}")
     c.commit()
     c.close()
     return {"enriched": enriched, "with_email": with_email, "checked": len(rows)}

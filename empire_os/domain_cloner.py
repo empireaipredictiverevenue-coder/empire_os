@@ -30,32 +30,39 @@ WAYBACK_CDX = "https://web.archive.org/cdx/search/cdx"
 
 
 def find_expired_domains(seed_keywords: list, min_da: int = 30, limit: int = 20) -> list:
-    """Step 1: discover dropped domains with authority in a niche.
+    """Step 1: discover dropped high-authority domains via OUR Serper product.
 
-    Uses a drop-list / expired-auction source. Placeholder uses a public
-    expired-DNS snapshot; swap for your licensed drop-list API.
+    Uses empire_os.lead_engine.serp_discovery (our own google.serper wrapper)
+    instead of scraping a third-party drop-list. Self-hosted infra, no rent.
     """
-    # Example: query a public expired-domain feed (replace with licensed source)
     found = []
-    for kw in seed_keywords:
-        try:
-            url = f"https://www.expireddomains.com/domain/{kw}"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
-                html = r.read().decode("utf-8", "ignore")
-            # naive extraction of domain-like tokens with DA signal (stub)
-            for tok in html.split():
-                if "." in tok and kw in tok.lower():
-                    found.append({"domain": tok.strip("\"'<>"), "seed": kw, "da_est": min_da})
-                    if len(found) >= limit:
-                        break
-        except Exception as e:
-            found.append({"seed": kw, "error": str(e)[:120]})
+    try:
+        from empire_os.lead_engine.serp_discovery import _search
+        for kw in seed_keywords:
+            q = f"expired domain {kw} authority backlinks"
+            rows = _search(q, num=10)
+            for r in rows:
+                title = (r.get("title") or "").lower()
+                link = r.get("url") or r.get("link") or ""
+                # crude domain extraction
+                import re
+                m = re.search(r"https?://([^/]+)/?", link)
+                dom = m.group(1) if m else link
+                if kw.replace("_", " ") in title or kw in dom:
+                    found.append({"domain": dom, "seed": kw, "source": "serper"})
+                if len(found) >= limit:
+                    break
+            if len(found) >= limit:
+                break
+    except Exception as e:
+        found.append({"error": f"serper: {str(e)[:120]}"})
+    if not found:
+        found.append({"note": "no expired domains found via serper for seeds"})
     return found
 
 
-def fetch_wayback_structure(domain: str) -> list:
-    """Step 2-3: pull historical URL slugs from Wayback CDX for a domain."""
+def fetch_wayback_structure(domain: str, retries: int = 3) -> list:
+    """Step 2-3: pull historical URL slugs from Wayback CDX (UA + retry)."""
     params = {
         "url": f"{domain}/*",
         "output": "json",
@@ -64,14 +71,19 @@ def fetch_wayback_structure(domain: str) -> list:
         "limit": "500",
     }
     q = urlparse.urlencode(params)
-    try:
-        with urllib.request.urlopen(f"{WAYBACK_CDX}?{q}", context=ctx, timeout=20) as r:
-            data = json.loads(r.read().decode("utf-8", "ignore"))
-        # first row is header
-        slugs = [row[0] for row in data[1:] if row]
-        return slugs
-    except Exception as e:
-        return [{"error": str(e)[:120]}]
+    import time
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(
+                f"{WAYBACK_CDX}?{q}", headers={"User-Agent": "Mozilla/5.0 EmpireAI"})
+            with urllib.request.urlopen(req, context=ctx, timeout=25) as r:
+                data = json.loads(r.read().decode("utf-8", "ignore"))
+            return [row[0] for row in data[1:] if row]
+        except Exception as e:
+            if attempt == retries - 1:
+                return [{"error": str(e)[:120]}]
+            time.sleep(2 * (attempt + 1))
+    return [{"error": "unknown"}]
 
 
 def clone_domain(domain: str, content_wrapper: callable = None) -> dict:

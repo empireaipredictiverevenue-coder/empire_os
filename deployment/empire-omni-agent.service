@@ -1,0 +1,20 @@
+[Unit]
+Description=Empire AI Node.js Omni-Agent Market Engine (Layer 21b: 7-module relay/waterfall/gauntlet/learning)
+After=network.target redis.service empire-hub-8081.service
+Requires=redis.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os/empire_os
+Environment=NODE_ENV=production
+Environment=PORT=3997
+Environment=REDIS_URL=redis://localhost:6379
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/local/bin/node /root/empire_os/empire_os/market_agent_node.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

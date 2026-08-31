@@ -424,6 +424,92 @@ class PredictiveCloudAGI:
         return {"layer": 19, "niche": nic, "volume": state["by_niche"].get(nic, 0),
                 "playbook": pb, "tiers": state["tiers_by_niche"].get(nic, {})}
 
+    # ── 14. LAYER 20: OUR SERP PRODUCT (search intelligence) ──────────
+    def serp_intel(self, niche: str, metro: str = "", limit: int = 20) -> dict:
+        """Layer 20 — our own Serper product (empire_os.lead_engine.serp_discovery).
+
+        Multi-intent SERP sweep for a niche/metro: returns discovered domains,
+        intent signals, and trigger phrases to feed the utility-suite + ad engines.
+        Self-hosted infra, no rent (uses our HUB/v1/web/search backend).
+        """
+        try:
+            from empire_os.lead_engine.serp_discovery import _search
+            q = f"{niche} {metro} intent buy lead".strip()
+            rows = _search(q, num=limit)
+            domains = []
+            for r in rows:
+                link = r.get("url") or r.get("link") or ""
+                if "http" in link:
+                    try:
+                        dom = link.split("/")[2].replace("www.", "")
+                    except IndexError:
+                        dom = link
+                    domains.append(dom)
+            return {"layer": 20, "niche": niche, "metro": metro,
+                    "results": len(rows), "domains": domains[:10]}
+        except Exception as e:
+            return {"layer": 20, "status": "deferred", "error": str(e)[:160]}
+
+    def serp_multi_niche(self, purposes: list = None) -> dict:
+        """Layer 20b — run our Serper product across ALL niches for any purpose.
+
+        purposes: lead_gen | expired_domains | trigger_words | ad_intel | competitor
+        Multi-niche conscious — fans out per niche, dedupes, scores, returns totals.
+        """
+        try:
+            from empire_os.lead_engine.serp_discovery import (
+                multi_niche_sweep, _serp_for_purpose)
+            out = {}
+            if purposes is None:
+                purposes = ["lead_gen", "trigger_words"]
+            if "lead_gen" in purposes:
+                out["lead_gen_sweep"] = multi_niche_sweep()
+            for p in purposes:
+                if p == "lead_gen":
+                    continue
+                # sample one niche to prove the purpose mode works
+                out[f"sample_{p}"] = _serp_for_purpose(p, "roofing", "Dallas", limit=5)
+            return {"layer": 20, "purposes": purposes, **out}
+        except Exception as e:
+            return {"layer": 20, "status": "deferred", "error": str(e)[:160]}
+
+    def market_agent_cycle(self, niches: list = None, limit: int = 10) -> dict:
+        """Layer 21 — Market Agent: Serper multi-niche sweep -> Waterfall enrich -> marketplace.
+
+        Runs our own Serper product across all niches, enriches fresh leads through
+        the self-built-first Waterfall, and stages them for the A2A buyer marketplace.
+        """
+        try:
+            from empire_os.market_agent import run_market_cycle
+            return run_market_cycle(niches=niches, limit=limit)
+        except Exception as e:
+            return {"layer": 21, "status": "deferred", "error": str(e)[:160]}
+
+    def market_agent_node_status(self) -> dict:
+        """Layer 21b — status of the Node.js Omni-Agent (paste_11: 7-module market engine)."""
+        import urllib.request
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:3997/healthz", timeout=3) as r:
+                return {"layer": 21, "node_omni_agent": json.loads(r.read().decode())}
+        except Exception as e:
+            return {"layer": 21, "node_omni_agent": {"status": "not_running", "note": str(e)[:80]}}
+
+    def domain_clone_run(self, seeds: list = None) -> dict:
+        """Run Pillar 3 expired-domain cloning via our Serper product + Wayback."""
+        seeds = seeds or ["roofing", "mass_tort"]
+        try:
+            from empire_os.domain_cloner import find_expired_domains, clone_domain
+            found = find_expired_domains(seeds, limit=5)
+            clones = []
+            for f in found[:3]:
+                dom = f.get("domain")
+                if dom and "." in dom:
+                    clones.append(clone_domain(dom))
+            return {"layer": 18, "discovered": found, "cloned": clones}
+        except Exception as e:
+            return {"layer": 18, "status": "deferred", "error": str(e)[:160]}
+
+
     # ── 13. FULL CYCLE (now niche-aware) ──────────────────────────────
     def run_cycle(self, niche: str = None) -> dict:
         self.cycle += 1
