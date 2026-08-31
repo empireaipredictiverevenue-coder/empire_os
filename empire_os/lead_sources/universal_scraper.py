@@ -38,8 +38,35 @@ from empire_os.lead_sources.models import LeadCandidate, SourceInfo
 from empire_os.lead_sources.utils import infer_niche
 
 # ──────────────────────────────────────────────────────────────────────
-UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-      "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+UA_POOL = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+]
+UA = UA_POOL[0]
+
+# Proxy rotation: set EMPIRE_PROXY_POOL="http://user:pass@host:port,..." or use the
+# Redis-backed pool managed by the Node omni-agent. Falls back to direct if empty.
+import os as _os
+_PROXY_POOL = [p.strip() for p in _os.environ.get("EMPIRE_PROXY_POOL", "").split(",") if p.strip()]
+_prox_idx = {"i": 0}
+
+
+def _next_proxy() -> Optional[str]:
+    if not _PROXY_POOL:
+        return None
+    p = _PROXY_POOL[_prox_idx["i"] % len(_PROXY_POOL)]
+    _prox_idx["i"] += 1
+    return p
+
+
+def _build_opener(proxy: Optional[str]):
+    if not proxy:
+        return urllib.request.build_opener()
+    handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+    return urllib.request.build_opener(handler)
 
 RATE_LIMIT = {
     "google_maps": 2.0,
@@ -72,26 +99,33 @@ def _polite(source: str):
 
 def _fetch(url: str, headers: Dict[str, str] = None, timeout: int = 15) -> Optional[str]:
     _polite("fetch")
-    h = {"User-Agent": UA}
+    h = {"User-Agent": random.choice(UA_POOL),
+         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+         "Accept-Language": "en-US,en;q=0.9"}
     if headers:
         h.update(headers)
     req = urllib.request.Request(url, headers=h)
+    opener = _build_opener(_next_proxy())
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with opener.open(req, timeout=timeout) as r:
             return r.read().decode("utf-8", "ignore")
     except Exception as e:
         print(f"[universal] fetch failed: {e}")
         return None
 
+
 def _fetch_post(url: str, data: dict, headers: Dict[str, str] = None, timeout: int = 20) -> Optional[str]:
     _polite("post")
-    h = {"User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded"}
+    h = {"User-Agent": random.choice(UA_POOL),
+         "Content-Type": "application/x-www-form-urlencoded",
+         "Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
     if headers:
         h.update(headers)
     try:
         data_enc = urllib.parse.urlencode(data).encode()
         req = urllib.request.Request(url, data=data_enc, headers=h, method="POST")
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        opener = _build_opener(_next_proxy())
+        with opener.open(req, timeout=timeout) as r:
             return r.read().decode("utf-8", "ignore")
     except Exception as e:
         print(f"[universal] POST fetch failed: {e}")
@@ -170,17 +204,36 @@ def _from_schema(data: dict, source: str, metro: str) -> Optional[LeadCandidate]
 def _bing_places(metro: str, niche: str, limit: int) -> Iterator[LeadCandidate]:
     _polite("bing_maps")
     query = urllib.parse.quote(f"{niche} {metro}")
-    url = f"https://www.bing.com/local/search?q={query}&form=LCL"
-    html = _fetch(url)
-    if not html:
-        return
-    for m in re.finditer(r'itemListElement.*?({.*?})', html, re.S):
-        try:
-            d = json.loads(m.group(1))
-            if d.get("@type") == "LocalBusiness":
-                yield _from_schema(d, "bing_maps", metro)
-        except Exception:
+    skip = ("bing", "microsoft", "yelp", "facebook", "google", "linkedin",
+            "yellowpages", "bbb.org", "angies", "thumbtack", "homeadvisor")
+    for attempt in range(3):
+        html = _fetch(f"https://www.bing.com/search?q={query}")
+        if not html:
             continue
+        seen = set()
+        for m in re.finditer(r"<cite>([^<]+)</cite>", html):
+            raw = m.group(1).strip()
+            domain = raw.split(" › ")[0].replace("https://", "").replace("http://", "")
+            domain = domain.split("/")[0].strip().lower()
+            if not domain or domain in seen or any(s in domain for s in skip):
+                continue
+            seen.add(domain)
+            name = domain.split(".")[0].replace("-", " ").title()
+            yield LeadCandidate(
+                name=name[:80],
+                email="",
+                phone="",
+                niche=niche,
+                metro=metro,
+                state="",
+                details=f"bing_maps: {domain}",
+                source="bing_maps",
+                lead_score=60,
+                url=f"https://{domain}",
+                raw={"domain": domain},
+            )
+        if seen:
+            break
 
 # ──────────────────────────────────────────────────────────────────────
 # Source 3: YellowPages / SuperPages / DexKnows
