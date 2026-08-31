@@ -118,33 +118,8 @@ class PredictiveCloudAGI:
             out["error"] = str(e)[:200]
         return out
 
-    # ── 2c. STORM + SATELLITE (wires real storm/satellite products) ─
-    def storm_satellite_scan(self, state_abbr: str = "TX") -> dict:
-        """Run Storm Strike + Satellite Scanner on a state."""
-        res = {"storm_metros": [], "satellite": []}
-        try:
-            from storm_strike import get_storm_metros
-            res["storm_metros"] = get_storm_metros(state=state_abbr, limit=8)
-        except Exception as e:
-            res["storm_error"] = str(e)[:120]
-        try:
-            from empire_os.satellite_scanner import SatelliteScanner
-            sc = SatelliteScanner()
-            # scan a sample of metro zips from crm_leads
-            c = _conn()
-            try:
-                zips = [r[0] for r in c.execute(
-                    "SELECT DISTINCT zip FROM crm_leads WHERE zip IS NOT NULL LIMIT 5").fetchall()]
-            finally:
-                c.close()
-            for z in zips:
-                try:
-                    res["satellite"].append({"zip": z, "scan": sc.scan_zip(z).__dict__})
-                except Exception:
-                    pass
-        except Exception as e:
-            res["sat_error"] = str(e)[:120]
-        return res
+    # ── 2c. STORM + SATELLITE ──────────────────────────────────────────
+    # (unified implementation at storm_satellite_scan() near bottom of class)
 
     # ── 2. REASON (cortex LLM + rule fallback) ──────────────────────
     def reason(self, state: dict) -> list:
@@ -274,37 +249,39 @@ class PredictiveCloudAGI:
 
     # ── 5. STORM TRACKER (Paste #7, Pillar 1) ───────────────────────
     def storm_scan(self, state_abbr: str = "TX") -> dict:
-        """Scaffold for NOAA/radar storm-damage lead sourcing.
-        Real feed integration lands here; returns geofenced target zones."""
-        return {
-            "pillar": "storm_tracker",
-            "target_state": state_abbr,
-            "data_feeds": ["NOAA GOES", "RadarSwath hail", "infrared"],
-            "action": "overlay hail/wind swath on industrial zones -> auto-identify damaged roofs",
-            "status": "scaffold_ready",
-        }
-
-    # ── 6. WAREHOUSE SNIPER (Paste #7, Pillar 2) ─────────────────────
-    def warehouse_sniper(self, zip_codes: list) -> dict:
-        """Scaffold for Sentinel-2 / Planet logistics capacity scouting."""
-        return {
-            "pillar": "warehouse_sniper",
-            "watch_zones": zip_codes,
-            "data_feeds": ["Sentinel-2 (10m)", "Planet Labs (hi-res)"],
-            "indicators": ["overflow_trailers", "empty_yards", "roof_construction"],
-            "status": "scaffold_ready",
-        }
-
-    # ── 7. VULTR/INCUS PROVISIONER (Paste #5/#7, Pillar 3) ──────────
-    def infra_provision(self, client_id: str) -> dict:
-        """Provision isolated Incus container on Vultr for white-label client."""
+        """Live NWS severe-weather alerts -> affected metros -> roofing/restoration outreach."""
+        out = {"pillar": "storm_tracker", "target_state": state_abbr}
         try:
-            net = subprocess.run(["incus", "network", "list", "-f", "json"],
-                                 capture_output=True, text=True, timeout=30)
-            return {"client": client_id, "incus_available": net.returncode == 0,
-                    "action": "incus launch images:ubuntu/22.04 empire-client-%s" % client_id}
+            from storm_strike import get_storm_metros, strike
+            metros = get_storm_metros(state=state_abbr, limit=8)
+            out["metros"] = metros
+            out["status"] = "live"
         except Exception as e:
-            return {"client": client_id, "incus_available": False, "error": str(e)}
+            out["status"] = "scaffold_ready"
+            out["note"] = f"storm_strike call deferred: {str(e)[:120]}"
+        return out
+
+    def warehouse_sniper(self, zip_codes: list) -> dict:
+        """Sentinel-2 / Planet logistics capacity scouting -> WHALE fleet signal."""
+        out = {"pillar": "warehouse_sniper", "watch_zones": zip_codes}
+        try:
+            from empire_os.satellite_scanner import SatelliteScanner
+            sc = SatelliteScanner()
+            out["scans"] = [sc.scan_zip(z).__dict__ for z in zip_codes[:5]]
+            out["status"] = "live"
+        except Exception as e:
+            out["status"] = "scaffold_ready"
+            out["note"] = f"satellite_scanner call deferred: {str(e)[:120]}"
+        return out
+
+    def storm_satellite_scan(self, state_abbr: str = "TX", zip_codes: list = None) -> dict:
+        """Unified storm + satellite recon. Real modules wired in."""
+        if zip_codes is None:
+            zip_codes = []
+        return {
+            "storm": self.storm_scan(state_abbr),
+            "satellite": self.warehouse_sniper(zip_codes),
+        }
 
     # ── 7b. PGVector BACKEND (self-hosted Postgres scale-out) ───────
     def pgvector_search(self, q: str, limit: int = 20) -> dict:
@@ -333,7 +310,29 @@ class PredictiveCloudAGI:
         except Exception as e:
             return {"engine": "pgvector", "status": "error", "error": str(e)[:160]}
 
-    # ── 7c. SETTLEMENT CONFIG (BSC BEP20 USDT, 15% success fee) ─────
+    def pgvector_sync(self, limit: int = 5000) -> dict:
+        """Sync local FTS5 lead index into self-hosted pgvector (scale-out)."""
+        dsn = os.environ.get("EMPIRE_PG_DSN")
+        if not dsn:
+            return {"status": "not_configured"}
+        try:
+            import psycopg2
+            c = _conn()
+            rows = c.execute(
+                "SELECT lead_ref, details FROM lane_leads WHERE omega_score IS NOT NULL LIMIT ?",
+                (limit,)).fetchall()
+            c.close()
+            conn = psycopg2.connect(dsn, connect_timeout=5)
+            cur = conn.cursor()
+            cur.execute("TRUNCATE lead_embeddings")
+            for ref, det in rows:
+                cur.execute(
+                    "INSERT INTO lead_embeddings (lead_ref, details, embedding) "
+                    "VALUES (%s, %s, embedding_from_query(%s))", (ref, det, det or ""))
+            conn.commit(); cur.close(); conn.close()
+            return {"status": "synced", "count": len(rows)}
+        except Exception as e:
+            return {"status": "error", "error": str(e)[:160]}
     SETTLEMENT = {
         "network": "BSC / BEP20 (EVM-compatible)",
         "token": "USDT",
@@ -352,10 +351,13 @@ class PredictiveCloudAGI:
         kws = keywords or ["storm damage", "insurance denied", "roof leak", "hail damage"]
         out = {"module": "reddit_sniper", "subs": subs, "keywords": kws, "status": "scaffold_ready"}
         try:
-            from empire_os.reddit_sniper import run_sniper
-            out["result"] = run_sniper(subreddits=subs, keywords=kws)
+            from empire_os.reddit_sniper import RedditSniper
+            sniper = RedditSniper()
+            sniper.TARGETS = subs  # override targets
+            leads = sniper.scrape()
+            out["result"] = {"scraped": len(leads)}
         except Exception as e:
-            out["note"] = f"reddit_sniper module call deferred: {str(e)[:120]}"
+            out["note"] = f"reddit_sniper call deferred: {str(e)[:120]}"
         return out
 
     def strike_linkedin_whale(self, signals: list = None) -> dict:
@@ -390,6 +392,31 @@ class PredictiveCloudAGI:
         actions = self.reason(state)
         results = self.act(actions)
         return {"cycle": self.cycle, "state": state, "actions_taken": results}
+
+    # ── 9. LAYER 16: ENHANCED DIRECT-RESPONSE PLAYBOOK ────────────────
+    DIRECT_RESPONSE_PLAYBOOK = {
+        "name": "EMPIRE AI ENHANCED DIRECT-RESPONSE PLAYBOOK",
+        "core_upgrade": "Autonomous Utility Empire — strip phone routing, double automated digital leverage",
+        "pillars": [
+            {"id": 1, "name": "Autonomous AI Utility Suites (Vultr & Incus)",
+             "shift": "Dynamic single-file AI tools on local LLMs, bare-metal Incus nodes",
+             "monetization": "Lock 3-5 high-paying SaaS/infra affiliate links into core workflow"},
+            {"id": 2, "name": "Predictive Intent & Trigger Word Swarms",
+             "shift": "Automated crawlers map long-tail micro-intent phrases instantly",
+             "result": "Capture laser-focused traffic at exact spend-ready moment"},
+            {"id": 3, "name": "Automated Expired Domain Authority Cloning",
+             "shift": "Hunt dropped high-equity domains, clone structure, map AI content wrappers",
+             "result": "Capture legacy search authority overnight, skip Google sandbox"},
+            {"id": 4, "name": "Hyper-Converged Ugly Banner Conversion Sinks",
+             "shift": "Ultra-fast high-contrast DR pages: one problem, one truth, one action",
+             "rule": "User must find answer in 3 seconds or layout is too slow"},
+        ],
+        "hermes_exec_prompt": "Build production blueprint for automated utility + domain scaling engine, phone-free",
+    }
+
+    def direct_response_playbook(self) -> dict:
+        """Layer 16 — the enhanced direct-response playbook as a live brain layer."""
+        return self.DIRECT_RESPONSE_PLAYBOOK
 
 
 def main():
