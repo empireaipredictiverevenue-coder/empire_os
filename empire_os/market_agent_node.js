@@ -25,6 +25,8 @@ const CFG = {
   TWENTY_API: process.env.TWENTY_API_URL || 'http://127.0.0.1:8080',
   TWENTY_TOKEN: process.env.TWENTY_API_KEY || '',
   RESEND_KEY: process.env.RESEND_API_KEY || '',
+  BREVO_KEY: process.env.BREVO_API_KEY || '',
+  BREVO_FROM: process.env.BREVO_FROM || 'growth@empire-ai.co.uk',
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
@@ -55,6 +57,30 @@ async function selfHeal(fn, label) {
     // capture stack for diagnostics; in production feed to model to rewrite fn
     return { ok: false, error: e.message, label };
   }
+}
+
+// ── Email relay: prefer Brevo (Cloudflare does not block Brevo); fall back to Resend ──
+async function sendEmail({ to, subject, text, from }) {
+  from = from || CFG.BREVO_FROM;
+  if (CFG.BREVO_KEY) {
+    try {
+      const r = await axios.post('https://api.brevo.com/v3/smtp/email', {
+        sender: { name: 'Empire AI', email: from },
+        to: [{ email: to }],
+        subject, textContent: text,
+      }, { headers: { 'api-key': CFG.BREVO_KEY, 'Content-Type': 'application/json' }, timeout: 8000 });
+      return { ok: true, via: 'brevo', id: r.data?.messageId };
+    } catch (e) { console.error('[email] brevo failed:', e.message); }
+  }
+  if (CFG.RESEND_KEY) {
+    try {
+      const r = await axios.post('https://api.resend.com/emails', {
+        from, to, subject, text,
+      }, { headers: { Authorization: `Bearer ${CFG.RESEND_KEY}` }, timeout: 8000 });
+      return { ok: true, via: 'resend', id: r.data?.id };
+    } catch (e) { console.error('[email] resend failed:', e.message); }
+  }
+  return { ok: false, note: 'no email key configured' };
 }
 
 // ── MODULE 2: Waterfall ingestor (dedupe via Supabase pgvector) ──────
@@ -113,14 +139,12 @@ app.post('/webhook/twenty', async (req, res) => {
     if (!fresh) return { skipped: 'duplicate' };
     const g = await gauntletLoop(p.companyName || firstName, 'expansion');
     if (g.passed) await captureWin({ company: p.companyName }, g.draft);
-    // fire Resend over 443
-    if (CFG.RESEND_KEY) {
-      await axios.post('https://api.resend.com/emails', {
-        from: 'growth@empire-ai.co.uk', to: email,
-        subject: 'Quick one — ' + (p.companyName || 'your company'),
-        text: g.draft,
-      }, { headers: { Authorization: `Bearer ${CFG.RESEND_KEY}` }, timeout: 8000 });
-    }
+    // fire outbound email (Brevo preferred, Resend fallback)
+    await sendEmail({
+      to: email,
+      subject: 'Quick one — ' + (p.companyName || 'your company'),
+      text: g.draft,
+    });
     await pushToTwenty({ name: p.companyName, domainName: p.website, enriched: true });
     return { sent: true };
   }, 'relay');
@@ -134,6 +158,9 @@ app.post('/ingest', async (req, res) => {
   if (!fresh) return res.json({ skipped: 'duplicate' });
   const g = await gauntletLoop(lead.company || '', lead.signal || 'hiring');
   await pushToTwenty(lead);
+  if (lead.email && g.passed) {
+    await sendEmail({ to: lead.email, subject: lead.company ? `Quick one — ${lead.company}` : 'Quick one', text: g.draft });
+  }
   res.json({ ok: true, draft: g.draft, passed: g.passed });
 });
 

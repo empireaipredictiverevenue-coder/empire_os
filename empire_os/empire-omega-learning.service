@@ -1,0 +1,21 @@
+[Unit]
+Description=Empire Omega AI Learning Engine (8-area FastAPI, port 9100)
+After=network.target empire-hub-8081.service
+Wants=empire-hub-8081.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/root/empire_os/.env
+EnvironmentFile=-/root/empire_secrets/llm.env
+WorkingDirectory=/root/empire_os
+ExecStartPre=/bin/bash -c "for p in $(ss -ltnp 2>/dev/null | grep \":9100\" | grep -oP 'pid=\K[0-9]+' | sort -u); do kill -9 $p 2>/dev/null; done; sleep 1"
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/run_omega_engine.py
+TimeoutStopSec=15
+KillSignal=SIGTERM
+FinalKillSignal=SIGKILL
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

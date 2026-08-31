@@ -187,6 +187,16 @@ def insert_inbound(payload: dict) -> dict:
         finally:
             cnx.close()
         match["inbox_id"] = inbox_id
+        # Fire the auto-responder for blast recipients (never breaks capture).
+        try:
+            from empire_os import auto_responder
+            auto_responder.handle_inbound(
+                inbox_id, addr or from_email, from_name,
+                payload.get("subject") or "",
+                payload.get("body_text") or "",
+                payload.get("message_id") or "")
+        except Exception:
+            pass
 
     return {"ok": True, "id": inbox_id, "matched": match}
 

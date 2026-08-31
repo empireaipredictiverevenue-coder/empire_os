@@ -22,7 +22,8 @@ import requests
 
 HUB  = os.environ.get("HUB_URL", "http://127.0.0.1:8080")
 OLLAMA = os.environ.get("OLLAMA_URL", "http://10.218.156.211:11434")
-LLM_MODEL = os.environ.get("LLM_MODEL", "qwen2.5:7b")
+LLM_MODEL = os.environ.get("LLM_MODEL", "groq/llama-3.1-8b-instant")
+# Groq API key auto-loaded from /root/empire_secrets/groq_api_key
 FB   = Path("/root/feedback")
 LOG  = FB / "research_log.jsonl"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", str(7 * 24 * 3600)))

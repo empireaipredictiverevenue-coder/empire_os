@@ -1,0 +1,15 @@
+[Unit]
+Description=Empire OS A2A/AEO forum autoposter (dry-run safe; posts when Reddit creds present)
+After=network.target empire-a2a-card.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os
+Environment=EMPIRE_DB=/root/empire_os/empire_os.db A2A_CARD_BASE=http://216.128.149.56:8086
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/a2a_autoposter.py --daemon --interval 1800
+Restart=always
+RestartSec=30
+User=root
+
+[Install]
+WantedBy=multi-user.target

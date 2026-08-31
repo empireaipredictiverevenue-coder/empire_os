@@ -1,0 +1,12 @@
+[Unit]
+Description=Empire OS 5-phase Omega pipeline (discovery->scoring->outreach->ml->report)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+# Env lives in /root/empire_os/.env (BREVO/EMPIRE vars); source via EnvironmentFile
+EnvironmentFile=/root/empire_os/.env
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 -m empire_os.automation_scheduler run-all
+TimeoutStartSec=1800

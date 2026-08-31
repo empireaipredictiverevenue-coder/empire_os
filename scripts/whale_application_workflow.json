@@ -1,0 +1,54 @@
+{
+  "name": "Empire OS Whale Tier Application",
+  "version": "1.0.0",
+  "tier": "whale",
+  "price": 4999,
+  "period": "mo",
+  "description": "Complete self-driving empire operations (30,192 leads, multi-chain settlements)",
+  "eligibility_criteria": {
+    "min_annual_revenue": 5000000,
+    "existing_tech_stack": [
+      "CRM",
+      "Marketing Automation",
+      "Payment Processor"
+    ],
+    "commitment": "minimum 6-month contract",
+    "exclusivity": "non-compete clause (no competing lead providers)"
+  },
+  "application_fields": [
+    "company_name",
+    "annual_revenue",
+    "current_lead_source_count",
+    "current_conversion_rate",
+    "tech_stack",
+    "deal_sizes",
+    "industry_niche",
+    "decision_maker_name",
+    "decision_maker_email",
+    "why_empire_os",
+    "expected_outcome"
+  ],
+  "review_process": {
+    "initial_screening": "24-48 hours",
+    "due_diligence": "3-5 business days",
+    "approval_committee": "empire-c-suite",
+    "onboarding_training": "1-week intensive"
+  },
+  "onboarding": {
+    "dedicated_success_manager": true,
+    "custom_ai_model_tuning": true,
+    "exclusive_buyer_pool": true,
+    "multi_chain_settlement": [
+      "BSC_USDT",
+      "Solana_USDC"
+    ],
+    "api_access": true,
+    "weekly_performance_reports": true
+  },
+  "metrics": {
+    "min_monthly_leads": 1000,
+    "target_conversion_rate": "3-5% (vs 0.5-1% standard)",
+    "min_deal_size": 5000,
+    "settlement_timeframe": "2-5 years (LTV 10-20x initial)"
+  }
+}

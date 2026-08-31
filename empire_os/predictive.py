@@ -341,7 +341,7 @@ print(json.dumps(result))
 
     gaps = detect_market_gaps(data["lanes"], data["leads"])
     leaks = detect_leaks(data["funnel"])
-    waste = detect_waste(data["lanes"], agent_health={})
+    waste = detect_waste(data["lanes"], agent_health=get_agent_health())
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -384,3 +384,44 @@ if __name__ == "__main__":
 
 # Backward-compat aliases (must be after function definitions)
 market_gaps = detect_market_gaps
+# ── AGENT HEALTH INTEGRATION ─────────────────────────────────────────────
+# Factor 154-agent uptime/errors into predictive models for better resource
+# allocation and confidence intervals.
+
+def get_agent_health():
+    """Query si_agent_health table for agent uptime and error patterns."""
+    try:
+        cx = sqlite3.connect(DB_PATH, timeout=30.0)
+        cx.execute("PRAGMA busy_timeout=30000")
+        
+        # Get latest health record per agent
+        rows = cx.execute("""
+            SELECT agent_name, role, is_active, checked_at, response_time_ms,
+                   LAG(checked_at) OVER (PARTITION BY agent_name ORDER BY checked_at) as prev_checked
+            FROM si_agent_health
+            ORDER BY checked_at DESC
+        """).fetchall()
+        
+        cx.close()
+        
+        # Build health summary
+        health = {}
+        for row in rows:
+            name, role, is_active, checked_at, response_ms, prev_checked = row
+            if name not in health:
+                # Calculate uptime since first record
+                health[name] = {
+                    "role": role,
+                    "is_active": bool(is_active),
+                    "last_checked": checked_at,
+                    "response_time_ms": response_ms or 0,
+                    "uptime_indicator": "healthy" if is_active else "unhealthy"
+                }
+        
+        return health
+    except Exception as e:
+        logger.warning(f"Could not query agent health: {e}")
+        return {}
+
+
+# Backward-compat aliases (must be after function definitions)

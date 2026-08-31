@@ -45,7 +45,8 @@ BIDS_LOG    = FEEDBACK / "bids.jsonl"
 DECISIONS   = FEEDBACK / "agi_decisions.jsonl"
 DEFAULT_FRM = os.environ.get("DEFAULT_FROM", "+188****0100")
 OLLAMA_URL  = os.environ.get("OLLAMA_URL", "http://10.218.156.211:11434")
-LLM_MODEL   = os.environ.get("LLM_MODEL", "qwen2.5:7b")
+LLM_MODEL   = os.environ.get("LLM_MODEL", "groq/llama-3.1-8b-instant")
+# Groq API key auto-loaded from /root/empire_secrets/groq_api_key
 LLM_TIMEOUT = int(os.environ.get("LLM_TIMEOUT", "180"))
 
 # ── persistence + auth + compliance ──

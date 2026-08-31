@@ -494,6 +494,23 @@ class PredictiveCloudAGI:
         except Exception as e:
             return {"layer": 21, "node_omni_agent": {"status": "not_running", "note": str(e)[:80]}}
 
+    def hermes_growth_engine(self) -> dict:
+        """Layer 22 — Hermes v9 Autonomous Marketing & Growth Engine.
+
+        Runs one Hermes cycle: intercept raw market signal -> extract Customer Truth ->
+        classify objection (PRICE_AND_ROI / COMPLEXITY / SKEPTICISM) -> engineer viral
+        growth loop (K-Factor > 1.5) -> self-reflect -> persist to self-hosted pgvector.
+        No Supabase cloud / no third-party SaaS (own infra per Philip directive).
+        """
+        try:
+            import asyncio
+            from empire_os.hermes_master_engine_v9 import HermesAgentLoop
+            loop = HermesAgentLoop()
+            res = asyncio.run(loop.run_cycle())
+            return {"layer": 22, "status": "ok", **res}
+        except Exception as e:
+            return {"layer": 22, "status": "deferred", "error": str(e)[:160]}
+
     def domain_clone_run(self, seeds: list = None) -> dict:
         """Run Pillar 3 expired-domain cloning via our Serper product + Wayback."""
         seeds = seeds or ["roofing", "mass_tort"]

@@ -65,15 +65,30 @@ def safe_email_fetch(imap: imaplib.IMAP4_SSL, num: int) -> Optional[bytes]:
 def parse_message_safe(raw_bytes: bytes) -> Dict[str, Any]:
     """Parse email with size limits."""
     try:
-        msg = EmailMessage()
-        msg.load_bytes(raw_bytes)
-        
+        import email
+        msg = email.message_from_bytes(raw_bytes)
+
+        body_text = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_type() == "text/plain" and part.get("Content-Disposition") != "attachment":
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        body_text = payload.decode(errors="replace")
+                        break
+        else:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                body_text = payload.decode(errors="replace")
+
         return {
             "subject": msg.get("Subject", ""),
             "from_email": msg.get("From", ""),
             "to_email": msg.get("To", ""),
-            "body": msg.get_body() or "",
-            "message_id": msg.get("Message-ID", "")
+            "body_text": body_text,
+            "body": body_text,
+            "message_id": msg.get("Message-ID", ""),
+            "raw_size": len(raw_bytes),
         }
     except Exception as exc:
         log.error(f"Parse error: {exc}")
@@ -82,10 +97,11 @@ def parse_message_safe(raw_bytes: bytes) -> Dict[str, Any]:
 def post_to_hub_safe(payload: Dict[str, Any]) -> int:
     """POST to hub with safe error handling."""
     try:
-        url = os.environ.get('EMPIRE_HUB_URL', 'http://localhost:8081') + '/v1/inbound/parse'
+        url = os.environ.get('EMPIRE_HUB_URL', 'http://10.118.155.218:8081') + '/v1/inbound/parse'
         body = json.dumps(payload).encode('utf-8')
         
-        req = urllib.request.Request(url, data=body, method='POST')
+        req = urllib.request.Request(url, data=body, method='POST',
+                                     headers={'Content-Type': 'application/json'})
         
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.code
@@ -94,9 +110,9 @@ def post_to_hub_safe(payload: Dict[str, Any]) -> int:
         return 0
 
 def fetch_unseen_uids(imap: imaplib.IMAP4_SSL) -> list:
-    """Fetch unseen UIDs with size limits."""
+    """Fetch unseen UIDs with size limits. Only replies since blast window (30-Aug-2026)."""
     try:
-        typ, data = imap.search(None, "UNSEEN")
+        typ, data = imap.search(None, "UNSEEN", "SINCE", "30-Aug-2026")
         if typ == "OK" and data and data[0]:
             return data[0].split()[:50]  # Limit per cycle
         return []

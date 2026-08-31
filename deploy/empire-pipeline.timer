@@ -1,0 +1,10 @@
+[Unit]
+Description=Empire OS 5-phase pipeline schedule (runs .service daily 06:10 UTC)
+
+[Timer]
+OnCalendar=*-*-* 06:10:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

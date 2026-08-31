@@ -1,0 +1,15 @@
+[Unit]
+Description=Empire OS A2A AgentCard discovery + product surface
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os
+Environment=EMPIRE_DB=/root/empire_os/empire_os.db BSC_WALLET_ADDRESS=0x1339b487046B0ad924a10c20b1791608EA8595a8 EMPIRE_PUBLIC_URL=http://216.128.149.56:8086
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/a2a_card_server.py
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

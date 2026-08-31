@@ -1,0 +1,15 @@
+[Unit]
+Description=Empire OS single-writer DB gatekeeper (Unix socket)
+After=network.target empire-hub-8081.service
+Wants=empire-hub-8081.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/db_writer.py
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

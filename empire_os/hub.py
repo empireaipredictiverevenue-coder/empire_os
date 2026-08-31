@@ -360,20 +360,20 @@ async def lifespan(app: FastAPI):
     try:
         agi_sales = AgiSalesAgent(
             backend=backend,
-            llm=None)  # rule-based closer: LLM too slow on CPU host
-        logger.info("agi-sales initialized in-process (Ollama %s)",
-                    os.environ.get("OLLAMA_MODEL") or os.environ.get("LLM_MODEL") or "qwen2.5:3b")
+            llm=None)  # rule-based closer: LLM too slow on CPU host; Groq auto if LLM_MODEL=groq/...
+        logger.info("agi-sales initialized in-process (Model: %s)",
+                    os.environ.get("LLM_MODEL") or "groq/llama-3.1-8b-instant")
     except Exception as e:
         logger.warning("agi-sales init skipped (LLM unreachable): %s", str(e)[:120])
         agi_sales = None
-    # AGI Closer — last-mile closer, also in-process. Same Ollama brain.
+    # AGI Closer — last-mile closer, also in-process. Same brain.
     global agi_closer
     try:
         agi_closer = AgiCloserAgent(
             backend=backend,
-            llm=None)  # rule-based closer: LLM too slow on CPU host
-        logger.info("agi-closer initialized in-process (Ollama %s)",
-                    os.environ.get("OLLAMA_MODEL") or os.environ.get("LLM_MODEL") or "qwen2.5:3b")
+            llm=None)  # rule-based closer: LLM too slow on CPU host; Groq auto if LLM_MODEL=groq/...
+        logger.info("agi-closer initialized in-process (Model: %s)",
+                    os.environ.get("LLM_MODEL") or "groq/llama-3.1-8b-instant")
     except Exception as e:
         logger.warning("agi-closer init skipped (LLM unreachable): %s", str(e)[:120])
         agi_closer = None
@@ -4002,7 +4002,7 @@ def product_order(sku: str, req: dict):
         "niche": (req.get("niche") or "").strip().lower(),
         "metro": (req.get("metro") or "").strip().upper(),
         "url": (req.get("url") or "").strip().lower(),
-        "amount_usdc": price, "product": sku, "status": "pending",
+        "amount_usdt": price, "product": sku, "status": "pending",
         "ts": datetime.now(timezone.utc).isoformat(),
     }
     try:
@@ -4017,7 +4017,7 @@ def product_order(sku: str, req: dict):
 
     return {
         "ok": True, "invoice_id": invoice_id,
-        "sku": sku, "amount_usdc": price,
+        "sku": sku, "amount_usdt": price,
         "vault_wallet": vault, "memo": invoice_id,
         "chain": "BSC", "token": "USDT",
         "payment_url": (
@@ -4043,7 +4043,7 @@ def a2a_create_quote(req: dict):
     """Create a signed quote for an A2A product purchase.
 
     Body: { product, buyer_wallet, quantity?, meta? }
-    Returns: { quote_id, amount_usdc, signed_payload, vault_sig, pay_url, expires_at }
+    Returns: { quote_id, amount_usdt, signed_payload, vault_sig, pay_url, expires_at }
     """
     from empire_os.a2a_marketplace import create_quote, compute_amount
     from empire_os.amount_policy import validate as policy_validate
@@ -4587,7 +4587,7 @@ def a2a_negotiate(req: dict):
         "vault": os.environ.get("BSC_WALLET_ADDRESS", VAULT),
         "settle_instruction": {
             "token": "USDT",
-            "amount_usdc": quote.get("seat_price_usdc") or quote.get("price_usdc"),
+            "amount_usdt": quote.get("seat_price_usdt") or quote.get("price_usdt"),
             "to": os.environ.get("BSC_WALLET_ADDRESS", VAULT),
             "memo": quote["memo"],
         },
@@ -5331,7 +5331,7 @@ def deep_audit_paid(data: dict, background_tasks: BackgroundTasks):
                 "VALUES (?, ?, ?)",
                 (f"invoice.{invoice_id}",
                  json.dumps({"invoice_id": invoice_id, "url": url, "email": email,
-                              "amount_usdc": 29, "product": "deep_audit",
+                              "amount_usdt": 29, "product": "deep_audit",
                               "status": "pending", "ts": datetime.now(timezone.utc).isoformat()}),
                  time.time())
             )
@@ -5341,7 +5341,7 @@ def deep_audit_paid(data: dict, background_tasks: BackgroundTasks):
         
         payment_info = {
             "invoice_id": invoice_id,
-            "amount_usdc": 29,
+            "amount_usdt": 29,
             "amount_usd": 29,
             "vault_wallet": vault if vault else "ComingSoon",
             "memo": invoice_id,
@@ -5358,7 +5358,7 @@ def deep_audit_paid(data: dict, background_tasks: BackgroundTasks):
             "ok": True,
             "requires_payment": True,
             "payment": payment_info,
-            "message": f"Send {payment_info['amount_usdc']} USDT to vault wallet with memo {invoice_id}, then POST /v1/audit/deep with payment_ref={invoice_id}",
+            "message": f"Send {payment_info['amount_usdt']} USDT to vault wallet with memo {invoice_id}, then POST /v1/audit/deep with payment_ref={invoice_id}",
         }
 
 
@@ -5471,7 +5471,7 @@ def _handle_sku_delivery(invoice_memo: str):
         sku = st.get("sku") or invoice_memo.replace("SKU_", "", 1).lower()
         niche = (st.get("niche") or "").replace("_", " ") or "your market"
         metro = (st.get("metro") or "").title() or "your area"
-        amt = float(st.get("amount_usdc") or 0)
+        amt = float(st.get("amount_usdt") or 0)
         # deliverable copy per SKU family
         deliverables = {
             "leadflow": [
@@ -5696,7 +5696,7 @@ def finance_replay(req: dict):
 
     Returns: { "ok": True, "matched_to": "...", "balance_after": float }
     """
-    amount = float(req.get("amount_usdc", 0))
+    amount = float(req.get("amount_usdt", 0))
     memo   = (req.get("memo") or "").strip()
     sig    = req.get("tx_signature") or f"replay_{int(time.time())}"
     wallet = req.get("wallet_from", "replay")
@@ -5819,7 +5819,7 @@ def finance_replay(req: dict):
                             "bsc_listener",
                             json.dumps({
                                 "lead_id": lead_id,
-                                "amount_usdc": amount,
+                                "amount_usdt": amount,
                                 "tx_signature": sig,
                                 "memo": m,
                                 "settled_at": occurred_at,
@@ -6058,7 +6058,7 @@ def finance_replay(req: dict):
                                 "(prospect_id, from_state, to_state, actor, notes, occurred_at) "
                                 "VALUES (?, 'open', 'settled', 'crypto_charge', ?, ?)",
                                 (chg_row[0],
-                                 json.dumps({"invoice_id": best, "amount_usdc": amount,
+                                 json.dumps({"invoice_id": best, "amount_usdt": amount,
                                               "tx_signature": sig}),
                                  datetime.now(timezone.utc).isoformat()))
                     except Exception as _e:
@@ -6145,7 +6145,7 @@ def finance_replay(req: dict):
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "level": "REPLAY_DEPOSIT",
                 "msg": "replay_deposit",
-                "amount_usdc": amount,
+                "amount_usdt": amount,
                 "memo": memo,
                 "tx_signature": sig,
                 "wallet_from": wallet,
@@ -6161,7 +6161,7 @@ def finance_replay(req: dict):
         "matched_to": matched_to,
         "paid_subscription_id": paid_sub,
         "paid_invoice_id": paid_inv,
-        "amount_usdc": amount,
+        "amount_usdt": amount,
         "memo": memo,
         "tx_signature": sig,
         "balance_after_usdc": new_bal if "new_bal" in dir() else None,
@@ -6872,15 +6872,16 @@ def outbox_enqueue(req: dict):
         cnx.commit()
         cur = cnx.execute(
             "INSERT INTO si_outbox "
-            "(to_email, subject, body, lane, tier, lead_id, source) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "(to_email, subject, body, lane, tier, lead_id, source, html_body) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (req.get("to_email", ""),
              req.get("subject", ""),
              req.get("body", "")[:8000],
              req.get("lane", ""),
              req.get("tier", ""),
              req.get("lead_id", ""),
-             req.get("source", "outreach_now"))
+             req.get("source", "outreach_now"),
+             req.get("html_body", ""))
         )
         cnx.commit()
         out_id = cur.lastrowid
@@ -7011,6 +7012,44 @@ def inbound_parse(req: dict):
         return inbound_replies.insert_inbound(req)
     except Exception as e:
         raise HTTPException(500, f"inbound_parse failed: {e}")
+
+
+@app.post("/v1/inbound/brevo")
+@app.post("/v1/inbound/brevo-apex")
+async def inbound_brevo(request: Request):
+    """Brevo inbound-parse webhook. Payload: {items:[{MessageId,From:{Address,
+    Name},To:[...],Subject,ExtractedMarkdownMessage,RawTextBody,RawHtmlBody,
+    SentAtDate,Headers,...}]}. Converts each item to insert_inbound shape.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "invalid json")
+    from empire_os import inbound_replies
+    results = []
+    for item in (body.get("items") or []):
+        frm = item.get("From") or {}
+        to_list = item.get("To") or []
+        to_email = (to_list[0].get("Address") if to_list and isinstance(to_list[0], dict) else "") or ""
+        hdrs = item.get("Headers") or {}
+        if isinstance(hdrs, list):
+            hdrs = {"_raw": hdrs[:50]}
+        payload = {
+            "message_id": item.get("MessageId") or "",
+            "from_email": frm.get("Address") or "",
+            "from_name": frm.get("Name") or "",
+            "to_email": to_email,
+            "subject": item.get("Subject") or "",
+            "body_text": item.get("ExtractedMarkdownMessage") or item.get("RawTextBody") or "",
+            "body_html": item.get("RawHtmlBody") or "",
+            "headers": hdrs,
+            "raw_size": len(item.get("RawTextBody") or ""),
+        }
+        try:
+            results.append(inbound_replies.insert_inbound(payload))
+        except Exception as e:
+            results.append({"ok": False, "error": str(e)})
+    return {"ok": True, "count": len(results), "results": results}
 
 
 @app.get("/v1/replies")
@@ -7275,7 +7314,7 @@ def buyer_signup_seat(req: dict):
             "lane_count": result.get("lane_count"),
             "lanes": result.get("lanes"),
             "monthly_cents": result.get("monthly_cents"),
-            "amount_usdc": amount_usdc,
+            "amount_usdt": amount_usdt,
             "vault_wallet": vault,
             "usdc_mint": usdc_mint,
             "memo": f"SEAT_{sub_id.replace('sub_', '')}",
@@ -7361,7 +7400,7 @@ def buyer_signup(req: dict):
             "tenant_id": tenant_id,
             "subscription_id": sub_id,
             "invoice_id": invoice_id,
-            "amount_usdc": (price_cents or 0) / 100 if price_cents else None,
+            "amount_usdt": (price_cents or 0) / 100 if price_cents else None,
             "amount_cents": price_cents,
             "vault_wallet": vault,
             "memo": f"INV_{invoice_id.replace('inv_', '')}" if invoice_id else "",
@@ -9422,7 +9461,7 @@ def payouts_batch_tx(req: BatchTxRequest = None):
             "index": len(txs),
             "payout_ids": [p["payout_id"] for p in chunk],
             "count": len(chunk),
-            "amount_usdc": result.total_amount_usdc,
+            "amount_usdt": result.total_amount_usdc,
             "amount_cents": result.total_amount_cents,
             "transaction_base64": result.transaction_base64 or "",
             "bsc_pay_url": result.bsc_pay_url or "",

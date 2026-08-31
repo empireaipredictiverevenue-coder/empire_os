@@ -673,6 +673,29 @@
       "depends_on": [],
       "description": "finance agent - blueprint v4 tier-1",
       "registered_at": "2026-07-14T16:24:12+00:00"
+    },
+    "a2a-marketplace": {
+      "id": "a2a-marketplace",
+      "role": "a2a-marketplace",
+      "name": "Empire OS A2A Marketplace",
+      "agent_card": "http://216.128.149.56:8086/.well-known/agent.json",
+      "catalog": "http://216.128.149.56:8086/v1/a2a/catalog",
+      "products": [
+        "lead_lane",
+        "ai_closer",
+        "inbound_reply",
+        "seat_corridor",
+        "predictive_rev",
+        "aeo_surface",
+        "satellite_dma",
+        "mass_tort"
+      ],
+      "settlement": {
+        "network": "bsc",
+        "asset": "USDT",
+        "vault": "0x1339b487046B0ad924a10c20b1791608EA8595a8"
+      },
+      "registered_at": "2026-08-31T21:12:36.949825+00:00"
     }
   },
   "last_updated": "2026-07-21T23:00:00.000000+00:00"
