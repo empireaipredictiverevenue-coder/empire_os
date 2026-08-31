@@ -88,23 +88,40 @@ class DataProvider:
 # ── Built-in providers (stubs — wire real APIs as keys arrive) ──────
 
 class ApolloProvider(DataProvider):
-    """Apollo.io — primary B2B contact source."""
+    """OUR internal Apollo clone (empire_intelligence_product.ApolloSearch) — no external key.
+
+    Hits our own B2B contact/company search engine.
+    """
     name = "apollo"
-    cost_cents = 8
-    api_key_env = "APOLLO_API_KEY"
+    cost_cents = 2
+    api_key_env = ""  # self-hosted, always available
+
+    def is_available(self) -> bool:
+        return True
 
     def search(self, lead_info: dict) -> Optional[LeadContact]:
-        if not self.is_configured:
-            return None
-        # Real implementation: POST to Apollo's people/match endpoint
-        # Stub: returns a synthetic confidence to drive the waterfall logic
-        return LeadContact(
-            email=f"contact@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            phone=lead_info.get("phone", ""),
-            source=self.name,
-            confidence=0.92,
-            raw={"stub": True, "lead": lead_info},
-        )
+        try:
+            from empire_os.empire_intelligence_product import ApolloSearch
+            ap = ApolloSearch()
+            domain = (lead_info.get("domain") or lead_info.get("website") or "").replace("www.", "")
+            if not domain:
+                return None
+            contacts = ap.search_contacts({"domain": domain}) or []
+            if contacts:
+                c = contacts[0]
+                return LeadContact(
+                    email=getattr(c, "email", "") or "",
+                    phone=getattr(c, "phone", "") or "",
+                    first_name=getattr(c, "first_name", "") or "",
+                    last_name=getattr(c, "last_name", "") or "",
+                    title=getattr(c, "title", "") or "",
+                    company=lead_info.get("company", ""),
+                    source=self.name,
+                    confidence=0.9,
+                )
+        except Exception as e:
+            logger.warning("our-apollo err: %s", e)
+        return None
 
 
 class PeopleDataLabsProvider(DataProvider):
@@ -125,20 +142,66 @@ class PeopleDataLabsProvider(DataProvider):
 
 
 class HunterProvider(DataProvider):
-    """Hunter.io — email finding + verification."""
+    """OUR internal email finder (pattern + MX verification) — no Hunter.io key."""
     name = "hunter"
-    cost_cents = 4
-    api_key_env = "HUNTER_API_KEY"
+    cost_cents = 1
+    api_key_env = ""  # self-hosted
+
+    def is_available(self) -> bool:
+        return True
 
     def search(self, lead_info: dict) -> Optional[LeadContact]:
-        if not self.is_configured:
-            return None
-        return LeadContact(
-            email=f"info@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            source=self.name,
-            confidence=0.81,
-            raw={"stub": True, "lead": lead_info},
-        )
+        try:
+            from empire_os.enrichment import email_pattern
+            from empire_os.lead_engine.email_verify import verify
+            domain = (lead_info.get("domain") or lead_info.get("website") or "").replace("www.", "")
+            if not domain:
+                return None
+            # our internal Hunter: guess standard patterns, MX-verify
+            candidates = [f"info@{domain}", f"contact@{domain}", f"sales@{domain}",
+                          f"hello@{domain}", f"admin@{domain}"]
+            for cand in candidates:
+                try:
+                    res = verify(cand)
+                    if res.get("valid") or res.get("mx"):
+                        return LeadContact(
+                            email=cand,
+                            company=lead_info.get("company", ""),
+                            source=self.name,
+                            confidence=0.82,
+                        )
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning("our-hunter err: %s", e)
+        return None
+
+
+class UniversalScraperProvider(DataProvider):
+    """OUR universal scraper (Google Maps / Bing / Yelp / BBB) — no external key."""
+    name = "universal_scraper"
+    cost_cents = 1
+    api_key_env = ""
+
+    def is_available(self) -> bool:
+        return True
+
+    def search(self, lead_info: dict) -> Optional[LeadContact]:
+        try:
+            from empire_os.lead_sources.universal_scraper import _fetch_yelp_email
+            domain = (lead_info.get("domain") or lead_info.get("website") or "").replace("www.", "")
+            if not domain:
+                return None
+            # try to resolve a yelp/biz email via our scraper path
+            email = _fetch_yelp_email(domain) if hasattr(__import__(
+                "empire_os.lead_sources.universal_scraper", fromlist=["_fetch_yelp_email"]),
+                "_fetch_yelp_email") else ""
+            if email:
+                return LeadContact(email=email, company=lead_info.get("company", ""),
+                                  source=self.name, confidence=0.8)
+        except Exception as e:
+            logger.warning("universal_scraper err: %s", e)
+        return None
 
 
 class InternalScraperProvider(DataProvider):
@@ -318,7 +381,7 @@ class Waterfall:
         self,
         providers: list,
         gate: Optional[ValidationGate] = None,
-        max_attempts: int = 4,
+        max_attempts: int = 12,
     ):
         self.providers = providers
         self.gate = gate or ValidationGate()
@@ -337,7 +400,9 @@ class Waterfall:
         tried = []
         total_cost = 0
 
-        for provider in self.providers[:self.max_attempts]:
+        for provider in self.providers:
+            if len(tried) >= self.max_attempts:
+                break
             if not provider.is_available():
                 logger.debug("provider '%s' not configured, skipping", provider.name)
                 continue
@@ -389,11 +454,12 @@ def build_default_waterfall() -> Waterfall:
         providers=[
             RegistryScraperProvider(),  # 1. Free: BBB + SunBiz (authoritative)
             SiteCrawlerProvider(),      # 2. Free: company site crawl + MX check
-            ApolloProvider(),           # 3. Paid fallback: if APOLLO_API_KEY set
-            PeopleDataLabsProvider(),   # 4. Paid fallback: if PDL_API_KEY set
-            HunterProvider(),           # 5. Paid fallback: if HUNTER_API_KEY set
-            SocialScraperProvider(),    # 6. Free last resort: social profiles
-            InternalScraperProvider(),  # 7. Always-on internal scraper
+            UniversalScraperProvider(),  # 3. OUR universal scraper (Google/Bing/Yelp/BBB)
+            ApolloProvider(),           # 4. OUR internal Apollo clone (no external key)
+            PeopleDataLabsProvider(),   # 5. Paid fallback: if PDL_API_KEY set
+            HunterProvider(),           # 6. OUR internal email finder (no key)
+            SocialScraperProvider(),    # 7. Free: social profiles
+            InternalScraperProvider(),  # 8. Always-on internal scraper
         ],
         gate=ValidationGate(min_confidence=0.7),
     )
