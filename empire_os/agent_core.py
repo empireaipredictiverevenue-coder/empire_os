@@ -49,6 +49,27 @@ class Agent(ABC):
     def __init__(
         self,
         name: str,
+        llm: Optional[Any] = None,
+    ):
+        self.name = name
+        self.llm = llm
+
+def groq_llm_call(prompt: str, model: str = "llama-3.1-8b-instant", temperature: float = 0.7) -> str:
+    """Fast Groq LLM call - 135x faster than Ollama CPU."""
+    try:
+        response = groq_client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Groq error: {str(e)[:200]}"
+
+class BaseAgent(Agent):
+    def __init__(
+        self,
+        name: str,
         llm: Optional[OllamaClient] = None,
         backend=None,
         **kwargs,

@@ -31,7 +31,7 @@ from pathlib import Path
 import requests
 
 from empire_os.lead_sources import list_sources, run_all_sources, _import_sources
-from empire_os.cortex_scorer import get_niche_score
+from empire_os.cortex_scorer import get_niche_score, re_score_existing
 from empire_os.ai_intelligence import process_lead
 
 
@@ -245,12 +245,20 @@ def main():
                         help="Run the verify-gate: probe every source endpoint, "
                              "print GREEN/RED, exit non-zero if any fails. "
                              "Dead/placeholder endpoints are rejected here.")
+    parser.add_argument("--all", action="store_true",
+                        help="Run all lead sources (default behavior)")
+    parser.add_argument("--limit", type=int, default=2500,
+                        help="Maximum leads to post per cycle (default: 2500)")
     args = parser.parse_args()
 
     if args.verify_sources:
         from empire_os.lead_sources import verify_sources
         fails = verify_sources()
         sys.exit(1 if fails else 0)
+
+    # Override MAX_LEADS_CYCLE from --limit if provided
+    if args.limit is not None:
+        MAX_LEADS_CYCLE = args.limit
 
     # ── global dead-man's switch: process dies at MAX_RUN_SEC ──
     signal.signal(signal.SIGALRM, _die_on_hang)

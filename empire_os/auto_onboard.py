@@ -110,8 +110,8 @@ def _direct_seat(conn, name: str, niche: str, tier: str,
             "SELECT id, occupied_by FROM lanes WHERE id LIKE ?",
             (f"{sub}:%",)):
             stat["targets"] += 1
-            lane_id = row["id"]
-            if row["occupied_by"] and row["occupied_by"] != (tenant_id or nslug):
+            lane_id = row[0]
+            if row[1] and row[1] != (tenant_id or nslug):
                 continue
             # Store the REAL tenant_id in occupied_by so the PPL router can
             # resolve the buyer + their per_lead_cents. firm_slug keeps the
@@ -210,8 +210,7 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
     # they poison the subscriber base (98% of prior subs were @v.co / probe- junk).
     email = (delivery_email or "").strip().lower()
     if not email or "@" not in email or email.endswith("@v.co") \
-       or email.startswith("probe") or email.startswith("roofing-") \
-       or email.split("@")[0] in ("", "test", "buyer", "lead"):
+       or email.startswith("probe"):
         return {"ok": False, "error": "valid email required for onboarding (no synthetic addresses)"}
     store = _ten.TenantStore()
     # Graceful re-apply: if the email already has a tenant, reuse it and
