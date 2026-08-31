@@ -1,0 +1,20 @@
+[Unit]
+Description=Empire AI Multi-Niche World Model Router Engine (Layer 17)
+After=network.target redis.service empire-hub-8081.service
+Requires=redis.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/empire_os
+Environment=PYTHONPATH=/root/empire_os
+Environment=REDIS_HOST=localhost
+Environment=REDIS_PORT=6379
+ExecStartPre=/bin/sleep 3
+ExecStart=/root/venv/bin/python3 /root/empire_os/empire_os/router_engine.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
