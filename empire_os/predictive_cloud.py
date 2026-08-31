@@ -385,8 +385,47 @@ class PredictiveCloudAGI:
             "deploy_target": "incus containers on empire-net (vultr/hetzner bare-metal)",
         }
 
-    # ── 8. FULL CYCLE ────────────────────────────────────────────────
-    def run_cycle(self) -> dict:
+    # ── 12. LAYER 19: MULTI-NICHE LEAD-GEN CONSCIOUSNESS ────────────
+    def multi_niche_state(self) -> dict:
+        """Layer 19 — brain is niche-conscious: reads lead volume + tiers PER NICHE
+        across the whole lead-gen estate. Feeds every downstream action."""
+        c = _conn()
+        try:
+            rows = c.execute(
+                "SELECT COALESCE(niche,'unknown') niche, COUNT(*) n "
+                "FROM crm_leads GROUP BY niche ORDER BY n DESC").fetchall()
+            tiers = c.execute(
+                "SELECT COALESCE(niche,'unknown'), icp_tier, COUNT(*) FROM crm_leads "
+                "GROUP BY niche, icp_tier").fetchall()
+        finally:
+            c.close()
+        by_niche = {r[0]: r[1] for r in rows}
+        tier_map = {}
+        for nic, tier, n in tiers:
+            tier_map.setdefault(nic, {})[tier or "unscored"] = n
+        return {"total_niches": len(by_niche), "by_niche": by_niche,
+                "tiers_by_niche": tier_map, "top_niche": rows[0][0] if rows else None}
+
+    def niche_brain(self, niche: str = None) -> dict:
+        """Route a niche through its correct brain-layer playbook (Layer 16/17 logic).
+        Returns the playbook block + recommended action for that vertical."""
+        state = self.multi_niche_state()
+        nic = niche or state.get("top_niche")
+        # niche-specific copy/action mapping (extends world_model_router)
+        playbooks = {
+            "roofing": {"hook": "storm damage", "action": "emergency inspection offer", "priority": "high"},
+            "mass_tort": {"hook": "compensation eligibility", "action": "qualify + route to firm", "priority": "high"},
+            "hvac": {"hook": "system failure / heat", "action": "same-day service slot", "priority": "med"},
+            "plumbing": {"hook": "burst / leak", "action": "emergency dispatch", "priority": "med"},
+            "legal_services": {"hook": "rights notice", "action": "claim review", "priority": "med"},
+            "real_estate": {"hook": "market shift", "action": "cash-offer pitch", "priority": "med"},
+        }
+        pb = playbooks.get(nic, {"hook": "priority alert", "action": "qualify + nurture", "priority": "low"})
+        return {"layer": 19, "niche": nic, "volume": state["by_niche"].get(nic, 0),
+                "playbook": pb, "tiers": state["tiers_by_niche"].get(nic, {})}
+
+    # ── 13. FULL CYCLE (now niche-aware) ──────────────────────────────
+    def run_cycle(self, niche: str = None) -> dict:
         self.cycle += 1
         state = self.read_state()
         actions = self.reason(state)
@@ -417,6 +456,50 @@ class PredictiveCloudAGI:
     def direct_response_playbook(self) -> dict:
         """Layer 16 — the enhanced direct-response playbook as a live brain layer."""
         return self.DIRECT_RESPONSE_PLAYBOOK
+
+    # ── 10. LAYER 17: MULTI-NICHE WORLD MODEL ROUTER ──────────────────
+    def world_model_router(self, event: dict = None) -> dict:
+        """Layer 17 — multi-niche event ingestion + digital-twin sim + Redis routing.
+
+        Ingests real-time niche event streams, simulates localized market impact,
+        routes brain-layer email/ad copy to outgoing Redis queues. Mirrors
+        empire_os/router_engine.py.
+        """
+        try:
+            from empire_os.router_engine import generate_brain_content, simulate_local_market
+            if event is None:
+                event = {"niche": "roofing", "location": "Dallas, TX", "est_volume": 100}
+            content = generate_brain_content(event)
+            sim = simulate_local_market(event)
+            return {"layer": 17, "event": event, "content": content, "simulation": sim,
+                    "queues": ["outgoing_emails", "outgoing_ads"]}
+        except Exception as e:
+            return {"layer": 17, "status": "deferred", "error": str(e)[:160]}
+
+    # ── 11. LAYER 18: AUTONOMOUS UTILITY SUITE GENERATOR ─────────────
+    def utility_suite(self, verticals: list = None, deploy: bool = False) -> dict:
+        """Layer 18 — Pillar 1-4 utility-suite generator.
+
+        Spawns single-file AI tools (Vultr/Incus), trigger-word swarms,
+        expired-domain cloning protocol, ugly-banner sinks. Self-hosted only.
+        """
+        verts = verticals or ["roofing", "legal", "finance", "mass_tort"]
+        try:
+            from empire_os.utility_suite_generator import (
+                generate_suite, trigger_word_swarm, expired_domain_protocol)
+            from empire_os.domain_cloner import clone_domain
+            suite = generate_suite(verts, containers=deploy)
+            swarm = trigger_word_swarm(verts, limit=20)
+            # Pillar 3: run domain cloner on a seed (egress required — Vultr container)
+            cloned = None
+            try:
+                cloned = clone_domain(f"{verts[0].replace('_','')}authority.com")
+            except Exception as e:
+                cloned = {"status": "egress_required", "note": str(e)[:120]}
+            return {"layer": 18, "suite": suite, "trigger_words_sample": swarm,
+                    "domain_protocol": expired_domain_protocol(), "domain_clone_sample": cloned}
+        except Exception as e:
+            return {"layer": 18, "status": "deferred", "error": str(e)[:160]}
 
 
 def main():
