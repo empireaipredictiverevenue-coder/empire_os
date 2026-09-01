@@ -62,8 +62,8 @@ FLEET = {
     # --- WHALE / ENTERPRISE / LAW-FIRM ---
     "whale_harvester":     {"engine": "whale", "systemd": "whale_harvester", "tick": None},
     "enterprise_campaigns":{"engine": "enterprise", "systemd": None, "tick": "empire_os.enterprise_campaigns:run", "script": True},
-    # --- GAMMA OS (analytics) ---
-    "metrics_exporter":    {"engine": "gamma", "systemd": "empire-metrics-exporter", "tick": None},
+    # --- CONTENT ENGINE (top-of-funnel moat) ---
+    "content_pipeline":    {"engine": "content", "systemd": None, "tick": "empire_os.content_pipeline:cycle", "script": True},
     # --- BETA OS (buyer/seller marketplace) covered by a2a_* above ---
 }
 

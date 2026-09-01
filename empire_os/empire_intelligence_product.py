@@ -748,7 +748,9 @@ class Product:
     billing: str          # one_time / per_month / per_lead
     description: str
     tier: str
-
+    keywords: str = ""    # SEO comma-separated keywords
+    meta_description: str = ""  # SEO meta description (<=160 chars)
+    seo_title: str = ""   # SEO <title> override
 PRODUCT_CATALOG = {
     # ── Empire Intelligence (Apollo/ZoomInfo killer) ──
     "EI-STARTER": Product(
@@ -756,19 +758,28 @@ PRODUCT_CATALOG = {
         99.0, "per_month",
         "500 enriched contacts/mo, Omega scoring, 5-source waterfall. "
         "Apollo-grade B2B intel without the enterprise price tag.",
-        "core"),
+        "core",
+        keywords="B2B leads, business intelligence, Apollo alternative, ZoomInfo alternative, lead enrichment, contact database",
+        meta_description="Apollo-grade B2B lead intelligence at $99/mo. 500 enriched contacts, Omega scoring, 5-source waterfall.",
+        seo_title="Empire Intelligence Starter — B2B Lead Intelligence"),
     "EI-PRO": Product(
         "EI-PRO", "Empire Intelligence — Pro",
         299.0, "per_month",
         "5,000 contacts/mo, 15-source waterfall, A2A marketplace access, "
         "predictive revenue per lead, Apollo-style sequences.",
-        "core"),
+        "core",
+        keywords="lead generation platform, sales intelligence, predictive lead scoring, A2A lead marketplace, B2B data",
+        meta_description="Pro B2B intelligence: 5,000 contacts/mo, 15-source waterfall, predictive revenue scoring, A2A marketplace.",
+        seo_title="Empire Intelligence Pro — Predictive B2B Lead Platform"),
     "EI-ENT": Product(
         "EI-ENT", "Empire Intelligence — Enterprise",
         999.0, "per_month",
         "Unlimited contacts, white-label A2A, custom Apify actors, "
         "dedicated whale harvesting, law-firm mass-tort routing.",
-        "core"),
+        "core",
+        keywords="enterprise lead intelligence, white-label lead platform, mass tort leads, whale harvesting, custom scraping actors",
+        meta_description="Enterprise B2B intelligence: unlimited contacts, white-label A2A, custom actors, whale + mass-tort routing.",
+        seo_title="Empire Intelligence Enterprise — White-Label Lead OS"),
 
     # ── Empire Ambient AI (the new product — Ambient/silent intelligence layer) ──
     "AMBIENT-AI": Product(
@@ -781,7 +792,10 @@ PRODUCT_CATALOG = {
         "to type. It observes, reasons, and acts. Pairs with Empire Intelligence "
         "for contact data and the 50+ agent fleet for execution. "
         "Layer 23 Predictive Cloud brain included.",
-        "ambient"),
+        "ambient",
+        keywords="ambient AI, autonomous AI agent, silent AI assistant, AI sales automation, intent signal monitoring, predictive outreach, no-code AI, background AI agent, Omega AI scoring, self-acting AI",
+        meta_description="Ambient AI that silently watches buying signals, scores contacts, and triggers agent actions — no dashboards, no prompts. $49/mo.",
+        seo_title="Empire Ambient AI — Silent Autonomous Intelligence for Your Business"),
     "AMBIENT-AI-WHALE": Product(
         "AMBIENT-AI-WHALE", "Empire Ambient AI — Whale Tier",
         499.0, "per_month",
@@ -789,7 +803,10 @@ PRODUCT_CATALOG = {
         "scans for high-value prospects ($10k+ deals), scores them platinum, "
         "and routes to closers automatically. Enterprise observability for "
         "your entire revenue stack via the Gamma analytics layer.",
-        "ambient"),
+        "ambient",
+        keywords="whale hunting AI, enterprise lead harvesting, high-ticket prospect AI, B2B whale detection, autonomous sales closing, revenue observability",
+        meta_description="Ambient AI + dedicated whale harvesting: auto-detects $10k+ prospects, scores platinum, routes to closers. $499/mo.",
+        seo_title="Empire Ambient AI Whale Tier — Autonomous High-Ticket Hunting"),
 }
 
 def get_product(sku: str) -> Optional[Product]:
