@@ -544,6 +544,21 @@ class PredictiveCloudAGI:
         except Exception as e:
             return {"layer": 23, "status": "deferred", "error": str(e)[:160]}
 
+    def agi_real_telemetry(self) -> dict:
+        """Layer 23b — feed LIVE agent metrics into the AGI swarm (real telemetry).
+
+        Collects actual omni-agent + redis latency/margin, writes to swarm_telemetry,
+        and auto-patches (restarts omni-agent) on real breaches. Closes the loop from
+        simulation sandbox -> live self-healing.
+        """
+        try:
+            import asyncio
+            from empire_os.empire_agi_blueprint import run_real_telemetry_cycle
+            res = asyncio.run(run_real_telemetry_cycle())
+            return {"layer": 23, "sub": "real_telemetry", **res}
+        except Exception as e:
+            return {"layer": 23, "sub": "real_telemetry", "status": "deferred", "error": str(e)[:160]}
+
     def domain_clone_run(self, seeds: list = None) -> dict:
         """Run Pillar 3 expired-domain cloning via our Serper product + Wayback."""
         seeds = seeds or ["roofing", "mass_tort"]

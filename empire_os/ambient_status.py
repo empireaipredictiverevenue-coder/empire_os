@@ -70,7 +70,7 @@ def _pg_counts():
 def status() -> dict:
     loops = {
         "omni_agent_host_3997": _http_ok("http://127.0.0.1:3997/healthz"),
-        "omni_agent_container_3000": _http_ok("http://10.118.156.211:3000/healthz"),
+        "omni_agent_container_3000": _http_ok("http://10.218.156.211:3000/healthz"),
         "listmonk_9000": _http_ok("http://10.118.155.153:9000/") or _http_ok("http://10.118.155.153:9000/api/health"),
         "twenty_crm_3000": _http_ok("http://10.118.155.248:3000/healthz"),
     }
