@@ -92,17 +92,35 @@ def run_aeo():
     log(f"  synced {synced} pages into {HUB_CT} (live at /aeo/<niche>/)")
 
 
-def run_reddit():
-    log("== Reddit sniper ==")
-    if not os.environ.get("REDDIT_CLIENT_ID"):
-        log("  skipped: REDDIT_CLIENT_ID not set")
-        return
+def run_backlinks():
+    log("== Backlink + indexing automation ==")
     try:
         r = subprocess.run(
-            [sys.executable, f"{ROOT}/empire_os/reddit_sniper.py"],
+            [sys.executable, f"{ROOT}/empire_os/backlink_builder.py"],
+            capture_output=True, text=True, timeout=120,
+        )
+        for line in r.stdout.strip().splitlines():
+            if "backlinks" in line:
+                log(f"  {line}")
+        if r.returncode != 0:
+            log(f"  err: {r.stderr[-200:]}")
+    except Exception as e:
+        log(f"  err: {e}")
+
+
+def run_sources():
+    log("== Free source sniper (HN + Lobsters + IndieHackers + Dev.to RSS) ==")
+    try:
+        r = subprocess.run(
+            [sys.executable, f"{ROOT}/empire_os/free_source_sniper.py", "--push"],
             capture_output=True, text=True, timeout=300,
         )
-        log(f"  exit={r.returncode}; {r.stdout[-200:]}")
+        try:
+            res = json.loads(r.stdout.strip().splitlines()[-1])
+            log(f"  leads={res.get('total')} qualified={res.get('qualified')} "
+                f"pushed_to_funnel={res.get('pushed')}")
+        except Exception:
+            log(f"  raw: {r.stdout[-200:]} {r.stderr[-200:]}")
     except Exception as e:
         log(f"  err: {e}")
 
@@ -135,7 +153,7 @@ def run_seo_report():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--channel", default="all",
-                    choices=["all", "aeo", "reddit", "social", "seo"])
+                    choices=["all", "aeo", "reddit", "social", "seo", "backlinks"])
     a = ap.parse_args()
     log(f"FREE TRAFFIC ENGINE @ {datetime.now(timezone.utc).isoformat()[:19]}Z")
     if a.channel in ("all", "aeo"):
@@ -143,7 +161,9 @@ def main():
     if a.channel in ("all", "seo"):
         run_seo_report()
     if a.channel in ("all", "reddit"):
-        run_reddit()
+        run_sources()
+    if a.channel in ("all", "backlinks"):
+        run_backlinks()
     if a.channel in ("all", "social"):
         run_social()
     log("DONE. Captured leads flow to /v1/leads/capture -> funnel.")

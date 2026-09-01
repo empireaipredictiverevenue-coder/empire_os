@@ -92,69 +92,79 @@ class RedditSniper:
         self.leads: list = []
 
     def is_configured(self) -> bool:
-        return bool(CLIENT_ID and CLIENT_SECRET)
+        # No credentials needed — public .json endpoints only require a UA.
+        return True
 
     def scrape(self) -> list[dict]:
-        """Scrape all target subreddits, return scored leads."""
-        try:
-            import praw  # type: ignore
-        except ImportError:
-            logger.error("praw not installed; cannot scrape Reddit")
-            return []
+        """Scrape all target subreddits via public .json endpoints (no API creds).
 
-        if not self.is_configured():
-            logger.warning("Reddit API credentials not set; cannot scrape")
-            return []
-
-        reddit = praw.Reddit(
-            client_id=CLIENT_ID,
-            client_secret=CLIENT_SECRET,
-            user_agent=USER_AGENT,
-            read_only=True,
-        )
+        Reddit's public JSON (https://www.reddit.com/r/<sub>/hot.json) is
+        usable read-only with just a descriptive User-Agent — no OAuth app,
+        no CLIENT_ID/SECRET. This is the credential-free fix.
+        """
+        import time
+        import urllib.request
+        import urllib.error
 
         leads = []
         seen_ids = set()
         scraped_at = datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z"
+        hdr = {"User-Agent": USER_AGENT}
 
         for sub_name in TARGETS:
             try:
-                sub = reddit.subreddit(sub_name)
-                streams = [sub.hot(limit=POSTS_PER_SUB), sub.new(limit=30)]
-                for stream in streams:
-                    for post in stream:
-                        if post.id in seen_ids:
+                for sort in ("hot", "new"):
+                    url = (f"https://www.reddit.com/r/{sub_name}/{sort}.json"
+                           f"?limit={POSTS_PER_SUB}&raw_json=1")
+                    req = urllib.request.Request(url, headers=hdr)
+                    try:
+                        with urllib.request.urlopen(req, timeout=15) as r:
+                            data = json.loads(r.read())
+                    except urllib.error.HTTPError as e:
+                        if e.code == 429:
+                            time.sleep(5)  # rate-limited; back off
+                        continue
+                    except Exception:
+                        continue
+                    children = data.get("data", {}).get("children", [])
+                    for ch in children:
+                        post = ch.get("data", {})
+                        pid = post.get("id", "")
+                        if pid in seen_ids:
                             continue
-                        if post.stickied or post.score < MIN_REDDIT_SCORE:
+                        if post.get("stickied") or (post.get("score") or 0) < MIN_REDDIT_SCORE:
                             continue
-
-                        body = post.selftext or ""
-                        title = post.title or ""
+                        body = post.get("selftext") or ""
+                        title = post.get("title") or ""
                         hits = self._kw_hits(title + " " + body)
                         if hits == 0:
                             continue
-
-                        seen_ids.add(post.id)
-                        ls = self._score_post(post, hits)
-
+                        seen_ids.add(pid)
+                        created = post.get("created_utc", 0)
+                        mult = self._recency_multiplier(created)
+                        ls = int(((post.get("score") or 0)
+                                  + (post.get("num_comments") or 0) * 2
+                                  + hits * 10) * mult)
                         lead = RedditLead(
-                            id=post.id,
+                            id=pid,
                             title=title.strip(),
                             subreddit=sub_name,
-                            url=f"https://reddit.com{post.permalink}",
-                            score=post.score,
-                            comments=post.num_comments,
+                            url=f"https://reddit.com{post.get('permalink', '')}",
+                            score=post.get("score") or 0,
+                            comments=post.get("num_comments") or 0,
                             kw_hits=hits,
                             lead_score=ls,
-                            author=str(post.author) if post.author else "[deleted]",
+                            author=str(post.get("author") or "[deleted]"),
                             preview=(body[:400] + "…") if len(body) > 400 else body,
                             created_utc=datetime.datetime.fromtimestamp(
-                                post.created_utc, tz=datetime.timezone.utc
+                                created, tz=datetime.timezone.utc
                             ).isoformat() + "Z",
                             scraped_at=scraped_at,
                             qualified=ls >= THRESHOLD,
                         )
                         leads.append(asdict(lead))
+                        # Reddit rate-limit: ~1 req/2s is safe without auth
+                        time.sleep(2)
             except Exception as exc:
                 print(f"[RedditSniper] r/{sub_name} error: {exc}", file=sys.stderr)
 
