@@ -14,18 +14,16 @@ Usage:
 """
 import os, sys, csv, json, time, argparse
 sys.path.insert(0, "/root/empire_os")
-SERPLY_KEY = os.environ.get("SERPLY_KEY", "")
-os.environ.setdefault("SERPLY_KEY", SERPLY_KEY)
-# pull from .env if not in shell
-if not SERPLY_KEY:
+# Use Empire's own SERP product (Serper) instead of third-party SerpLy.
+SERPER_KEY = os.environ.get("SERPER_KEY", "")
+if not SERPER_KEY:
     try:
-        for ln in open("/root/empire_os/.env"):
-            ln = ln.strip()
-            if ln.startswith("SERPLY_KEY="):
-                SERPLY_KEY = ln.split("=", 1)[1].strip().strip('"').strip("'")
-                os.environ["SERPLY_KEY"] = SERPLY_KEY
+        for ln in open("/root/empire_secrets/serper_api_key"):
+            SERPER_KEY = ln.strip()
+            break
     except Exception:
         pass
+os.environ["SERPER_KEY"] = SERPER_KEY
 
 import requests
 
@@ -43,12 +41,11 @@ NICHE_Q = {
     "fire_damage": "fire damage restoration",
 }
 OUT = "/root/empire_os/founder_leads.csv"
-API = "https://api.serply.io/api/v1/maps"
+API = "https://google.serper.dev/maps"
 
 
 def search(q, geo, page=1):
-    h = {"X-API-KEY": SERPLY_KEY, "Content-Type": "application/json",
-          "X-Proxy-Location": "US"}
+    h = {"X-API-KEY": SERPER_KEY, "Content-Type": "application/json"}
     params = {"q": q, "gl": "us", "hl": "en", "page": page}
     if geo:
         params["geo"] = geo
@@ -56,8 +53,9 @@ def search(q, geo, page=1):
     if r.status_code != 200:
         return []
     data = r.json()
-    # Serply maps returns 'results' or 'local_results'
-    return data.get("results") or data.get("local_results") or data.get("organic_results") or []
+    # Serper maps returns 'localResults' / 'places'
+    res = data.get("localResults") or data.get("places") or data.get("organicResults") or []
+    return res if isinstance(res, list) else []
 
 
 def main(cap=40):

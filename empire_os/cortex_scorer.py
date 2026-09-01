@@ -60,13 +60,13 @@ def re_score_existing(limit: int = 500) -> int:
         return 0
     
     updated = 0
-        # Filter out leads with missing niche or metro
-        valid_rows = []
-        for row in rows:
-            pid, niche, metro, old_score = row
-            if niche is not None and niche != "" and metro is not None and metro != "":
-                valid_rows.append(row)
-        rows = valid_rows
+    # Filter out leads with missing niche or metro
+    valid_rows = []
+    for row in rows:
+        pid, niche, metro, old_score = row
+        if niche is not None and niche != "" and metro is not None and metro != "":
+            valid_rows.append(row)
+    rows = valid_rows
     with sqlite3.connect(DB) as c:
         # Find leads that need re-scoring (score < 80 or older than 24h)
         rows = c.execute(
