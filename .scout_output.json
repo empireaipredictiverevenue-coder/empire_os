@@ -756,20 +756,6 @@
     "preview": "I was looking for a good CRM and Salesforce seemed like the unquestioned leader.<p>We’ve had a meeting with a sales rep in their luxurious offices at the foot of the Eiffel tower.\nDespite 2 hours of phone interview before, the sales rep had no understanding of our business and the product demo was extremely disappointing.<p>The platform is not user friendly at all and the transition to the new ‘li…"
   },
   {
-    "id": "github_374887998",
-    "title": "moqui moqui-framework",
-    "source": "github",
-    "url": "https://github.com/moqui/moqui-framework",
-    "score": 323,
-    "comments": 0,
-    "kw_hits": 1,
-    "lead_score": 42,
-    "author": "moqui",
-    "created_utc": "",
-    "qualified": false,
-    "preview": "Use Moqui Framework to build enterprise applications based on Java. It includes tools for databases (relational, graph, document), local and web services, web and other UI with screens and forms, security, file/resource access, scripts, templates, l10n, caching, logging, search, rules, workflow, multi-instance, and integration."
-  },
-  {
     "id": "hn_11689722",
     "title": "Ask HN: How to get projects if you are development company?",
     "source": "hackernews",
@@ -1288,7 +1274,21 @@
     "preview": "I&#x27;ll keep this short. We run a marketing agency of 60+ people in the Philippines called Clicklabs(dot)Ventures. We&#x27;re looking to buy startups who likely failed because of poor marketing. Please contact me here or via my email in my profile."
   },
   {
-    "id": "github_150179604",
+    "id": "github_889008407",
+    "title": "coreyhaines31 endpointforms",
+    "source": "github",
+    "url": "https://github.com/coreyhaines31/endpointforms",
+    "score": 1,
+    "comments": 0,
+    "kw_hits": 2,
+    "lead_score": 20,
+    "author": "coreyhaines31",
+    "created_utc": "",
+    "qualified": false,
+    "preview": "Open-source form builder that optimizes for revenue, not submissions. Split tests scored on closed pipeline, and every form publishes an agent-callable endpoint."
+  },
+  {
+    "id": "github_906170341",
     "title": "aadiieee multi-agent-revenue-orchestrator",
     "source": "github",
     "url": "https://github.com/aadiieee/multi-agent-revenue-orchestrator",
@@ -1484,20 +1484,6 @@
     "preview": ""
   },
   {
-    "id": "github_222852096",
-    "title": "rameerez pricing_plans",
-    "source": "github",
-    "url": "https://github.com/rameerez/pricing_plans",
-    "score": 61,
-    "comments": 0,
-    "kw_hits": 1,
-    "lead_score": 16,
-    "author": "rameerez",
-    "created_utc": "",
-    "qualified": false,
-    "preview": "💵 Define and enforce pricing plan limits in your Rails SaaS (entitlements, quotas, feature gating)"
-  },
-  {
     "id": "hn_17527756",
     "title": "Request for Proposal: Help Us Find Low-Cost Housing for Lambda School Students",
     "source": "hackernews",
@@ -1554,7 +1540,7 @@
     "preview": ""
   },
   {
-    "id": "github_724570505",
+    "id": "github_457382419",
     "title": "getaero-io gtm-eng-skills",
     "source": "github",
     "url": "https://github.com/getaero-io/gtm-eng-skills",
@@ -1694,18 +1680,18 @@
     "preview": ""
   },
   {
-    "id": "github_612179211",
-    "title": "Inikoo-Ltd aiku",
+    "id": "github_279115159",
+    "title": "RaisFast raisfast",
     "source": "github",
-    "url": "https://github.com/Inikoo-Ltd/aiku",
-    "score": 45,
+    "url": "https://github.com/RaisFast/raisfast",
+    "score": 42,
     "comments": 0,
     "kw_hits": 1,
     "lead_score": 14,
-    "author": "Inikoo-Ltd",
+    "author": "RaisFast",
     "created_utc": "",
     "qualified": false,
-    "preview": "Open Source White-label opinionated ERP web app"
+    "preview": "The fastest CMS, easiest to deploy. Single binary, zero dependencies, zero GC. Download and run.  Rust-powered high-performance BaaS and headless CMS with built-in blog, ecommerce, wallet, payment & multi-tenant SaaS. JS / Rhai / Lua / WASM plugin engines for infinite extensibility."
   },
   {
     "id": "hn_23015535",
@@ -1960,35 +1946,21 @@
     "preview": ""
   },
   {
-    "id": "github_943096878",
-    "title": "epiphany-dynamics aiforbizcalculator",
+    "id": "github_658582950",
+    "title": "bakaphp kanvas-ecosystem-api",
     "source": "github",
-    "url": "https://github.com/epiphany-dynamics/aiforbizcalculator",
-    "score": 1,
+    "url": "https://github.com/bakaphp/kanvas-ecosystem-api",
+    "score": 15,
     "comments": 0,
     "kw_hits": 1,
-    "lead_score": 10,
-    "author": "epiphany-dynamics",
+    "lead_score": 11,
+    "author": "bakaphp",
     "created_utc": "",
     "qualified": false,
-    "preview": "AI Automation Calculator - Free business assessment tool. Built with Astro, React, Tailwind."
+    "preview": "Kanvas is the nervous system for modern operations; connecting your systems, orchestrating workflows, and enabling AI agents and humans to execute work across your business."
   },
   {
-    "id": "github_50935590",
-    "title": "lorindabichrome692 lead-automation",
-    "source": "github",
-    "url": "https://github.com/lorindabichrome692/lead-automation",
-    "score": 0,
-    "comments": 0,
-    "kw_hits": 1,
-    "lead_score": 10,
-    "author": "lorindabichrome692",
-    "created_utc": "",
-    "qualified": false,
-    "preview": "Automate lead capture, AI scoring, CRM storage, and follow-up emails from web forms and WhatsApp with a real-time dashboard"
-  },
-  {
-    "id": "github_911599675",
+    "id": "github_187274176",
     "title": "Huo-sui marketing-pipeline-dashboard",
     "source": "github",
     "url": "https://github.com/Huo-sui/marketing-pipeline-dashboard",
@@ -2002,7 +1974,7 @@
     "preview": "Solo Company Marketing Pipeline: local-first Android discovery for Xiaohongshu and TikTok, with a modular generation-to-publishing roadmap."
   },
   {
-    "id": "github_102253372",
+    "id": "github_313679766",
     "title": "siddhant-bachal viral-product-launch-architects",
     "source": "github",
     "url": "https://github.com/siddhant-bachal/viral-product-launch-architects",
@@ -2016,77 +1988,77 @@
     "preview": "21-Agent Viral Launch Pipeline 2026 – AI Research to Multi-Channel Delivery"
   },
   {
-    "id": "github_894245484",
-    "title": "JoaoGabriel39359 Smart-Booking-SaaS",
+    "id": "github_814182646",
+    "title": "BlogArray SaaS",
     "source": "github",
-    "url": "https://github.com/JoaoGabriel39359/Smart-Booking-SaaS",
+    "url": "https://github.com/BlogArray/SaaS",
     "score": 1,
     "comments": 0,
     "kw_hits": 1,
     "lead_score": 10,
-    "author": "JoaoGabriel39359",
+    "author": "BlogArray",
     "created_utc": "",
     "qualified": false,
-    "preview": "SaaS de agendamento automatizado para professores particulares com integração Google Calendar e portal do aluno para reagendamentos VIP."
+    "preview": "An open-source multi-tenant SaaS platform built with ASP.NET Core, empowering .NET developers to build, deploy, and manage scalable SaaS applications effortlessly."
   },
   {
-    "id": "github_600315462",
-    "title": "undone0603 authichain-unified",
+    "id": "github_861464895",
+    "title": "ronney0611-dev EPS-HighSchool",
     "source": "github",
-    "url": "https://github.com/undone0603/authichain-unified",
-    "score": 2,
-    "comments": 0,
-    "kw_hits": 1,
-    "lead_score": 10,
-    "author": "undone0603",
-    "created_utc": "",
-    "qualified": false,
-    "preview": "Multi-tenant blockchain authentication platform — AI-powered product verification (GPT-4 Vision), NFT certificates on Polygon, QR-based supply chain tracking, and autonomous revenue pipelines across 10 industry verticals. Built on Next.js, Cloudflare Workers, and Supabase."
-  },
-  {
-    "id": "github_982366737",
-    "title": "CalosDev SaaS-courier",
-    "source": "github",
-    "url": "https://github.com/CalosDev/SaaS-courier",
+    "url": "https://github.com/ronney0611-dev/EPS-HighSchool",
     "score": 0,
     "comments": 0,
     "kw_hits": 1,
     "lead_score": 10,
-    "author": "CalosDev",
+    "author": "ronney0611-dev",
     "created_utc": "",
     "qualified": false,
-    "preview": "Multi-tenant SaaS platform for courier operations in the Dominican Republic."
+    "preview": "EPS - a SaaS platform for PE teachers in Algeria (primary, middle, high school). Automates curriculum-aligned documents, grading, class/attendance management, and print exports — replacing hours of manual paperwork. Next.js 16, TypeScript, MongoDB, NextAuth."
   },
   {
-    "id": "github_717692234",
-    "title": "soenneker soenneker.zoho.httpclients",
+    "id": "github_261624426",
+    "title": "coreystevensdev tellsight",
     "source": "github",
-    "url": "https://github.com/soenneker/soenneker.zoho.httpclients",
+    "url": "https://github.com/coreystevensdev/tellsight",
+    "score": 3,
+    "comments": 0,
+    "kw_hits": 1,
+    "lead_score": 10,
+    "author": "coreystevensdev",
+    "created_utc": "",
+    "qualified": false,
+    "preview": "Multi-tenant SaaS analytics that explains your business data in plain English. Connect QuickBooks or upload a CSV, get charts plus a weekly AI interpretation. Only computed stats reach Claude, never your raw rows."
+  },
+  {
+    "id": "github_647893556",
+    "title": "HassaanInspires Silaye",
+    "source": "github",
+    "url": "https://github.com/HassaanInspires/Silaye",
     "score": 1,
     "comments": 0,
     "kw_hits": 1,
     "lead_score": 10,
-    "author": "soenneker",
+    "author": "HassaanInspires",
     "created_utc": "",
     "qualified": false,
-    "preview": "A thread-safe singleton HttpClient for Zoho's OpenAPI integration."
+    "preview": "Silaye (سلائی) — Bespoke Tailor Workshop Management & CRM Engine"
   },
   {
-    "id": "github_900822141",
-    "title": "soenneker soenneker.attio.httpclients",
+    "id": "github_682491134",
+    "title": "mnashat18 wellar-ai-frontend",
     "source": "github",
-    "url": "https://github.com/soenneker/soenneker.attio.httpclients",
+    "url": "https://github.com/mnashat18/wellar-ai-frontend",
     "score": 0,
     "comments": 0,
     "kw_hits": 1,
     "lead_score": 10,
-    "author": "soenneker",
+    "author": "mnashat18",
     "created_utc": "",
     "qualified": false,
-    "preview": "A thread-safe singleton HttpClient for Attio's OpenAPI integration."
+    "preview": "Frontend application for Wellar AI SaaS platform built with Angular, TypeScript, RxJS and REST API integration."
   },
   {
-    "id": "github_248008621",
+    "id": "github_479827684",
     "title": "mat-lucie outbound-sales-agent",
     "source": "github",
     "url": "https://github.com/mat-lucie/outbound-sales-agent",
@@ -2100,7 +2072,49 @@
     "preview": "Agent-operated outbound sales engine: LinkedIn + email cadence, two-stage ICP qualifier, learning loop. CRM-agnostic (Attio bundled, adapters generated + conformance-tested). Clone it and let your AI agent onboard you."
   },
   {
-    "id": "github_778778485",
+    "id": "github_23608614",
+    "title": "Anton-Barinov TropaTT",
+    "source": "github",
+    "url": "https://github.com/Anton-Barinov/TropaTT",
+    "score": 9,
+    "comments": 0,
+    "kw_hits": 1,
+    "lead_score": 10,
+    "author": "Anton-Barinov",
+    "created_utc": "",
+    "qualified": false,
+    "preview": "Free self-hosted open-source CRM, task manager, project platform, team chat, automation, API and AI workflows for PHP/MySQL."
+  },
+  {
+    "id": "github_393225020",
+    "title": "soenneker soenneker.close.httpclients",
+    "source": "github",
+    "url": "https://github.com/soenneker/soenneker.close.httpclients",
+    "score": 0,
+    "comments": 0,
+    "kw_hits": 1,
+    "lead_score": 10,
+    "author": "soenneker",
+    "created_utc": "",
+    "qualified": false,
+    "preview": "A thread-safe singleton HttpClient for Close's OpenAPI integration."
+  },
+  {
+    "id": "github_479827684",
+    "title": "mat-lucie outbound-sales-agent",
+    "source": "github",
+    "url": "https://github.com/mat-lucie/outbound-sales-agent",
+    "score": 6,
+    "comments": 0,
+    "kw_hits": 1,
+    "lead_score": 10,
+    "author": "mat-lucie",
+    "created_utc": "",
+    "qualified": false,
+    "preview": "Agent-operated outbound sales engine: LinkedIn + email cadence, two-stage ICP qualifier, learning loop. CRM-agnostic (Attio bundled, adapters generated + conformance-tested). Clone it and let your AI agent onboard you."
+  },
+  {
+    "id": "github_563686344",
     "title": "Bacchantfurtherance294 crm-on-cloudflare",
     "source": "github",
     "url": "https://github.com/Bacchantfurtherance294/crm-on-cloudflare",
@@ -2114,7 +2128,7 @@
     "preview": "Build a first-party CRM on Cloudflare's free tier using Workers, D1, and KV."
   },
   {
-    "id": "github_801163982",
+    "id": "github_978637337",
     "title": "anhb1 sales-outreach-automation-langgraph",
     "source": "github",
     "url": "https://github.com/anhb1/sales-outreach-automation-langgraph",
@@ -2128,31 +2142,17 @@
     "preview": "🚀 Automate your sales outreach with an AI system that analyzes leads across multiple platforms, creating personalized strategies and materials for engagement."
   },
   {
-    "id": "github_381874593",
-    "title": "Raz-Gits outbound-pipeline",
+    "id": "github_23608614",
+    "title": "Anton-Barinov TropaTT",
     "source": "github",
-    "url": "https://github.com/Raz-Gits/outbound-pipeline",
-    "score": 0,
+    "url": "https://github.com/Anton-Barinov/TropaTT",
+    "score": 9,
     "comments": 0,
     "kw_hits": 1,
     "lead_score": 10,
-    "author": "Raz-Gits",
+    "author": "Anton-Barinov",
     "created_utc": "",
     "qualified": false,
-    "preview": "Source-agnostic lead enrichment: cost-ordered provider cascade, SMTP-verified-only output, append-only suppression, report-only shipping. Extracted from a production outbound engine."
-  },
-  {
-    "id": "github_121595486",
-    "title": "open-gw gateway-db-mcp",
-    "source": "github",
-    "url": "https://github.com/open-gw/gateway-db-mcp",
-    "score": 1,
-    "comments": 0,
-    "kw_hits": 1,
-    "lead_score": 10,
-    "author": "open-gw",
-    "created_utc": "",
-    "qualified": false,
-    "preview": "GatewayDB-MCP allows enterprises to securely and efficiently expose relational databases (MySQL, PostgreSQL, SQL Server, etc.) as MCP tools for AI agents through existing API gateways without writing custom application code."
+    "preview": "Free self-hosted open-source CRM, task manager, project platform, team chat, automation, API and AI workflows for PHP/MySQL."
   }
 ]
