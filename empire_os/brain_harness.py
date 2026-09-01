@@ -83,7 +83,27 @@ def _service_active(spec: dict) -> bool:
         else ["systemctl", "is-active", svc]
     try:
         r = subprocess.run(target, capture_output=True, text=True, timeout=10)
-        return r.stdout.strip() == "active"
+        st = r.stdout.strip()
+        # Only "active" or "activating" count as alive. "activating" must NOT
+        # be treated as dead — restarting an activating unit SIGTERMs a healthy
+        # startup and causes a death spiral (status=15/TERM on client request).
+        return st in ("active", "activating")
+    except Exception:
+        return False
+
+
+def _is_failed(spec: dict) -> bool:
+    """True only when the unit is in a genuinely failed state (not just
+    inactive between batch runs, not activating). Restarting non-failed
+    units murders healthy processes."""
+    svc = spec["systemd"]
+    if not svc:
+        return False
+    target = ["incus", "exec", "empire-hub", "--", "systemctl", "is-failed", svc] if spec.get("container") \
+        else ["systemctl", "is-failed", svc]
+    try:
+        r = subprocess.run(target, capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() == "failed"
     except Exception:
         return False
 
@@ -165,10 +185,17 @@ def cycle() -> dict:
         active = _service_active(spec)
         recent = _recent_log(spec, 15) if active else False
         if not active:
-            res = _restart(spec)
-            report["dead"].append(name)
-            report["agents"][name] = {"status": "DEAD", "action": res}
-            state[name] = time.time()
+            # Only restart a unit that is genuinely FAILED — never one that is
+            # merely inactive (batch/oneshot between runs) or activating.
+            # Restarting healthy/starting units SIGTERMs them -> death spiral.
+            if _is_failed(spec):
+                res = _restart(spec)
+                report["dead"].append(name)
+                report["agents"][name] = {"status": "DEAD", "action": res}
+                state[name] = time.time()
+            else:
+                # not active but not failed (e.g. oneshot between ticks) -> skip
+                report["agents"][name] = {"status": "OK", "tick": "skip-not-failed"}
         elif not recent:
             # STALE but alive — alert only (long-cycle agents stay up)
             report["stale"].append(name)
