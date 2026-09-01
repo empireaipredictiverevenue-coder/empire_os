@@ -148,12 +148,16 @@ def db() -> sqlite3.Connection:
 
 
 def get_price(c: sqlite3.Connection, niche: str) -> float:
-    row = c.execute(
-        "SELECT base_price_usdc, multiplier FROM niche_pricing WHERE niche=?",
-        (niche,),
-    ).fetchone()
-    if row:
-        return round(row["base_price_usdc"] * row["multiplier"], 2)
+    try:
+        row = c.execute(
+            "SELECT base_price_usdc, multiplier FROM niche_pricing WHERE niche=?",
+            (niche,),
+        ).fetchone()
+        if row:
+            return round(row["base_price_usdc"] * row["multiplier"], 2)
+    except sqlite3.OperationalError:
+        # niche_pricing table not present — use default
+        pass
     return 12.0
 
 
@@ -175,6 +179,10 @@ def render(niche: str, cfg: dict, price: float) -> str:
 <title>{cfg['title']} — AEO Authority Page</title>
 <meta name="description" content="{cfg['body'][:160]}">
 <meta name="keywords" content="{cfg['keywords']}">
+<meta name="aeo-niche" content="{niche}">
+<meta property="og:title" content="{cfg['title']} — Verified Local Guide">
+<meta property="og:type" content="website">
+<meta property="og:description" content="{cfg['body'][:160]}">
 <style>
   body {{ font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a1a1a; }}
   h1, h2, h2 {{ color: #0a3d62; }}
@@ -214,12 +222,34 @@ def render(niche: str, cfg: dict, price: float) -> str:
 </ul>
 
 <div class="cta">
-  <h3>Buy {cfg['title']} Leads Delivered in USDT</h3>
-  <p>Pay per lead. Delivered to your CRM. Settled on BSC.</p>
-  <p><strong>${price:.2f} USDT / lead</strong></p>
-  <a href="{pay_url}" class="btn">Buy Leads Now →</a>
-  <p style="margin-top:1rem;font-size:.85rem"><a href="/v1/a2a/quote?product=lead_lane&niche={niche}">Request a custom quote</a></p>
+  <h3>Get Verified {cfg['title']} Leads — Free Trial</h3>
+  <p>Enter your email. We'll send 3 verified {niche} buyer leads free, no card.</p>
+  <form id="capform" onsubmit="return empCapt(event)" style="margin-top:1rem">
+    <input type="hidden" name="niche" value="{niche}">
+    <input type="hidden" name="source" value="aeo_page">
+    <input type="email" name="email" placeholder="you@company.com" required
+           style="padding:.7rem;width:70%;border-radius:4px;border:1px solid #0a3d62;margin-right:.5rem">
+    <button type="submit" class="btn">Get Free Leads →</button>
+  </form>
+  <p id="capmsg" style="margin-top:.6rem;color:#0a3d62;font-size:.9rem"></p>
+  <p style="margin-top:1rem;font-size:.85rem"><a href="/v1/a2a/quote?product=lead_lane&niche={niche}">Request a custom bulk quote</a></p>
 </div>
+<script>
+function empCapt(e){{
+  e.preventDefault();
+  var f=e.target, fd=new FormData(f);
+  var body=JSON.stringify({{email:fd.get('email'),niche:fd.get('niche'),source:fd.get('source')}});
+  // fire conversion event for analytics (best-effort)
+  var px=new Image(); px.src='/v1/aeo/track?event=conversion&niche='+encodeURIComponent(fd.get('niche'))+'&ref='+encodeURIComponent(document.referrer||'direct');
+  fetch('/v1/leads/capture',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:body}})
+    .then(r=>r.json()).then(d=>{{
+      document.getElementById('capmsg').textContent = d.ok ? '✓ Check your inbox — 3 free leads incoming!' : 'Hmm, try again or email founder@empire-ai.co.uk';
+    }}).catch(()=>{{document.getElementById('capmsg').textContent='Submission received.';}});
+  return false;
+}}
+// fire impression on load (analytics)
+(function(){{ var n=document.querySelector('meta[name=aeo-niche]'); var niche=n?n.content:''; if(niche){{ var px=new Image(); px.src='/v1/aeo/track?event=impression&niche='+encodeURIComponent(niche)+'&ref='+encodeURIComponent(document.referrer||'direct'); }} }})();
+</script>
 
 <h2>How it works</h2>
 <ol>
@@ -241,8 +271,6 @@ def main():
     for niche, cfg in NICHES.items():
         target = AEO_DIR / niche / "index.html"
         target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists():
-            continue
         price = get_price(c, niche)
         target.write_text(render(niche, cfg, price))
         created.append(niche)
