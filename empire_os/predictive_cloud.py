@@ -511,6 +511,22 @@ class PredictiveCloudAGI:
         except Exception as e:
             return {"layer": 22, "status": "deferred", "error": str(e)[:160]}
 
+    def hermes_real_signal_feed(self, limit: int = 8) -> dict:
+        """Layer 22b — feed REAL market signals into Hermes v9 (not the demo string).
+
+        Pulls live signals from: Reddit sniper output, inbound reply daemon,
+        buyer-intent lane sales loop, and GEO/AEO audit runs. Each is run through
+        the Customer-Truth / Objection / Growth engine and persisted to pgvector.
+        This is the revenue-earning loop: real demand -> real truth maps.
+        """
+        try:
+            import asyncio
+            from empire_os.hermes_signal_feed import run as feed_run
+            res = asyncio.run(feed_run(limit))
+            return {"layer": 22, "sub": "real_signal_feed", **res}
+        except Exception as e:
+            return {"layer": 22, "sub": "real_signal_feed", "status": "deferred", "error": str(e)[:160]}
+
     def domain_clone_run(self, seeds: list = None) -> dict:
         """Run Pillar 3 expired-domain cloning via our Serper product + Wayback."""
         seeds = seeds or ["roofing", "mass_tort"]

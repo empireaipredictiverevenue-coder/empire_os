@@ -125,6 +125,30 @@ class CustomerTruthAndObjectionEngine:
     async def extract_and_learn(self, raw_input: str, source_channel: str) -> Dict[str, Any]:
         logger.info(f"[Truth Engine] Processing raw signal from {source_channel}...")
         text_lower = raw_input.lower()
+
+        # Buyer-intent signals (lane demand): surface niche + metro + demand truth
+        if source_channel == "buyer_intent_signal" or "buyer demand in" in text_lower:
+            objection_cat = "BUYER_INTENT"
+            counter_angle = ("Route this demand to an open lane + auto-onboard a buyer with a "
+                             "reply-to-buy Brevo sequence; thin supply = pricing power.")
+            customer_truth = (raw_input.strip()
+                              or "Buyer demand exists but supply is not matched — capture it before competitors.")
+            refined_copy = (f"Buyers are actively hunting in this niche right now. "
+                           f"{counter_angle} Empire AI matches demand to lanes automatically — no phone calls.")
+            return {"objection_category": objection_cat, "counter_angle": counter_angle,
+                    "customer_truth": customer_truth, "refined_copy": refined_copy, "confidence": 96.0}
+
+        # Inbound 'yes/buy/interested' reply: hot buyer, low friction
+        if source_channel.startswith("inbound_reply") and any(
+                w in text_lower for w in ("yes", "buy", "interested", "send", "more info", "go")):
+            objection_cat = "HOT_BUYER"
+            counter_angle = "Auto-onboard immediately via Brevo reply-to-buy; issue pay-link, no sales call."
+            customer_truth = "Prospect said yes — they want zero-friction purchase, not more pitch."
+            refined_copy = ("You're in. Reply paid, seat reserved, leads flowing — no call needed. "
+                           "Empire AI delivers on autopilot.")
+            return {"objection_category": objection_cat, "counter_angle": counter_angle,
+                    "customer_truth": customer_truth, "refined_copy": refined_copy, "confidence": 98.0}
+
         if "expensive" in text_lower or "cost" in text_lower or "saas bloat" in text_lower:
             objection_cat = "PRICE_AND_ROI"
             counter_angle = "Demonstrate instant ROI recovery with zero recurring SaaS bloat."
