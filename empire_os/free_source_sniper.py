@@ -196,6 +196,45 @@ def _parse_rss(name: str, url: str) -> list:
     return out
 
 
+def scrape_github() -> list:
+    """Credential-free GitHub search for B2B buying intent (public API, no auth)."""
+    out = []
+    now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    queries = [
+        "topic:lead-generation", "topic:marketing-automation",
+        "topic:saas", "topic:crm", "topic:sales-automation",
+        "need crm in:readme", "looking for agency in:readme",
+    ]
+    for q in queries:
+        try:
+            url = ("https://api.github.com/search/repositories?q="
+                   + urllib.parse.quote(q + " pushed:>2024-01-01") + "&per_page=10&sort=updated")
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read())
+            for item in data.get("items", []):
+                desc = item.get("description") or ""
+                name = item.get("full_name") or ""
+                title = name.replace("/", " ")
+                hits = _kw_hits(title + " " + desc)
+                if hits == 0:
+                    continue
+                ls = int((item.get("stargazers_count", 0) // 10 + hits * 10) * 1.0)
+                gid = abs(hash(name)) % 10**9
+                out.append({
+                    "id": f"github_{gid}", "title": title, "source": "github",
+                    "url": item.get("html_url", ""), "score": item.get("stargazers_count", 0),
+                    "comments": 0, "kw_hits": hits, "lead_score": ls,
+                    "author": item.get("owner", {}).get("login", "github"),
+                    "created_utc": "", "qualified": ls >= THRESHOLD,
+                    "preview": (desc[:400] + "…") if len(desc) > 400 else desc,
+                })
+            time.sleep(2)  # GitHub rate limit: 60 unauth req/hr
+        except Exception as e:
+            logger.warning("github query '%s' failed: %s", q, e)
+    return out
+
+
 def scrape_rss() -> list:
     out = []
     for name, url in RSS_FEEDS.items():
@@ -205,7 +244,7 @@ def scrape_rss() -> list:
 
 
 def run(push: bool = False) -> dict:
-    leads = scrape_hn() + scrape_rss()
+    leads = scrape_hn() + scrape_rss() + scrape_github()
     leads.sort(key=lambda x: x["lead_score"], reverse=True)
     qualified = [l for l in leads if l["qualified"]]
     if push:

@@ -61,6 +61,23 @@ def pages() -> dict:
         return {"count": 0}
 
 
+def funnel_free_traffic() -> dict:
+    """Count free-traffic leads captured into the funnel (hub crm_leads table)."""
+    rows = _ct_db(
+        "SELECT "
+        "SUM(CASE WHEN email LIKE '%free-scout%' THEN 1 ELSE 0 END) AS scraper, "
+        "SUM(CASE WHEN source='aeo_page' THEN 1 ELSE 0 END) AS aeo, "
+        "COUNT(*) AS total "
+        "FROM crm_leads;"
+    )
+    r = rows[0] if rows else {}
+    return {
+        "scraper_leads": int(r.get("scraper") or 0),
+        "aeo_leads": int(r.get("aeo") or 0),
+        "total_crm": int(r.get("total") or 0),
+    }
+
+
 def source_breakdown(days: int) -> dict:
     rows = _ct_db(
         "SELECT COALESCE(NULLIF(ref_code,''),'direct') AS source, "
@@ -80,9 +97,11 @@ def main():
     conv = conversions(a.days)
     pg = pages()
     src = source_breakdown(a.days)
+    fft = funnel_free_traffic()
 
     if a.json:
-        print(json.dumps({"conversions": conv, "pages": pg, "sources": src}, indent=2))
+        print(json.dumps({"conversions": conv, "pages": pg, "sources": src,
+                          "funnel": fft}, indent=2))
         return
 
     print(f"\n=== EMPIRE FREE TRAFFIC ANALYTICS ({a.days}d) @ "
@@ -109,7 +128,14 @@ def main():
     print(f"\nIndexed AEO pages served: {n_pages}")
     tot_imp = sum(v.get("impression", {}).get("count", 0)
                   for v in bn.values())
-    print(f"Total impressions ({(a.days)}d): {tot_imp}")
+    print(f"Total AEO impressions ({a.days}d): {tot_imp}")
+    print(f"\nFUNNEL (free-traffic leads captured):")
+    print(f"  scraper (HN/RSS/GitHub): {fft['scraper_leads']}")
+    print(f"  AEO form captures:        {fft['aeo_leads']}")
+    print(f"  total crm_leads:          {fft['total_crm']}")
+    print(f"\nNOTE: GSC/Bing organic clicks flow in via AEO pages -> /v1/leads/capture")
+    print(f"      (source=aeo_page). Live search-impression data needs GSC API key;")
+    print(f"      current signal = on-site events + funnel captures (credential-free).")
 
 
 if __name__ == "__main__":
