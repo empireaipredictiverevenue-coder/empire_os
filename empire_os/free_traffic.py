@@ -168,8 +168,57 @@ def crosslink_aeo():
     log(f"crosslink_aeo: injected {linked} Ambient AI CTAs into AEO pages")
     return linked
 
+def publish_feed(items):
+    """Publish the fact-checked harvest to a live, indexable AEO feed page.
+    Credential-free traffic surface (HN/RSS topics -> real indexed HTML with
+    Ambient AI CTA). No Reddit/creds required."""
+    out = Path("/srv/aeo/traffic")
+    out.mkdir(parents=True, exist_ok=True)
+    cards = []
+    for it in items:
+        forum = it.get("forum", "")
+        topic = it.get("topic", "")
+        comment = it.get("comment", "")
+        cards.append(
+            f'  <article style="border:1px solid #1e3a44;border-radius:10px;'
+            f'padding:16px;margin:12px 0;background:#0c1620">\n'
+            f'    <div style="color:#39d98a;font-size:12px;letter-spacing:1px">'
+            f'{forum} &middot; {topic}</div>\n'
+            f'    <p style="color:#cfe9f3;line-height:1.5">{comment}</p>\n'
+            f'    <p><a href="{AMBIENT_URL}" style="color:#22d3ee">'
+            f'Try Ambient AI — runs your business 24/7, reply &quot;buy&quot; to start ($49/mo)</a></p>\n'
+            f'  </article>')
+    html = (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">\n'
+        '<title>Empire AI — live AI business automation briefs</title>\n'
+        '<meta name="description" content="Fact-checked AI business automation '
+        'briefs from public sources. Built by Empire AI / Ambient AI.">\n'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
+        '</head><body style="background:#07111a;color:#cfe9f3;'
+        'font-family:system-ui;max-width:760px;margin:0 auto;padding:24px">\n'
+        '<h1 style="color:#22d3ee">Empire AI — live AI business automation briefs</h1>\n'
+        '<p style="color:#7fa8b8">Auto-harvested from keyless public sources '
+        '(Hacker News, RSS). Each brief links to Ambient AI.</p>\n'
+        + "\n".join(cards) +
+        '\n</body></html>\n')
+    (out / "index.html").write_text(html)
+    # expose in sitemap so it gets indexed
+    sm = Path("/srv/aeo/sitemap.xml")
+    url = "<url><loc>https://empire-ai.co.uk/traffic/</loc></url>"
+    try:
+        if sm.exists() and url not in sm.read_text():
+            txt = sm.read_text()
+            txt = txt.replace("</urlset>", f"  {url}\n</urlset>")
+            sm.write_text(txt)
+    except Exception:
+        pass
+    log(f"publish_feed: wrote {len(cards)} briefs to /srv/aeo/traffic/index.html")
+    return len(cards)
+
+
 def run_once(dry_run=True):
     prepared = posted = skipped = 0
+    items = []
     reddit = None
     if not dry_run and os.environ.get("REDDIT_CLIENT_ID"):
         try:
@@ -194,6 +243,7 @@ def run_once(dry_run=True):
                 "url": AMBIENT_URL, "pay": AMBIENT_PAY,
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "status": "prepared"}
+        items.append(item)
         if reddit and not dry_run:
             try:
                 sub = reddit.subreddit(forum.replace("r/", ""))
@@ -206,6 +256,13 @@ def run_once(dry_run=True):
             item["status"] = "dry_run"; prepared += 1
         QUEUE.joinpath(f"{forum.replace('/', '_')}.json").write_text(
             json.dumps(item, indent=2))
+    # Credential-free publish: write the harvest to a live indexable feed
+    if not dry_run and items:
+        try:
+            publish_feed(items)
+            prepared = len(items)  # count as live-published surfaces
+        except Exception as e:
+            log(f"publish_feed failed: {e}")
     log(f"pass done: prepared={prepared} posted={posted} skipped={skipped} dry_run={dry_run}")
     return {"prepared": prepared, "posted": posted, "skipped": skipped}
 
