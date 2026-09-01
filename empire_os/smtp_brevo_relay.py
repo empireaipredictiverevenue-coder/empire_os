@@ -88,7 +88,9 @@ class BrevoHandler:
         except urllib.error.HTTPError as e:
             status, resp = e.code, e.read().decode()[:200]
         if status == 201:
+            print(f"[smtp-relay] queued via Brevo -> {rcpt}", flush=True)
             return "250 OK queued via Brevo"
+        print(f"[smtp-relay] Brevo error {status}: {resp} -> {rcpt}", flush=True)
         return f"451 Brevo error {status}: {resp}"
 
 
