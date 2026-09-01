@@ -96,6 +96,13 @@ def decode_transfer(log_entry: dict) -> dict:
 
 
 def conn():
+    # Pitfall 59: route writes through the single-writer gatekeeper so the
+    # matcher never collides with the 33+ process fleet and wedges on a lock.
+    try:
+        from empire_os.db_writer import gatekept_conn
+        return gatekept_conn(DB, timeout=60)
+    except Exception:
+        pass
     import time as _t
     for _ in range(5):
         try:

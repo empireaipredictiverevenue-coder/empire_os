@@ -5681,7 +5681,7 @@ def finance_replay(req: dict):
     """Simulate an inbound USDT deposit for testing the listener flow.
 
     Body:
-      amount_usdc        float  required  (e.g. 100.00)
+      amount_usdt        float  required  (e.g. 100.00)
       memo               str    required  (e.g. "SEAT_sub_ad55f6264deb")
       wallet_from        str    optional  (any string, defaults to "replay")
       tx_signature       str    optional  (any string, defaults to "replay_<ts>")
@@ -5710,9 +5710,10 @@ def finance_replay(req: dict):
     paid_sub   = None
 
     try:
-        import sqlite3 as _sq3
-        cnx = _sq3.connect("/root/empire_os/empire_os.db", timeout=10,
-                           check_same_thread=False)
+        # Pitfall 59: route settlement writes through the single-writer
+        # gatekeeper so 33+ fleet writers can't wedge the replay on a lock.
+        from empire_os.db_writer import gatekept_conn
+        cnx = gatekept_conn("/root/empire_os/empire_os.db", timeout=60)
         try:
             # ensure app_kv table exists (tiny key-value store)
             cnx.execute(
