@@ -38,29 +38,31 @@ STATE = "/root/empire_os/logs/brain_harness_state.json"
 # systemd: the service that keeps it alive (for health + restart)
 FLEET = {
     # --- REVENUE LOOP (critical) ---
-    "bsc_listener":        {"engine": "revenue_loop", "systemd": "bsc_listener", "tick": None},
+    # systemd values MUST match real `systemctl` unit names (verified 2026-09-01).
+    # None = no dedicated unit (managed elsewhere / script-based) -> not false-flagged.
+    "bsc_listener":        {"engine": "revenue_loop", "systemd": "empire-bsc-listener", "tick": None},
     "payment_matcher":     {"engine": "revenue_loop", "systemd": "empire-payment-matcher", "tick": None},
     "mail_sender":         {"engine": "revenue_loop", "systemd": "empire-mail-sender", "tick": None},
-    "smtp_relay":          {"engine": "revenue_loop", "systemd": "empire-smtp-relay", "tick": None},
+    "smtp_relay":          {"engine": "revenue_loop", "systemd": None, "tick": None},  # no dedicated unit; mail-sender covers it
     # --- MARKETPLACE (engine #1, $600M target) ---
     "buyer_hunter":        {"engine": "marketplace", "systemd": "empire-buyer-hunter", "tick": None},
-    "a2a_publisher":       {"engine": "marketplace", "systemd": "empire-a2a-publisher", "tick": None},
+    "a2a_publisher":       {"engine": "marketplace", "systemd": "empire-a2a-sales-agent", "tick": None},
     "a2a_buyer_mkt":       {"engine": "marketplace", "systemd": "empire-a2a-buyer-marketplace", "tick": None},
     "a2a_closer":          {"engine": "marketplace", "systemd": "empire-a2a-closer", "tick": None},
-    "omni_agent":          {"engine": "marketplace", "systemd": "empire-omni-agent", "tick": None},
-    "revenue_engine":      {"engine": "marketplace", "systemd": "empire-revenue-engine", "tick": None},
-    "router_engine":       {"engine": "marketplace", "systemd": "empire-router-engine", "tick": None},
-    "queue_sender":        {"engine": "marketplace", "systemd": "empire-queue-sender", "tick": None},
-    "lanes":               {"engine": "marketplace", "systemd": "empire-lanes", "tick": None, "container": True},
-    "neural_scout":        {"engine": "marketplace", "systemd": "empire-neural-scout", "tick": None, "container": True},
+    "omni_agent":          {"engine": "marketplace", "systemd": None, "tick": None},  # no empire-omni-agent unit
+    "revenue_engine":      {"engine": "marketplace", "systemd": "empire-revenue-generation", "tick": None},
+    "router_engine":       {"engine": "marketplace", "systemd": "empire-ppc-router", "tick": None},
+    "queue_sender":        {"engine": "marketplace", "systemd": "empire-unified-delivery", "tick": None},
+    "lanes":               {"engine": "marketplace", "systemd": "empire-lanes", "tick": None},
+    "neural_scout":        {"engine": "marketplace", "systemd": "empire-neural-scout", "tick": None},
     # --- INTELLIGENCE (L1-23) ---
-    "omega_os":            {"engine": "intelligence", "systemd": "empire-omega-os", "tick": None},
+    "omega_os":            {"engine": "intelligence", "systemd": "empire-omega-learning", "tick": None},
     "omega_learning":      {"engine": "intelligence", "systemd": "empire-omega-learning", "tick": None},
     "marketing_agent":     {"engine": "intelligence", "systemd": "empire-agent-marketing_agent", "tick": None},
-    "agi_sim":             {"engine": "intelligence", "systemd": "empire-agi-sim", "tick": None},
-    "predictive_cloud":    {"engine": "intelligence", "systemd": "empire-predictive-cloud", "tick": None},
+    "agi_sim":             {"engine": "intelligence", "systemd": None, "tick": None},  # no empire-agi-sim unit
+    "predictive_cloud":    {"engine": "intelligence", "systemd": "empire-predictive", "tick": None},
     # --- WHALE / ENTERPRISE / LAW-FIRM ---
-    "whale_harvester":     {"engine": "whale", "systemd": "whale_harvester", "tick": None},
+    "whale_harvester":     {"engine": "whale", "systemd": None, "tick": None},  # no empire-whale-harvester unit
     "enterprise_campaigns":{"engine": "enterprise", "systemd": None, "tick": "empire_os.enterprise_campaigns:run", "script": True},
     # --- CONTENT ENGINE (top-of-funnel moat) ---
     "content_pipeline":    {"engine": "content", "systemd": None, "tick": "empire_os.content_pipeline:cycle", "script": True},
@@ -120,6 +122,10 @@ def _restart(spec: dict) -> str:
     svc = spec["systemd"]
     if not svc:
         return "no-svc"
+    # Use `restart` (not kill) so units with Restart=no are brought back if
+    # they can start; broken units fail gracefully (err:N) instead of being
+    # left permanently SIGTERM'd. Unit names are now correct (verified 2026-09-01)
+    # so this no longer hits the old err:5 wrong-name failure.
     target = ["incus", "exec", "empire-hub", "--", "systemctl", "restart", svc] if spec.get("container") \
         else ["systemctl", "restart", svc]
     try:
@@ -174,8 +180,12 @@ def cycle() -> dict:
 
     # ── BRAIN DISPATCH: detect revenue gaps, fire corrective agent ──
     try:
+        # Short-timeout local read; gatekeeper owns heavy writes so this won't
+        # content for long (Pitfall 59). If the DB is busy, metrics are skipped
+        # rather than blocking the whole cycle.
         import sqlite3
-        conn = sqlite3.connect(DB, timeout=30)
+        conn = sqlite3.connect(DB, timeout=10)
+        conn.execute("PRAGMA busy_timeout=10000")
         cur = conn.cursor()
         settled = cur.execute("SELECT COUNT(*) FROM si_settlements").fetchone()[0]
         leads = cur.execute("SELECT COUNT(*) FROM lane_leads").fetchone()[0]
