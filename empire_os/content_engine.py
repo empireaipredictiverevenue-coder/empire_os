@@ -20,10 +20,14 @@ VAULT_KEY = "/root/empire_secrets/groq_api_key"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_KEY = "/root/empire_secrets/openrouter_api_key"
-BAI_URL = "https://b.ai/api/v1/chat/completions"
+BAI_URL = "https://api.b.ai/v1/chat/completions"
 BAI_KEY = "/root/empire_secrets/bai_api_key"
-# GLM 5.3 flash (free tier) via OpenRouter — primary working LLM.
+BAI_MODEL = "deepseek-v4-flash"  # fastest + non-reasoning + free via BAI (~6-9s, real content)
+# OpenRouter GLM fallback (free tier) — secondary.
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_KEY = "/root/empire_secrets/openrouter_api_key"
 OR_MODEL = "z-ai/glm-5.3-flash"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
 
@@ -46,48 +50,29 @@ def _call(url: str, key: str, model: str, system: str, user: str,
         req = urllib.request.Request(url, data=payload,
                                      headers={"Authorization": f"Bearer {key}",
                                                "Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=40) as r:
-            data = json.loads(r.read().decode())
-        return data["choices"][0]["message"]["content"].strip()
+        with urllib.request.urlopen(req, timeout=60) as r:
+            raw = r.read().decode()
+        # Fast-fail if the endpoint returned HTML (SPA) instead of JSON.
+        if not raw.strip().startswith("{"):
+            return None
+        data = json.loads(raw)
+        msg = data["choices"][0]["message"]
+        content = msg.get("content")
+        # GLM-5.3-flash is a reasoning model: final answer lives in
+        # reasoning_content when content is empty.
+        if not content:
+            content = msg.get("reasoning_content")
+        return content.strip() if content else None
     except Exception as e:
-        # Groq may block the host IP but allow the container — retry there.
-        if "groq.com" in url and "403" in str(e):
-            try:
-                import subprocess
-                script = (
-                    "import json,urllib.request;key=open('/root/empire_secrets/groq_api_key').read().strip();"
-                    f"p=json.dumps({{'model':{model!r},'max_tokens':{max_tokens},"
-                    f"'messages':[{{'role':'system','content':{system!r}}},{{'role':'user','content':{user!r}}}]}}).encode();"
-                    "r=urllib.request.Request('https://api.groq.com/openai/v1/chat/completions',data=p,"
-                    "headers={'Authorization':f'Bearer {key}','Content-Type':'application/json'});"
-                    "print(urllib.request.urlopen(r,timeout=40).read().decode())"
-                )
-                out = subprocess.run(
-                    ["incus", "exec", "empire-hub", "--", "python3", "-c", script],
-                    capture_output=True, text=True, timeout=60)
-                if out.returncode == 0 and out.stdout.strip():
-                    return json.loads(out.stdout.strip())["choices"][0]["message"]["content"].strip()
-            except Exception as e2:
-                print(f"[content_engine] container Groq retry failed: {e2}")
         print(f"[content_engine] LLM call failed ({url.split('/')[2]}): {e}")
         return None
 
 
-def _llm(system: str, user: str, max_tokens: int = 1400) -> str | None:
-    # Order: BAI (intended, endpoint TBD) -> OpenRouter GLM-5.3-flash (free, working) -> Groq -> None
+def _llm(system: str, user: str, max_tokens: int = 900) -> str | None:
+    # Primary: BAI GLM-5.3-flash (free, working). Fallback: template (no dead-key detours).
     bk = _key(BAI_KEY)
     if bk:
-        out = _call(BAI_URL, bk, "glm-5.3-flash", system, user, max_tokens)
-        if out:
-            return out
-    ok = _key(OPENROUTER_KEY)
-    if ok:
-        out = _call(OPENROUTER_URL, ok, OR_MODEL, system, user, max_tokens)
-        if out:
-            return out
-    gk = _key(VAULT_KEY)
-    if gk:
-        return _call(GROQ_URL, gk, GROQ_MODEL, system, user, max_tokens)
+        return _call(BAI_URL, bk, BAI_MODEL, system, user, max_tokens)
     return None
 
 
@@ -128,22 +113,27 @@ Ready to see qualified {niche.replace('_',' ')} leads land in your pipeline?
 def generate(niche: str, keyword: str = "") -> dict:
     """Produce full content set for a niche."""
     kw = keyword or niche.replace("_", " ")
-    if _key(VAULT_KEY) or _key(OPENROUTER_KEY):
+    if _key(BAI_KEY):
         sys_p = ("You are a B2B lead-generation content writer for Empire AI. "
                  "Write tight, no-fluff, conversion-focused copy. No em-dashes. "
                  "Plain English. Return JSON only.")
-        usr = (f"Nicke: {niche.replace('_',' ')}. Keyword: {kw}. "
-               f"Return JSON: {{title, blog (800 words markdown), "
+        usr = (f"Niche: {niche.replace('_',' ')}. Keyword: {kw}. "
+               f"Return JSON: {{title, blog (500 words markdown), "
                f"social (3 strings), email (1 string)}}")
         out = _llm(sys_p, usr, max_tokens=1400)
         if out:
             try:
-                # strip code fences if present
-                if out.startswith("```"):
-                    out = out.split("```")[1].split("```")[0]
-                d = json.loads(out)
-                d["source"] = "llm"
-                return d
+                # GLM reasoning model may wrap JSON in text or code fences.
+                txt = out
+                if "```" in txt:
+                    txt = txt.split("```")[1].split("```")[0]
+                # extract first balanced {...} block
+                s = txt.find("{")
+                e = txt.rfind("}")
+                if s >= 0 and e > s:
+                    d = json.loads(txt[s:e + 1])
+                    d["source"] = "llm"
+                    return d
             except Exception:
                 pass
     return _template(niche, kw)

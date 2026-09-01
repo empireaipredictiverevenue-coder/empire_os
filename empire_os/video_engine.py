@@ -17,7 +17,8 @@ from pathlib import Path
 
 OUT_DIR = "/srv/aeo/video"
 W, H = 1080, 1920
-SLIDE_SEC = 4
+SLIDE_SEC = 3
+PRESET = "ultrafast"
 
 
 def _slide_png(text: str, idx: int, total: int, path: str):
@@ -71,7 +72,7 @@ def render(niche: str, title: str, lines: list[str]) -> str:
     cmd = [
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat,
         "-vf", f"scale={W}:{H},format=yuv420p",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25", out,
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", PRESET, "-r", "25", out,
     ]
     r = subprocess.run(cmd, capture_output=True, timeout=120)
     if r.returncode != 0:
