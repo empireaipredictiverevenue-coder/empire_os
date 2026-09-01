@@ -278,5 +278,115 @@
     "status": "SERVICE",
     "detail": "long-running/side-effecting \u2014 launched separately",
     "ts": "2026-07-20T11:09:13.507344+00:00"
+  },
+  "bsc_listener": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "revenue_loop"
+  },
+  "payment_matcher": {
+    "status": "DEAD",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "revenue_loop"
+  },
+  "mail_sender": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "revenue_loop"
+  },
+  "smtp_relay": {
+    "status": "STALE(alive)",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "revenue_loop"
+  },
+  "buyer_hunter": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "a2a_publisher": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "a2a_buyer_mkt": {
+    "status": "DEAD",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "a2a_closer": {
+    "status": "DEAD",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "omni_agent": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "revenue_engine": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "router_engine": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "queue_sender": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "lanes": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "neural_scout": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "marketplace"
+  },
+  "omega_os": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "intelligence"
+  },
+  "omega_learning": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "intelligence"
+  },
+  "marketing_agent": {
+    "status": "STALE(alive)",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "intelligence"
+  },
+  "agi_sim": {
+    "status": "DEAD",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "intelligence"
+  },
+  "predictive_cloud": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "intelligence"
+  },
+  "whale_harvester": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "whale"
+  },
+  "enterprise_campaigns": {
+    "status": "OK",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "enterprise"
+  },
+  "metrics_exporter": {
+    "status": "DEAD",
+    "ts": "2026-09-01T03:28:45.548687+00:00",
+    "engine": "gamma"
   }
 }

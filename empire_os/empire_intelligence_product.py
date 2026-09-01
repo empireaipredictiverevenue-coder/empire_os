@@ -735,3 +735,65 @@ def init_empire_intelligence_schema():
 if __name__ == "__main__":
     init_empire_intelligence_schema()
     print("Empire Intelligence schema initialized")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PRODUCT CATALOG — Empire AI product line (sellable SKUs)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class Product:
+    sku: str
+    name: str
+    price_usd: float
+    billing: str          # one_time / per_month / per_lead
+    description: str
+    tier: str
+
+PRODUCT_CATALOG = {
+    # ── Empire Intelligence (Apollo/ZoomInfo killer) ──
+    "EI-STARTER": Product(
+        "EI-STARTER", "Empire Intelligence — Starter",
+        99.0, "per_month",
+        "500 enriched contacts/mo, Omega scoring, 5-source waterfall. "
+        "Apollo-grade B2B intel without the enterprise price tag.",
+        "core"),
+    "EI-PRO": Product(
+        "EI-PRO", "Empire Intelligence — Pro",
+        299.0, "per_month",
+        "5,000 contacts/mo, 15-source waterfall, A2A marketplace access, "
+        "predictive revenue per lead, Apollo-style sequences.",
+        "core"),
+    "EI-ENT": Product(
+        "EI-ENT", "Empire Intelligence — Enterprise",
+        999.0, "per_month",
+        "Unlimited contacts, white-label A2A, custom Apify actors, "
+        "dedicated whale harvesting, law-firm mass-tort routing.",
+        "core"),
+
+    # ── Empire Ambient AI (the new product — Ambient/silent intelligence layer) ──
+    "AMBIENT-AI": Product(
+        "AMBIENT-AI", "Empire Ambient AI",
+        49.0, "per_month",
+        "Ambient AI that runs silently in the background of your business — "
+        "watches signals (intent, churn risk, buying windows, competitor moves), "
+        "scores every contact with the Omega engine, and triggers the right "
+        "agent action without human input. No dashboards to babysit, no prompts "
+        "to type. It observes, reasons, and acts. Pairs with Empire Intelligence "
+        "for contact data and the 50+ agent fleet for execution. "
+        "Layer 23 Predictive Cloud brain included.",
+        "ambient"),
+    "AMBIENT-AI-WHALE": Product(
+        "AMBIENT-AI-WHALE", "Empire Ambient AI — Whale Tier",
+        499.0, "per_month",
+        "Ambient AI plus dedicated whale harvesting: the brain continuously "
+        "scans for high-value prospects ($10k+ deals), scores them platinum, "
+        "and routes to closers automatically. Enterprise observability for "
+        "your entire revenue stack via the Gamma analytics layer.",
+        "ambient"),
+}
+
+def get_product(sku: str) -> Optional[Product]:
+    return PRODUCT_CATALOG.get(sku)
+
+def list_products() -> List[dict]:
+    return [asdict(p) for p in PRODUCT_CATALOG.values()]

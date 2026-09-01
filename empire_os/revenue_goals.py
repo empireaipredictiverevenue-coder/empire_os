@@ -111,6 +111,43 @@ AGENT_GOALS = {
         "description": "Design A/B tests, calculate sample size, recommend winner",
         "mrr_per_winning_test": 250,  # $250 MRR per winning test
     },
+    # ── Scaling engines (injected 2026-09-01, $1B directive) ──
+    "marketplace": {
+        "revenue_lever": "leads_sold",
+        "baseline_target": 1000,  # 1000 leads sold/week
+        "description": "B2B lead marketplace: 1500 lanes, 5049 lane_leads supply. Sell $4-45",
+        "mrr_per_lead": 10,  # $10 avg per lead sold
+    },
+    "whale": {
+        "revenue_lever": "whales_harvested",
+        "baseline_target": 5,  # 5 whale prospects/week
+        "description": "High-value prospect harvesting (whale_harvester)",
+        "mrr_per_whale": 2000,  # $2k MRR per whale closed
+    },
+    "enterprise": {
+        "revenue_lever": "enterprise_seats",
+        "baseline_target": 3,  # 3 enterprise seats/week
+        "description": "Enterprise tier $999/mo base, $1M/mo plus. Law-firm + high-ticket.",
+        "mrr_per_seat": 999,
+    },
+    "beta_marketplace": {
+        "revenue_lever": "a2a_transactions",
+        "baseline_target": 50,  # 50 a2a buyer/seller txns/week
+        "description": "Beta OS buyer/seller marketplace (a2a-publisher, buyer-marketplace, closer)",
+        "mrr_per_txn": 100,
+    },
+    "gamma_analytics": {
+        "revenue_lever": "attributed_revenue_visible",
+        "baseline_target": 1,  # dashboards live + accurate
+        "description": "Gamma OS analytics: metrics-exporter + free_traffic_analytics. Visibility = control",
+        "mrr_per_pct_visible": 0,  # meta — enables other levers
+    },
+    "monitoring": {
+        "revenue_lever": "services_healthy",
+        "baseline_target": 0.99,  # 99% of watched services alive+producing
+        "description": "empire_watchdog self-heals dead services + alerts stale. 'active' != 'working'",
+        "mrr_per_pct_health": 3200,
+    },
 }
 
 

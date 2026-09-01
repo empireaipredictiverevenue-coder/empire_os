@@ -21,6 +21,11 @@ import sqlite3, json
 
 DB = "/root/empire_os/empire_os.db"
 
+try:
+    from empire_os.empire_intelligence_product import PRODUCT_CATALOG
+except Exception:
+    PRODUCT_CATALOG = {}
+
 
 def _resolve(memo: str) -> dict:
     """Map a payment memo to display context. Returns {} if unknown."""
@@ -73,6 +78,18 @@ def _resolve(memo: str) -> dict:
                     "title": f"Activate — {r['business_name'] or 'your pipeline'}",
                     "amount_usdc": amt,
                     "sub": f"Fund ${amt:.2f}/lead wallet · {r['niche'] or 'home-services'}",
+                    "memo": memo,
+                }
+        # Product purchase: memo = prod:<sku>
+        if memo.startswith("prod:"):
+            sku = memo.split(":", 1)[1]
+            p = PRODUCT_CATALOG.get(sku)
+            if p:
+                return {
+                    "kind": "prod",
+                    "title": f"Empire AI — {p.name}",
+                    "amount_usdc": float(p.price_usd),
+                    "sub": f"{p.billing} · {p.tier} tier",
                     "memo": memo,
                 }
     except Exception:
@@ -167,6 +184,8 @@ def _register_expected_payment(ctx: dict) -> None:
         tenant = ctx.get("title", "seat")[:40]
     elif kind == "pilot":
         tenant = "pilot"
+    elif kind == "prod":
+        tenant = "prod:" + memo.split(":", 1)[1]
     try:
         c = sqlite3.connect(DB, timeout=20)
         c.execute(
