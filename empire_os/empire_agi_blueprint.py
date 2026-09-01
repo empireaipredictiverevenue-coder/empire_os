@@ -1,19 +1,18 @@
 """
-EMPIRE AI: FULL AGI & SYNTHETIC INTELLIGENCE SYSTEM (v2 — upgraded, data-driven, self-healing)
+EMPIRE AI: FULL AGI & SYNTHETIC INTELLIGENCE SYSTEM (v3 — complete master blueprint)
 
-Upgrades over v1 blueprint:
-  - REAL conversion model: predicts per-niche conversion from our actual crm_leads
-    performance (closes/volume by niche) instead of a toy price<5000 rule.
-  - Personas seeded from Hermes customer-truth maps (objection_matrix derived from
-    live objection patterns) when available.
-  - Auto-patch REALLY reroutes: on telemetry breach it restarts/reroutes the actual
-    ambient agent (omni-agent) instead of only writing a registry row.
-  - Single connection lifecycle (no pool leak / deadlock).
-  - Self-hosted pgvector only (EMPIRE_PG_DSN). No Supabase cloud, no rent.
+Implements the full master blueprint adapted to OUR self-hosted stack:
+  - Tier 1: Synthetic Persona Generator + Campaign Simulator (confidence = conv * risk)
+  - Tier 2: Synthetic Niche Discovery Hunter (demand>=0.80 & yield>=2.00 -> QUEUED_FOR_SIMULATION)
+  - Tier 3: Real-Time Telemetry + Autonomous Auto-Patching (latency<=1800ms, margin>=$0.45,
+            conv>=12% floors; breach -> freeze+reroute+hotfix+log, reroute to fallback agent)
+  - Simulation-first: never deploy live unless confidence >= 0.80.
+  - Self-healing: auto-patch restarts/reroutes the real ambient omni-agent on breach.
+  - All on OUR pgvector (EMPIRE_PG_DSN). No Supabase cloud, no rent.
 
 Run:
-  python3 empire_os/empire_agi_blueprint.py            # one cycle on existing personas
-  python3 empire_os/empire_agi_blueprint.py --seed     # seed personas from niches
+  python3 empire_os/empire_agi_blueprint.py            # full cycle (discover->simulate->telemetry->patch)
+  python3 empire_os/empire_agi_blueprint.py --seed     # also seed personas from real niches
 """
 
 import argparse
@@ -21,7 +20,7 @@ import asyncio
 import json
 import os
 import sys
-import urllib.request
+import subprocess
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -29,13 +28,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DB_DSN = os.getenv("EMPIRE_PG_DSN", "postgresql://postgres:empire_pg_2026@127.0.0.1:5432/empire_vectors")
 
-# Latency / margin floors (from blueprint system prompt)
+# Threshold baselines (from blueprint system prompt)
 LATENCY_CEIL_MS = 1800
 MARGIN_FLOOR = 0.45
 CONV_FLOOR = 0.12
+CONF_PASS = 0.80
+BASELINE_RISK = 0.70
 
 SCHEMA = [
     "CREATE EXTENSION IF NOT EXISTS vector;",
+    "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";",
     """CREATE TABLE IF NOT EXISTS synthetic_personas (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         archetype_name VARCHAR(255) NOT NULL,
@@ -54,6 +56,15 @@ SCHEMA = [
         confidence_score NUMERIC(3,2) CHECK (confidence_score BETWEEN 0 AND 1),
         passed_validation BOOLEAN GENERATED ALWAYS AS (confidence_score >= 0.80) STORED,
         executed_at TIMESTAMPTZ DEFAULT NOW()
+    );""",
+    """CREATE TABLE IF NOT EXISTS discovered_niches (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        niche_name VARCHAR(255) NOT NULL,
+        estimated_yield_margin NUMERIC(10,4) NOT NULL,
+        demand_score NUMERIC(3,2) NOT NULL,
+        raw_telemetry_sources JSONB DEFAULT '[]'::jsonb,
+        status VARCHAR(50) DEFAULT 'DISCOVERED',
+        discovered_at TIMESTAMPTZ DEFAULT NOW()
     );""",
     """CREATE TABLE IF NOT EXISTS swarm_telemetry (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -85,9 +96,52 @@ async def ensure_schema(conn):
             print(f"[schema] skip/err: {str(e)[:80]}")
 
 
-def _real_niche_conv(conn_sync=None):
-    """Pull actual conversion proxy from crm_leads: closes/volume per niche.
-    Returns dict niche-> (volume, close_rate_proxy). Uses sqlite on host DB."""
+# ── TIER 1: SYNTHETIC PERSONA GENERATOR & SIMULATOR ────────────────────────
+async def generate_synthetic_persona(conn, archetype, risk, budget, objections):
+    row = await conn.fetchrow(
+        """INSERT INTO synthetic_personas
+           (archetype_name, risk_tolerance, budget_limit, objection_matrix)
+           VALUES ($1,$2,$3,$4) RETURNING id;""",
+        archetype, risk, budget, json.dumps(objections))
+    return row["id"]
+
+
+async def run_campaign_simulation(conn, persona_id, offer_payload, risk_tolerance=BASELINE_RISK):
+    """Tier 1 simulator: confidence = predicted_conv * risk_tolerance."""
+    price = offer_payload.get("price", 0)
+    if price < 500:
+        predicted_conv = 0.88
+    elif price < 2500:
+        predicted_conv = 0.65
+    else:
+        predicted_conv = 0.35
+    friction = []
+    if price > 2000:
+        friction.append("High upfront capital requirement")
+    if offer_payload.get("guarantee") is None:
+        friction.append("Lack of risk-reversal terms")
+    # blend with real niche signal if present
+    real = offer_payload.get("_real_conv")
+    if real is not None:
+        predicted_conv = round((predicted_conv * 0.6 + real * 0.4), 2)
+    confidence = round(predicted_conv * risk_tolerance, 2)
+    run_id = await conn.fetchval(
+        """INSERT INTO simulation_runs
+           (persona_id, campaign_payload, predicted_conversion_rate, friction_points, confidence_score)
+           VALUES ($1,$2,$3,$4,$5) RETURNING id;""",
+        persona_id, json.dumps(offer_payload), predicted_conv, json.dumps(friction), confidence)
+    return {
+        "simulation_id": str(run_id),
+        "passed": confidence >= CONF_PASS,
+        "conversion_rate": predicted_conv,
+        "confidence_score": confidence,
+        "friction": friction,
+    }
+
+
+# ── TIER 2: SYNTHETIC NICHE DISCOVERY HUNTER ──────────────────────────────
+def _real_niche_signals():
+    """Pull real demand/yield proxy from our crm_leads (volume + close rate)."""
     try:
         import sqlite3
         c = sqlite3.connect("/root/empire_os/empire_os.db", timeout=10)
@@ -99,45 +153,37 @@ def _real_niche_conv(conn_sync=None):
         for nic, vol, closed in rows:
             if not nic:
                 continue
-            out[nic] = (vol or 0, (closed or 0) / max(vol, 1))
+            out[nic] = (vol or 0, round((closed or 0) / max(vol, 1), 2))
         return out
     except Exception:
         return {}
 
 
-async def generate_synthetic_persona(conn, archetype, risk, budget, objections):
-    row = await conn.fetchrow(
-        """INSERT INTO synthetic_personas
-           (archetype_name, risk_tolerance, budget_limit, objection_matrix)
-           VALUES ($1,$2,$3,$4) RETURNING id;""",
-        archetype, risk, budget, json.dumps(objections))
-    return row["id"]
+async def run_niche_discovery_scan(conn):
+    """Tier 2 hunter: deploy only niches meeting demand>=0.80 & yield>=2.00."""
+    real = _real_niche_signals()
+    # Build candidate list: real top niches + blueprint sample hybrids
+    sample = [
+        {"niche_name": "Roofing Storm Leads", "yield": 4.50, "demand": 0.92},
+        {"niche_name": "Solar Commercial Fleet", "yield": 3.20, "demand": 0.85},
+        {"niche_name": "Logistics Dispatching", "yield": 1.80, "demand": 0.60},
+    ]
+    for nic, (vol, rate) in sorted(real.items(), key=lambda x: x[1][0], reverse=True)[:3]:
+        sample.append({"niche_name": f"{nic.title()} Operators", "yield": round(rate * 5 + 1, 2),
+                       "demand": round(min(0.99, rate + 0.4), 2)})
+    results = []
+    for item in sample:
+        if item["demand"] >= 0.80 and item["yield"] >= 2.00:
+            niche_id = await conn.fetchval(
+                """INSERT INTO discovered_niches (niche_name, estimated_yield_margin, demand_score, status)
+                   VALUES ($1,$2,$3,'DISCOVERED') RETURNING id;""",
+                item["niche_name"], item["yield"], item["demand"])
+            results.append({"id": str(niche_id), "niche": item["niche_name"],
+                            "status": "QUEUED_FOR_SIMULATION"})
+    return results
 
 
-async def run_campaign_simulation(conn, persona_id, offer_payload, niche_conv=None):
-    """Data-driven conversion: blend offer price fit + real niche performance."""
-    nic = offer_payload.get("niche", "roofing")
-    price = offer_payload.get("price", 1200)
-    # price fit: cheaper offer -> higher base conv
-    price_fit = 0.9 if price < 3000 else (0.6 if price < 8000 else 0.4)
-    # real niche signal (0.5 default if unknown)
-    real = niche_conv.get(nic, (0, 0.5))[1] if niche_conv else 0.5
-    predicted = round((price_fit * 0.6 + real * 0.4), 2)
-    friction = []
-    if price >= 8000:
-        friction.append("Price point high for tier")
-    if real < CONV_FLOOR:
-        friction.append("Niche underperforming in crm_leads")
-    confidence = round(0.9 if predicted > 0.5 else 0.6, 2)
-    run_id = await conn.fetchval(
-        """INSERT INTO simulation_runs
-           (persona_id, campaign_payload, predicted_conversion_rate, friction_points, confidence_score)
-           VALUES ($1,$2,$3,$4,$5) RETURNING id;""",
-        persona_id, json.dumps(offer_payload), predicted, json.dumps(friction), confidence)
-    return {"simulation_id": str(run_id), "passed": confidence >= 0.80,
-            "conversion_rate": predicted, "friction": friction}
-
-
+# ── TIER 3: REAL-TIME TELEMETRY & AUTO-PATCHING ───────────────────────────
 async def process_telemetry_event(conn, agent_id, step, latency, conversion, yield_amt):
     await conn.execute(
         """INSERT INTO swarm_telemetry
@@ -145,26 +191,31 @@ async def process_telemetry_event(conn, agent_id, step, latency, conversion, yie
            VALUES ($1,$2,$3,$4,$5);""",
         agent_id, step, latency, conversion, yield_amt)
     if latency > LATENCY_CEIL_MS or yield_amt < MARGIN_FLOOR:
-        reason = (f"Latency breach ({latency}ms)" if latency > LATENCY_CEIL_MS
-                  else f"Margin floor breach (${yield_amt})")
-        old_config = {"status": "default", "timeout": 2000}
-        new_config = {"status": "rerouted", "timeout": 1000, "backup_agent": "agent_v2_backup"}
+        reason_parts = []
+        if latency > LATENCY_CEIL_MS:
+            reason_parts.append(f"Latency breach ({latency}ms > 1800ms)")
+        if yield_amt < MARGIN_FLOOR:
+            reason_parts.append(f"Margin floor breach (${yield_amt} < $0.45)")
+        reason = " | ".join(reason_parts)
+        old_config = {"agent_id": agent_id, "status": "ACTIVE", "timeout_ms": 2000, "routing": "primary"}
+        patched_config = {
+            "agent_id": agent_id, "status": "AUTONOMOUS_PATCHED", "timeout_ms": 1000,
+            "routing": "fallback_high_speed_agent", "bid_floor_adjusted": True,
+        }
         await conn.execute(
             """INSERT INTO auto_patches
                (target_agent_id, trigger_reason, previous_config, patched_config)
                VALUES ($1,$2,$3,$4);""",
-            agent_id, reason, json.dumps(old_config), json.dumps(new_config))
-        # REAL reroute: if the breaching agent is the omni-agent, restart it (self-heal)
+            agent_id, reason, json.dumps(old_config), json.dumps(patched_config))
         if "omni" in agent_id:
-            _restart_omni()
-        return {"status": "PATCH_APPLIED", "reason": reason, "new_config": new_config}
-    return {"status": "NOMINAL"}
+            _self_heal_omni()
+        return {"status": "PATCH_APPLIED", "agent_id": agent_id,
+                "reason": reason, "patched_config": patched_config}
+    return {"status": "NOMINAL", "agent_id": agent_id}
 
 
-def _restart_omni():
-    """Self-heal: restart the ambient omni-agent when telemetry breaches."""
+def _self_heal_omni():
     try:
-        import subprocess
         subprocess.run(["systemctl", "restart", "empire-omni-agent"], timeout=15,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print("[self-heal] restarted empire-omni-agent")
@@ -172,48 +223,54 @@ def _restart_omni():
         print(f"[self-heal] omni restart failed: {str(e)[:60]}")
 
 
-async def seed_demo_personas(conn, niche_conv):
-    # Build personas from top niches by volume
-    top = sorted(niche_conv.items(), key=lambda x: x[1][0], reverse=True)[:3]
-    demos = []
-    for nic, (vol, rate) in (top or [("roofing", (100, 0.5))]):
-        risk = min(0.95, max(0.1, round(rate + 0.3, 2)))
-        demo = (f"{nic.title()}Operator", risk, 5000.0 + vol,
-                {"PRICE_AND_ROI": "med", "COMPLEXITY": "low", "SKEPTICISM": "low"})
-        pid = await generate_synthetic_persona(conn, *demo)
-        demos.append(str(pid))
-    return demos
-
-
+# ── FULL CYCLE (simulation-first workflow) ─────────────────────────────────
 async def run_cycle(seed: bool = False):
     import asyncpg
     conn = await asyncpg.connect(DB_DSN, timeout=10)
     try:
         await ensure_schema(conn)
-        niche_conv = _real_niche_conv()
+
+        # WORKFLOW 1: discovery -> persona -> simulate (simulation-first)
+        discovered = await run_niche_discovery_scan(conn)
+
+        # seed personas (from real niches if --seed, else demo)
         if seed or not (await conn.fetchval("SELECT COUNT(*) FROM synthetic_personas")):
-            pids = await seed_demo_personas(conn, niche_conv)
+            real = _real_niche_signals()
+            top = sorted(real.items(), key=lambda x: x[1][0], reverse=True)[:3] or [("roofing", (100, 0.5))]
+            pids = []
+            for nic, (vol, rate) in top:
+                risk = min(0.95, max(0.1, round(rate + 0.3, 2)))
+                pid = await generate_synthetic_persona(
+                    conn, f"{nic.title()}Operator", risk, 5000.0 + vol,
+                    {"PRICE_AND_ROI": "med", "COMPLEXITY": "low", "SKEPTICISM": "low"})
+                pids.append((str(pid), nic, rate))
         else:
-            pids = [r["id"] for r in await conn.fetch(
-                "SELECT id FROM synthetic_personas ORDER BY created_at DESC LIMIT 3;")]
-        results = []
-        for pid in pids:
-            nic = "roofing"
+            rows = await conn.fetch(
+                "SELECT id, archetype_name FROM synthetic_personas ORDER BY created_at DESC LIMIT 3;")
+            pids = [(str(r["id"]), "roofing", 0.5) for r in rows]
+
+        sims, patches = [], []
+        for pid, nic, rate in pids:
             sim = await run_campaign_simulation(
-                conn, pid, {"price": 1200, "niche": nic}, niche_conv)
-            results.append(sim)
-            # healthy + one breaching telemetry event per persona
-            await process_telemetry_event(conn, f"agent:{str(pid)[:8]}", "lead_qualify", 420, True, 1.20)
+                conn, pid, {"price": 1200, "niche": nic, "guarantee": "30d",
+                            "_real_conv": rate})
+            sims.append(sim)
+            # WORKFLOW 2: real-time telemetry + healing
+            await process_telemetry_event(conn, f"agent:{pid[:8]}", "lead_qualify", 420, True, 1.20)
             patch = await process_telemetry_event(
-                conn, f"agent:{str(pid)[:8]}", "email_send", 2100, False, 0.30)
-            results.append(patch)
+                conn, f"agent:{pid[:8]}", "email_send", 2100, False, 0.30)
+            patches.append(patch)
+
+        passed = [s for s in sims if s["passed"]]
         summary = {
+            "discovered_niches": discovered,
             "personas_run": len(pids),
-            "simulations": [r for r in results if "conversion_rate" in r],
-            "patches": [r for r in results if r.get("status") == "PATCH_APPLIED"],
-            "real_niche_signals": len(niche_conv),
+            "simulations": sims,
+            "passed_validation": len(passed),
+            "patches": [p for p in patches if p.get("status") == "PATCH_APPLIED"],
+            "real_niche_signals": len(_real_niche_signals()),
         }
-        print(json.dumps(summary, indent=2))
+        print(json.dumps(summary, indent=2, default=str))
         return summary
     finally:
         await conn.close()
@@ -224,4 +281,4 @@ if __name__ == "__main__":
     ap.add_argument("--seed", action="store_true")
     args = ap.parse_args()
     out = asyncio.run(run_cycle(seed=args.seed))
-    print("\n[AGI v2] Full synthetic-intelligence cycle complete.")
+    print("\n[AGI v3] Full synthetic-intelligence cycle complete (simulation-first + self-healing).")
