@@ -59,8 +59,8 @@ def search(q, geo, page=1):
 
 
 def main(cap=40):
-    if not SERPLY_KEY:
-        print("NO SERPLY_KEY — cannot scrape. Set in .env.")
+    if not SERPER_KEY:
+        print("NO SERPER_KEY — cannot scrape. Set serper_api_key.")
         return 0
     out = []
     seen = set()
