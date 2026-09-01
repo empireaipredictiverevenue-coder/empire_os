@@ -527,6 +527,23 @@ class PredictiveCloudAGI:
         except Exception as e:
             return {"layer": 22, "sub": "real_signal_feed", "status": "deferred", "error": str(e)[:160]}
 
+    def agi_synthetic_intelligence(self, seed: bool = False) -> dict:
+        """Layer 23 — Empire AGI & Synthetic Intelligence System.
+
+        Runs the full synthetic-intelligence cycle on OUR pgvector (no Supabase cloud):
+        seed synthetic personas -> simulate campaigns -> emit telemetry ->
+        auto-patch breaching agents (latency>1800ms / margin<$0.45). Self-healing
+        revenue swarm. Tables: synthetic_personas, simulation_runs, swarm_telemetry,
+        auto_patches.
+        """
+        try:
+            import asyncio
+            from empire_os.empire_agi_blueprint import run_cycle
+            res = asyncio.run(run_cycle(seed=seed))
+            return {"layer": 23, "status": "ok", **res}
+        except Exception as e:
+            return {"layer": 23, "status": "deferred", "error": str(e)[:160]}
+
     def domain_clone_run(self, seeds: list = None) -> dict:
         """Run Pillar 3 expired-domain cloning via our Serper product + Wayback."""
         seeds = seeds or ["roofing", "mass_tort"]

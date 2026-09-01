@@ -123,6 +123,31 @@ def _audit_signals(limit: int):
     return out
 
 
+def _auto_onboard_hot_buyer(text: str, channel: str) -> dict:
+    """Close the autonomous revenue loop: a HOT_BUYER reply -> auto_onboard pay-link.
+
+    Parses a likely niche + email from the reply, calls auto_onboard.onboard() which
+    returns a BSC Pay URL. Zero-friction: no call, immediate funding link.
+    Defensive: never crashes the feed if parsing/onboard fails.
+    """
+    try:
+        import re
+        from empire_os import auto_onboard as ao
+        # crude niche extraction from known niches
+        niches = ["roofing", "mass_tort", "legal", "finance", "real_estate", "solar",
+                  "hvac", "contractor", "insurance", "medic"]
+        niche = next((n for n in niches if n in text.lower()), "roofing")
+        email_m = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", text)
+        email = email_m.group(0) if email_m else "buyer@reply.empire-ai.co.uk"
+        name = email.split("@")[0]
+        res = ao.onboard(name=name, niche=niche, tier="starter",
+                         delivery_email=email, source=f"hot_buyer:{channel}")
+        pay = res.get("pay_link") or res.get("payment_url") or res.get("bsc_pay_url") or ""
+        return {"status": "onboarded", "niche": niche, "email": email, "pay_link": pay[:80]}
+    except Exception as e:
+        return {"status": "onboard_failed", "error": str(e)[:120]}
+
+
 async def run(limit: int = 5):
     from empire_os.hermes_master_engine_v9 import HermesAgentLoop
     loop = HermesAgentLoop()
@@ -157,8 +182,15 @@ async def run(limit: int = 5):
             await loop.vector_store.log_learning_cycle(
                 original_output=text[:200], critic_score=insights["confidence"],
                 refined_output=growth["growth_copy"], learned_truth=insights["customer_truth"])
+
+            # HOT_BUYER: close the autonomous revenue loop — auto-onboard with zero friction.
+            # Signal says yes/buy/interested -> issue a pay-link via auto_onboard (no sales call).
+            action = None
+            if insights["objection_category"] == "HOT_BUYER":
+                action = _auto_onboard_hot_buyer(text, channel)
+
             results.append({"channel": channel, "objection": insights["objection_category"],
-                            "k": growth["projected_k_factor"]})
+                            "k": growth["projected_k_factor"], "action": action})
         except Exception as e:
             results.append({"channel": channel, "error": str(e)[:120]})
 
