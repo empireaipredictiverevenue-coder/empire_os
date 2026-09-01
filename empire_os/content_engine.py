@@ -20,8 +20,11 @@ VAULT_KEY = "/root/empire_secrets/groq_api_key"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_KEY = "/root/empire_secrets/openrouter_api_key"
+BAI_URL = "https://b.ai/api/v1/chat/completions"
+BAI_KEY = "/root/empire_secrets/bai_api_key"
+# GLM 5.3 flash (free tier) via OpenRouter — primary working LLM.
+OR_MODEL = "z-ai/glm-5.3-flash"
 GROQ_MODEL = "llama-3.3-70b-versatile"
-OR_MODEL = "openai/gpt-4o-mini"
 
 
 def _key(path: str) -> str | None:
@@ -71,15 +74,20 @@ def _call(url: str, key: str, model: str, system: str, user: str,
 
 
 def _llm(system: str, user: str, max_tokens: int = 1400) -> str | None:
-    # Primary: Groq (per directive). Fallback: OpenRouter (proven working).
-    gk = _key(VAULT_KEY)
-    if gk:
-        out = _call(GROQ_URL, gk, GROQ_MODEL, system, user, max_tokens)
+    # Order: BAI (intended, endpoint TBD) -> OpenRouter GLM-5.3-flash (free, working) -> Groq -> None
+    bk = _key(BAI_KEY)
+    if bk:
+        out = _call(BAI_URL, bk, "glm-5.3-flash", system, user, max_tokens)
         if out:
             return out
     ok = _key(OPENROUTER_KEY)
     if ok:
-        return _call(OPENROUTER_URL, ok, OR_MODEL, system, user, max_tokens)
+        out = _call(OPENROUTER_URL, ok, OR_MODEL, system, user, max_tokens)
+        if out:
+            return out
+    gk = _key(VAULT_KEY)
+    if gk:
+        return _call(GROQ_URL, gk, GROQ_MODEL, system, user, max_tokens)
     return None
 
 
@@ -134,7 +142,7 @@ def generate(niche: str, keyword: str = "") -> dict:
                 if out.startswith("```"):
                     out = out.split("```")[1].split("```")[0]
                 d = json.loads(out)
-                d["source"] = "openrouter"
+                d["source"] = "llm"
                 return d
             except Exception:
                 pass
