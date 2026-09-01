@@ -1,113 +1,54 @@
-#!/usr/bin/env python3
-"""indexnow_submit — Submit URLs to IndexNow (Bing/DuckDuckGo/Yandex).
+"""
+indexnow_submit.py — submit all AEO page URLs to Bing/DuckDuckGo/Yandex via
+IndexNow (credential-free, no Webmaster account needed).
 
-Reads sitemap.xml, extracts up to 10k URLs, submits via IndexNow API
-using the stored key. Tracks submission state in /root/empire_os/feedback/indexnow.jsonl.
+The key file lives at https://empire-ai.co.uk/<KEY>.txt (served by caddy from
+/srv/aeo). Run after generating/updating AEO pages.
 
-Key: /srv/aeo/{key}.txt (must be publicly served at /{key}.txt)
+Run:
+  python3 indexnow_submit.py
 """
 from __future__ import annotations
-import json
-import os
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
-import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+import json, re, urllib.request, urllib.error
 from pathlib import Path
 
-SITEMAP = "/srv/aeo/sitemap.xml"
-AEO_DIR = Path("/srv/aeo")
-HOST = "empire-ai.co.uk"
-LOG_PATH = Path("/root/empire_os/feedback/indexnow.jsonl")
-LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-MAX_URLS = 10000  # IndexNow hard cap
+KEY = "d857ca343ba6a720246b88872937f277"
+KEY_FILE = f"https://empire-ai.co.uk/{KEY}.txt"
+SITEMAP = Path("/srv/aeo/sitemap.xml")
+API = "https://api.indexnow.org/indexnow"
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def collect_urls() -> list[str]:
+    xml = SITEMAP.read_text()
+    return re.findall(r"<loc>(.*?)</loc>", xml)
 
 
-def _log(record: dict) -> None:
-    with open(LOG_PATH, "a") as f:
-        f.write(json.dumps(record, default=str) + "\n")
-
-
-def find_key() -> str:
-    """Find the IndexNow key (32 hex chars) in /srv/aeo/{key}.txt."""
-    for p in AEO_DIR.glob("*.txt"):
-        if len(p.stem) == 32 and all(c in "0123456789abcdef" for c in p.stem.lower()):
-            return p.stem
-    return ""
-
-
-def read_sitemap(max_urls: int = MAX_URLS) -> list:
-    """Read up to max_urls URLs from sitemap."""
-    try:
-        tree = ET.parse(SITEMAP)
-        urls = [u.text for u in tree.getroot().iter()
-                if u.text and "empire-ai.co.uk" in u.text]
-        return urls[:max_urls]
-    except Exception as e:
-        _log({"ts": _now(), "event": "read_sitemap_error", "error": str(e)[:200]})
-        return []
-
-
-def submit(urls: list, key: str) -> dict:
-    """Submit URLs to IndexNow."""
-    if not urls or not key:
-        return {"ok": False, "error": "missing_input"}
-    key_url = f"https://{HOST}/{key}.txt"
-    payload = {
-        "host": HOST,
-        "key": key,
-        "keyLocation": key_url,
+def submit(urls: list[str]) -> int:
+    payload = json.dumps({
+        "host": "empire-ai.co.uk",
+        "key": KEY,
+        "keyLocation": KEY_FILE,
         "urlList": urls,
-    }
-    body = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        "https://api.indexnow.org/indexnow",
-        data=body,
-        headers={"Content-Type": "application/json"},
-    )
+    }).encode()
+    req = urllib.request.Request(API, data=payload,
+                                 headers={"Content-Type": "application/json"},
+                                 method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return {
-                "ok": True,
-                "status": r.status,
-                "url_count": len(urls),
-            }
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return r.status
     except urllib.error.HTTPError as e:
-        return {
-            "ok": False,
-            "status": e.code,
-            "error": e.read().decode()[:200],
-            "url_count": len(urls),
-        }
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200], "url_count": len(urls)}
+        return e.code
 
 
-def main() -> dict:
-    key = find_key()
-    if not key:
-        return {"ok": False, "error": "no_key_file"}
-
-    urls = read_sitemap()
+def main():
+    urls = collect_urls()
     if not urls:
-        return {"ok": False, "error": "no_urls"}
-
-    summary = {
-        "ts": _now(),
-        "key": key[:8] + "...",
-        "url_count": len(urls),
-    }
-    result = submit(urls, key)
-    summary.update(result)
-    _log(summary)
-    return summary
+        print("no URLs found in sitemap")
+        return
+    code = submit(urls)
+    print(f"[indexnow] submitted {len(urls)} URLs -> HTTP {code}")
+    print("  (202=accepted by Bing/DuckDuckGo/Yandex; indexing follows)")
 
 
 if __name__ == "__main__":
-    print(json.dumps(main(), indent=2, default=str))
+    main()

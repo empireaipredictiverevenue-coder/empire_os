@@ -110,7 +110,18 @@ def main():
     linked = inject_crosslinks(niches)
     print(f"[backlinks] cross-linked {linked} pages")
     sync_to_hub()
-    print("[backlinks] synced to hub. Done.")
+    print("[backlinks] synced to hub.")
+    # IndexNow: push all URLs to Bing/DuckDuckGo/Yandex (credential-free)
+    try:
+        import subprocess, sys
+        r = subprocess.run([sys.executable,
+                            str(Path(__file__).parent / "indexnow_submit.py")],
+                           capture_output=True, text=True, timeout=30)
+        for line in r.stdout.strip().splitlines():
+            if "indexnow" in line:
+                print(f"[backlinks] {line}")
+    except Exception as e:
+        print(f"[backlinks] indexnow err: {e}")
 
 
 if __name__ == "__main__":
