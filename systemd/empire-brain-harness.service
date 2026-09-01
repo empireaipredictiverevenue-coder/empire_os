@@ -1,0 +1,16 @@
+[Unit]
+Description=Empire OS Brain Harness (fleet control plane cycle)
+After=network.target empire-hub-8081.service
+Wants=empire-hub-8081.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/empire_os
+EnvironmentFile=-/root/empire_os/.env
+ExecStart=/root/venv/bin/python3 -u /root/empire_os/empire_os/brain_harness.py
+StandardOutput=append:/root/empire_os/logs/brain_harness.log
+StandardError=append:/root/empire_os/logs/brain_harness.log
+
+[Install]
+WantedBy=multi-user.target
