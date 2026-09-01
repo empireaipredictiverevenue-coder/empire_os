@@ -147,6 +147,41 @@ setTimeout(function(){{
 </html>"""
 
 
+def _register_expected_payment(ctx: dict) -> None:
+    """When a buyer opens the pay page, register an expected_payment so the
+    payment_matcher has a row to reconcile the inbound USDT transfer against.
+    Without this, paid transfers land in si_unmatched_deposits and never
+    activate the buyer. Idempotent on ref (memo)."""
+    memo = ctx.get("memo", "")
+    if not memo:
+        return
+    amt = float(ctx.get("amount_usdc", 0) or 0)
+    if amt <= 0:
+        return
+    kind = ctx.get("kind", "")
+    tenant = ""
+    email = ""
+    if kind == "a2a":
+        tenant = "a2a"
+    elif kind == "seat":
+        tenant = ctx.get("title", "seat")[:40]
+    elif kind == "pilot":
+        tenant = "pilot"
+    try:
+        c = sqlite3.connect(DB, timeout=20)
+        c.execute(
+            "INSERT OR IGNORE INTO expected_payments "
+            "(amount_usd, email, tenant_id, ref, status, created_at) "
+            "VALUES (?,?,?,?, 'pending', datetime('now'))",
+            (amt, email, tenant, memo),
+        )
+        c.commit()
+        c.close()
+    except Exception as e:
+        # non-fatal: page still renders; matcher may still match on amount
+        print(f"[pay_landing] expected_payment insert failed: {e}", flush=True)
+
+
 def render_pay_page(memo: str) -> HTMLResponse:
     ctx = _resolve(memo)
     if not ctx:
@@ -158,4 +193,5 @@ def render_pay_page(memo: str) -> HTMLResponse:
             "</body></html>",
             status_code=404,
         )
+    _register_expected_payment(ctx)
     return HTMLResponse(_page(ctx))
