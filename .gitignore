@@ -1,11 +1,27 @@
+# Secrets / local configuration
 .env
-empire_os.db
-empire_os.db-wal
-empire_os.db-shm
-__pycache__/
-.env
-empire_os.db
-empire_os.db-wal
-empire_os.db-shm
+.env.*
+!.env.example
+.env~
+
+# Local databases and SQLite sidecars
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+
+# Python caches
 __pycache__/
 *.pyc
+
+# Local recovery / backup artifacts
+*.bak
+*.backup
+*.dump
+*.sql.gz
+
+# Runtime / logs
+*.log
