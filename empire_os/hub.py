@@ -1867,13 +1867,13 @@ def product_register(req: dict):
 # ─────────────────────────────────────────────────────────────────
 
 SWARM_REGISTRY_PATH = "/root/feedback/swarm_registry.jsonl"
-SWARM_AUDIT_PATH = "/root/feedback/swarm_audit.jsonl"
+SWARM_AUDIT_PATH = os.environ.get("SWARM_AUDIT_PATH", os.path.join(os.environ.get("SWARM_AUDIT_DIR", "/srv/empire_os/runtime/feedback"), "swarm_audit.jsonl"))
 import json as _json
 
 
 def _swarm_audit(event_type: str, **fields):
     """Append-only audit trail for every swarm routing decision."""
-    Path("/root/feedback").mkdir(parents=True, exist_ok=True)
+    Path(os.getenv("SWARM_AUDIT_DIR", "/srv/empire_os/runtime/feedback")).mkdir(parents=True, exist_ok=True)
     entry = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "event": event_type,

@@ -33,9 +33,12 @@ class PayoutEngine:
     DB-side batch management.
     """
 
-    def __init__(self, db_path: str = "/root/empire_os/empire_os.db"):
-        self.db_path = db_path
-        self.conn = sqlite3.connect(db_path, timeout=30)
+    def __init__(self, db_path: str | None = None):
+        self.db_path = db_path or os.getenv(
+            "EMPIRE_DB_PATH",
+            os.getenv("DB_PATH", "/root/empire_os/empire_os.db"),
+        )
+        self.conn = sqlite3.connect(self.db_path, timeout=30)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA busy_timeout=30000")

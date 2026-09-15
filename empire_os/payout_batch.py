@@ -46,7 +46,7 @@ class PayoutBatchStore:
     """Persists payout batches to disk so they survive hub restarts."""
 
     def __init__(self, path: Optional[Path] = None):
-        self.path = path or Path("/root/.empire/payout_batches.json")
+        self.path = path or Path(os.getenv("PAYOUT_BATCHES_PATH", "/srv/empire_os/runtime/payout_batches.json"))
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.batches: list = []
         self._load()
