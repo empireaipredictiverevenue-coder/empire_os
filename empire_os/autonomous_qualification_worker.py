@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from empire_os.lead_scoring import compute_lead_score
+from empire_os.prospect_enrichment import enrich_prospect_for_scoring
 
 
 ENV_PATH = "/etc/empire_os.env"
@@ -252,7 +253,22 @@ def qualify(prospect_id: str) -> dict[str, Any]:
     score_input.setdefault("enrichment_score", 0)
     score_input.setdefault("social_links", [])
 
-    result = compute_lead_score(score_input)
+    initial_result = compute_lead_score(score_input)
+    enrichment: dict[str, Any] | None = None
+
+    # Only spend public-web enrichment time on records that have enough
+    # evidence to be worth improving, while keeping the raw prospect intact.
+    if initial_result["tier"] == "cold":
+        enrichment = enrich_prospect_for_scoring(prospect)
+        score_input.update(enrichment.get("fields", {}))
+        score_input["enrichment_score"] = enrichment.get(
+            "enrichment_score",
+            0,
+        )
+        result = compute_lead_score(score_input)
+        result["enrichment"] = enrichment
+    else:
+        result = initial_result
 
     qualification = upsert_qualification(
         prospect,
