@@ -41,7 +41,12 @@ from typing import Any
 
 sys.path.insert(0, "/root/empire_os")
 
-LOG = Path("/root/feedback/satellite_damage.jsonl")
+LOG = Path(
+    os.getenv(
+        "SATELLITE_DAMAGE_LOG",
+        "/srv/empire_os/runtime/feedback/satellite_damage.jsonl",
+    )
+)
 LOG.parent.mkdir(parents=True, exist_ok=True)
 DB_PATH = "/root/empire_os/empire_os.db"
 BDA_WEIGHTS_PATH = "/opt/bda_ckpt/unet_xview2.weights.json"

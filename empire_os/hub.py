@@ -1222,7 +1222,12 @@ async def buy_leads_page():
 
 
 
-RESEND_WEBHOOK_LOG = Path("/root/feedback/resend_webhook.jsonl")
+RESEND_WEBHOOK_LOG = Path(
+    os.getenv(
+        "RESEND_WEBHOOK_LOG",
+        "/srv/empire_os/runtime/feedback/resend_webhook.jsonl",
+    )
+)
 RESEND_WEBHOOK_LOG.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -5677,7 +5682,12 @@ def score_prospect(prospect_id: str):
 
 
 # --- Swarm pub/sub (file-backed, lets containers share events) ---
-SWARMS_LOG = Path("/root/swarms/events.jsonl")
+SWARMS_LOG = Path(
+    os.getenv(
+        "SWARMS_LOG",
+        "/srv/empire_os/runtime/swarms/events.jsonl",
+    )
+)
 SWARMS_LOG.parent.mkdir(parents=True, exist_ok=True)
 SWARMS_MAX_LINES = 5000  # bounded
 
