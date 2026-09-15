@@ -999,14 +999,24 @@ def direct_lead_intake(req: dict):
     if not niche or not metro:
         raise HTTPException(400, "niche and metro required")
 
-    score = int(req.get("lead_score", 50))
-    score = max(0, min(100, score))
-    if score >= 75:
-        tier = "gold"
-    elif score >= 50:
-        tier = "silver"
-    else:
-        tier = "bronze"
+    # Omega 2.0 is the canonical intelligence source. Any incoming
+    # legacy lead_score remains informational and is not used to derive
+    # the stored Omega score/tier.
+    from empire_os.intelligence.compat import legacy_fields
+
+    omega = legacy_fields({
+        "business_name": req.get("name", ""),
+        "phone": req.get("phone", ""),
+        "email": req.get("email", ""),
+        "metro": metro,
+        "state": req.get("state", ""),
+        "niche": niche,
+        "details": req.get("details", ""),
+        "source": req.get("source", "api"),
+        "status": "pending",
+    })
+    score = omega["omega_score"]
+    tier = omega["omega_tier"]
 
     # We're inside empire-hub, so we can write directly to the DB
     if not backend:
