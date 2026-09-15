@@ -256,17 +256,44 @@ def qualify(prospect_id: str) -> dict[str, Any]:
     initial_result = compute_lead_score(score_input)
     enrichment: dict[str, Any] | None = None
 
-    # Only spend public-web enrichment time on records that have enough
-    # evidence to be worth improving, while keeping the raw prospect intact.
-    if initial_result["tier"] == "cold":
+    # Enrichment is driven by missing evidence, not preliminary tier.
+    required_fields = (
+        "email",
+        "contact_name",
+        "website",
+        "street",
+        "city",
+        "state",
+        "zip",
+        "social_links",
+    )
+    missing_fields = [
+        field
+        for field in required_fields
+        if not score_input.get(field)
+        and score_input.get(field) != 0
+    ]
+
+    should_enrich = bool(missing_fields) and (
+        initial_result["tier"] in {"cold", "warm"}
+        or not score_input.get("enrichment_score")
+    )
+
+    if should_enrich:
         enrichment = enrich_prospect_for_scoring(prospect)
         score_input.update(enrichment.get("fields", {}))
         score_input["enrichment_score"] = enrichment.get(
             "enrichment_score",
             0,
         )
+        score_input["omega_score"] = prospect.get("omega_score", 0) or 0
+
         result = compute_lead_score(score_input)
         result["enrichment"] = enrichment
+        result["enrichment_trigger"] = {
+            "missing_fields": missing_fields,
+            "initial_tier": initial_result["tier"],
+        }
     else:
         result = initial_result
 
