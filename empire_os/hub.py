@@ -1910,14 +1910,27 @@ def hub_intake(req: dict):
     # Step 1: Label
     niche = req.get("niche") or _infer_niche(text)
     metro = req.get("metro") or _infer_metro(text) or ""
-    lead_score = req.get("lead_score")
-    if lead_score is None:
-        # Heuristic: keyword density * 10 + contact-presence bump
-        kw_score = sum(1 for kw in ["need ", " quote", " emergency",
-                                     " asap", " urgent", " broken"]
-                       if kw in text.lower()) * 12
-        contact_score = (10 if email else 0) + (10 if phone else 0)
-        lead_score = min(100, 35 + kw_score + contact_score)
+
+    # Omega 2.0 is the canonical intelligence source. Any incoming
+    # legacy lead_score remains informational and is not used to derive
+    # the stored/returned Omega score.
+    from empire_os.intelligence.compat import legacy_fields
+
+    omega = legacy_fields({
+        "business_name": req.get("name", ""),
+        "contact_name": req.get("contact_name", ""),
+        "phone": phone,
+        "email": email,
+        "website": req.get("url", ""),
+        "metro": metro,
+        "state": req.get("state", ""),
+        "niche": niche,
+        "sub_niche": req.get("sub_niche", ""),
+        "details": text,
+        "source": req.get("source", "hub_intake"),
+        "status": "pending",
+    })
+    lead_score = omega["omega_score"]
 
     payload_hash = hashlib.sha256(
         (text + email + phone).encode()).hexdigest()[:16]
