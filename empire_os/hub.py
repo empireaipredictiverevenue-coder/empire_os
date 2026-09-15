@@ -672,10 +672,12 @@ def scan_competitor_niche(niche: str):
 # --- CRM / Lead Intake ---
 
 class LeadIntakeRequest(BaseModel):
+    lead_id: str = ""
     name: str = ""
     email: str = ""
     phone: str = ""
     state: str = ""
+    metro: str = ""
     zip: str = ""
     niche: str = ""
     details: str = ""
@@ -948,29 +950,109 @@ def satellite_strike(req: dict):
         import traceback
         raise HTTPException(500, detail=str(e)[:300] + " | " + traceback.format_exc()[:200])
 
+@app.post("/v1/leads/intake")
 def lead_intake(req: LeadIntakeRequest):
-    """Capture a lead from AEO form → route → score → store."""
+    """Capture and persist an inbound lead through the Omega 2.0 boundary."""
     if not backend:
         raise HTTPException(503, "backend not initialized")
+
+    from empire_os.intelligence.compat import analyze_with_legacy_fields
+
+    external_id = req.lead_id or ""
+    stable_uid = external_id.strip() or (f"lead:{req.email.strip()}" if req.email.strip() else "")
+
+    if not stable_uid:
+        import uuid
+        stable_uid = f"lead:{uuid.uuid4()}"
+
+    metro = req.metro.strip()
+    lead = {
+        "business_name": req.name,
+        "email": req.email,
+        "phone": req.phone,
+        "state": req.state,
+        "zip": req.zip,
+        "metro": metro,
+        "niche": req.niche,
+        "details": req.details,
+        "source": req.source,
+        "status": "raw",
+    }
+
+    prediction, omega_fields = analyze_with_legacy_fields(lead)
+
+    existing = backend.execute(
+        "SELECT id FROM crm_leads WHERE lead_uid = ?",
+        (stable_uid,),
+    ).fetchone()
+    if existing:
+        return {
+            "ok": True,
+            "already": True,
+            "lead_id": existing[0],
+            "lead_uid": stable_uid,
+            "score": omega_fields["omega_score"],
+            "tier": omega_fields["omega_tier"],
+            "prediction": prediction.to_dict(),
+        }
+
+    now = datetime.now(timezone.utc).isoformat()
+
     try:
-        from empire_os.crm import intake_lead
-        result = intake_lead(
-            backend,
-            name=req.name,
-            email=req.email,
-            phone=req.phone,
-            state=req.state,
-            niche=req.niche,
-            details=req.details,
-            source=req.source,
-            ip_address=req.ip_address,
-            user_agent=req.user_agent,
+        backend.execute(
+            """INSERT INTO crm_leads
+               (lead_uid, source, business_name, email, phone, metro, niche,
+                state, zip, omega_score, omega_tier, status, notes,
+                created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'raw', ?, ?, ?)""",
+            (
+                stable_uid,
+                req.source,
+                req.name,
+                req.email,
+                req.phone,
+                metro,
+                req.niche,
+                req.state,
+                req.zip,
+                omega_fields["omega_score"],
+                omega_fields["omega_tier"],
+                req.details[:1000],
+                now,
+                now,
+            ),
         )
-        if "error" in result:
-            raise HTTPException(500, result["error"])
-        return result
-    except ImportError as e:
-        raise HTTPException(503, f"CRM module not available: {e}")
+        crm_id = backend.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        backend.execute(
+            "INSERT INTO crm_activities "
+            "(lead_id, act_type, summary, detail, actor) "
+            "VALUES (?, 'system', ?, ?, 'omega-2.0')",
+            (
+                crm_id,
+                "Inbound lead scored by Omega 2.0",
+                json.dumps({
+                    "model_version": prediction.model_version,
+                    "opportunity_score": prediction.opportunity_score,
+                    "confidence": prediction.confidence,
+                    "next_best_action": prediction.next_best_action,
+                }),
+            ),
+        )
+        backend.commit()
+    except Exception as e:
+        raise HTTPException(500, f"CRM write failed: {e}")
+
+    return {
+        "ok": True,
+        "already": False,
+        "lead_id": crm_id,
+        "lead_uid": stable_uid,
+        "score": omega_fields["omega_score"],
+        "tier": omega_fields["omega_tier"],
+        "status": "raw",
+        "prediction": prediction.to_dict(),
+    }
 
 
 @app.get("/v1/leads/counts")
