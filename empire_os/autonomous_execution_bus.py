@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -946,20 +947,37 @@ def run_one_job() -> bool:
                 "complete_gtm_job rejected the lease"
             )
 
-        insert_event(
-            event_type="gtm_job_completed",
-            job=job,
-            payload=result,
-            idempotency_key=(
-                f"job:{job.id}:completed:{job.attempts}"
-            ),
-        )
+        # The database state transition is authoritative. Once the job
+        # is completed, a telemetry/audit write must never push the same
+        # job through the failure path and attempt to re-lease/retry it.
+        try:
+            insert_event(
+                event_type="gtm_job_completed",
+                job=job,
+                payload=result,
+                idempotency_key=(
+                    f"job:{job.id}:completed:{job.attempts}"
+                ),
+            )
+            completion_event_recorded = True
+        except Exception as event_exc:
+            completion_event_recorded = False
+            log(
+                "ERROR",
+                "completion_event_deferred",
+                job_id=job.id,
+                error=str(event_exc)[:1000],
+                idempotency_key=(
+                    f"job:{job.id}:completed:{job.attempts}"
+                ),
+            )
 
         log(
             "INFO",
             "job_completed",
             job_id=job.id,
             duration_ms=elapsed_ms,
+            completion_event_recorded=completion_event_recorded,
         )
 
         return True
@@ -1065,6 +1083,19 @@ def print_status() -> None:
 
 
 def main() -> None:
+    shutdown_event = threading.Event()
+
+    def request_shutdown(signum: int, _frame: Any) -> None:
+        log(
+            "INFO",
+            "shutdown_requested",
+            signal=signum,
+        )
+        shutdown_event.set()
+
+    signal.signal(signal.SIGINT, request_shutdown)
+    signal.signal(signal.SIGTERM, request_shutdown)
+
     parser = argparse.ArgumentParser(
         description="Empire OS Autonomous Execution Bus",
     )
@@ -1106,7 +1137,7 @@ def main() -> None:
 
         return
 
-    while True:
+    while not shutdown_event.is_set():
         try:
             processed = run_once()
 
@@ -1123,9 +1154,15 @@ def main() -> None:
                 error=str(exc)[:1000],
             )
 
-        time.sleep(
+        shutdown_event.wait(
             max(IDLE_SLEEP_SECONDS, 5)
         )
+
+    log(
+        "INFO",
+        "bus_stop",
+        reason="shutdown_requested",
+    )
 
 
 if __name__ == "__main__":
