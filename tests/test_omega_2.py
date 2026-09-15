@@ -100,6 +100,39 @@ def test_analyze_many_ranks_by_commercial_value():
     assert results[0].expected_gross_profit >= results[1].expected_gross_profit
 
 
+def test_legacy_omega_score_does_not_change_omega_2_prediction():
+    lead = {
+        "business_name": "Example Roofing",
+        "phone": "+1 555 0100",
+        "email": "owner@example.com",
+        "website": "https://example.com",
+        "city": "Dallas",
+        "state": "TX",
+        "niche": "roofing",
+        "status": "qualified",
+        "details": "Commercial roofing replacement opportunity.",
+    }
+
+    low_legacy = analyze({**lead, "omega_score": 0})
+    high_legacy = analyze({**lead, "omega_score": 100})
+
+    assert low_legacy.quality_probability == high_legacy.quality_probability
+    assert low_legacy.buyer_fit_probability == high_legacy.buyer_fit_probability
+    assert low_legacy.engagement_probability == high_legacy.engagement_probability
+    assert low_legacy.conversion_probability == high_legacy.conversion_probability
+    assert low_legacy.payment_probability == high_legacy.payment_probability
+    assert low_legacy.expected_revenue == high_legacy.expected_revenue
+    assert low_legacy.expected_gross_profit == high_legacy.expected_gross_profit
+    assert low_legacy.opportunity_score == high_legacy.opportunity_score
+    assert low_legacy.confidence == high_legacy.confidence
+    assert low_legacy.next_best_action == high_legacy.next_best_action
+    assert low_legacy.reasons == high_legacy.reasons
+
+    # The compatibility score is generated from the new Omega 2.0
+    # prediction, not copied from the caller's legacy score.
+    assert low_legacy.legacy_omega_score == high_legacy.legacy_omega_score
+
+
 def test_analyze_uses_canonical_feature_extractor(monkeypatch):
     canonical = LeadFeatures(
         has_identity=True,

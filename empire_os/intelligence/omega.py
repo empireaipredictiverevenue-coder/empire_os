@@ -95,6 +95,12 @@ def _quality(features: LeadFeatures) -> tuple[float, list[str]]:
 
 
 def _buyer_fit(features: LeadFeatures) -> tuple[float, list[str]]:
+    """Estimate buyer fit from current lead evidence only.
+
+    Legacy Omega is intentionally excluded from this calculation. The
+    legacy score remains available on LeadFeatures for compatibility and
+    audit purposes, but it must not become an input to Omega 2.0.
+    """
     score = 0.25
     reasons: list[str] = []
 
@@ -104,11 +110,15 @@ def _buyer_fit(features: LeadFeatures) -> tuple[float, list[str]]:
 
     if features.has_identity or features.has_website:
         score += 0.15
+        reasons.append("business identity signal present")
 
     if features.has_location:
         score += 0.10
+        reasons.append("target location identified")
 
-    score += 0.20 * _clamp(features.legacy_omega_score / 100.0)
+    if features.contactability > 0:
+        score += 0.15
+        reasons.append("contactability signal present")
 
     if features.status in {"new", "qualified", "raw"}:
         score += 0.10
