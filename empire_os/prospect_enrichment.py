@@ -168,12 +168,22 @@ def _extract_site(url: str) -> dict[str, Any]:
     if email_candidates:
         result["email"] = email_candidates[0]
 
-    phones = re.findall(
-        r"(?<!\d)(?:\+?1[\s.\-]?)?(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]\d{4}(?!\d)",
+    phone_sources = (
         body,
+        result.get("site_title", ""),
+        result.get("meta_description", ""),
     )
+    phones = []
+    for source_text in phone_sources:
+        for match in re.findall(
+            r"(?<!\d)(?:\+?1[\s.\-]?)?(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]\d{4}(?!\d)",
+            str(source_text),
+        ):
+            value = match.strip()
+            if value not in phones:
+                phones.append(value)
     if phones:
-        result["phone"] = phones[0].strip()
+        result["phone"] = phones[0]
 
     social_map = {
         "facebook": r"https?://(?:www\.)?facebook\.com/[^\s\"'<>]+",
@@ -190,6 +200,25 @@ def _extract_site(url: str) -> dict[str, Any]:
                 socials.append(value)
     if socials:
         result["social_links"] = json.dumps(socials)
+
+    # Extract explicit structured address data when present.
+    # Never infer a street address from a city or ZIP alone.
+    address_patterns = (
+        (r'"streetAddress"\s*:\s*"([^"]+)"', "street"),
+        (r'"addressLocality"\s*:\s*"([^"]+)"', "city"),
+        (r'"addressRegion"\s*:\s*"([A-Za-z]{2})"', "state"),
+        (r'"postalCode"\s*:\s*"([0-9]{5}(?:-[0-9]{4})?)"', "zip"),
+        (r'data-address-line1=["\']([^"\']+)', "street"),
+        (r'data-address-locality=["\']([^"\']+)', "city"),
+        (r'data-address-region=["\']([A-Za-z]{2})', "state"),
+        (r'data-postal-code=["\']([0-9]{5}(?:-[0-9]{4})?)', "zip"),
+    )
+    for pattern, field_name in address_patterns:
+        match = re.search(pattern, body, re.IGNORECASE)
+        if match and field_name not in result:
+            value = html.unescape(match.group(1)).strip()
+            if value:
+                result[field_name] = value
 
     return result
 
@@ -273,27 +302,36 @@ def enrich_prospect_for_scoring(prospect: dict[str, Any]) -> dict[str, Any]:
                 }
             )
 
-    # A separate business-signals source is credited only when enrichment
-    # actually surfaced business-facing contact or social evidence.
-    if any(k in fields for k in ("email", "phone", "social_links")):
-        source_names.append("business_signals")
-        evidence.append(
-            {
-                "source": "business_signals",
-                "fields": [
-                    k for k in ("email", "phone", "social_links") if k in fields
-                ],
-            }
-        )
-
     unique_sources = []
     for source in source_names:
         if source not in unique_sources:
             unique_sources.append(source)
 
+    source_quality = sum(
+        SOURCE_WEIGHTS.get(source, 0)
+        for source in unique_sources
+    )
+
+    useful_fields = {
+        "email",
+        "phone",
+        "website",
+        "street",
+        "city",
+        "state",
+        "zip",
+        "social_links",
+        "domain_created",
+    }
+    field_coverage = len(useful_fields.intersection(fields.keys()))
+
     quality = min(
         100.0,
-        sum(SOURCE_WEIGHTS.get(source, 0) for source in unique_sources),
+        round(
+            source_quality * 0.55
+            + min(field_coverage, 7) * 5,
+            1,
+        ),
     )
 
     return {
