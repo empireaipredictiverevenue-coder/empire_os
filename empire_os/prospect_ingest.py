@@ -432,3 +432,101 @@ def lookup_existing_prospect(
         "rows_scanned": len(rows),
         "pages_scanned": pages,
     }
+
+
+def materialize_prospect(
+    prepared: dict[str, Any],
+    lookup_result: dict[str, Any],
+    writer,
+) -> dict[str, Any]:
+    """
+    Materialize a prepared prospect after conservative lookup.
+
+    Existing or ambiguous identities are returned without writing.
+    Only a lookup decision of ``new`` may reach the injected atomic writer.
+    """
+    prospect = prepared.get("prospect")
+    evidence = prepared.get("evidence")
+    ingest_key = prepared.get("ingest_key")
+
+    if not isinstance(prospect, dict):
+        raise ProspectIngestError(
+            "prepared candidate missing prospect payload"
+        )
+
+    if not isinstance(evidence, dict):
+        raise ProspectIngestError(
+            "prepared candidate missing evidence payload"
+        )
+
+    if not isinstance(ingest_key, str) or not ingest_key:
+        raise ProspectIngestError(
+            "prepared candidate missing ingest key"
+        )
+
+    if not isinstance(lookup_result, dict):
+        raise ProspectIngestError(
+            "invalid prospect lookup result"
+        )
+
+    decision = lookup_result.get("decision")
+
+    if decision in {"matched", "ambiguous"}:
+        return dict(lookup_result)
+
+    if decision != "new":
+        raise ProspectIngestError(
+            "invalid prospect lookup decision"
+        )
+
+    result = writer(
+        {
+            "prospect": dict(prospect),
+            "evidence": dict(evidence),
+            "ingest_key": ingest_key,
+            "identity_keys": prospect_identity_keys(prepared),
+        }
+    )
+
+    if not isinstance(result, dict):
+        raise ProspectIngestError(
+            "prospect writer returned invalid response"
+        )
+
+    return result
+
+
+
+def prospect_identity_keys(
+    prepared: dict[str, Any],
+) -> list[str]:
+    """
+    Derive all strong deterministic identity keys available.
+
+    Name + metro is always retained. When a normalized phone exists,
+    phone + metro is added as an additional concurrency/idempotency claim.
+    """
+    prospect = prepared.get("prospect")
+
+    if not isinstance(prospect, dict):
+        raise ProspectIngestError(
+            "prepared candidate missing prospect payload"
+        )
+
+    business_name = _key(prospect.get("business_name"))
+    metro = _key(prospect.get("metro"))
+    phone = _phone(prospect.get("phone"))
+
+    if not business_name or not metro:
+        raise ProspectIngestError(
+            "prepared candidate missing strong identity"
+        )
+
+    keys: list[str] = []
+
+    if phone:
+        keys.append(f"phone_metro:{phone}|{metro}")
+
+    keys.append(f"name_metro:{business_name}|{metro}")
+
+    return keys

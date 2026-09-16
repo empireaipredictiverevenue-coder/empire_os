@@ -301,3 +301,44 @@ def test_materializer_rejects_non_integer_batch():
         bus._materialize_qualification_jobs(
             claimed_job(target_payload("five"))
         )
+
+
+def test_atomic_prospect_writer_calls_ingest_rpc(monkeypatch):
+    seen = {}
+
+    def fake_rest(method, path, **kwargs):
+        seen["method"] = method
+        seen["path"] = path
+        seen["payload"] = kwargs.get("payload")
+        return {
+            "decision": "created",
+            "prospect": {"id": "prospect-1"},
+        }
+
+    monkeypatch.setattr(bus, "_rest_json", fake_rest)
+
+    payload = {
+        "prospect": {
+            "business_name": "Acme Roofing",
+            "niche": "roofing",
+            "metro": "austin",
+        },
+        "evidence": {"source": "permits"},
+        "ingest_key": "ingest-1",
+        "identity_keys": [
+            "phone_metro:5125550101|austin",
+            "name_metro:acme roofing|austin",
+        ],
+    }
+
+    result = bus._write_canonical_prospect(payload)
+
+    assert result["decision"] == "created"
+    assert seen["method"] == "POST"
+    assert seen["path"] == "/rest/v1/rpc/ingest_prospect_atomic"
+    assert seen["payload"] == {
+        "p_prospect": payload["prospect"],
+        "p_evidence": payload["evidence"],
+        "p_ingest_key": payload["ingest_key"],
+        "p_identity_keys": payload["identity_keys"],
+    }

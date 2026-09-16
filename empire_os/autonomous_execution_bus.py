@@ -528,6 +528,50 @@ def _rest_json(
         ) from exc
 
 
+
+
+def _write_canonical_prospect(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    prospect = payload.get("prospect")
+    evidence = payload.get("evidence")
+    ingest_key = payload.get("ingest_key")
+    identity_keys = payload.get("identity_keys")
+
+    if not isinstance(prospect, dict):
+        raise BusError("canonical prospect writer missing prospect")
+
+    if not isinstance(evidence, dict):
+        raise BusError("canonical prospect writer missing evidence")
+
+    if not isinstance(ingest_key, str) or not ingest_key:
+        raise BusError("canonical prospect writer missing ingest_key")
+
+    if (
+        not isinstance(identity_keys, list)
+        or not identity_keys
+        or not all(isinstance(key, str) and key for key in identity_keys)
+    ):
+        raise BusError("canonical prospect writer missing identity_keys")
+
+    result = _rest_json(
+        "POST",
+        "/rest/v1/rpc/ingest_prospect_atomic",
+        payload={
+            "p_prospect": prospect,
+            "p_evidence": evidence,
+            "p_ingest_key": ingest_key,
+            "p_identity_keys": identity_keys,
+        },
+    )
+
+    if not isinstance(result, dict):
+        raise BusError(
+            "canonical prospect ingest returned invalid response"
+        )
+
+    return result
+
 def _qualification_candidates(
     *,
     family: str,

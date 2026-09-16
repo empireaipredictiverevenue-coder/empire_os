@@ -516,3 +516,141 @@ def test_readonly_lookup_rejects_invalid_response():
             prepared,
             lambda path, params: {"bad": "shape"},
         )
+
+
+def test_materialize_new_prospect_uses_atomic_writer():
+    from empire_os.prospect_ingest import materialize_prospect
+
+    prepared = prepare_candidate(
+        {
+            "name": "Acme Roofing",
+            "phone": "5125550101",
+            "niche": "roofing",
+            "metro": "austin",
+            "source": "permits",
+            "url": "https://example.gov/permit/123",
+        }
+    )
+
+    calls = []
+
+    def writer(payload):
+        calls.append(payload)
+        return {
+            "decision": "created",
+            "prospect": {"id": "prospect-1"},
+        }
+
+    result = materialize_prospect(
+        prepared,
+        {
+            "decision": "new",
+            "reason": "no_strong_identity_match",
+            "prospect": None,
+        },
+        writer,
+    )
+
+    assert result["decision"] == "created"
+    assert result["prospect"]["id"] == "prospect-1"
+    assert len(calls) == 1
+    assert calls[0]["prospect"] == prepared["prospect"]
+    assert calls[0]["evidence"] == prepared["evidence"]
+    assert calls[0]["ingest_key"] == prepared["ingest_key"]
+    assert calls[0]["identity_keys"] == [
+        "phone_metro:5125550101|austin",
+        "name_metro:acme roofing|austin",
+    ]
+
+
+def test_materialize_matched_prospect_never_writes():
+    from empire_os.prospect_ingest import materialize_prospect
+
+    prepared = prepare_candidate(
+        {
+            "name": "Acme Roofing",
+            "phone": "5125550101",
+            "niche": "roofing",
+            "metro": "austin",
+        }
+    )
+
+    def writer(payload):
+        raise AssertionError("writer must not be called")
+
+    lookup = {
+        "decision": "matched",
+        "reason": "exact_phone",
+        "prospect": {"id": "existing-1"},
+    }
+
+    result = materialize_prospect(
+        prepared,
+        lookup,
+        writer,
+    )
+
+    assert result == lookup
+
+
+def test_materialize_ambiguous_prospect_never_writes():
+    from empire_os.prospect_ingest import materialize_prospect
+
+    prepared = prepare_candidate(
+        {
+            "name": "Acme Roofing",
+            "niche": "roofing",
+            "metro": "austin",
+        }
+    )
+
+    def writer(payload):
+        raise AssertionError("writer must not be called")
+
+    lookup = {
+        "decision": "ambiguous",
+        "reason": "multiple_exact_name_metro_matches",
+        "prospect": None,
+    }
+
+    result = materialize_prospect(
+        prepared,
+        lookup,
+        writer,
+    )
+
+    assert result == lookup
+
+
+def test_prospect_identity_keys_include_phone_and_name_metro():
+    from empire_os.prospect_ingest import prospect_identity_keys
+
+    prepared = prepare_candidate(
+        {
+            "name": "Acme Roofing",
+            "phone": "+1 (512) 555-0101",
+            "niche": "roofing",
+            "metro": "Austin",
+        }
+    )
+
+    assert prospect_identity_keys(prepared) == [
+        "phone_metro:5125550101|austin",
+        "name_metro:acme roofing|austin",
+    ]
+
+
+def test_prospect_identity_keys_fall_back_to_name_metro():
+    from empire_os.prospect_ingest import prospect_identity_keys
+
+    prepared = prepare_candidate(
+        {
+            "name": "  Acme   Roofing LLC ",
+            "niche": "roofing",
+            "metro": " Austin ",
+        }
+    )
+
+    assert prospect_identity_keys(prepared) == [
+        "name_metro:acme roofing llc|austin"
+    ]
