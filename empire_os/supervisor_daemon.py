@@ -3,7 +3,7 @@
 
 Problems this fixes:
   - 65 agents exist but most are library stubs, never started as processes.
-  - Some generate SIMULATED data (_seed_damage, synthetic_*). NO-SIM policy.
+  - NO-SIM policy: production paths must fail closed rather than fabricate data.
   - Nothing tracks run-state -> dead-by-morning (agents silently stop).
   - No single source of truth for what should be running.
 
@@ -55,7 +55,7 @@ REGISTRY_DATA = {
     # ── SATELLITE / STORM (daemons, but SIM until real source) ──
     "satellite_damage":   {"file": "satellite_damage_agent.py", "mode": "daemon",
                             "sim_risk": "high", "enabled": False,
-                            "note": "USES _seed_damage (synthetic grid). DISABLED until real source."},
+                            "note": "NO-SIM: fail-closed until real imagery and parcel source are wired."},
     "satellite_strike":   {"file": "satellite_strike_agent.py", "mode": "daemon",
                             "sim_risk": "medium", "enabled": True,
                             "note": "NWS storm cells. Null-geom crash fixed."},

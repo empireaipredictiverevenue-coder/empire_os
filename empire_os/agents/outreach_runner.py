@@ -422,53 +422,6 @@ def run_cycle():
     _log("INFO", "cycle_done", processed=processed, sent=sent, skipped=skipped)
 
 
-def seed_from_permits_if_empty() -> int:
-    """Seed si_buyer_outreach cold prospects from lane_leads permits.
-
-    Idempotent — only seeds if there are no current prospects.
-    """
-    body = hub_get("/v1/outreach/prospects/pending", limit=100)
-    if body.get("prospects"):
-        return 0
-
-    try:
-        r = _http.get(f"{HUB_URL}/v1/leads/counts", timeout=10)
-        if r.status_code != 200:
-            return 0
-        # Pull permits via direct DB
-        # Use hub_sql via a fake query — actually use a new endpoint
-        # Simpler: pull from existing /v1/leads/?source=permits_nyc&limit=N
-        r = _http.get(
-            f"{HUB_URL}/v1/lanes/leads/by-source",
-            params={"source": "permits_nyc", "limit": 100},
-            timeout=10,
-        )
-        if r.status_code != 200:
-            return 0
-        leads = r.json().get("leads", [])
-        count = 0
-        for lead in leads:
-            lane_id = lead.get("lane_id", "")
-            niche = lane_id.split(":")[0] if ":" in lane_id else ""
-            p = {
-                "prospect_id": f"permits_nyc_{lead['id']}",
-                "business_name": (lead.get("name", "")).split("(")[0].strip(),
-                "email": "",
-                "metro": lead.get("metro", ""),
-                "niche": niche,
-                "phone": lead.get("phone", ""),
-                "source": "permits_nyc",
-                "score": 70,
-                "url": "",
-            }
-            if register_prospect(p):
-                count += 1
-        return count
-    except Exception as e:
-        _log("ERROR", "seed_failed", error=str(e)[:200])
-        return 0
-
-
 if __name__ == "__main__":
     print(f"[{datetime.now(timezone.utc).isoformat()}] outreach-agent starting "
           f"- interval {INTERVAL_SECONDS}s, limit {CYCLE_PROSPECT_LIMIT}", flush=True)

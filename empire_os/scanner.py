@@ -5,9 +5,8 @@ Each scanner implements `scan(niches=None)` and returns a list of
 raw lead dicts with keys: niche, details, phone, zip_code, name,
 address, source.
 
-The scanners try real public data sources first. When blocked or
-unreachable, they fall back to data-seeded generation based on the
-target niche + location so the pipeline stays exercisable end-to-end.
+The scanners return only observed data from real configured sources.
+When a source is blocked or unavailable, that scanner returns no leads.
 """
 
 from __future__ import annotations
@@ -57,58 +56,6 @@ NICHE_LICENSE_CLASSES = {
 
 def _ts() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _generate_leads_for_niche(niche: str, count: int = 3,
-                              location: str = "FL") -> list[dict]:
-    """Seed-data fallback: generate realistic-looking leads for a niche."""
-    niches_list = list(NICHE_KEYWORDS.keys()) + [niche]
-    if niche not in NICHE_KEYWORDS:
-        niches_list = [niche]
-
-    zips_fl = [
-        ("33101", "Miami"), ("32202", "Jacksonville"),
-        ("33602", "Tampa"), ("32801", "Orlando"),
-        ("33301", "Fort Lauderdale"), ("33701", "St. Petersburg"),
-        ("32901", "Melbourne"), ("32043", "Jacksonville"),
-    ]
-    names = {
-        "roofing": ["Elite Roofing Solutions", "Apex Roofing & Construction",
-                     "Sunstate Roofing Co", "Guardian Roofing Services"],
-        "hvac": ["Coastal Comfort HVAC", "Precision Air Services",
-                 "Climate Control Experts", "All Seasons HVAC"],
-        "mass_torts": ["Law Offices of Miller & Associates",
-                       "Justice Legal Group", "Consumer Rights Law Firm"],
-        "pest_control": ["Bug Free Pest Management", "Guardian Pest Control",
-                         "Termite Shield Services"],
-        "plumbing": ["Drain King Plumbing", "Reliable Rooter Services",
-                     "Flow Right Plumbing"],
-        "electrical": ["Bright Spark Electric", "Power Safe Electric Co",
-                       "Circuit Pro Electrical"],
-    }
-    fallback_names = [
-        "Premier Services LLC", "Advanced Solutions Inc",
-        "Pro Care Contractors", "Quality First Services",
-    ]
-
-    leads = []
-    for i in range(min(count, 4)):
-        zip_code, city = zips_fl[(hash(niche + str(i)) % len(zips_fl))]
-        name_pool = names.get(niche, fallback_names)
-        name = name_pool[i % len(name_pool)]
-        kw_pool = NICHE_KEYWORDS.get(niche, [niche])
-        kw = kw_pool[i % len(kw_pool)] if kw_pool else niche
-        leads.append({
-            "niche": niche,
-            "name": f"{name} #{i+1}",
-            "phone": f"305-55{(i*111+100) % 10000:04d}",
-            "zip_code": zip_code,
-            "details": f"{kw} services in {city}. "
-                       f"Licensed bonded insured. Est. 20{(i+14)%10+10}.",
-            "address": f"{i+1}0{i+2} Main St, {city}, FL {zip_code}",
-            "source": "generated",
-        })
-    return leads
 
 
 # ── Shared helpers ─────────────────────────────────────────────────
@@ -228,9 +175,6 @@ class DBPRScanner(Scanner):
                     all_leads.extend(raw)
                 time.sleep(0.5)  # be polite
 
-        if not all_leads:
-            logger.info("DBPR: no live results, using seed fallback")
-            all_leads = self._fallback(niches)
 
         return all_leads
 
@@ -280,13 +224,6 @@ class DBPRScanner(Scanner):
                 })
         return leads
 
-    def _fallback(self, niches: Optional[list[str]] = None) -> list[dict]:
-        leads = []
-        for niche in (niches or list(NICHE_KEYWORDS.keys())):
-            for county in self.COUNTIES:
-                leads.extend(_generate_leads_for_niche(niche, 1, county))
-        return leads
-
 
 class SunbizScanner(Scanner):
     """FL Sunbiz — Division of Corporation business entity search.
@@ -310,9 +247,6 @@ class SunbizScanner(Scanner):
                     all_leads.extend(raw)
                 time.sleep(0.3)
 
-        if not all_leads:
-            logger.info("Sunbiz: no live results, using seed fallback")
-            all_leads = self._fallback(niches)
 
         return all_leads
 
@@ -358,20 +292,13 @@ class SunbizScanner(Scanner):
                 })
         return leads[:15]
 
-    def _fallback(self, niches: Optional[list[str]] = None) -> list[dict]:
-        leads = []
-        for niche in (niches or ["roofing", "hvac", "pest_control",
-                                  "plumbing", "electrical"]):
-            leads.extend(_generate_leads_for_niche(niche, 2, "FL"))
-        return leads
-
 
 class CountyAppraiserScanner(Scanner):
     """County property appraiser search for commercial properties.
 
     Many FL counties have publicly accessible property databases.
     This scanner uses a template pattern with a few well-known
-    county endpoints and falls back to seed data for others.
+    county endpoints and returns no lead when real records cannot be parsed.
     """
     name = "county-appraiser"
 
@@ -403,9 +330,6 @@ class CountyAppraiserScanner(Scanner):
                 if raw:
                     all_leads.extend(raw)
 
-        if not all_leads:
-            logger.info("CountyAppraiser: using seed fallback")
-            all_leads = self._fallback(niches)
 
         return all_leads
 
@@ -452,13 +376,6 @@ class CountyAppraiserScanner(Scanner):
                 })
         return leads[:10]
 
-    def _fallback(self, niches: Optional[list[str]] = None) -> list[dict]:
-        leads = []
-        for niche in (niches or ["roofing", "hvac", "plumbing"]):
-            for county in self.COUNTIES:
-                leads.extend(_generate_leads_for_niche(niche, 1, county))
-        return leads
-
 
 class PermitScanner(Scanner):
     """Public building permit search.
@@ -500,9 +417,6 @@ class PermitScanner(Scanner):
                         all_leads.extend(raw)
                     time.sleep(0.3)
 
-        if not all_leads:
-            logger.info("Permits: no live results, using seed fallback")
-            all_leads = self._fallback(niches)
 
         return all_leads
 
@@ -533,24 +447,6 @@ class PermitScanner(Scanner):
             logger.debug("Permit search error: %s", e)
             return []
 
-    def _fallback(self, niches: Optional[list[str]] = None) -> list[dict]:
-        leads = []
-        for niche in (niches or ["roofing", "hvac", "plumbing",
-                                  "electrical", "pest_control"]):
-            for j in self.JURISDICTIONS:
-                leads.append({
-                    "niche": niche,
-                    "name": f"Recent {niche} Permit — {j['name']}",
-                    "phone": "",
-                    "zip_code": "33101",
-                    "details": (f"Building permit filed for {niche}-related "
-                                f"work in {j['name']}. "
-                                f"Permit type: Commercial Alteration."),
-                    "address": f"{j['name']}, FL",
-                    "source": "permits",
-                })
-        return leads
-
 
 class BBBScanner(Scanner):
     """Better Business Bureau business search.
@@ -579,9 +475,6 @@ class BBBScanner(Scanner):
                     all_leads.extend(raw)
                 time.sleep(0.5)
 
-        if not all_leads:
-            logger.info("BBB: no live results, using seed fallback")
-            all_leads = self._fallback(niches)
 
         return all_leads
 
@@ -624,24 +517,13 @@ class BBBScanner(Scanner):
                 })
         return leads[:15]
 
-    def _fallback(self, niches: Optional[list[str]] = None) -> list[dict]:
-        leads = []
-        for niche in (niches or list(NICHE_KEYWORDS.keys())):
-            for metro in self.METROS:
-                base = _generate_leads_for_niche(niche, 1, "FL")[0]
-                base["address"] = f"{metro}, FL"
-                base["source"] = "bbb"
-                leads.append(base)
-        return leads
-
 
 class WebSearchScanner(Scanner):
     """General web search for prospect discovery.
 
     Uses a configurable search endpoint (defaults to DuckDuckGo's
     lite HTML version to avoid API keys) to find businesses in
-    target niches. Falls back to seed data when the endpoint is
-    blocked.
+    target niches. Returns no leads when the endpoint is blocked.
 
     Can also be configured with a SerpAPI key for higher-quality
     results: set env SEARCH_API_KEY and SEARCH_ENGINE=serpapi.
@@ -666,9 +548,6 @@ class WebSearchScanner(Scanner):
                     all_leads.extend(raw)
                 time.sleep(0.2)
 
-        if not all_leads:
-            logger.info("WebSearch: no live results, using seed fallback")
-            all_leads = self._fallback(targets)
 
         return all_leads
 
@@ -748,9 +627,3 @@ class WebSearchScanner(Scanner):
         except Exception as e:
             logger.debug("SerpAPI search error: %s", e)
             return []
-
-    def _fallback(self, niches: list[str]) -> list[dict]:
-        leads = []
-        for niche in niches:
-            leads.extend(_generate_leads_for_niche(niche, 2, "FL"))
-        return leads
