@@ -356,3 +356,163 @@ def test_dedupe_never_matches_on_niche_and_metro_only():
         "reason": "no_strong_identity_match",
         "prospect": None,
     }
+
+
+def test_readonly_lookup_paginates_and_matches_phone():
+    from empire_os.prospect_ingest import (
+        lookup_existing_prospect,
+    )
+
+    prepared = prepare_candidate(
+        {
+            "name": "Acme Roofing",
+            "phone": "5125550101",
+            "niche": "roofing",
+            "metro": "austin",
+        }
+    )
+
+    calls = []
+
+    def reader(path, params):
+        calls.append((path, dict(params)))
+
+        if params["offset"] == "0":
+            return [
+                {
+                    "id": "other",
+                    "business_name": "Other Co",
+                    "phone": "5551112222",
+                    "metro": "austin",
+                },
+                {
+                    "id": "target",
+                    "business_name": "Acme Roofing",
+                    "phone": "(512) 555-0101",
+                    "metro": "Austin",
+                },
+            ]
+
+        return []
+
+    result = lookup_existing_prospect(
+        prepared,
+        reader,
+        page_size=2,
+        max_pages=3,
+    )
+
+    assert result["decision"] == "matched"
+    assert result["reason"] == "exact_phone"
+    assert result["prospect"]["id"] == "target"
+    assert result["rows_scanned"] == 2
+    assert result["pages_scanned"] == 2
+    assert [call[1]["offset"] for call in calls] == [
+        "0",
+        "2",
+    ]
+
+
+def test_readonly_lookup_returns_new_after_complete_scan():
+    from empire_os.prospect_ingest import (
+        lookup_existing_prospect,
+    )
+
+    prepared = prepare_candidate(
+        {
+            "name": "Brand New Co",
+            "niche": "hvac",
+            "metro": "tampa",
+        }
+    )
+
+    def reader(path, params):
+        return [
+            {
+                "id": "different",
+                "business_name": "Different Co",
+                "metro": "tampa",
+                "phone": "",
+            }
+        ]
+
+    result = lookup_existing_prospect(
+        prepared,
+        reader,
+        page_size=100,
+        max_pages=2,
+    )
+
+    assert result["decision"] == "new"
+    assert result["reason"] == "no_strong_identity_match"
+    assert result["rows_scanned"] == 1
+
+
+def test_readonly_lookup_fails_closed_when_truncated():
+    from empire_os.prospect_ingest import (
+        lookup_existing_prospect,
+    )
+
+    prepared = prepare_candidate(
+        {
+            "name": "Acme",
+            "niche": "roofing",
+            "metro": "large-metro",
+        }
+    )
+
+    def reader(path, params):
+        return [
+            {
+                "id": (
+                    f"row-{params['offset']}-1"
+                ),
+                "business_name": "Other One",
+                "metro": "large-metro",
+            },
+            {
+                "id": (
+                    f"row-{params['offset']}-2"
+                ),
+                "business_name": "Other Two",
+                "metro": "large-metro",
+            },
+        ]
+
+    result = lookup_existing_prospect(
+        prepared,
+        reader,
+        page_size=2,
+        max_pages=2,
+    )
+
+    assert result == {
+        "decision": "ambiguous",
+        "reason": "prospect_lookup_truncated",
+        "prospect": None,
+        "rows_scanned": 4,
+        "pages_scanned": 2,
+    }
+
+
+def test_readonly_lookup_rejects_invalid_response():
+    from empire_os.prospect_ingest import (
+        lookup_existing_prospect,
+    )
+
+    prepared = prepare_candidate(
+        {
+            "name": "Acme",
+            "niche": "roofing",
+            "metro": "austin",
+        }
+    )
+
+    with pytest.raises(
+        ProspectIngestError,
+        match="prospect lookup returned invalid response",
+    ):
+        lookup_existing_prospect(
+            prepared,
+            lambda path, params: {"bad": "shape"},
+        )

@@ -327,3 +327,108 @@ def match_existing_prospect(
         "reason": "no_strong_identity_match",
         "prospect": None,
     }
+
+
+def lookup_existing_prospect(
+    prepared: dict[str, Any],
+    reader,
+    *,
+    page_size: int = 1000,
+    max_pages: int = 10,
+) -> dict[str, Any]:
+    """
+    Read-only canonical prospect lookup.
+
+    Fetches prospects only for the candidate metro, paginates deterministically,
+    then applies match_existing_prospect() client-side.
+
+    If the bounded lookup is exhausted before the metro is fully scanned,
+    fail closed as ambiguous rather than incorrectly declaring a new prospect.
+
+    `reader` signature:
+        reader(path: str, params: dict[str, str]) -> list[dict]
+    """
+    prospect = prepared.get("prospect")
+
+    if not isinstance(prospect, dict):
+        raise ProspectIngestError(
+            "prepared candidate missing prospect payload"
+        )
+
+    metro = _key(prospect.get("metro"))
+
+    if not metro:
+        raise ProspectIngestError(
+            "prepared candidate missing metro"
+        )
+
+    if page_size < 1:
+        raise ProspectIngestError(
+            "page_size must be positive"
+        )
+
+    if max_pages < 1:
+        raise ProspectIngestError(
+            "max_pages must be positive"
+        )
+
+    rows: list[dict[str, Any]] = []
+    pages = 0
+    truncated = False
+
+    for page in range(max_pages):
+        offset = page * page_size
+
+        batch = reader(
+            "/rest/v1/prospects",
+            {
+                "select": (
+                    "id,business_name,phone,metro,niche,"
+                    "website,address,status,contact_source"
+                ),
+                "metro": "ilike." + metro,
+                "order": "created_at.asc",
+                "limit": str(page_size),
+                "offset": str(offset),
+            },
+        )
+
+        if not isinstance(batch, list):
+            raise ProspectIngestError(
+                "prospect lookup returned invalid response"
+            )
+
+        pages += 1
+        rows.extend(
+            row
+            for row in batch
+            if isinstance(row, dict)
+        )
+
+        if len(batch) < page_size:
+            break
+    else:
+        # We consumed every permitted page. If the final page was full,
+        # there may be additional rows we did not inspect.
+        if batch and len(batch) >= page_size:
+            truncated = True
+
+    if truncated:
+        return {
+            "decision": "ambiguous",
+            "reason": "prospect_lookup_truncated",
+            "prospect": None,
+            "rows_scanned": len(rows),
+            "pages_scanned": pages,
+        }
+
+    result = match_existing_prospect(
+        prepared,
+        rows,
+    )
+
+    return {
+        **result,
+        "rows_scanned": len(rows),
+        "pages_scanned": pages,
+    }
