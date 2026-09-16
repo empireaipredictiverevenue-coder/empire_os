@@ -24,6 +24,21 @@ CREATE TABLE IF NOT EXISTS public.prospect_acquisitions (
     UNIQUE (ingest_key)
 );
 
+-- Canonical identity/provenance tables are service-only.
+-- RLS remains enabled even though the service role uses the privileged path.
+ALTER TABLE public.prospect_identity_claims ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prospect_acquisitions ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.prospect_identity_claims
+    FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON TABLE public.prospect_acquisitions
+    FROM PUBLIC, anon, authenticated, service_role;
+
+GRANT SELECT, INSERT ON TABLE public.prospect_identity_claims
+    TO service_role;
+GRANT SELECT, INSERT ON TABLE public.prospect_acquisitions
+    TO service_role;
+
 CREATE INDEX IF NOT EXISTS idx_prospect_acquisitions_identity
     ON public.prospect_acquisitions USING GIN (identity_keys);
 

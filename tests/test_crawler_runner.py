@@ -158,3 +158,45 @@ def test_ingest_candidate_accepts_direct_endpoint_payload():
     assert result["prospect"]["id"] == "prospect-real-2"
     assert writes[0]["prospect"]["business_name"] == "Observed Plumbing Ltd"
     assert writes[0]["prospect"]["contact_source"] == "aeo_form"
+
+def test_run_source_safe_respects_max_candidates(monkeypatch):
+    candidates = [
+        candidate(),
+        LeadCandidate(
+            name="Second Real Roofing LLC",
+            niche="roofing",
+            metro="Austin",
+            source="permits",
+        ),
+    ]
+
+    src = SimpleNamespace(
+        name="permits",
+        tier="real",
+        requires=[],
+        run_fn=lambda metro=None: iter(candidates),
+    )
+
+    calls = []
+
+    monkeypatch.setattr(
+        "empire_os.crawler_runner.ingest_candidate",
+        lambda cand: calls.append(cand.name) or {
+            "decision": "created",
+            "prospect": {"id": "prospect-1"},
+        },
+    )
+    monkeypatch.setattr(
+        "empire_os.crawler_runner.log",
+        lambda *args, **kwargs: None,
+    )
+
+    found, accepted, errors = run_source_safe(
+        src,
+        None,
+        False,
+        max_candidates=1,
+    )
+
+    assert (found, accepted, errors) == (1, 1, 0)
+    assert calls == ["Real Roofing LLC"]

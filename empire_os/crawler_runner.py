@@ -111,7 +111,7 @@ def _required_env_available(src) -> bool:
     return True
 
 
-def run_source_safe(src, metro, dry_run):
+def run_source_safe(src, metro, dry_run, max_candidates=None):
     """Run one real source with candidate-level failure isolation."""
     if src.tier != "real":
         log("SKIP", "source_not_real", source=src.name, tier=src.tier)
@@ -132,6 +132,8 @@ def run_source_safe(src, metro, dry_run):
     try:
         iterator = src.run_fn(metro=metro)
         for cand in iterator:
+            if max_candidates is not None and candidates >= max_candidates:
+                break
             candidates += 1
 
             if dry_run:
@@ -217,7 +219,16 @@ def main():
         help="Discover candidates without writing canonical prospects",
     )
     parser.add_argument("--source", default=None, help="Run one source by name")
+    parser.add_argument(
+        "--max-candidates",
+        type=int,
+        default=None,
+        help="Stop after discovering at most N candidates across the run",
+    )
     args = parser.parse_args()
+
+    if args.max_candidates is not None and args.max_candidates < 1:
+        parser.error("--max-candidates must be >= 1")
 
     signal.signal(signal.SIGALRM, _die_on_hang)
     signal.alarm(MAX_RUN_SEC)
@@ -228,6 +239,7 @@ def main():
         metro=args.metro,
         dry_run=args.dry_run,
         source=args.source,
+        max_candidates=args.max_candidates,
         canonical_store="supabase",
         timeout_s=MAX_RUN_SEC,
     )
@@ -243,9 +255,22 @@ def main():
     else:
         sources = list_sources()
 
+    remaining = args.max_candidates
+
     for src in sources:
-        c, accepted, errors = run_source_safe(src, args.metro, args.dry_run)
+        if remaining is not None and remaining <= 0:
+            break
+
+        c, accepted, errors = run_source_safe(
+            src,
+            args.metro,
+            args.dry_run,
+            max_candidates=remaining,
+        )
         candidates_total += c
+
+        if remaining is not None:
+            remaining -= c
         accepted_total += accepted
         errored_total += errors
         if errors:

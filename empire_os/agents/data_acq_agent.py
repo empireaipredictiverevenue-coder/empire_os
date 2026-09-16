@@ -60,8 +60,22 @@ def post(lead, niche: str, metro: str, src: str) -> bool:
         return False
 
     observed_source = str(body.get("source") or src).strip() or src
-    body["niche"] = niche
-    body["metro"] = metro
+    observed_niche = str(body.get("niche") or "").strip()
+    observed_metro = str(body.get("metro") or "").strip()
+    target_niche = str(niche or "").strip()
+    target_metro = str(metro or "").strip()
+
+    # Hot-lane context may filter/reject candidates, never relabel observations.
+    if not observed_niche:
+        return False
+    if observed_niche.casefold() != target_niche.casefold():
+        return False
+    if observed_metro and observed_metro.casefold() != target_metro.casefold():
+        return False
+
+    # Metro fallback is allowed only when the source supplied no metro.
+    body["niche"] = observed_niche
+    body["metro"] = observed_metro or target_metro
     body["source"] = f"acq_{observed_source}"
 
     try:
