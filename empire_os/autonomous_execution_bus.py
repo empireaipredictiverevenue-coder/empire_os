@@ -417,12 +417,24 @@ def execute_subprocess(
         )[-4000:],
     }
 
+    if not result["ok"]:
+        diagnostic = (
+            str(result["stderr_tail"]).strip()
+            or str(result["stdout_tail"]).strip()
+            or (
+                "worker exited with return code "
+                f"{completed_process.returncode}"
+            )
+        )
+        result["error"] = diagnostic[-4000:]
+
     log(
         "INFO" if result["ok"] else "ERROR",
         "worker_finish",
         job_id=job.id,
         adapter=job.worker_adapter,
         returncode=completed_process.returncode,
+        error=result.get("error"),
     )
 
     return result

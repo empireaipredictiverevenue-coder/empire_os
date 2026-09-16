@@ -226,15 +226,27 @@ def emit_event(
         ),
     }
 
-    request_json(
-        "POST",
-        "/rest/v1/commercial_events",
-        payload=event,
-        prefer=(
-            "resolution=ignore-duplicates,"
-            "return=minimal"
-        ),
-    )
+    try:
+        request_json(
+            "POST",
+            "/rest/v1/commercial_events",
+            payload=event,
+            prefer="return=minimal",
+        )
+    except RuntimeError as exc:
+        message = str(exc)
+
+        duplicate_event = (
+            "HTTP 409" in message
+            and '"code":"23505"' in message
+            and (
+                "uq_commercial_events_idempotency_key"
+                in message
+            )
+        )
+
+        if not duplicate_event:
+            raise
 
 
 def qualify(prospect_id: str) -> dict[str, Any]:
