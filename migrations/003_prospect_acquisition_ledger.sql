@@ -213,7 +213,7 @@ $$;
 
 REVOKE ALL ON FUNCTION public.ingest_prospect_atomic(
     JSONB, JSONB, TEXT, TEXT[]
-) FROM PUBLIC;
+) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.ingest_prospect_atomic(
     JSONB, JSONB, TEXT, TEXT[]
