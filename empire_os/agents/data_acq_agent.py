@@ -51,16 +51,25 @@ def hot_lanes() -> list:
     return sorted(heat.items(), key=lambda kv: -kv[1])[:15]
 
 
-def post(lead: dict, niche: str, metro: str, src: str) -> bool:
-    body = {"niche": niche, "metro": metro,
-            "source": f"acq_{src}",
-            "name":   lead.get("name", ""),
-            "phone":  lead.get("phone", ""),
-            "email":  lead.get("email", ""),
-            "address": lead.get("address", "")}
+def post(lead, niche: str, metro: str, src: str) -> bool:
+    if hasattr(lead, "to_intake_payload"):
+        body = lead.to_intake_payload()
+    elif isinstance(lead, dict):
+        body = dict(lead)
+    else:
+        return False
+
+    observed_source = str(body.get("source") or src).strip() or src
+    body["niche"] = niche
+    body["metro"] = metro
+    body["source"] = f"acq_{observed_source}"
+
     try:
-        r = requests.post(f"{HUB}/v1/leads/direct",
-                          json=body, timeout=8).json()
+        r = requests.post(
+            f"{HUB}/v1/leads/direct",
+            json=body,
+            timeout=8,
+        ).json()
         return bool(r.get("ok"))
     except Exception:
         return False

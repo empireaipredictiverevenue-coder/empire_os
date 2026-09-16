@@ -1066,83 +1066,70 @@ def lead_counts():
 
 @app.post("/v1/leads/direct")
 def direct_lead_intake(req: dict):
-    """Direct lead intake — writes to lane_leads without going through crm routing.
+    """Compatibility intake route backed only by canonical Supabase prospects.
 
-    Use this for partner webhooks, AEO forms, or any external system
-    that has already determined the niche+metro. The lead_deliverer
-    picks it up on its 30s poll.
-
-    Body:
-        name, email, phone, niche (required), metro (required),
-        state, details, source, lead_score (0-100)
+    Existing AEO/forms and acquisition agents may continue posting here, but
+    this route no longer fabricates prospect IDs or inserts into lane_leads.
+    Allocation/delivery belongs to the governed commercial pipeline.
     """
-    niche = (req.get("niche") or "").strip()
-    metro = (req.get("metro") or "").strip().upper()
-    if not niche or not metro:
-        raise HTTPException(400, "niche and metro required")
+    name = str(req.get("name") or "").strip()
+    niche = str(req.get("niche") or "").strip()
+    metro = str(req.get("metro") or "").strip()
 
-    # Omega 2.0 is the canonical intelligence source. Any incoming
-    # legacy lead_score remains informational and is not used to derive
-    # the stored Omega score/tier.
-    from empire_os.intelligence.compat import legacy_fields
+    if not name or not niche or not metro:
+        raise HTTPException(400, "name, niche and metro required")
 
-    omega = legacy_fields({
-        "business_name": req.get("name", ""),
-        "phone": req.get("phone", ""),
-        "email": req.get("email", ""),
-        "metro": metro,
-        "state": req.get("state", ""),
-        "niche": niche,
-        "details": req.get("details", ""),
-        "source": req.get("source", "api"),
-        "status": "pending",
-    })
-    score = omega["omega_score"]
-    tier = omega["omega_tier"]
-
-    # We're inside empire-hub, so we can write directly to the DB
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-
-    import uuid
-    from datetime import datetime, timezone as _tz
-    lead_id = "lead_" + datetime.now(_tz.utc).strftime("%y%m%d%H%M%S%f")
-    lane_id = f"{niche}:{metro}"
-    prospect_id = "prospect_" + datetime.now(_tz.utc).strftime("%y%m%d%H%M%S%f")
-    now = datetime.now(_tz.utc).isoformat()
+    payload = dict(req)
+    payload["name"] = name
+    payload["niche"] = niche
+    payload["metro"] = metro
+    payload["source"] = str(req.get("source") or "api").strip() or "api"
 
     try:
-        backend.execute(
-            "INSERT INTO lane_leads "
-            "(lane_id, prospect_id, status, omega_score, omega_tier, "
-            "notes, niche, created_at) "
-            "VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)",
-            (lane_id, prospect_id, score, tier,
-             f"name={req.get('name','')} email={req.get('email','')} "
-             f"phone={req.get('phone','')} metro={metro} "
-             f"state={req.get('state','')} details={req.get('details','')}",
-             niche, now)
+        # Lazy import: canonical writer loads live Supabase service config only
+        # when this endpoint actually receives an intake request.
+        from empire_os.crawler_runner import ingest_candidate
+
+        result = ingest_candidate(payload)
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "canonical direct lead ingest failed"
         )
-        backend.commit()
-        # Get the inserted ID
-        row = backend.execute(
-            "SELECT id FROM lane_leads WHERE prospect_id=?",
-            (prospect_id,)).fetchone()
-        db_id = row[0] if row else None
-    except Exception as e:
-        raise HTTPException(500, f"DB write failed: {e}")
+        # Fail closed. Never fall back to lane_leads/SQLite identity creation.
+        raise HTTPException(
+            503,
+            "canonical prospect ingest temporarily unavailable",
+        )
+
+    if not isinstance(result, dict):
+        raise HTTPException(502, "invalid canonical ingest response")
+
+    decision = str(result.get("decision") or "").strip()
+    if not decision:
+        raise HTTPException(502, "canonical ingest missing decision")
+
+    if decision in {"ambiguous", "conflict"}:
+        raise HTTPException(
+            409,
+            "prospect identity requires manual resolution",
+        )
+
+    prospect = result.get("prospect")
+    prospect_id = (
+        prospect.get("id")
+        if isinstance(prospect, dict)
+        else result.get("prospect_id")
+    )
 
     return {
         "ok": True,
-        "lead_id": lead_id,
-        "db_id": db_id,
-        "lane_id": lane_id,
+        "decision": decision,
+        "prospect_id": prospect_id,
         "niche": niche,
         "metro": metro,
-        "tier": tier,
-        "score": score,
-        "status": "pending",
+        "status": "canonical_owned",
     }
+
 
 
 class BuyerApplyRequest(BaseModel):

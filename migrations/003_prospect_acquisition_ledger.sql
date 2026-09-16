@@ -129,8 +129,8 @@ BEGIN
         INSERT INTO public.prospect_identity_claims (
             identity_key, prospect_id
         )
-        SELECT DISTINCT identity_key, v_new_id
-          FROM unnest(p_identity_keys) AS identity_key;
+        SELECT DISTINCT keys.identity_key, v_new_id
+          FROM unnest(p_identity_keys) AS keys(identity_key);
 
         INSERT INTO public.prospect_acquisitions (
             prospect_id, ingest_key, identity_keys,

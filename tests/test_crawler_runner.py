@@ -128,3 +128,33 @@ def test_run_source_safe_dry_run_never_ingests(monkeypatch):
     found, accepted, errors = run_source_safe(src, None, True)
 
     assert (found, accepted, errors) == (1, 0, 0)
+
+def test_ingest_candidate_accepts_direct_endpoint_payload():
+    writes = []
+
+    payload = {
+        "name": "Observed Plumbing Ltd",
+        "phone": "020 7946 0101",
+        "niche": "plumbing",
+        "metro": "London",
+        "source": "aeo_form",
+        "lead_score": 71,
+        "url": "https://source.example/form/456",
+    }
+
+    def reader(path, params):
+        return []
+
+    def writer(body):
+        writes.append(body)
+        return {
+            "decision": "created",
+            "prospect": {"id": "prospect-real-2"},
+        }
+
+    result = ingest_candidate(payload, reader=reader, writer=writer)
+
+    assert result["decision"] == "created"
+    assert result["prospect"]["id"] == "prospect-real-2"
+    assert writes[0]["prospect"]["business_name"] == "Observed Plumbing Ltd"
+    assert writes[0]["prospect"]["contact_source"] == "aeo_form"
