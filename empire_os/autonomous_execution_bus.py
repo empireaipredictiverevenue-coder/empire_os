@@ -44,7 +44,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
-from empire_os.niche_taxonomy import NICHE_FAMILIES, normalise
+from empire_os.niche_taxonomy import (
+    NICHE_FAMILIES,
+    metro_key,
+    niche_family,
+    normalise,
+)
 
 
 ENV_PATH = os.environ.get(
@@ -81,6 +86,10 @@ MAX_JOBS_PER_CYCLE = int(
 # Hard production safety ceiling for one market-level
 # qualification parent job.
 MAX_QUALIFICATION_BATCH_SIZE = 5
+
+# Canonical buyer reads for capacity gating are paginated so the
+# execution decision never silently truncates a growing buyer fleet.
+CAPACITY_BUYER_PAGE_SIZE = 1000
 
 EXECUTION_MODE = os.environ.get(
     "EMPIRE_EXECUTION_MODE",
@@ -855,17 +864,191 @@ def execute_product_offer(job: ClaimedJob) -> dict[str, Any]:
     }
 
 
+def _nonnegative_int(value: Any) -> int:
+    try:
+        return max(int(value or 0), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _capacity_buyer_rows() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    offset = 0
+
+    while True:
+        batch = _rest_json(
+            "GET",
+            "/rest/v1/buyers",
+            params={
+                "select": (
+                    "id,buyer_name,niche,metro,is_active,status,"
+                    "daily_cap,calls_today"
+                ),
+                "limit": str(CAPACITY_BUYER_PAGE_SIZE),
+                "offset": str(offset),
+            },
+        )
+
+        if not isinstance(batch, list):
+            raise BusError(
+                "capacity check buyers query returned invalid payload"
+            )
+
+        rows.extend(batch)
+
+        if len(batch) < CAPACITY_BUYER_PAGE_SIZE:
+            break
+
+        offset += CAPACITY_BUYER_PAGE_SIZE
+
+    return rows
+
+
 def execute_capacity_check(job: ClaimedJob) -> dict[str, Any]:
+    """
+    Recompute fulfilment capacity from canonical buyer state.
+
+    This is a read-only execution gate. Planner payload capacity is
+    retained only for audit/comparison and is never trusted as the
+    live gate decision.
+    """
+
+    target = job.payload.get("target")
+    if not isinstance(target, dict):
+        target = {}
+
+    target_niche = str(
+        target.get("niche")
+        or target.get("niche_family")
+        or job.payload.get("niche")
+        or job.payload.get("niche_family")
+        or ""
+    )
+
+    target_metro = str(
+        target.get("metro")
+        or job.payload.get("metro")
+        or ""
+    )
+
+    family = niche_family(target_niche)
+    metro = metro_key(target_metro)
+
+    if not family or not metro:
+        raise BusError(
+            "capacity check missing niche_family or metro"
+        )
+
+    rows = _capacity_buyer_rows()
+
+    matched_buyers = 0
+    available_buyers = 0
+    daily_cap = 0
+    calls_today = 0
+    remaining_capacity = 0
+
+    for row in rows:
+        status = normalise(row.get("status"))
+
+        is_active = (
+            bool(row.get("is_active"))
+            and status not in {
+                "inactive",
+                "disabled",
+            }
+        )
+
+        if not is_active:
+            continue
+
+        buyer_niche = normalise(
+            row.get("niche")
+        )
+
+        buyer_family = (
+            niche_family(buyer_niche)
+            if buyer_niche
+            else ""
+        )
+
+        buyer_metro = metro_key(
+            row.get("metro")
+        )
+
+        niche_match = (
+            buyer_family == family
+            or not buyer_niche
+        )
+
+        metro_match = (
+            not buyer_metro
+            or buyer_metro == metro
+        )
+
+        if not (
+            niche_match
+            and metro_match
+        ):
+            continue
+
+        buyer_daily_cap = _nonnegative_int(
+            row.get("daily_cap")
+        )
+
+        buyer_calls_today = _nonnegative_int(
+            row.get("calls_today")
+        )
+
+        buyer_remaining = max(
+            buyer_daily_cap
+            - buyer_calls_today,
+            0,
+        )
+
+        matched_buyers += 1
+        daily_cap += buyer_daily_cap
+        calls_today += buyer_calls_today
+        remaining_capacity += buyer_remaining
+
+        if buyer_remaining > 0:
+            available_buyers += 1
+
+    planned_capacity = _nonnegative_int(
+        job.payload.get("buyer_capacity")
+    )
+
+    gate_open = (
+        available_buyers > 0
+        and remaining_capacity > 0
+    )
+
     return {
         "ok": True,
         "executed": True,
         "mode": "capacity_check",
-        "buyer_capacity": job.payload.get(
-            "buyer_capacity",
-            0,
+        "source": "buyers",
+        "niche_family": family,
+        "metro": metro,
+        "matched_buyers": matched_buyers,
+        "available_buyers": available_buyers,
+        "daily_cap": daily_cap,
+        "calls_today": calls_today,
+        "remaining_capacity": remaining_capacity,
+        # Preserve the legacy result key, but make it live capacity.
+        "buyer_capacity": remaining_capacity,
+        "planned_buyer_capacity": planned_capacity,
+        "capacity_changed": (
+            planned_capacity
+            != remaining_capacity
+        ),
+        "gate_open": gate_open,
+        "gate_reason": (
+            "live_buyer_capacity_available"
+            if gate_open
+            else "no_live_buyer_capacity"
         ),
         "market_balance": job.payload.get(
-            "market_balance",
+            "market_balance"
         ),
     }
 
