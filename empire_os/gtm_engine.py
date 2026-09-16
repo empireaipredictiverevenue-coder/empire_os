@@ -32,7 +32,10 @@ from empire_os.niche_taxonomy import (
     normalise,
 )
 
-ENV_PATH = "/etc/empire_os.env"
+ENV_PATH = os.environ.get(
+    "EMPIRE_ENV_PATH",
+    "/etc/empire_os.env",
+)
 
 RUNTIME_ROOT = Path(
     os.environ.get("EMPIRE_RUNTIME_ROOT", "/srv/empire_os/runtime")
@@ -46,6 +49,9 @@ REPORT_PATH = Path(
 )
 
 BATCH_SIZE = 1000
+
+# Explicit bounded qualification fan-out per market parent.
+QUALIFICATION_BATCH_SIZE = 5
 
 
 # ---------------------------------------------------------------------------
@@ -798,6 +804,9 @@ def build_gtm_jobs(
                     **base_payload,
                     "strategy": (
                         "identity_aware_qualification"
+                    ),
+                    "qualification_batch_size": (
+                        QUALIFICATION_BATCH_SIZE
                     ),
                 },
             )

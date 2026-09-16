@@ -47,7 +47,10 @@ from typing import Any, Callable
 from empire_os.niche_taxonomy import NICHE_FAMILIES, normalise
 
 
-ENV_PATH = "/etc/empire_os.env"
+ENV_PATH = os.environ.get(
+    "EMPIRE_ENV_PATH",
+    "/etc/empire_os.env",
+)
 
 RUNTIME_ROOT = Path(
     os.environ.get(
@@ -75,6 +78,10 @@ MAX_JOBS_PER_CYCLE = int(
     os.environ.get("EMPIRE_MAX_JOBS_PER_CYCLE", "10")
 )
 
+# Hard production safety ceiling for one market-level
+# qualification parent job.
+MAX_QUALIFICATION_BATCH_SIZE = 5
+
 EXECUTION_MODE = os.environ.get(
     "EMPIRE_EXECUTION_MODE",
     "observe",
@@ -89,7 +96,6 @@ WORKER_ID = os.environ.get(
 @dataclass(frozen=True)
 class ClaimedJob:
     id: str
-    opportunity_id: str
     opportunity_id: str
     job_type: str
     worker_adapter: str
@@ -517,7 +523,7 @@ def _qualification_candidates(
     *,
     family: str,
     metro: str,
-    limit: int = 25,
+    limit: int = MAX_QUALIFICATION_BATCH_SIZE,
 ) -> list[dict[str, Any]]:
     aliases = sorted(
         {
@@ -579,18 +585,31 @@ def _materialize_qualification_jobs(
             "qualification job missing niche_family or metro"
         )
 
-    batch_size = min(
-        max(
-            int(
-                job.payload.get(
-                    "qualification_batch_size",
-                )
-                or 25
-            ),
-            1,
-        ),
-        25,
+    raw_batch_size = job.payload.get(
+        "qualification_batch_size"
     )
+
+    if raw_batch_size is None:
+        raise BusError(
+            "qualification job missing qualification_batch_size"
+        )
+
+    try:
+        batch_size = int(raw_batch_size)
+    except (TypeError, ValueError) as exc:
+        raise BusError(
+            "qualification_batch_size must be an integer"
+        ) from exc
+
+    if not (
+        1
+        <= batch_size
+        <= MAX_QUALIFICATION_BATCH_SIZE
+    ):
+        raise BusError(
+            "qualification_batch_size must be between "
+            f"1 and {MAX_QUALIFICATION_BATCH_SIZE}"
+        )
 
     candidates = _qualification_candidates(
         family=family,
@@ -628,7 +647,7 @@ def _materialize_qualification_jobs(
                     "in.(" + ",".join(prospect_ids) + ")"
                 ),
                 "scoring_engine": (
-                    "eq.autonomous_lead_scorer"
+                    "eq.empire_os.lead_scoring"
                 ),
                 "scoring_version": "eq.v1",
             },
@@ -642,6 +661,7 @@ def _materialize_qualification_jobs(
             }
 
     jobs_created = 0
+    jobs_existing = 0
     jobs_considered = 0
 
     for prospect in candidates:
@@ -692,15 +712,55 @@ def _materialize_qualification_jobs(
             "idempotency_key": idempotency_key,
         }
 
-        _rest_json(
-            "POST",
+        existing_jobs = _rest_json(
+            "GET",
             "/rest/v1/gtm_jobs",
-            payload=row,
-            prefer=(
-                "resolution=ignore-duplicates,"
-                "return=minimal"
-            ),
+            params={
+                "select": "id",
+                "idempotency_key": (
+                    f"eq.{idempotency_key}"
+                ),
+                "limit": "1",
+            },
         )
+
+        if (
+            isinstance(existing_jobs, list)
+            and existing_jobs
+        ):
+            jobs_existing += 1
+            continue
+
+        try:
+            created_rows = _rest_json(
+                "POST",
+                "/rest/v1/gtm_jobs",
+                payload=row,
+                prefer="return=representation",
+            )
+        except BusError as exc:
+            message = str(exc)
+
+            duplicate_child = (
+                "HTTP 409" in message
+                and '"code":"23505"' in message
+                and "idempotency_key" in message
+            )
+
+            if not duplicate_child:
+                raise
+
+            jobs_existing += 1
+            continue
+
+        if not (
+            isinstance(created_rows, list)
+            and created_rows
+        ):
+            raise BusError(
+                "qualification child job insert "
+                "returned no row"
+            )
 
         jobs_created += 1
 
@@ -713,6 +773,7 @@ def _materialize_qualification_jobs(
         "candidates": len(candidates),
         "already_qualified": len(existing),
         "jobs_considered": jobs_considered,
+        "jobs_existing": jobs_existing,
         "jobs_created": jobs_created,
         "batch_size": batch_size,
     }
