@@ -31,6 +31,13 @@ await test('human approver owns approval',async()=>{
   const r=(await asRole('empire_outbound_approver','select public.approve_outbound_intent($1,$2,$3) result',[intentId,'phil','reviewed'])).rows[0].result;
   assert.equal(r.status,'approved');
 });
+await test('sender review is read-only and creates no send attempt',async()=>{
+  const before=(await admin.query("select count(*)::int n from outbound_events where intent_id=$1 and event_type='send_attempt'",[intentId])).rows[0].n;
+  const review=(await asRole('empire_outbound_sender','select public.get_outbound_intent_review($1) result',[intentId])).rows[0].result;
+  assert.equal(review.decision,'review'); assert.equal(review.status,'approved');
+  const after=(await admin.query("select count(*)::int n from outbound_events where intent_id=$1 and event_type='send_attempt'",[intentId])).rows[0].n;
+  assert.equal(after,before);
+});
 await test('sender claims and records delivery only after approval',async()=>{
   const claim=(await asRole('empire_outbound_sender','select public.claim_outbound_send($1,$2) result',[intentId,'resend-worker'])).rows[0].result;
   assert.equal(claim.decision,'authorized_send'); assert.equal(claim.recipient,'buyer@example.com');

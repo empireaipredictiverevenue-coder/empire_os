@@ -213,6 +213,25 @@ BEGIN
     RETURN jsonb_build_object('decision','classified','reply_id',x.id,'classification',v,'suppressed',(v IN ('unsubscribe','bounce')),'actual_revenue',false);
 END;
 $$;
+CREATE FUNCTION public.get_outbound_intent_review(p_intent_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE r public.outbound_intents%ROWTYPE;
+BEGIN
+    SELECT * INTO r FROM public.outbound_intents WHERE id=p_intent_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'outbound intent not found'; END IF;
+    RETURN jsonb_build_object(
+        'decision','review','intent_id',r.id,'channel',r.channel,
+        'recipient',r.recipient,'subject',r.subject,'body_text',r.body_text,
+        'body_html',r.body_html,'offer_key',r.offer_key,'status',r.status,
+        'approved_by',r.approved_by,'approved_at',r.approved_at,
+        'expires_at',r.expires_at,'actual_revenue',false
+    );
+END;
+$$;
+REVOKE ALL ON FUNCTION public.get_outbound_intent_review(uuid)
+FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_outbound_intent_review(uuid)
+TO service_role,empire_outbound_approver,empire_outbound_sender;
 REVOKE ALL ON FUNCTION public.guard_outbound_events_append_only()
 FROM PUBLIC,anon,authenticated,service_role,empire_outbound_approver,empire_outbound_sender,empire_reply_ingest;
 REVOKE ALL ON FUNCTION public.propose_outbound_intent(uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,timestamptz,jsonb)

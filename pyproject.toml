@@ -23,6 +23,9 @@ dspy = [
 payment-ops = [
     "psycopg[binary]>=3.2,<4",
 ]
+outbound-email = [
+    "resend>=2.21.0,<3",
+]
 
 [tool.setuptools.packages.find]
 include = ["empire_os*"]
