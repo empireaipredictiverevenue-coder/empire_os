@@ -49,4 +49,10 @@ The review-only proposal CLI never writes or sends. It renders the candidate-rev
 - A materially lower current role (for example, canonical `Owner` but current official site `Project Manager`) sets `review_required=true` and blocks outreach.
 - Equivalent economic-buyer authority can confirm the candidate.
 - Public-web validation on 2026-09-17 exposed a real stale-role example, proving this gate is necessary.
+## Public-web corroborated contact evidence
+- Explicit public business-directory contact evidence may bind to a decision maker only when the person identity matches exactly and the role is independently corroborated.
+- Unsupported sources, mismatched names, and uncorroborated third-party records are rejected.
+- DNS-valid public contact evidence can make a candidate `review_ready` without making it `outreach_ready`.
+- First real canonical prospect reached `review_ready=true` on 2026-09-17; it remained `outreach_ready=false` pending stronger mailbox-level evidence.
+- No production row was created and no email was sent.
 

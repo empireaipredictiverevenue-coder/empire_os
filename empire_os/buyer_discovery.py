@@ -374,6 +374,50 @@ def validate_email_candidates(candidates: Iterable[str], validator: Any, *, requ
         })
     return results
 
+def merge_public_web_contact_evidence(
+    enriched: Mapping[str, Any], evidence: Iterable[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Bind explicit public-web contacts only with identity and role corroboration."""
+    result = dict(enriched)
+    decision = result.get("decision_maker") or {}
+    decision_name = _text(decision.get("name"))
+    contacts = [dict(item) for item in (result.get("contact_candidates") or [])]
+    accepted = []
+    for item in evidence or []:
+        name = _text(item.get("name"))
+        email = _text(item.get("email")).lower()
+        source_url = _text(item.get("source_url"))
+        source_kind = _text(item.get("source_kind")).lower()
+        if not decision_name or name.casefold() != decision_name.casefold():
+            continue
+        if not email or "@" not in email or not source_url:
+            continue
+        if source_kind not in {"official_site", "public_business_directory"}:
+            continue
+        if source_kind == "public_business_directory" and not bool(item.get("role_corroborated")):
+            continue
+        accepted.append({
+            "email": email,
+            "source": source_kind,
+            "bound_to_decision_maker": True,
+            "source_url": source_url,
+            "role_corroborated": bool(item.get("role_corroborated")),
+        })
+    contacts.extend(accepted)
+    dedup = {}
+    for item in contacts:
+        email = _text(item.get("email")).lower()
+        if not email:
+            continue
+        previous = dedup.get(email)
+        if previous is None or item.get("bound_to_decision_maker"):
+            dedup[email] = item
+    result["contact_candidates"] = list(dedup.values())
+    result["contact_email_candidates"] = list(dedup.keys())
+    result["public_web_evidence_accepted"] = len(accepted)
+    return result
+
+
 def merge_generated_contact_evidence(enriched: Mapping[str, Any], validated: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     result = dict(enriched)
     contacts = [dict(item) for item in (result.get("contact_candidates") or [])]
@@ -430,29 +474,32 @@ def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[
             "source": contact.get("source") or "unknown",
             "bound_to_decision_maker": bool(contact.get("bound_to_decision_maker")),
         })
-    eligible = [
+    review_eligible = [
         item for item in verified
         if item["is_valid"] and not item["is_role_address"] and not item["is_disposable"]
         and item["bound_to_decision_maker"]
     ]
+    outreach_eligible = [
+        item for item in review_eligible
+        if item["smtp_accepts"] or item["source"] == "person_structured_data"
+    ]
     decision_score = float((decision or {}).get("decision_score") or 0.0)
+    reconciliation_clear = not bool((reconciliation or {}).get("review_required"))
     return {
         "mode": "OBSERVE",
         "write_authorized": False,
         "decision_maker": decision,
         "verified_contacts": verified,
-        "preferred_email": eligible[0]["email"] if eligible else None,
-        "outreach_ready": bool(
-            decision and decision_score >= 0.5 and eligible
-            and not bool((reconciliation or {}).get("review_required"))
-        ),
+        "preferred_email": review_eligible[0]["email"] if review_eligible else None,
+        "review_ready": bool(decision and decision_score >= 0.5 and review_eligible and reconciliation_clear),
+        "outreach_ready": bool(decision and decision_score >= 0.5 and outreach_eligible and reconciliation_clear),
     }
 
 
 def build_candidate_review_plan(candidate: BuyerCandidate, contact_plan: Mapping[str, Any], *,
                                 idempotency_key: str) -> dict[str, Any]:
-    if not contact_plan.get("outreach_ready"):
-        raise ValueError("verified outreach-ready contact required")
+    if not contact_plan.get("review_ready"):
+        raise ValueError("verified review-ready contact required")
     email = _text(contact_plan.get("preferred_email")).lower()
     decision = contact_plan.get("decision_maker") or {}
     name = _text(decision.get("name"))

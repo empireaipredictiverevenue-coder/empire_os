@@ -107,6 +107,7 @@ def test_verified_contact_gate_requires_named_authority_and_non_role_email():
         ],
     }
     plan = verify_contact_plan(enriched, validator=Validator())
+    assert plan["review_ready"] is True
     assert plan["outreach_ready"] is True
     assert plan["preferred_email"] == "jane@acme.test"
     assert plan["write_authorized"] is False
@@ -115,6 +116,7 @@ def test_verified_contact_gate_requires_named_authority_and_non_role_email():
         {"decision_maker":None,"contact_candidates":[{"email":"jane@acme.test","source":"person_structured_data","bound_to_decision_maker":True}]},
         validator=Validator(),
     )
+    assert no_person["review_ready"] is False
     assert no_person["outreach_ready"] is False
 
     generic_only = verify_contact_plan(
@@ -122,6 +124,7 @@ def test_verified_contact_gate_requires_named_authority_and_non_role_email():
          "contact_candidates":[{"email":"office@acme.test","source":"site_observed","bound_to_decision_maker":False}]},
         validator=Validator(),
     )
+    assert generic_only["review_ready"] is False
     assert generic_only["outreach_ready"] is False
     assert generic_only["preferred_email"] is None
 
@@ -136,7 +139,7 @@ def test_candidate_review_and_reviewed_outbound_plans_are_separate():
         "website":"https://acme.test","contact_name":"Jane Smith","contact_title":"CEO",
     })
     contact = {
-        "outreach_ready":True,"preferred_email":"jane@acme.test",
+        "review_ready":True,"outreach_ready":True,"preferred_email":"jane@acme.test",
         "decision_maker":{"name":"Jane Smith","title":"CEO","decision_score":1.0,"decision_role":"economic_buyer"},
         "verified_contacts":[{"email":"jane@acme.test","is_valid":True}],
     }
@@ -280,3 +283,29 @@ def test_current_official_equivalent_authority_confirms_candidate():
     assert rec["status"] == "confirmed"
     assert rec["review_required"] is False
     assert rec["decision_maker"]["decision_role"] == "economic_buyer"
+
+
+def test_public_web_contact_binding_requires_explicit_identity_and_role_corroboration():
+    from empire_os.buyer_discovery import merge_public_web_contact_evidence
+    enriched={
+        "decision_maker":{"name":"Hugo Guerra","title":"Owner","decision_score":1.0},
+        "contact_candidates":[],
+    }
+    accepted=merge_public_web_contact_evidence(enriched,[{
+        "name":"Hugo Guerra","email":"hugo@example.com",
+        "source_url":"https://directory.example/hugo","source_kind":"public_business_directory",
+        "role_corroborated":True,
+    }])
+    assert accepted["public_web_evidence_accepted"] == 1
+    assert accepted["contact_candidates"][0]["bound_to_decision_maker"] is True
+
+    rejected=merge_public_web_contact_evidence(enriched,[
+        {"name":"Other Person","email":"hugo@example.com","source_url":"https://x.example/a",
+         "source_kind":"public_business_directory","role_corroborated":True},
+        {"name":"Hugo Guerra","email":"hugo@example.com","source_url":"https://x.example/b",
+         "source_kind":"public_business_directory","role_corroborated":False},
+        {"name":"Hugo Guerra","email":"hugo@example.com","source_url":"https://x.example/c",
+         "source_kind":"social_profile","role_corroborated":True},
+    ])
+    assert rejected["public_web_evidence_accepted"] == 0
+    assert rejected["contact_candidates"] == []
