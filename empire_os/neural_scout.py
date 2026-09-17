@@ -63,13 +63,13 @@ HIGH_TICKET_KEYWORDS = [
 ]
 
 
-def calculate_synthetic_score(
+def calculate_observed_score(
     niche: str,
     details: str,
     phone: str = "",
     zip_code: str = "",
 ) -> float:
-    """Calculate a synthetic intent score for a lead.
+    """Calculate a deterministic score from observed lead evidence.
 
     Returns a float in [0.0, 1.0]. Higher = more qualified.
     """
@@ -88,6 +88,10 @@ def calculate_synthetic_score(
     return round(
         min(base_weight + intent_score + target_multiplier + phone_bonus, 1.0), 2
     )
+
+
+# Backward-compatible name; production code should use calculate_observed_score.
+calculate_synthetic_score = calculate_observed_score
 
 
 # ── Scout ────────────────────────────────────────────────────────────
@@ -151,7 +155,7 @@ class NeuralScout:
         prospect_id: Optional[str] = None,
     ) -> Optional[ScoredLead]:
         """Evaluate a raw lead and return a ScoredLead if it passes threshold."""
-        score = calculate_synthetic_score(niche, details, phone, zip_code)
+        score = calculate_observed_score(niche, details, phone, zip_code)
         if score < self.min_score:
             logger.info(
                 "Lead below threshold: niche=%s score=%.2f min=%.2f",
@@ -176,15 +180,16 @@ class NeuralScout:
     def register_lead(self, lead: ScoredLead) -> int:
         """Register a scored lead as a discovery in the funnel.
 
-        Also writes to si_prospect_consent with opt-in status.
+        Discovery provenance is recorded with opted_in=0. Consent must be
+        established separately by a dedicated consent action.
         Returns the funnel event id.
         """
-        # Upsert consent
+        # Discovery is not consent. Record provenance without asserting opt-in.
         self.backend.execute(
             """INSERT OR REPLACE INTO si_prospect_consent
                (prospect_id, opted_in, opted_in_at, niche, source)
-               VALUES (?, 1, ?, ?, ?)""",
-            (lead.prospect_id, lead.discovered_at, lead.niche, lead.source),
+               VALUES (?, 0, NULL, ?, ?)""",
+            (lead.prospect_id, lead.niche, lead.source),
         )
 
         # Register in funnel

@@ -61,7 +61,7 @@ from empire_os.funnel import (
     events_for,
     count_by_state,
 )
-from empire_os.neural_scout import NeuralScout, calculate_synthetic_score
+from empire_os.neural_scout import NeuralScout, calculate_observed_score
 from empire_os.traffic_specialist import (
     DiscoveredProspect,
     discover_one,
@@ -497,7 +497,7 @@ async def incoming_lead(lead: LeadPayload, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=400, detail="Missing lead data")
 
     # Score
-    score = calculate_synthetic_score(lead.niche, lead.details, lead.phone, lead.zip_code)
+    score = calculate_observed_score(lead.niche, lead.details, lead.phone, lead.zip_code)
 
     # Evaluate and register
     scored = scout.evaluate(

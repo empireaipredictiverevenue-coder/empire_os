@@ -8,7 +8,7 @@ import pytest
 from empire_os.funnel import SQLiteBackend, get_state, list_states
 from empire_os.neural_scout import (
     NeuralScout,
-    calculate_synthetic_score,
+    calculate_observed_score,
     ScoredLead,
 )
 from empire_os.scanner import (
@@ -26,7 +26,7 @@ def backend():
 
 class TestScoring:
     def test_high_score_roofing(self):
-        score = calculate_synthetic_score(
+        score = calculate_observed_score(
             niche="roofing",
             details="Commercial warehouse roof has storm damage from recent hail. "
                      "Multiple leaks reported. Facility needs urgent repair. "
@@ -37,7 +37,7 @@ class TestScoring:
         assert score >= 0.70, f"Expected high score, got {score}"
 
     def test_low_score_no_details(self):
-        score = calculate_synthetic_score(
+        score = calculate_observed_score(
             niche="landscaping",
             details="Lawn service",
             phone="",
@@ -46,7 +46,7 @@ class TestScoring:
         assert score < 0.50, f"Expected low score, got {score}"
 
     def test_mass_torts_base_weight(self):
-        score = calculate_synthetic_score(
+        score = calculate_observed_score(
             niche="mass_torts",
             details="Exposed to toxic chemicals at work for 5 years. "
                      "Multiple health issues diagnosed. Seeking legal counsel "
@@ -56,7 +56,7 @@ class TestScoring:
         assert score >= 0.55
 
     def test_unknown_niche_default(self):
-        score = calculate_synthetic_score(
+        score = calculate_observed_score(
             niche="dog_walking",
             details="Looking for dog walker in downtown area",
             phone="",
@@ -121,6 +121,12 @@ class TestNeuralScout:
         state = get_state(backend, "test-p1")
         assert state is not None
         assert state.current_state == "discovered"
+        consent = backend.execute(
+            "SELECT opted_in, opted_in_at FROM si_prospect_consent WHERE prospect_id=?",
+            ("test-p1",),
+        ).fetchone()
+        assert consent["opted_in"] == 0
+        assert consent["opted_in_at"] is None
 
     def test_tick_with_static_scanner(self, backend, tmp_path):
         leads_file = tmp_path / "leads.json"

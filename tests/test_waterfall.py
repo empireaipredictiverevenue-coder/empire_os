@@ -36,49 +36,41 @@ class TestProviders:
             assert p.is_configured is False
             assert p.search({"company": "Acme"}) is None
 
-    def test_apollo_configured(self):
-        p = _make_configured(ApolloProvider)
-        result = p.search({"company": "Acme Roofing", "phone": "555-1234"})
-        assert result is not None
-        assert result.source == "apollo"
-        assert result.confidence > 0.7
-        assert "@" in result.email
+    def test_configured_unimplemented_paid_providers_fail_closed(self):
+        for provider_class in (ApolloProvider, PeopleDataLabsProvider, HunterProvider):
+            p = _make_configured(provider_class)
+            assert p.is_available() is True
+            assert p.search({"company": "Acme Roofing", "phone": "555-1234"}) is None
 
-    def test_pdl_configured(self):
-        p = _make_configured(PeopleDataLabsProvider)
-        result = p.search({"company": "Acme"})
-        assert result.source == "pdl"
-
-    def test_hunter_configured(self):
-        p = _make_configured(HunterProvider)
-        result = p.search({"company": "Acme"})
-        assert result.source == "hunter"
-
-    def test_internal_scraper_always_available(self):
+    def test_internal_scraper_disabled_until_real_implementation(self):
         p = InternalScraperProvider()
-        assert p.is_available() is True
-        result = p.search({"company": "Acme"})
-        assert result.source == "internal_scraper"
-        assert result.confidence < 0.7  # low confidence
+        assert p.is_available() is False
+        assert p.search({"company": "Acme"}) is None
 
 
 class TestValidationGate:
-    def test_validates_email_and_confidence(self):
+    def test_validates_bound_email_and_confidence(self):
         gate = ValidationGate(min_confidence=0.7)
-        assert gate.validate(LeadContact(email="a@b.com", confidence=0.9)) is True
-        assert gate.validate(LeadContact(email="a@b.com", confidence=0.5)) is False
-        assert gate.validate(LeadContact(email="", confidence=0.9)) is False
-        assert gate.validate(LeadContact(email="not-an-email", confidence=0.9)) is False
+        bound = {"bound_to_decision_maker": True}
+        assert gate.validate(LeadContact(email="a@b.com", confidence=0.9, raw=bound)) is True
+        assert gate.validate(LeadContact(email="a@b.com", confidence=0.5, raw=bound)) is False
+        assert gate.validate(LeadContact(email="", confidence=0.9, raw=bound)) is False
+        assert gate.validate(LeadContact(email="not-an-email", confidence=0.9, raw=bound)) is False
+        assert gate.validate(LeadContact(email="a@b.com", confidence=0.9, raw={})) is False
 
-    def test_custom_threshold(self):
+    def test_custom_threshold_can_still_require_binding(self):
         gate = ValidationGate(min_confidence=0.5)
-        assert gate.validate(LeadContact(email="a@b.com", confidence=0.6)) is True
+        assert gate.validate(LeadContact(email="a@b.com", confidence=0.6,
+                                         raw={"bound_to_decision_maker": True})) is True
 
 
 class TestWaterfall:
     def test_first_provider_wins(self):
         """If the first provider returns a valid result, no others are tried."""
         apollo = _make_configured(ApolloProvider)
+        apollo.search = MagicMock(return_value=LeadContact(
+            email="jane@acme.test", confidence=0.95, source="apollo",
+            raw={"bound_to_decision_maker": True}))
         pdl = _make_configured(PeopleDataLabsProvider)
         wf = Waterfall(providers=[apollo, pdl])
         result = wf.enrich({"company": "Acme"})
@@ -94,24 +86,23 @@ class TestWaterfall:
         # Make apollo return None
         apollo.search = MagicMock(return_value=None)
         pdl = _make_configured(PeopleDataLabsProvider)
+        pdl.search = MagicMock(return_value=LeadContact(
+            email="jane@acme.test", confidence=0.9, source="pdl",
+            raw={"bound_to_decision_maker": True}))
         wf = Waterfall(providers=[apollo, pdl])
         result = wf.enrich({"company": "Acme"})
         assert result.success is True
         assert result.final_provider == "pdl"
         assert result.providers_tried == ["apollo", "pdl"]
 
-    def test_falls_through_to_internal_scraper(self):
-        """If all real providers fail, internal scraper returns low-confidence."""
+    def test_internal_scraper_cannot_create_synthetic_fallback(self):
         apollo = _make_configured(ApolloProvider)
         apollo.search = MagicMock(return_value=None)
         scraper = InternalScraperProvider()
-        # Default gate is 0.7, scraper returns 0.45 → should fail validation
-        wf = Waterfall(providers=[apollo, scraper], gate=ValidationGate(min_confidence=0.4))
-        # Lower threshold so scraper passes
-        wf.gate = ValidationGate(min_confidence=0.4)
+        wf = Waterfall(providers=[apollo, scraper])
         result = wf.enrich({"company": "Acme"})
-        assert result.success is True
-        assert result.final_provider == "internal_scraper"
+        assert result.success is False
+        assert "internal_scraper" not in result.providers_tried
 
     def test_failure_when_all_providers_return_invalid(self):
         apollo = _make_configured(ApolloProvider)
@@ -125,6 +116,9 @@ class TestWaterfall:
 
     def test_skips_unconfigured_providers(self):
         apollo = _make_configured(ApolloProvider)
+        apollo.search = MagicMock(return_value=LeadContact(
+            email="jane@acme.test", confidence=0.95, source="apollo",
+            raw={"bound_to_decision_maker": True}))
         # Hunter is NOT configured
         with patch.dict("os.environ", {}, clear=True):
             hunter = HunterProvider()
@@ -136,6 +130,9 @@ class TestWaterfall:
 
     def test_metrics_tracking(self):
         apollo = _make_configured(ApolloProvider)
+        apollo.search = MagicMock(return_value=LeadContact(
+            email="jane@acme.test", confidence=0.95, source="apollo",
+            raw={"bound_to_decision_maker": True}))
         pdl = _make_configured(PeopleDataLabsProvider)
         wf = Waterfall(providers=[apollo, pdl])
         wf.enrich({"company": "A"})
@@ -150,6 +147,9 @@ class TestWaterfall:
         apollo = _make_configured(ApolloProvider)
         apollo.search = MagicMock(side_effect=RuntimeError("API down"))
         pdl = _make_configured(PeopleDataLabsProvider)
+        pdl.search = MagicMock(return_value=LeadContact(
+            email="jane@acme.test", confidence=0.9, source="pdl",
+            raw={"bound_to_decision_maker": True}))
         wf = Waterfall(providers=[apollo, pdl])
         result = wf.enrich({"company": "Acme"})
         # Apollo crashed, pdl should win

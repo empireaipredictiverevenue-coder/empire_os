@@ -85,7 +85,7 @@ class DataProvider:
         return self.is_configured
 
 
-# ── Built-in providers (stubs — wire real APIs as keys arrive) ──────
+# ── Declared external providers (fail closed until real APIs are wired) ──
 
 class ApolloProvider(DataProvider):
     """Apollo.io — primary B2B contact source."""
@@ -94,17 +94,9 @@ class ApolloProvider(DataProvider):
     api_key_env = "APOLLO_API_KEY"
 
     def search(self, lead_info: dict) -> Optional[LeadContact]:
-        if not self.is_configured:
-            return None
-        # Real implementation: POST to Apollo's people/match endpoint
-        # Stub: returns a synthetic confidence to drive the waterfall logic
-        return LeadContact(
-            email=f"contact@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            phone=lead_info.get("phone", ""),
-            source=self.name,
-            confidence=0.92,
-            raw={"stub": True, "lead": lead_info},
-        )
+        # Fail closed until the real provider API is implemented.
+        # Never fabricate contact data from a configured API key.
+        return None
 
 
 class PeopleDataLabsProvider(DataProvider):
@@ -114,14 +106,9 @@ class PeopleDataLabsProvider(DataProvider):
     api_key_env = "PDL_API_KEY"
 
     def search(self, lead_info: dict) -> Optional[LeadContact]:
-        if not self.is_configured:
-            return None
-        return LeadContact(
-            email=f"lead@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            source=self.name,
-            confidence=0.78,
-            raw={"stub": True, "lead": lead_info},
-        )
+        # Fail closed until the real provider API is implemented.
+        # Never fabricate contact data from a configured API key.
+        return None
 
 
 class HunterProvider(DataProvider):
@@ -131,14 +118,9 @@ class HunterProvider(DataProvider):
     api_key_env = "HUNTER_API_KEY"
 
     def search(self, lead_info: dict) -> Optional[LeadContact]:
-        if not self.is_configured:
-            return None
-        return LeadContact(
-            email=f"info@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            source=self.name,
-            confidence=0.81,
-            raw={"stub": True, "lead": lead_info},
-        )
+        # Fail closed until the real provider API is implemented.
+        # Never fabricate contact data from a configured API key.
+        return None
 
 
 class InternalScraperProvider(DataProvider):
@@ -148,16 +130,11 @@ class InternalScraperProvider(DataProvider):
     api_key_env = ""  # no key needed
 
     def is_available(self) -> bool:
-        return True  # always available
+        return False
 
     def search(self, lead_info: dict) -> Optional[LeadContact]:
-        # Always returns a low-confidence result
-        return LeadContact(
-            email=f"unknown@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            source=self.name,
-            confidence=0.45,
-            raw={"stub": True, "lead": lead_info},
-        )
+        # Disabled until a real evidence-backed scraper exists.
+        return None
 
 
 # ── Self-built providers (no API keys required) ─────────────────────
@@ -242,7 +219,8 @@ class SiteCrawlerProvider(DataProvider):
                     company=lead_info.get("company", ""),
                     source=self.name,
                     confidence=0.55,
-                    raw={"crawl": {"pages": result.pages_crawled,
+                    raw={"bound_to_decision_maker": False,
+                         "crawl": {"pages": result.pages_crawled,
                                    "rejected_email": best.email}},
                 )
             confidence = validation.confidence
@@ -252,7 +230,8 @@ class SiteCrawlerProvider(DataProvider):
             company=lead_info.get("company", ""),
             source=self.name,
             confidence=confidence,
-            raw={"crawl": {"pages": result.pages_crawled,
+            raw={"bound_to_decision_maker": False,
+                 "crawl": {"pages": result.pages_crawled,
                            "source_url": best.source_url}},
         )
 
@@ -264,34 +243,26 @@ class SocialScraperProvider(DataProvider):
     api_key_env = ""
 
     def is_available(self) -> bool:
-        return True
+        return False
 
     def search(self, lead_info: dict) -> Optional[LeadContact]:
-        # Stub — real implementation would query LinkedIn's public search,
-        # Facebook's Graph API (no key needed for public pages), etc.
-        # For now: return a low-confidence result so the waterfall can
-        # try the next provider.
-        return LeadContact(
-            phone=lead_info.get("phone", ""),
-            company=lead_info.get("company", ""),
-            source=self.name,
-            confidence=0.4,
-            raw={"stub": True, "note": "social scraping not yet implemented"},
-        )
+        return None
 
 
 # ── Validation gate ──────────────────────────────────────────────────
 
 class ValidationGate:
-    """Post-processing step that verifies a LeadContact before use.
+    """Post-processing gate for evidence-backed contact records.
 
-    In production this calls ZeroBounce, SMTP check, or similar. Here we
-    provide a confidence-based gate that rejects results below threshold.
+    A contact must meet the confidence floor and, by default, carry explicit
+    decision-maker binding evidence. Generic or fabricated addresses fail closed.
     """
 
-    def __init__(self, min_confidence: float = 0.7, require_email: bool = True):
+    def __init__(self, min_confidence: float = 0.7, require_email: bool = True,
+                 require_bound_contact: bool = True):
         self.min_confidence = min_confidence
         self.require_email = require_email
+        self.require_bound_contact = require_bound_contact
 
     def validate(self, contact: LeadContact) -> bool:
         if contact is None:
@@ -301,6 +272,8 @@ class ValidationGate:
         if "@" not in contact.email:
             return False
         if contact.confidence < self.min_confidence:
+            return False
+        if self.require_bound_contact and contact.raw.get("bound_to_decision_maker") is not True:
             return False
         return True
 
