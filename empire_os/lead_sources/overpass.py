@@ -1,36 +1,18 @@
 #!/usr/bin/env python3
-"""
-Empire OS v3 — Overpass (OpenStreetMap) local-lead source
-==========================================================
+"""Bounded OpenStreetMap/Overpass business-identity source."""
 
-Keyless, free, unlimited local-business sourcing via the Overpass API.
-No API key. Returns real businesses (name / phone / website / geo) within a
-radius of a city center — the geo-radius complement to the keyword-based
-search-API sources we already run.
+from __future__ import annotations
 
-Why this exists (per founder decision 2026-07-18):
-  - Fill the geo-radius gap for local pay-per-call verticals (roofing, HVAC,
-    plumbing, etc.) without depending on a search-API keyword match.
-  - 100% legit: public OSM data, no personal-contact scraping, no Origami-style
-    individual cell/email harvesting. Business listings only.
-
-Usage:
-  from empire_os.lead_sources.overpass import run, register_source
-  for lead in run(metro="Houston, TX"):
-      intake(lead.to_intake_payload())
-
-Register with the fleet via register_source(reg).
-"""
-from itertools import islice
-from typing import Iterator, Optional
-import urllib.request
-import urllib.parse
 import json
+import re
 import time
+import urllib.parse
+import urllib.request
+from typing import Iterator, Optional
 
-from empire_os.lead_sources import LeadCandidate, SourceInfo, infer_niche
+from empire_os.lead_sources import LeadCandidate, SourceInfo
 
-# Major US metro centers (lat, lon). Add more as coverage grows.
+
 METRO_COORDS = {
     "Houston, TX": (29.763284, -95.363271),
     "Dallas, TX": (32.776672, -96.796888),
@@ -49,105 +31,297 @@ METRO_COORDS = {
     "Tampa, FL": (27.950575, -82.457177),
 }
 
-# OSM amenity/shop/craft tags that map to our pay-per-call verticals.
-OSM_TAGS = [
-    '"roofing"', '"hvac"', '"plumber"', '"electrician"',
-    '"painter"', '"general_contractor"', '"pest_control"',
-    '"landscaper"', '"tree_service"', '"mold_remediation"',
-    '"disaster_recovery"', '"cleaning"', '"gardener"',
-]
+CRAFT_TO_NICHE = {
+    "roofer": "roofing",
+    "hvac": "hvac",
+    "plumber": "plumbing",
+    "electrician": "electrical",
+    "painter": "painting",
+    "gardener": "landscaping",
+    "carpenter": "carpentry",
+    "pest_control": "pest_control",
+}
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-RADIUS_M = 25000  # 25km radius — covers a metro's suburbs
+OVERPASS_ENDPOINTS = (
+    "https://overpass-api.de/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+)
+
+RADIUS_M = 25000
+MAX_RESULTS = 200
+QUERY_TIMEOUT_SECONDS = 25
+NETWORK_TIMEOUT_SECONDS = 35
 
 
-def _query(lat, lon, radius, tags):
-    tag_expr = "][".join(tags)
+def _query(lat: float, lon: float, radius: int = RADIUS_M) -> str:
+    values = "|".join(
+        re.escape(value)
+        for value in CRAFT_TO_NICHE
+    )
+    selector = f'["craft"~"^({values})$"]'
+
     return f"""
-    [out:json][timeout:25];
-    (
-      node[{tag_expr}](around:{radius},{lat},{lon});
-      way[{tag_expr}](around:{radius},{lat},{lon});
-    );
-    out center 200;
-    """
+[out:json][timeout:{QUERY_TIMEOUT_SECONDS}];
+(
+  node{selector}(around:{radius},{lat},{lon});
+  way{selector}(around:{radius},{lat},{lon});
+  relation{selector}(around:{radius},{lat},{lon});
+);
+out center {MAX_RESULTS};
+""".strip()
 
 
-def _fetch(lat, lon, radius=RADIUS_M, tags=OSM_TAGS, limit=200):
-    q = _query(lat, lon, radius, tags)
-    try:
-        req = urllib.request.Request(
-            OVERPASS_URL,
-            data=urllib.parse.urlencode({"data": q}).encode(),
-            headers={"User-Agent": "EmpireOS-LeadSource/1.0"},
-        )
-        raw = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "ignore")
-        data = json.loads(raw)
-    except Exception as e:
-        print(f"[overpass] fetch failed: {e}")
-        return []
-    out = []
-    for el in data.get("elements", []):
-        tags = el.get("tags", {})
-        # way elements carry center lat/lon
-        lat_ = el.get("lat") or el.get("center", {}).get("lat")
-        lon_ = el.get("lon") or el.get("center", {}).get("lon")
-        name = tags.get("name", "")
-        if not name:
-            continue
-        phone = (tags.get("phone") or tags.get("contact:phone")
-                 or tags.get("mobile") or "")
-        website = tags.get("website") or tags.get("contact:website") or ""
-        # infer niche from the OSM tag that matched
-        matched_tag = next((t for t in OSM_TAGS
-                            if t.strip('"') in tags), "")
-        niche = infer_niche(name + " " + matched_tag.replace('_', ' ')) \
-            if matched_tag else infer_niche(name)
-        city = tags.get("addr:city", "")
-        state = tags.get("addr:state", "")
-        street = tags.get("addr:street", "")
-        addr = f"{street}, {city}, {state}".strip(", ")
-        out.append(LeadCandidate(
-            name=name,
-            phone=phone,
-            niche=niche,
-            metro="",  # filled by run() from the metro key
-            state=state,
-            details=(f"OSM business listing: {name}. "
-                     f"{'Phone '+phone+'. ' if phone else ''}"
-                     f"{'Web '+website+'. ' if website else ''}"
-                     f"{'Addr: '+addr+'. ' if addr else ''}"
-                     f"Geo: {lat_},{lon_}"),
-            source="overpass_osm",
-            lead_score=55 + (10 if phone else 0),
-            url=website or "",
-            raw={"lat": lat_, "lon": lon_, "osm_tags": tags},
-        ))
-        if len(out) >= limit:
-            break
-    return out
+def _request_overpass(query: str) -> dict:
+    payload = urllib.parse.urlencode(
+        {"data": query}
+    ).encode()
 
+    last_error = None
 
-def run(metro: Optional[str] = None) -> Iterator[LeadCandidate]:
-    """Yield Overpass leads for one metro (or all known metros)."""
-    targets = {metro: METRO_COORDS[metro]} if metro and metro in METRO_COORDS \
-        else METRO_COORDS
-    for m, (lat, lon) in targets.items():
+    for endpoint in OVERPASS_ENDPOINTS:
         try:
-            for lead in _fetch(lat, lon):
-                lead.metro = m
-                yield lead
-        except Exception as e:
-            print(f"[overpass] metro {m} failed: {e}")
-        time.sleep(1.0)  # be polite to the public endpoint
+            request = urllib.request.Request(
+                endpoint,
+                data=payload,
+                headers={
+                    "User-Agent": (
+                        "EmpireOS-BusinessDiscovery/1.0 "
+                        "(contact@empire-ai.co.uk)"
+                    )
+                },
+            )
+
+            raw = urllib.request.urlopen(
+                request,
+                timeout=NETWORK_TIMEOUT_SECONDS,
+            ).read().decode("utf-8", "ignore")
+
+            data = json.loads(raw)
+
+            if isinstance(data, dict):
+                return data
+
+        except Exception as exc:
+            last_error = exc
+
+    if last_error:
+        print(
+            "[overpass] all endpoints failed: "
+            f"{type(last_error).__name__}: {last_error}"
+        )
+
+    return {}
+
+
+def _contact_value(tags: dict, *keys: str) -> str:
+    for key in keys:
+        value = str(tags.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _element_to_candidate(element: dict) -> LeadCandidate | None:
+    tags = element.get("tags") or {}
+
+    craft = str(
+        tags.get("craft") or ""
+    ).strip().casefold()
+
+    niche = CRAFT_TO_NICHE.get(craft)
+    if not niche:
+        return None
+
+    name = str(tags.get("name") or "").strip()
+    if not name:
+        return None
+
+    phone = _contact_value(
+        tags,
+        "phone",
+        "contact:phone",
+        "mobile",
+        "contact:mobile",
+    )
+    website = _contact_value(
+        tags,
+        "website",
+        "contact:website",
+    )
+    email = _contact_value(
+        tags,
+        "email",
+        "contact:email",
+    )
+
+    if not phone and not website and not email:
+        return None
+
+    osm_type = str(
+        element.get("type") or ""
+    ).strip()
+    osm_id = element.get("id")
+
+    if osm_type not in {"node", "way", "relation"}:
+        return None
+    if osm_id in (None, ""):
+        return None
+
+    center = element.get("center") or {}
+    lat = element.get("lat")
+    lon = element.get("lon")
+
+    if lat is None:
+        lat = center.get("lat")
+    if lon is None:
+        lon = center.get("lon")
+
+    number = str(
+        tags.get("addr:housenumber") or ""
+    ).strip()
+    street = str(
+        tags.get("addr:street") or ""
+    ).strip()
+    city = str(
+        tags.get("addr:city") or ""
+    ).strip()
+    state = str(
+        tags.get("addr:state") or ""
+    ).strip()
+    postcode = str(
+        tags.get("addr:postcode") or ""
+    ).strip()
+
+    street_address = " ".join(
+        part for part in (number, street) if part
+    )
+
+    address = ", ".join(
+        part
+        for part in (
+            street_address,
+            city,
+            state,
+            postcode,
+        )
+        if part
+    )
+
+    osm_url = (
+        f"https://www.openstreetmap.org/"
+        f"{osm_type}/{osm_id}"
+    )
+
+    score = 60
+    score += 15 if phone else 0
+    score += 15 if website else 0
+    score += 5 if email else 0
+    score += 5 if address else 0
+    score = min(score, 100)
+
+    details = [
+        f"OSM verified trade tag craft={craft}",
+        f"OSM object {osm_type}/{osm_id}",
+    ]
+
+    if phone:
+        details.append(f"Phone {phone}")
+    if website:
+        details.append(f"Website {website}")
+    if email:
+        details.append(f"Email {email}")
+    if address:
+        details.append(f"Address {address}")
+    if lat is not None and lon is not None:
+        details.append(f"Geo {lat},{lon}")
+
+    return LeadCandidate(
+        name=name,
+        email=email,
+        phone=phone,
+        niche=niche,
+        metro="",
+        state=state,
+        details=". ".join(details),
+        source="overpass_osm",
+        lead_score=score,
+        url=osm_url,
+        raw={
+            "osm_type": osm_type,
+            "osm_id": osm_id,
+            "lat": lat,
+            "lon": lon,
+            "craft": craft,
+            "business_website": website,
+            "osm_tags": tags,
+        },
+    )
+
+
+def _fetch(
+    lat: float,
+    lon: float,
+    radius: int = RADIUS_M,
+    limit: int = MAX_RESULTS,
+) -> list[LeadCandidate]:
+    data = _request_overpass(
+        _query(lat, lon, radius)
+    )
+
+    results = []
+
+    for element in data.get("elements", []):
+        candidate = _element_to_candidate(element)
+
+        if candidate is None:
+            continue
+
+        results.append(candidate)
+
+        if len(results) >= limit:
+            break
+
+    return results
+
+
+def run(
+    metro: Optional[str] = None,
+) -> Iterator[LeadCandidate]:
+
+    if metro is not None:
+        if metro not in METRO_COORDS:
+            return
+
+        targets = {
+            metro: METRO_COORDS[metro]
+        }
+    else:
+        targets = METRO_COORDS
+
+    for metro_name, (lat, lon) in targets.items():
+        try:
+            for candidate in _fetch(lat, lon):
+                candidate.metro = metro_name
+                yield candidate
+
+        except Exception as exc:
+            print(
+                f"[overpass] metro {metro_name} failed: {exc}"
+            )
+
+        time.sleep(1.0)
 
 
 def register_source(reg):
-    reg(SourceInfo(
-        name="overpass",
-        tier="real",
-        requires=[],
-        description="OpenStreetMap/Overpass local businesses by geo-radius — "
-                    "keyless, free, no personal-contact scraping.",
-        run_fn=run,
-    ))
+    reg(
+        SourceInfo(
+            name="overpass",
+            tier="real",
+            requires=[],
+            description=(
+                "OpenStreetMap/Overpass contactable "
+                "local trade businesses"
+            ),
+            run_fn=run,
+        )
+    )
