@@ -27,6 +27,10 @@ import time
 import traceback
 from pathlib import Path
 
+from empire_os.candidate_quality import (
+    assess_candidate,
+    enforce_candidate_quality,
+)
 from empire_os.lead_sources import list_sources, _import_sources
 from empire_os.prospect_ingest import (
     lookup_existing_prospect,
@@ -79,7 +83,10 @@ def ingest_candidate(candidate, *, reader=None, writer=None) -> dict:
     reader = reader or _canonical_reader
     writer = writer or _canonical_writer
 
+    quality = enforce_candidate_quality(candidate)
     prepared = prepare_candidate(candidate)
+    prepared.setdefault("evidence", {})["quality"] = quality.to_evidence()
+
     lookup = lookup_existing_prospect(prepared, reader)
     return materialize_prospect(prepared, lookup, writer)
 
@@ -136,6 +143,22 @@ def run_source_safe(src, metro, dry_run, max_candidates=None):
                 break
             candidates += 1
 
+            quality = assess_candidate(cand)
+            if not quality.accepted:
+                log(
+                    "SKIP",
+                    "candidate_quality_rejected",
+                    source=cand.source,
+                    niche=cand.niche,
+                    metro=cand.metro,
+                    name=cand.name[:40],
+                    reason_codes=list(quality.reason_codes),
+                    quality_confidence=quality.confidence,
+                    entity_kind=quality.entity_kind,
+                    source_role=quality.source_role,
+                )
+                continue
+
             if dry_run:
                 log(
                     "DRYRUN",
@@ -144,6 +167,8 @@ def run_source_safe(src, metro, dry_run, max_candidates=None):
                     niche=cand.niche,
                     metro=cand.metro,
                     name=cand.name[:40],
+                    quality_confidence=quality.confidence,
+                    entity_kind=quality.entity_kind,
                 )
                 continue
 

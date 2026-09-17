@@ -138,7 +138,18 @@ def _run_nyc(lookback_days: int = 7) -> Iterator[LeadCandidate]:
             owner_first = (row.get("owner_s_first_name") or "").strip()
             owner_last = (row.get("owner_s_last_name") or "").strip()
             owner_name = owner_biz or f"{owner_first} {owner_last}".strip()
-            if not owner_name:
+
+            placeholder_names = {
+                "",
+                "na",
+                "n/a",
+                "none",
+                "unknown",
+                "not available",
+                "not applicable",
+            }
+
+            if owner_name.strip().casefold() in placeholder_names:
                 continue
 
             phone = (row.get("permittee_s_phone__") or "").strip()

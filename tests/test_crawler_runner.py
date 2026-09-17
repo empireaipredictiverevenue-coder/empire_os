@@ -11,7 +11,7 @@ def candidate():
         niche="roofing",
         metro="Austin",
         state="TX",
-        source="permits",
+        source="overpass_osm",
         lead_score=82,
         url="https://source.example/record/123",
     )
@@ -72,7 +72,8 @@ def test_run_source_safe_fails_closed_without_legacy_fallback(monkeypatch):
             name="Second Real Roofing LLC",
             niche="roofing",
             metro="Austin",
-            source="permits",
+            source="overpass_osm",
+            url="https://source.example/record/456",
         ),
     ]
 
@@ -166,7 +167,7 @@ def test_run_source_safe_respects_max_candidates(monkeypatch):
             name="Second Real Roofing LLC",
             niche="roofing",
             metro="Austin",
-            source="permits",
+            source="overpass_osm",
         ),
     ]
 
@@ -200,3 +201,43 @@ def test_run_source_safe_respects_max_candidates(monkeypatch):
 
     assert (found, accepted, errors) == (1, 1, 0)
     assert calls == ["Real Roofing LLC"]
+
+
+def test_run_source_safe_rejects_signal_before_ingest(monkeypatch):
+    signal_candidate = LeadCandidate(
+        name="Example Property Owner LLC (Queens)",
+        phone="212-555-0101",
+        niche="roofing",
+        metro="NYC",
+        source="permits_nyc",
+        url="https://example.test/permit/123",
+        raw={"job__": "123"},
+    )
+
+    src = SimpleNamespace(
+        name="permits",
+        tier="real",
+        requires=[],
+        run_fn=lambda metro=None: iter([signal_candidate]),
+    )
+
+    calls = []
+
+    monkeypatch.setattr(
+        "empire_os.crawler_runner.ingest_candidate",
+        lambda cand: calls.append(cand.name),
+    )
+    monkeypatch.setattr(
+        "empire_os.crawler_runner.log",
+        lambda *args, **kwargs: None,
+    )
+
+    found, accepted, errors = run_source_safe(
+        src,
+        None,
+        False,
+        max_candidates=1,
+    )
+
+    assert (found, accepted, errors) == (1, 0, 0)
+    assert calls == []
