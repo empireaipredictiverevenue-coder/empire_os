@@ -27,3 +27,7 @@ __pycache__/
 *.log
 
 runtime/
+
+# Node / local tool caches
+node_modules/
+supabase/.temp/
