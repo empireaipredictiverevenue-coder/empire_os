@@ -23,6 +23,8 @@ try{
   await admin.query(outbound);
   const gate=await readFile(join(root,'supabase/migrations/20260917201500_buyer_candidate_review_gate.sql'),'utf8');
   await admin.query(gate);
+  const readiness=await readFile(join(root,'supabase/migrations/20260917204159_enforce_outreach_ready_review_gate.sql'),'utf8');
+  await admin.query(readiness);
   const prospect=randomUUID(), entity=randomUUID();
   await admin.query('insert into prospects(id) values($1)',[prospect]);
   await admin.query('insert into business_entities(id) values($1)',[entity]);
@@ -31,7 +33,7 @@ try{
 
   await test('service nominates candidate but direct outbound is revoked',async()=>{
     const r=(await asRole('service_role',`select public.propose_buyer_candidate_review($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) result`,[
-      prospect,entity,'Frank Smith','Founder','frank@acme.example','managed_service',90,1.0,{source:'website'},'cand-0001'
+      prospect,entity,'Frank Smith','Founder','frank@acme.example','managed_service',90,1.0,{source:'website',outreach_ready:false},'cand-0001'
     ])).rows[0].result;
     reviewId=r.review_id; assert.equal(r.status,'pending');
     await assert.rejects(asRole('service_role',`select public.propose_outbound_intent($1,$2,null,null,'email',$3,'Hi','Body',null,'managed_service','idem-direct','planner',$4,'{}')`,[entity,prospect,'frank@acme.example',expires]),/permission denied/);
@@ -47,7 +49,12 @@ try{
     assert.equal(r.status,'approved');
   });
 
-  await test('approved candidate can create pending outbound intent only',async()=>{
+  await test('approved review-only candidate cannot create outbound intent',async()=>{
+    await assert.rejects(asRole('service_role',`select public.propose_reviewed_outbound_intent($1,'Hi Frank','Body',null,'idem-reviewed-blocked','planner',$2,'{}')`,[reviewId,expires]),/outreach-ready evidence required/);
+    await admin.query("update buyer_candidate_reviews set evidence=evidence || '{\"outreach_ready\":true}'::jsonb where id=$1",[reviewId]);
+  });
+
+  await test('approved outreach-ready candidate can create pending outbound intent only',async()=>{
     const r=(await asRole('service_role',`select public.propose_reviewed_outbound_intent($1,'Hi Frank','Body with unsubscribe and footer',null,'idem-reviewed-2','planner',$2,'{}') result`,[reviewId,expires])).rows[0].result;
     assert.equal(r.status,'pending_approval');
     assert.equal(r.actual_revenue,false);
