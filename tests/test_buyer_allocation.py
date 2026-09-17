@@ -312,3 +312,20 @@ def test_phase3d_buyer_activation_migration_is_fail_closed():
     )
     for fragment in required:
         assert fragment in sql
+
+
+def test_buyer_commercial_evidence_migration_verifies_sources():
+    sql = Path("migrations/006_buyer_commercial_evidence.sql").read_text(encoding="utf-8")
+    required = (
+        "CREATE TABLE IF NOT EXISTS public.buyer_commercial_evidence",
+        "verification_state TEXT NOT NULL DEFAULT 'pending'",
+        "active buyer subscription does not verify these terms",
+        "agreement_sha256",
+        "verified payment does not resolve to this buyer",
+        "commercial_terms_sha256",
+        "activate_buyer_from_evidence",
+        "buyer_commercially_activated",
+        "REVOKE ALL ON FUNCTION public.activate_buyer_from_evidence",
+    )
+    for fragment in required:
+        assert fragment in sql
