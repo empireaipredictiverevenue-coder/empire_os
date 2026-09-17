@@ -9,11 +9,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
-from empire_os.buyer_discovery import enrich_candidate, select_candidates
-from empire_os.search_fabric.site_probe import probe_site
+from empire_os.buyer_discovery import select_candidates
 
 
 def _load_env():
@@ -85,6 +85,8 @@ def main(argv=None):
     p.add_argument("--min-score", type=float, default=50.0)
     p.add_argument("--probe", type=int, default=0,
                    help="probe public websites for up to N top candidates")
+    p.add_argument("--probe-timeout", type=float, default=10.0,
+                   help="hard per-site child-process timeout in seconds")
     args = p.parse_args(argv)
     rows = load_rows()
     candidates = select_candidates(rows, min_score=args.min_score, limit=args.limit)
@@ -95,17 +97,28 @@ def main(argv=None):
     }
     if args.probe:
         enriched = []
-        for candidate in candidates[:max(0, min(args.probe, 20))]:
-            evidence = probe_site(candidate.website, max_pages=4, request_timeout=6, time_budget_seconds=18)
-            result = enrich_candidate(candidate, evidence)
-            enriched.append({
-                "prospect_id": candidate.prospect_id,
-                "business_name": candidate.business_name,
-                "site_ok": bool(evidence.get("ok")),
-                "site_evidence_score": evidence.get("evidence_score"),
-                "decision_maker_found": bool(result.get("decision_maker")),
-                "email_candidates_found": len(result.get("contact_email_candidates") or []),
-            })
+        timeout = max(2.0, min(float(args.probe_timeout), 30.0))
+        for candidate in candidates[:max(0, min(args.probe, 50))]:
+            row = candidate.to_dict()
+            row["id"] = row.pop("prospect_id")
+            try:
+                proc = subprocess.run(
+                    [sys.executable, "-m", "empire_os.buyer_probe_worker"],
+                    input=json.dumps(row), text=True, capture_output=True,
+                    timeout=timeout, check=False, cwd="/srv/empire_os",
+                )
+                if proc.returncode == 0:
+                    enriched.append(json.loads(proc.stdout))
+                else:
+                    enriched.append({"prospect_id": candidate.prospect_id,
+                                     "business_name": candidate.business_name,
+                                     "site_ok": False, "outreach_ready": False,
+                                     "rejection_reason": "probe_failed"})
+            except subprocess.TimeoutExpired:
+                enriched.append({"prospect_id": candidate.prospect_id,
+                                 "business_name": candidate.business_name,
+                                 "site_ok": False, "outreach_ready": False,
+                                 "rejection_reason": "site_timeout"})
         output["site_probe"] = enriched
     print(json.dumps(output, indent=2, sort_keys=True, default=str))
     return 0

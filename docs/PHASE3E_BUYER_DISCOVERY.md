@@ -38,3 +38,9 @@ The current bottleneck is decision-maker/contact resolution, not raw company dis
 Official company-site emails and generated work-email patterns are different evidence classes.
 Observed company-site emails may enter contact verification. Generated patterns remain candidates only and must not become outreach-ready without mailbox-level evidence.
 The review-only proposal CLI never writes or sends. It renders the candidate-review payload and, only with an explicit approved review UUID, the reviewed-outbound payload for human review.
+## Bounded batch review
+- `scripts/buyer_discovery_preview.py --probe N` now isolates each public-site probe in a child process.
+- `--probe-timeout` applies a hard per-site deadline so broken websites cannot stall the batch or remote bridge.
+- Results include explicit rejection reasons such as `site_timeout`, `no_decision_maker`, `no_bound_contact`, `role_address_only`, and `contact_not_verified`.
+- DNS-only contact validation is used in preview mode; no email is sent and no SMTP mailbox probe is required.
+
