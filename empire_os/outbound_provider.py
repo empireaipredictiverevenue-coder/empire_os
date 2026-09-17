@@ -37,17 +37,30 @@ def threaded_reply_address(reply_to: str, intent_id: Any) -> str:
     return f"{local}+{_intent_uuid(intent_id)}@{domain}"
 
 
-def build_resend_send(claim: dict[str, Any], *, sender: str, reply_to: str) -> dict[str, Any]:
+def build_resend_send(claim: dict[str, Any], *, sender: str, reply_to: str,
+                      required_sender_domain: str = "mail.empire-ai.co.uk",
+                      required_postal_footer: str = "31 St Thomas St, Bolton, BL1 2QR, UK") -> dict[str, Any]:
     if not isinstance(claim, dict) or claim.get("decision") != "authorized_send":
         raise OutboundProviderError("database-authorized send claim required")
     if claim.get("actual_revenue") is not False or claim.get("channel") != "email":
         raise OutboundProviderError("safe email send claim required")
     recipient = _email(claim.get("recipient"))
     sender_address = _email(sender)
+    required_domain = str(required_sender_domain or "").strip().lower()
+    if not required_domain or sender_address.rsplit("@", 1)[-1] != required_domain:
+        raise OutboundProviderError("approved outbound sender domain required")
     reply_address = threaded_reply_address(reply_to, claim.get("intent_id"))
+    if reply_address.rsplit("@", 1)[-1] != required_domain:
+        raise OutboundProviderError("approved outbound reply domain required")
     body_text = str(claim.get("body_text") or "")
     if not body_text.strip():
         raise OutboundProviderError("non-empty outbound body required")
+    lower_body = body_text.lower()
+    if not any(token in lower_body for token in ("unsubscribe", "opt out", "opt-out")):
+        raise OutboundProviderError("visible outbound opt-out required")
+    footer = str(required_postal_footer or "").strip()
+    if not footer or footer.lower() not in lower_body:
+        raise OutboundProviderError("approved postal footer required")
     return {
         "from": sender,
         "to": [recipient],
@@ -56,7 +69,9 @@ def build_resend_send(claim: dict[str, Any], *, sender: str, reply_to: str) -> d
         "text": body_text,
         "html": claim.get("body_html") or None,
         "tags": [{"name": "intent_id", "value": str(claim.get("intent_id") or "")}],
+        "headers": {"List-Unsubscribe": f"<mailto:{reply_address}?subject=opt%20out>"},
         "_sender_address": sender_address,
+        "_idempotency_key": f"outbound/{_intent_uuid(claim.get("intent_id"))}",
     }
 
 
@@ -135,11 +150,14 @@ def send_with_resend(payload: dict[str, Any], *, api_key: str,
     if not isinstance(payload, dict) or not payload.get("_sender_address"):
         raise OutboundProviderError("validated Resend payload required")
     outbound = {k: v for k, v in payload.items() if not k.startswith("_") and v is not None}
+    idempotency_key = str(payload.get("_idempotency_key") or "").strip()
+    if not idempotency_key:
+        raise OutboundProviderError("outbound idempotency key required")
     try:
         if resend_module is None:
             import resend as resend_module
         resend_module.api_key = api_key
-        result = resend_module.Emails.send(outbound)
+        result = resend_module.Emails.send(outbound, {"idempotency_key": idempotency_key})
     except Exception as exc:
         raise OutboundProviderError("Resend send failed") from exc
     if isinstance(result, dict):

@@ -19,8 +19,8 @@ def parser():
     p = argparse.ArgumentParser(description="Empire governed outbound email tool")
     p.add_argument("intent_id")
     p.add_argument("--actor", default=os.getenv("EMPIRE_OPERATOR_ID", ""))
-    p.add_argument("--sender", default=os.getenv("EMPIRE_OUTBOUND_FROM", ""))
-    p.add_argument("--reply-to", default=os.getenv("EMPIRE_REPLY_TO", ""))
+    p.add_argument("--sender", default=os.getenv("EMPIRE_OUTBOUND_FROM", "Phil - Founder - Empire AI <phil@mail.empire-ai.co.uk>"))
+    p.add_argument("--reply-to", default=os.getenv("EMPIRE_REPLY_TO", "reply@mail.empire-ai.co.uk"))
     p.add_argument("--send", action="store_true", help="actually send after DB authorization")
     return p
 
