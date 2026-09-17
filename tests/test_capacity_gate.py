@@ -52,6 +52,20 @@ def capacity_job(
     )
 
 
+def activated_fields():
+    return {
+        "commercial_activation_state": "activated",
+        "reviewed_at": "2026-09-17T10:00:00Z",
+        "commercial_activated_at": "2026-09-17T10:01:00Z",
+        "commercial_terms_source": "manual_contract",
+        "commercial_terms_reference": "contract:capacity-test",
+        "commercial_terms_verified_at": "2026-09-17T10:01:00Z",
+        "capacity_verified_at": "2026-09-17T10:01:00Z",
+        "delivery_verified_at": "2026-09-17T10:01:00Z",
+        "destination_phone": "+15125550123",
+        "webhook_url": None,
+    }
+
 def test_capacity_gate_fails_closed_without_market_identity():
     with pytest.raises(
         bus.BusError,
@@ -88,6 +102,7 @@ def test_capacity_gate_uses_live_buyer_state(
                 "status": "active",
                 "daily_cap": 10,
                 "calls_today": 3,
+                **activated_fields(),
             },
             {
                 "id": "buyer-2",
@@ -98,6 +113,7 @@ def test_capacity_gate_uses_live_buyer_state(
                 "status": "active",
                 "daily_cap": 5,
                 "calls_today": 5,
+                **activated_fields(),
             },
             {
                 "id": "buyer-3",
@@ -108,6 +124,7 @@ def test_capacity_gate_uses_live_buyer_state(
                 "status": "disabled",
                 "daily_cap": 100,
                 "calls_today": 0,
+                **activated_fields(),
             },
             {
                 "id": "buyer-4",
@@ -118,6 +135,7 @@ def test_capacity_gate_uses_live_buyer_state(
                 "status": "active",
                 "daily_cap": 100,
                 "calls_today": 0,
+                **activated_fields(),
             },
         ]
 
@@ -170,6 +188,7 @@ def test_capacity_gate_closes_when_capacity_exhausted(
                 "status": "active",
                 "daily_cap": 10,
                 "calls_today": 10,
+                **activated_fields(),
             },
         ]
 
@@ -196,7 +215,7 @@ def test_capacity_gate_closes_when_capacity_exhausted(
     assert result["buyer_capacity"] == 0
 
 
-def test_capacity_gate_supports_market_wide_buyer(
+def test_capacity_gate_rejects_unscoped_market_wide_buyer(
     monkeypatch,
 ):
     def fake_rest(method, path, **kwargs):
@@ -213,6 +232,7 @@ def test_capacity_gate_supports_market_wide_buyer(
                 "status": "active",
                 "daily_cap": 20,
                 "calls_today": 4,
+                **activated_fields(),
             },
         ]
 
@@ -226,10 +246,10 @@ def test_capacity_gate_supports_market_wide_buyer(
         capacity_job()
     )
 
-    assert result["gate_open"] is True
-    assert result["matched_buyers"] == 1
-    assert result["available_buyers"] == 1
-    assert result["remaining_capacity"] == 16
+    assert result["gate_open"] is False
+    assert result["matched_buyers"] == 0
+    assert result["available_buyers"] == 0
+    assert result["remaining_capacity"] == 0
 
 def test_capacity_gate_paginates_buyer_state(
     monkeypatch,
@@ -252,6 +272,7 @@ def test_capacity_gate_paginates_buyer_state(
             "status": "active",
             "daily_cap": 5,
             "calls_today": 1,
+            **activated_fields(),
         },
         {
             "id": "buyer-2",
@@ -262,6 +283,7 @@ def test_capacity_gate_paginates_buyer_state(
             "status": "active",
             "daily_cap": 5,
             "calls_today": 2,
+            **activated_fields(),
         },
         {
             "id": "buyer-3",
@@ -272,6 +294,7 @@ def test_capacity_gate_paginates_buyer_state(
             "status": "active",
             "daily_cap": 5,
             "calls_today": 3,
+            **activated_fields(),
         },
     ]
 

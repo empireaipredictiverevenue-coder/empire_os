@@ -25,6 +25,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from empire_os.buyer_allocation import buyer_activation_decision
 from empire_os.niche_taxonomy import (
     NICHE_FAMILIES,
     metro_key,
@@ -243,7 +244,12 @@ def fetch_buyer_signals() -> list[BuyerSignal]:
         "buyers",
         (
             "id,buyer_name,niche,metro,is_active,status,"
-            "daily_cap,calls_today,base_payout,per_lead_rate,priority"
+            "daily_cap,calls_today,base_payout,per_lead_rate,priority,"
+            "destination_phone,webhook_url,reviewed_at,"
+            "commercial_activation_state,commercial_activated_at,"
+            "commercial_terms_source,commercial_terms_reference,"
+            "commercial_terms_verified_at,capacity_verified_at,"
+            "delivery_verified_at"
         ),
     )
 
@@ -253,15 +259,16 @@ def fetch_buyer_signals() -> list[BuyerSignal]:
         niche = normalise(row.get("niche"))
         metro = metro_key(row.get("metro"))
 
-        is_active = bool(row.get("is_active"))
+        activation_allowed, _ = buyer_activation_decision(row)
         status = normalise(row.get("status"))
 
         daily_cap = int(row.get("daily_cap") or 0)
         calls_today = int(row.get("calls_today") or 0)
 
-        remaining_capacity = max(
-            daily_cap - calls_today,
-            0,
+        remaining_capacity = (
+            max(daily_cap - calls_today, 0)
+            if activation_allowed
+            else 0
         )
 
         raw_rate = row.get("per_lead_rate")
@@ -293,10 +300,7 @@ def fetch_buyer_signals() -> list[BuyerSignal]:
                 niche=niche,
                 niche_family=niche_family(niche),
                 metro=metro,
-                is_active=(
-                    is_active
-                    and status not in {"inactive", "disabled"}
-                ),
+                is_active=activation_allowed,
                 status=status,
                 daily_cap=daily_cap,
                 calls_today=calls_today,
@@ -377,15 +381,8 @@ def buyer_matches(
     target_family = niche_family(niche)
     target_metro = metro_key(metro)
 
-    niche_match = (
-        buyer.niche_family == target_family
-        or not buyer.niche
-    )
-
-    metro_match = (
-        not buyer.metro
-        or buyer.metro == target_metro
-    )
+    niche_match = buyer.niche_family == target_family
+    metro_match = buyer.metro == target_metro
 
     return niche_match and metro_match
 

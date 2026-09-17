@@ -5,6 +5,7 @@ import pytest
 from empire_os.buyer_allocation import (
     BuyerAllocationError,
     allocate_owned_prospect,
+    buyer_activation_decision,
     allocation_key,
     fetch_buyer_rows,
     plan_allocation,
@@ -49,6 +50,16 @@ def buyer(
     calls_today=0,
     priority=50,
     rate=75,
+    activation_state="activated",
+    reviewed_at="2026-09-17T10:00:00Z",
+    commercial_activated_at="2026-09-17T10:01:00Z",
+    commercial_terms_source="manual_contract",
+    commercial_terms_reference="contract:buyer-test",
+    commercial_terms_verified_at="2026-09-17T10:01:00Z",
+    capacity_verified_at="2026-09-17T10:01:00Z",
+    delivery_verified_at="2026-09-17T10:01:00Z",
+    destination_phone="+15125550123",
+    webhook_url=None,
 ):
     return {
         "id": buyer_id,
@@ -62,6 +73,16 @@ def buyer(
         "priority": priority,
         "per_lead_rate": rate,
         "base_payout": None,
+        "commercial_activation_state": activation_state,
+        "reviewed_at": reviewed_at,
+        "commercial_activated_at": commercial_activated_at,
+        "commercial_terms_source": commercial_terms_source,
+        "commercial_terms_reference": commercial_terms_reference,
+        "commercial_terms_verified_at": commercial_terms_verified_at,
+        "capacity_verified_at": capacity_verified_at,
+        "delivery_verified_at": delivery_verified_at,
+        "destination_phone": destination_phone,
+        "webhook_url": webhook_url,
     }
 
 
@@ -74,6 +95,31 @@ def test_qualification_gate_is_fail_closed():
         qualification(score=49, tier="cold")
     )[0] is False
     assert qualification_decision(qualification())[0] is True
+
+
+def test_buyer_activation_gate_rejects_auto_created_capacity():
+    row = buyer(
+        "auto-created",
+        daily_cap=50,
+        activation_state="discovered",
+        reviewed_at=None,
+    )
+    allowed, reason = buyer_activation_decision(row)
+    assert allowed is False
+    assert reason == "buyer_not_commercially_activated"
+
+
+def test_buyer_activation_gate_requires_verified_evidence():
+    assert buyer_activation_decision(buyer("ok")) == (True, "activated")
+    assert buyer_activation_decision(
+        buyer("no-terms", commercial_terms_reference="")
+    ) == (False, "commercial_terms_reference_missing")
+    assert buyer_activation_decision(
+        buyer("no-cap-proof", capacity_verified_at=None)
+    ) == (False, "buyer_capacity_unverified")
+    assert buyer_activation_decision(
+        buyer("no-route", destination_phone="", webhook_url=None)
+    ) == (False, "buyer_delivery_destination_missing")
 
 
 def test_rank_buyers_prefers_exact_market_and_filters_ineligible():
@@ -93,15 +139,10 @@ def test_rank_buyers_prefers_exact_market_and_filters_ineligible():
         rows,
     )
 
-    assert [item.buyer_id for item in ranked] == [
-        "exact",
-        "wildcard",
-    ]
+    assert [item.buyer_id for item in ranked] == ["exact"]
     assert ranked[0].exact_niche is True
     assert ranked[0].exact_metro is True
     assert ranked[0].remaining_capacity == 8
-    assert ranked[1].exact_niche is False
-    assert ranked[1].exact_metro is False
 
 
 def test_rank_buyers_deduplicates_buyer_ids():
@@ -250,3 +291,24 @@ def test_phase3d_migration_contains_atomic_guards():
     # Phase 3D must not invent commercial economics.
     assert "price_cents," in sql
     assert "expected_margin_cents," in sql
+
+
+def test_phase3d_buyer_activation_migration_is_fail_closed():
+    sql = Path("migrations/005_buyer_activation_gate.sql").read_text(encoding="utf-8")
+    required = (
+        "commercial_activation_state TEXT NOT NULL DEFAULT 'discovered'",
+        "commercial_terms_reference TEXT",
+        "capacity_verified_at TIMESTAMPTZ",
+        "delivery_verified_at TIMESTAMPTZ",
+        "lower(trim(COALESCE(status, ''))) = 'active'",
+        "lower(trim(COALESCE(commercial_activation_state, ''))) = 'activated'",
+        "reviewed_at IS NOT NULL",
+        "commercial_terms_verified_at IS NOT NULL",
+        "capacity_verified_at IS NOT NULL",
+        "delivery_verified_at IS NOT NULL",
+        "lower(trim(niche)) = lower(trim(COALESCE(v_prospect.niche, '')))",
+        "lower(trim(metro)) = lower(trim(COALESCE(v_prospect.metro, '')))",
+        "REVOKE ALL ON FUNCTION public.allocate_prospect_atomic",
+    )
+    for fragment in required:
+        assert fragment in sql

@@ -47,6 +47,7 @@ from typing import Any, Callable
 from empire_os.buyer_allocation import (
     BuyerAllocationError,
     allocate_owned_prospect,
+    buyer_activation_decision,
 )
 from empire_os.niche_taxonomy import (
     NICHE_FAMILIES,
@@ -1261,7 +1262,11 @@ def _capacity_buyer_rows() -> list[dict[str, Any]]:
             params={
                 "select": (
                     "id,buyer_name,niche,metro,is_active,status,"
-                    "daily_cap,calls_today"
+                    "daily_cap,calls_today,destination_phone,webhook_url,"
+                    "reviewed_at,commercial_activation_state,"
+                    "commercial_activated_at,commercial_terms_source,"
+                    "commercial_terms_reference,commercial_terms_verified_at,"
+                    "capacity_verified_at,delivery_verified_at"
                 ),
                 "limit": str(CAPACITY_BUYER_PAGE_SIZE),
                 "offset": str(offset),
@@ -1327,17 +1332,8 @@ def execute_capacity_check(job: ClaimedJob) -> dict[str, Any]:
     remaining_capacity = 0
 
     for row in rows:
-        status = normalise(row.get("status"))
-
-        is_active = (
-            bool(row.get("is_active"))
-            and status not in {
-                "inactive",
-                "disabled",
-            }
-        )
-
-        if not is_active:
+        activation_allowed, _ = buyer_activation_decision(row)
+        if not activation_allowed:
             continue
 
         buyer_niche = normalise(
@@ -1354,15 +1350,8 @@ def execute_capacity_check(job: ClaimedJob) -> dict[str, Any]:
             row.get("metro")
         )
 
-        niche_match = (
-            buyer_family == family
-            or not buyer_niche
-        )
-
-        metro_match = (
-            not buyer_metro
-            or buyer_metro == metro
-        )
+        niche_match = buyer_family == family
+        metro_match = buyer_metro == metro
 
         if not (
             niche_match

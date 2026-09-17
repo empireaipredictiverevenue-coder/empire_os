@@ -81,6 +81,16 @@ def buyer_row():
         "base_payout": None,
         "per_lead_rate": 80,
         "priority": 90,
+        "destination_phone": "+15125550123",
+        "webhook_url": None,
+        "reviewed_at": "2026-09-17T10:00:00Z",
+        "commercial_activation_state": "activated",
+        "commercial_activated_at": "2026-09-17T10:01:00Z",
+        "commercial_terms_source": "manual_contract",
+        "commercial_terms_reference": "contract:materializer-test",
+        "commercial_terms_verified_at": "2026-09-17T10:01:00Z",
+        "capacity_verified_at": "2026-09-17T10:01:00Z",
+        "delivery_verified_at": "2026-09-17T10:01:00Z",
     }
 
 

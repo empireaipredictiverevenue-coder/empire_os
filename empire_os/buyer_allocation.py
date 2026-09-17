@@ -11,7 +11,7 @@ from empire_os.niche_taxonomy import (
 
 MIN_QUALIFICATION_SCORE = 50.0
 ALLOCATABLE_TIERS = frozenset({"hot", "warm"})
-INACTIVE_BUYER_STATUSES = frozenset({"inactive", "disabled"})
+ACTIVATED_BUYER_STATE = "activated"
 BUYER_PAGE_SIZE = 1000
 MAX_RPC_CANDIDATES = 20
 ALLOCATION_VERSION = "v1"
@@ -67,6 +67,62 @@ def _buyer_rate(row: dict[str, Any]) -> float | None:
     if value in (None, ""):
         value = row.get("base_payout")
     return _float_or_none(value)
+
+
+def buyer_activation_decision(
+    row: dict[str, Any] | None,
+) -> tuple[bool, str]:
+    if not isinstance(row, dict):
+        return False, "missing_buyer"
+
+    if not bool(row.get("is_active")):
+        return False, "buyer_inactive"
+
+    status = normalise(row.get("status"))
+    if status != "active":
+        return False, "buyer_status_not_active"
+
+    if normalise(row.get("commercial_activation_state")) != ACTIVATED_BUYER_STATE:
+        return False, "buyer_not_commercially_activated"
+
+    if not row.get("reviewed_at"):
+        return False, "buyer_not_reviewed"
+
+    if not row.get("commercial_activated_at"):
+        return False, "buyer_activation_timestamp_missing"
+
+    if not str(row.get("commercial_terms_source") or "").strip():
+        return False, "commercial_terms_source_missing"
+
+    if not str(row.get("commercial_terms_reference") or "").strip():
+        return False, "commercial_terms_reference_missing"
+
+    if not row.get("commercial_terms_verified_at"):
+        return False, "commercial_terms_unverified"
+
+    if not row.get("capacity_verified_at"):
+        return False, "buyer_capacity_unverified"
+
+    if not row.get("delivery_verified_at"):
+        return False, "buyer_delivery_unverified"
+
+    if not str(row.get("niche") or "").strip():
+        return False, "buyer_niche_missing"
+
+    if not str(row.get("metro") or "").strip():
+        return False, "buyer_metro_missing"
+
+    has_delivery = bool(
+        str(row.get("destination_phone") or "").strip()
+        or str(row.get("webhook_url") or "").strip()
+    )
+    if not has_delivery:
+        return False, "buyer_delivery_destination_missing"
+
+    if _nonnegative_int(row.get("daily_cap")) <= 0:
+        return False, "buyer_capacity_not_configured"
+
+    return True, "activated"
 
 def qualification_decision(
     qualification: dict[str, Any] | None,
@@ -126,24 +182,16 @@ def _buyer_match(
     if not buyer_id:
         return None
 
-    status = normalise(row.get("status"))
-    if not bool(row.get("is_active")):
-        return None
-    if status in INACTIVE_BUYER_STATUSES:
+    activation_allowed, _ = buyer_activation_decision(row)
+    if not activation_allowed:
         return None
 
     buyer_niche = normalise(row.get("niche"))
     buyer_family = niche_family(buyer_niche) if buyer_niche else ""
     buyer_metro = metro_key(row.get("metro"))
 
-    niche_match = (
-        not buyer_niche
-        or buyer_family == prospect_family
-    )
-    metro_match = (
-        not buyer_metro
-        or buyer_metro == prospect_metro
-    )
+    niche_match = buyer_family == prospect_family
+    metro_match = buyer_metro == prospect_metro
 
     if not niche_match or not metro_match:
         return None
@@ -307,7 +355,12 @@ def fetch_buyer_rows(
             {
                 "select": (
                     "id,buyer_name,niche,metro,is_active,status,"
-                    "daily_cap,calls_today,base_payout,per_lead_rate,priority"
+                    "daily_cap,calls_today,base_payout,per_lead_rate,priority,"
+                    "destination_phone,webhook_url,reviewed_at,"
+                    "commercial_activation_state,commercial_activated_at,"
+                    "commercial_terms_source,commercial_terms_reference,"
+                    "commercial_terms_verified_at,capacity_verified_at,"
+                    "delivery_verified_at"
                 ),
                 "limit": str(page_size),
                 "offset": str(offset),
