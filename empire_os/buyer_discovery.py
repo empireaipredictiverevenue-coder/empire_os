@@ -363,15 +363,54 @@ def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[
     }
 
 
-def build_outbound_intent_plan(candidate: BuyerCandidate, contact_plan: Mapping[str, Any], *,
-                               subject: str, body_text: str, proposed_by: str,
-                               expires_at: str, idempotency_key: str,
-                               postal_address: str, opportunity_id: str | None = None) -> dict[str, Any]:
+def build_candidate_review_plan(candidate: BuyerCandidate, contact_plan: Mapping[str, Any], *,
+                                idempotency_key: str) -> dict[str, Any]:
     if not contact_plan.get("outreach_ready"):
         raise ValueError("verified outreach-ready contact required")
     email = _text(contact_plan.get("preferred_email")).lower()
-    if not email:
-        raise ValueError("preferred verified email required")
+    decision = contact_plan.get("decision_maker") or {}
+    name = _text(decision.get("name"))
+    title = _text(decision.get("title"))
+    decision_score = float(decision.get("decision_score") or candidate.decision_score or 0.0)
+    idem = _text(idempotency_key)
+    if not email or not looks_like_person_name(name) or not title or decision_score < 0.5:
+        raise ValueError("verified decision maker required")
+    if len(idem) < 8:
+        raise ValueError("candidate review idempotency key required")
+    evidence = {
+        **candidate.evidence,
+        "decision_role": decision.get("decision_role") or candidate.decision_role,
+        "contact_source": decision.get("source") or candidate.contact_source,
+        "verified_contacts": contact_plan.get("verified_contacts") or [],
+        "source": "buyer_discovery_v2",
+    }
+    return {
+        "mode": "OBSERVE",
+        "write_authorized": False,
+        "rpc": "propose_buyer_candidate_review",
+        "params": {
+            "p_prospect_id": _uuid_or_none(candidate.prospect_id),
+            "p_entity_id": _uuid_or_none(candidate.entity_id),
+            "p_contact_name": name,
+            "p_contact_title": title,
+            "p_contact_email": email,
+            "p_offer_key": candidate.offer_key,
+            "p_company_score": candidate.company_score,
+            "p_decision_score": decision_score,
+            "p_evidence": evidence,
+            "p_idempotency_key": idem,
+        },
+    }
+
+
+def build_reviewed_outbound_intent_plan(review_id: str, *, subject: str, body_text: str,
+                                        proposed_by: str, expires_at: str,
+                                        idempotency_key: str, postal_address: str,
+                                        body_html: str | None = None,
+                                        metadata: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    review_uuid = _uuid_or_none(review_id)
+    if not review_uuid:
+        raise ValueError("approved buyer candidate review id required")
     subject_text = _text(subject)
     body = _text(body_text)
     actor = _text(proposed_by)
@@ -387,26 +426,15 @@ def build_outbound_intent_plan(candidate: BuyerCandidate, contact_plan: Mapping[
     return {
         "mode": "OBSERVE",
         "write_authorized": False,
-        "rpc": "propose_outbound_intent",
+        "rpc": "propose_reviewed_outbound_intent",
         "params": {
-            "p_entity_id": _uuid_or_none(candidate.entity_id),
-            "p_prospect_id": _uuid_or_none(candidate.prospect_id),
-            "p_buyer_id": None,
-            "p_opportunity_id": _uuid_or_none(opportunity_id),
-            "p_channel": "email",
-            "p_recipient": email,
+            "p_review_id": review_uuid,
             "p_subject": subject_text,
             "p_body_text": body,
-            "p_body_html": None,
-            "p_offer_key": candidate.offer_key,
+            "p_body_html": body_html,
             "p_idempotency_key": idem,
             "p_proposed_by": actor,
             "p_expires_at": expires_at,
-            "p_metadata": {
-                "decision_role": candidate.decision_role,
-                "decision_score": candidate.decision_score,
-                "company_score": candidate.company_score,
-                "source": "buyer_discovery_v1",
-            },
+            "p_metadata": {"source": "buyer_discovery_v2", **dict(metadata or {})},
         },
     }

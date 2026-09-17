@@ -115,30 +115,43 @@ def test_verified_contact_gate_requires_named_authority_and_non_role_email():
     assert no_person["outreach_ready"] is False
 
 
-def test_outbound_plan_requires_verified_contact_optout_and_postal_footer():
-    from empire_os.buyer_discovery import build_outbound_intent_plan
+def test_candidate_review_and_reviewed_outbound_plans_are_separate():
+    import pytest
+    from empire_os.buyer_discovery import (
+        build_candidate_review_plan, build_reviewed_outbound_intent_plan
+    )
     candidate = build_candidate({
         "id":"00000000-0000-0000-0000-000000000001","business_name":"Acme","niche":"software","metro":"London",
         "website":"https://acme.test","contact_name":"Jane Smith","contact_title":"CEO",
     })
-    contact = {"outreach_ready":True,"preferred_email":"jane@acme.test"}
-    body = "Hi Jane. Relevant revenue idea. Reply to opt out. 10 Example Street, London."
-    plan = build_outbound_intent_plan(
-        candidate, contact, subject="Revenue idea", body_text=body,
-        proposed_by="planner", expires_at="2026-09-18T18:00:00+00:00",
-        idempotency_key="buyer:0001:001", postal_address="10 Example Street, London",
-    )
-    assert plan["rpc"] == "propose_outbound_intent"
-    assert plan["params"]["p_recipient"] == "jane@acme.test"
-    assert plan["params"]["p_offer_key"] == "high_ticket"
-    assert plan["write_authorized"] is False
+    contact = {
+        "outreach_ready":True,"preferred_email":"jane@acme.test",
+        "decision_maker":{"name":"Jane Smith","title":"CEO","decision_score":1.0,"decision_role":"economic_buyer"},
+        "verified_contacts":[{"email":"jane@acme.test","is_valid":True}],
+    }
+    review = build_candidate_review_plan(candidate, contact, idempotency_key="buyer:0001:review")
+    assert review["rpc"] == "propose_buyer_candidate_review"
+    assert review["params"]["p_contact_email"] == "jane@acme.test"
+    assert review["params"]["p_offer_key"] == "high_ticket"
+    assert review["write_authorized"] is False
 
-    import pytest
+    body = "Hi Jane. Relevant revenue idea. Reply to opt out. 10 Example Street, London."
+    outbound = build_reviewed_outbound_intent_plan(
+        "00000000-0000-0000-0000-000000000099",
+        subject="Revenue idea", body_text=body, proposed_by="planner",
+        expires_at="2026-09-18T18:00:00+00:00", idempotency_key="buyer:0001:outbound",
+        postal_address="10 Example Street, London",
+    )
+    assert outbound["rpc"] == "propose_reviewed_outbound_intent"
+    assert outbound["params"]["p_review_id"] == "00000000-0000-0000-0000-000000000099"
+    assert outbound["write_authorized"] is False
+
     with pytest.raises(ValueError, match="opt-out"):
-        build_outbound_intent_plan(
-            candidate, contact, subject="x", body_text="No footer 10 Example Street, London",
-            proposed_by="planner", expires_at="2026-09-18T18:00:00+00:00",
-            idempotency_key="buyer:0001:002", postal_address="10 Example Street, London",
+        build_reviewed_outbound_intent_plan(
+            "00000000-0000-0000-0000-000000000099", subject="x",
+            body_text="No footer 10 Example Street, London", proposed_by="planner",
+            expires_at="2026-09-18T18:00:00+00:00", idempotency_key="buyer:0001:bad",
+            postal_address="10 Example Street, London",
         )
 
 
