@@ -32,7 +32,25 @@ QUALITY → FIRST REVENUE → PROVE ECONOMICS → CAPTURE OUTCOMES → IMPROVE P
 - Autonomous execution service remains OBSERVE.
 - BSC payment verification, buyer-payment evidence binding, and separated payment
   proposal/human-approval/verifier roles are deployed fail-closed in canonical Supabase.
+- BSC smart-contract escrow database rail is deployed fail-closed; contract mainnet deployment remains gated by external review and production roles.
+- Empire Intelligence Fabric schema is being built as the shared temporal/provenance graph across intelligence domains.
 - Protected untracked `recovery/` and `toop` remain untouched.
+
+## Cross-Phase Intelligence Fabric — ACTIVE FOUNDATION
+The Empire Intelligence Fabric is the shared substrate beneath all intelligence domains. It is not a replacement roadmap phase and does not move the CURRENT marker away from Phase 3E.
+
+Core graph objects:
+- canonical companies and people; employment and buying roles; verified contact points
+- provenance-backed temporal facts with first/last seen and validity windows
+- market, buyer, intent, opportunity, revenue, competitive, pricing, search, AEO/GEO, conversation, risk and governance signals
+- TAM segments for software/MRR, high-ticket, managed services, white-label, enterprise and escrow/payment fit
+- versioned Omega/Astra scores with confidence, feature evidence and explanations
+- offer-fit and expected-value scoring per company
+- commercial outcomes for calibration, causal learning and future Digital Twin simulation
+
+Operating rule: intelligence records remain intelligence until a governed qualification step promotes them into CRM/outbound. No crawler, score or model may self-create buyer activation, outreach or settlement.
+
+Moat direction: temporal graph + source provenance + signal fusion + commercial outcomes + causal models + execution history. Every future intelligence engine must read/write through this shared substrate rather than create isolated data silos.
 
 ## Phase Roadmap
 
@@ -143,8 +161,10 @@ Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deploym
 8. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution.
 9. Expand Astra operating authority only after proven controls and economics.
 
-10. BSC USDT smart-contract escrow: local contract + verifier + isolated DB model ✅;
-    external audit, production identities, migration approval and mainnet deployment pending.
+10. BSC USDT smart-contract escrow: local contract + verifier + database rail ✅;
+    canonical Supabase migration ✅; external audit, production identities and mainnet contract deployment pending.
+11. Empire Intelligence Fabric: canonical schema + provenance/temporal graph ← ACTIVE SUPPORT WORK;
+    integrate real source adapters and TAM segmentation, then return primary effort to Phase 3E outbound/reply capture.
 
 ## Definition of Actual Revenue
 Actual revenue requires independently verifiable payment evidence tied to a real buyer, real commercial terms and the relevant Empire request/order. Escrow funding is not revenue; a verified escrow release is only revenue-eligible until a separate governed accounting event recognizes it. Modeled, forecast, quoted, pending, simulated or manually asserted values are not actual revenue.
