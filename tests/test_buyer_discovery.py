@@ -147,6 +147,8 @@ def test_candidate_review_and_reviewed_outbound_plans_are_separate():
     assert review["rpc"] == "propose_buyer_candidate_review"
     assert review["params"]["p_contact_email"] == "jane@acme.test"
     assert review["params"]["p_offer_key"] == "high_ticket"
+    assert review["params"]["p_evidence"]["review_ready"] is True
+    assert review["params"]["p_evidence"]["outreach_ready"] is True
     assert review["write_authorized"] is False
 
     body = "Hi Jane. Relevant revenue idea. Reply to opt out. 10 Example Street, London."

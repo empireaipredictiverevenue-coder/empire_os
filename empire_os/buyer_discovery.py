@@ -555,6 +555,8 @@ def build_candidate_review_plan(candidate: BuyerCandidate, contact_plan: Mapping
         "decision_role": decision.get("decision_role") or candidate.decision_role,
         "contact_source": decision.get("source") or candidate.contact_source,
         "verified_contacts": contact_plan.get("verified_contacts") or [],
+        "review_ready": bool(contact_plan.get("review_ready")),
+        "outreach_ready": bool(contact_plan.get("outreach_ready")),
         "source": "buyer_discovery_v2",
     }
     return {
