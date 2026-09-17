@@ -29,6 +29,8 @@ CREATE TABLE public.bsc_escrow_agreements (
     creation_transaction_hash text NOT NULL UNIQUE CHECK (creation_transaction_hash ~ '^0x[0-9a-f]{64}$'),
     creation_block_hash text NOT NULL CHECK (creation_block_hash ~ '^0x[0-9a-f]{64}$'),
     creation_block_number bigint NOT NULL CHECK (creation_block_number > 0),
+    creation_confirmations integer NOT NULL CHECK (creation_confirmations >= 12),
+    creation_chain_timestamp timestamptz NOT NULL,
     payer_address text NOT NULL CHECK (payer_address ~ '^0x[0-9a-f]{40}$'),
     amount_raw numeric NOT NULL CHECK (amount_raw > 0 AND amount_raw = trunc(amount_raw)),
     commercial_terms_sha256 text NOT NULL CHECK (commercial_terms_sha256 ~ '^[0-9a-f]{64}$'),
@@ -185,6 +187,14 @@ BEGIN
     IF (p_evidence->>'verified') IS DISTINCT FROM 'true' THEN
         RAISE EXCEPTION 'verified escrow creation proof required';
     END IF;
+    IF (p_evidence->>'confirmations')::integer < 12
+       OR (p_evidence->>'block_number')::bigint < r.min_block_number THEN
+        RAISE EXCEPTION 'escrow creation confirmations or block floor are insufficient';
+    END IF;
+    IF lower(COALESCE(p_evidence->>'transaction_hash','')) !~ '^0x[0-9a-f]{64}$'
+       OR lower(COALESCE(p_evidence->>'block_hash','')) !~ '^0x[0-9a-f]{64}$' THEN
+        RAISE EXCEPTION 'canonical escrow creation transaction and block hashes are required';
+    END IF;
     v_expected_id := '0x' || lpad(replace(r.id::text,'-',''),64,'0');
     IF lower(COALESCE(p_evidence->>'escrow_id','')) IS DISTINCT FROM v_expected_id THEN
         RAISE EXCEPTION 'escrow id does not match payment request';
@@ -225,13 +235,13 @@ BEGIN
     INSERT INTO public.bsc_escrow_agreements(
         request_id,escrow_id,contract_address,beneficiary_address,runtime_sha256,
         creation_transaction_hash,creation_block_hash,creation_block_number,
-        payer_address,amount_raw,commercial_terms_sha256,
+        creation_confirmations,creation_chain_timestamp,payer_address,amount_raw,commercial_terms_sha256,
         funding_deadline,refund_after,creation_verified_at
     ) VALUES (
         r.id,v_expected_id,lower(p_evidence->>'contract_address'),r.treasury_address,
         lower(p_evidence->>'runtime_sha256'),lower(p_evidence->>'transaction_hash'),
         lower(p_evidence->>'block_hash'),(p_evidence->>'block_number')::bigint,
-        r.payer_address,(p_evidence->>'amount_raw')::numeric,r.commercial_terms_sha256,
+        (p_evidence->>'confirmations')::integer,v_chain_time,r.payer_address,(p_evidence->>'amount_raw')::numeric,r.commercial_terms_sha256,
         to_timestamp((p_evidence->>'funding_deadline')::bigint),
         to_timestamp((p_evidence->>'refund_after')::bigint),v_verified_at
     ) RETURNING * INTO a;

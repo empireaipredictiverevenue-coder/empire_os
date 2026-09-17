@@ -37,6 +37,15 @@ function lifecycle(action,tx,party){ return {
   party_address:party, confirmations:12,
   block_timestamp:Math.floor(Date.now()/1000), verified_at:nowIso(),
 }; }
+function creationProof(overrides={}){
+  const now=Math.floor(Date.now()/1000);
+  return {verified:true,escrow_id:'0x'+requestId.replaceAll('-','').padStart(64,'0'),
+    payer_address:payer,amount_raw:'100000000000000000000',terms_hash:'0x'+terms,
+    beneficiary_address:beneficiary,contract_address:contract,runtime_sha256:runtime,
+    transaction_hash:createTx,block_hash:blockHash,block_number:100,confirmations:12,
+    funding_deadline:now+1800,refund_after:now+86400,block_timestamp:now,verified_at:nowIso(),
+    ...overrides};
+}
 let passed=0;
 async function test(name,fn){ await fn(); passed++; console.log('PASS '+name); }
 try{
@@ -74,13 +83,7 @@ try{
 
   const escrowId='0x'+requestId.replaceAll('-','').padStart(64,'0');
   await test('escrow verifier records on-chain creation only', async()=>{
-    const now=Math.floor(Date.now()/1000);
-    const creation={verified:true, escrow_id:escrowId, payer_address:payer,
-      amount_raw:'100000000000000000000', terms_hash:'0x'+terms,
-      beneficiary_address:beneficiary, contract_address:contract,
-      runtime_sha256:runtime, transaction_hash:createTx, block_hash:blockHash,
-      block_number:100, funding_deadline:now+1800, refund_after:now+86400,
-      block_timestamp:now, verified_at:nowIso()};
+    const creation=creationProof();
     const result=(await asRole('empire_escrow_verifier',
       'select public.record_bsc_escrow_creation($1,$2) result',[requestId,creation])).rows[0].result;
     agreementId=result.agreement_id; assert.equal(result.status,'open');
