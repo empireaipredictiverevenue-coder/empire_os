@@ -81,9 +81,9 @@ Code may be prepared and tested for those operations, but live side effects rema
 - Phase 2: complete
 - Phase 3A qualification: complete
 - Phase 3B market qualification materializer: complete
-- Phase 3C canonical acquisition + live buyer capacity gate: current until explicitly closed
-- Phase 3D buyer matching + capacity allocation: next
-- Phase 3E governed outbound
+- Phase 3C canonical acquisition + live buyer capacity gate: complete
+- Phase 3D buyer matching + capacity allocation: current
+- Phase 3E governed outbound: next
 - Phase 3F outcome feedback
 
 Do not broaden a Phase 3C task into Phase 3D+ unless explicitly requested.

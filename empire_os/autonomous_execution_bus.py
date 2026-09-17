@@ -44,6 +44,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+from empire_os.buyer_allocation import (
+    BuyerAllocationError,
+    allocate_owned_prospect,
+)
 from empire_os.niche_taxonomy import (
     NICHE_FAMILIES,
     metro_key,
@@ -86,6 +90,10 @@ MAX_JOBS_PER_CYCLE = int(
 # Hard production safety ceiling for one market-level
 # qualification parent job.
 MAX_QUALIFICATION_BATCH_SIZE = 5
+
+# Hard ceiling for one market-level Phase 3D allocation materializer.
+MAX_ALLOCATION_BATCH_SIZE = 5
+ALLOCATION_SCAN_MULTIPLIER = 10
 
 # Canonical buyer reads for capacity gating are paginated so the
 # execution decision never silently truncates a growing buyer fleet.
@@ -870,6 +878,333 @@ def execute_autonomous_qualification(
     )
 
 
+
+def _allocation_candidates(
+    *,
+    family: str,
+    metro: str,
+    limit: int = MAX_ALLOCATION_BATCH_SIZE,
+) -> list[dict[str, Any]]:
+    aliases = sorted(
+        {
+            normalise(alias)
+            for alias in NICHE_FAMILIES.get(family, {family})
+            if normalise(alias)
+        }
+    )
+
+    if not aliases:
+        aliases = [normalise(family)]
+
+    scan_limit = max(
+        limit * ALLOCATION_SCAN_MULTIPLIER,
+        limit,
+    )
+
+    prospects = _rest_json(
+        "GET",
+        "/rest/v1/prospects",
+        params={
+            "select": (
+                "id,business_name,niche,metro,status,"
+                "buy_signal_score,phone,website,address,"
+                "contact_source,contacted_status"
+            ),
+            "niche": "in.(" + ",".join(aliases) + ")",
+            "metro": "ilike." + metro,
+            "status": "not.eq.archived",
+            "order": "buy_signal_score.desc.nullslast,created_at.asc",
+            "limit": str(scan_limit),
+        },
+    )
+
+    if not isinstance(prospects, list) or not prospects:
+        return []
+
+    prospect_ids = [
+        str(row.get("id") or "")
+        for row in prospects
+        if isinstance(row, dict) and row.get("id")
+    ]
+
+    if not prospect_ids:
+        return []
+
+    qualifications = _rest_json(
+        "GET",
+        "/rest/v1/prospect_qualifications",
+        params={
+            "select": "prospect_id,score,tier,status,scored_at",
+            "prospect_id": "in.(" + ",".join(prospect_ids) + ")",
+            "status": "eq.scored",
+            "tier": "in.(hot,warm)",
+            "score": "gte.50",
+            "scoring_engine": "eq.empire_os.lead_scoring",
+            "scoring_version": "eq.v1",
+            "order": "score.desc,scored_at.asc",
+        },
+    )
+
+    if not isinstance(qualifications, list):
+        raise BusError(
+            "allocation qualification query returned invalid payload"
+        )
+
+    qual_by_id = {
+        str(row.get("prospect_id")): row
+        for row in qualifications
+        if isinstance(row, dict) and row.get("prospect_id")
+    }
+
+    qualified = [
+        {
+            **row,
+            "_qualification": qual_by_id[str(row["id"])],
+        }
+        for row in prospects
+        if (
+            isinstance(row, dict)
+            and row.get("id")
+            and str(row["id"]) in qual_by_id
+        )
+    ]
+
+    if not qualified:
+        return []
+
+    qualified_ids = [str(row["id"]) for row in qualified]
+
+    existing_orders = _rest_json(
+        "GET",
+        "/rest/v1/fulfilment_orders",
+        params={
+            "select": "prospect_id",
+            "prospect_id": "in.(" + ",".join(qualified_ids) + ")",
+            "state": "not.in.(rejected,cancelled)",
+        },
+    )
+
+    if not isinstance(existing_orders, list):
+        raise BusError(
+            "allocation fulfilment query returned invalid payload"
+        )
+
+    allocated = {
+        str(row.get("prospect_id"))
+        for row in existing_orders
+        if isinstance(row, dict) and row.get("prospect_id")
+    }
+
+    available = [
+        row for row in qualified
+        if str(row["id"]) not in allocated
+    ]
+
+    available.sort(
+        key=lambda row: (
+            -float(row["_qualification"].get("score") or 0),
+            -float(row.get("buy_signal_score") or 0),
+            str(row["id"]),
+        )
+    )
+
+    return available[:limit]
+
+
+def _materialize_allocation_jobs(
+    job: ClaimedJob,
+) -> dict[str, Any]:
+    target = job.payload.get("target")
+    if not isinstance(target, dict):
+        target = {}
+
+    family = normalise(
+        target.get("niche_family")
+        or job.payload.get("niche_family")
+        or job.payload.get("niche")
+        or ""
+    )
+    metro = normalise(
+        target.get("metro")
+        or job.payload.get("metro")
+        or ""
+    )
+
+    if not family or not metro:
+        raise BusError(
+            "allocation materializer missing niche_family or metro"
+        )
+
+    raw_batch_size = job.payload.get("allocation_batch_size")
+    if raw_batch_size is None:
+        raise BusError(
+            "allocation materializer missing allocation_batch_size"
+        )
+
+    try:
+        batch_size = int(raw_batch_size)
+    except (TypeError, ValueError) as exc:
+        raise BusError(
+            "allocation_batch_size must be an integer"
+        ) from exc
+
+    if not (1 <= batch_size <= MAX_ALLOCATION_BATCH_SIZE):
+        raise BusError(
+            "allocation_batch_size must be between "
+            f"1 and {MAX_ALLOCATION_BATCH_SIZE}"
+        )
+
+    candidates = _allocation_candidates(
+        family=family,
+        metro=metro,
+        limit=batch_size,
+    )
+
+    jobs_created = 0
+    jobs_existing = 0
+
+    for prospect in candidates:
+        prospect_id = str(prospect.get("id") or "")
+        qualification = prospect.get("_qualification") or {}
+        idempotency_key = f"allocation:{prospect_id}:v1"
+
+        existing_jobs = _rest_json(
+            "GET",
+            "/rest/v1/gtm_jobs",
+            params={
+                "select": "id",
+                "idempotency_key": f"eq.{idempotency_key}",
+                "limit": "1",
+            },
+        )
+
+        if isinstance(existing_jobs, list) and existing_jobs:
+            jobs_existing += 1
+            continue
+
+        row = {
+            "opportunity_id": job.opportunity_id,
+            "job_type": "prospect_buyer_allocation",
+            "worker_adapter": "buyer_allocation_adapter",
+            "priority": float(job.priority or 0.0),
+            "status": "planned",
+            "requires_approval": True,
+            "approved_at": None,
+            "payload": {
+                "opportunity_id": job.opportunity_id,
+                "parent_job_id": job.id,
+                "prospect_id": prospect_id,
+                "niche_family": family,
+                "metro": metro,
+                "qualification_score": qualification.get("score"),
+                "qualification_tier": qualification.get("tier"),
+                "created_by": "autonomous_execution_bus",
+            },
+            "attempts": 0,
+            "max_attempts": 5,
+            "created_by": "autonomous_execution_bus",
+            "idempotency_key": idempotency_key,
+        }
+
+        try:
+            created = _rest_json(
+                "POST",
+                "/rest/v1/gtm_jobs",
+                payload=row,
+                prefer="return=representation",
+            )
+        except BusError as exc:
+            message = str(exc)
+            duplicate = (
+                "HTTP 409" in message
+                and '"code":"23505"' in message
+                and "idempotency_key" in message
+            )
+            if not duplicate:
+                raise
+            jobs_existing += 1
+            continue
+
+        if not isinstance(created, list) or not created:
+            raise BusError(
+                "allocation child job insert returned no row"
+            )
+
+        jobs_created += 1
+
+    return {
+        "ok": True,
+        "executed": True,
+        "mode": "allocation_materialize",
+        "niche_family": family,
+        "metro": metro,
+        "candidates": len(candidates),
+        "jobs_created": jobs_created,
+        "jobs_existing": jobs_existing,
+        "batch_size": batch_size,
+    }
+
+
+def execute_allocation_materializer(
+    job: ClaimedJob,
+) -> dict[str, Any]:
+    return _materialize_allocation_jobs(job)
+
+
+def execute_buyer_allocation(
+    job: ClaimedJob,
+) -> dict[str, Any]:
+    prospect_id = str(job.payload.get("prospect_id") or "").strip()
+    if not prospect_id:
+        raise BusError("buyer allocation job missing prospect_id")
+
+    rows = _rest_json(
+        "GET",
+        "/rest/v1/prospects",
+        params={
+            "select": (
+                "id,business_name,niche,metro,status,buy_signal_score,"
+                "phone,website,address,contact_source,contacted_status"
+            ),
+            "id": f"eq.{prospect_id}",
+            "limit": "1",
+        },
+    )
+
+    if not isinstance(rows, list) or len(rows) != 1:
+        raise BusError("buyer allocation prospect not found")
+
+    prospect = rows[0]
+    if normalise(prospect.get("status")) in {"archived", "rejected"}:
+        raise BusError("buyer allocation prospect is not active")
+
+    def reader(path: str, params: dict[str, str]) -> Any:
+        return _rest_json("GET", path, params=params)
+
+    def allocator(payload: dict[str, Any]) -> Any:
+        return rpc("allocate_prospect_atomic", payload)
+
+    try:
+        result = allocate_owned_prospect(
+            prospect,
+            reader,
+            allocator,
+        )
+    except BuyerAllocationError as exc:
+        raise BusError(f"buyer allocation failed: {exc}") from exc
+
+    decision = str(result.get("decision") or "")
+    return {
+        "ok": True,
+        "executed": decision in {
+            "allocated",
+            "existing_allocation",
+        },
+        "mode": "buyer_allocation",
+        **result,
+    }
+
+
 def execute_visibility(job: ClaimedJob) -> dict[str, Any]:
     """
     Visibility adapter remains coordination-only until SEO/AEO/GEO
@@ -1115,6 +1450,10 @@ ADAPTERS: dict[str, Adapter] = {
     "autonomous_qualification_adapter": (
         execute_autonomous_qualification
     ),
+    "buyer_allocation_materializer_adapter": (
+        execute_allocation_materializer
+    ),
+    "buyer_allocation_adapter": execute_buyer_allocation,
     "seo_adapter": execute_visibility,
     "aeo_adapter": execute_visibility,
     "geo_adapter": execute_visibility,

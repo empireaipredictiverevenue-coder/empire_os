@@ -53,6 +53,9 @@ BATCH_SIZE = 1000
 # Explicit bounded qualification fan-out per market parent.
 QUALIFICATION_BATCH_SIZE = 5
 
+# Phase 3D only materializes a small approval queue per market cycle.
+ALLOCATION_BATCH_SIZE = 5
+
 
 # ---------------------------------------------------------------------------
 # Normalisation / matching
@@ -811,6 +814,35 @@ def build_gtm_jobs(
                 },
             )
         )
+
+        # Phase 3D allocation planning is separate from acquisition.
+        # The parent may run automatically, but it only creates
+        # approval-required per-prospect allocation jobs.
+        if opportunity.buyer_capacity > 0:
+            jobs.append(
+                GTMJob(
+                    job_type="buyer_allocation_materialize",
+                    priority=round(
+                        opportunity.priority_score * 0.92,
+                        4,
+                    ),
+                    target=target,
+                    status="planned",
+                    worker_adapter=(
+                        "buyer_allocation_materializer_adapter"
+                    ),
+                    requires_approval=False,
+                    payload={
+                        **base_payload,
+                        "allocation_batch_size": (
+                            ALLOCATION_BATCH_SIZE
+                        ),
+                        "allocation_policy": (
+                            "qualified_owned_inventory_only"
+                        ),
+                    },
+                )
+            )
 
         # Visibility is first-class, but the trigger is a market with
         # meaningful supply / activation opportunity rather than volume alone.
