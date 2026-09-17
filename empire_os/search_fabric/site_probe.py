@@ -163,25 +163,36 @@ def _format_address(value: Any) -> str:
     return ", ".join(parts)
 
 
-def _schema_evidence(records: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+def _schema_evidence(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     names: List[str] = []
     phones: List[str] = []
     emails: List[str] = []
     addresses: List[str] = []
     types: List[str] = []
+    people: List[Dict[str, str]] = []
 
     for root in records:
         for item in _walk_json(root):
             schema_type = item.get("@type")
-
-            if isinstance(schema_type, list):
-                types.extend(str(x) for x in schema_type)
-            elif schema_type:
-                types.append(str(schema_type))
+            item_types = (
+                [str(x) for x in schema_type]
+                if isinstance(schema_type, list)
+                else ([str(schema_type)] if schema_type else [])
+            )
+            types.extend(item_types)
+            is_person = any(value.lower() == "person" for value in item_types)
 
             name = item.get("name")
             if isinstance(name, str) and name.strip():
-                names.append(name.strip())
+                if is_person:
+                    people.append({
+                        "name": name.strip(),
+                        "title": str(item.get("jobTitle") or "").strip(),
+                        "email": str(item.get("email") or "").removeprefix("mailto:").strip(),
+                        "url": str(item.get("url") or "").strip(),
+                    })
+                else:
+                    names.append(name.strip())
 
             phone = item.get("telephone")
             if isinstance(phone, str) and phone.strip():
@@ -203,6 +214,9 @@ def _schema_evidence(records: List[Dict[str, Any]]) -> Dict[str, List[str]]:
         "emails": list(dict.fromkeys(emails)),
         "addresses": list(dict.fromkeys(addresses)),
         "schema_types": list(dict.fromkeys(types)),
+        "people": list({
+            (p["name"], p["title"], p["email"], p["url"]): p for p in people
+        }.values()),
     }
 
 
@@ -322,6 +336,7 @@ def probe_site(
     addresses: List[str] = []
     socials: List[str] = []
     schema_types: List[str] = []
+    people: List[Dict[str, str]] = []
     pages: List[dict] = []
 
     best_title = homepage.title
@@ -352,6 +367,7 @@ def probe_site(
         addresses.extend(schema["addresses"])
         socials.extend(document.socials)
         schema_types.extend(schema["schema_types"])
+        people.extend(schema["people"])
 
         pages.append({
             "url": document.url,
@@ -392,6 +408,11 @@ def probe_site(
     addresses = unique(addresses)
     socials = unique(socials)
     schema_types = unique(schema_types)
+    people = list({
+        (p.get("name", ""), p.get("title", ""), p.get("email", ""), p.get("url", "")): p
+        for p in people
+        if p.get("name")
+    }.values())
 
     evidence_score = 0.0
 
@@ -427,6 +448,7 @@ def probe_site(
         "addresses": addresses,
         "socials": socials,
         "schema_types": schema_types,
+        "people": people,
         "pages_checked": pages,
         "evidence_score": round(evidence_score, 4),
     }
