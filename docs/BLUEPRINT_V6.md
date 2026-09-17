@@ -30,6 +30,8 @@ QUALITY → FIRST REVENUE → PROVE ECONOMICS → CAPTURE OUTCOMES → IMPROVE P
 - AEO/GEO/citation schemas are exposed but evidence adapters remain pending; no fabricated visibility claims.
 - Astra bootstrap is deterministic/plan-only.
 - Autonomous execution service remains OBSERVE.
+- BSC payment verification, buyer-payment evidence binding, and separated payment
+  proposal/human-approval/verifier roles are deployed fail-closed in canonical Supabase.
 - Protected untracked `recovery/` and `toop` remain untouched.
 
 ## Phase Roadmap
@@ -130,12 +132,15 @@ Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deploym
 ## Immediate Execution Order
 1. Complete Phase 3E governed buyer outbound/reply capture.
 2. Replace legacy AI Closer with Supabase-backed commercial state machine.
-3. Add fail-closed USDT/BSC verifier and payment evidence adapter.
-4. Activate first genuine buyer only after verified evidence.
-5. Deliver first paid opportunity and capture outcome/profit.
-6. Feed actual outcomes into Astra/Omega/revenue intelligence.
-7. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution.
-8. Expand Astra operating authority only after proven controls and economics.
+3. Fail-closed USDT/BSC verifier, evidence adapter, and governed request/approval
+   separation ✅
+4. Provision controlled operator-approval and verifier service identities/tools without
+   exposing public mutation or granting agents self-approval.
+5. Activate first genuine buyer only after verified evidence.
+6. Deliver first paid opportunity and capture outcome/profit.
+7. Feed actual outcomes into Astra/Omega/revenue intelligence.
+8. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution.
+9. Expand Astra operating authority only after proven controls and economics.
 
 ## Definition of Actual Revenue
 Actual revenue requires independently verifiable payment evidence tied to a real buyer, real commercial terms and the relevant Empire request/order. Modeled, forecast, quoted, pending, simulated or manually asserted values are not actual revenue.
