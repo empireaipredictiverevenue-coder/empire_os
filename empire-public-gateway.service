@@ -1,0 +1,19 @@
+[Unit]
+Description=Empire AI Public Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=EMPIRE_PUBLIC_AEO_ROOT=/srv/empire_os/runtime/aeo
+ExecStart=/srv/empire_os/.venv/bin/python -m uvicorn empire_os.public_gateway:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

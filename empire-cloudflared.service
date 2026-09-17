@@ -1,0 +1,17 @@
+[Unit]
+Description=Empire AI Cloudflare Tunnel
+After=network-online.target empire-public-gateway.service
+Wants=network-online.target empire-public-gateway.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+ExecStart=/usr/local/bin/cloudflared tunnel run --token-file /home/ubuntu/.cloudflared/Empire-AI.token
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
