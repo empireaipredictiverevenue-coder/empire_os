@@ -37,8 +37,8 @@ def test_send_payload_requires_database_authorized_claim():
 def test_webhook_verification_requires_signed_headers_and_rejects_failure():
     event = {"type": "email.received", "data": {"email_id": "em_1"}}
     seen = {}
-    def verify_webhook(**kwargs):
-        seen.update(kwargs)
+    def verify_webhook(options):
+        seen.update(options)
         return event
     value = verify_resend_inbound(
         '{"type":"email.received"}',
@@ -46,12 +46,13 @@ def test_webhook_verification_requires_signed_headers_and_rejects_failure():
         secret="whsec_test", verify_webhook=verify_webhook,
     )
     assert value == event
-    assert seen["secret"] == "whsec_test"
+    assert seen["webhook_secret"] == "whsec_test"
+    assert seen["headers"] == {"id":"id","timestamp":"ts","signature":"sig"}
     with pytest.raises(OutboundProviderError, match="headers"):
         verify_resend_inbound("{}", {}, secret="x", verify_webhook=verify_webhook)
     with pytest.raises(OutboundProviderError, match="verification failed"):
         verify_resend_inbound("{}", {"svix-id":"i","svix-timestamp":"t","svix-signature":"s"},
-                              secret="x", verify_webhook=lambda **_: (_ for _ in ()).throw(ValueError()))
+                              secret="x", verify_webhook=lambda _: (_ for _ in ()).throw(ValueError()))
 
 
 def test_extract_reply_returns_inert_plain_text_only():
@@ -102,3 +103,18 @@ def test_send_with_resend_uses_validated_payload_and_requires_message_id():
     assert FakeResend.api_key == "re_test"
     with pytest.raises(OutboundProviderError, match="API key"):
         send_with_resend(payload, api_key="", resend_module=FakeResend)
+
+
+def test_send_payload_uses_intent_specific_reply_alias():
+    payload = build_resend_send(
+        authorized_claim(), sender="Empire <sales@empire-ai.co.uk>",
+        reply_to="replies@empire-ai.co.uk",
+    )
+    assert payload["reply_to"] == [
+        "replies+00000000-0000-0000-0000-000000000001@empire-ai.co.uk"
+    ]
+    from empire_os.outbound_provider import resolve_intent_from_recipients
+    resolved = resolve_intent_from_recipients(
+        payload["reply_to"], reply_to="replies@empire-ai.co.uk",
+    )
+    assert resolved == "00000000-0000-0000-0000-000000000001"

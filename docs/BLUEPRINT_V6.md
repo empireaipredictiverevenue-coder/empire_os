@@ -83,7 +83,7 @@ Commercial products, buyer records/capacity, commercial events, fulfilment, idem
 Phase 3E deliverables:
 - Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers.
 - Governed Resend outbound with approval, idempotency, opt-out and postal-footer compliance. Canonical DB layer + fail-closed Resend provider adapter + OBSERVE-first manual sender local/tested; production migration, sender identity and webhook registration pending.
-- Reply capture and classification. Signed-webhook normalization + canonical reply ingest/classification/suppression flow local/tested; production webhook registration pending.
+- Reply capture and classification. Signed-webhook normalization + per-intent reply alias + isolated webhook receiver + canonical reply ingest/classification/suppression flow local/tested; production DB migration/service routing/webhook enablement pending.
 - New Supabase-backed AI Closer; legacy SQLite closer is retired from active flow. Canonical case/recommendation/human-advance state machine local/tested; production migration pending.
 - Commercial proposal states without fabricated prices or fake settlement.
 - Buyer activation only after verified commercial evidence.
