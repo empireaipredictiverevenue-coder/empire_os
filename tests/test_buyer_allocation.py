@@ -329,3 +329,16 @@ def test_buyer_commercial_evidence_migration_verifies_sources():
     )
     for fragment in required:
         assert fragment in sql
+
+
+def test_gtm_control_rpc_migration_is_service_role_only():
+    sql = Path("migrations/007_lock_gtm_control_rpcs.sql").read_text(encoding="utf-8")
+    for fn in (
+        "claim_next_gtm_job",
+        "heartbeat_gtm_job",
+        "complete_gtm_job",
+        "fail_gtm_job",
+    ):
+        assert f"public.{fn}" in sql
+    assert "FROM PUBLIC, anon, authenticated" in sql
+    assert "TO service_role" in sql
