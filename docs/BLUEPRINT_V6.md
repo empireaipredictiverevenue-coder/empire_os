@@ -77,13 +77,13 @@ Commercial products, buyer records/capacity, commercial events, fulfilment, idem
 3B Market materialization ✅ mostly
 3C Canonical acquisition ✅
 3D Buyer matching/allocation ✅
-3E Governed outbound ← NOW
+3E Governed outbound ← NOW (canonical DB layer local/tested)
 3F Outcome feedback
 
 Phase 3E deliverables:
 - Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers.
-- Governed Resend outbound with approval, idempotency, opt-out and postal-footer compliance.
-- Reply capture and classification.
+- Governed Resend outbound with approval, idempotency, opt-out and postal-footer compliance. Canonical intent/approval/send/reply/suppression DB layer local + tested; provider adapter deployment pending.
+- Reply capture and classification. Canonical reply ingest/classification/suppression DB layer local + tested; live provider webhook pending.
 - New Supabase-backed AI Closer; legacy SQLite closer is retired from active flow.
 - Commercial proposal states without fabricated prices or fake settlement.
 - Buyer activation only after verified commercial evidence.
