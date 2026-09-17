@@ -18,8 +18,9 @@ return the existing evidence ID; differing evidence fails. Evidence is append-on
 Approved request terms are immutable; cancellation and expiry remain possible.
 The verifier supplies chain evidence; PostgreSQL cannot verify the chain itself.
 
-Forward migration `20260917165008_bind_buyer_payment_to_bsc_evidence.sql` replaces
-the legacy `crypto_payment_requests` verification branch for buyer commercial
+Forward migration `20260917165008_bind_buyer_payment_to_bsc_evidence.sql` is now
+applied to canonical Supabase as migration `20260917165748_bind_buyer_payment_to_bsc_evidence`.
+It replaces the legacy `crypto_payment_requests` verification branch for buyer commercial
 evidence. A `verified_payment` must reference canonical `bsc_payment_evidence` and
 match the buyer, order, commercial terms hash, payer, treasury, BSC chain/token,
 amount floor, minimum block and confirmation threshold. The bridge does not record
@@ -41,13 +42,14 @@ Current validation: 24 recorder database tests, 5 buyer-payment bridge database
 tests, and 73 Python tests pass. Test fixtures are synthetic only inside disposable
 local PostgreSQL databases; production business/payment data is never synthesized.
 
-## Remaining deployment gates
-1. Review and explicitly approve the forward buyer-payment bridge migration before
-   applying it to canonical Supabase.
-2. After applying it, verify function ACLs and rerun Supabase security advisors.
+## Deployment status and remaining gates
+1. BSC payment schema migration is applied to canonical Supabase.
+2. Buyer-payment bridge migration is applied and verified. `anon` and `authenticated`
+   cannot execute `verify_buyer_commercial_evidence`; `service_role` can.
 3. Build the governed payment-request approval workflow and dedicated verifier role;
    API payment recording remains intentionally disabled.
-4. Do not grant the recorder to service_role as a shortcut around verifier governance.
+4. Do not grant `record_bsc_payment_evidence` to `service_role` as a shortcut around
+   verifier governance.
 5. Review revenue recognition separately; receipt of USDT is not automatically
    recognized GBP/USD revenue.
 
