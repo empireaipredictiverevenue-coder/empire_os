@@ -9,10 +9,12 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/srv/empire_os
 Environment=EMPIRE_PUBLIC_AEO_ROOT=/srv/empire_os/runtime/aeo
-ExecStart=/srv/empire_os/.venv/bin/python -m uvicorn empire_os.public_gateway:app --host 127.0.0.1 --port 8000 --workers 1
+ExecStart=/srv/empire_os/.venv/bin/python -m uvicorn empire_os.public_gateway:app --host 127.0.0.1 --port 80 --workers 1
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 PrivateTmp=true
 
 [Install]
