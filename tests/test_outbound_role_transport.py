@@ -61,6 +61,10 @@ def test_approver_role_is_separate_and_parameter_shape_is_strict():
         "p_intent_id":"00000000-0000-0000-0000-000000000001",
         "p_approved_by":"human.operator", "p_note":"reviewed",
     })
+    rpc("cancel_outbound_intent", {
+        "p_intent_id":"00000000-0000-0000-0000-000000000001",
+        "p_cancelled_by":"human.operator", "p_reason":"replace stale draft",
+    })
     with pytest.raises(OutboundProviderError, match="unexpected"):
         rpc("approve_outbound_intent", {"wrong":"shape"})
     with pytest.raises(OutboundProviderError, match="unsupported"):

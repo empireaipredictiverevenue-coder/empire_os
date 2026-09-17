@@ -15,6 +15,10 @@ ROLE_FUNCTIONS = {
             "select public.approve_outbound_intent(%s,%s,%s)",
             ("p_intent_id", "p_approved_by", "p_note"),
         ),
+        "cancel_outbound_intent": (
+            "select public.cancel_outbound_intent(%s,%s,%s)",
+            ("p_intent_id", "p_cancelled_by", "p_reason"),
+        ),
     },
     "empire_outbound_sender": {
         "get_outbound_intent_review": (

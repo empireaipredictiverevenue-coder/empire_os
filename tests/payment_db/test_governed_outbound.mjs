@@ -19,6 +19,7 @@ await admin.query(`create role anon; create role authenticated; create role serv
 create table prospects(id uuid primary key); create table business_entities(id uuid primary key);
 create table buyers(id uuid primary key); create table gtm_opportunities(id uuid primary key);`);
 const sql=await readFile(join(root,'supabase/migrations/20260917190000_governed_outbound_reply_capture.sql'),'utf8'); await admin.query(sql);
+const cancelSql=await readFile(join(root,'supabase/migrations/20260917230500_governed_outbound_cancel.sql'),'utf8'); await admin.query(cancelSql);
 const entity=randomUUID(); await admin.query('insert into business_entities(id) values($1)',[entity]);
 const expires=new Date(Date.now()+3600_000).toISOString(); let intentId,replyId;
 await test('service role proposes but cannot approve or send',async()=>{
@@ -26,6 +27,13 @@ await test('service role proposes but cannot approve or send',async()=>{
   intentId=r.intent_id; assert.equal(r.status,'pending_approval');
   await assert.rejects(asRole('service_role','select public.approve_outbound_intent($1,$2,$3)',[intentId,'human','ok']),/permission denied/);
   await assert.rejects(asRole('service_role','select public.claim_outbound_send($1,$2)',[intentId,'sender']),/permission denied/);
+});
+await test('human approver can cancel a pending proposal but service role cannot',async()=>{
+  const r=(await asRole('service_role',`select public.propose_outbound_intent($1,null,null,null,'email','replace@example.com','Old','Old body',null,'white_label','idem-cancel-1','planner',$2,'{}') result`,[entity,expires])).rows[0].result;
+  await assert.rejects(asRole('service_role','select public.cancel_outbound_intent($1,$2,$3)',[r.intent_id,'service','replace']),/permission denied/);
+  const c=(await asRole('empire_outbound_approver','select public.cancel_outbound_intent($1,$2,$3) result',[r.intent_id,'phil','replace stale draft'])).rows[0].result;
+  assert.equal(c.status,'cancelled');
+  await assert.rejects(asRole('empire_outbound_sender','select public.claim_outbound_send($1,$2)',[r.intent_id,'sender']),/approved unexpired outbound intent required/);
 });
 await test('human approver owns approval',async()=>{
   const r=(await asRole('empire_outbound_approver','select public.approve_outbound_intent($1,$2,$3) result',[intentId,'phil','reviewed'])).rows[0].result;
