@@ -14,8 +14,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
+from empire_os.agent_web_runtime import execute_public_capability
 
-GATEWAY_VERSION = "agent-web-v1"
+GATEWAY_VERSION = "agent-web-v1.1"
 PUBLIC_BASE_URL = os.getenv("EMPIRE_PUBLIC_BASE_URL", "https://empire-ai.co.uk").rstrip("/")
 AEO_ROOT = Path(os.getenv("EMPIRE_PUBLIC_AEO_ROOT", "/srv/empire_os/runtime/aeo"))
 AEO_ROOT.mkdir(parents=True, exist_ok=True)
@@ -89,6 +90,14 @@ def a2a_message_send(payload: dict = Body(...)):
     return JSONResponse({"message": reply}, media_type="application/a2a+json")
 
 
+@app.post("/agent-web/tools/{tool_name:path}")
+def run_public_tool(tool_name: str, arguments: dict = Body(default_factory=dict)):
+    allowed = {item["name"] for item in capability_manifest()}
+    if tool_name not in allowed:
+        return JSONResponse({"error": "unknown_public_capability"}, status_code=404)
+    return execute_public_capability(tool_name, arguments or {})
+
+
 @app.get("/agent-web/webmcp-manifest.json")
 def webmcp_manifest_route():
     return {"version": "2026-09-15-draft", "tools": webmcp_manifest()}
@@ -96,26 +105,29 @@ def webmcp_manifest_route():
 
 @app.get("/agent-web/webmcp.js")
 def webmcp_bootstrap():
-    script = r'''(() => {
+    script = r'''(async () => {
   const mc = document.modelContext;
   if (!mc || !mc.registerTool) return;
-  mc.registerTool({
-    name: "empire_discover_intelligence",
-    title: "Discover Empire Intelligence",
-    description: "Discover Empire's public read-only market, opportunity, SEO, AEO, GEO and citation capabilities.",
-    inputSchema: {
-      type: "object",
-      properties: { surface: { type: "string", enum: ["webmcp", "mcp", "a2a"] } },
-      additionalProperties: false
-    },
-    annotations: { readOnlyHint: true, untrustedContentHint: false, consequentialHint: false },
-    execute: async (args, options) => {
-      const qs = args && args.surface ? `?surface=${encodeURIComponent(args.surface)}` : "";
-      const response = await fetch(`/agent-web/capabilities${qs}`, { signal: options.signal });
-      if (!response.ok) throw new Error(`Empire capability discovery failed: ${response.status}`);
-      return await response.json();
-    }
-  }).catch(() => {});
+  const manifest = await fetch("/agent-web/webmcp-manifest.json").then(r => r.json());
+  for (const tool of manifest.tools || []) {
+    mc.registerTool({
+      name: tool.name,
+      title: tool.title,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      annotations: tool.annotations,
+      execute: async (args, options) => {
+        const response = await fetch(`/agent-web/tools/${encodeURIComponent(tool.name)}`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(args || {}),
+          signal: options.signal
+        });
+        if (!response.ok) throw new Error(`Empire tool failed: ${response.status}`);
+        return await response.json();
+      }
+    }).catch(() => {});
+  }
 })();'''
     return Response(content=script, media_type="application/javascript")
 
