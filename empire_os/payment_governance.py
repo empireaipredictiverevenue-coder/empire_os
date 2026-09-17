@@ -105,6 +105,38 @@ def build_payment_proposal(*, fulfilment_order_id: Any, amount_usdt: Any,
     }
 
 
+def build_escrow_proposal(*, fulfilment_order_id: Any, amount_usdt: Any,
+                          payer_address: Any, beneficiary_address: Any,
+                          min_block_number: Any, expires_at: datetime,
+                          idempotency_key: Any, actor: Any,
+                          now: datetime | None = None) -> dict[str, Any]:
+    try:
+        payer = _address(payer_address)
+        beneficiary = _address(beneficiary_address)
+    except PaymentVerificationError as exc:
+        raise PaymentGovernanceError("invalid BSC payer or beneficiary address") from exc
+    if payer == beneficiary:
+        raise PaymentGovernanceError("payer and beneficiary must differ")
+    params = {
+        "p_fulfilment_order_id": _uuid(fulfilment_order_id, "fulfilment_order_id"),
+        "p_amount_usdt": _amount(amount_usdt),
+        "p_payer_address": payer,
+        "p_beneficiary_address": beneficiary,
+        "p_min_block_number": _positive_block(min_block_number),
+        "p_expires_at": _expires(expires_at, now=now),
+        "p_idempotency_key": _key(idempotency_key),
+        "p_actor": _actor(actor),
+    }
+    return {
+        "mode": "OBSERVE",
+        "write_authorized": False,
+        "actual_revenue": False,
+        "settlement_mode": "escrow",
+        "rpc": "propose_bsc_escrow_request",
+        "params": params,
+    }
+
+
 def _canonical_service_db(db: Any | None) -> Any:
     if db is not None:
         return db
@@ -125,7 +157,9 @@ def submit_payment_proposal(plan: dict[str, Any], *, operator_authorized: bool =
                             db: Any | None = None) -> dict[str, Any]:
     if not operator_authorized:
         raise PaymentGovernanceError("explicit operator authorization required")
-    if not isinstance(plan, dict) or plan.get("rpc") != "propose_bsc_payment_request":
+    if not isinstance(plan, dict) or plan.get("rpc") not in {
+        "propose_bsc_payment_request", "propose_bsc_escrow_request"
+    }:
         raise PaymentGovernanceError("invalid payment proposal plan")
     if plan.get("write_authorized") is not False or plan.get("actual_revenue") is not False:
         raise PaymentGovernanceError("unsafe payment proposal plan")
@@ -170,10 +204,25 @@ def validate_review_block_anchor(review: dict[str, Any], *, config=None, rpc_cal
             raise ValueError("timezone")
     except (KeyError, TypeError, ValueError, AttributeError) as exc:
         raise PaymentGovernanceError("invalid request block anchor metadata") from exc
-    cfg = config or BscUsdtConfig.from_env()
+    mode = str(review.get("settlement_mode") or "direct").strip().lower()
+    if mode not in {"direct", "escrow"}:
+        raise PaymentGovernanceError("unsupported settlement_mode")
+    if config is None:
+        if mode == "escrow":
+            from empire_os.bsc_escrow_verifier import BscEscrowConfig
+            cfg = BscEscrowConfig.from_env()
+        else:
+            cfg = BscUsdtConfig.from_env()
+    else:
+        cfg = config
     try:
-        if _address(review.get("treasury_address")) != _address(cfg.treasury_address):
-            raise PaymentGovernanceError("request treasury does not match configured treasury")
+        configured_target = cfg.beneficiary if mode == "escrow" else cfg.treasury_address
+        if _address(review.get("treasury_address")) != _address(configured_target):
+            raise PaymentGovernanceError(
+                "request beneficiary does not match configured escrow beneficiary"
+                if mode == "escrow" else
+                "request treasury does not match configured treasury"
+            )
         anchor = get_block_anchor(cfg, block_number=block_number, rpc_call=rpc_call)
     except PaymentVerificationError as exc:
         raise PaymentGovernanceError("BSC block anchor verification failed") from exc

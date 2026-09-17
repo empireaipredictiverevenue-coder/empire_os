@@ -6,11 +6,13 @@ import pytest
 from empire_os.payment_governance import (
     PaymentGovernanceError,
     approve_payment_request,
+    build_escrow_proposal,
     build_payment_proposal,
     cancel_payment_request,
     record_payment_preview,
     review_payment_request,
     submit_payment_proposal,
+    validate_review_block_anchor,
 )
 
 PAYER = "0x" + "33" * 20
@@ -180,3 +182,70 @@ def test_cancel_can_use_dedicated_approver_transport_without_service_db():
             request_id, actor="human.operator", reason="buyer cancelled terms",
             operator_authorized=True, cancel_rpc=rpc, db=FakeDb({}),
         )
+
+
+def test_build_escrow_proposal_is_explicit_and_uses_beneficiary():
+    plan = build_escrow_proposal(
+        fulfilment_order_id=uuid4(), amount_usdt="100",
+        payer_address=PAYER, beneficiary_address=TREASURY,
+        min_block_number=123, expires_at=NOW + timedelta(hours=1),
+        idempotency_key="escrow:test:001", actor="operator.test", now=NOW,
+    )
+    assert plan["mode"] == "OBSERVE"
+    assert plan["settlement_mode"] == "escrow"
+    assert plan["rpc"] == "propose_bsc_escrow_request"
+    assert plan["params"]["p_beneficiary_address"] == TREASURY
+    assert plan["actual_revenue"] is False
+
+
+def test_submit_accepts_escrow_proposal_but_still_requires_operator_authorization():
+    plan = build_escrow_proposal(
+        fulfilment_order_id=uuid4(), amount_usdt="50",
+        payer_address=PAYER, beneficiary_address=TREASURY,
+        min_block_number=321, expires_at=NOW + timedelta(hours=1),
+        idempotency_key="escrow:test:002", actor="operator.test", now=NOW,
+    )
+    db = FakeDb({"decision":"proposed","status":"pending","actual_revenue":False})
+    with pytest.raises(PaymentGovernanceError, match="operator authorization"):
+        submit_payment_proposal(plan, db=db)
+    result = submit_payment_proposal(plan, operator_authorized=True, db=db)
+    assert result["decision"] == "proposed"
+    assert db.calls[0][0] == "propose_bsc_escrow_request"
+
+
+def test_block_anchor_validation_supports_escrow_beneficiary():
+    class EscrowCfg:
+        rpc_url = "https://example.invalid"
+        beneficiary = TREASURY
+        chain_id = 56
+    review = {
+        "actual_revenue": False, "settlement_mode": "escrow",
+        "treasury_address": TREASURY, "min_block_number": 123,
+        "created_at": NOW.isoformat(),
+    }
+    responses = {
+        "eth_chainId": hex(56),
+        "eth_getBlockByNumber": {
+            "number": hex(123), "hash": "0x" + "77" * 32,
+            "timestamp": hex(int(NOW.timestamp())),
+        },
+    }
+    result = validate_review_block_anchor(
+        review, config=EscrowCfg(), rpc_call=lambda method, params: responses[method]
+    )
+    assert result["verified"] is True
+    assert result["actual_revenue"] is False
+
+
+def test_block_anchor_validation_rejects_wrong_escrow_beneficiary():
+    class EscrowCfg:
+        rpc_url = "https://example.invalid"
+        beneficiary = "0x" + "44" * 20
+        chain_id = 56
+    review = {
+        "actual_revenue": False, "settlement_mode": "escrow",
+        "treasury_address": TREASURY, "min_block_number": 123,
+        "created_at": NOW.isoformat(),
+    }
+    with pytest.raises(PaymentGovernanceError, match="escrow beneficiary"):
+        validate_review_block_anchor(review, config=EscrowCfg(), rpc_call=lambda *_: None)

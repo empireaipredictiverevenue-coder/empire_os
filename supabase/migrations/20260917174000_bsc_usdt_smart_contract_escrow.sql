@@ -378,6 +378,35 @@ GRANT EXECUTE ON FUNCTION public.record_bsc_escrow_creation(uuid,jsonb)
     TO empire_escrow_verifier;
 GRANT EXECUTE ON FUNCTION public.record_bsc_escrow_lifecycle(uuid,text,jsonb)
     TO empire_escrow_verifier;
+CREATE OR REPLACE FUNCTION public.get_bsc_payment_request_review(p_request_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE
+    r public.bsc_payment_requests%ROWTYPE;
+    o public.fulfilment_orders%ROWTYPE;
+    e public.bsc_payment_evidence%ROWTYPE;
+BEGIN
+    SELECT * INTO r FROM public.bsc_payment_requests WHERE id=p_request_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'payment request not found'; END IF;
+    SELECT * INTO o FROM public.fulfilment_orders WHERE id=r.fulfilment_order_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'fulfilment order not found'; END IF;
+    SELECT * INTO e FROM public.bsc_payment_evidence WHERE request_id=r.id;
+    RETURN jsonb_build_object(
+        'request_id',r.id,'buyer_id',r.buyer_id,'fulfilment_order_id',r.fulfilment_order_id,
+        'status',r.status,'settlement_mode',r.settlement_mode,
+        'amount_usdt',r.amount_usdt::text,'payer_address',r.payer_address,
+        'treasury_address',r.treasury_address,
+        'commercial_terms_sha256',r.commercial_terms_sha256,
+        'min_block_number',r.min_block_number,'expires_at',r.expires_at,
+        'approved_by',r.approved_by,'approved_at',r.approved_at,
+        'idempotency_key',r.idempotency_key,'created_at',r.created_at,
+        'order_state',o.state,
+        'order_commercial_terms_sha256',lower(COALESCE(o.commercial_payload->>'commercial_terms_sha256','')),
+        'evidence_id',e.id,'evidence_transaction_hash',e.transaction_hash,
+        'actual_revenue',false
+    );
+END;
+$$;
+
 CREATE FUNCTION public.get_bsc_escrow_request_review(p_request_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE
