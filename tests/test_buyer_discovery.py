@@ -101,7 +101,10 @@ def test_verified_contact_gate_requires_named_authority_and_non_role_email():
 
     enriched = {
         "decision_maker":{"name":"Jane Smith","title":"CEO","decision_score":1.0},
-        "contact_email_candidates":["info@acme.test","jane@acme.test"],
+        "contact_candidates":[
+            {"email":"info@acme.test","source":"site_observed","bound_to_decision_maker":False},
+            {"email":"jane@acme.test","source":"person_structured_data","bound_to_decision_maker":True},
+        ],
     }
     plan = verify_contact_plan(enriched, validator=Validator())
     assert plan["outreach_ready"] is True
@@ -109,10 +112,18 @@ def test_verified_contact_gate_requires_named_authority_and_non_role_email():
     assert plan["write_authorized"] is False
 
     no_person = verify_contact_plan(
-        {"decision_maker":None,"contact_email_candidates":["jane@acme.test"]},
+        {"decision_maker":None,"contact_candidates":[{"email":"jane@acme.test","source":"person_structured_data","bound_to_decision_maker":True}]},
         validator=Validator(),
     )
     assert no_person["outreach_ready"] is False
+
+    generic_only = verify_contact_plan(
+        {"decision_maker":{"name":"Jane Smith","title":"CEO","decision_score":1.0},
+         "contact_candidates":[{"email":"office@acme.test","source":"site_observed","bound_to_decision_maker":False}]},
+        validator=Validator(),
+    )
+    assert generic_only["outreach_ready"] is False
+    assert generic_only["preferred_email"] is None
 
 
 def test_candidate_review_and_reviewed_outbound_plans_are_separate():
@@ -214,3 +225,23 @@ def test_email_candidate_validation_preserves_evidence_level():
     assert checked[2]["verification_state"] == "mx_observed"
     strict = validate_email_candidates(["jane.smith@acme.co.uk","jsmith@acme.co.uk"], Validator(), require_smtp=True)
     assert [x["email"] for x in strict] == ["jsmith@acme.co.uk"]
+
+
+def test_generated_pattern_requires_smtp_before_binding():
+    from types import SimpleNamespace
+    from empire_os.buyer_discovery import merge_generated_contact_evidence, verify_contact_plan
+    enriched={
+        "decision_maker":{"name":"Jane Smith","title":"CEO","decision_score":1.0},
+        "contact_candidates":[],
+    }
+    merged=merge_generated_contact_evidence(enriched,[
+        {"email":"jane.smith@acme.test","verification_state":"mx_valid"},
+        {"email":"jsmith@acme.test","verification_state":"smtp_valid"},
+    ])
+    assert [x["email"] for x in merged["contact_candidates"]] == ["jsmith@acme.test"]
+    class Validator:
+        def validate(self,email):
+            return SimpleNamespace(email=email,is_valid=True,confidence=0.95,is_role_address=False,is_disposable=False,has_mx=True,smtp_accepts=True)
+    plan=verify_contact_plan(merged,validator=Validator())
+    assert plan["outreach_ready"] is True
+    assert plan["preferred_email"] == "jsmith@acme.test"

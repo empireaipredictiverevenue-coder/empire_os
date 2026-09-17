@@ -242,12 +242,14 @@ def rank_site_people(people: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]
 def enrich_candidate(candidate: BuyerCandidate, site_evidence: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(site_evidence, Mapping) or site_evidence.get("ok") is not True:
         return {"candidate": candidate.to_dict(), "site_evidence": {}, "decision_maker": None,
-                "contact_email_candidates": [], "mode": "OBSERVE", "write_authorized": False}
+                "contact_candidates": [], "contact_email_candidates": [],
+                "mode": "OBSERVE", "write_authorized": False}
     expected_domain = _host(candidate.website)
     observed_domain = _host(site_evidence.get("domain"))
     domain_match = bool(expected_domain and observed_domain and expected_domain == observed_domain)
     people = rank_site_people(site_evidence.get("people") or []) if domain_match else []
     named = None
+    matching_person = None
     if candidate.contact_name and candidate.contact_title:
         named = {
             "name": candidate.contact_name,
@@ -256,18 +258,32 @@ def enrich_candidate(candidate: BuyerCandidate, site_evidence: Mapping[str, Any]
             "decision_score": candidate.decision_score,
             "source": candidate.contact_source or "canonical_prospect",
         }
+        for person in people:
+            if _text(person.get("name")).casefold() == candidate.contact_name.casefold():
+                matching_person = person
+                break
     elif people:
-        best = people[0]
-        named = {**best, "source": "website_structured_data"}
-    emails = [
-        _text(e).lower() for e in site_evidence.get("emails") or []
-        if _text(e) and domain_match and _email_domain(e) == expected_domain
-    ]
-    if named and _text(named.get("email")) and domain_match:
-        person_email = _text(named.get("email")).lower()
-        if _email_domain(person_email) == expected_domain:
-            emails.insert(0, person_email)
-    emails = list(dict.fromkeys(emails))
+        matching_person = people[0]
+        named = {**matching_person, "source": "website_structured_data"}
+
+    contacts = []
+    for email in site_evidence.get("emails") or []:
+        value = _text(email).lower()
+        if value and domain_match and _email_domain(value) == expected_domain:
+            contacts.append({"email": value, "source": "site_observed",
+                             "bound_to_decision_maker": False})
+    if matching_person and _text(matching_person.get("email")) and domain_match:
+        value = _text(matching_person.get("email")).lower()
+        if _email_domain(value) == expected_domain:
+            contacts.insert(0,{"email":value,"source":"person_structured_data",
+                               "bound_to_decision_maker":True})
+    dedup = {}
+    for item in contacts:
+        email = item["email"]
+        previous = dedup.get(email)
+        if previous is None or item["bound_to_decision_maker"]:
+            dedup[email] = item
+    contacts = list(dedup.values())
     return {
         "candidate": candidate.to_dict(),
         "site_evidence": {
@@ -278,11 +294,11 @@ def enrich_candidate(candidate: BuyerCandidate, site_evidence: Mapping[str, Any]
             "pages_checked": site_evidence.get("pages_checked") or [],
         },
         "decision_maker": named,
-        "contact_email_candidates": emails,
+        "contact_candidates": contacts,
+        "contact_email_candidates": [item["email"] for item in contacts],
         "mode": "OBSERVE",
         "write_authorized": False,
     }
-
 
 
 def generate_work_email_candidates(person_name: Any, company_website: Any) -> list[str]:
@@ -330,11 +346,46 @@ def validate_email_candidates(candidates: Iterable[str], validator: Any, *, requ
         })
     return results
 
+def merge_generated_contact_evidence(enriched: Mapping[str, Any], validated: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    result = dict(enriched)
+    contacts = [dict(item) for item in (result.get("contact_candidates") or [])]
+    for item in validated or []:
+        if item.get("verification_state") != "smtp_valid":
+            continue
+        email = _text(item.get("email")).lower()
+        if not email:
+            continue
+        contacts.append({
+            "email": email,
+            "source": "generated_pattern_smtp_verified",
+            "bound_to_decision_maker": True,
+        })
+    dedup = {}
+    for item in contacts:
+        email = _text(item.get("email")).lower()
+        if not email:
+            continue
+        previous = dedup.get(email)
+        if previous is None or item.get("bound_to_decision_maker"):
+            dedup[email] = item
+    result["contact_candidates"] = list(dedup.values())
+    result["contact_email_candidates"] = list(dedup.keys())
+    return result
+
+
 def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[str, Any]:
     decision = enriched.get("decision_maker") if isinstance(enriched, Mapping) else None
-    emails = list(enriched.get("contact_email_candidates") or []) if isinstance(enriched, Mapping) else []
+    raw_contacts = list(enriched.get("contact_candidates") or []) if isinstance(enriched, Mapping) else []
+    if not raw_contacts and isinstance(enriched, Mapping):
+        raw_contacts = [
+            {"email": email, "source": "legacy_unbound", "bound_to_decision_maker": False}
+            for email in (enriched.get("contact_email_candidates") or [])
+        ]
     verified = []
-    for email in emails:
+    for contact in raw_contacts:
+        email = _text(contact.get("email")).lower()
+        if not email:
+            continue
         try:
             result = validator.validate(email)
         except Exception:
@@ -347,10 +398,13 @@ def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[
             "is_disposable": bool(getattr(result, "is_disposable", False)),
             "has_mx": bool(getattr(result, "has_mx", False)),
             "smtp_accepts": bool(getattr(result, "smtp_accepts", False)),
+            "source": contact.get("source") or "unknown",
+            "bound_to_decision_maker": bool(contact.get("bound_to_decision_maker")),
         })
     eligible = [
         item for item in verified
         if item["is_valid"] and not item["is_role_address"] and not item["is_disposable"]
+        and item["bound_to_decision_maker"]
     ]
     decision_score = float((decision or {}).get("decision_score") or 0.0)
     return {
