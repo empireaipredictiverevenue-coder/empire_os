@@ -1,28 +1,39 @@
-# BSC payment evidence — OBSERVE-only preview
+# BSC payment evidence — staged, OBSERVE-only
 
-The adapter in empire_os/bsc_payment_evidence.py reads approved requests from
-canonical Supabase and independently calls the chain verifier. It does not write
-evidence, recognize revenue, activate a buyer, create an invoice, or deliver.
+The preview adapter reads approved terms from canonical Supabase and checks BSC.
+It never records evidence, activates buyers, delivers orders, or recognizes revenue.
+The SQL recorder is implemented, but API roles cannot execute it or insert evidence.
+No live migration has been applied.
 
-The request binds a buyer UUID, fulfilment order UUID, approved USDT amount,
-payer and treasury, terms fingerprint, expiry, and minimum payment block.
-Amounts are selected as text to avoid JSON floating-point loss.
-Existing ledger matches are rejected before chain verification.
-These lookups are advisory, not a race-safe reservation.
+The request binds buyer, order, amount, payer, treasury, terms fingerprint, expiry,
+and minimum payment block. Amounts are read as text to preserve token precision.
+A trigger rechecks those terms under row locks when inserting evidence.
+Unique keys reserve a transaction, request, and order once. Identical RPC retries
+return the existing evidence ID; differing evidence fails. Evidence is append-only.
+Approved request terms are immutable; cancellation and expiry remain possible.
+The verifier supplies chain evidence; PostgreSQL cannot verify the chain itself.
 
-The existing empty migration scaffold now contains a DRAFT schema.
-Do not apply it to production yet. It grants service_role SELECT only.
-Unique transaction_hash and request_id constraints are the planned reservation
-boundary. A whole transaction may pay only one request in this first version.
+## Validation
+Real PostgreSQL integration tests run in an isolated temporary cluster on loopback
+port 55439. No production URL/credential is accepted by the test runner.
+Dependencies are pinned and locked under tests/payment_db.
+From the repository root, with a non-root user and an unused port 55439:
+```bash
+npm ci --prefix tests/payment_db --no-audit --no-fund
+EMPIRE_PG_TEST_DEPS="$PWD/tests/payment_db" node tests/payment_db/test_recorder.mjs
+.venv/bin/python -m pytest -q tests/test_bsc_usdt_verifier.py tests/test_bsc_payment_evidence.py
+```
+The runner stops its temporary PostgreSQL process in finally. Its temporary data
+directory is retained for diagnosis. Tests use minimal dependency schemas and
+synthetic fixtures exclusively in the isolated database.
 
-Remaining gates:
-1. Validate the draft in disposable Postgres, including RLS and concurrent inserts.
-2. Add a human-approved request creation workflow that freezes commercial terms.
-3. Implement/test an atomic restricted recorder that rechecks approval, order,
-   terms, expiry and fresh chain evidence under lock and handles retries safely.
-4. Replace the legacy verified_payment branch in migration 006 before activation.
-5. Review revenue recognition separately; USDT amount is not automatically GBP/USD.
-6. Obtain explicit approval for live migration and any production activation.
+## Deployment gates
+1. Explicitly approve applying the schema migration to owbeinlfcfdtwcwrttjy.
+2. Apply the exact reviewed migration and verify the resulting schema/permissions.
+3. Prepare the governed request-approval workflow and dedicated verifier permissions;
+   this migration intentionally withholds API recording permissions.
+4. Replace migration 006's legacy payment verification branch before buyer activation.
+5. Review revenue recognition separately; USDT is not automatically GBP/USD revenue.
 
-No runtime route, queue handler, service, or execution-mode change is included.
-The adapter fails closed if the draft tables are absent. No SQLite fallback.
+No execution-mode, runtime route, queue handler or production service change is
+included. Absence of these tables fails closed. No SQLite fallback exists.

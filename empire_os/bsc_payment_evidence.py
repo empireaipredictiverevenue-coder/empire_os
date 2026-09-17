@@ -101,6 +101,8 @@ def preview_payment(request_id, transaction_hash, *, db=None, config=None,
         raise PaymentVerificationError("wrong token precision or payment predates request")
     evidence = proof.to_dict()
     evidence["amount_raw"] = str(proof.amount_raw)  # preserve uint256 through JSON
+    evidence["commercial_terms_sha256"] = terms
+    evidence["verified_at"] = datetime.now(timezone.utc).isoformat()
     return {
         "mode": "OBSERVE", "recorded": False, "actual_revenue": False,
         "request_id": request_id, "buyer_id": buyer_id,
