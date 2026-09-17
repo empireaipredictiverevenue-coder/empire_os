@@ -294,11 +294,21 @@ def enrich_candidate(candidate: BuyerCandidate, site_evidence: Mapping[str, Any]
         named = {**matching_person, "source": "website_structured_data"}
 
     contacts = []
+    decision_first = ""
+    if named and looks_like_person_name(named.get("name")):
+        decision_first = re.sub(r"[^a-z]", "", _text(named.get("name")).split()[0].lower())
     for email in site_evidence.get("emails") or []:
         value = _text(email).lower()
         if value and domain_match and _email_domain(value) == expected_domain:
-            contacts.append({"email": value, "source": "site_observed",
-                             "bound_to_decision_maker": False})
+            local = value.split("@", 1)[0]
+            first_name_match = bool(
+                decision_first and local == decision_first and local not in {"info", "contact", "sales", "hello", "support"}
+            )
+            contacts.append({
+                "email": value,
+                "source": "site_observed_first_name_match" if first_name_match else "site_observed",
+                "bound_to_decision_maker": first_name_match,
+            })
     if matching_person and _text(matching_person.get("email")) and domain_match:
         value = _text(matching_person.get("email")).lower()
         if _email_domain(value) == expected_domain:

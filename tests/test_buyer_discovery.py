@@ -309,3 +309,30 @@ def test_public_web_contact_binding_requires_explicit_identity_and_role_corrobor
     ])
     assert rejected["public_web_evidence_accepted"] == 0
     assert rejected["contact_candidates"] == []
+
+
+def test_site_observed_exact_first_name_can_be_review_bound_but_not_send_ready():
+    from types import SimpleNamespace
+    from empire_os.buyer_discovery import verify_contact_plan
+    candidate = build_candidate({
+        "id":"75c4d15b-3b1d-4779-8917-c14a6b624403",
+        "business_name":"Prodigy Restoration", "niche":"restoration", "metro":"Oklahoma City",
+        "website":"https://prodigyrestoration.com/", "contact_name":"Matthew Maloy",
+        "contact_title":"Founder", "contact_source":"public_website",
+    })
+    evidence={"ok":True,"domain":"prodigyrestoration.com","evidence_score":1.0,"pages_checked":[],
+              "people":[],"emails":["matthew@prodigyrestoration.com","info@prodigyrestoration.com"]}
+    enriched=enrich_candidate(candidate,evidence)
+    bound=[x for x in enriched["contact_candidates"] if x["bound_to_decision_maker"]]
+    assert bound == [{"email":"matthew@prodigyrestoration.com",
+                      "source":"site_observed_first_name_match",
+                      "bound_to_decision_maker":True}]
+    class Validator:
+        def validate(self,email):
+            if email.startswith("info@"):
+                return SimpleNamespace(email=email,is_valid=False,confidence=0.0,is_role_address=True,is_disposable=False,has_mx=False,smtp_accepts=False)
+            return SimpleNamespace(email=email,is_valid=True,confidence=0.75,is_role_address=False,is_disposable=False,has_mx=True,smtp_accepts=False)
+    plan=verify_contact_plan(enriched,validator=Validator())
+    assert plan["review_ready"] is True
+    assert plan["outreach_ready"] is False
+    assert plan["preferred_email"] == "matthew@prodigyrestoration.com"
