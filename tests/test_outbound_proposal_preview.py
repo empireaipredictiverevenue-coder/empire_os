@@ -23,7 +23,8 @@ def test_review_only_bundle_never_authorizes_write(tmp_path):
         "contact_title": "Founder",
     }
     contact = {
-        "outreach_ready": True,
+        "review_ready": True,
+        "outreach_ready": False,
         "preferred_email": "frank@acme.example",
         "decision_maker": {"name":"Frank Smith","title":"Founder","decision_score":1.0},
     }
@@ -51,7 +52,7 @@ def test_preview_refuses_unverified_contact(tmp_path):
         "business_name": "Acme Roofing", "niche": "roofing", "website": "https://acme.example",
         "contact_name": "Frank Smith", "contact_title": "Founder",
     }
-    contact = {"outreach_ready": False, "preferred_email": None}
+    contact = {"review_ready": False, "outreach_ready": False, "preferred_email": None}
     c = tmp_path / "candidate.json"; p = tmp_path / "contact.json"; body = tmp_path / "body.txt"
     _write(c, candidate); _write(p, contact); body.write_text("unsubscribe\n123 Test Street, London")
     result = subprocess.run([
@@ -60,12 +61,12 @@ def test_preview_refuses_unverified_contact(tmp_path):
         "--postal-address", "123 Test Street, London", "--idempotency-key", "preview-0002"
     ], cwd=ROOT, text=True, capture_output=True)
     assert result.returncode != 0
-    assert "verified outreach-ready contact required" in result.stderr
+    assert "verified review-ready contact required" in result.stderr
 
 
 def test_preview_renders_reviewed_outbound_only_with_approved_review_id(tmp_path):
     candidate={"id":"598006a1-7872-45c5-a1c9-f616bb83bcfc","business_name":"Acme Roofing","niche":"roofing","website":"https://acme.example","contact_name":"Frank Smith","contact_title":"Founder"}
-    contact={"outreach_ready":True,"preferred_email":"frank@acme.example","decision_maker":{"name":"Frank Smith","title":"Founder","decision_score":1.0}}
+    contact={"review_ready":True,"outreach_ready":True,"preferred_email":"frank@acme.example","decision_maker":{"name":"Frank Smith","title":"Founder","decision_score":1.0}}
     c=tmp_path/"candidate.json"; p=tmp_path/"contact.json"; body=tmp_path/"body.txt"
     _write(c,candidate); _write(p,contact); body.write_text("Reply unsubscribe.\n123 Test Street, London")
     result=subprocess.run([str(ROOT/".venv/bin/python"),str(SCRIPT),str(c),str(p),"--subject","Test","--body-file",str(body),"--postal-address","123 Test Street, London","--idempotency-key","preview-0003","--approved-review-id","00000000-0000-0000-0000-000000000099"],cwd=ROOT,text=True,capture_output=True,check=True)

@@ -33,6 +33,7 @@ def run(row: dict, *, max_pages: int = 2, request_timeout: float = 3.0,
         "decision_maker": enriched.get("decision_maker"),
         "contacts": enriched.get("contact_candidates") or [],
         "verified_contacts": contact.get("verified_contacts") or [],
+        "review_ready": bool(contact.get("review_ready")),
         "outreach_ready": bool(contact.get("outreach_ready")),
         "preferred_email": contact.get("preferred_email"),
         "mode": "OBSERVE",
@@ -41,7 +42,7 @@ def run(row: dict, *, max_pages: int = 2, request_timeout: float = 3.0,
 
 
 def rejection_reason(result: dict) -> str | None:
-    if result.get("outreach_ready"):
+    if result.get("review_ready"):
         return None
     if not result.get("site_ok"):
         return "site_unavailable"
