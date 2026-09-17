@@ -84,7 +84,7 @@ Phase 3E deliverables:
 - Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers.
 - Governed Resend outbound with approval, idempotency, opt-out and postal-footer compliance. Canonical intent/approval/send/reply/suppression DB layer local + tested; provider adapter deployment pending.
 - Reply capture and classification. Canonical reply ingest/classification/suppression DB layer local + tested; live provider webhook pending.
-- New Supabase-backed AI Closer; legacy SQLite closer is retired from active flow.
+- New Supabase-backed AI Closer; legacy SQLite closer is retired from active flow. Canonical case/recommendation/human-advance state machine local + tested; production migration/provider wiring pending.
 - Commercial proposal states without fabricated prices or fake settlement.
 - Buyer activation only after verified commercial evidence.
 - USDT/BSC payment request + independent on-chain verification.
