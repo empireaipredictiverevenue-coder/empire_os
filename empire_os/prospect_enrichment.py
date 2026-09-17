@@ -52,6 +52,7 @@ SOURCE_WEIGHTS = {
     # These are real acquisition/provenance sources only.
     "website": 20,
     "search_fabric": 15,
+    "acquisition_evidence": 15,
     "rdap": 10,
 }
 
@@ -91,6 +92,13 @@ def _normalise_url(url: str) -> str:
     return url.rstrip("/")
 
 
+def _phone_digits(value: Any) -> str:
+    digits = re.sub(r"\D", "", str(value or ""))
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    return digits
+
+
 def _discover_website(
     prospect: dict[str, Any],
 ) -> tuple[str, dict[str, Any] | None]:
@@ -108,6 +116,21 @@ def _discover_website(
 
     if current and not _is_directory(current):
         return current, None
+
+    acquisition_website = _normalise_url(
+        str(prospect.get("_acquisition_website") or "")
+    )
+
+    if acquisition_website and not _is_directory(acquisition_website):
+        return acquisition_website, {
+            "source": "acquisition_evidence",
+            "url": acquisition_website,
+            "confidence_score": 1.0,
+            "relevance_score": 1.0,
+            "geo_score": 1.0,
+            "entity_score": 1.0,
+            "provenance": ["prospect_acquisitions"],
+        }
 
     name = str(
         prospect.get("business_name") or ""
@@ -348,6 +371,29 @@ def enrich_prospect_for_scoring(
                 candidate_url=website,
                 probe=probe,
             )
+
+            source_phone = _phone_digits(prospect.get("phone"))
+            site_phones = {
+                _phone_digits(value)
+                for value in probe.get("phones", [])
+                if _phone_digits(value)
+            }
+
+            if (
+                source_phone
+                and site_phones
+                and source_phone not in site_phones
+            ):
+                identity = dict(identity)
+                identity["accepted"] = False
+                identity["source_phone_match"] = False
+                reasons = list(identity.get("reasons") or [])
+                if "phone_mismatch" not in reasons:
+                    reasons.append("phone_mismatch")
+                identity["reasons"] = reasons
+            elif source_phone and site_phones:
+                identity = dict(identity)
+                identity["source_phone_match"] = True
 
             evidence.append(
                 {

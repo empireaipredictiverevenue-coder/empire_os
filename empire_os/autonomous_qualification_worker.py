@@ -134,6 +134,43 @@ def fetch_prospect(prospect_id: str) -> dict[str, Any]:
     return rows[0]
 
 
+
+
+def fetch_acquisition_website(prospect_id: str) -> str:
+    params = urllib.parse.urlencode(
+        {
+            "select": "evidence,created_at",
+            "prospect_id": f"eq.{prospect_id}",
+            "order": "created_at.desc",
+            "limit": 10,
+        }
+    )
+
+    rows = request_json(
+        "GET",
+        f"/rest/v1/prospect_acquisitions?{params}",
+    )
+
+    if not isinstance(rows, list):
+        raise RuntimeError(
+            "prospect acquisition lookup returned invalid payload"
+        )
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        evidence = row.get("evidence")
+        if not isinstance(evidence, dict):
+            continue
+        raw = evidence.get("raw")
+        if not isinstance(raw, dict):
+            continue
+        website = str(raw.get("business_website") or "").strip()
+        if website:
+            return website
+
+    return ""
+
 def upsert_qualification(
     prospect: dict[str, Any],
     result: dict[str, Any],
@@ -292,7 +329,18 @@ def qualify(prospect_id: str) -> dict[str, Any]:
     )
 
     if should_enrich:
-        enrichment = enrich_prospect_for_scoring(prospect)
+        enrichment_input = dict(prospect)
+        acquisition_website = fetch_acquisition_website(
+            prospect_id
+        )
+        if acquisition_website:
+            enrichment_input["_acquisition_website"] = (
+                acquisition_website
+            )
+
+        enrichment = enrich_prospect_for_scoring(
+            enrichment_input
+        )
         score_input.update(enrichment.get("fields", {}))
         score_input["enrichment_score"] = enrichment.get(
             "enrichment_score",

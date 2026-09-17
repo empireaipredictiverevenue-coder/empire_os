@@ -404,3 +404,138 @@ class TestEnrichmentFailClosed:
         assert result["sources"] == []
         assert result["enrichment_score"] == 0.0
         rdap.assert_not_called()
+
+
+class TestAcquisitionWebsiteIdentity:
+    def test_acquisition_website_precedes_search_fabric(self):
+        with patch.object(pe, "fused_search") as fused:
+            website, discovery = pe._discover_website(
+                {
+                    "business_name": "All Star Roofing",
+                    "metro": "Austin, TX",
+                    "niche": "roofing",
+                    "website": "",
+                    "_acquisition_website": (
+                        "https://allstarroofingtexas.com/"
+                    ),
+                }
+            )
+
+        assert website == "https://allstarroofingtexas.com"
+        assert discovery["source"] == "acquisition_evidence"
+        assert discovery["provenance"] == ["prospect_acquisitions"]
+        fused.assert_not_called()
+
+    def test_phone_mismatch_rejects_same_name_site(self):
+        candidate = "https://allstarroofingservice.repair"
+        discovery = {
+            "source": "search_fabric",
+            "url": candidate,
+            "confidence_score": 0.9,
+            "relevance_score": 1.0,
+            "geo_score": 1.0,
+            "entity_score": 1.0,
+            "provenance": ["duckduckgo_html"],
+        }
+        site_fields = {
+            "website": candidate,
+            "email": "info@allstarroofingservice.repair",
+            "phone": "255-876-5432",
+        }
+        probe = {
+            "ok": True,
+            "domain": "allstarroofingservice.repair",
+            "canonical_url": candidate + "/",
+            "phones": ["255-876-5432"],
+            "pages_checked": [{"url": candidate + "/"}],
+            "evidence_score": 0.6,
+        }
+        accepted_identity = {
+            "accepted": True,
+            "candidate_url": candidate,
+            "reasons": [],
+        }
+
+        with patch.object(
+            pe, "_discover_website", return_value=(candidate, discovery)
+        ), patch.object(
+            pe, "_extract_site", return_value=(site_fields, probe)
+        ), patch.object(
+            pe, "assess_first_party_identity", return_value=accepted_identity
+        ), patch.object(pe, "_rdap") as rdap:
+            result = pe.enrich_prospect_for_scoring(
+                {
+                    "business_name": "All Star Roofing",
+                    "metro": "Austin, TX",
+                    "niche": "roofing",
+                    "phone": "+1-512-477-7827",
+                    "website": "",
+                }
+            )
+
+        identity = next(
+            item for item in result["evidence"]
+            if item.get("source") == "identity_guard"
+        )
+        search_ev = next(
+            item for item in result["evidence"]
+            if item.get("source") == "search_fabric"
+        )
+        assert identity["accepted"] is False
+        assert identity["source_phone_match"] is False
+        assert "phone_mismatch" in identity["reasons"]
+        assert search_ev["accepted"] is False
+        assert result["fields"] == {}
+        assert result["enrichment_score"] == 0.0
+        rdap.assert_not_called()
+
+    def test_matching_source_phone_allows_verified_acquisition_site(self):
+        candidate = "https://allstarroofingtexas.com"
+        site_fields = {
+            "website": candidate,
+            "email": "info@allstarroofingtx.com",
+            "phone": "512-477-7827",
+        }
+        probe = {
+            "ok": True,
+            "domain": "allstarroofingtexas.com",
+            "canonical_url": candidate + "/",
+            "phones": ["512-477-7827", "512-635-4936"],
+            "pages_checked": [{"url": candidate + "/"}],
+            "evidence_score": 0.8,
+        }
+        accepted_identity = {
+            "accepted": True,
+            "candidate_url": candidate,
+            "reasons": [],
+        }
+
+        with patch.object(
+            pe, "_extract_site", return_value=(site_fields, probe)
+        ), patch.object(
+            pe, "assess_first_party_identity", return_value=accepted_identity
+        ), patch.object(pe, "_rdap", return_value={}):
+            result = pe.enrich_prospect_for_scoring(
+                {
+                    "business_name": "All Star Roofing",
+                    "metro": "Austin, TX",
+                    "niche": "roofing",
+                    "phone": "+1-512-477-7827",
+                    "website": "",
+                    "_acquisition_website": candidate,
+                }
+            )
+
+        identity = next(
+            item for item in result["evidence"]
+            if item.get("source") == "identity_guard"
+        )
+        acquisition_ev = next(
+            item for item in result["evidence"]
+            if item.get("source") == "acquisition_evidence"
+        )
+        assert identity["accepted"] is True
+        assert identity["source_phone_match"] is True
+        assert acquisition_ev["accepted"] is True
+        assert result["fields"]["website"] == candidate
+        assert result["fields"]["email"] == "info@allstarroofingtx.com"
