@@ -52,6 +52,15 @@ Operating rule: intelligence records remain intelligence until a governed qualif
 
 Moat direction: temporal graph + source provenance + signal fusion + commercial outcomes + causal models + execution history. Every future intelligence engine must read/write through this shared substrate rather than create isolated data silos.
 
+Competitive design target — business-web search plus closed-loop intelligence:
+- crawl/index primary business websites directly at internet scale; retain source text and change history
+- natural-language ICP, exact-phrase and domain-lookalike search across the company universe
+- multilingual company discovery, technographics, domain health and open-web decision-maker discovery
+- count-before-materialize queries, exclusions/suppression and confidence floors before CRM promotion
+- agent-native API/MCP/SDK access, but all mutation remains governed
+- exceed discovery-only platforms with temporal signal sequences, buying-committee reconstruction, multi-offer fit, expected deal value, next-best-action, payment/revenue truth, outcome-conditioned memory and causal learning
+- learn from Empire-specific wins/losses/fulfilment/churn/revenue so ranking optimizes for probability of profitable Empire outcomes, not generic ICP similarity alone
+
 ## Phase Roadmap
 
 ### Phase 0 — Foundation ✅
