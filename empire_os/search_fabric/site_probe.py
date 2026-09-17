@@ -250,11 +250,11 @@ def _internal_candidates(html: str, origin: str) -> List[str]:
     return list(dict.fromkeys(candidates))
 
 
-def _fetch(session: requests.Session, url: str):
+def _fetch(session: requests.Session, url: str, *, timeout: float = 15.0):
     try:
         response = session.get(
             url,
-            timeout=15,
+            timeout=max(1.0, float(timeout)),
             allow_redirects=True,
         )
     except requests.RequestException:
@@ -286,6 +286,8 @@ def probe_site(
     url: str,
     *,
     max_pages: int = 4,
+    request_timeout: float = 8.0,
+    time_budget_seconds: float = 24.0,
 ) -> dict:
     """
     Inspect a public business site and return normalized evidence.
@@ -306,7 +308,12 @@ def probe_site(
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
-    homepage = _fetch(session, url)
+    max_pages = max(1, min(int(max_pages), 12))
+    request_timeout = max(1.0, min(float(request_timeout), 30.0))
+    time_budget_seconds = max(request_timeout, min(float(time_budget_seconds), 120.0))
+    deadline = time.monotonic() + time_budget_seconds
+
+    homepage = _fetch(session, url, timeout=request_timeout)
 
     if homepage is None:
         return {
@@ -348,9 +355,15 @@ def probe_site(
         else:
             if not _same_site(page_url, origin):
                 continue
+            if time.monotonic() >= deadline:
+                break
 
-            time.sleep(0.4)
-            document = _fetch(session, page_url)
+            time.sleep(min(0.25, max(0.0, deadline - time.monotonic())))
+            remaining = max(1.0, deadline - time.monotonic())
+            document = _fetch(
+                session, page_url,
+                timeout=min(request_timeout, remaining),
+            )
 
             if document is None:
                 continue
@@ -451,4 +464,6 @@ def probe_site(
         "people": people,
         "pages_checked": pages,
         "evidence_score": round(evidence_score, 4),
+        "time_budget_seconds": round(time_budget_seconds, 2),
+        "budget_exhausted": time.monotonic() >= deadline,
     }

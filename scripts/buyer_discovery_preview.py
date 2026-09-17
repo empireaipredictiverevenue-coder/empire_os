@@ -96,7 +96,7 @@ def main(argv=None):
     if args.probe:
         enriched = []
         for candidate in candidates[:max(0, min(args.probe, 20))]:
-            evidence = probe_site(candidate.website, max_pages=4)
+            evidence = probe_site(candidate.website, max_pages=4, request_timeout=6, time_budget_seconds=18)
             result = enrich_candidate(candidate, evidence)
             enriched.append({
                 "prospect_id": candidate.prospect_id,
