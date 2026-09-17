@@ -54,5 +54,7 @@ The review-only proposal CLI never writes or sends. It renders the candidate-rev
 - Unsupported sources, mismatched names, and uncorroborated third-party records are rejected.
 - DNS-valid public contact evidence can make a candidate `review_ready` without making it `outreach_ready`.
 - First real canonical prospect reached `review_ready=true` on 2026-09-17; it remained `outreach_ready=false` pending stronger mailbox-level evidence.
+- Later the same day, Jake Montgomery / Silverado Construction Services became the first canonical prospect to reach both `review_ready=true` and `outreach_ready=true` using an exact email published in a 2025 government permit record, current founder/owner corroboration, same-domain identity, and valid MX.
+- SMTP probing is treated as optional supporting evidence because network policy can block port 25; recent exact public publication plus current role corroboration is accepted as a stronger provenance path than inferred email patterns.
 - No production row was created and no email was sent.
 

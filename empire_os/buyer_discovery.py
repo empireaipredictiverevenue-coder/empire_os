@@ -6,6 +6,7 @@ It performs no sending, buyer activation, CRM mutation, payment or revenue write
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import date, datetime
 import re
 from typing import Any, Iterable, Mapping
 from uuid import UUID
@@ -126,6 +127,21 @@ def _host(value: Any) -> str:
 def _email_domain(value: Any) -> str:
     text = _text(value).lower()
     return text.rsplit("@", 1)[-1] if "@" in text else ""
+
+
+def _publication_is_recent(value: Any, *, max_age_days: int = 730) -> bool:
+    text = _text(value)
+    if not text:
+        return False
+    try:
+        published = datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+    except ValueError:
+        try:
+            published = date.fromisoformat(text[:10])
+        except ValueError:
+            return False
+    age = (date.today() - published).days
+    return 0 <= age <= max_age_days
 
 
 def _bounded(value: Any, low: float = 0.0, high: float = 100.0) -> float:
@@ -402,16 +418,26 @@ def merge_public_web_contact_evidence(
             continue
         if not email or "@" not in email or not source_url:
             continue
-        if source_kind not in {"official_site", "public_business_directory"}:
+        allowed_sources = {
+            "official_site", "public_business_directory",
+            "public_government_record", "company_press_release",
+        }
+        if source_kind not in allowed_sources:
             continue
-        if source_kind == "public_business_directory" and not bool(item.get("role_corroborated")):
+        role_corroborated = bool(item.get("role_corroborated"))
+        published_at = _text(item.get("published_at"))
+        if source_kind != "official_site" and not role_corroborated:
+            continue
+        if source_kind in {"public_government_record", "company_press_release"} and not _publication_is_recent(published_at):
             continue
         accepted.append({
             "email": email,
             "source": source_kind,
             "bound_to_decision_maker": True,
             "source_url": source_url,
-            "role_corroborated": bool(item.get("role_corroborated")),
+            "role_corroborated": role_corroborated,
+            "direct_publication": bool(item.get("direct_publication", True)),
+            "published_at": published_at,
         })
     contacts.extend(accepted)
     dedup = {}
@@ -489,9 +515,13 @@ def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[
         if item["is_valid"] and not item["is_role_address"] and not item["is_disposable"]
         and item["bound_to_decision_maker"]
     ]
+    strong_public_sources = {
+        "person_structured_data", "official_site",
+        "public_government_record", "company_press_release",
+    }
     outreach_eligible = [
         item for item in review_eligible
-        if item["smtp_accepts"] or item["source"] == "person_structured_data"
+        if item["smtp_accepts"] or item["source"] in strong_public_sources
     ]
     decision_score = float((decision or {}).get("decision_score") or 0.0)
     reconciliation_clear = not bool((reconciliation or {}).get("review_required"))

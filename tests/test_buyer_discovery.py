@@ -336,3 +336,40 @@ def test_site_observed_exact_first_name_can_be_review_bound_but_not_send_ready()
     assert plan["review_ready"] is True
     assert plan["outreach_ready"] is False
     assert plan["preferred_email"] == "matthew@prodigyrestoration.com"
+
+
+def test_recent_exact_public_record_can_support_outreach_without_smtp():
+    from types import SimpleNamespace
+    from empire_os.buyer_discovery import merge_public_web_contact_evidence, verify_contact_plan
+    candidate = build_candidate({
+        "id":"f1100b66-90bb-49d7-8bdd-bdb54bd055cb","business_name":"Silverado Construction Services",
+        "niche":"general contractor","metro":"Dallas-Fort Worth","website":"http://www.silveradoconstruct.com/",
+        "contact_name":"Jake Montgomery","contact_title":"Founder","contact_source":"public_website",
+    })
+    enriched = {"decision_maker":{"name":"Jake Montgomery","title":"Founder","decision_score":1.0},
+                "contact_candidates":[],"decision_reconciliation":{"review_required":False}}
+    enriched = merge_public_web_contact_evidence(enriched,[{
+        "name":"Jake Montgomery","email":"jake@silveradoconstruct.com",
+        "source_url":"https://example.gov/permit-record","source_kind":"public_government_record",
+        "role_corroborated":True,"direct_publication":True,"published_at":"2025-01-06",
+    }])
+    class Validator:
+        def validate(self,email):
+            return SimpleNamespace(email=email,is_valid=True,confidence=0.75,is_role_address=False,
+                is_disposable=False,has_mx=True,smtp_accepts=False)
+    plan = verify_contact_plan(enriched, validator=Validator())
+    assert plan["review_ready"] is True
+    assert plan["outreach_ready"] is True
+    assert plan["preferred_email"] == "jake@silveradoconstruct.com"
+
+
+def test_stale_exact_public_record_cannot_be_bound_as_recent_evidence():
+    from empire_os.buyer_discovery import merge_public_web_contact_evidence
+    enriched={"decision_maker":{"name":"Jake Montgomery","title":"Founder","decision_score":1.0},"contact_candidates":[]}
+    merged=merge_public_web_contact_evidence(enriched,[{
+        "name":"Jake Montgomery","email":"jake@silveradoconstruct.com",
+        "source_url":"https://example.gov/old-record","source_kind":"public_government_record",
+        "role_corroborated":True,"direct_publication":True,"published_at":"2019-01-01",
+    }])
+    assert merged["public_web_evidence_accepted"] == 0
+    assert merged["contact_candidates"] == []
