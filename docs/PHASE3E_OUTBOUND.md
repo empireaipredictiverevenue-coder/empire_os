@@ -9,6 +9,7 @@ Status: local implementation tested; production activation gated.
 - Isolated Resend webhook FastAPI service is local and tested.
 - `empire-ai.co.uk` is verified for Resend sending and receiving.
 - Existing Resend webhooks are disabled; reply capture is not live.
+- Dedicated Phase 3E runtime LOGIN-role migration is local/tested; passwords remain unprovisioned.
 - Legacy outreach timers/services are inactive/not installed.
 - Empire execution remains OBSERVE.
 
