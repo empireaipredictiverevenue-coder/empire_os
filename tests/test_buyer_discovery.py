@@ -245,3 +245,38 @@ def test_generated_pattern_requires_smtp_before_binding():
     plan=verify_contact_plan(merged,validator=Validator())
     assert plan["outreach_ready"] is True
     assert plan["preferred_email"] == "jsmith@acme.test"
+
+
+def test_current_official_role_conflict_requires_review():
+    from types import SimpleNamespace
+    from empire_os.buyer_discovery import reconcile_decision_maker, verify_contact_plan
+    candidate = build_candidate({
+        "id":"00000000-0000-0000-0000-000000000777","business_name":"Quality Exteriors",
+        "niche":"roofing","metro":"Austin","website":"https://quality.example",
+        "contact_name":"Peter Reed","contact_title":"Owner","contact_source":"public_website",
+    })
+    official=[{"name":"Peter Reed","title":"Project Manager","email":"peter@quality.example"}]
+    rec=reconcile_decision_maker(candidate,official)
+    assert rec["status"] == "role_conflict"
+    assert rec["review_required"] is True
+    assert rec["decision_maker"]["decision_role"] == "influencer"
+    class Validator:
+        def validate(self,email):
+            return SimpleNamespace(email=email,is_valid=True,confidence=0.95,is_role_address=False,
+                                   is_disposable=False,has_mx=True,smtp_accepts=True)
+    enriched={"decision_maker":rec["decision_maker"],"decision_reconciliation":rec,
+              "contact_candidates":[{"email":"peter@quality.example","source":"person_structured_data",
+                                      "bound_to_decision_maker":True}]}
+    assert verify_contact_plan(enriched,validator=Validator())["outreach_ready"] is False
+
+
+def test_current_official_equivalent_authority_confirms_candidate():
+    from empire_os.buyer_discovery import reconcile_decision_maker
+    candidate=build_candidate({
+        "id":"00000000-0000-0000-0000-000000000778","business_name":"Acme",
+        "website":"https://acme.example","contact_name":"Jane Smith","contact_title":"Founder",
+    })
+    rec=reconcile_decision_maker(candidate,[{"name":"Jane Smith","title":"CEO","email":"jane@acme.example"}])
+    assert rec["status"] == "confirmed"
+    assert rec["review_required"] is False
+    assert rec["decision_maker"]["decision_role"] == "economic_buyer"

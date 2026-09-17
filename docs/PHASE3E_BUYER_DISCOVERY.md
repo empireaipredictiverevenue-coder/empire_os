@@ -43,4 +43,10 @@ The review-only proposal CLI never writes or sends. It renders the candidate-rev
 - `--probe-timeout` applies a hard per-site deadline so broken websites cannot stall the batch or remote bridge.
 - Results include explicit rejection reasons such as `site_timeout`, `no_decision_maker`, `no_bound_contact`, `role_address_only`, and `contact_not_verified`.
 - DNS-only contact validation is used in preview mode; no email is sent and no SMTP mailbox probe is required.
+## Current-role reconciliation
+- Canonical contact/title fields are not trusted indefinitely.
+- Current official-site person evidence is reconciled against the canonical decision maker before outreach readiness.
+- A materially lower current role (for example, canonical `Owner` but current official site `Project Manager`) sets `review_required=true` and blocks outreach.
+- Equivalent economic-buyer authority can confirm the candidate.
+- Public-web validation on 2026-09-17 exposed a real stale-role example, proving this gate is necessary.
 

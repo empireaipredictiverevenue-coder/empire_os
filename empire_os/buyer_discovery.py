@@ -219,6 +219,25 @@ def select_candidates(rows: Iterable[Mapping[str, Any]], *, min_score: float = 4
     return selected[:limit]
 
 
+def reconcile_decision_maker(candidate: BuyerCandidate, official_people: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """Reconcile canonical authority against current official-site person evidence."""
+    ranked = rank_site_people(official_people)
+    matches = [p for p in ranked if _text(p.get("name")).casefold() == candidate.contact_name.casefold()]
+    if not candidate.contact_name or not matches:
+        return {
+            "status": "unconfirmed",
+            "review_required": False,
+            "decision_maker": None,
+        }
+    current = matches[0]
+    conflict = float(current.get("decision_score") or 0.0) + 0.2 < float(candidate.decision_score or 0.0)
+    return {
+        "status": "role_conflict" if conflict else "confirmed",
+        "review_required": conflict,
+        "decision_maker": {**current, "source": "official_site_current"},
+    }
+
+
 def rank_site_people(people: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     ranked = []
     for person in people or []:
@@ -247,21 +266,29 @@ def enrich_candidate(candidate: BuyerCandidate, site_evidence: Mapping[str, Any]
     expected_domain = _host(candidate.website)
     observed_domain = _host(site_evidence.get("domain"))
     domain_match = bool(expected_domain and observed_domain and expected_domain == observed_domain)
-    people = rank_site_people(site_evidence.get("people") or []) if domain_match else []
+    raw_people = site_evidence.get("people") or []
+    people = rank_site_people(raw_people) if domain_match else []
+    reconciliation = (
+        reconcile_decision_maker(candidate, raw_people)
+        if domain_match else {"status": "unconfirmed", "review_required": False, "decision_maker": None}
+    )
     named = None
     matching_person = None
     if candidate.contact_name and candidate.contact_title:
-        named = {
-            "name": candidate.contact_name,
-            "title": candidate.contact_title,
-            "decision_role": candidate.decision_role,
-            "decision_score": candidate.decision_score,
-            "source": candidate.contact_source or "canonical_prospect",
-        }
-        for person in people:
-            if _text(person.get("name")).casefold() == candidate.contact_name.casefold():
-                matching_person = person
-                break
+        if reconciliation.get("decision_maker"):
+            named = dict(reconciliation["decision_maker"])
+            matching_person = next(
+                (person for person in people if _text(person.get("name")).casefold() == candidate.contact_name.casefold()),
+                None,
+            )
+        else:
+            named = {
+                "name": candidate.contact_name,
+                "title": candidate.contact_title,
+                "decision_role": candidate.decision_role,
+                "decision_score": candidate.decision_score,
+                "source": candidate.contact_source or "canonical_prospect",
+            }
     elif people:
         matching_person = people[0]
         named = {**matching_person, "source": "website_structured_data"}
@@ -294,6 +321,7 @@ def enrich_candidate(candidate: BuyerCandidate, site_evidence: Mapping[str, Any]
             "pages_checked": site_evidence.get("pages_checked") or [],
         },
         "decision_maker": named,
+        "decision_reconciliation": reconciliation,
         "contact_candidates": contacts,
         "contact_email_candidates": [item["email"] for item in contacts],
         "mode": "OBSERVE",
@@ -375,6 +403,7 @@ def merge_generated_contact_evidence(enriched: Mapping[str, Any], validated: Ite
 
 def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[str, Any]:
     decision = enriched.get("decision_maker") if isinstance(enriched, Mapping) else None
+    reconciliation = enriched.get("decision_reconciliation") if isinstance(enriched, Mapping) else None
     raw_contacts = list(enriched.get("contact_candidates") or []) if isinstance(enriched, Mapping) else []
     if not raw_contacts and isinstance(enriched, Mapping):
         raw_contacts = [
@@ -413,7 +442,10 @@ def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[
         "decision_maker": decision,
         "verified_contacts": verified,
         "preferred_email": eligible[0]["email"] if eligible else None,
-        "outreach_ready": bool(decision and decision_score >= 0.5 and eligible),
+        "outreach_ready": bool(
+            decision and decision_score >= 0.5 and eligible
+            and not bool((reconciliation or {}).get("review_required"))
+        ),
     }
 
 
