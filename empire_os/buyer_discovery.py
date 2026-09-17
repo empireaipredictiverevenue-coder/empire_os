@@ -6,6 +6,7 @@ It performs no sending, buyer activation, CRM mutation, payment or revenue write
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import re
 from typing import Any, Iterable, Mapping
 from uuid import UUID
 from urllib.parse import urlparse
@@ -282,6 +283,52 @@ def enrich_candidate(candidate: BuyerCandidate, site_evidence: Mapping[str, Any]
         "write_authorized": False,
     }
 
+
+
+def generate_work_email_candidates(person_name: Any, company_website: Any) -> list[str]:
+    """Generate deterministic work-email patterns; candidates are not verification."""
+    name = _text(person_name)
+    if not looks_like_person_name(name):
+        return []
+    host = _host(company_website)
+    if not host:
+        return []
+    parts = [re.sub(r"[^a-z]", "", part.lower()) for part in name.replace("-", " ").replace("'", " ").split()]
+    parts = [part for part in parts if part]
+    if len(parts) < 2:
+        return []
+    first, last = parts[0], parts[-1]
+    local_parts = [
+        f"{first}.{last}", f"{first}{last}", f"{first[0]}{last}",
+        f"{first[0]}.{last}", f"{first}{last[0]}", f"{first}.{last[0]}",
+        first, last,
+    ]
+    return list(dict.fromkeys(f"{local}@{host}" for local in local_parts if local))
+
+
+def validate_email_candidates(candidates: Iterable[str], validator: Any, *, require_smtp: bool = False) -> list[dict[str, Any]]:
+    """Validate candidates while preserving the strongest evidence actually observed."""
+    results = []
+    for email in list(candidates)[:12]:
+        outcome = validator.validate(email)
+        state = "invalid"
+        if getattr(outcome, "is_valid", False):
+            state = "smtp_valid" if getattr(outcome, "smtp_accepts", False) else "mx_valid"
+        elif getattr(outcome, "has_mx", False) and not getattr(outcome, "is_role_address", False):
+            state = "mx_observed"
+        if require_smtp and state != "smtp_valid":
+            continue
+        results.append({
+            "email": email,
+            "verification_state": state,
+            "confidence": float(getattr(outcome, "confidence", 0.0) or 0.0),
+            "has_mx": bool(getattr(outcome, "has_mx", False)),
+            "smtp_accepts": bool(getattr(outcome, "smtp_accepts", False)),
+            "is_role_address": bool(getattr(outcome, "is_role_address", False)),
+            "is_disposable": bool(getattr(outcome, "is_disposable", False)),
+            "source": "generated_pattern",
+        })
+    return results
 
 def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[str, Any]:
     decision = enriched.get("decision_maker") if isinstance(enriched, Mapping) else None

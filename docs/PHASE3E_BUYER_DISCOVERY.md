@@ -23,3 +23,16 @@ The current bottleneck is decision-maker/contact resolution, not raw company dis
 8. Verify discovered direct email separately from discovery.
 9. Build an OBSERVE-only outbound intent plan with opt-out and postal footer.
 10. Human approval remains mandatory before any provider send.
+
+## Review-only proposal gate
+- `scripts/outbound_proposal_preview.py` renders the exact governed `propose_outbound_intent` RPC payload.
+- Output is always `mode=OBSERVE` and `write_authorized=false`.
+- Requires a verified direct non-role email, canonical prospect UUID, opt-out wording, and configured postal address.
+- It does not call Supabase, approve an intent, or contact Resend.
+- Human approval remains a separate permission boundary before any send claim.
+
+## Contact evidence rule
+
+Official company-site emails and generated work-email patterns are different evidence classes.
+Observed company-site emails may enter contact verification. Generated patterns remain candidates only and must not become outreach-ready without mailbox-level evidence.
+The review-only proposal CLI never writes or sends; it only renders the exact governed `propose_outbound_intent` payload for human review.

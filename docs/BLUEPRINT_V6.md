@@ -81,7 +81,7 @@ Commercial products, buyer records/capacity, commercial events, fulfilment, idem
 3F Outcome feedback
 
 Phase 3E deliverables:
-- Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers. Canonical buyer discovery now includes business-web evidence, structured Person extraction, decision-maker authority ranking, personhood-quality guards, domain-integrity checks, offer-fit routing and a verified-contact gate; local/tested, production write-back disabled.
+- Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers. Canonical buyer discovery now includes business-web evidence, structured Person extraction, decision-maker authority ranking, personhood-quality guards, domain-integrity checks, offer-fit routing, a verified-contact gate, and review-only governed outbound proposal bundles; local/tested, production write-back disabled.
 - Governed Resend outbound with approval, idempotency, opt-out and postal-footer compliance. Canonical DB layer + fail-closed Resend provider adapter + OBSERVE-first manual sender local/tested; production migration, sender identity and webhook registration pending.
 - Reply capture and classification. Signed-webhook normalization + per-intent reply alias + isolated webhook receiver + canonical reply ingest/classification/suppression flow local/tested; production DB migrations/runtime credential provisioning/service routing/webhook enablement pending.
 - New Supabase-backed AI Closer; legacy SQLite closer is retired from active flow. Canonical case/recommendation/human-advance state machine local/tested; production migration pending.

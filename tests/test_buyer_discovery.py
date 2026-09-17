@@ -2,6 +2,8 @@ from empire_os.buyer_discovery import (
     build_candidate,
     classify_decision_role,
     looks_like_person_name,
+    generate_work_email_candidates,
+    validate_email_candidates,
     enrich_candidate,
     rank_site_people,
     select_candidates,
@@ -170,3 +172,32 @@ def test_personhood_guard_rejects_live_scrape_fragments():
             "Mary-Jane O'Connor", "J. R. Smith"]
     for value in good:
         assert looks_like_person_name(value) is True, value
+
+
+def test_email_pattern_generation_is_candidate_only_and_domain_bound():
+    values = generate_work_email_candidates("Jane Smith", "https://www.acme.co.uk/about")
+    assert values[0] == "jane.smith@acme.co.uk"
+    assert "jsmith@acme.co.uk" in values
+    assert generate_work_email_candidates("Pricing Guide", "https://acme.co.uk") == []
+
+
+def test_email_candidate_validation_preserves_evidence_level():
+    class Result:
+        def __init__(self, valid, mx, smtp=False, confidence=0.0):
+            self.is_valid=valid; self.has_mx=mx; self.smtp_accepts=smtp
+            self.confidence=confidence; self.is_role_address=False; self.is_disposable=False
+    class Validator:
+        def validate(self, email):
+            if email.startswith("jane.smith"):
+                return Result(True, True, False, 0.75)
+            if email.startswith("jsmith"):
+                return Result(True, True, True, 0.95)
+            return Result(False, True, False, 0.5)
+    checked = validate_email_candidates([
+        "jane.smith@acme.co.uk","jsmith@acme.co.uk","x@acme.co.uk"
+    ], Validator())
+    assert checked[0]["verification_state"] == "mx_valid"
+    assert checked[1]["verification_state"] == "smtp_valid"
+    assert checked[2]["verification_state"] == "mx_observed"
+    strict = validate_email_candidates(["jane.smith@acme.co.uk","jsmith@acme.co.uk"], Validator(), require_smtp=True)
+    assert [x["email"] for x in strict] == ["jsmith@acme.co.uk"]
