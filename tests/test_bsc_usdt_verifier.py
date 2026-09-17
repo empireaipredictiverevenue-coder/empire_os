@@ -7,7 +7,7 @@ from empire_os.bsc_usdt_verifier import (
     BscUsdtConfig,
     PaymentVerificationError,
     TRANSFER_TOPIC,
-    verify_payment,
+    get_block_anchor, verify_payment,
 )
 
 TOKEN = BSC_USDT_CONTRACT
@@ -228,3 +228,34 @@ def test_rejects_nonzero_topic_padding():
         return result
     with pytest.raises(PaymentVerificationError, match="padding"):
         verify_payment(config(), TX, "100", rpc_call=rpc)
+
+
+def test_get_block_anchor_reads_canonical_head_and_timestamp():
+    responses = {
+        "eth_chainId": hex(56),
+        "eth_blockNumber": hex(321),
+        "eth_getBlockByNumber": {
+            "number": hex(321), "hash": BLOCK_HASH, "timestamp": hex(1_789_662_000),
+        },
+    }
+    anchor = get_block_anchor(config(), rpc_call=lambda method, params: responses[method])
+    assert anchor == {
+        "chain_id": 56,
+        "block_number": 321,
+        "block_hash": BLOCK_HASH,
+        "timestamp": 1_789_662_000,
+    }
+
+
+def test_get_block_anchor_rejects_wrong_chain_or_block_number():
+    with pytest.raises(PaymentVerificationError, match="wrong chain"):
+        get_block_anchor(config(), rpc_call=lambda method, params: "0x1")
+    responses = {
+        "eth_chainId": hex(56),
+        "eth_getBlockByNumber": {
+            "number": hex(322), "hash": BLOCK_HASH, "timestamp": hex(1_789_662_000),
+        },
+    }
+    with pytest.raises(PaymentVerificationError, match="number mismatch"):
+        get_block_anchor(config(), block_number=321,
+                         rpc_call=lambda method, params: responses[method])

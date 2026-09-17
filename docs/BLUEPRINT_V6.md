@@ -135,12 +135,16 @@ Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deploym
 3. Fail-closed USDT/BSC verifier, evidence adapter, and governed request/approval
    separation ✅
 4. Provision controlled operator-approval and verifier service identities/tools without
-   exposing public mutation or granting agents self-approval.
+   exposing public mutation or granting agents self-approval. Local/manual tooling ✅;
+   production login identities remain a deployment gate.
 5. Activate first genuine buyer only after verified evidence.
 6. Deliver first paid opportunity and capture outcome/profit.
 7. Feed actual outcomes into Astra/Omega/revenue intelligence.
 8. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution.
 9. Expand Astra operating authority only after proven controls and economics.
 
+10. BSC USDT smart-contract escrow: local contract + verifier + isolated DB model ✅;
+    external audit, production identities, migration approval and mainnet deployment pending.
+
 ## Definition of Actual Revenue
-Actual revenue requires independently verifiable payment evidence tied to a real buyer, real commercial terms and the relevant Empire request/order. Modeled, forecast, quoted, pending, simulated or manually asserted values are not actual revenue.
+Actual revenue requires independently verifiable payment evidence tied to a real buyer, real commercial terms and the relevant Empire request/order. Escrow funding is not revenue; a verified escrow release is only revenue-eligible until a separate governed accounting event recognizes it. Modeled, forecast, quoted, pending, simulated or manually asserted values are not actual revenue.

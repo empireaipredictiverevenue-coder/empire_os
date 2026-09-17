@@ -20,6 +20,9 @@ dev = [
 dspy = [
     "dspy-ai>=2.5,<4",
 ]
+payment-ops = [
+    "psycopg[binary]>=3.2,<4",
+]
 
 [tool.setuptools.packages.find]
 include = ["empire_os*"]

@@ -108,5 +108,5 @@ def preview_payment(request_id, transaction_hash, *, db=None, config=None,
         "request_id": request_id, "buyer_id": buyer_id,
         "fulfilment_order_id": order_id, "commercial_terms_sha256": terms,
         "evidence": evidence,
-        "next_gate": "human_review_and_atomic_database_reservation",
+        "next_gate": "dedicated_verifier_atomic_recording",
     }

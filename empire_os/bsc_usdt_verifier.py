@@ -135,6 +135,37 @@ def _token_decimals(config: BscUsdtConfig, rpc: Callable[[str, list[Any]], Any])
     return decimals
 
 
+def get_block_anchor(
+    config: BscUsdtConfig, *, block_number: int | None = None,
+    rpc_call: Callable[[str, list[Any]], Any] | None = None,
+) -> dict[str, Any]:
+    """Read and validate a canonical BSC block anchor without any chain mutation."""
+    if config.chain_id != BSC_MAINNET_CHAIN_ID:
+        raise PaymentVerificationError("configured chain is not BSC mainnet")
+    raw_rpc = rpc_call or (lambda method, params: _rpc_request(config.rpc_url, method, params))
+    chain_id = _hex_int(raw_rpc("eth_chainId", []))
+    if chain_id != config.chain_id:
+        raise PaymentVerificationError(f"wrong chain id: {chain_id}")
+    if block_number is None:
+        target = _hex_int(raw_rpc("eth_blockNumber", []))
+    elif type(block_number) is int and block_number > 0:
+        target = block_number
+    else:
+        raise PaymentVerificationError("positive block number required")
+    block = raw_rpc("eth_getBlockByNumber", [hex(target), False])
+    if not isinstance(block, dict):
+        raise PaymentVerificationError("block anchor not found")
+    number = _hex_int(block.get("number"))
+    if number != target:
+        raise PaymentVerificationError("block anchor number mismatch")
+    return {
+        "chain_id": chain_id,
+        "block_number": number,
+        "block_hash": _tx_hash(block.get("hash")),
+        "timestamp": _hex_int(block.get("timestamp")),
+    }
+
+
 def verify_payment(
     config: BscUsdtConfig,
     transaction_hash: str,
