@@ -373,3 +373,21 @@ def test_stale_exact_public_record_cannot_be_bound_as_recent_evidence():
     }])
     assert merged["public_web_evidence_accepted"] == 0
     assert merged["contact_candidates"] == []
+
+
+def test_public_web_email_named_for_different_person_cannot_bind_to_decision_maker():
+    from empire_os.buyer_discovery import merge_public_web_contact_evidence
+    enriched = {
+        "decision_maker": {"name":"Luis Mondragon","title":"Founder","decision_score":1.0},
+        "contact_candidates": [],
+    }
+    merged = merge_public_web_contact_evidence(enriched,[{
+        "name":"Jorge Mondragon",
+        "email":"office@mondragonac.com",
+        "source_url":"https://mondragonac.com/jose-luis-mondragon/",
+        "source_kind":"official_site",
+        "role_corroborated":True,
+        "direct_publication":True,
+    }])
+    assert merged["public_web_evidence_accepted"] == 0
+    assert merged["contact_candidates"] == []
