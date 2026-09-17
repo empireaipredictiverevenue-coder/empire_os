@@ -26,10 +26,8 @@ def _validate_hex(value: str | None, length: int, label: str) -> str:
     text = str(value or "").strip().lower()
     if len(text) != length or not text.startswith("0x"):
         raise PaymentVerificationError(f"invalid {label}")
-    try:
-        int(text[2:], 16)
-    except ValueError as exc:
-        raise PaymentVerificationError(f"invalid {label}") from exc
+    if any(char not in "0123456789abcdef" for char in text[2:]):
+        raise PaymentVerificationError(f"invalid {label}")
     return text
 
 
@@ -87,6 +85,8 @@ class PaymentEvidence:
     block_number: int | None
     confirmations: int
     reason: str
+    block_hash: str = ""
+    log_index: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -121,8 +121,9 @@ def _hex_int(value: Any) -> int:
 
 def _topic_address(topic: str) -> str:
     text = str(topic or "").lower()
-    if not text.startswith("0x") or len(text) != 66:
-        raise PaymentVerificationError("invalid address topic")
+    _validate_hex(text, 66, "address topic")
+    if text[2:26] != "0" * 24:
+        raise PaymentVerificationError("invalid address topic padding")
     return _address("0x" + text[-40:])
 
 
@@ -177,11 +178,20 @@ def verify_payment(
     if payer and sender != payer:
         raise PaymentVerificationError("transaction sender does not match expected payer")
 
+    block_number = _hex_int(receipt.get("blockNumber"))
+    block_hash = _tx_hash(receipt.get("blockHash"))
+    if (_tx_hash(tx.get("blockHash")) != block_hash
+            or _hex_int(tx.get("blockNumber")) != block_number):
+        raise PaymentVerificationError("transaction and receipt block mismatch")
     decimals = _token_decimals(config, raw_rpc)
-    scaled_expected = expected * (Decimal(10) ** decimals)
-    if scaled_expected != scaled_expected.to_integral_value():
+    # Integer ratios avoid rounding through the process-wide Decimal context.
+    numerator, denominator = expected.as_integer_ratio()
+    expected_raw, remainder = divmod(numerator * 10 ** decimals, denominator)
+    if remainder:
         raise PaymentVerificationError("expected amount exceeds token precision")
-    expected_raw = int(scaled_expected)
+    if expected_raw > 2 ** 256 - 1:
+        raise PaymentVerificationError("expected amount exceeds uint256")
+    matched_index = None
     matched_raw = 0
     matched_from: str | None = None
 
@@ -193,18 +203,28 @@ def verify_payment(
         if not isinstance(log, dict) or _address(log.get("address")) != token:
             continue
         topics = log.get("topics") or []
-        if len(topics) < 3 or str(topics[0]).lower() != TRANSFER_TOPIC:
+        if not isinstance(topics, list) or not topics or str(topics[0]).lower() != TRANSFER_TOPIC:
             continue
+        if len(topics) != 3:
+            raise PaymentVerificationError("invalid Transfer topics")
+        if log.get("removed") is not False:
+            raise PaymentVerificationError("removed or unconfirmed log")
+        if (_tx_hash(log.get("transactionHash")) != tx_hash
+                or _tx_hash(log.get("blockHash")) != block_hash
+                or _hex_int(log.get("blockNumber")) != block_number):
+            raise PaymentVerificationError("log provenance mismatch")
         transfer_from = _topic_address(topics[1])
         transfer_to = _topic_address(topics[2])
         if transfer_to != treasury:
             continue
         if payer and transfer_from != payer:
             continue
-        amount_raw = _hex_int(log.get("data"))
+        amount_raw = int(_validate_hex(log.get("data"), 66, "transfer data"), 16)
+        log_index = _hex_int(log.get("logIndex"))
         if amount_raw > matched_raw:
             matched_raw = amount_raw
             matched_from = transfer_from
+            matched_index = log_index
 
     if matched_raw < expected_raw:
         raise PaymentVerificationError("no qualifying USDT transfer to treasury")
@@ -217,7 +237,13 @@ def verify_payment(
             f"insufficient confirmations: {confirmations}/{config.min_confirmations}"
         )
 
-    amount = Decimal(matched_raw) / (Decimal(10) ** decimals)
+    canonical = raw_rpc("eth_getBlockByNumber", [hex(block_number), False])
+    if (not isinstance(canonical, dict)
+            or _tx_hash(canonical.get("hash")) != block_hash
+            or _hex_int(canonical.get("number")) != block_number):
+        raise PaymentVerificationError("receipt block is no longer canonical")
+    digits = str(matched_raw).zfill(decimals + 1)
+    amount = (digits[:-decimals] + "." + digits[-decimals:]).rstrip("0").rstrip(".") if decimals else digits
     return PaymentEvidence(
         verified=True,
         transaction_hash=tx_hash,
@@ -227,8 +253,10 @@ def verify_payment(
         sender_address=matched_from or sender,
         token_decimals=decimals,
         amount_raw=matched_raw,
-        amount_token=format(amount, "f"),
+        amount_token=amount,
         block_number=block_number,
         confirmations=confirmations,
         reason="verified_bsc_usdt_transfer",
+        block_hash=block_hash,
+        log_index=matched_index,
     )

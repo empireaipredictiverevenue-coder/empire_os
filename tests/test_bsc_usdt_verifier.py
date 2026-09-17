@@ -17,6 +17,7 @@ PAYER = "0x3333333333333333333333333333333333333333"
 OTHER = "0x5555555555555555555555555555555555555555"
 TX = "0x" + "44" * 32
 OTHER_TX = "0x" + "66" * 32
+BLOCK_HASH = "0x" + "77" * 32
 
 
 def topic(address: str) -> str:
@@ -40,19 +41,29 @@ def mock_rpc(
     logs = [{
         "address": token,
         "topics": [TRANSFER_TOPIC, topic(sender), topic(recipient)],
-        "data": hex(amount_raw),
+        "data": "0x" + format(amount_raw, "064x"),
+        "removed": False,
+        "transactionHash": TX,
+        "blockHash": BLOCK_HASH,
+        "blockNumber": hex(block),
+        "logIndex": "0x0",
     }]
     responses = {
         "eth_chainId": hex(chain),
-        "eth_getTransactionByHash": {"hash": tx_hash, "from": sender},
+        "eth_getTransactionByHash": {
+            "hash": tx_hash, "from": sender,
+            "blockHash": BLOCK_HASH, "blockNumber": hex(block),
+        },
         "eth_getTransactionReceipt": {
             "transactionHash": receipt_hash,
+            "blockHash": BLOCK_HASH,
             "status": hex(status),
             "blockNumber": hex(block),
             "logs": logs if logs_valid else None,
         },
         "eth_call": hex(18),
         "eth_blockNumber": hex(latest),
+        "eth_getBlockByNumber": {"number": hex(block), "hash": BLOCK_HASH},
     }
     return lambda method, params: responses[method]
 
@@ -152,3 +163,68 @@ def test_direct_config_cannot_override_chain_or_token():
     bad_token = BscUsdtConfig("unused", TREASURY, WRONG_TOKEN)
     with pytest.raises(PaymentVerificationError, match="canonical BSC USDT"):
         verify_payment(bad_token, TX, "100", rpc_call=mock_rpc())
+
+
+@pytest.mark.parametrize("field,value", [
+    ("removed", True),
+    ("removed", None),
+    ("blockHash", OTHER_TX),
+    ("transactionHash", OTHER_TX),
+    ("blockNumber", "0x65"),
+    ("data", "0x1"),
+    ("topics", [TRANSFER_TOPIC, topic(PAYER), topic(TREASURY), TX]),
+])
+def test_rejects_invalid_transfer_log(field, value):
+    base = mock_rpc()
+    def rpc(method, params):
+        result = base(method, params)
+        if method == "eth_getTransactionReceipt":
+            result["logs"][0][field] = value
+        return result
+    with pytest.raises(PaymentVerificationError):
+        verify_payment(config(), TX, "100", rpc_call=rpc)
+
+
+@pytest.mark.parametrize("canonical", [
+    None,
+    {"number": "0x64", "hash": OTHER_TX},
+    {"number": "0x65", "hash": BLOCK_HASH},
+])
+def test_rejects_orphaned_or_missing_block(canonical):
+    base = mock_rpc()
+    def rpc(method, params):
+        if method == "eth_getBlockByNumber":
+            return canonical
+        return base(method, params)
+    with pytest.raises(PaymentVerificationError, match="canonical"):
+        verify_payment(config(), TX, "100", rpc_call=rpc)
+
+
+def test_amount_checks_do_not_round_large_values():
+    expected = "123456789012345678901234567890.000000000000000001"
+    raw = 123456789012345678901234567890000000000000000001
+    with pytest.raises(PaymentVerificationError, match="no qualifying"):
+        verify_payment(config(), TX, expected, rpc_call=mock_rpc(amount_raw=raw-1))
+    evidence = verify_payment(config(), TX, expected, rpc_call=mock_rpc(amount_raw=raw))
+    assert evidence.amount_token == expected
+    assert evidence.block_hash == BLOCK_HASH
+    assert evidence.log_index == 0
+
+
+@pytest.mark.parametrize("bad_hash", [
+    "0x+" + "1" * 63, "0x" + "1_" * 32, "0x " + "1" * 63,
+])
+def test_rejects_non_hex_characters(bad_hash):
+    with pytest.raises(PaymentVerificationError, match="invalid transaction hash"):
+        verify_payment(config(), bad_hash, "100", rpc_call=mock_rpc())
+
+
+def test_rejects_nonzero_topic_padding():
+    base = mock_rpc()
+    def rpc(method, params):
+        result = base(method, params)
+        if method == "eth_getTransactionReceipt":
+            result["logs"][0]["topics"][2] = "0x" + "1" * 24 + TREASURY[2:]
+        return result
+    with pytest.raises(PaymentVerificationError, match="padding"):
+        verify_payment(config(), TX, "100", rpc_call=rpc)
