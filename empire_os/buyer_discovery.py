@@ -29,6 +29,11 @@ NON_PERSON_NAME_TERMS = {
     "membership", "pricing", "price", "guide", "award", "awards", "multiple",
     "services", "service", "contact", "team", "company", "solutions", "quote",
     "estimate", "schedule", "booking", "maintenance", "support", "office",
+    "owner", "founder", "president", "principal", "manager", "director", "ceo",
+    "lorem", "ipsum", "himself", "herself", "itself", "who", "what", "when",
+    "where", "why", "how", "was", "were", "is", "are", "does", "did", "not",
+    "after", "before", "through", "each", "very", "exceptional", "needed", "came",
+    "ship", "club", "engineer",
 }
 
 
@@ -67,10 +72,20 @@ def looks_like_person_name(value: Any) -> bool:
     words = [w.strip(".,()[]{}") for w in name.split() if w.strip(".,()[]{}") ]
     if not 2 <= len(words) <= 5:
         return False
-    lowered = {w.lower() for w in words}
+    lowered = {w.lower().strip("'\"-") for w in words}
     if lowered & NON_PERSON_NAME_TERMS:
         return False
-    return all(any(ch.isalpha() for ch in word) for word in words)
+    for word in words:
+        cleaned = word.replace("'", "").replace("-", "").replace(".", "")
+        if not cleaned.isalpha():
+            return False
+        if len(cleaned) == 1:
+            if not cleaned.isupper():
+                return False
+            continue
+        if not word[0].isupper():
+            return False
+    return True
 
 
 def _uuid_or_none(value: Any) -> str | None:

@@ -1,6 +1,7 @@
 from empire_os.buyer_discovery import (
     build_candidate,
     classify_decision_role,
+    looks_like_person_name,
     enrich_candidate,
     rank_site_people,
     select_candidates,
@@ -154,3 +155,18 @@ def test_scraped_page_labels_cannot_become_decision_makers():
         assert candidate.decision_role == "unknown"
         assert candidate.evidence["raw_contact_name_present"] is True
         assert candidate.evidence["contact_personhood_valid"] is False
+
+
+def test_personhood_guard_rejects_live_scrape_fragments():
+    bad = [
+        "Lorem Ipsum", "himself came", "ship Jonathan", "engineer who",
+        "Owner Nathan", "was exceptional", "does not", "who needed",
+        "ial Club", "through each", "After graduating", "was very",
+    ]
+    for value in bad:
+        assert looks_like_person_name(value) is False, value
+    good = ["Frank Stilley", "Christina Doe", "Ronald Moss", "Eric Aultz",
+            "Sam Shukuri", "Clay Winter", "Mason Hoover", "Peter Reed",
+            "Mary-Jane O'Connor", "J. R. Smith"]
+    for value in good:
+        assert looks_like_person_name(value) is True, value
