@@ -99,6 +99,29 @@ Phase 3F deliverables:
 - OBSERVE-first bounded revenue-recognition worker + systemd timer. ✅ local/tested
 - Production migration/runtime credential activation and live evidence observation remain gated.
 
+### Empire Coder — Developer Intelligence Layer (HIGH PRIORITY PARALLEL FOUNDATION)
+Empire Coder is the governed internal engineering system for building, debugging, testing, improving and maintaining EmpireOS itself.
+
+Foundation status — local/tested, production activation gated:
+- OBSERVE-first capability profile and protected-path/secret-file enforcement.
+- Targeted repository intelligence with Blueprint-aware context windows.
+- Durable task/plan/checkpoint/proposal state plus versioned compact recovery context for long-running engineering jobs.
+- Mandatory best-of-N rule: at least two model candidates -> comparative critique -> synthesized final; first output is never actionable.
+- The same best-of-N rule governs proposed next commands before command-policy evaluation.
+- Knowledge Garden with canonical precedence, ACTIVE/REVIEW/QUARANTINED states, duplicate/stale guidance detection and active-only default retrieval.
+- Provider-agnostic model router with local Ollama support.
+- Local qwen3-coder:30b installed and benchmarked on the EmpireOS host.
+- Read-before-write patching, atomic writes and rollback checkpoints.
+- Python AST-aware symbol patching plus dependency/reverse-dependency and impacted-test selection.
+- Restricted subprocess runner with filtered environment, timeouts and secret-output scrubbing.
+- Specialist Architect/Backend/Frontend/QA/Security/Reviewer role definitions with writer/verifier separation.
+- Independent verifier with security, diff and test checks.
+- Controlled self-build scope that cannot silently widen authority.
+- Staged canonical coder_* Supabase schema with a dedicated least-privilege engineering-state role.
+- Staged localhost-only Ollama systemd packaging; not installed/enabled automatically.
+
+Candidate engineering changes stop at human approval. Commit/push/merge/deploy, production DB changes, service control, outbound, payment/funds and production credentials remain gated.
+
 ### Phase 4 — Astra Operating Layer
 Astra becomes the top coordinator for business priorities, agent routing, bottleneck detection, expected-value decisions, resource allocation, cost control and approval policies. Premium AI is used only when expected value justifies the cost.
 
