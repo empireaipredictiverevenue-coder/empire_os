@@ -3618,11 +3618,11 @@ def agi_closer_state():
 
 @app.post("/v1/agi/closer/tick")
 def agi_closer_tick():
-    """Run one AGI Closer observe-reason-act cycle."""
-    global agi_closer
-    if not agi_closer:
-        raise HTTPException(503, "agi-closer not initialized")
-    return agi_closer.tick()
+    """Legacy closer execution is retired in favor of the governed closer."""
+    raise HTTPException(
+        410,
+        "legacy_agi_closer_execution_retired_use_canonical_supabase_closer",
+    )
 
 
 def has_active_sku(tenant: str, sku: str) -> bool:
@@ -3638,44 +3638,11 @@ def has_active_sku(tenant: str, sku: str) -> bool:
 
 @app.post("/v1/ai-closer/close")
 def ai_closer_close(req: dict):
-    """B2B: buyer with active sku_ai_closer runs a close sequence on a lead.
-    Rule-based (LLM down) — sends a claim/settlement nudge via Resend."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "ai_closer"):
-        raise HTTPException(402, "no active ai_closer subscription")
-    lead_email = req.get("lead_email", "")
-    niche = req.get("niche", "your service")
-    if not lead_email:
-        raise HTTPException(400, "lead_email required")
-    # rule-based close nudge (LLM disabled)
-    subject = f"Your {niche} quote is ready — confirm to lock pricing"
-    body = (f"Hi,\n\nFollowing up on your {niche} enquiry. "
-             f"Your tailored quote is ready. Reply CONFIRM to lock "
-             f"pricing and schedule your consultation.\n\n"
-             f"— Empire AI Closer (automated, USDC-settled)")
-    try:
-        import requests as _r
-        _s = _r.Session(); _s.trust_env = False
-        resp = _s.post(f"{HUB}/v1/outreach/send",
-                       json={"to": lead_email, "subject": subject,
-                             "body": body, "source": "ai_closer_b2b",
-                             "tenant": tenant}, timeout=12)
-        sent = resp.status_code == 200
-    except Exception:
-        sent = False
-    try:
-        with open("/root/feedback/b2b_ai_closer.jsonl", "a") as f:
-            f.write(json.dumps({
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "tenant": tenant, "lead_email": lead_email,
-                "niche": niche, "sent": sent,
-            }) + "\n")
-    except Exception:
-        pass
-    return {"ok": True, "closed_via": "rule-based", "sent": sent,
-            "note": "lead nudged to claimed; LLM reasoning resumes ~2026-07-23"}
+    """Retired direct-send closer path; canonical governed flow is required."""
+    raise HTTPException(
+        410,
+        "legacy_ai_closer_close_retired_use_canonical_closer_and_outbound",
+    )
 
 
 @app.post("/v1/satellite/idle-watch/report")
@@ -4424,92 +4391,11 @@ class PriceAndSettleRequest(BaseModel):
 
 @app.post("/v1/funnel/price-and-settle")
 def price_and_settle(req: PriceAndSettleRequest):
-    """LLM-price a deal, split the fee, and (optionally) settle.
-
-    Used by the auto-pilot and AGI Closer. Reads the prospect's details
-    from the funnel, asks the LLM for a realistic deal amount, computes
-    the fee split, transitions claimed → settled, returns the full record.
-    """
-    from empire_os.funnel import transition, get_state, FunnelState
-    if not backend:
-        raise HTTPException(503, "Engine not initialized")
-    if not fee_agent:
-        raise HTTPException(503, "Fee agent not initialized")
-
-    state = get_state(backend, req.prospect_id)
-    if not state:
-        raise HTTPException(404, f"Prospect {req.prospect_id} not found")
-    if state.current_state != FunnelState.CLAIMED.value:
-        raise HTTPException(400, f"Prospect must be in claimed state, "
-                                f"got {state.current_state}")
-
-    # Get all event notes to give the LLM context for pricing
-    ev_rows = backend.execute(
-        "SELECT notes FROM si_funnel_event WHERE prospect_id=? "
-        "ORDER BY id ASC", (req.prospect_id,),
-    ).fetchall()
-    notes = " ".join((r["notes"] or "") for r in ev_rows)
-    niche = req.niche
-    for n in ["roofing", "hvac", "solar", "plumbing", "electrical", "mass_tort"]:
-        if n in notes.lower():
-            niche = n
-            break
-
-    # Ask LLM for price
-    from empire_os.agent_core import OllamaClient
-    llm = OllamaClient()
-    prompt = (
-        f"You are a sales estimator for a B2B home-services company.\n"
-        f"Niche: {niche or 'general'}\n"
-        f"Deal details: {notes[:400]}\n"
-        f"Estimate the realistic contract value in USD for closing this deal.\n"
-        f"Respond with ONLY a single integer dollar amount, no other text."
+    """Retired LLM-priced settlement path; verified canonical terms are required."""
+    raise HTTPException(
+        410,
+        "legacy_price_and_settle_retired_use_verified_bsc_usdt_commercial_flow",
     )
-    import re
-    try:
-        amount_dollars = 1500  # default
-        raw = llm.chat(
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
-        match = re.search(r"\d[\d,]*", raw.replace(",", ""))
-        if match:
-            amount_dollars = max(500, min(int(match.group(0)), 20000))
-    except Exception as e:
-        logger.warning("LLM price failed for %s: %s — using $1500 default",
-                       req.prospect_id, e)
-        amount_dollars = 1500
-
-    amount_cents = amount_dollars * 100
-    split = fee_agent.calculate(amount_cents)
-
-    result = {
-        "ok": True,
-        "prospect_id": req.prospect_id,
-        "niche": niche,
-        "amount_cents": amount_cents,
-        "fee_bps": split["fee_bps"],
-        "fee_cents": split["fee_cents"],
-        "client_cents": split["client_cents"],
-    }
-
-    if req.settle:
-        notes_text = (
-            f"settled ${amount_cents/100:.2f} "
-            f"(llm-priced, fee ${split['fee_cents']/100:.2f}, "
-            f"client ${split['client_cents']/100:.2f})"
-        )
-        eid = transition(
-            backend, req.prospect_id, FunnelState.SETTLED.value,
-            "agi-closer", notes=notes_text,
-        )
-        # Record fee
-        fee_agent.record(str(eid), amount_cents)
-        # Create payout
-        if payout_engine:
-            payout_engine.payout(str(eid), req.prospect_id, split["client_cents"])
-        result["event_id"] = eid
-    return result
 
 
 # --- Payouts ---
