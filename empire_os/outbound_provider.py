@@ -107,6 +107,59 @@ def verify_resend_inbound(raw_body: str, headers: dict[str, Any], *, secret: str
     return event
 
 
+def _resend_tag(tags: Any, name: str) -> str:
+    if isinstance(tags, dict):
+        return str(tags.get(name) or "").strip()
+    if isinstance(tags, list):
+        for item in tags:
+            if isinstance(item, dict) and str(item.get("name") or "") == name:
+                return str(item.get("value") or "").strip()
+    return ""
+
+
+def extract_resend_provider_event(event: dict[str, Any]) -> dict[str, Any] | None:
+    event_map = {
+        "email.delivered": "delivered",
+        "email.delivery_delayed": "delivery_delayed",
+        "email.bounced": "bounced",
+        "email.complained": "complained",
+        "email.opened": "opened",
+        "email.clicked": "clicked",
+        "email.failed": "failed",
+        "email.suppressed": "suppressed",
+    }
+    event_type = event_map.get(str(event.get("type") or ""))
+    if not event_type:
+        return None
+    data = event.get("data")
+    if not isinstance(data, dict):
+        raise OutboundProviderError("verified provider event missing data")
+    message_id = str(data.get("email_id") or "").strip()
+    if not message_id:
+        raise OutboundProviderError("verified provider event missing email_id")
+    recipients = data.get("to")
+    if isinstance(recipients, str):
+        recipients = [recipients]
+    if not isinstance(recipients, list) or len(recipients) != 1:
+        raise OutboundProviderError("provider event requires one recipient")
+    recipient = _email(recipients[0])
+    intent_id = _intent_uuid(_resend_tag(data.get("tags"), "intent_id"))
+    suppress = event_type in {"complained", "suppressed"}
+    if event_type == "bounced":
+        bounce = data.get("bounce") if isinstance(data.get("bounce"), dict) else {}
+        bounce_type = str(bounce.get("type") or "").strip().lower()
+        bounce_subtype = str(bounce.get("subType") or "").strip().lower()
+        suppress = bounce_type in {"permanent", "hard"} or bounce_subtype == "suppressed"
+    return {
+        "intent_id": intent_id,
+        "event_type": event_type,
+        "provider_message_id": message_id,
+        "recipient": recipient,
+        "suppress": suppress,
+        "payload": data,
+    }
+
+
 def extract_resend_reply(event: dict[str, Any], *, fetch_email: Callable[[str], Any],
                          reply_to: str | None = None) -> dict[str, Any] | None:
     if event.get("type") != "email.received":

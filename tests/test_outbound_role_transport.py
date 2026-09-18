@@ -29,12 +29,18 @@ class Factory:
         return FakeConnection(self.cursor)
 
 
-def test_sender_role_can_claim_and_record_delivery_only():
+def test_sender_role_can_review_context_claim_and_record_but_not_approve():
     factory = Factory({"decision":"authorized_send","actual_revenue":False})
     rpc = PostgresOutboundRpc("postgresql://secret", "empire_outbound_sender", connect_factory=factory)
     result = rpc("claim_outbound_send", {"p_intent_id":"00000000-0000-0000-0000-000000000001","p_actor":"sender"})
     assert result["decision"] == "authorized_send"
     assert factory.cursor.calls[0] == ("SET LOCAL ROLE empire_outbound_sender", None)
+    rpc("get_outbound_governor_context", {
+        "p_intent_id":"00000000-0000-0000-0000-000000000001"
+    })
+    assert "get_outbound_governor_context" in factory.cursor.calls[-1][0]
+    rpc("list_outbound_governor_work", {"p_limit":25})
+    assert "list_outbound_governor_work" in factory.cursor.calls[-1][0]
     with pytest.raises(OutboundProviderError, match="not allowed"):
         rpc("approve_outbound_intent", {})
 
@@ -49,6 +55,16 @@ def test_reply_ingest_serializes_metadata_and_cannot_send():
         "p_received_at":"2026-09-17T18:00:00Z", "p_metadata":{"provider":"resend"},
     })
     values = factory.cursor.calls[1][1]
+    assert json.loads(values[-1]) == {"provider":"resend"}
+    rpc("record_outbound_provider_event", {
+        "p_intent_id":"00000000-0000-0000-0000-000000000001",
+        "p_event_type":"delivered",
+        "p_provider_message_id":"em_1",
+        "p_recipient":"buyer@example.com",
+        "p_suppress":False,
+        "p_payload":{"provider":"resend"},
+    })
+    values = factory.cursor.calls[-1][1]
     assert json.loads(values[-1]) == {"provider":"resend"}
     with pytest.raises(OutboundProviderError, match="not allowed"):
         rpc("claim_outbound_send", {})

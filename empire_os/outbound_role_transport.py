@@ -25,6 +25,14 @@ ROLE_FUNCTIONS = {
             "select public.get_outbound_intent_review(%s)",
             ("p_intent_id",),
         ),
+        "get_outbound_governor_context": (
+            "select public.get_outbound_governor_context(%s)",
+            ("p_intent_id",),
+        ),
+        "list_outbound_governor_work": (
+            "select public.list_outbound_governor_work(%s)",
+            ("p_limit",),
+        ),
         "claim_outbound_send": (
             "select public.claim_outbound_send(%s,%s)",
             ("p_intent_id", "p_actor"),
@@ -42,6 +50,13 @@ ROLE_FUNCTIONS = {
         "classify_outbound_reply": (
             "select public.classify_outbound_reply(%s,%s,%s,%s)",
             ("p_reply_id", "p_classification", "p_confidence", "p_actor"),
+        ),
+        "record_outbound_provider_event": (
+            "select public.record_outbound_provider_event(%s,%s,%s,%s,%s,%s::jsonb)",
+            (
+                "p_intent_id", "p_event_type", "p_provider_message_id",
+                "p_recipient", "p_suppress", "p_payload",
+            ),
         ),
     },
 }

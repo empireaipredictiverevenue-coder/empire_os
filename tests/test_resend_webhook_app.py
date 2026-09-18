@@ -33,12 +33,37 @@ def fetched(to=None):
     }
 
 
+def provider_event(event_type="email.delivered", *, permanent_bounce=False):
+    data = {
+        "email_id": "em_1",
+        "from": "Phil <phil@mail.empire-ai.co.uk>",
+        "to": ["buyer@example.com"],
+        "subject": "Quick question",
+        "tags": {"intent_id": INTENT},
+        "created_at": "2026-09-18T12:00:00Z",
+    }
+    if event_type == "email.bounced":
+        data["bounce"] = {
+            "type": "Permanent" if permanent_bounce else "Temporary",
+            "subType": "General",
+        }
+    return {"type": event_type, "data": data}
+
+
 def test_valid_signed_reply_ingests_only_inert_reply_record():
     calls = []
     def verify(_): return event()
     def rpc(name, params):
         calls.append((name, params))
-        return {"decision": "recorded"}
+        if name == "ingest_outbound_reply":
+            return {"decision": "recorded", "reply_id": "00000000-0000-0000-0000-000000000099"}
+        if name == "classify_outbound_reply":
+            return {
+                "decision": "classified",
+                "classification": params["p_classification"],
+                "suppressed": False,
+            }
+        raise AssertionError(name)
     app = create_app(
         verify_webhook=verify, fetch_email=lambda _: fetched(), reply_rpc=rpc,
         webhook_secret="whsec_test", reply_to="replies@empire-ai.co.uk",
@@ -51,6 +76,9 @@ def test_valid_signed_reply_ingests_only_inert_reply_record():
     assert params["p_intent_id"] == INTENT
     assert params["p_metadata"]["untrusted_content"] is True
     assert params["p_body_text"] == "Interested, tell me more."
+    assert calls[1][0] == "classify_outbound_reply"
+    assert calls[1][1]["p_classification"] == "positive"
+    assert r.json()["classification_auto_applied"] is True
 
 
 def test_bad_signature_is_400_and_unmatched_alias_is_ignored():
@@ -74,7 +102,7 @@ def test_bad_signature_is_400_and_unmatched_alias_is_ignored():
     assert calls == []
 
 
-def test_database_failure_is_retryable_and_non_received_event_is_ignored():
+def test_database_failure_is_retryable_and_non_actionable_event_is_ignored():
     failed = create_app(
         verify_webhook=lambda _: event(), fetch_email=lambda _: fetched(),
         reply_rpc=lambda *_: (_ for _ in ()).throw(RuntimeError("db down")),
@@ -84,7 +112,7 @@ def test_database_failure_is_retryable_and_non_received_event_is_ignored():
     assert r.status_code == 503
 
     ignored = create_app(
-        verify_webhook=lambda _: event("email.delivered"),
+        verify_webhook=lambda _: event("email.sent"),
         fetch_email=lambda _: (_ for _ in ()).throw(AssertionError("must not fetch")),
         reply_rpc=lambda *_: (_ for _ in ()).throw(AssertionError("must not write")),
         webhook_secret="whsec_test", reply_to="replies@empire-ai.co.uk",
@@ -92,3 +120,60 @@ def test_database_failure_is_retryable_and_non_received_event_is_ignored():
     r = TestClient(ignored).post("/webhooks/resend-inbound", content="{}", headers=HEADERS)
     assert r.status_code == 200
     assert r.json()["ignored"] is True
+
+
+def test_provider_delivery_event_records_without_fetching_email():
+    calls = []
+
+    def rpc(name, params):
+        calls.append((name, params))
+        assert name == "record_outbound_provider_event"
+        return {
+            "decision": "recorded_provider_event",
+            "event_type": params["p_event_type"],
+            "suppressed": False,
+        }
+
+    app = create_app(
+        verify_webhook=lambda _: provider_event("email.delivered"),
+        fetch_email=lambda _: (_ for _ in ()).throw(AssertionError("must not fetch")),
+        reply_rpc=rpc,
+        webhook_secret="whsec_test",
+        reply_to="replies@empire-ai.co.uk",
+    )
+    r = TestClient(app).post(
+        "/webhooks/resend-inbound", content="{}", headers=HEADERS
+    )
+    assert r.status_code == 200
+    assert r.json()["event_type"] == "delivered"
+    assert calls[0][1]["p_intent_id"] == INTENT
+    assert calls[0][1]["p_recipient"] == "buyer@example.com"
+
+
+def test_permanent_bounce_requests_suppression():
+    seen = {}
+
+    def rpc(name, params):
+        seen.update(params)
+        return {
+            "decision": "recorded_provider_event",
+            "event_type": "bounced",
+            "suppressed": True,
+        }
+
+    app = create_app(
+        verify_webhook=lambda _: provider_event(
+            "email.bounced", permanent_bounce=True
+        ),
+        fetch_email=lambda _: (_ for _ in ()).throw(AssertionError("must not fetch")),
+        reply_rpc=rpc,
+        webhook_secret="whsec_test",
+        reply_to="replies@empire-ai.co.uk",
+    )
+    r = TestClient(app).post(
+        "/webhooks/resend-inbound", content="{}", headers=HEADERS
+    )
+    assert r.status_code == 200
+    assert seen["p_event_type"] == "bounced"
+    assert seen["p_suppress"] is True
+    assert r.json()["suppressed"] is True

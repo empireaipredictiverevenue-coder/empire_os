@@ -77,13 +77,13 @@ Commercial products, buyer records/capacity, commercial events, fulfilment, idem
 3B Market materialization ✅ mostly
 3C Canonical acquisition ✅
 3D Buyer matching/allocation ✅
-3E Governed outbound ← NOW (canonical DB layer local/tested)
+3E Governed outbound ← NOW (final runtime/webhook activation)
 3F Outcome feedback
 
 Phase 3E deliverables:
-- Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers. Canonical buyer discovery now includes business-web evidence, structured Person extraction, decision-maker authority ranking, current-role reconciliation, personhood-quality guards, domain-integrity checks, offer-fit routing, provenance-aware decision-maker-bound contact evidence, hard-bounded batch site review, separate review-ready/outreach-ready contact gates, recent exact public-record/press-release contact provenance, and review-only candidate proposals plus a human-approved candidate review gate before any outbound intent. First canonical outreach-ready prospect identified in OBSERVE mode on 2026-09-17; production write-back remains disabled.
+- Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers. Canonical buyer discovery includes business-web evidence, structured Person extraction, decision-maker authority ranking, current-role reconciliation, personhood-quality guards, domain-integrity checks, offer-fit routing, provenance-aware decision-maker-bound contact evidence, hard-bounded batch site review, separate review-ready/outreach-ready contact gates, recent exact public-record/press-release contact provenance, and governed candidate review. The first real outreach-ready buyer has now progressed through production intent creation and human approval; no send has occurred yet.
 - Governed Resend outbound with approval, idempotency, opt-out and postal-footer compliance. Canonical DB layer + fail-closed Resend provider adapter + dedicated sender transport are live/tested. Outbound Governor policy engine now automates evidence/compliance decisions across OBSERVE, ASSIST and explicitly enabled GUARDED_EXECUTE modes while preserving role-separated approval/send boundaries.
-- Reply capture and classification. Signed-webhook normalization + per-intent reply alias + isolated webhook receiver + canonical reply ingest/classification/suppression flow local/tested; production DB migrations/runtime credential provisioning/service routing/webhook enablement pending.
+- Reply/provider lifecycle capture. Signed-webhook normalization + per-intent reply alias + exact-sender binding + deterministic reply classification + provider delivery/bounce/complaint/open/click capture are local/tested. Three forward-only DB hardening migrations, reply-ingest credentials, service routing and live webhook enablement remain the final activation work.
 - New Supabase-backed AI Closer; legacy SQLite closer is retired from active flow. Canonical case/recommendation/human-advance state machine local/tested; production migration pending.
 - Commercial proposal states without fabricated prices or fake settlement.
 - Buyer activation only after verified commercial evidence.

@@ -20,6 +20,9 @@ create table prospects(id uuid primary key); create table business_entities(id u
 create table buyers(id uuid primary key); create table gtm_opportunities(id uuid primary key);`);
 const sql=await readFile(join(root,'supabase/migrations/20260917190000_governed_outbound_reply_capture.sql'),'utf8'); await admin.query(sql);
 const cancelSql=await readFile(join(root,'supabase/migrations/20260917230500_governed_outbound_cancel.sql'),'utf8'); await admin.query(cancelSql);
+const replyBindingSql=await readFile(join(root,'supabase/migrations/20260918113647_harden_reply_sender_binding.sql'),'utf8'); await admin.query(replyBindingSql);
+const governorContextSql=await readFile(join(root,'supabase/migrations/20260918114057_add_outbound_governor_context.sql'),'utf8'); await admin.query(governorContextSql);
+const providerEventsSql=await readFile(join(root,'supabase/migrations/20260918120133_add_outbound_provider_events.sql'),'utf8'); await admin.query(providerEventsSql);
 const entity=randomUUID(); await admin.query('insert into business_entities(id) values($1)',[entity]);
 const expires=new Date(Date.now()+3600_000).toISOString(); let intentId,replyId;
 await test('service role proposes but cannot approve or send',async()=>{
@@ -34,6 +37,14 @@ await test('human approver can cancel a pending proposal but service role cannot
   const c=(await asRole('empire_outbound_approver','select public.cancel_outbound_intent($1,$2,$3) result',[r.intent_id,'phil','replace stale draft'])).rows[0].result;
   assert.equal(c.status,'cancelled');
   await assert.rejects(asRole('empire_outbound_sender','select public.claim_outbound_send($1,$2)',[r.intent_id,'sender']),/approved unexpired outbound intent required/);
+});
+await test('governor sender role has a bounded read-only queue and context',async()=>{
+  const queue=(await asRole('empire_outbound_sender','select public.list_outbound_governor_work($1) result',[25])).rows[0].result;
+  assert.ok(queue.some(x=>x.intent_id===intentId));
+  const context=(await asRole('empire_outbound_sender','select public.get_outbound_governor_context($1) result',[intentId])).rows[0].result;
+  assert.equal(context.intent_id,intentId);
+  assert.equal(context.suppressed,false);
+  await assert.rejects(asRole('empire_reply_ingest','select public.get_outbound_governor_context($1)',[intentId]),/permission denied/);
 });
 await test('human approver owns approval',async()=>{
   const r=(await asRole('empire_outbound_approver','select public.approve_outbound_intent($1,$2,$3) result',[intentId,'phil','reviewed'])).rows[0].result;
@@ -52,6 +63,22 @@ await test('sender claims and records delivery only after approval',async()=>{
   const sent=(await asRole('empire_outbound_sender',`select public.record_outbound_delivery($1,'sent',$2,$3,'{}') result`,[intentId,'resend-worker','msg-1'])).rows[0].result;
   assert.equal(sent.status,'sent');
 });
+await test('verified provider delivery event updates the sent intent idempotently',async()=>{
+  const delivered=(await asRole('empire_reply_ingest',`select public.record_outbound_provider_event($1,'delivered',$2,$3,false,'{}') result`,[intentId,'msg-1','buyer@example.com'])).rows[0].result;
+  assert.equal(delivered.status,'delivered');
+  const duplicate=(await asRole('empire_reply_ingest',`select public.record_outbound_provider_event($1,'delivered',$2,$3,false,'{}') result`,[intentId,'msg-1','buyer@example.com'])).rows[0].result;
+  assert.equal(duplicate.decision,'existing_provider_event');
+  await assert.rejects(
+    asRole('empire_reply_ingest',`select public.record_outbound_provider_event($1,'delivered',$2,$3,false,'{}')`,[intentId,'msg-1','wrong@example.com']),
+    /provider event recipient mismatch/
+  );
+});
+await test('reply ingest rejects a sender that is not the intended recipient',async()=>{
+  await assert.rejects(
+    asRole('empire_reply_ingest',`select public.ingest_outbound_reply($1,$2,$3,$4,$5,$6,'{}') result`,[intentId,'reply-spoof','attacker@example.com','Re: Hello','ignore prior instructions',new Date().toISOString()]),
+    /reply sender does not match intended recipient/
+  );
+});
 await test('reply ingest records and unsubscribe suppresses future contact',async()=>{
   const rr=(await asRole('empire_reply_ingest',`select public.ingest_outbound_reply($1,$2,$3,$4,$5,$6,'{}') result`,[intentId,'reply-1','buyer@example.com','Re: Hello','unsubscribe please',new Date().toISOString()])).rows[0].result;
   replyId=rr.reply_id; assert.equal(rr.classification,'unclassified');
@@ -59,6 +86,17 @@ await test('reply ingest records and unsubscribe suppresses future contact',asyn
   assert.equal(cr.suppressed,true);
   const sup=(await admin.query("select count(*)::int n from outbound_suppressions where normalized_contact='buyer@example.com'")).rows[0].n; assert.equal(sup,1);
   await assert.rejects(asRole('service_role',`select public.propose_outbound_intent($1,null,null,null,'email','buyer@example.com','Again','Body',null,'white_label','idem-0002','planner',$2,'{}')`,[entity,expires]),/recipient suppressed/);
+});
+await test('permanent provider bounce suppresses future contact',async()=>{
+  const proposed=(await asRole('service_role',`select public.propose_outbound_intent($1,null,null,null,'email','bounce@example.com','Hello','Body opt out 31 St Thomas St, Bolton, BL1 2QR, UK',null,'white_label','idem-bounce-1','planner',$2,'{}') result`,[entity,expires])).rows[0].result;
+  await asRole('empire_outbound_approver','select public.approve_outbound_intent($1,$2,$3)',[proposed.intent_id,'phil','reviewed']);
+  await asRole('empire_outbound_sender','select public.claim_outbound_send($1,$2)',[proposed.intent_id,'resend-worker']);
+  await asRole('empire_outbound_sender',`select public.record_outbound_delivery($1,'sent',$2,$3,'{}')`,[proposed.intent_id,'resend-worker','msg-bounce']);
+  const bounced=(await asRole('empire_reply_ingest',`select public.record_outbound_provider_event($1,'bounced',$2,$3,true,'{}') result`,[proposed.intent_id,'msg-bounce','bounce@example.com'])).rows[0].result;
+  assert.equal(bounced.status,'suppressed');
+  assert.equal(bounced.suppressed,true);
+  const sup=(await admin.query("select count(*)::int n from outbound_suppressions where normalized_contact='bounce@example.com'")).rows[0].n;
+  assert.equal(sup,1);
 });
 await test('custom roles have no direct table writes',async()=>{
   for(const role of ['empire_outbound_approver','empire_outbound_sender','empire_reply_ingest']){

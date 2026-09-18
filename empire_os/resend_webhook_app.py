@@ -14,10 +14,12 @@ from fastapi.responses import JSONResponse
 
 from empire_os.outbound_provider import (
     OutboundProviderError,
+    extract_resend_provider_event,
     extract_resend_reply,
     verify_resend_inbound,
 )
 from empire_os.outbound_role_transport import PostgresOutboundRpc
+from empire_os.reply_classifier import classify_reply_text
 
 MAX_WEBHOOK_BYTES = 1_000_000
 
@@ -43,6 +45,14 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
     reply_base = (reply_to if reply_to is not None
                   else os.getenv("EMPIRE_REPLY_TO", "")).strip()
 
+    def inbound_rpc():
+        if reply_rpc is not None:
+            return reply_rpc
+        dsn = os.getenv("EMPIRE_REPLY_INGEST_DSN", "").strip()
+        if not dsn:
+            raise OutboundProviderError("EMPIRE_REPLY_INGEST_DSN is required")
+        return PostgresOutboundRpc(dsn, "empire_reply_ingest")
+
     @app.get("/health")
     async def health():
         return {"ok": True, "mode": "OBSERVE", "provider": "resend"}
@@ -62,6 +72,30 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
             return JSONResponse({"ok": False}, status_code=400)
 
         try:
+            provider_event = extract_resend_provider_event(event)
+        except OutboundProviderError:
+            return JSONResponse({"ok": False}, status_code=400)
+
+        if provider_event is not None:
+            try:
+                result = inbound_rpc()("record_outbound_provider_event", {
+                    "p_intent_id": provider_event["intent_id"],
+                    "p_event_type": provider_event["event_type"],
+                    "p_provider_message_id": provider_event["provider_message_id"],
+                    "p_recipient": provider_event["recipient"],
+                    "p_suppress": provider_event["suppress"],
+                    "p_payload": provider_event["payload"],
+                })
+            except Exception:
+                return JSONResponse({"ok": False}, status_code=503)
+            return {
+                "ok": True,
+                "decision": result.get("decision", "recorded_provider_event"),
+                "event_type": provider_event["event_type"],
+                "suppressed": bool(result.get("suppressed", False)),
+            }
+
+        try:
             reply = extract_resend_reply(
                 event, fetch_email=fetch_email, reply_to=reply_base,
             )
@@ -70,16 +104,8 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
         if reply is None:
             return {"ok": True, "ignored": True}
 
-        rpc = reply_rpc
-        if rpc is None:
-            dsn = os.getenv("EMPIRE_REPLY_INGEST_DSN", "").strip()
-            if not dsn:
-                return JSONResponse({"ok": False}, status_code=503)
-            try:
-                rpc = PostgresOutboundRpc(dsn, "empire_reply_ingest")
-            except OutboundProviderError:
-                return JSONResponse({"ok": False}, status_code=503)
         try:
+            rpc = inbound_rpc()
             result = rpc("ingest_outbound_reply", {
                 "p_intent_id": reply["intent_id"],
                 "p_provider_message_id": reply["provider_message_id"],
@@ -95,7 +121,30 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
             })
         except Exception:
             return JSONResponse({"ok": False}, status_code=503)
-        return {"ok": True, "decision": result.get("decision", "recorded")}
+
+        classification = classify_reply_text(reply["body_text"], reply["subject"])
+        classified = None
+        if classification["auto_apply"]:
+            try:
+                classified = rpc("classify_outbound_reply", {
+                    "p_reply_id": result["reply_id"],
+                    "p_classification": classification["classification"],
+                    "p_confidence": classification["confidence"],
+                    "p_actor": "reply_classifier_v1",
+                })
+            except Exception:
+                return JSONResponse({"ok": False}, status_code=503)
+
+        return {
+            "ok": True,
+            "decision": result.get("decision", "recorded"),
+            "classification": (
+                classified.get("classification")
+                if isinstance(classified, dict)
+                else classification["classification"]
+            ),
+            "classification_auto_applied": bool(classified),
+        }
 
     return app
 

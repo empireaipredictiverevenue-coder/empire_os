@@ -3,6 +3,7 @@ import pytest
 from empire_os.outbound_provider import (
     OutboundProviderError,
     build_resend_send,
+    extract_resend_provider_event,
     extract_resend_reply,
     verify_resend_inbound,
 )
@@ -160,3 +161,52 @@ def test_send_payload_requires_visible_opt_out_and_postal_footer():
             authorized_claim(body_text="Hello. Reply opt out."),
             sender="Phil <phil@mail.empire-ai.co.uk>", reply_to="reply@mail.empire-ai.co.uk",
         )
+
+
+def test_extract_provider_event_uses_intent_tag_and_single_recipient():
+    event = {
+        "type": "email.delivered",
+        "data": {
+            "email_id": "em_123",
+            "to": ["Buyer@Example.com"],
+            "tags": {
+                "intent_id": "00000000-0000-0000-0000-000000000001"
+            },
+        },
+    }
+    result = extract_resend_provider_event(event)
+    assert result["event_type"] == "delivered"
+    assert result["intent_id"].endswith("0001")
+    assert result["recipient"] == "buyer@example.com"
+    assert result["suppress"] is False
+
+
+def test_extract_provider_event_only_suppresses_permanent_bounce():
+    base = {
+        "type": "email.bounced",
+        "data": {
+            "email_id": "em_123",
+            "to": ["buyer@example.com"],
+            "tags": {
+                "intent_id": "00000000-0000-0000-0000-000000000001"
+            },
+        },
+    }
+    permanent = {
+        **base,
+        "data": {**base["data"], "bounce": {"type": "Permanent"}},
+    }
+    temporary = {
+        **base,
+        "data": {**base["data"], "bounce": {"type": "Temporary"}},
+    }
+    assert extract_resend_provider_event(permanent)["suppress"] is True
+    assert extract_resend_provider_event(temporary)["suppress"] is False
+
+
+def test_extract_provider_event_rejects_missing_intent_tag():
+    with pytest.raises(OutboundProviderError, match="intent id"):
+        extract_resend_provider_event({
+            "type": "email.delivered",
+            "data": {"email_id": "em_123", "to": ["buyer@example.com"]},
+        })

@@ -1,0 +1,19 @@
+[Unit]
+Description=Empire AI Outbound Governor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=-/srv/empire_os/.env.outbound_sender
+EnvironmentFile=-/srv/empire_os/.env.outbound_governor
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/outbound_governor_worker.py --limit 25 --execute
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictSUIDSGID=true
+LockPersonality=true
