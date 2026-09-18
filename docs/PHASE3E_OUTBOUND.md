@@ -11,7 +11,17 @@ Status: local implementation tested; production activation gated.
 - Existing Resend webhooks are disabled; reply capture is not live.
 - Dedicated Phase 3E runtime LOGIN-role migration is local/tested; passwords remain unprovisioned.
 - Legacy outreach timers/services are inactive/not installed.
-- Empire execution remains OBSERVE.
+- Empire execution remains OBSERVE globally. The new Outbound Governor can evaluate OBSERVE, ASSIST, and GUARDED_EXECUTE policy modes, but mutation stays fail-closed unless that workflow is explicitly promoted.
+
+## Outbound Governor
+`empire_os/outbound_governor.py` is the deterministic policy layer for Phase 3E. It evaluates the current intent plus evidence context and returns one of: `HOLD`, `REPAIR_REQUIRED`, `AUTO_REPAIR`, `ESCALATE`, `READY_FOR_HUMAN_APPROVAL`, `AUTO_APPROVE_ELIGIBLE`, `READY_FOR_SEND_GATE`, or `AUTO_SEND_ELIGIBLE`.
+
+Modes are deliberately separated:
+- `OBSERVE`: evaluate only; no mutations.
+- `ASSIST`: deterministic repairs may be authorized, but approval/send remain gated.
+- `GUARDED_EXECUTE`: auto-approval/send can become eligible only when explicitly enabled and every hard/evidence/compliance check passes.
+
+The governor never sends email or writes commercial state itself. Existing role-separated transports remain the only mutation boundary.
 
 ## Security boundaries
 1. `service_role` may propose an outbound intent; it cannot approve or send it.
