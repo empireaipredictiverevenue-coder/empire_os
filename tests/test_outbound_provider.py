@@ -134,6 +134,21 @@ def test_send_payload_rejects_wrong_sender_or_reply_domain():
         )
 
 
+def test_send_payload_accepts_multiline_equivalent_postal_footer():
+    payload = build_resend_send(
+        authorized_claim(
+            body_text=(
+                "Hello. Reply opt out.\n\n"
+                "Empire-AI Intelligent Systems\n"
+                "31 St Thomas St\nBolton\nBL1 2QR\nUK"
+            )
+        ),
+        sender="Phil <phil@mail.empire-ai.co.uk>",
+        reply_to="reply@mail.empire-ai.co.uk",
+    )
+    assert payload["to"] == ["buyer@example.com"]
+
+
 def test_send_payload_requires_visible_opt_out_and_postal_footer():
     with pytest.raises(OutboundProviderError, match="opt-out"):
         build_resend_send(

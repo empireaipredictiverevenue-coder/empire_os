@@ -59,7 +59,9 @@ def build_resend_send(claim: dict[str, Any], *, sender: str, reply_to: str,
     if not any(token in lower_body for token in ("unsubscribe", "opt out", "opt-out")):
         raise OutboundProviderError("visible outbound opt-out required")
     footer = str(required_postal_footer or "").strip()
-    if not footer or footer.lower() not in lower_body:
+    normalized_body = re.sub(r"[^a-z0-9]+", " ", lower_body).strip()
+    normalized_footer = re.sub(r"[^a-z0-9]+", " ", footer.lower()).strip()
+    if not normalized_footer or normalized_footer not in normalized_body:
         raise OutboundProviderError("approved postal footer required")
     return {
         "from": sender,
