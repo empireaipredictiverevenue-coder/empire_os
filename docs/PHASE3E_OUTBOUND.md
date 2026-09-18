@@ -21,7 +21,7 @@ Modes are deliberately separated:
 - `ASSIST`: deterministic repairs may be authorized, but approval/send remain gated.
 - `GUARDED_EXECUTE`: auto-approval/send can become eligible only when explicitly enabled and every hard/evidence/compliance check passes.
 
-The governor never sends email or writes commercial state itself. Existing role-separated transports remain the only mutation boundary.
+The governor never sends email or writes commercial state itself. `empire_os/outbound_governor_executor.py` is the separate execution adapter: it accepts only `GUARDED_EXECUTE` decisions with explicit mutation authorization, routes approvals only through the approver transport, and routes sends only through the sender transport plus the existing fail-closed Resend provider. Existing role-separated transports remain the mutation boundary.
 
 ## Security boundaries
 1. `service_role` may propose an outbound intent; it cannot approve or send it.
