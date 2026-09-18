@@ -77,8 +77,8 @@ Commercial products, buyer records/capacity, commercial events, fulfilment, idem
 3B Market materialization ✅ mostly
 3C Canonical acquisition ✅
 3D Buyer matching/allocation ✅
-3E Governed outbound ← NOW (final runtime/webhook activation)
-3F Outcome feedback
+3E Governed outbound ✅ implementation complete; production runtime/webhook activation gated
+3F Outcome feedback ← NOW (implementation complete locally; production activation gated)
 
 Phase 3E deliverables:
 - Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers. Canonical buyer discovery includes business-web evidence, structured Person extraction, decision-maker authority ranking, current-role reconciliation, personhood-quality guards, domain-integrity checks, offer-fit routing, provenance-aware decision-maker-bound contact evidence, hard-bounded batch site review, separate review-ready/outreach-ready contact gates, recent exact public-record/press-release contact provenance, and governed candidate review. The first real outreach-ready buyer has now progressed through production intent creation and human approval; no send has occurred yet.
@@ -91,8 +91,12 @@ Phase 3E deliverables:
 - First genuine paid buyer recorded as actual revenue in Supabase.
 
 Phase 3F deliverables:
-- Delivery outcome, conversion, actual revenue, cost, gross profit and buyer satisfaction.
-- Feed actual outcomes back into Omega/revenue intelligence and Astra priorities.
+- Append-only delivery outcome, conversion and buyer-satisfaction evidence. ✅ local/tested
+- Evidence-derived actual revenue, cost and gross profit from verified BSC direct payment or released escrow only. ✅ local/tested
+- Exact approved USD price ↔ USDT settlement invariant; overpayment is not silently counted as revenue. ✅ local/tested
+- Canonical feedback projection + Python adapter for Omega/revenue intelligence and Astra priorities. ✅ local/tested
+- OBSERVE-first bounded revenue-recognition worker + systemd timer. ✅ local/tested
+- Production migration/runtime credential activation and live evidence observation remain gated.
 
 ### Phase 4 — Astra Operating Layer
 Astra becomes the top coordinator for business priorities, agent routing, bottleneck detection, expected-value decisions, resource allocation, cost control and approval policies. Premium AI is used only when expected value justifies the cost.
