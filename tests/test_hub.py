@@ -130,6 +130,29 @@ class TestAgiCloser:
         resp = client.get("/v1/agi/closer/state")
         assert resp.status_code == 200
 
+    def test_legacy_closer_tick_is_retired(self, client):
+        resp = client.post("/v1/agi/closer/tick")
+        assert resp.status_code == 410
+        assert "canonical_supabase_closer" in resp.json()["detail"]
+
+    def test_legacy_ai_closer_direct_send_is_retired(self, client):
+        resp = client.post(
+            "/v1/ai-closer/close",
+            json={"tenant": "t1", "lead_email": "buyer@example.com"},
+        )
+        assert resp.status_code == 410
+        assert "canonical_closer_and_outbound" in resp.json()["detail"]
+
+    def test_legacy_price_and_settle_is_retired_without_amount(self, client):
+        resp = client.post(
+            "/v1/funnel/price-and-settle",
+            json={"prospect_id": "p1", "settle": True},
+        )
+        assert resp.status_code == 410
+        body = resp.json()
+        assert "verified_bsc_usdt" in body["detail"]
+        assert "amount_cents" not in body
+
 
 class TestDecisions:
     def test_decisions_list(self, client):
