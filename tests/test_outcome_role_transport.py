@@ -70,3 +70,31 @@ def test_transport_rejects_bad_role_and_shape():
         PostgresOutcomeRpc("postgresql://secret", "service_role", connect_factory=Factory({}))
     with pytest.raises(OutcomeTransportError, match="DSN"):
         PostgresOutcomeRpc("", "empire_revenue_recognizer", connect_factory=Factory({}))
+
+
+def test_astra_observer_can_read_feedback_only():
+    factory = Factory([
+        {
+            "conversion_outcome": "won",
+            "actual_revenue_cents": 10000,
+        }
+    ])
+    rpc = PostgresOutcomeRpc(
+        "postgresql://secret",
+        "empire_astra_observer",
+        connect_factory=factory,
+    )
+
+    result = rpc(
+        "get_commercial_outcome_feedback",
+        {"p_limit": 100},
+    )
+
+    assert result[0]["actual_revenue_cents"] == 10000
+    assert factory.cursor.calls[0][0] == "SET LOCAL ROLE empire_astra_observer"
+    assert "get_commercial_outcome_feedback" in factory.cursor.calls[-1][0]
+
+    with pytest.raises(OutcomeTransportError, match="not allowed"):
+        rpc("record_commercial_outcome", {})
+    with pytest.raises(OutcomeTransportError, match="not allowed"):
+        rpc("recognize_bsc_revenue", {})

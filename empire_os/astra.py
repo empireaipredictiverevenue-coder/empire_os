@@ -156,3 +156,47 @@ def decide(snapshot: AstraSnapshot) -> AstraDecision:
         "acquisition_agent", 88, False, "rules",
         ("buyer capacity exists but there is no owned inventory to match",), (),
     )
+
+
+def decide_with_outcomes(
+    snapshot: AstraSnapshot,
+    *,
+    negative_margin_orders: int = 0,
+    calibration_ready: bool = False,
+    gross_margin_rate: float | None = None,
+) -> AstraDecision:
+    """Overlay verified outcome signals without changing economic parameters.
+
+    Outcome evidence can change what Astra recommends reviewing, but this
+    function never changes prices, budgets, model weights, or commercial state.
+    """
+    baseline = decide(snapshot)
+    if baseline.workstream == "governance":
+        return baseline
+
+    if int(negative_margin_orders or 0) > 0:
+        rationale = [
+            "verified outcome feedback contains negative-margin orders",
+            "unit economics require review before additional scaling",
+        ]
+        if gross_margin_rate is not None:
+            rationale.append(
+                f"observed feedback gross margin rate={float(gross_margin_rate):.4f}"
+            )
+        if not calibration_ready:
+            rationale.append(
+                "sample is below calibration threshold; review evidence without retuning models"
+            )
+        return AstraDecision(
+            ASTRA_VERSION,
+            "unit_economics",
+            "review_negative_margin",
+            "revenue_intelligence",
+            99,
+            False,
+            "rules",
+            tuple(rationale),
+            (),
+        )
+
+    return baseline
