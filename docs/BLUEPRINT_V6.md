@@ -84,7 +84,7 @@ Phase 3E deliverables:
 - Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers. Canonical buyer discovery includes business-web evidence, structured Person extraction, decision-maker authority ranking, current-role reconciliation, personhood-quality guards, domain-integrity checks, offer-fit routing, provenance-aware decision-maker-bound contact evidence, hard-bounded batch site review, separate review-ready/outreach-ready contact gates, recent exact public-record/press-release contact provenance, and governed candidate review. The first real outreach-ready buyer has now progressed through production intent creation and human approval; no send has occurred yet.
 - Governed Resend outbound with approval, idempotency, opt-out and postal-footer compliance. Canonical DB layer + fail-closed Resend provider adapter + dedicated sender transport are live/tested. Outbound Governor policy engine now automates evidence/compliance decisions across OBSERVE, ASSIST and explicitly enabled GUARDED_EXECUTE modes while preserving role-separated approval/send boundaries.
 - Reply/provider lifecycle capture. Signed-webhook normalization + per-intent reply alias + exact-sender binding + deterministic reply classification + provider delivery/bounce/complaint/open/click capture are local/tested. Three forward-only DB hardening migrations, reply-ingest credentials, service routing and live webhook enablement remain the final activation work.
-- New Supabase-backed AI Closer; legacy SQLite closer is retired from active flow. Canonical case/recommendation/human-advance state machine local/tested; production migration pending.
+- New Supabase-backed AI Closer; legacy SQLite closer execution is retired from active flow. Canonical case/recommendation/human-advance state machine + separated observer/planner/approver runtime identities + OBSERVE-only closer worker are local/tested; canonical migration/credential/service activation remains gated.
 - Commercial proposal states without fabricated prices or fake settlement.
 - Buyer activation only after verified commercial evidence.
 - USDT/BSC payment request + independent on-chain verification.
@@ -201,7 +201,7 @@ Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deploym
 3. Send/deliver the first genuine governed buyer opportunity and capture real delivery/conversion evidence.
 4. Recognize the first independently verified paid outcome as actual revenue and gross profit.
 5. Feed the canonical Phase 3F outcome projection into Astra/Omega/revenue intelligence calibration.
-6. Complete the Supabase-backed AI Closer production state-machine gate.
+6. Supabase-backed AI Closer production state-machine gate ✅ local/tested; activate its canonical migrations, separated runtime credentials and OBSERVE worker only under production gates.
 7. Move the CURRENT marker to Phase 4 Astra Operating Layer once first-revenue feedback is proven end to end.
 8. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution in parallel where they do not bypass gates. Build the Search Intelligence foundation first; stabilize its API contract, then build the Search Command Centre frontend.
 9. Expand Astra operating authority only after proven controls and economics.
