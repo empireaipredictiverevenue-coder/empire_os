@@ -1,0 +1,133 @@
+"""Read-only Phase 4 Astra observer runtime.
+
+Fetches the bounded Phase 3F outcome projection, builds deterministic
+calibration, optionally evaluates a fully explicit operational snapshot,
+and writes a local observation artifact. No commercial mutation occurs.
+"""
+from __future__ import annotations
+
+import json
+from dataclasses import fields
+from pathlib import Path
+from typing import Any, Callable, Mapping
+
+from empire_os.astra import AstraSnapshot, decide_with_outcomes
+from empire_os.astra_feedback import build_outcome_calibration
+from empire_os.outcome_role_transport import PostgresOutcomeRpc
+
+
+class AstraObserverError(RuntimeError):
+    pass
+
+
+def bounded_feedback_limit(value: Any, *, default: int = 100) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(1, min(parsed, 1000))
+
+
+def parse_operational_snapshot(raw: str | None) -> AstraSnapshot | None:
+    """Parse a complete observed Astra snapshot.
+
+    Partial snapshots are rejected because dataclass defaults would otherwise
+    turn missing observations into invented zero/false values.
+    """
+    if raw is None or not str(raw).strip():
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise AstraObserverError("invalid operational snapshot JSON") from exc
+    if not isinstance(payload, dict):
+        raise AstraObserverError("operational snapshot must be a JSON object")
+
+    required = {field.name for field in fields(AstraSnapshot)}
+    supplied = set(payload)
+    missing = sorted(required - supplied)
+    extra = sorted(supplied - required)
+    if missing or extra:
+        raise AstraObserverError(
+            "operational snapshot must provide exactly AstraSnapshot fields; "
+            f"missing={missing}; extra={extra}"
+        )
+    snapshot = AstraSnapshot(**payload)
+    if str(snapshot.execution_mode).strip().lower() not in {"observe", "dry_run"}:
+        raise AstraObserverError("operational snapshot must remain OBSERVE/DRY_RUN")
+    return snapshot
+
+
+def atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+
+
+def run_observer_cycle(
+    *,
+    dsn: str,
+    mode: str = "OBSERVE",
+    feedback_limit: int = 100,
+    min_samples: int = 20,
+    min_conversions: int = 5,
+    operational_snapshot_json: str | None = None,
+    output_path: str | Path = "runtime/astra/latest.json",
+    rpc_factory: Callable[..., Any] = PostgresOutcomeRpc,
+) -> dict[str, Any]:
+    """Run one bounded read-only Astra observation cycle."""
+    normalized_mode = str(mode or "OBSERVE").strip().upper()
+    if normalized_mode != "OBSERVE":
+        raise AstraObserverError("Phase 4 Astra observer supports OBSERVE only")
+
+    clean_dsn = str(dsn or "").strip()
+    if not clean_dsn:
+        raise AstraObserverError("EMPIRE_ASTRA_OBSERVER_DSN is required")
+
+    limit = bounded_feedback_limit(feedback_limit)
+    rpc = rpc_factory(clean_dsn, "empire_astra_observer")
+    rows = rpc("get_commercial_outcome_feedback", {"p_limit": limit})
+    if rows is None:
+        rows = []
+    if not isinstance(rows, list):
+        raise AstraObserverError("outcome feedback projection must return a list")
+
+    calibration = build_outcome_calibration(
+        rows,
+        min_samples=max(int(min_samples), 1),
+        min_conversions=max(int(min_conversions), 1),
+    )
+    snapshot = parse_operational_snapshot(operational_snapshot_json)
+
+    if snapshot is None:
+        decision: dict[str, Any] = {
+            "available": False,
+            "reason": "operational_snapshot_missing",
+        }
+    else:
+        decision = {
+            "available": True,
+            "source": "explicit_operational_snapshot",
+            "result": decide_with_outcomes(
+                snapshot,
+                negative_margin_orders=calibration.negative_margin_orders,
+                calibration_ready=calibration.calibration_ready,
+                gross_margin_rate=calibration.gross_margin_rate,
+            ).as_dict(),
+        }
+
+    payload: dict[str, Any] = {
+        "ok": True,
+        "mode": "OBSERVE",
+        "feedback_limit": limit,
+        "feedback_rows": len(rows),
+        "calibration": calibration.as_dict(),
+        "decision": decision,
+        "side_effects": "none",
+    }
+    atomic_write_json(Path(output_path), payload)
+    return payload

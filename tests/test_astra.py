@@ -1,4 +1,4 @@
-from empire_os.astra import AstraSnapshot, decide, route_intelligence
+from empire_os.astra import AstraSnapshot, decide, decide_with_outcomes, route_intelligence
 
 
 def test_astra_prioritises_live_buyer_replies():
@@ -96,3 +96,22 @@ def test_astra_fails_closed_if_execution_is_unexpectedly_live():
     assert decision.owner == "human"
     assert decision.side_effect_approval_required is True
     assert "unexpected_execution_mode" in decision.blockers
+
+
+def test_verified_negative_margin_outcome_prioritises_review_not_execution():
+    decision = decide_with_outcomes(
+        AstraSnapshot(
+            active_buyer_capacity=5,
+            owned_inventory_count=10,
+            outbound_domain_verified=True,
+        ),
+        negative_margin_orders=2,
+        calibration_ready=False,
+        gross_margin_rate=-0.1,
+    )
+    assert decision.workstream == "unit_economics"
+    assert decision.recommended_job_type == "review_negative_margin"
+    assert decision.owner == "revenue_intelligence"
+    assert decision.side_effect_approval_required is False
+    assert decision.intelligence_route == "rules"
+    assert "retuning" in " ".join(decision.rationale)

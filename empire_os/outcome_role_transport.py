@@ -10,6 +10,12 @@ class OutcomeTransportError(RuntimeError):
 
 
 ROLE_FUNCTIONS = {
+    "empire_astra_observer": {
+        "get_commercial_outcome_feedback": (
+            "select public.get_commercial_outcome_feedback(%s)",
+            ("p_limit",),
+        ),
+    },
     "empire_outcome_recorder": {
         "record_commercial_outcome": (
             "select public.record_commercial_outcome(%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s)",
