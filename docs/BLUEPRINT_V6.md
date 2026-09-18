@@ -37,7 +37,7 @@ QUALITY → FIRST REVENUE → PROVE ECONOMICS → CAPTURE OUTCOMES → IMPROVE P
 - Protected untracked `recovery/` and `toop` remain untouched.
 
 ## Cross-Phase Intelligence Fabric — ACTIVE FOUNDATION
-The Empire Intelligence Fabric is the shared substrate beneath all intelligence domains. It is not a replacement roadmap phase and does not move the CURRENT marker away from Phase 3E.
+The Empire Intelligence Fabric is the shared substrate beneath all intelligence domains. It is not a replacement roadmap phase and does not move the CURRENT marker away from Phase 3F.
 
 Core graph objects:
 - canonical companies and people; employment and buying roles; verified contact points
@@ -161,23 +161,20 @@ Astra detects → predicts economics → selects market → creates acquisition/
 Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deployment, heavy model-serving infrastructure and continuous retraining remain later-stage tools. They activate only when measured scale, reliability or revenue requirements justify the complexity.
 
 ## Immediate Execution Order
-1. Complete Phase 3E governed buyer outbound/reply capture.
-2. Replace legacy AI Closer with Supabase-backed commercial state machine.
-3. Fail-closed USDT/BSC verifier, evidence adapter, and governed request/approval
-   separation ✅
-4. Provision controlled operator-approval and verifier service identities/tools without
-   exposing public mutation or granting agents self-approval. Local/manual tooling ✅;
-   production login identities remain a deployment gate.
-5. Activate first genuine buyer only after verified evidence.
-6. Deliver first paid opportunity and capture outcome/profit.
-7. Feed actual outcomes into Astra/Omega/revenue intelligence.
-8. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution.
+1. Activate the staged Phase 3E outbound/reply hardening migrations and inbound runtime under the existing production gates.
+2. Activate Phase 3F outcome/revenue migration and dedicated runtime identities in OBSERVE first.
+3. Send/deliver the first genuine governed buyer opportunity and capture real delivery/conversion evidence.
+4. Recognize the first independently verified paid outcome as actual revenue and gross profit.
+5. Feed the canonical Phase 3F outcome projection into Astra/Omega/revenue intelligence calibration.
+6. Complete the Supabase-backed AI Closer production state-machine gate.
+7. Move the CURRENT marker to Phase 4 Astra Operating Layer once first-revenue feedback is proven end to end.
+8. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution in parallel where they do not bypass gates.
 9. Expand Astra operating authority only after proven controls and economics.
 
 10. BSC USDT smart-contract escrow: local contract + verifier + database rail ✅;
     canonical Supabase migration ✅; external audit, production identities and mainnet contract deployment pending.
 11. Empire Intelligence Fabric: canonical schema + provenance/temporal graph ← ACTIVE SUPPORT WORK;
-    integrate real source adapters and TAM segmentation, then return primary effort to Phase 3E outbound/reply capture.
+    integrate real source adapters and TAM segmentation while primary effort completes Phase 3F outcome/revenue feedback.
 
 ## Definition of Actual Revenue
 Actual revenue requires independently verifiable payment evidence tied to a real buyer, real commercial terms and the relevant Empire request/order. Escrow funding is not revenue; a verified escrow release is only revenue-eligible until a separate governed accounting event recognizes it. Modeled, forecast, quoted, pending, simulated or manually asserted values are not actual revenue.

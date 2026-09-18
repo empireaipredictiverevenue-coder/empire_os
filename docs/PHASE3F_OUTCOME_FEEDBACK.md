@@ -1,79 +1,68 @@
-# Phase 3F — Outcome Feedback / Revenue Recognition
-
-Status: implementation and isolated PostgreSQL verification in progress; production activation gated.
+# Phase 3F — Outcome Feedback and Revenue Truth
 
 ## Purpose
-Phase 3F closes the commercial learning loop without allowing an AI, API client,
-or operator-provided amount to become revenue by assertion.
+Close the commercial learning loop without allowing models, agents, public API
+roles, or unverified external events to manufacture revenue.
 
-There are two independent paths:
+## Canonical rules
+1. `commercial_events` is append-only. Existing zero-value operational events
+   remain compatible, but non-zero financial events require the dedicated
+   `empire_revenue_recognizer` role.
+2. `commercial_outcomes` is append-only and stores delivery, conversion,
+   satisfaction and provenance evidence. Recording an outcome never creates
+   revenue.
+3. Actual revenue is derived only by `recognize_bsc_revenue()`; callers do not
+   provide the revenue amount, cost or margin.
+4. Direct BSC/USDT revenue requires an approved payment request plus independently
+   verified payment evidence.
+5. Escrow funding is not revenue. Escrow revenue requires a verified release.
+6. The approved USD order price must equal the USDT settlement amount at the
+   canonical commercial accounting basis (USD cents / USDT). A mismatch is held.
+7. Acquisition cost + fulfilment cost are taken from the governed order; realized
+   margin is derived, not supplied by an agent.
+8. Revenue recognition is retry-safe through the commercial event idempotency key
+   `revenue:<fulfilment_order_id>:v1`.
 
-1. **Outcome feedback** — append-only delivery, conversion and buyer-satisfaction
-   evidence. It is non-financial and returns `actual_revenue=false`.
-2. **Revenue recognition** — derives revenue, cost and gross profit only from
-   canonical fulfilment terms plus independently verified BSC settlement evidence.
+## Runtime roles
+- `empire_outcome_recorder`: record evidence-backed non-financial outcomes only.
+- `empire_revenue_recognizer`: inspect bounded recognition work and recognize
+  evidence-backed revenue only.
+- Dedicated LOGIN identities are created passwordless and must be provisioned
+  out-of-band.
 
-## Revenue invariant
-Recognized revenue is never supplied by the worker.
-
-For a fulfilment order to produce `revenue_recognized`:
-- approved commercial terms must exist on the order;
-- the order must have a positive canonical USD price;
-- the payment request must remain human-approved;
-- direct settlement requires verified BSC USDT transfer evidence;
-- escrow settlement requires a verified released escrow;
-- request `amount_usdt * 100` must equal the approved `price_cents` exactly;
-- commercial terms hashes must match;
-- realized margin must remain positive.
-
-Chain overpayment is not silently counted as additional revenue.
-
-## Role separation
-- `empire_outcome_recorder` records non-financial outcomes only.
-- `empire_revenue_recognizer` lists evidence-backed recognition work and
-  recognizes revenue only through the narrow database RPC.
-- `service_role` can still append legacy zero-value GTM/qualification events,
-  but database guards block it from forging financial commercial events.
-- Existing payment/escrow verifier roles still verify chain evidence; they do
-  not recognize revenue.
-
-## Immutable history
-`commercial_outcomes` is append-only.
-`commercial_events` is now database-enforced append-only.
-Financial event fields and `revenue_recognized` are reserved for the dedicated
-revenue recognizer role.
-
-## Omega / Astra feedback
-`get_commercial_outcome_feedback()` projects canonical order outcome data:
-- delivery outcome
-- conversion outcome
+## Learning surface
+`get_commercial_outcome_feedback()` exposes a bounded canonical read model with:
+- delivery/conversion outcome
 - buyer satisfaction
-- actual revenue
-- actual cost
-- gross profit
-- previous purchase
-- booked / converted targets
+- actual revenue/cost/gross profit
+- previous-purchase and conversion labels
+- prospect, buyer, opportunity and fulfilment linkage
 
-`empire_os/outcome_feedback.py` maps this projection into deterministic learning
-features and aggregate business metrics for revenue intelligence and Astra.
+`empire_os/outcome_feedback.py` maps this read model into features already used
+by revenue intelligence and future Astra/Omega calibration.
 
-## Runtime
-`scripts/revenue_recognition_worker.py` runs in `OBSERVE` by default.
+## Worker
+`scripts/revenue_recognition_worker.py` defaults to OBSERVE. Even with
+`--execute`, mutations occur only in `GUARDED_EXECUTE`, and mismatched economic
+amounts remain held.
 
-It can only execute recognition when:
-- mode is `GUARDED_EXECUTE`;
-- `--execute` is present;
-- the queue reports exact amount matching;
-- the dedicated revenue-recognizer DSN is configured.
+## Production gates
+Before activation:
+1. Apply the Phase 3F migration to canonical Supabase.
+2. Provision dedicated outcome/revenue login passwords locally.
+3. Create `.env.revenue_recognition` from the committed example.
+4. Install the revenue-recognition service/timer with OBSERVE defaults.
+5. Observe real evidence candidates before promoting recognition to
+   `GUARDED_EXECUTE`.
+6. Keep payment movement, payment approval and escrow lifecycle verification in
+   their existing separated roles.
 
-The worker moves no funds. It recognizes already-verified settlement evidence.
-
-## Production activation gate
-Before enabling the runtime:
-1. Apply the staged Phase 3E hardening migrations.
-2. Apply `20260918123504_phase3f_outcome_feedback.sql`.
-3. Apply `20260918124631_phase3f_runtime_identities.sql`.
-4. Provision the dedicated outcome/revenue login passwords out of band.
-5. Install the revenue recognition service/timer in OBSERVE.
-6. Validate live provider/reply events and recognition queue behavior.
-7. Promote only the specific workflow after explicit approval.
+## Tested locally
+- direct verified USDT recognition
+- released escrow recognition
+- funded escrow rejected as revenue
+- exact amount mismatch hold
+- forged service-role revenue rejection
+- append-only commercial events and outcomes
+- idempotent recognition
+- canonical feedback projection
