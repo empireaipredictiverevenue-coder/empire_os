@@ -71,6 +71,7 @@ from empire_os.traffic_specialist import (
 from empire_os.marketing import tick as marketing_tick, draft_spec_for_niche
 from empire_os.aeo_surface import deploy_spec, list_pages, remove_page
 from empire_os.search_intelligence.api import router as search_intelligence_router
+from empire_os.coder.api import router as empire_coder_router
 from empire_os.ceo import build_brief
 from empire_os.daily_revenue import DailyRevenueSnapshotter, DailyRevenueBriefWorker
 from empire_os.remote_scanner import ScoutAgentClient
@@ -455,6 +456,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(search_intelligence_router)
+app.include_router(empire_coder_router)
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
