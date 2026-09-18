@@ -155,6 +155,7 @@ Astra detects → predicts economics → selects market → creates acquisition/
 - Legacy SQLite as business source of truth.
 - Legacy AI closer behaviour that invents settlement amounts or changes funnel states without evidence.
 - Simulated/fabricated settlement, fake revenue and placeholder buyer activation.
+- Legacy synthetic runtime augmentation, finance replay, autonomous funnel mutation and mock marketplace settlement are retired/fail-closed.
 - Direct public access to allocation, activation, settlement, treasury or campaign mutation endpoints.
 
 ## Infrastructure Gated Until Economically Justified

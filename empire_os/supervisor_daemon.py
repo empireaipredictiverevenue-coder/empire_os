@@ -49,9 +49,9 @@ REGISTRY_DATA = {
                             "note": "Plans ppc. Must wire invoice writes."},
     "outreach_runner":    {"file": "outreach_runner.py", "mode": "daemon",
                             "sim_risk": "low", "enabled": True},
-    "solana_listener":    {"file": "solana_listener_agent.py", "mode": "daemon",
-                            "sim_risk": "low", "enabled": True,
-                            "note": "USDC collection listener. Online 2h+."},
+    "solana_listener":    {"file": "solana_listener_agent.py", "mode": "tool",
+                            "sim_risk": "high", "enabled": False,
+                            "note": "RETIRED: legacy Solana/USDC rail; canonical settlement is BSC USDT."},
     # ── SATELLITE / STORM (daemons, but SIM until real source) ──
     "satellite_damage":   {"file": "satellite_damage_agent.py", "mode": "daemon",
                             "sim_risk": "high", "enabled": False,
@@ -112,8 +112,8 @@ def launch_daemon(agent, spec):
     """Launch an enabled daemon as a systemd unit (survives reboot)."""
     if spec["mode"] != "daemon" or not spec.get("enabled"):
         return
-    if spec["sim_risk"] == "high" and not os.environ.get("ALLOW_SIM"):
-        print(f"  SKIP {agent}: sim_risk=high (no-sim gate). Set ALLOW_SIM=1 to force.")
+    if spec["sim_risk"] == "high":
+        print(f"  SKIP {agent}: sim_risk=high (production no-sim policy).")
         return
     uname = unit_name(agent)
     venv_py = "/root/empire_os/venv/bin/python3"

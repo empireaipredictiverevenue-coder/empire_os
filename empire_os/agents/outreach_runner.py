@@ -1,15 +1,11 @@
 """
-Empire OS v3 — Outreach Agent (production loop)
-================================================
+Empire OS v3 — Legacy Outreach Agent (RETIRED SEND PATH)
+=========================================================
 
-Lives inside outreach-agent Incus container.
-Loops every 60 minutes:
-  1. Discovers prospects via hub HTTP /v1/outreach/prospects/pending
-  2. Filters already-contacted
-  3. Enriches email (Hunter.io, falls back to skip)
-  4. Pulls sample lead from /v1/leads/sample
-  5. Drafts + sends via Resend
-  6. Tracks via /v1/outreach/prospect/touched
+This module is retained only for compatibility/read-only nurture planning.
+Direct prospect transmission is permanently fail-closed. Phase 3E outbound must
+flow through buyer candidate review -> human approval -> governed outbound
+intent -> human message approval -> dedicated sender role.
 """
 from __future__ import annotations
 
@@ -21,12 +17,10 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# Load .env (same pattern as charge.py / OllamaClient) so HUB_URL + keys
-# resolve from /root/empire_os/.env at startup. Without this, pm2-launched
-# processes fall back to the hardcoded dead default (127.0.0.1:8000)
-# and every hub call silently times out -> zero outreach sends.
-for _ln in (Path("/root/empire_os/.env").read_text(encoding="utf-8").splitlines()
-            if Path("/root/empire_os/.env").exists() else ()):
+# Compatibility config only. The retired sender never consumes credentials.
+_ENV_FILE = Path(os.environ.get("EMPIRE_ENV_FILE", "/srv/empire_os/.env"))
+for _ln in (_ENV_FILE.read_text(encoding="utf-8").splitlines()
+            if _ENV_FILE.exists() else ()):
     _ln = _ln.strip()
     if not _ln or _ln.startswith("#") or "=" not in _ln:
         continue
@@ -47,10 +41,14 @@ CYCLE_PROSPECT_LIMIT = int(os.environ.get("LIMIT", "20"))
 # sequence spacing in days per step + max step
 STEP_GAP_DAYS = {0: 0, 1: 3, 2: 4, 3: 7}
 MAX_STEP = 3
+# Phase 3E replaced this legacy autonomous nurture sender. This is deliberately
+# not configurable: re-enabling requires a code change and review.
+LEGACY_OUTREACH_RETIRED = True
 RESEND_OWNER = os.environ.get("RESEND_OWNER", "Founder <founder@empire-ai.co.uk>")
 RESEND_REPLY_TO = os.environ.get("EMPIRE_REPLY_TO", "founder@empire-ai.co.uk")
 ALLOWED_SEND_DOMAIN = os.environ.get("ALLOWED_SEND_DOMAIN", "empire-ai.co.uk")
-LOG_PATH = Path("/root/feedback/outreach_log.jsonl")
+_RUNTIME_DIR = Path(os.environ.get("EMPIRE_RUNTIME_DIR", "/srv/empire_os/runtime"))
+LOG_PATH = _RUNTIME_DIR / "feedback" / "outreach_log.jsonl"
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -253,63 +251,18 @@ def draft_email(prospect: dict, sample: dict | None, step: int = 0) -> tuple[str
 
 
 def send_via_resend(to: str, subject: str, body: str, metadata: dict) -> tuple[bool, str]:
-    env = Path("/root/empire_os/.env")
-    api_key = ""
-    if env.exists():
-        for line in env.read_text().splitlines():
-            if line.startswith("RESEND_API_KEY="):
-                api_key = line.split("=", 1)[1].strip()
-                break
-    if not api_key:
-        return False, "no_resend_key"
-    if f"@{ALLOWED_SEND_DOMAIN}" not in RESEND_OWNER:
-        return False, f"from '{RESEND_OWNER}' not on allowed domain @{ALLOWED_SEND_DOMAIN}"
+    """Retired prospect-send boundary.
 
-    try:
-        r = _http.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": RESEND_OWNER,
-                "to": [to],
-                "reply_to": [RESEND_REPLY_TO],
-                "subject": subject,
-                "text": body,
-                "metadata": {str(k): str(v) for k, v in metadata.items()},
-            },
-            timeout=10,
-        )
-        if r.status_code < 300:
-            return True, f"sent {r.status_code}: {r.text[:200]}"
-        # Resend failed (e.g. 401 invalid key) -> try SMTP relay fallback
-        fb = _smtp_fallback(to, subject, body)
-        if fb[0]:
-            return fb
-        return False, f"HTTP {r.status_code}: {r.text[:200]}"
-    except Exception as e:
-        # network error -> try SMTP relay before giving up
-        fb = _smtp_fallback(to, subject, body)
-        if fb[0]:
-            return fb
-        return False, f"request_error: {str(e)[:200]}"
+    Legacy callers must not be able to bypass the Phase 3E governed outbound
+    state machine. Keep this function for compatibility, but never inspect
+    credentials, call Resend, or fall back to SMTP/direct MX.
+    """
+    return False, "legacy_outreach_retired_use_governed_phase3e"
 
 
 def _smtp_fallback(to: str, subject: str, body: str) -> tuple[bool, str]:
-    """Try the configured SMTP relay (Brevo/ImproveMX/etc) when Resend is
-    down/invalid. Returns (ok, info). No-op if SMTP unconfigured."""
-    try:
-        from empire_os import mail_sender as _ms
-        if _ms.EMAIL_BACKEND != "smtp":
-            return False, "smtp_backend_disabled"
-        res = _ms._smtp_send(to, subject, body)
-        if res.get("ok"):
-            return True, f"smtp_sent: {res.get('msg_id', '')}"
-        return False, f"smtp_fail: {res.get('error', '')[:120]}"
-    except Exception as e:
-        return False, f"smtp_error: {str(e)[:120]}"
+    """Retired together with the legacy prospect-send boundary."""
+    return False, "legacy_outreach_retired_use_governed_phase3e"
 
 
 def recent_touched(prospect_id: str) -> bool:
@@ -323,8 +276,15 @@ def recent_touched(prospect_id: str) -> bool:
 
 
 def process_prospect(p, counters):
-    """Process one prospect through the nurture sequence. Returns delta
-    (sent_inc, skipped_inc)."""
+    """Retained compatibility entrypoint; prospect mutation/send is retired.
+
+    The return occurs before enrichment, registration, touched-state writes, or
+    provider calls. Governed Phase 3E is the only prospect outbound path.
+    """
+    if LEGACY_OUTREACH_RETIRED:
+        _log("SKIP", "legacy_outreach_retired",
+             prospect_id=p.get("prospect_id"), mode="OBSERVE")
+        return 0, 1
     sent_inc = 0
     skipped_inc = 0
     rs = p.get("reply_state", "cold")

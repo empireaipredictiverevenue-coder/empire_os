@@ -4,8 +4,8 @@ Synthetic AGI Layer — shared base for the new domain agents.
 Each new agent (mesh, business, growth, engineering, scheduling) extends
 `SyntheticAgent` and implements its own observe / reason / act / learn.
 
-The learn() hook runs after every cycle and uses synthetic intelligence
-to enrich the agent's prompt context for future decisions.
+The learn() hook runs after every cycle and records only measured outcomes.
+No fabricated examples are generated or fed back into runtime decisions.
 
 v2 upgrades (memory + role + anti-repetition + skills gallery):
 
@@ -42,11 +42,6 @@ from pathlib import Path
 from typing import Optional
 
 from empire_os.agent_core import Agent, OllamaClient
-from empire_os.synthetic_intelligence import (
-    SyntheticIntelligence,
-    SyntheticExample,
-)
-
 logger = logging.getLogger("synthetic_agents")
 
 # Default memory settings — overridable per-agent via constructor
@@ -56,8 +51,10 @@ DEFAULT_SKILLS_LIMIT = 5           # top-K skills fed into LLM context
 
 
 class SyntheticAgent(Agent):
-    """Agent base with SOUL preamble + memory + anti-repetition +
-    skills gallery + synthetic intelligence + self-heal + learning.
+    """Legacy-named agent base using only observed runtime outcomes.
+
+    The class name remains for import compatibility; production learning never
+    fabricates examples or injects synthetic records.
     """
 
     def __init__(
@@ -77,7 +74,6 @@ class SyntheticAgent(Agent):
             llm = OllamaClient(base_url=llm_url, model=llm_model, timeout=180)
         super().__init__(name=name, llm=llm, backend=backend, **kwargs)
         self.role = role
-        self.syn = SyntheticIntelligence(llm=self.llm, n_synthetic=3)
 
         log_path = Path(f"/root/{role}/{role}.log")
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -332,24 +328,14 @@ class SyntheticAgent(Agent):
         logger.info(line.strip())
 
     def learn(self, state: dict, decision: str, result: dict) -> dict:
-        """Generate synthetic training examples from this cycle's data."""
-        try:
-            decision_dict = {"raw": decision}
-            try:
-                decision_dict = json.loads(decision)
-            except Exception:
-                pass
-            examples = self.syn.augment(state, decision_dict)
-            self._log("learn: %d synthetic examples generated" % len(examples))
-            return {
-                "examples": [
-                    {"input": e.input, "expected_output": e.expected_output, "rationale": e.rationale}
-                    for e in examples
-                ]
-            }
-        except Exception as e:
-            self._log("learn error: %s" % e, "ERROR")
-            return {"examples": [], "error": str(e)}
+        """Learn only from the real observed outcome of this cycle."""
+        success = self._success_from_result(result)
+        self._log("learn: real-observation-only")
+        return {
+            "mode": "real_observations_only",
+            "examples": [],
+            "observed_success": success,
+        }
 
     def tick(self) -> dict:
         """Observe → Reason (with SOUL+memory+skills) → Act (anti-rep) → Learn → Record."""
