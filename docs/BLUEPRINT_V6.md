@@ -104,6 +104,28 @@ Astra becomes the top coordinator for business priorities, agent routing, bottle
 ### Phase 5 — Organic Growth Engine
 SEO, AEO, GEO, keyword intelligence, topic clusters, programmatic pages, AI Cards, citation/mention monitoring, authority/backlink graph, competitor citation gaps, public publishing, first-party tracking and content→revenue attribution.
 
+#### Empire Search Intelligence Engine — PARALLEL FOUNDATION
+The proprietary Search Intelligence foundation is being built early in parallel with Phase 3F/4 because it is safe, reversible growth infrastructure and increases product value without bypassing revenue or autonomy gates.
+
+Foundation scope:
+- canonical Search Page + Search Opportunity models;
+- deterministic opportunity scoring with unknown external metrics left null;
+- mandatory Content Quality Firewall;
+- metadata, JSON-LD, canonical and indexability recommendations;
+- explicit auditable indexation lifecycle;
+- OBSERVE-only SearchCommander;
+- read-only/recommendation FastAPI surface under `/v1/search/*`;
+- forward-only canonical Supabase schema with tenant/site isolation and search→commercial attribution links;
+- Search Console/SERP adapters disabled until real evidence/credentials exist;
+- programmatic SEO prohibited from auto-publishing or auto-indexing;
+- legacy AEO direct-publish code is compatibility-only and will be governed behind the new layer rather than expanded.
+
+Search Fabric remains the retrieval/discovery substrate. Search Intelligence is the quality, governance, AEO/GEO, opportunity and commercial-attribution layer above it.
+
+After the API contract is stable, add a Next.js + TypeScript + Tailwind Search Command Centre for Organic Revenue, opportunities, page quality, indexation, decay, cannibalisation, alerts, Search Console and metadata/schema previews. The UI consumes governed APIs and is not the source of truth.
+
+Production database migration, Search Console credentials, sitemap/index submission, content publishing, redirects and robots/canonical mutation remain explicitly gated.
+
 ### Phase 6 — A2A Commerce Network
 A2A Agent Card/protocol, authenticated agent discovery, agent buyers/suppliers, AI-to-AI quoting, negotiation and tasks, commercial gates, marketplace and revenue attribution. Public discovery stays low-risk; activation/payment/allocation remain governed.
 
@@ -169,7 +191,7 @@ Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deploym
 5. Feed the canonical Phase 3F outcome projection into Astra/Omega/revenue intelligence calibration.
 6. Complete the Supabase-backed AI Closer production state-machine gate.
 7. Move the CURRENT marker to Phase 4 Astra Operating Layer once first-revenue feedback is proven end to end.
-8. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution in parallel where they do not bypass gates.
+8. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution in parallel where they do not bypass gates. Build the Search Intelligence foundation first; stabilize its API contract, then build the Search Command Centre frontend.
 9. Expand Astra operating authority only after proven controls and economics.
 
 10. BSC USDT smart-contract escrow: local contract + verifier + database rail ✅;
