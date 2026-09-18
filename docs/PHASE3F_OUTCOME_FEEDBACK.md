@@ -27,6 +27,8 @@ roles, or unverified external events to manufacture revenue.
 - `empire_outcome_recorder`: record evidence-backed non-financial outcomes only.
 - `empire_revenue_recognizer`: inspect bounded recognition work and recognize
   evidence-backed revenue only.
+- `empire_outcome_reader`: read bounded outcome projections and commercial
+  figures only; it has no direct commercial table writes or revenue authority.
 - Dedicated LOGIN identities are created passwordless and must be provisioned
   out-of-band.
 
@@ -41,6 +43,25 @@ roles, or unverified external events to manufacture revenue.
 `empire_os/outcome_feedback.py` maps this read model into features already used
 by revenue intelligence and future Astra/Omega calibration.
 
+## Commercial figures
+`get_phase3f_commercial_scorecard(p_days)` is the canonical actuals scorecard.
+It reports:
+- actual revenue, actual cost and gross profit in USD cents
+- gross margin rate and percentage
+- recognized revenue order count and average recognized order value
+- outcome count plus won/lost/booked/qualified/no-response counts
+- conversion rate and conversion percentage
+- average buyer satisfaction
+- revenue, cost, profit and margin by niche/metro
+- revenue, cost, profit and margin by buyer
+- settlement identity: USDT on BSC
+
+The scorecard contains recognized actuals only. Forecasts and model estimates stay
+separate so predicted revenue can never be presented as earned revenue.
+
+`scripts/phase3f_scorecard.py` reads the scorecard only through the dedicated
+`empire_outcome_reader` role.
+
 ## Worker
 `scripts/revenue_recognition_worker.py` defaults to OBSERVE. Even with
 `--execute`, mutations occur only in `GUARDED_EXECUTE`, and mismatched economic
@@ -49,7 +70,7 @@ amounts remain held.
 ## Production gates
 Before activation:
 1. Apply the Phase 3F migration to canonical Supabase.
-2. Provision dedicated outcome/revenue login passwords locally.
+2. Provision dedicated outcome/revenue/figures-reader login passwords locally.
 3. Create `.env.revenue_recognition` from the committed example.
 4. Install the revenue-recognition service/timer with OBSERVE defaults.
 5. Observe real evidence candidates before promoting recognition to
@@ -66,3 +87,6 @@ Before activation:
 - append-only commercial events and outcomes
 - idempotent recognition
 - canonical feedback projection
+- hard-figures scorecard with revenue/cost/profit/margin/conversion/satisfaction
+  and buyer/niche segmentation
+- dedicated read-only scorecard identity

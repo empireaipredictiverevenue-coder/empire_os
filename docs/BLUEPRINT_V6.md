@@ -95,6 +95,7 @@ Phase 3F deliverables:
 - Evidence-derived actual revenue, cost and gross profit from verified BSC direct payment or released escrow only. ✅ local/tested
 - Exact approved USD price ↔ USDT settlement invariant; overpayment is not silently counted as revenue. ✅ local/tested
 - Canonical feedback projection + Python adapter for Omega/revenue intelligence and Astra priorities. ✅ local/tested
+- Hard commercial figures scorecard: actual revenue/cost/gross profit/margin, conversion, buyer satisfaction and buyer/niche profitability via a dedicated read-only role. ✅ local/tested
 - OBSERVE-first bounded revenue-recognition worker + systemd timer. ✅ local/tested
 - Production migration/runtime credential activation and live evidence observation remain gated.
 

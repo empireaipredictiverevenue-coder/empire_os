@@ -46,8 +46,14 @@ function directProof(amount='100000000000000000000'){
 
 async function createOrder({price=10000,state='accepted'}={}){
   const buyer=randomUUID(),prospect=randomUUID(),order=randomUUID();
-  await admin.query('insert into buyers(id) values($1)',[buyer]);
-  await admin.query('insert into prospects(id) values($1)',[prospect]);
+  await admin.query(
+    "insert into buyers(id,niche,metro,status) values($1,'roofing','houston','active')",
+    [buyer]
+  );
+  await admin.query(
+    "insert into prospects(id,business_name,niche,metro,status) values($1,'Test Prospect','roofing','houston','qualified')",
+    [prospect]
+  );
   await admin.query(`
     insert into fulfilment_orders(
       id,prospect_id,buyer_id,state,price_cents,
@@ -70,8 +76,12 @@ try{
   await admin.query(`create role anon; create role authenticated;
     create role service_role bypassrls;
     create table business_entities(id uuid primary key);
-    create table prospects(id uuid primary key);
-    create table buyers(id uuid primary key);`);
+    create table prospects(
+      id uuid primary key,business_name text,niche text,metro text,status text
+    );
+    create table buyers(
+      id uuid primary key,niche text,metro text,status text
+    );`);
 
   await admin.query(await readFile(join(root,'migrations/002_commercial_control_plane.sql'),'utf8'));
   // Mirror canonical production's legacy service_role event-write surface.
@@ -82,6 +92,7 @@ try{
     '20260917174000_bsc_usdt_smart_contract_escrow.sql',
     '20260918123504_phase3f_outcome_feedback.sql',
     '20260918124631_phase3f_runtime_identities.sql',
+    '20260918191547_phase3f_commercial_figures.sql',
   ]){
     await admin.query(await readFile(join(root,'supabase/migrations',file),'utf8'));
   }
@@ -304,6 +315,41 @@ try{
     assert.equal(recognized.settlement_source,'escrow_release');
     assert.equal(Number(recognized.amount_cents),10000);
     assert.equal(Number(recognized.margin_cents),7000);
+  });
+
+  await test('commercial scorecard exposes real figures and segment performance',async()=>{
+    const scorecard=(await asRole('empire_outcome_reader',
+      'select public.get_phase3f_commercial_scorecard($1) result',[30])).rows[0].result;
+    assert.equal(Number(scorecard.actual_revenue_cents),20000);
+    assert.equal(Number(scorecard.actual_cost_cents),6000);
+    assert.equal(Number(scorecard.gross_profit_cents),14000);
+    assert.equal(Number(scorecard.gross_margin_rate),0.7);
+    assert.equal(Number(scorecard.gross_margin_pct),70);
+    assert.equal(scorecard.currency,'USD');
+    assert.equal(scorecard.settlement_asset,'USDT');
+    assert.equal(scorecard.settlement_chain,'BSC');
+    assert.equal(Number(scorecard.recognized_revenue_orders),2);
+    assert.equal(Number(scorecard.outcome_orders),1);
+    assert.equal(Number(scorecard.won),1);
+    assert.equal(Number(scorecard.conversion_rate),1);
+    assert.equal(Number(scorecard.conversion_rate_pct),100);
+    assert.equal(Number(scorecard.average_buyer_satisfaction),4.5);
+    assert.equal(Number(scorecard.revenue_per_recognized_order_cents),10000);
+    assert.equal(scorecard.by_niche[0].niche,'roofing');
+    assert.equal(scorecard.by_niche[0].metro,'houston');
+    assert.equal(Number(scorecard.by_niche[0].actual_revenue_cents),20000);
+    assert.equal(Number(scorecard.by_niche[0].gross_profit_cents),14000);
+    assert.equal(scorecard.by_buyer.length,2);
+    assert.equal(Number(scorecard.by_buyer[0].actual_cost_cents),3000);
+    assert.equal(Number(scorecard.by_buyer[0].gross_margin_rate),0.7);
+
+    const feedback=(await asRole('empire_outcome_reader',
+      'select public.get_commercial_outcome_feedback($1) result',[100])).rows[0].result;
+    assert.ok(feedback.length>=2);
+    await assert.rejects(
+      asRole('empire_outcome_reader','select count(*) from public.commercial_events'),
+      /permission denied/
+    );
   });
 
   console.log(passed+' Phase 3F outcome/revenue tests passed; no production database contacted.');

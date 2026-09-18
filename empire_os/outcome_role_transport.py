@@ -37,6 +37,16 @@ ROLE_FUNCTIONS = {
             ("p_fulfilment_order_id", "p_actor"),
         ),
     },
+    "empire_outcome_reader": {
+        "get_commercial_outcome_feedback": (
+            "select public.get_commercial_outcome_feedback(%s)",
+            ("p_limit",),
+        ),
+        "get_phase3f_commercial_scorecard": (
+            "select public.get_phase3f_commercial_scorecard(%s)",
+            ("p_days",),
+        ),
+    },
 }
 
 

@@ -98,3 +98,24 @@ def test_astra_observer_can_read_feedback_only():
         rpc("record_commercial_outcome", {})
     with pytest.raises(OutcomeTransportError, match="not allowed"):
         rpc("recognize_bsc_revenue", {})
+
+
+def test_reader_role_can_read_figures_but_cannot_write():
+    factory = Factory({
+        "actual_revenue_cents": 10000,
+        "gross_profit_cents": 7000,
+    })
+    rpc = PostgresOutcomeRpc(
+        "postgresql://secret", "empire_outcome_reader",
+        connect_factory=factory,
+    )
+    result = rpc(
+        "get_phase3f_commercial_scorecard",
+        {"p_days": 30},
+    )
+    assert result["actual_revenue_cents"] == 10000
+    assert "get_phase3f_commercial_scorecard" in factory.cursor.calls[-1][0]
+    with pytest.raises(OutcomeTransportError, match="not allowed"):
+        rpc("recognize_bsc_revenue", {})
+    with pytest.raises(OutcomeTransportError, match="not allowed"):
+        rpc("record_commercial_outcome", {})
