@@ -1,6 +1,7 @@
 """Empire Coder — governed developer intelligence for EmpireOS."""
 
 from .context import ContextBuilder, ContextPack
+from .jobs import CoderJob, JobKind, JobStatus, LocalJobQueue
 from .models import (
     CoderTask,
     TaskPhase,
@@ -22,9 +23,15 @@ from .refinement import (
 from .repo import RepoIntelligence
 from .router import ModelProfile, ModelRouter
 from .verifier import Verifier
+from .worker import CoderTaskWorker
 
 __all__ = [
     "Capability",
+    "CoderJob",
+    "CoderTaskWorker",
+    "JobKind",
+    "JobStatus",
+    "LocalJobQueue",
     "CoderTask",
     "ContextBuilder",
     "ContextPack",

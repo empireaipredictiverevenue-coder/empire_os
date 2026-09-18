@@ -119,6 +119,9 @@ Foundation status — local/tested, production activation gated:
 - Controlled self-build scope that cannot silently widen authority.
 - Staged canonical coder_* Supabase schema with a dedicated least-privilege engineering-state role.
 - Staged localhost-only Ollama systemd packaging; not installed/enabled automatically.
+- Disabled-by-default, internal-token-gated `/v1/coder/*` API for task state and proposal-job queueing only; no remote execution/patch/deploy endpoint.
+- Resumable local job queue with stale-job recovery and proposal-only PLAN / NEXT_COMMAND worker.
+- Staged Coder worker service/timer with localhost-only network access; not installed/enabled automatically.
 
 Candidate engineering changes stop at human approval. Commit/push/merge/deploy, production DB changes, service control, outbound, payment/funds and production credentials remain gated.
 

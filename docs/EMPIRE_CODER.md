@@ -108,6 +108,37 @@ Empire Coder can improve itself only through the same governed pipeline. Default
 
 Self-build cannot silently widen its own authority.
 
+## Internal API and Resumable Worker
+
+Empire Coder exposes a deliberately narrow internal control plane under `/v1/coder`.
+
+Public-safe:
+- `GET /v1/coder/health` — reports OBSERVE mode, whether the internal API is enabled, and confirms there is no production authority.
+
+Internal-token gated and disabled by default:
+- create/read task state;
+- read compact task memory;
+- enqueue a PLAN job;
+- enqueue a NEXT_COMMAND proposal job;
+- read job status;
+- read knowledge-garden health.
+
+The API has no run, execute, patch, commit, merge, deploy, migration or service-control endpoint.
+
+Activation requires both:
+- `EMPIRE_CODER_API_ENABLED=1`
+- a non-empty `EMPIRE_CODER_API_INTERNAL_TOKEN`
+
+Authentication uses constant-time token comparison. Without both configuration values, control endpoints fail closed.
+
+Long model work is placed in `runtime/coder/jobs` rather than executed inside the HTTP request.
+
+`LocalJobQueue` supports atomic claim, completion/failure state and stale-running-job recovery. `CoderTaskWorker` currently processes only:
+- PLAN — best-of-N implementation planning, proposal only;
+- NEXT_COMMAND — best-of-N command synthesis and policy classification, never execution.
+
+`empire-coder-worker.service` and timer are staged but not installed/enabled. The staged worker service is filesystem-restricted and network-restricted to localhost so it can reach local Ollama without receiving general outbound network access.
+
 ## Runtime Packaging
 
 empire-ollama.service is staged only and is not installed/enabled automatically. It binds Ollama to localhost, loads one model at a time, allows one parallel generation and runs as ubuntu with restrictive systemd protections.
@@ -117,10 +148,10 @@ empire-ollama.service is staged only and is not installed/enabled automatically.
 1. Canonical PostgreSQL state transport after migration and credential approval.
 2. Structured model-to-patch schema with AST validation before patch application.
 3. Separate writer and verifier model routes so verification can use a different model/provider.
-4. Resumable engineering task worker/queue with crash recovery from compact context snapshots.
-5. Governed /v1/coder API for task creation, status, context, proposals and verification.
-6. Task-specific knowledge promotion so REVIEW skills can be temporarily activated with provenance.
-7. Disposable sandbox/container for higher-risk development commands.
-8. Multi-agent execution scheduler using the existing specialist role definitions and file-ownership DAG.
-9. Repeatable local/hosted coding benchmark suite for routing decisions.
-10. Controlled end-to-end self-build benchmark that creates a patch, tests it, verifies it and stops at approval.
+4. Task-specific knowledge promotion so REVIEW sources can be temporarily activated with provenance.
+5. Disposable sandbox/container for higher-risk development commands.
+6. Multi-agent execution scheduler using specialist roles and file-ownership DAG.
+7. Repeatable local/hosted coding benchmark suite for model-routing decisions.
+8. Controlled end-to-end self-build benchmark that creates a patch, tests it, verifies it and stops at approval.
+9. Internal API authorization integration with the broader EmpireOS identity layer once that canonical layer is selected.
+10. Production activation only after API auth, state transport, worker runtime and rollback controls have been reviewed together.
