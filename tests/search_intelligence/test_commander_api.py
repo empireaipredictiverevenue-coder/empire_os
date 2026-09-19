@@ -55,6 +55,9 @@ class FakeSearchRepository:
     def internal_links(self, *, limit):
         return self._rows("internal_links", limit)
 
+    def ai_visibility(self, *, limit):
+        return self._rows("ai_visibility", limit)
+
 
 def _repository_client(repository):
     app = FastAPI()
@@ -235,3 +238,62 @@ def test_internal_links_endpoint_uses_canonical_repository_contract():
     assert body["limit"] == 9
     assert body["items"] == [{"kind": "internal_links", "rank": 1}]
     assert repository.calls[-1] == ("internal_links", 9)
+
+
+def test_ai_visibility_repository_endpoint_uses_canonical_contract():
+    repository = FakeSearchRepository()
+    response = _repository_client(repository).get(
+        "/v1/search/ai-visibility?limit=11"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "canonical_search_repository"
+    assert body["limit"] == 11
+    assert body["items"] == [{"kind": "ai_visibility", "rank": 1}]
+
+
+def test_ai_visibility_preview_counts_only_observed_citations():
+    response = _client().post(
+        "/v1/search/ai-visibility/preview",
+        json={
+            "query": "predictive revenue software",
+            "engine": "answer_engine",
+            "empire_domains": ["empire-ai.co.uk"],
+            "observations": [
+                {
+                    "query": "predictive revenue software",
+                    "engine": "answer_engine",
+                    "observed_at": "2026-09-19T20:00:00+00:00",
+                    "cited_url": "https://empire-ai.co.uk/guides/revenue",
+                    "source_url": "https://answer.example/result/1",
+                    "citation_position": 2,
+                    "mention_text": "Empire AI",
+                    "provenance": ["provider_capture:1"],
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "OBSERVE"
+    assert body["execution_allowed"] is False
+    assert body["analysis"]["available"] is True
+    assert body["analysis"]["empire_cited"] is True
+    assert body["analysis"]["empire_positions"] == [2]
+
+
+def test_ai_visibility_preview_keeps_missing_evidence_unknown():
+    response = _client().post(
+        "/v1/search/ai-visibility/preview",
+        json={
+            "query": "predictive revenue software",
+            "engine": "answer_engine",
+            "empire_domains": ["empire-ai.co.uk"],
+            "observations": [],
+        },
+    )
+    assert response.status_code == 200
+    analysis = response.json()["analysis"]
+    assert analysis["available"] is False
+    assert analysis["empire_cited"] is None
+    assert analysis["reason"] == "no_observed_ai_citation_evidence"

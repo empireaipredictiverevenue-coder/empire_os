@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from .attribution import preview_search_revenue_attribution
+from .ai_visibility import AiCitationObservation, analyse_ai_visibility
 from .commander import SearchCommanderAgent
 from .competitor_gap import analyse_competitor_gap
 from .health import search_health
@@ -24,6 +25,25 @@ from .search_console import (
 )
 from .serp import SerpResultEvidence, SerpSnapshot
 
+
+
+
+class AiCitationObservationRequest(BaseModel):
+    query: str
+    engine: str
+    observed_at: str
+    cited_url: str
+    source_url: str | None = None
+    citation_position: int | None = Field(default=None, ge=1)
+    mention_text: str | None = None
+    provenance: list[str] = Field(min_length=1)
+
+
+class AiVisibilityPreviewRequest(BaseModel):
+    query: str
+    engine: str
+    empire_domains: list[str] = Field(min_length=1)
+    observations: list[AiCitationObservationRequest] = Field(default_factory=list)
 
 class AnalyseRequest(BaseModel):
     page: dict[str, Any]
@@ -200,6 +220,41 @@ def create_search_router(
     @router.get("/internal-links")
     def internal_links(limit: int = Query(default=200, ge=1, le=500)):
         return _collection("internal_links", limit)
+
+    @router.get("/ai-visibility")
+    def ai_visibility(limit: int = Query(default=200, ge=1, le=500)):
+        return _collection("ai_visibility", limit)
+
+    @router.post("/ai-visibility/preview")
+    def ai_visibility_preview(req: AiVisibilityPreviewRequest):
+        try:
+            observations = tuple(
+                AiCitationObservation(
+                    query=item.query,
+                    engine=item.engine,
+                    observed_at=item.observed_at,
+                    cited_url=item.cited_url,
+                    source_url=item.source_url,
+                    citation_position=item.citation_position,
+                    mention_text=item.mention_text,
+                    provenance=tuple(item.provenance),
+                )
+                for item in req.observations
+            )
+            analysis = analyse_ai_visibility(
+                observations,
+                empire_domains=tuple(req.empire_domains),
+                query=req.query,
+                engine=req.engine,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_allowed": False,
+            "analysis": analysis.as_dict(),
+        }
 
     @router.post("/revenue/preview")
     def revenue_attribution_preview(req: RevenueAttributionPreviewRequest):

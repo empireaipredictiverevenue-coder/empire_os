@@ -38,6 +38,9 @@ class SearchRepository(Protocol):
     def internal_links(self, *, limit: int) -> Sequence[Mapping[str, Any]]:
         ...
 
+    def ai_visibility(self, *, limit: int) -> Sequence[Mapping[str, Any]]:
+        ...
+
 
 def bounded_limit(value: int, *, maximum: int = 500) -> int:
     return max(1, min(int(value), maximum))

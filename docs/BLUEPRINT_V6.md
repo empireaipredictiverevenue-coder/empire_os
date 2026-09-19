@@ -27,7 +27,7 @@ QUALITY → FIRST REVENUE → PROVE ECONOMICS → CAPTURE OUTCOMES → IMPROVE P
 - Public Agent Web health, A2A Agent Card and WebMCP manifest live.
 - Canonical market intelligence snapshot is Supabase-backed and public-safe/aggregated.
 - `market.search`, aggregate `opportunity.search`, and revenue-backed SEO keyword intelligence execute live.
-- AEO/GEO/citation schemas are exposed but evidence adapters remain pending; no fabricated visibility claims.
+- AEO/GEO/citation evidence adapter ✅ local/tested: only observed citation/mention evidence is counted, missing evidence remains unknown, and no fabricated visibility score or ranking is emitted. Production observation ingestion remains gated.
 - Astra bootstrap is deterministic/plan-only.
 - Autonomous execution service remains OBSERVE.
 - BSC payment verification, buyer-payment evidence binding, and separated payment
@@ -180,6 +180,7 @@ Foundation scope:
 Search Fabric remains the retrieval/discovery substrate. Search Intelligence is the quality, governance, AEO/GEO, opportunity and commercial-attribution layer above it.
 
 Search Command Centre foundation ✅ local/tested: `apps/search-command-centre/` is a Next.js 16 + TypeScript + Tailwind server-rendered dashboard for Organic Revenue, opportunities, page intelligence, alerts and Search Console readiness. A `/technical` drill-down now covers repository-backed indexation, content-decay and cannibalisation evidence. It consumes governed `search-v1` APIs via a server-only API binding, renders gated/unknown states instead of fabricated zeros, and is not the source of truth.
+AEO/GEO/citation evidence slice ✅ local/tested: staged tenant-scoped `seo_ai_visibility_observations`, read-only repository/API access and evidence-only preview analysis record observed cited URLs/positions/provenance. No observation means visibility is unavailable rather than zero; no publishing, provider mutation or synthetic AI-visibility score exists.
 
 Production database migration, Search Console credentials, sitemap/index submission, content publishing, redirects and robots/canonical mutation remain explicitly gated.
 

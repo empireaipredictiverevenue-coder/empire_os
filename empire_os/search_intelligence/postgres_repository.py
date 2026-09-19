@@ -290,6 +290,27 @@ class PostgresSearchRepository:
         )
 
 
+    def ai_visibility(
+        self,
+        *,
+        limit: int,
+    ) -> Sequence[Mapping[str, Any]]:
+        return self._read(
+            """
+            SELECT
+              v.id,v.site_id,v.query,v.engine,v.cited_url,v.source_url,
+              v.citation_position,v.mention_text,v.provenance,
+              v.observed_at,v.created_at
+            FROM public.seo_ai_visibility_observations v
+            JOIN public.seo_sites s ON s.id = v.site_id
+            WHERE s.tenant_key = %s
+            ORDER BY v.observed_at DESC, v.id
+            LIMIT %s
+            """,
+            (self.tenant_key, bounded_limit(limit)),
+        )
+
+
 
 def configured_search_repository_from_env(
     *,
