@@ -196,6 +196,8 @@ Foundation slice ✅ local/tested: canonical `empire_conversations` + append-onl
 ### Phase 8 — Revenue CRM
 Prospect/buyer graph, conversations, pipeline, deal probability, next action, follow-ups, preferences, territory/capacity, offers/contracts/payments, retention, expansion and customer success.
 
+Foundation slice ✅ local/tested: staged read-only `revenue_crm_prospects` and `revenue_crm_buyers` projections compose canonical prospects, Conversation OS, closer state, fulfilment state and buyer activation/capacity. `deal_probability` remains NULL until a calibrated evidence-backed model exists; no follow-up automation, payment action, CRM mutation or production migration is activated.
+
 ### Phase 9 — Advertising Brain
 Google/Meta integrations, video/ad factory, UGC/avatar creative, A/B testing, media buying, ROAS/profit optimisation, budget allocation, retargeting and landing-page feedback loops.
 
