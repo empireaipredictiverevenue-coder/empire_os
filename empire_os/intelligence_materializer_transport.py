@@ -123,12 +123,15 @@ class PostgresIntelligenceMaterializer:
               data_completeness_score,business_presence_score,
               market_fit_score,engagement_potential_score,
               enrichment_quality_score,recommended_action,
-              scoring_engine,scoring_version,scored_at
+              scoring_engine,scoring_version,evidence_confidence,
+              observed_dimensions,unknown_dimensions,scored_at
             FROM public.prospect_qualifications
             WHERE prospect_id=%s
               AND scoring_engine='empire_os.lead_scoring'
-              AND scoring_version='v1'
-            ORDER BY scored_at DESC
+              AND scoring_version IN ('v2','v1')
+            ORDER BY
+              CASE scoring_version WHEN 'v2' THEN 0 ELSE 1 END,
+              scored_at DESC
             LIMIT 1
             """,
             (pid,),
@@ -136,7 +139,7 @@ class PostgresIntelligenceMaterializer:
         qualification = self._row(cursor)
         if qualification is None:
             raise IntelligenceMaterializerTransportError(
-                "v1 qualification not found"
+                "compatible qualification not found"
             )
 
         return prospect, links[0], qualification

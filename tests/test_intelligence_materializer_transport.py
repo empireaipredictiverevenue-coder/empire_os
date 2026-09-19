@@ -162,6 +162,12 @@ def test_materialize_sets_role_and_inserts_only_fixed_shapes():
     assert result["scores_inserted"] == 1
     assert result["facts_existing"] == 0
     assert result["scores_existing"] == 0
+    qualification_sql = next(
+        sql for sql, _ in cursor.calls
+        if "FROM public.prospect_qualifications" in sql
+    )
+    assert "scoring_version IN (\'v2\',\'v1\')" in qualification_sql
+    assert "CASE scoring_version WHEN \'v2\' THEN 0 ELSE 1 END" in qualification_sql
     assert not any(
         call[0].startswith(("UPDATE ", "DELETE "))
         for call in cursor.calls

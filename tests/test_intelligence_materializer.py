@@ -74,9 +74,63 @@ def test_builds_evidence_preserving_plan():
     assert score.model_key == "empire_os.lead_scoring:v1"
     assert (
         score.explanation["confidence_basis"]
-        == "data_completeness_score/100; "
-        "not outcome-calibrated predictive confidence"
+        == "data_completeness_score/100; legacy v1 "
+        "completeness proxy, not outcome-calibrated "
+        "predictive confidence"
     )
+
+
+def test_v2_uses_evidence_confidence_not_completeness():
+    prospect, link, qualification = inputs()
+    qualification.update({
+        "scoring_version": "v2",
+        "data_completeness_score": 80.0,
+        "evidence_confidence": 0.35,
+        "observed_dimensions": ["market_fit"],
+        "unknown_dimensions": [
+            "business_presence",
+            "engagement_potential",
+            "enrichment_quality",
+        ],
+    })
+
+    plan = build_materialization_plan(
+        prospect=prospect,
+        identity_link=link,
+        qualification=qualification,
+    )
+
+    score = plan.score_rows[0]
+    assert score.confidence == 0.35
+    assert score.model_key == "empire_os.lead_scoring:v2"
+    assert score.features["source_key"] == (
+        "empire.qualification.lead_scoring.v2"
+    )
+    assert score.features["observed_dimensions"] == ["market_fit"]
+    assert score.features["unknown_dimensions"] == [
+        "business_presence",
+        "engagement_potential",
+        "enrichment_quality",
+    ]
+    assert score.explanation["confidence_basis"].startswith(
+        "qualification.evidence_confidence"
+    )
+
+
+def test_v2_missing_evidence_confidence_fails_closed():
+    prospect, link, qualification = inputs()
+    qualification["scoring_version"] = "v2"
+    qualification["evidence_confidence"] = None
+
+    with pytest.raises(
+        IntelligenceMaterializerError,
+        match="v2 evidence confidence is required",
+    ):
+        build_materialization_plan(
+            prospect=prospect,
+            identity_link=link,
+            qualification=qualification,
+        )
 
 
 def test_missing_fields_are_skipped_not_invented():

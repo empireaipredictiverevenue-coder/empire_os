@@ -72,6 +72,11 @@ try{
     'utf8',
   );
   await admin.query(migration);
+  const v2Compat=await readFile(
+    join(root,'supabase/migrations/20260919130000_intelligence_materializer_v2_compat.sql'),
+    'utf8',
+  );
+  await admin.query(v2Compat);
 
   await test('roles restricted and passwordless',async()=>{
     const rows=(await admin.query(
@@ -96,6 +101,7 @@ try{
     assert.deepEqual(rows,[
       'empire.prospect.canonical.v1',
       'empire.qualification.lead_scoring.v1',
+      'empire.qualification.lead_scoring.v2',
     ]);
   });
 
@@ -177,6 +183,22 @@ try{
       "'company','00000000-0000-0000-0000-000000000011',",
       "'lead_qualification',76.4,0.6,'empire_os.lead_scoring:v1',",
       "'{}'::jsonb,'{}'::jsonb,'2026-09-19T09:05:00Z') returning id",
+    ].join(' ');
+    const inserted=await asRole(
+      'empire_intelligence_materializer',
+      sql,
+    );
+    assert.equal(inserted.rowCount,1);
+  });
+
+  await test('valid v2 qualification score insert succeeds',async()=>{
+    const sql=[
+      'insert into intelligence_scores(',
+      'entity_type,entity_id,score_type,score,confidence,',
+      'model_key,features,explanation,scored_at) values(',
+      "'company','00000000-0000-0000-0000-000000000013',",
+      "'lead_qualification',74.0,0.35,'empire_os.lead_scoring:v2',",
+      "'{}'::jsonb,'{}'::jsonb,'2026-09-19T09:06:00Z') returning id",
     ].join(' ');
     const inserted=await asRole(
       'empire_intelligence_materializer',

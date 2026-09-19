@@ -14,7 +14,7 @@ class IntelligenceMaterializerError(RuntimeError):
 
 
 PROSPECT_SOURCE_KEY = "empire.prospect.canonical.v1"
-QUALIFICATION_SOURCE_KEY = "empire.qualification.lead_scoring.v1"
+SUPPORTED_QUALIFICATION_VERSIONS = {"v1", "v2"}
 
 
 @dataclass(frozen=True)
@@ -222,6 +222,16 @@ def build_materialization_plan(
     version = str(
         qualification.get("scoring_version") or ""
     ).strip()
+    if (
+        engine != "empire_os.lead_scoring"
+        or version not in SUPPORTED_QUALIFICATION_VERSIONS
+    ):
+        raise IntelligenceMaterializerError(
+            "unsupported qualification model"
+        )
+    qualification_source_key = (
+        f"empire.qualification.lead_scoring.{version}"
+    )
     completeness = qualification.get(
         "data_completeness_score"
     )
@@ -246,19 +256,52 @@ def build_materialization_plan(
             raise IntelligenceMaterializerError(
                 "data completeness must be between 0 and 100"
             )
+        if version == "v2":
+            evidence_confidence = qualification.get(
+                "evidence_confidence"
+            )
+            if evidence_confidence is None:
+                raise IntelligenceMaterializerError(
+                    "v2 evidence confidence is required"
+                )
+            score_confidence = _unit(
+                evidence_confidence,
+                field="v2 evidence confidence",
+            )
+            confidence_basis = (
+                "qualification.evidence_confidence; "
+                "evidence sufficiency, not outcome-calibrated "
+                "predictive confidence"
+            )
+        else:
+            score_confidence = completeness_value / 100.0
+            confidence_basis = (
+                "data_completeness_score/100; legacy v1 "
+                "completeness proxy, not outcome-calibrated "
+                "predictive confidence"
+            )
         score_rows.append(
             ScoreObservation(
                 entity_id=entity_id,
                 score_type="lead_qualification",
                 score=score_value,
-                confidence=completeness_value / 100.0,
+                confidence=score_confidence,
                 model_key=f"{engine}:{version}",
                 features={
                     "prospect_id": prospect_id,
                     "qualification_id": qualification_id,
-                    "source_key": QUALIFICATION_SOURCE_KEY,
+                    "source_key": qualification_source_key,
                     "tier": qualification.get("tier"),
                     "data_completeness_score": completeness_value,
+                    "evidence_confidence": qualification.get(
+                        "evidence_confidence"
+                    ),
+                    "observed_dimensions": qualification.get(
+                        "observed_dimensions"
+                    ),
+                    "unknown_dimensions": qualification.get(
+                        "unknown_dimensions"
+                    ),
                     "business_presence_score": qualification.get(
                         "business_presence_score"
                     ),
@@ -276,10 +319,7 @@ def build_materialization_plan(
                     "recommended_action": qualification.get(
                         "recommended_action"
                     ),
-                    "confidence_basis": (
-                        "data_completeness_score/100; "
-                        "not outcome-calibrated predictive confidence"
-                    ),
+                    "confidence_basis": confidence_basis,
                 },
                 scored_at=_iso(
                     scored_at,
