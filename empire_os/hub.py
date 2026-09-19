@@ -2475,30 +2475,21 @@ def get_counts():
 
 @app.post("/v1/revenue/snapshot/{snapshot_date}")
 def revenue_snapshot(snapshot_date: str, tenant_id: str = "default"):
-    """Compute daily revenue snapshot for a date."""
-    if not backend:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-    snap = DailyRevenueSnapshotter(backend)
-    result = snap.recompute_snapshot(snapshot_date, tenant_id)
-    return {
-        "date": result.date,
-        "tenant_id": result.tenant_id,
-        "gross_cents": result.gross_cents,
-        "gross_dollars": f"${result.gross_cents // 100}.{result.gross_cents % 100:02d}",
-        "settlement_count": result.settlement_count,
-    }
+    """Retired legacy revenue recomputation mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_revenue_snapshot_retired_use_canonical_phase3f_revenue_worker",
+    )
 
 
 @app.post("/v1/revenue/brief")
 def revenue_brief_endpoint():
-    """Generate and return the daily revenue brief."""
-    if not revenue_worker:
-        raise HTTPException(status_code=503, detail="Revenue worker not initialized")
-    msg = revenue_worker.tick()
-    return {"message": msg}
+    """Retired legacy revenue worker trigger."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_revenue_brief_tick_retired_use_canonical_revenue_read_model",
+    )
 
-
-# --- Delegate to Scout-Agent ---
 
 @app.get("/v1/delegate/scanners")
 def delegate_list_scanners():
@@ -2510,12 +2501,11 @@ def delegate_list_scanners():
 
 @app.post("/v1/delegate/scan")
 def delegate_scan(niches: Optional[str] = None, min_score: float = 0.30):
-    """Delegate a scan to the remote scout-agent container."""
-    if not scout_agent:
-        raise HTTPException(status_code=503, detail="scout-agent not initialized")
-    niche_list = [n.strip() for n in niches.split(",")] if niches else None
-    result = scout_agent.scan(niches=niche_list, min_score=min_score)
-    return result
+    """Retired public remote scanner execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_delegate_scan_retired_use_governed_source_mesh",
+    )
 
 
 @app.get("/v1/delegate/health")
@@ -2595,11 +2585,11 @@ def agi_scout_state():
 
 @app.post("/v1/agi/scout/tick")
 def agi_scout_tick():
-    """Run one AGI Scout observe-reason-act cycle."""
-    global agi_scout
-    if not agi_scout:
-        raise HTTPException(503, "agi-scout not initialized")
-    return agi_scout.tick()
+    """Retired direct AGI scout execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_agi_scout_tick_retired_use_governed_source_mesh",
+    )
 
 
 @app.get("/v1/agi/marketing/state")
@@ -2638,64 +2628,39 @@ def agi_sales_state():
 # Video Ads Engine endpoint
 @app.post("/v1/video/brief")
 def video_brief(req: dict):
-    """Submit a video-ads brief. Synthesizes an MP4 via ffmpeg.
-
-    Body: { copy, niche, duration_s, brand }
-    Returns: { render_id, path/url, ... }
-    """
-    import subprocess as _sp, secrets as _se
-    brief = req.get("copy", "Empire OS")
-    niche = req.get("niche", "general")
-    duration = min(int(req.get("duration_s", 15)), 60)
-    outpath = (Path("/root/feedback/renders")
-               if Path("/root/feedback/renders").exists()
-               else Path("/tmp/renders"))
-    outpath.mkdir(parents=True, exist_ok=True)
-    render_id = "rdr_" + _se.token_hex(6)
-    path = outpath / (render_id + ".mp4")
-    cmd = (
-        f"ffmpeg -y -f lavfi -i color=c=0x101828:s=720x1280:d={duration}:r=30 "
-        f"-vf \"drawtext=text='{brief}':fontcolor=white:fontsize=44:"
-        f"x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=0x101828@0.4:"
-        f"boxborderw=18\" -c:v libx264 -preset ultrafast -pix_fmt yuv420p "
-        f"\"{path}\" 2>/dev/null"
+    """Retired direct shell-based video rendering path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_video_brief_retired_use_governed_advertising_creative_flow",
     )
-    try:
-        rc = _sp.run(["bash", "-c", cmd], timeout=60).returncode
-        return {"render_id": render_id, "path": str(path),
-                "url": f"/v1/renders/{render_id}.mp4",
-                "ffmpeg_rc": rc}
-    except Exception as e:
-        return {"render_id": render_id, "error": str(e)[:200]}
 
 
-# Cinematic Landing-Page endpoint
 @app.post("/v1/cinematic/render")
 def cinematic_render(req: dict):
-    """Render a high-converting HTML LP from a brief."""
-    import secrets as _se
-    lp_id = "lp_" + _se.token_hex(6)
-    outdir = (Path("/root/feedback/rendered_lps")
-              if Path("/root/feedback/rendered_lps").exists()
-              else Path("/tmp/lps"))
-    outdir.mkdir(parents=True, exist_ok=True)
-    html = (
-        f"<!DOCTYPE html><html><head><title>{req.get('headline','')}</title>"
-        f"<meta name='description' content='{req.get('subhead','')}'>"
-        f"<script src='https://cdn.tailwindcss.com'></script></head>"
-        f"<body class='bg-slate-950 text-white'>"
-        f"<section class='min-h-screen flex flex-col items-center "
-        f"justify-center text-center px-8'>"
-        f"<h1 class='text-6xl font-bold'>{req.get('headline','')}</h1>"
-        f"<p class='text-2xl mt-8'>{req.get('subhead','')}</p>"
-        f"<div class='mt-12 text-4xl font-mono'>{req.get('price','')}</div>"
-        f"<a href='/signup' class='mt-8 inline-block bg-emerald-500 "
-        f"text-slate-950 px-12 py-6 rounded-2xl text-3xl font-bold'>"
-        f"{req.get('cta','')}</a></section></body></html>"
+    """Generate an in-memory, non-published cinematic landing preview."""
+    import html as _html
+
+    headline = _html.escape(str(req.get("headline") or "")[:180])
+    subhead = _html.escape(str(req.get("subhead") or "")[:320])
+    price = _html.escape(str(req.get("price") or "")[:80])
+    cta = _html.escape(str(req.get("cta") or "Learn more")[:80])
+    niche = str(req.get("niche") or "")[:120]
+
+    markup = (
+        f"<!DOCTYPE html><html><head><title>{headline}</title>"
+        f"<meta name='description' content='{subhead}'>"
+        f"</head><body><main>"
+        f"<h1>{headline}</h1><p>{subhead}</p>"
+        f"<div>{price}</div><button>{cta}</button>"
+        f"</main></body></html>"
     )
-    (outdir / (lp_id + ".html")).write_text(html)
-    return {"lp_id": lp_id, "url": f"/v1/lps/{lp_id}.html",
-            "niche": req.get("niche", "")}
+    return {
+        "mode": "PREVIEW",
+        "published": False,
+        "execution_authority": "none",
+        "niche": niche,
+        "html": markup,
+    }
 
 
 # Tenant Studio endpoint
@@ -2707,11 +2672,16 @@ def tenant_portal(tenant: str = ""):
 
 @app.post("/v1/media/schedule")
 def media_schedule(req: dict):
-    """Stub. media-suite agent schedules post next poll."""
-    return {"ok": True, "scheduled_at": datetime.now(timezone.utc).isoformat()}
+    """Recommendation-only media scheduling preview."""
+    return {
+        "ok": True,
+        "scheduled": False,
+        "mode": "OBSERVE",
+        "execution_authority": "none",
+        "requested": dict(req),
+    }
 
 
-# Prompts product: tiered access to 382 OSS prompts
 @app.get("/v1/prompts/tiers")
 def prompts_tiers():
     """Show available tiers and access counts."""
@@ -3406,27 +3376,12 @@ def list_agents():
 
 @app.post("/v1/agents/{agent_name}/dispatch")
 def dispatch_to_agent(agent_name: str, payload: dict):
-    """Send a message to a registered agent.
+    """Retired public direct-agent dispatch path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_agent_dispatch_retired_use_governed_execution_bus",
+    )
 
-    Body: free-form JSON the agent's endpoint understands.
-    """
-    if agent_name not in AGENT_REGISTRY:
-        raise HTTPException(404, f"unknown agent: {agent_name}")
-    info = AGENT_REGISTRY[agent_name]
-    try:
-        import urllib.request
-        url = f"http://{info['host']}:{info['port']}/dispatch"
-        req = urllib.request.Request(
-            url, data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return {"dispatched": True, "response": json.loads(resp.read().decode())}
-    except Exception as e:
-        raise HTTPException(502, f"dispatch failed: {e}")
-
-
-# --- Decision Queue ---
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard_page():
@@ -4295,29 +4250,11 @@ async def ppc_list_invoices(limit: int = 50):
 
 @app.post("/v1/swarms/events")
 async def swarm_log_event(request: Request):
-    """Station 0 (keyword-expert) calls this to emit
-    MarketOpportunityFound events. Body: any JSON object with
-    fields event_type + niche_id. Append-only file backed."""
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(400, "invalid JSON body")
-    if not isinstance(body, dict):
-        raise HTTPException(400, "body must be object")
-    if "event_type" not in body or "niche_id" not in body:
-        raise HTTPException(400, "requires event_type + niche_id")
-    body.setdefault("ts",
-                    datetime.utcnow().replace(tzinfo=timezone.utc).isoformat())
-    with SWARMS_LOG.open("a") as f:
-        f.write(json.dumps(body) + "\n")
-    # Trim if too large
-    try:
-        lines = SWARMS_LOG.read_text().splitlines()
-        if len(lines) > SWARMS_MAX_LINES:
-            SWARMS_LOG.write_text("\n".join(lines[-SWARMS_MAX_LINES:]) + "\n")
-    except Exception:
-        pass
-    return {"ok": True, "logged": True, "path": str(SWARMS_LOG)}
+    """Retired unauthenticated file-backed swarm event writer."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_swarm_event_writer_retired_use_governed_execution_bus",
+    )
 
 
 @app.get("/v1/swarms/events")

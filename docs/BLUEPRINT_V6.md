@@ -276,6 +276,7 @@ Production repositories, provider credentials, trusted keys, migrations and cons
 - `/v1/hub/intake` now converges business leads onto canonical Supabase prospect ingestion with no `lane_leads` fallback; storm alerts no longer create fake CRM prospects, and legacy outreach register/touched SQLite mutations are retired.
 - Canonical prospect consent is staged as append-only grant/revoke evidence with a latest-state view and governed `/v1/consent/*` API. The old damage-consent SQLite mutation/read routes are retired, the opt-in landing page now POSTs to canonical consent, and consent recording never implies outbound send authority.
 - Public hub hardening milestone: direct SQL mutation calls have been eliminated from `empire_os/hub.py`; remaining legacy carrier roster inspection is read-only and public carrier scrape/batch writers are retired.
+- Public execution hardening: direct shell video rendering, public cross-agent dispatch, legacy revenue worker ticks, remote delegated scanning, AGI scout ticks and unauthenticated swarm event-file writes are retired. Cinematic landing generation is now an escaped in-memory preview (`published=false`), and media scheduling is recommendation-only.
 
 ## Infrastructure Gated Until Economically Justified
 Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deployment, heavy model-serving infrastructure and continuous retraining remain later-stage tools. They activate only when measured scale, reliability or revenue requirements justify the complexity.
