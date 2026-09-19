@@ -229,6 +229,8 @@ Foundation slice ✅ local/tested: staged canonical `ad_accounts`, `ad_campaigns
 
 Second slice ✅ local/tested: provider observations can now be normalized into an existing canonical campaign through a dedicated append-only NOLOGIN RPC role. Provider observation IDs are idempotent, attribution nulls remain null, and the fail-closed ingest API has no campaign creation, budget, pause or retarget authority.
 
+Third slice ✅ local/tested: campaign economics review now aggregates observed spend/conversions and exposes ROAS/profit-ROAS only when attribution evidence is complete. Partial attribution remains unknown rather than zero; budget, pause and retarget execution stay disabled.
+
 ### Phase 10 — Predictive Cloud V3
 Trend Radar, market/demand/business/buyer/revenue/profit forecasts, churn, LTV, capacity, conversion, Horizon forecasts, Revenue GPS and connected Business/Buyer/Signal/Revenue graphs.
 

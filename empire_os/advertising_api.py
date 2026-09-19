@@ -6,7 +6,9 @@ from typing import Any, Mapping, Protocol
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from empire_os.advertising_brain import normalise_ad_observation
 from empire_os.advertising_ingest import build_canonical_ad_observation
+from empire_os.advertising_review import review_campaign_economics
 
 
 class AdvertisingReadAdapter(Protocol):
@@ -25,6 +27,11 @@ class AdvertisingReadAdapter(Protocol):
 class AdvertisingObservationRepository(Protocol):
     def append(self, item):
         ...
+
+
+class AdvertisingCampaignReviewRequest(BaseModel):
+    campaign_id: str
+    observations: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AdvertisingObservationIngestRequest(BaseModel):
@@ -126,6 +133,30 @@ def create_advertising_router(
             "count": len(items),
             "limit": limit,
             "items": items,
+        }
+
+    @router.post("/campaigns/review/preview")
+    def campaign_review(req: AdvertisingCampaignReviewRequest):
+        try:
+            observations = tuple(
+                normalise_ad_observation(row)
+                for row in req.observations
+            )
+            result = review_campaign_economics(
+                observations,
+                campaign_id=req.campaign_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "campaign_creation": False,
+            "budget_mutation": False,
+            "pause_mutation": False,
+            "retarget_execution": False,
+            "review": result.as_dict(),
         }
 
     @router.post("/observations/ingest")
