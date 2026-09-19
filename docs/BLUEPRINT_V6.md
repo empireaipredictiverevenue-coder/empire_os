@@ -221,6 +221,8 @@ Foundation slice ✅ local/tested: governed demand-plan and evidence records are
 ### Phase 13 — Revenue Exchange
 Inventory marketplace, real-time pricing, exclusives, territories, human/agent buyers, supply-demand pricing, capacity-aware allocation and Revenue Lanes.
 
+Foundation slice ✅ local/tested: staged `revenue_exchange_observations` and a typed exchange snapshot separate inventory/capacity/verified-price intelligence from execution. Supply-demand ratio and observed price ranges are derived only from canonical evidence; allocation, exclusivity enforcement, settlement and production migration remain governed and unexposed.
+
 ### Phase 14 — Digital Twin
 Simulate markets, campaigns, pricing, buyers, inventory, sales capacity, ad spend and offers before deploying real capital.
 
