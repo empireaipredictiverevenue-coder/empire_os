@@ -31,6 +31,34 @@ def test_candidate_scoring_uses_only_observed_fields():
     assert c.mode == "OBSERVE" and c.write_authorized is False
 
 
+def test_directory_website_is_not_first_party_buyer_evidence():
+    row = {
+        "id": "dir-1",
+        "business_name": "Directory Roofing",
+        "website": "https://www.bbb.org/us/tx/austin/profile/roofing-contractors/example",
+        "phone": "5125550101",
+        "niche": "roofing",
+        "metro": "Austin, TX",
+        "buy_signal_score": 100,
+        "contact_name": "Jane Smith",
+        "contact_title": "Owner",
+        "entity_id": "e-dir",
+    }
+    candidate = build_candidate(
+        row,
+        entity_id="e-dir",
+        entity_linked=True,
+    )
+    assert candidate.website == ""
+    assert candidate.evidence["has_website"] is False
+    assert candidate.evidence["directory_website_rejected"] is True
+    assert select_candidates([row], min_score=0, limit=10) == []
+    assert generate_work_email_candidates(
+        "Jane Smith",
+        row["website"],
+    ) == []
+
+
 def test_selection_requires_website_and_sorts_by_quality():
     rows = [
         {"id":"a","business_name":"A","website":"https://a.test","phone":"1",

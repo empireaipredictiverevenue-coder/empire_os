@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from empire_os.buyer_discovery import select_candidates
+from empire_os.niche_taxonomy import metro_key, niche_family
 
 
 def _load_env():
@@ -62,6 +63,19 @@ def load_rows():
     return prospects
 
 
+def filter_market_rows(rows, *, niche="", metro=""):
+    target_family = niche_family(niche) if str(niche or "").strip() else ""
+    target_metro = metro_key(metro) if str(metro or "").strip() else ""
+    selected = []
+    for row in rows:
+        if target_family and niche_family(row.get("niche")) != target_family:
+            continue
+        if target_metro and metro_key(row.get("metro")) != target_metro:
+            continue
+        selected.append(row)
+    return selected
+
+
 def public_candidate(candidate):
     value = candidate.to_dict()
     return {
@@ -83,16 +97,34 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Empire real-buyer discovery preview")
     p.add_argument("--limit", type=int, default=25)
     p.add_argument("--min-score", type=float, default=50.0)
+    p.add_argument("--niche", default="",
+                   help="optional target niche/family, e.g. roofing")
+    p.add_argument("--metro", default="",
+                   help="optional target metro, e.g. Austin, TX")
     p.add_argument("--probe", type=int, default=0,
                    help="probe public websites for up to N top candidates")
     p.add_argument("--probe-timeout", type=float, default=10.0,
                    help="hard per-site child-process timeout in seconds")
     args = p.parse_args(argv)
-    rows = load_rows()
-    candidates = select_candidates(rows, min_score=args.min_score, limit=args.limit)
+    source_rows = load_rows()
+    rows = filter_market_rows(
+        source_rows,
+        niche=args.niche,
+        metro=args.metro,
+    )
+    candidates = select_candidates(
+        rows,
+        min_score=args.min_score,
+        limit=args.limit,
+    )
     output = {
-        "mode": "OBSERVE", "write_authorized": False,
-        "source_rows": len(rows), "candidate_count": len(candidates),
+        "mode": "OBSERVE",
+        "write_authorized": False,
+        "source_rows": len(source_rows),
+        "market_rows": len(rows),
+        "target_niche": args.niche or None,
+        "target_metro": args.metro or None,
+        "candidate_count": len(candidates),
         "candidates": [public_candidate(c) for c in candidates],
     }
     if args.probe:

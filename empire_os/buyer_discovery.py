@@ -12,6 +12,8 @@ from typing import Any, Iterable, Mapping
 from uuid import UUID
 from urllib.parse import urlparse
 
+from empire_os.search_fabric.verification import is_directory_url
+
 ECONOMIC_BUYER_TERMS = (
     "founder", "co-founder", "owner", "chief executive", "ceo",
     "managing director", "president", "principal", "chief revenue", "cro",
@@ -169,10 +171,17 @@ def choose_offer(record: Mapping[str, Any], decision_role: str) -> str:
     return "software_mrr"
 
 
+def _first_party_website(value: Any) -> str:
+    website = _text(value)
+    if not website or is_directory_url(website):
+        return ""
+    return website
+
+
 def score_company(record: Mapping[str, Any], *, entity_linked: bool = False) -> float:
     score = 0.0
     if _text(record.get("business_name")): score += 10
-    if _text(record.get("website")): score += 20
+    if _first_party_website(record.get("website")): score += 20
     if _text(record.get("phone")): score += 10
     if _text(record.get("niche")): score += 5
     if _text(record.get("metro")): score += 5
@@ -191,13 +200,15 @@ def build_candidate(record: Mapping[str, Any], *, entity_id: str | None = None,
     role, decision_score = classify_decision_role(record.get("contact_title")) if valid_person else ("unknown", 0.0)
     score = score_company(record, entity_linked=entity_linked)
     offer = choose_offer(record, role)
+    raw_website = _text(record.get("website"))
+    first_party_website = _first_party_website(raw_website)
     return BuyerCandidate(
         prospect_id=_text(record.get("id")),
         entity_id=_text(entity_id) or None,
         business_name=_text(record.get("business_name")),
         niche=_text(record.get("niche")),
         metro=_text(record.get("metro")),
-        website=_text(record.get("website")),
+        website=first_party_website,
         phone=_text(record.get("phone")),
         contact_name=_text(record.get("contact_name")) if valid_person else "",
         contact_title=_text(record.get("contact_title")) if valid_person else "",
@@ -209,7 +220,10 @@ def build_candidate(record: Mapping[str, Any], *, entity_id: str | None = None,
         evidence={
             "buy_signal_score": _bounded(record.get("buy_signal_score")),
             "entity_linked": bool(entity_linked),
-            "has_website": bool(_text(record.get("website"))),
+            "has_website": bool(first_party_website),
+            "directory_website_rejected": bool(
+                raw_website and not first_party_website
+            ),
             "has_phone": bool(_text(record.get("phone"))),
             "has_named_contact": valid_person,
             "raw_contact_name_present": bool(_text(record.get("contact_name"))),
@@ -275,6 +289,10 @@ def rank_site_people(people: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]
 
 
 def enrich_candidate(candidate: BuyerCandidate, site_evidence: Mapping[str, Any]) -> dict[str, Any]:
+    if not candidate.website or is_directory_url(candidate.website):
+        return {"candidate": candidate.to_dict(), "site_evidence": {}, "decision_maker": None,
+                "contact_candidates": [], "contact_email_candidates": [],
+                "mode": "OBSERVE", "write_authorized": False}
     if not isinstance(site_evidence, Mapping) or site_evidence.get("ok") is not True:
         return {"candidate": candidate.to_dict(), "site_evidence": {}, "decision_maker": None,
                 "contact_candidates": [], "contact_email_candidates": [],
@@ -360,7 +378,8 @@ def generate_work_email_candidates(person_name: Any, company_website: Any) -> li
     name = _text(person_name)
     if not looks_like_person_name(name):
         return []
-    host = _host(company_website)
+    website = _first_party_website(company_website)
+    host = _host(website)
     if not host:
         return []
     parts = [re.sub(r"[^a-z]", "", part.lower()) for part in name.replace("-", " ").replace("'", " ").split()]

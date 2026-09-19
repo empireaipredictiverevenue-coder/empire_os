@@ -14,8 +14,8 @@ The current bottleneck is decision-maker/contact resolution, not raw company dis
 
 ## Operating sequence
 1. Rank real canonical businesses using observed company evidence.
-2. Require a public website before enrichment.
-3. Probe only public company pages and structured data.
+2. Require a first-party company website before enrichment; directory/social platform URLs do not count as company-site evidence.
+3. Probe only first-party public company pages and structured data.
 4. Separate schema.org `Person` evidence from business identity.
 5. Rank economic/functional buyers from explicit titles.
 6. Validate names for personhood; page labels do not count as people.
@@ -39,7 +39,9 @@ Official company-site emails and generated work-email patterns are different evi
 Observed company-site emails may enter contact verification. Generated patterns remain candidates only and must not become outreach-ready without mailbox-level evidence.
 The review-only proposal CLI never writes or sends. It renders the candidate-review payload and, only with an explicit approved review UUID, the reviewed-outbound payload for human review.
 ## Bounded batch review
-- `scripts/buyer_discovery_preview.py --probe N` now isolates each public-site probe in a child process.
+- `scripts/buyer_discovery_preview.py` supports optional `--niche` and `--metro` filters using the canonical niche-family/metro normalization, so review can be scoped to a real target market before ranking or probing.
+- Directory/social URLs are stripped from buyer candidates, contribute no website score, cannot seed generated work-email patterns, and are never sent to the public-site probe.
+- `scripts/buyer_discovery_preview.py --probe N` isolates each public-site probe in a child process.
 - `--probe-timeout` applies a hard per-site deadline so broken websites cannot stall the batch or remote bridge.
 - Results include explicit rejection reasons such as `site_timeout`, `no_decision_maker`, `no_bound_contact`, `role_address_only`, and `contact_not_verified`.
 - DNS-only contact validation is used in preview mode; no email is sent and no SMTP mailbox probe is required.
