@@ -193,6 +193,9 @@ Foundation slice ✅ local/tested: `/a2a/v1/discovery` now publishes machine-rea
 Second slice ✅ local/tested: authenticated agent identity now supports a non-executing `commerce.intent` scope in addition to discovery. A staged append-only `a2a_commercial_intents` contract + dedicated NOLOGIN RPC role records quote/negotiation/task requests as `pending_approval`; the fail-closed `/v1/a2a-commerce/intents` API remains unbound by default. No approval, execution, payment or allocation RPC exists in this slice.
 
 ### Phase 7 — Conversation OS
+
+Second slice ✅ local/tested: provider ingestion now records deterministic payload hashes, requires timezone-aware event timestamps and treats exact replay as idempotent while rejecting altered payloads under the same provider-event ID. Persistence remains append-only and provider sends/calls/bookings stay disabled.
+
 Vonage, ElevenLabs, streaming voice, barge-in, tone mirroring, summaries/transcripts, AI qualification/closing, human escalation, booking, objections, DISC/coaching, dynamic offers and unified conversation history across email/voice/A2A/CRM.
 
 Foundation slice ✅ local/tested: canonical `empire_conversations` + append-only `empire_conversation_events` are staged as the shared channel-neutral history layer across email/SMS/voice/A2A, linked to existing prospects, entities, buyers, opportunities and closer cases. No provider ingestion writer, Vonage call, ElevenLabs streaming, outbound, booking or production migration is activated.

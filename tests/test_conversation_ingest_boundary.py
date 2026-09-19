@@ -16,13 +16,26 @@ class FakeRepository:
 
     def append(self, *, provider, external_conversation_id, event):
         key = (event.conversation_id, event.provider_event_id)
+        payload_hash = str(
+            (event.evidence or {}).get("payload_sha256") or ""
+        )
         if key in self.events:
+            existing = self.events[key]
+            if existing["payload_sha256"] != payload_hash:
+                return {
+                    "status": "conflict",
+                    "reason": "provider_event_payload_mismatch",
+                    "event_id": existing["event_id"],
+                }
             return {
                 "status": "existing",
-                "event_id": self.events[key],
+                "event_id": existing["event_id"],
             }
         event_id = f"event-{len(self.events) + 1}"
-        self.events[key] = event_id
+        self.events[key] = {
+            "event_id": event_id,
+            "payload_sha256": payload_hash,
+        }
         return {"status": "recorded", "event_id": event_id}
 
 
@@ -32,7 +45,7 @@ def client(repository=None):
     return TestClient(app)
 
 
-def vonage_payload():
+def vonage_payload(text="Interested"):
     return {
         "provider": "vonage",
         "conversation_id": "conversation-1",
@@ -42,7 +55,7 @@ def vonage_payload():
             "event_type": "speech_received",
             "timestamp": "2026-09-19T20:45:00+00:00",
             "direction": "inbound",
-            "text": "Interested",
+            "text": text,
             "actor": "buyer",
         },
     }
@@ -77,7 +90,7 @@ def test_provider_event_appends_without_execution_authority():
     assert body["booking_execution"] is False
 
 
-def test_provider_event_is_idempotent():
+def test_exact_provider_event_replay_is_idempotent():
     repo = FakeRepository()
     c = client(repo)
     first = c.post(
@@ -94,7 +107,26 @@ def test_provider_event_is_idempotent():
     assert len(repo.events) == 1
 
 
-def test_rpc_repository_maps_canonical_event():
+def test_changed_payload_with_same_provider_event_id_conflicts():
+    repo = FakeRepository()
+    c = client(repo)
+    first = c.post(
+        "/v1/conversations/events/ingest",
+        json=vonage_payload("Interested"),
+    )
+    second = c.post(
+        "/v1/conversations/events/ingest",
+        json=vonage_payload("Different payload"),
+    )
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert second.json()["detail"] == (
+        "provider_event_payload_mismatch"
+    )
+    assert len(repo.events) == 1
+
+
+def test_rpc_repository_maps_payload_hash_evidence():
     calls = []
 
     def rpc(name, params):
@@ -115,6 +147,7 @@ def test_rpc_repository_maps_canonical_event():
     assert calls[0][0] == "ingest_conversation_provider_event"
     assert calls[0][1]["p_provider"] == "vonage"
     assert calls[0][1]["p_provider_event_id"] == "provider-event-1"
+    assert len(calls[0][1]["p_evidence"]["payload_sha256"]) == 64
 
 
 def test_transport_rejects_non_ingest_rpc_before_connect():

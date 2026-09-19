@@ -98,6 +98,14 @@ def create_conversation_router(
             event=event,
         )
         status = str(result.get("status") or "").strip()
+        if status == "conflict":
+            raise HTTPException(
+                status_code=409,
+                detail=str(
+                    result.get("reason")
+                    or "conversation_provider_event_conflict"
+                ),
+            )
         if status not in {"recorded", "existing"}:
             raise HTTPException(
                 status_code=502,

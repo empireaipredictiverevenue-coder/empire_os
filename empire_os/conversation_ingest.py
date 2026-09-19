@@ -1,13 +1,52 @@
-"""Read-only provider event normalizers for Conversation OS."""
+"""Provider event normalizers for Conversation OS."""
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+import hashlib
+import json
 from typing import Any, Mapping
 
-from empire_os.conversation_os import ConversationDirection, ConversationEventRecord
+from empire_os.conversation_os import (
+    ConversationDirection,
+    ConversationEventRecord,
+)
 
 
-SUPPORTED_PROVIDERS = frozenset({"vonage", "elevenlabs", "email", "a2a"})
+SUPPORTED_PROVIDERS = frozenset({
+    "vonage",
+    "elevenlabs",
+    "email",
+    "a2a",
+})
+
+
+def _stable_payload_hash(payload: Mapping[str, Any]) -> str:
+    try:
+        encoded = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            default=str,
+        ).encode("utf-8")
+    except Exception as exc:
+        raise ValueError("provider payload is not serializable") from exc
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _validate_occurred_at(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("occurred_at required")
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError("occurred_at must be ISO-8601") from exc
+    if parsed.tzinfo is None:
+        raise ValueError("occurred_at must include timezone")
+    return raw
 
 
 @dataclass(frozen=True)
@@ -18,6 +57,7 @@ class ProviderConversationEvent:
     event_type: str
     direction: ConversationDirection
     occurred_at: str
+    payload_sha256: str
     actor: str | None = None
     text: str | None = None
     evidence: Mapping[str, Any] | None = None
@@ -29,10 +69,11 @@ class ProviderConversationEvent:
             ("external_conversation_id", self.external_conversation_id),
             ("provider_event_id", self.provider_event_id),
             ("event_type", self.event_type),
-            ("occurred_at", self.occurred_at),
+            ("payload_sha256", self.payload_sha256),
         ):
             if not str(value or "").strip():
                 raise ValueError(f"{name} required")
+        _validate_occurred_at(self.occurred_at)
 
     def to_conversation_event(
         self,
@@ -43,11 +84,11 @@ class ProviderConversationEvent:
         if not cid:
             raise ValueError("canonical conversation_id required")
         evidence = dict(self.evidence or {})
-        evidence.setdefault("provider", self.provider)
-        evidence.setdefault(
-            "external_conversation_id",
-            self.external_conversation_id,
+        evidence["provider"] = self.provider
+        evidence["external_conversation_id"] = (
+            self.external_conversation_id
         )
+        evidence["payload_sha256"] = self.payload_sha256
         return ConversationEventRecord(
             conversation_id=cid,
             event_type=self.event_type,
@@ -58,6 +99,8 @@ class ProviderConversationEvent:
             provider_event_id=self.provider_event_id,
             evidence=evidence,
         )
+
+
 def _direction(value: Any) -> ConversationDirection:
     text = str(value or "").strip().lower()
     aliases = {
@@ -117,6 +160,9 @@ def normalise_provider_event(
         },
     }
     mapping = field_maps[name]
+    occurred_at = _validate_occurred_at(
+        str(payload.get(mapping["time"]) or "").strip()
+    )
     event = ProviderConversationEvent(
         provider=name,
         external_conversation_id=str(
@@ -125,9 +171,12 @@ def normalise_provider_event(
         provider_event_id=str(
             payload.get(mapping["event"]) or ""
         ).strip(),
-        event_type=str(payload.get(mapping["type"]) or "").strip(),
+        event_type=str(
+            payload.get(mapping["type"]) or ""
+        ).strip(),
         direction=_direction(payload.get(mapping["direction"])),
-        occurred_at=str(payload.get(mapping["time"]) or "").strip(),
+        occurred_at=occurred_at,
+        payload_sha256=_stable_payload_hash(payload),
         actor=(
             str(payload.get("actor")).strip()
             if payload.get("actor") is not None
@@ -138,7 +187,10 @@ def normalise_provider_event(
             if payload.get(mapping["text"]) is not None
             else None
         ),
-        evidence={"raw_kind": name},
+        evidence={
+            "raw_kind": name,
+            "provider_schema": "v1",
+        },
     )
     event.validate()
     return event
