@@ -260,6 +260,8 @@ Second slice ✅ local/tested: demand readiness analysis now requires observed d
 
 Third slice ✅ local/tested: governed demand-plan registry persists only review-ready evidence-backed plans with idempotent read-only history. Publishing, outbound, ad-spend and provider activation remain hard-disabled.
 
+Fourth slice ✅ local/tested: observed demand outcome feedback now compares the plan success metric against later evidence-backed outcomes and preserves missing outcome evidence as unknown. Feedback never enables publishing, outbound, ad spend or provider activation.
+
 ### Phase 13 — Revenue Exchange
 Inventory marketplace, real-time pricing, exclusives, territories, human/agent buyers, supply-demand pricing, capacity-aware allocation and Revenue Lanes.
 

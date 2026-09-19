@@ -5,6 +5,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from empire_os.demand_genesis import DemandPlan
+from empire_os.demand_outcome import (
+    DemandOutcomeEvidence,
+    review_demand_outcome,
+)
 from empire_os.demand_registry import DemandRegistryRecord
 from empire_os.demand_readiness import (
     DemandEvidenceSnapshot,
@@ -27,6 +31,16 @@ class DemandPlanRegistryRequest(BaseModel):
     historical_conversion_rate: float | None = Field(default=None, ge=0, le=1)
     observed_cost_cents: int | None = Field(default=None, ge=0)
     evidence: dict = Field(default_factory=dict)
+
+class DemandOutcomeRequest(BaseModel):
+    plan_id: str
+    success_metric: str
+    baseline_value: float | None = None
+    observed_value: float | None = None
+    observed_cost_cents: int | None = Field(default=None, ge=0)
+    observed_at: str
+    evidence_refs: list[str] = Field(min_length=1)
+
 
 class DemandEvidenceRequest(BaseModel):
     plan_id: str
@@ -59,6 +73,33 @@ def create_demand_router(registry=None) -> APIRouter:
             "ad_spend_enabled": False,
             "provider_activation_enabled": False,
             "registry_available": registry is not None,
+        }
+
+    @router.post("/outcome/preview")
+    def outcome_preview(req: DemandOutcomeRequest):
+        try:
+            review = review_demand_outcome(
+                DemandOutcomeEvidence(
+                    plan_id=req.plan_id,
+                    success_metric=req.success_metric,
+                    baseline_value=req.baseline_value,
+                    observed_value=req.observed_value,
+                    observed_cost_cents=req.observed_cost_cents,
+                    observed_at=req.observed_at,
+                    evidence_refs=tuple(req.evidence_refs),
+                )
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "publishing_enabled": False,
+            "outbound_enabled": False,
+            "ad_spend_enabled": False,
+            "provider_activation_enabled": False,
+            "outcome_review": review.as_dict(),
         }
 
     @router.post("/readiness/preview")
