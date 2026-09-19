@@ -94,6 +94,7 @@ from empire_os.data_plane_api import create_data_plane_router
 from empire_os.agi_control_api import create_agi_control_router
 from empire_os.quant_brain_api import create_quant_brain_router
 from empire_os.company_operating_api import create_company_operating_router
+from empire_os.strategy_api import create_strategy_router
 from empire_os.ceo import build_brief
 from empire_os.daily_revenue import DailyRevenueSnapshotter, DailyRevenueBriefWorker
 from empire_os.remote_scanner import ScoutAgentClient
@@ -501,6 +502,7 @@ app.include_router(create_data_plane_router())
 app.include_router(create_agi_control_router())
 app.include_router(create_quant_brain_router())
 app.include_router(create_company_operating_router())
+app.include_router(create_strategy_router())
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────

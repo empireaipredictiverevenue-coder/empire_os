@@ -786,13 +786,25 @@ Raw signals
    Research portfolio, experiments, prototypes, evaluation, product transfer,
    defensible IP and research-to-commercial-value loops.
 
-8. `BLUEPRINT_V6.md`
+8. `STRATEGY_DEPARTMENT_BLUEPRINT.md`
+   Corporate, market, competitive, portfolio, SEO/keyword, AI and strategic
+   investment strategy.
+
+9. `SEO_KEYWORD_STRATEGY.md`
+   Search-demand portfolio, topic clusters, keyword-to-product mapping,
+   programmatic SEO and AI-search/GEO strategy.
+
+10. `AI_STRATEGY.md`
+   AI capability portfolio, build/buy/open-source decisions, model economics,
+   proprietary data advantage, evaluation and AI product strategy.
+
+11. `BLUEPRINT_V6.md`
    Engineering/phase implementation roadmap and production gates.
 
-9. `COMMERCIAL_BLUEPRINT.md`
+12. `COMMERCIAL_BLUEPRINT.md`
    Buyer/seats/territories/corridors/MRR detail.
 
-10. Phase/product docs
+13. Phase/product docs
    Implementation-specific detail.
 
 No future phase document should silently redefine the company model.
@@ -850,6 +862,13 @@ Turn founder intent into a maximum-three-priority company stack, explicit
 decision rights, cross-functional dependencies, daily/weekly/monthly operating
 reviews and a unified initiative portfolio across Marketing, R&D, Product,
 Engineering, Data, Sales and Revenue.
+
+### Track K — Strategy Department
+Run where-to-play/how-to-win strategy across market/corridor selection,
+competitive advantage, strategic bets, product/portfolio choices, SEO/keyword
+portfolio, AI capability portfolio and scenario/resource-allocation decisions.
+Strategy supplies choices; Chief of Staff turns them into company priorities;
+functional departments execute within governance.
 
 ## 21. Non-Negotiable Principles
 

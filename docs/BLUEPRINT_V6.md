@@ -178,6 +178,14 @@ Chief of Staff Operating System ✅ canonical design: founder attention, maximum
 
 Company Operating System V1 ✅ local/tested: the /v1/company-ops/* surface exposes OBSERVE-only initiative ranking, founder-brief preview, governed marketing-brief review and R&D-candidate review. It cannot publish, send outreach, spend, launch products, deploy research, staff roles or mutate commercial state.
 
+Strategy Department Blueprint ✅ canonical design: Empire now has explicit corporate, market/corridor, competitive, portfolio, SEO/keyword and AI strategy ownership. Strategy chooses where to play, how to win, which strategic bets to test, which keyword/search portfolios to compound and which AI capabilities to build/buy/open-source. Chief of Staff converts those choices into priorities; Marketing/R&D/Product/Engineering execute them.
+
+SEO/Keyword Strategy ✅ canonical design: keyword/query clusters are mapped to ICP, product, funnel stage, free tool/report, CTA and revenue attribution. Keyword priority is based on observed demand, commercial intent, product/buyer fit, coverage/competitor/AI-citation gaps, conversion evidence and strategic category value; unknown search metrics remain unknown and no page is auto-published/indexed.
+
+AI Strategy ✅ canonical design: Empire manages AI as a capability portfolio across deterministic math, retrieval, statistical models, local/frontier models, multimodal, agents, planner/verifier and outcome learning. Build/buy/open-source decisions depend on proprietary-data advantage, quality, privacy, cost, switching flexibility and strategic value rather than model hype.
+
+Strategy Operating System V1 ✅ local/tested: the /v1/strategy/* surface exposes OBSERVE-only market-thesis review, strategic-bet review, keyword portfolio ranking and AI-capability review. It cannot enter markets, publish/index content, commit capital, activate providers, promote models or expand authority.
+
 ### Phase 5 — Organic Growth Engine
 SEO, AEO, GEO, keyword intelligence, topic clusters, programmatic pages, AI Cards, citation/mention monitoring, authority/backlink graph, competitor citation gaps, public publishing, first-party tracking and content→revenue attribution.
 
