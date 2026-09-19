@@ -141,6 +141,28 @@ Core domains:
 The system learns from Empire-specific wins, losses, payments, fulfilment,
 repeat purchases, churn and gross profit — not generic ICP similarity alone.
 
+### Data Infrastructure / Commercial World Model Plane
+
+The Intelligence Fabric sits on top of the canonical data architecture defined in
+`DATA_INFRASTRUCTURE_BLUEPRINT.md`.
+
+That data plane adds:
+- immutable raw evidence
+- versioned data contracts/schema semantics
+- replay/backfill and deterministic materialization
+- lineage from source -> fact -> feature -> prediction -> action -> outcome
+- source/dataset quality and freshness
+- point-in-time-correct feature data
+- analytical/search/vector/geospatial/time-series serving layers
+- cost attribution by source/pipeline
+- agent-native evidence retrieval
+- measured activation gates for object storage, Kafka/Redpanda, ClickHouse,
+  dedicated search/graph and multi-region infrastructure
+
+Long-term target: a live commercial world model that can reconstruct what Empire
+knew at any point in time, explain why a revenue decision was made, and connect
+that decision to verified realized gross profit.
+
 ## 4. Signal & Data Products
 
 Existing crawlers/scrapers/scanners are upgraded into governed products and
@@ -733,13 +755,17 @@ Raw signals
 1. `MASTER_BUSINESS_BLUEPRINT.md`
    Business, product, intelligence and monetisation truth.
 
-2. `BLUEPRINT_V6.md`
+2. `DATA_INFRASTRUCTURE_BLUEPRINT.md`
+   Data plane, world model, lineage, replay, quality, feature/analytics serving,
+   and measured infrastructure activation rules.
+
+3. `BLUEPRINT_V6.md`
    Engineering/phase implementation roadmap and production gates.
 
-3. `COMMERCIAL_BLUEPRINT.md`
+4. `COMMERCIAL_BLUEPRINT.md`
    Buyer/seats/territories/corridors/MRR detail.
 
-4. Phase/product docs
+5. Phase/product docs
    Implementation-specific detail.
 
 No future phase document should silently redefine the company model.
@@ -748,9 +774,12 @@ No future phase document should silently redefine the company model.
 
 Parallel build tracks:
 
-### Track A — Intelligence Fabric
-Upgrade real crawlers/scrapers/source adapters, entity resolution, temporal
-graph, signal fusion, TAM/market segmentation and source health.
+### Track A — Intelligence Fabric + Data Plane
+Upgrade real crawlers/scrapers/source adapters, immutable raw evidence, data
+contracts, lineage/replay, entity resolution, temporal graph, signal fusion,
+TAM/market segmentation, source health, point-in-time features and data
+observability. Heavy infrastructure remains evidence-triggered rather than
+pre-activated.
 
 ### Track B — Productise Signal Engines
 Permit Intelligence, Storm/Satellite Intelligence, Warehouse/Industrial Radar,

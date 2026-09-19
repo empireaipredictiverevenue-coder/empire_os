@@ -52,6 +52,8 @@ Operating rule: intelligence records remain intelligence until a governed qualif
 
 Moat direction: temporal graph + source provenance + signal fusion + commercial outcomes + causal models + execution history. Every future intelligence engine must read/write through this shared substrate rather than create isolated data silos.
 
+Data Plane V1 ✅ local/tested foundation: canonical architecture now defines immutable raw evidence, versioned data contracts, lineage/replay, quality/freshness, point-in-time features, analytical/search/geospatial serving and measured activation gates for object storage, Kafka/Redpanda, ClickHouse, dedicated search/graph and multi-region. The mounted `/v1/data-plane/*` surface is OBSERVE/dry-run only and cannot deploy, provision, migrate or replay production data.
+
 Competitive design target — business-web search plus closed-loop intelligence:
 - crawl/index primary business websites directly at internet scale; retain source text and change history
 - natural-language ICP, exact-phrase and domain-lookalike search across the company universe
