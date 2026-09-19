@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { connection } from "next/server";
 import {
   type ApiResult,
@@ -227,6 +228,12 @@ export default async function Home() {
               <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400 md:text-base">
                 Governed organic revenue intelligence. Real evidence only. Publishing, index submission and search mutations remain separately gated.
               </p>
+              <Link
+                href="/technical"
+                className="mt-5 inline-flex text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300 hover:text-emerald-200"
+              >
+                Technical intelligence →
+              </Link>
             </div>
 
             <div className="flex flex-wrap gap-2">

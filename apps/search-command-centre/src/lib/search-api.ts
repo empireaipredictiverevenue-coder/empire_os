@@ -70,6 +70,16 @@ async function request<T>(path: string): Promise<ApiResult<T>> {
   }
 }
 
+export async function getTechnicalData() {
+  const [health, indexation, decay, cannibalisation] = await Promise.all([
+    request<Health>("/v1/search/health"),
+    request<CollectionEnvelope>("/v1/search/indexation?limit=20"),
+    request<CollectionEnvelope>("/v1/search/decay?limit=20"),
+    request<CollectionEnvelope>("/v1/search/cannibalisation?limit=20"),
+  ]);
+  return { health, indexation, decay, cannibalisation };
+}
+
 export async function getDashboardData() {
   const [health, summary, searchConsole, pages, opportunities, alerts, revenue] =
     await Promise.all([
