@@ -74,6 +74,7 @@ from empire_os.search_intelligence.api import router as search_intelligence_rout
 from empire_os.coder.api import router as empire_coder_router
 from empire_os.revenue_os_api import create_revenue_os_router
 from empire_os.enterprise_api import create_enterprise_router
+from empire_os.saas_api import create_saas_router
 from empire_os.ceo import build_brief
 from empire_os.daily_revenue import DailyRevenueSnapshotter, DailyRevenueBriefWorker
 from empire_os.remote_scanner import ScoutAgentClient
@@ -461,6 +462,7 @@ app.include_router(search_intelligence_router)
 app.include_router(empire_coder_router)
 app.include_router(create_revenue_os_router())
 app.include_router(create_enterprise_router())
+app.include_router(create_saas_router())
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
