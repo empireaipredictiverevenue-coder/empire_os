@@ -1,6 +1,6 @@
 # Singleton Evidence Identity Plan
 
-Status: local/tested, dry-run only. Production promotion is gated.
+Status: local/tested. One explicitly approved bounded production promotion has been completed; automatic or bulk promotion remains gated.
 
 ## Purpose
 
@@ -56,5 +56,4 @@ current opportunity that can satisfy this path:
 - evidence-aware qualification replay reaches the governed decision-confidence
   floor without inventing engagement evidence.
 
-No business entity, prospect link, v2 qualification, materializer row, outreach,
-or commercial action has been written from this review.
+The explicitly approved bounded production activation created the deterministic All Star Roofing business entity, its one active prospect link, and one v2 qualification. Materializer rows, materializer runtime roles, outreach, buyer allocation, commercial terms, and payments remain unwritten/gated.
