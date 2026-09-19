@@ -12,7 +12,8 @@ class DigitalTwinRegistryTransportError(RuntimeError):
 
 
 RPC_NAME = "record_digital_twin_scenario"
-ROLE = "empire_digital_twin_registry_writer"
+WRITER_ROLE = "empire_digital_twin_registry_writer"
+READER_ROLE = "empire_digital_twin_registry_reader"
 SQL = (
     "select public.record_digital_twin_scenario("
     "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)"
@@ -80,7 +81,7 @@ class PostgresDigitalTwinRegistryRpc:
         try:
             with self._connect(self.dsn) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute("SET LOCAL ROLE " + ROLE)
+                    cursor.execute("SET LOCAL ROLE " + WRITER_ROLE)
                     cursor.execute(SQL, tuple(values))
                     row = cursor.fetchone()
         except Exception as exc:
@@ -94,9 +95,92 @@ class PostgresDigitalTwinRegistryRpc:
         return row[0]
 
 
+READ_SQL = """
+SELECT
+  s.id AS scenario_id,
+  s.scenario_key,
+  s.niche,
+  s.metro,
+  s.baseline_evidence_ref,
+  s.baseline_observed_at,
+  s.observed_demand_units,
+  s.observed_capacity_units,
+  s.observed_price_per_unit_cents,
+  s.demand_multiplier,
+  s.capacity_multiplier,
+  s.price_multiplier,
+  s.evidence,
+  s.execution_authority,
+  s.capital_execution,
+  s.campaign_execution,
+  s.pricing_execution,
+  r.id AS result_id,
+  r.projected_served_units,
+  r.projected_revenue_cents,
+  r.simulated_revenue_delta_cents,
+  r.execution_authority AS result_execution_authority,
+  s.created_at
+FROM public.digital_twin_scenarios s
+LEFT JOIN public.digital_twin_results r
+  ON r.scenario_id=s.id
+ORDER BY s.created_at DESC,s.id DESC
+LIMIT %s
+"""
+
+
+class PostgresDigitalTwinRegistryReader:
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        connect_factory: Callable | None = None,
+    ) -> None:
+        self.dsn = str(dsn or "").strip()
+        if not self.dsn:
+            raise DigitalTwinRegistryTransportError(
+                "dedicated digital twin registry read DSN required"
+            )
+        if connect_factory is None:
+            try:
+                import psycopg
+            except ImportError as exc:
+                raise DigitalTwinRegistryTransportError(
+                    "psycopg is required for digital twin registry read"
+                ) from exc
+            connect_factory = psycopg.connect
+        self._connect = connect_factory
+
+    def __call__(self, *, limit: int) -> list[dict[str, Any]]:
+        bounded = max(1, min(int(limit), 500))
+        try:
+            with self._connect(self.dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL ROLE " + READER_ROLE)
+                    cursor.execute(READ_SQL, (bounded,))
+                    columns = [
+                        description.name
+                        for description in cursor.description
+                    ]
+                    rows = cursor.fetchall()
+        except Exception as exc:
+            raise DigitalTwinRegistryTransportError(
+                "digital twin registry read failed"
+            ) from exc
+        return [
+            dict(zip(columns, row, strict=True))
+            for row in rows
+        ]
+
+
 class RpcDigitalTwinRegistryRepository:
-    def __init__(self, rpc: Callable[[str, dict[str, Any]], Any]):
+    def __init__(
+        self,
+        rpc: Callable[[str, dict[str, Any]], Any],
+        *,
+        reader: Callable[..., list[dict[str, Any]]] | None = None,
+    ):
         self.rpc = rpc
+        self.reader = reader
 
     def record(self, item: DigitalTwinRegistryRecord):
         item.validate()
@@ -136,3 +220,15 @@ class RpcDigitalTwinRegistryRepository:
                 "digital twin registry RPC returned invalid payload"
             )
         return result
+
+    def list_scenarios(self, *, limit: int):
+        if self.reader is None:
+            raise DigitalTwinRegistryTransportError(
+                "digital twin registry reader not activated"
+            )
+        rows = self.reader(limit=limit)
+        if not isinstance(rows, list):
+            raise DigitalTwinRegistryTransportError(
+                "digital twin registry reader returned invalid payload"
+            )
+        return rows
