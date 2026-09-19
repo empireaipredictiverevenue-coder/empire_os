@@ -9,7 +9,11 @@ from empire_os.hub import app
 
 
 @pytest.fixture
-def client():
+def client(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "empire_os.hub.AEO_SURFACE_ROOT",
+        str(tmp_path / "aeo"),
+    )
     with TestClient(app) as c:
         yield c
 
@@ -98,9 +102,10 @@ class TestMarketing:
 
     def test_marketing_tick(self, client):
         resp = client.post("/v1/marketing/tick")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "scanned" in data
+        assert resp.status_code == 410
+        assert resp.json()["detail"] == (
+            "legacy_marketing_tick_retired_use_search_intelligence_and_demand_genesis"
+        )
 
 
 class TestAgiSales:

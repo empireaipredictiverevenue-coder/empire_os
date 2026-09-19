@@ -593,11 +593,11 @@ def traffic_status():
 
 @app.post("/v1/marketing/tick")
 def marketing_tick_endpoint():
-    """Run the marketing tick: gap analysis → draft → register."""
-    if not backend:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-    result = marketing_tick(backend)
-    return result
+    """Retired legacy marketing mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_marketing_tick_retired_use_search_intelligence_and_demand_genesis",
+    )
 
 
 @app.get("/v1/marketing/draft/{niche}")
@@ -611,12 +611,11 @@ def get_draft(niche: str):
 
 @app.post("/v1/marketing/draft/{niche}/deploy")
 def deploy_niche_page(niche: str, surface_root: Optional[str] = None):
-    """Draft an AEO spec for a niche and deploy it to the AEO surface."""
-    if not backend:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-    draft = draft_spec_for_niche(backend, niche)
-    path = deploy_spec(draft, surface_root=surface_root)
-    return {"niche": niche, "deployed_to": str(path), "spec": draft.to_dict()}
+    """Retired direct AEO publish path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_aeo_deploy_retired_use_governed_search_content_flow",
+    )
 
 
 @app.get("/v1/aeo/pages")
@@ -627,11 +626,11 @@ def list_aeo_pages(surface_root: Optional[str] = None):
 
 @app.delete("/v1/aeo/pages/{niche}")
 def delete_aeo_page(niche: str, surface_root: Optional[str] = None):
-    """Remove a published AEO page."""
-    ok = remove_page(niche, surface_root=surface_root)
-    if not ok:
-        raise HTTPException(status_code=404, detail=f"No page found for niche '{niche}'")
-    return {"removed": niche}
+    """Retired direct AEO delete path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_aeo_delete_retired_use_governed_search_content_flow",
+    )
 
 
 # --- Ad-Gen Pipeline ---
@@ -1670,132 +1669,20 @@ def product_detail(sku: str):
 
 @app.post("/v1/a2a/negotiate")
 def a2a_negotiate(req: dict):
-    """Another agent posts buy-intent -> hub quotes + returns settle instr."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    product = req.get("product", "lead_lane")
-    niche = req.get("niche", "")
-    metro = req.get("metro", "")
-    buyer_agent = req.get("buyer_agent", "")
-    wallet = req.get("wallet", "")
-    if not buyer_agent:
-        raise HTTPException(400, "buyer_agent required")
-
-    # map generic niche names to lane sub_niche / category
-    NICHE_ALIAS = {
-        "roofing": "residential_roofing",
-        "roof": "residential_roofing",
-        "roofer": "residential_roofing",
-        "hvac": "hvac",
-        "plumbing": "plumbing",
-        "electrical": "electrical",
-        "solar": "solar",
-        "windows": "windows",
-        "flooring": "flooring",
-        "landscaping": "landscaping",
-    }
-    search_niche = NICHE_ALIAS.get(niche.lower(), niche)
-
-    # map city name to airport-code metro used in lanes
-    METRO_ALIAS = {
-        "phoenix": "PHX", "los angeles": "LAX", "dallas": "DFW",
-        "houston": "HOU", "chicago": "CHI", "new york": "NYC",
-        "atlanta": "ATL", "miami": "MIA", "boston": "BOS",
-        "san francisco": "SFO", "washington": "WDC", "philadelphia": "PHL",
-    }
-    search_metro = METRO_ALIAS.get(metro.lower(), metro.upper()[:3])
-
-    quote = None
-    if product == "lead_lane":
-        row = backend.execute(
-            "SELECT id, seat_price, category, sub_niche, metro FROM lanes "
-            "WHERE (occupied_by IS NULL OR occupied_by = '') "
-            "AND (sub_niche = ? OR category = ? OR sub_niche = ?) AND metro = ? LIMIT 1",
-            (search_niche, search_niche, niche, search_metro),
-        ).fetchone()
-        if row:
-            quote = {
-                "sku": "lead_lane", "lane_id": row[0],
-                "seat_price_usdc": float(row[1]) if row[1] else 0.0,
-                "niche": row[3], "metro": row[4],
-                "memo": f"LANE_{row[0]}",
-            }
-    else:
-        # dynamic: look up SKU in si_products (GitHub-sourced or static)
-        _, prices = load_product_catalog()
-        row = backend.execute(
-            "SELECT sku, tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, "
-            "setup_fee_usdc FROM si_products WHERE sku = ? AND active=1",
-            (product,)).fetchone()
-        price = float(row[1]) if row else prices.get(product)
-        if price:
-            quote = {
-                "sku": product, "price_usdc": price,
-                "tiers": {
-                    "t1": float(row[1]) if row else price,
-                    "t2": float(row[2]) if row else price * 2,
-                    "t3": float(row[3]) if row else price * 5,
-                    "t4_titanium": float(row[4]) if row else price * 10,
-                },
-                "setup_fee_usdc": float(row[5]) if row else 0.0,
-                "whitelabel": bool(row and float(row[5] or 0) > 0),
-                "memo": f"SKU_{product.upper()}",
-            }
-
-    if not quote:
-        return {"matched": False, "message": "no open inventory for intent"}
-
-    try:
-        with open("/root/feedback/a2a_mesh.jsonl", "a") as f:
-            f.write(json.dumps({
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "buyer_agent": buyer_agent, "wallet": wallet,
-                "product": product, "quote": quote,
-            }) + "\n")
-    except Exception:
-        pass
-
-    return {
-        "matched": True,
-        "vault": VAULT,
-        "settle_instruction": {
-            "token": "USDC",
-            "amount_usdc": quote.get("seat_price_usdc") or quote.get("price_usdc"),
-            "to": VAULT,
-            "memo": quote["memo"],
-        },
-        "quote": quote,
-        "note": "Send USDC with memo; listener detects + seats automatically.",
-    }
+    """Retired legacy AI-to-AI settlement negotiation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_a2a_negotiate_retired_use_governed_a2a_commerce_flow",
+    )
 
 
 @app.post("/v1/products/register")
 def product_register(req: dict):
-    """product_factory: register a GitHub-sourced OSS as a B2B SKU."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    sku = (req.get("sku") or "").strip()
-    if not sku:
-        raise HTTPException(400, "sku required")
-    ensure_products_table()
-    backend.execute(
-        "INSERT OR REPLACE INTO si_products "
-        "(sku, name, repo_url, license, description, b2b_angle, "
-        "tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, setup_fee_usdc, "
-        "active, created_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?)",
-        (sku, req.get("name", sku), req.get("repo_url", ""),
-         req.get("license", ""), req.get("description", ""),
-         req.get("b2b_angle", ""),
-         float(req.get("tier1_usdc", 0) or 0),
-         float(req.get("tier2_usdc", 0) or 0),
-         float(req.get("tier3_usdc", 0) or 0),
-         float(req.get("tier4_usdc", 0) or 0),
-         float(req.get("setup_fee_usdc", 0) or 0),
-         datetime.now(timezone.utc).isoformat()))
-    backend.commit()
-    return {"ok": True, "sku": sku,
-            "note": "live in A2A catalog + negotiate"}
+    """Retired legacy SQLite product catalog mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_product_register_retired_use_governed_product_catalog",
+    )
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -3346,24 +3233,11 @@ def agi_marketing_state():
 
 @app.post("/v1/agi/marketing/tick")
 def agi_marketing_tick():
-    """Run one AGI Marketing observe-reason-act cycle, sync to hub AEO surface."""
-    global agi_marketing
-    if not agi_marketing:
-        raise HTTPException(503, "agi-marketing not initialized")
-    result = agi_marketing.tick()
-    # Sync generated content to hub's AEO surface
-    if isinstance(result, dict):
-        sub = result.get("result", {})
-        html = sub.get("html_content", "")
-        niche = sub.get("niche", "")
-        if html and niche:
-            surface_root = Path("/srv/aeo")
-            niche_dir = surface_root / niche
-            niche_dir.mkdir(parents=True, exist_ok=True)
-            (niche_dir / "index.html").write_text(html, encoding="utf-8")
-            sub["synced_to_hub"] = str(niche_dir / "index.html")
-            logger.info("Synced AEO page '%s' to hub surface", niche)
-    return result
+    """Retired AGI marketing mutation/publish path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_agi_marketing_tick_retired_use_governed_search_and_demand_flow",
+    )
 
 
 # --- AGI Sales (in-process) ---
