@@ -41,6 +41,7 @@ The review-only proposal CLI never writes or sends. It renders the candidate-rev
 ## Bounded batch review
 - `scripts/buyer_discovery_preview.py` supports optional `--niche` and `--metro` filters using the canonical niche-family/metro normalization, so review can be scoped to a real target market before ranking or probing.
 - Directory/social URLs are stripped from buyer candidates, contribute no website score, cannot seed generated work-email patterns, and are never sent to the public-site probe.
+- When the canonical prospect has no first-party website, accepted `identity_or_direct` acquisition evidence may supply the first-party site as a provenance-preserving fallback. Canonical first-party website evidence wins when present; buyer discovery does not mutate `prospects.website`.
 - `scripts/buyer_discovery_preview.py --probe N` isolates each public-site probe in a child process.
 - `--probe-timeout` applies a hard per-site deadline so broken websites cannot stall the batch or remote bridge.
 - Results include explicit rejection reasons such as `site_timeout`, `no_decision_maker`, `no_bound_contact`, `role_address_only`, and `contact_not_verified`.

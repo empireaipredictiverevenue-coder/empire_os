@@ -178,10 +178,49 @@ def _first_party_website(value: Any) -> str:
     return website
 
 
+def accepted_acquisition_website(evidence: Any) -> str:
+    if not isinstance(evidence, Mapping):
+        return ""
+    quality = evidence.get("quality")
+    if not isinstance(quality, Mapping):
+        return ""
+    if quality.get("accepted") is not True:
+        return ""
+    if _text(quality.get("source_role")) != "identity_or_direct":
+        return ""
+
+    raw = evidence.get("raw")
+    if not isinstance(raw, Mapping):
+        return ""
+
+    website = _first_party_website(raw.get("business_website"))
+    if website:
+        return website
+
+    tags = raw.get("osm_tags")
+    if isinstance(tags, Mapping):
+        return _first_party_website(tags.get("website"))
+    return ""
+
+
+def _candidate_website(record: Mapping[str, Any]) -> tuple[str, str]:
+    canonical = _first_party_website(record.get("website"))
+    if canonical:
+        return canonical, "canonical_prospect"
+
+    acquired = accepted_acquisition_website(
+        record.get("_acquisition_evidence")
+    )
+    if acquired:
+        return acquired, "accepted_acquisition"
+
+    return "", ""
+
+
 def score_company(record: Mapping[str, Any], *, entity_linked: bool = False) -> float:
     score = 0.0
     if _text(record.get("business_name")): score += 10
-    if _first_party_website(record.get("website")): score += 20
+    if _candidate_website(record)[0]: score += 20
     if _text(record.get("phone")): score += 10
     if _text(record.get("niche")): score += 5
     if _text(record.get("metro")): score += 5
@@ -201,7 +240,7 @@ def build_candidate(record: Mapping[str, Any], *, entity_id: str | None = None,
     score = score_company(record, entity_linked=entity_linked)
     offer = choose_offer(record, role)
     raw_website = _text(record.get("website"))
-    first_party_website = _first_party_website(raw_website)
+    first_party_website, website_source = _candidate_website(record)
     return BuyerCandidate(
         prospect_id=_text(record.get("id")),
         entity_id=_text(entity_id) or None,
@@ -221,8 +260,12 @@ def build_candidate(record: Mapping[str, Any], *, entity_id: str | None = None,
             "buy_signal_score": _bounded(record.get("buy_signal_score")),
             "entity_linked": bool(entity_linked),
             "has_website": bool(first_party_website),
+            "website_source": website_source or None,
             "directory_website_rejected": bool(
-                raw_website and not first_party_website
+                raw_website and is_directory_url(raw_website)
+            ),
+            "acquisition_website_accepted": bool(
+                website_source == "accepted_acquisition"
             ),
             "has_phone": bool(_text(record.get("phone"))),
             "has_named_contact": valid_person,

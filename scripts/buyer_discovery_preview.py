@@ -13,7 +13,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from empire_os.buyer_discovery import select_candidates
+from empire_os.buyer_discovery import (
+    accepted_acquisition_website,
+    select_candidates,
+)
 from empire_os.niche_taxonomy import metro_key, niche_family
 
 
@@ -29,12 +32,27 @@ def _load_env():
         os.environ.setdefault(key.strip(), value.strip())
 
 
-def _pages(select_fn, table, columns, *, filters=None, batch=1000, max_rows=50000):
+def _pages(
+    select_fn,
+    table,
+    columns,
+    *,
+    filters=None,
+    order=None,
+    batch=1000,
+    max_rows=50000,
+):
     rows = []
     offset = 0
     while len(rows) < max_rows:
-        page = select_fn(table, columns=columns, filters=filters,
-                         limit=min(batch, max_rows-len(rows)), offset=offset)
+        page = select_fn(
+            table,
+            columns=columns,
+            filters=filters,
+            order=order,
+            limit=min(batch, max_rows-len(rows)),
+            offset=offset,
+        )
         if not page:
             break
         rows.extend(page)
@@ -54,12 +72,36 @@ def load_rows():
         "id,business_name,niche,metro,phone,website,buy_signal_score,status,notes,contact_name,contact_title,contact_source,contacted_status",
     )
     links = _pages(
-        sb.select, "prospect_entity_links", "prospect_id,entity_id,match_score,active",
+        sb.select,
+        "prospect_entity_links",
+        "prospect_id,entity_id,match_score,active",
         filters={"active": "true"},
     )
-    entity_by_prospect = {str(row["prospect_id"]): str(row["entity_id"]) for row in links}
+    acquisitions = _pages(
+        sb.select,
+        "prospect_acquisitions",
+        "prospect_id,evidence,created_at",
+        order="created_at.desc",
+    )
+    entity_by_prospect = {
+        str(row["prospect_id"]): str(row["entity_id"])
+        for row in links
+    }
+    acquisition_by_prospect = {}
+    for acquisition in acquisitions:
+        prospect_id = str(acquisition.get("prospect_id") or "")
+        if not prospect_id or prospect_id in acquisition_by_prospect:
+            continue
+        evidence = acquisition.get("evidence")
+        if accepted_acquisition_website(evidence):
+            acquisition_by_prospect[prospect_id] = evidence
+
     for row in prospects:
-        row["entity_id"] = entity_by_prospect.get(str(row.get("id")), "")
+        prospect_id = str(row.get("id") or "")
+        row["entity_id"] = entity_by_prospect.get(prospect_id, "")
+        evidence = acquisition_by_prospect.get(prospect_id)
+        if evidence:
+            row["_acquisition_evidence"] = evidence
     return prospects
 
 

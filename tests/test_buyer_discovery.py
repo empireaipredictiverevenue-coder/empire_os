@@ -1,4 +1,5 @@
 from empire_os.buyer_discovery import (
+    accepted_acquisition_website,
     build_candidate,
     classify_decision_role,
     looks_like_person_name,
@@ -57,6 +58,114 @@ def test_directory_website_is_not_first_party_buyer_evidence():
         "Jane Smith",
         row["website"],
     ) == []
+
+
+def accepted_acquisition_evidence(
+    website="https://www.allstarroofingtexas.com/",
+    *,
+    accepted=True,
+    source_role="identity_or_direct",
+):
+    return {
+        "quality": {
+            "accepted": accepted,
+            "confidence": 100,
+            "source_role": source_role,
+        },
+        "raw": {
+            "business_website": website,
+            "osm_tags": {"website": website},
+        },
+    }
+
+
+def test_accepted_acquisition_site_is_first_party_fallback():
+    evidence = accepted_acquisition_evidence()
+    row = {
+        "id": "acq-1",
+        "business_name": "All Star Roofing",
+        "website": "",
+        "phone": "+1-512-477-7827",
+        "niche": "roofing",
+        "metro": "Austin, TX",
+        "buy_signal_score": 80,
+        "entity_id": "e-acq",
+        "_acquisition_evidence": evidence,
+    }
+    candidate = build_candidate(
+        row,
+        entity_id="e-acq",
+        entity_linked=True,
+    )
+    assert accepted_acquisition_website(evidence) == (
+        "https://www.allstarroofingtexas.com/"
+    )
+    assert candidate.website == "https://www.allstarroofingtexas.com/"
+    assert candidate.evidence["website_source"] == "accepted_acquisition"
+    assert candidate.evidence["acquisition_website_accepted"] is True
+    assert candidate.evidence["has_website"] is True
+    assert [item.prospect_id for item in select_candidates(
+        [row], min_score=0, limit=10
+    )] == ["acq-1"]
+
+
+def test_acquisition_site_fallback_is_fail_closed():
+    for evidence in (
+        accepted_acquisition_evidence(accepted=False),
+        accepted_acquisition_evidence(source_role="discovery_only"),
+        accepted_acquisition_evidence(
+            website="https://www.bbb.org/us/tx/austin/example"
+        ),
+        {"quality": {"accepted": True, "source_role": "identity_or_direct"}},
+    ):
+        assert accepted_acquisition_website(evidence) == ""
+
+    row = {
+        "id": "acq-bad",
+        "business_name": "Bad Acquisition",
+        "website": "",
+        "niche": "roofing",
+        "metro": "Austin, TX",
+        "_acquisition_evidence": accepted_acquisition_evidence(
+            accepted=False
+        ),
+    }
+    assert build_candidate(row).website == ""
+    assert select_candidates([row], min_score=0, limit=10) == []
+
+
+def test_canonical_first_party_site_precedes_acquisition_fallback():
+    row = {
+        "id": "canonical-wins",
+        "business_name": "Canonical Co",
+        "website": "https://canonical.example",
+        "niche": "roofing",
+        "metro": "Austin, TX",
+        "_acquisition_evidence": accepted_acquisition_evidence(
+            website="https://acquired.example"
+        ),
+    }
+    candidate = build_candidate(row)
+    assert candidate.website == "https://canonical.example"
+    assert candidate.evidence["website_source"] == "canonical_prospect"
+    assert candidate.evidence["acquisition_website_accepted"] is False
+
+
+def test_directory_canonical_site_can_fall_back_to_accepted_acquisition():
+    row = {
+        "id": "directory-fallback",
+        "business_name": "Directory Fallback",
+        "website": "https://www.bbb.org/example",
+        "niche": "roofing",
+        "metro": "Austin, TX",
+        "_acquisition_evidence": accepted_acquisition_evidence(
+            website="https://firstparty.example"
+        ),
+    }
+    candidate = build_candidate(row)
+    assert candidate.website == "https://firstparty.example"
+    assert candidate.evidence["directory_website_rejected"] is True
+    assert candidate.evidence["acquisition_website_accepted"] is True
 
 
 def test_selection_requires_website_and_sorts_by_quality():
