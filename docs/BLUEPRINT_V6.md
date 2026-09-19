@@ -206,6 +206,8 @@ Foundation slice ✅ local/tested: staged canonical `ad_accounts`, `ad_campaigns
 ### Phase 10 — Predictive Cloud V3
 Trend Radar, market/demand/business/buyer/revenue/profit forecasts, churn, LTV, capacity, conversion, Horizon forecasts, Revenue GPS and connected Business/Buyer/Signal/Revenue graphs.
 
+Foundation slice ✅ local/tested: `predictive_cloud_v3` now supports bounded explainable directional forecasts from canonical observed time series only, with a seven-observation minimum gate, explicit trend slope/R²/evidence confidence, and `insufficient_history` instead of guessed direction. Staged forecast/signal tables are read-only to the current service role; no autonomous commercial execution or production migration is activated.
+
 ### Phase 11 — Experiment + Causal Engine
 Controlled experiments, counterfactuals, holdouts, creative/offer/pricing/page tests, incrementality and causal attribution.
 
