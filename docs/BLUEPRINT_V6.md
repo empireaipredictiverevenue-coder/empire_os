@@ -191,6 +191,8 @@ Foundation slice ✅ local/tested: `/a2a/v1/discovery` now publishes machine-rea
 ### Phase 7 — Conversation OS
 Vonage, ElevenLabs, streaming voice, barge-in, tone mirroring, summaries/transcripts, AI qualification/closing, human escalation, booking, objections, DISC/coaching, dynamic offers and unified conversation history across email/voice/A2A/CRM.
 
+Foundation slice ✅ local/tested: canonical `empire_conversations` + append-only `empire_conversation_events` are staged as the shared channel-neutral history layer across email/SMS/voice/A2A, linked to existing prospects, entities, buyers, opportunities and closer cases. No provider ingestion writer, Vonage call, ElevenLabs streaming, outbound, booking or production migration is activated.
+
 ### Phase 8 — Revenue CRM
 Prospect/buyer graph, conversations, pipeline, deal probability, next action, follow-ups, preferences, territory/capacity, offers/contracts/payments, retention, expansion and customer success.
 
