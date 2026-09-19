@@ -83,6 +83,7 @@ from empire_os.experiment_api import create_experiment_router
 from empire_os.predictive_api import create_predictive_router
 from empire_os.advertising_api import create_advertising_router
 from empire_os.revenue_crm_api import create_revenue_crm_router
+from empire_os.conversation_api import create_conversation_router
 from empire_os.ceo import build_brief
 from empire_os.daily_revenue import DailyRevenueSnapshotter, DailyRevenueBriefWorker
 from empire_os.remote_scanner import ScoutAgentClient
@@ -479,6 +480,7 @@ app.include_router(create_experiment_router())
 app.include_router(create_predictive_router())
 app.include_router(create_advertising_router())
 app.include_router(create_revenue_crm_router())
+app.include_router(create_conversation_router())
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
