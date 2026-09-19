@@ -1015,29 +1015,12 @@ def resend_webhook_recent(limit: int = 20):
 
 @app.get("/v1/leads/sample")
 def sample_lead_for_outreach(niche: str, metro: str):
-    """Pick a real pending lead matching niche+metro for outreach sample.
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lead_sample_retired_use_canonical_prospect_reader",
+    )
 
-    Defined BEFORE /v1/leads/{lead_id} so the static path wins.
-    """
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    rows = backend.execute(
-        "SELECT id, name, email, phone, metro, niche, "
-        "substr(details, 1, 250) "
-        "FROM lane_leads WHERE status='pending' AND niche=? AND metro=? "
-        "ORDER BY id DESC LIMIT 1",
-        (niche, metro),
-    ).fetchall()
-    if not rows:
-        return {"found": False}
-    return {
-        "found": True,
-        "lead": {
-            "id": rows[0][0], "name": rows[0][1], "email": rows[0][2],
-            "phone": rows[0][3], "metro": rows[0][4], "niche": rows[0][5],
-            "details": rows[0][6],
-        },
-    }
 
 
 @app.get("/v1/leads/{lead_id}")
@@ -1053,25 +1036,13 @@ def get_lead_by_id(lead_id: str):
 
 
 @app.get("/v1/leads")
-def list_leads(
-    status: str = "",
-    niche: str = "",
-    metro: str = "",
-    limit: int = 50,
-    offset: int = 0,
-):
-    """List leads with optional filters."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    from empire_os.crm import list_leads as crm_list_leads
-    return crm_list_leads(
-        backend,
-        status=status or None,
-        niche=niche or None,
-        metro=metro or None,
-        limit=limit,
-        offset=offset,
+def list_leads(status: str = "", niche: str = "", metro: str = "", limit: int = 50, offset: int = 0):
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lead_list_retired_use_v1_revenue_crm_prospects",
     )
+
 
 
 @app.patch("/v1/leads/{lead_id}/status")
@@ -1111,24 +1082,12 @@ def outreach_touched(req: dict):
 
 @app.get("/v1/outreach/prospect/{prospect_id}")
 def outreach_get(prospect_id: str):
-    """Look up prospect contact history."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    rows = backend.execute(
-        "SELECT touch_count, reply_state, last_touch_at, email "
-        "FROM si_buyer_outreach WHERE prospect_id=?",
-        (prospect_id,),
-    ).fetchall()
-    if not rows:
-        return {"known": False}
-    tc, rs, lt, em = rows[0]
-    return {
-        "known": True,
-        "touch_count": tc,
-        "reply_state": rs,
-        "last_touch_at": lt,
-        "email": em,
-    }
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_outreach_prospect_read_retired_use_canonical_outbound_events",
+    )
+
 
 
 @app.get("/v1/outreach/prospects/pending")
@@ -1647,31 +1606,12 @@ def swarm_prompt(agent: str):
 
 @app.get("/v1/swarm/ledger")
 def swarm_ledger():
-    """Master ledger aggregator — returns counts from every JSONL source."""
-    sources = [
-        "crawler_runs.jsonl",
-        "lead_deliveries.jsonl",
-        "solana_payments.jsonl",
-        "alerts.jsonl",
-        "outreach_log.jsonl",
-        "lane_monitor.jsonl",
-        "commander_observations.jsonl",
-        "synthetic_recommendations.jsonl",
-        "resend_webhook.jsonl",
-        "code_suggestions.jsonl",
-        "efficiency_spike.jsonl",
-        "swarm_registry.jsonl",
-        "swarm_audit.jsonl",
-    ]
-    out = {}
-    for s in sources:
-        p = Path("/root/feedback") / s
-        if p.exists():
-            n = sum(1 for _ in p.read_text().splitlines() if _.strip())
-            out[s] = {"events": n, "size_bytes": p.stat().st_size}
-        else:
-            out[s] = {"events": 0, "size_bytes": 0}
-    return {"ledger": out, "ts": datetime.now(timezone.utc).isoformat()}
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_swarm_ledger_retired_use_canonical_observability",
+    )
+
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1725,25 +1665,21 @@ def homeowner_create_job_retired():
 
 @app.get("/v1/homeowner/jobs")
 def homeowner_list_jobs(status: str = None, limit: int = 50):
-    """List homeowner jobs, optionally filtered by status."""
-    from empire_os.homeowner_matching import list_jobs
-    b = _hm_backend()
-    jobs = list_jobs(b, status=status, limit=limit)
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_jobs_read_retired_use_governed_marketplace_read_model",
+    )
 
-    return {"ok": True, "jobs": jobs}
 
 @app.get("/v1/homeowner/jobs/{job_id}")
 def homeowner_get_job(job_id: int):
-    """Get a job with its matches."""
-    from empire_os.homeowner_matching import get_job_with_matches, JobNotFoundError
-    b = _hm_backend()
-    try:
-        result = get_job_with_matches(b, job_id)
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_job_read_retired_use_governed_marketplace_read_model",
+    )
 
-        return {"ok": True, **result}
-    except JobNotFoundError as e:
-
-        raise HTTPException(status_code=404, detail=str(e))
 
 @app.post("/v1/homeowner/jobs/{job_id}/match")
 def homeowner_match_retired(job_id: int):
@@ -1787,25 +1723,21 @@ def carrier_application_create_retired():
 
 @app.get("/v1/carrier-applications")
 def carrier_app_list(carrier: str = None, status: str = None, limit: int = 100):
-    """List carrier applications."""
-    from empire_os.carrier_applications import list_applications
-    b = _hm_backend()
-    apps = list_applications(b, carrier=carrier, status=status, limit=limit)
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_carrier_application_read_retired_use_governed_partner_read_model",
+    )
 
-    return {"ok": True, "applications": [a.to_dict() for a in apps]}
 
 @app.get("/v1/carrier-applications/{app_id}")
 def carrier_app_get(app_id: int):
-    """Get a single carrier application."""
-    from empire_os.carrier_applications import get_application, ApplicationNotFoundError
-    b = _hm_backend()
-    try:
-        app = get_application(b, app_id)
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_carrier_application_read_retired_use_governed_partner_read_model",
+    )
 
-        return {"ok": True, "application": app.to_dict()}
-    except ApplicationNotFoundError as e:
-
-        raise HTTPException(status_code=404, detail=str(e))
 
 @app.patch("/v1/carrier-applications/{app_id}")
 def carrier_application_update_retired(app_id: int):
@@ -1840,21 +1772,21 @@ def homeowner_pipeline_transition_retired():
 
 @app.get("/v1/homeowner/pipeline/timeline/{job_id}")
 def homeowner_pipeline_timeline(job_id: str):
-    """Return all pipeline events for a homeowner job."""
-    from empire_os.homeowner_pipeline import get_job_timeline
-    b = _hm_backend()
-    timeline = get_job_timeline(b, job_id)
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_timeline_retired_use_governed_marketplace_read_model",
+    )
 
-    return {"ok": True, "job_id": job_id, "events": timeline}
 
 @app.get("/v1/homeowner/pipeline/stats")
 def homeowner_pipeline_stats():
-    """Return job counts at each homeowner pipeline state."""
-    from empire_os.homeowner_pipeline import get_pipeline_stats
-    b = _hm_backend()
-    stats = get_pipeline_stats(b)
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_stats_retired_use_governed_marketplace_read_model",
+    )
 
-    return {"ok": True, "stats": stats}
 
 # ═══════════════════════════════════════════════════════════════════════
 # Revenue & Lead Stats
@@ -1862,15 +1794,21 @@ def homeowner_pipeline_stats():
 
 @app.get("/v1/stats/revenue")
 def stats_revenue():
-    """Aggregate revenue metrics."""
-    from empire_os.empire_stats import revenue_stats
-    return revenue_stats(_hm_backend())
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_revenue_stats_retired_use_v1_revenue_os_board",
+    )
+
 
 @app.get("/v1/stats/leads")
 def stats_leads():
-    """Aggregate lead metrics."""
-    from empire_os.empire_stats import lead_stats
-    return lead_stats(_hm_backend())
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lead_stats_retired_use_v1_revenue_crm_prospects",
+    )
+
 
 
 @app.get("/sitemap.xml")
@@ -2086,14 +2024,12 @@ def buyer_signup_seat(req: dict):
 
 @app.get("/v1/buyers/seat-tiers")
 def seat_tiers_endpoint():
-    """Public list of per-seat subscription tiers (for marketing page)."""
-    from empire_os.marketplace import LANE_SEAT_PRICING
-    return {
-        "tiers": LANE_SEAT_PRICING,
-        "comparison_field": "monthly_cents",
-        "currency": "USD",
-        "payee_currency": "USDC",
-    }
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_buyer_seat_tiers_retired_use_governed_bsc_commercial_terms",
+    )
+
 
 
 @app.post("/v1/buyers/signup")
@@ -2391,30 +2327,12 @@ def media_schedule(req: dict):
 
 @app.get("/v1/prompts/tiers")
 def prompts_tiers():
-    """Show available tiers and access counts."""
-    src_count = int(json.loads(
-        Path("/root/empire_os/empire_os/data/prompts_index.json")
-        .read_text()
-    ).get("total", 382))
-    return {
-        "tiers": {
-            "bronze":  {"monthly_usdc": 200,  "prompts_access": 50},
-            "silver":  {"monthly_usdc": 500,  "prompts_access": 200},
-            "gold":    {"monthly_usdc": 1000, "prompts_access": src_count,
-                        "custom_prompt_engineering": True},
-            "diamond": {"monthly_usdc": 5000, "prompts_access": src_count,
-                        "agent_loop": True, "voice": False},
-            "empire":  {"monthly_usdc": 15000,"prompts_access": src_count,
-                        "agent_loop": True, "voice": True,
-                        "custom_prompts_per_month": 100},
-            "titanium":{"monthly_usdc": 50000,"prompts_access": src_count,
-                        "agent_loop": True, "voice": True,
-                        "custom_prompts_per_month": 1000,
-                        "named_prompt_engineer": True},
-        },
-        "source": "ai-boost/awesome-prompts (cached in /tmp/prompts_*)",
-        "total": src_count,
-    }
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_prompt_pricing_retired_use_governed_product_catalog",
+    )
+
 
 
 @app.get("/v1/prompts/list")
@@ -2802,10 +2720,12 @@ def price_and_settle(req: PriceAndSettleRequest):
 
 @app.get("/v1/payouts/status")
 def payouts_status():
-    """Get payout engine status (method, totals, configured)."""
-    if not payout_engine:
-        raise HTTPException(503, "Payout engine not initialized")
-    return payout_engine.status()
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_payout_status_retired_use_governed_bsc_treasury_read_model",
+    )
+
 
 
 # --- Fee Agent ---
@@ -2863,21 +2783,12 @@ def tenant_signup(req: SignupRequest):
 
 @app.get("/v1/tenants/{tenant_id}")
 def tenant_info(tenant_id: str):
-    if not tenant_store:
-        raise HTTPException(503, "Tenant store not initialized")
-    t = tenant_store.get_tenant(tenant_id)
-    if not t:
-        raise HTTPException(404, "tenant not found")
-    sub = tenant_store.get_active_subscription(tenant_id)
-    seats = tenant_store.list_seats(tenant_id)
-    cycles_this_month = tenant_store.usage_for_period(tenant_id, "cycles")
-    return {
-        "tenant": asdict(t) if hasattr(asdict, '__call__') else t.__dict__,
-        "active_subscription": sub.__dict__ if sub else None,
-        "seat_count": len(seats),
-        "cycles_this_month": cycles_this_month,
-        "plan_limit": PLANS.get(t.plan, PLANS["free"]).max_cycles_per_month,
-    }
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_tenant_info_retired_use_canonical_saas_tenant_read_model",
+    )
+
 
 
 class SubscribeRequest(BaseModel):
@@ -3023,100 +2934,22 @@ async def wallet_sign_page():
 
 @app.get("/v1/payouts/sign-tx")
 def payouts_sign_tx_request_sync():
-    """Solana Pay Transaction Request endpoint."""
-    import traceback, base64
-    from empire_os.batched_payout import build_batched_payout_tx
-    from fastapi.responses import Response
-    if not payout_engine or not billing_engine:
-        raise HTTPException(503, "payout engine not initialized")
-    crypto_cfg = billing_engine.crypto
-    if not crypto_cfg.configured():
-        raise HTTPException(503, "set VAULT_WALLET_ADDRESS first")
-
-    sender = crypto_cfg.vault_wallet
-    pending = [r for r in payout_engine.store.list_all()
-               if r.get("status") == "pending"]
-    if not pending:
-        raise HTTPException(404, "no pending payouts")
-
-    payouts = [{
-        "payout_id": p["payout_id"],
-        "destination": sender,
-        "amount_cents": p["amount_cents"],
-    } for p in pending]
-
-    try:
-        result = build_batched_payout_tx(
-            payouts=payouts,
-            sender_wallet=sender,
-            mint=crypto_cfg.usdc_mint,
-        )
-    except Exception:
-        import sys
-        print("SIGN-TX ERROR:", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
-        sys.stderr.flush()
-        raise
-
-    if not result.transaction_base64:
-        raise HTTPException(500, "failed to build transaction (empty base64)")
-
-    tx_bytes = base64.b64decode(result.transaction_base64)
-    return Response(
-        content=tx_bytes,
-        media_type="application/octet-stream",
-        headers={
-            "x-solana-pay-message": (
-                f"Sign to execute {result.instruction_count} payouts "
-                f"totaling ${result.total_amount_usdc:,.2f} USDC"
-            ),
-            "x-solana-pay-label": "Empire OS Batched Payout",
-        },
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_payout_sign_tx_retired_use_governed_bsc_treasury_flow",
     )
+
 
 
 @app.get("/v1/payouts/tx-base64")
 def payouts_tx_base64():
-    """Download the unsigned base64 transaction as plain text."""
-    import traceback, base64
-    from empire_os.batched_payout import build_batched_payout_tx
-    from fastapi.responses import PlainTextResponse
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_payout_tx_base64_retired_use_governed_bsc_treasury_flow",
+    )
 
-    if not payout_engine or not billing_engine:
-        raise HTTPException(503, "payout engine not initialized")
-    crypto_cfg = billing_engine.crypto
-    if not crypto_cfg.configured():
-        raise HTTPException(503, "set VAULT_WALLET_ADDRESS first")
-
-    sender = crypto_cfg.vault_wallet
-    pending = [r for r in payout_engine.store.list_all()
-               if r.get("status") == "pending"]
-    if not pending:
-        raise HTTPException(404, "no pending payouts")
-
-    payouts_list = [{
-        "payout_id": p["payout_id"],
-        "destination": sender,
-        "amount_cents": p["amount_cents"],
-    } for p in pending]
-
-    try:
-        result = build_batched_payout_tx(
-            payouts=payouts_list,
-            sender_wallet=sender,
-            mint=crypto_cfg.usdc_mint,
-        )
-    except Exception:
-        import sys
-        print("TX-BASE64 ERROR:", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
-        sys.stderr.flush()
-        raise
-
-    if not result.transaction_base64:
-        raise HTTPException(500, "failed to build transaction (empty base64)")
-
-    return PlainTextResponse(result.transaction_base64)
 
 
 class PayoutVerifyBatchRequest(BaseModel):
@@ -3152,16 +2985,12 @@ def payouts_verify_batch(req: PayoutVerifyBatchRequest):
 
 @app.get("/v1/lanes")
 def list_lanes():
-    """List all 36 lanes with their status."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    cur = backend.execute(
-        "SELECT l.* FROM lanes l ORDER BY l.category, l.sub_niche, l.metro"
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lane_list_retired_use_v1_revenue_exchange_markets",
     )
-    lanes = []
-    for row in cur.fetchall():
-        lanes.append(dict(row))
-    return {"lanes": lanes, "total": len(lanes)}
+
 
 
 @app.get("/v1/lanes/sub-niches")
@@ -3190,36 +3019,12 @@ def list_metros():
 
 @app.get("/v1/lanes/{lane_id}")
 def get_lane(lane_id: str):
-    """Get a single lane's details + lead count."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    cur = backend.execute("SELECT * FROM lanes WHERE id=?", (lane_id,))
-    row = cur.fetchone()
-    if not row:
-        raise HTTPException(404, f"lane {lane_id} not found")
-    lane = dict(row)
-
-    cur = backend.execute(
-        "SELECT COUNT(*) as lead_count FROM lane_leads WHERE lane_id=? AND status='pending'",
-        (lane_id,),
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lane_read_retired_use_revenue_exchange_and_buyer_allocation",
     )
-    lane["pending_leads"] = cur.fetchone()[0]
 
-    cur = backend.execute(
-        "SELECT * FROM lane_seats WHERE lane_id=? AND active=1", (lane_id,)
-    )
-    lane["seats"] = [dict(r) for r in cur.fetchall()]
-
-    cur = backend.execute(
-        "SELECT COUNT(*) as total, SUM(CASE WHEN status='delivered' THEN 1 ELSE 0 END) as delivered "
-        "FROM lane_leads WHERE lane_id=?",
-        (lane_id,),
-    )
-    stats = cur.fetchone()
-    lane["total_leads"] = stats[0]
-    lane["delivered_leads"] = stats[1]
-
-    return lane
 
 
 class AssignSeatRequest(BaseModel):
@@ -3248,32 +3053,23 @@ def release_seat(lane_id: str):
 
 
 @app.get("/v1/lanes/leads/pending")
-def pending_lane_leads():
-    """Get all pending (undelivered) lane leads grouped by lane."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    cur = backend.execute(
-        "SELECT ll.*, l.sub_niche AS tort_key, l.metro, l.occupied_by "
-        "FROM lane_leads ll JOIN lanes l ON ll.lane_id=l.id "
-        "WHERE ll.status='pending' ORDER BY ll.created_at DESC"
+def pending_lane_leads(limit: int = 100):
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lane_pending_read_retired_use_canonical_prospect_reader",
     )
-    leads = [dict(r) for r in cur.fetchall()]
-    return {"pending": len(leads), "leads": leads}
+
 
 
 @app.get("/v1/lanes/leads/by-source")
-def leads_by_source(source: str = "permits_nyc", limit: int = 100):
-    """List leads filtered by source (e.g. permits_nyc, chicago_311)."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    cur = backend.execute(
-        "SELECT id, name, phone, lane_id, metro, source, status "
-        "FROM lane_leads WHERE source=? "
-        "ORDER BY id DESC LIMIT ?",
-        (source, limit),
+def leads_by_source():
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lane_source_read_retired_use_canonical_source_mesh",
     )
-    leads = [dict(r) for r in cur.fetchall()]
-    return {"source": source, "count": len(leads), "leads": leads}
+
 
 
 @app.get("/v1/agents/status")
@@ -3339,36 +3135,12 @@ def route_batch(req: QualifyBatchRequest):
 
 @app.get("/v1/lanes/score/{prospect_id}")
 def score_prospect(prospect_id: str):
-    """Get Omega OS score for an existing prospect."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    # Fetch from DB
-    cur = backend.execute(
-        "SELECT ll.*, l.sub_niche AS tort_key, l.metro "
-        "FROM lane_leads ll JOIN lanes l ON ll.lane_id=l.id "
-        "WHERE ll.prospect_id=? ORDER BY ll.created_at DESC LIMIT 1",
-        (prospect_id,),
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lane_score_retired_use_canonical_intelligence_materializer",
     )
-    row = cur.fetchone()
-    if not row:
-        raise HTTPException(404, f"prospect {prospect_id} not found")
 
-    # Try to get funnel notes
-    cur = backend.execute(
-        "SELECT notes FROM si_funnel_events WHERE prospect_id=? ORDER BY event_id DESC LIMIT 1",
-        (prospect_id,),
-    )
-    notes = ""
-    if row_f := cur.fetchone():
-        notes = row_f["notes"]
-
-    omega = OmegaScore(
-        tort_key=row["tort_key"],
-        details=notes,
-        source="web",
-    )
-    result = omega.compute()
-    return {"prospect_id": prospect_id, "score": result}
 
 
 # --- Swarm pub/sub (file-backed, lets containers share events) ---
@@ -3413,63 +3185,33 @@ async def ppc_charge(request: Request):
 
 
 @app.get("/v1/ppc/buyer_pms")
-async def ppc_buyer_pms(buyer_id: str):
-    """Get a buyer's payment methods from the canonical hub DB.
+async def ppc_buyer_pms():
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_ppc_buyer_pms_retired_use_v1_advertising_observations",
+    )
 
-    Containers with local DB mirrors call this to resolve buyer
-    wallets before charging. Returns list of PMs with
-    {processor, customer_ref, payment_ref, brand, last4,
-    is_default, created_at}.
-    """
-    import sqlite3 as _sq
-    cnx = _sq.connect(PPC_DB)
-    cnx.row_factory = _sq.Row
-    rows = cnx.execute(
-        "SELECT id, buyer_id, processor, customer_ref, "
-        "payment_ref, brand, last4, is_default, created_at "
-        "FROM si_buyer_payment_methods "
-        "WHERE buyer_id=? AND deleted_at IS NULL "
-        "ORDER BY is_default DESC, id DESC",
-        (buyer_id,)).fetchall()
-    cnx.close()
-    pms = []
-    for r in rows:
-        d = dict(r)
-        d["is_default"] = bool(d.get("is_default"))
-        pms.append(d)
-    return {"buyer_id": buyer_id, "pms": pms, "count": len(pms)}
 
 
 @app.get("/v1/ppc/charges")
-async def ppc_list_charges(limit: int = 50, head: int = 0,
-                            status: str = ""):
-    """Inspect the canonical ledger. Optional filters."""
-    import sqlite3 as _sq
-    cnx = _sq.connect(PPC_DB)
-    cnx.row_factory = _sq.Row
-    q = "SELECT * FROM si_charges WHERE 1=1"
-    args: list = []
-    if head:
-        q += " AND head=?"; args.append(head)
-    if status:
-        q += " AND status=?"; args.append(status)
-    q += " ORDER BY id DESC LIMIT ?"; args.append(limit)
-    rows = [dict(r) for r in cnx.execute(q, args).fetchall()]
-    cnx.close()
-    return {"charges": rows, "count": len(rows)}
+async def ppc_list_charges(limit: int = 100, status: str = ""):
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_ppc_charge_read_retired_use_v1_advertising_observations",
+    )
+
 
 
 @app.get("/v1/ppc/invoices")
 async def ppc_list_invoices(limit: int = 50):
-    """Inspect the canonical invoice ledger."""
-    import sqlite3 as _sq
-    cnx = _sq.connect(PPC_DB)
-    cnx.row_factory = _sq.Row
-    rows = [dict(r) for r in cnx.execute(
-        "SELECT * FROM si_ppc_invoices ORDER BY id DESC LIMIT ?",
-        (limit,)).fetchall()]
-    cnx.close()
-    return {"invoices": rows, "count": len(rows)}
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_ppc_invoice_read_retired_use_canonical_advertising_observations",
+    )
+
 
 
 @app.post("/v1/swarms/events")
@@ -3621,29 +3363,12 @@ def homeowner_pipeline_timeline(job_id: str):
 
 @app.get("/v1/crm/leads")
 def crm_list(request: Request):
-    """List/filter leads. Query params: status, niche, metro, query, limit, offset, omega_min."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        status = request.query_params.get("status")
-        niche = request.query_params.get("niche")
-        metro = request.query_params.get("metro")
-        query = request.query_params.get("query")
-        omega_min = request.query_params.get("omega_min")
-        
-        data = crm_list_leads(
-            backend,
-            status=status,
-            niche=niche,
-            metro=metro,
-            query=query,
-            omega_min=float(omega_min) if omega_min else None,
-            limit=int(request.query_params.get("limit", 100)),
-            offset=int(request.query_params.get("offset", 0)),
-        )
-        return {"ok": True, **data}
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_lead_list_retired_use_v1_revenue_crm_prospects",
+    )
+
 
 
 @app.post("/v1/crm/leads/batch-enrich")
@@ -3658,15 +3383,12 @@ def crm_batch_enrich_retired():
 
 @app.get("/v1/crm/leads/{lead_id}")
 def crm_get(lead_id: int):
-    """Get single lead with activities and pipeline stage."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        return crm_get_lead(backend, lead_id)
-    except ValueError as e:
-        raise HTTPException(404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_lead_read_retired_use_v1_revenue_crm_prospects",
+    )
+
 
 
 class CrmUpdateRequest(BaseModel):
@@ -3716,35 +3438,32 @@ def crm_enrich_retired(lead_id: int):
 
 @app.get("/v1/crm/pipeline")
 def crm_pipeline():
-    """Get pipeline summary by stage."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        return crm_pipeline_summary(backend)
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_pipeline_retired_use_v1_revenue_crm_prospects",
+    )
+
 
 
 @app.get("/v1/crm/enrichment-stats")
 def crm_enrich_stats_endpoint():
-    """Return enrichment coverage stats."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        return crm_enrich_stats(backend)
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_enrichment_stats_retired_use_canonical_intelligence_materializer",
+    )
+
 
 
 @app.get("/v1/crm/qualification-summary")
 def crm_qualification():
-    """Return qualification/score distribution."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        return crm_qual_summary(backend)
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_qualification_retired_use_canonical_intelligence_materializer",
+    )
+
 
 
 @app.post("/v1/crm/import-lane-leads")
@@ -3759,163 +3478,22 @@ def crm_import_retired():
 
 @app.get("/v1/crm/analytics")
 def crm_analytics():
-    """Aggregated analytics data for the CRM dashboard charts."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        import json
-        
-        # ── Lead counts ──
-        total = backend.execute("SELECT COUNT(*) AS c FROM crm_leads").fetchone()["c"]
-        
-        # Status distribution
-        by_status = backend.execute(
-            "SELECT status, COUNT(*) AS cnt FROM crm_leads GROUP BY status ORDER BY cnt DESC"
-        ).fetchall()
-        
-        # By niche
-        by_niche = backend.execute(
-            "SELECT niche, COUNT(*) AS cnt FROM crm_leads WHERE niche != '' GROUP BY niche ORDER BY cnt DESC LIMIT 10"
-        ).fetchall()
-        
-        # By metro
-        by_metro = backend.execute(
-            "SELECT metro, COUNT(*) AS cnt FROM crm_leads WHERE metro != '' GROUP BY metro ORDER BY cnt DESC LIMIT 10"
-        ).fetchall()
-        
-        # Enrichment score buckets
-        score_buckets = [
-            {"range": "0-20", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE enrichment_score < 20").fetchone()["c"]},
-            {"range": "20-40", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE enrichment_score >= 20 AND enrichment_score < 40").fetchone()["c"]},
-            {"range": "40-60", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE enrichment_score >= 40 AND enrichment_score < 60").fetchone()["c"]},
-            {"range": "60-80", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE enrichment_score >= 60 AND enrichment_score < 80").fetchone()["c"]},
-            {"range": "80-100", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE enrichment_score >= 80").fetchone()["c"]},
-        ]
-        
-        # Omega score buckets
-        omega_buckets = [
-            {"range": "0-100", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE omega_score < 100").fetchone()["c"]},
-            {"range": "100-300", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE omega_score >= 100 AND omega_score < 300").fetchone()["c"]},
-            {"range": "300-500", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE omega_score >= 300 AND omega_score < 500").fetchone()["c"]},
-            {"range": "500-700", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE omega_score >= 500 AND omega_score < 700").fetchone()["c"]},
-            {"range": "700+", "cnt": backend.execute("SELECT COUNT(*) AS c FROM crm_leads WHERE omega_score >= 700").fetchone()["c"]},
-        ]
-        
-        # Leads created over time (last 30 days)
-        time_data = backend.execute(
-            "SELECT DATE(created_at) AS day, COUNT(*) AS cnt FROM crm_leads "
-            "WHERE created_at >= DATE('now', '-30 days') GROUP BY day ORDER BY day"
-        ).fetchall()
-        lead_trend = [{"date": r["day"], "count": r["cnt"]} for r in time_data]
-        
-        # Enrichment source summary
-        enrich_sources = backend.execute(
-            "SELECT source, COUNT(*) AS cnt, SUM(fields_found) AS total_fields "
-            "FROM crm_enrichment_log GROUP BY source ORDER BY cnt DESC"
-        ).fetchall()
-        
-        # Pipeline funnel counts
-        stages = ["raw", "qualifying", "qualified", "assigned", "contacted", "converted", "dead"]
-        funnel = []
-        for s in stages:
-            cnt = backend.execute(
-                "SELECT COUNT(*) AS c FROM crm_leads WHERE status = ?", (s,)
-            ).fetchone()["c"]
-            funnel.append({"stage": s, "count": cnt})
-        
-        # Total enrichment fields found
-        fields_found = backend.execute(
-            "SELECT COALESCE(SUM(fields_found), 0) AS total FROM crm_enrichment_log"
-        ).fetchone()["total"]
-        
-        # Avg enrichment score
-        avg_enrich = backend.execute(
-            "SELECT AVG(enrichment_score) AS avg FROM crm_leads"
-        ).fetchone()["avg"] or 0
-        
-        # Qualified leads (non-raw, non-dead)
-        qualified = backend.execute(
-            "SELECT COUNT(*) AS c FROM crm_leads WHERE status IN ('qualified','assigned','contacted','converted')"
-        ).fetchone()["c"]
-        
-        # Conversion rate (raw → any progress)
-        non_raw = backend.execute(
-            "SELECT COUNT(*) AS c FROM crm_leads WHERE status != 'raw'"
-        ).fetchone()["c"]
-        conv_rate = round(non_raw / total * 100, 1) if total else 0
-        
-        # Activity stats
-        total_activities = backend.execute(
-            "SELECT COUNT(*) AS c FROM crm_activities"
-        ).fetchone()["c"]
-        
-        # Recent activity trend
-        activity_trend = backend.execute(
-            "SELECT DATE(occurred_at) AS day, COUNT(*) AS cnt FROM crm_activities "
-            "WHERE occurred_at >= DATE('now', '-14 days') GROUP BY day ORDER BY day"
-        ).fetchall()
-        
-        return {
-            "total": total,
-            "by_status": [dict(r) for r in by_status],
-            "by_niche": [dict(r) for r in by_niche],
-            "by_metro": [dict(r) for r in by_metro],
-            "enrichment_score_buckets": score_buckets,
-            "omega_score_buckets": omega_buckets,
-            "lead_trend": lead_trend,
-            "enrichment_sources": [dict(r) for r in enrich_sources],
-            "pipeline_funnel": funnel,
-            "total_fields_found": int(fields_found),
-            "avg_enrichment_score": round(float(avg_enrich), 1),
-            "qualified_leads": qualified,
-            "conversion_rate": conv_rate,
-            "total_activities": total_activities,
-            "activity_trend": [dict(r) for r in activity_trend],
-        }
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_analytics_retired_use_revenue_crm_read_model",
+    )
+
 
 
 @app.get("/v1/crm/revenue-analytics")
 def crm_revenue_analytics():
-    """Revenue analytics for CRM charting."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        # Monthly revenue
-        monthly = backend.execute(
-            "SELECT strftime('%Y-%m', created_at) AS month, "
-            "SUM(amount_cents) AS total_cents, COUNT(*) AS tx_count "
-            "FROM bill_charges WHERE status = 'paid' "
-            "GROUP BY month ORDER BY month DESC LIMIT 12"
-        ).fetchall()
-        
-        # Revenue by plan
-        by_plan = backend.execute(
-            "SELECT plan_id, SUM(amount_cents) AS total_cents "
-            "FROM bill_charges WHERE status = 'paid' "
-            "GROUP BY plan_id ORDER BY total_cents DESC"
-        ).fetchall()
-        
-        # Total invoiced
-        total_invoiced = backend.execute(
-            "SELECT COUNT(*) AS cnt, SUM(amount_cents) AS total_cents FROM ppc_invoices WHERE status = 'paid'"
-        ).fetchone()
-        
-        # Active lanes/subscriptions
-        active_lanes = backend.execute(
-            "SELECT COUNT(*) AS cnt FROM lanes WHERE status = 'active'"
-        ).fetchone()["cnt"]
-        
-        return {
-            "monthly_revenue": [dict(r) for r in monthly],
-            "revenue_by_plan": [dict(r) for r in by_plan],
-            "total_ppc_invoiced": total_invoiced["total_cents"] or 0 if total_invoiced else 0,
-            "total_ppc_count": total_invoiced["cnt"] if total_invoiced else 0,
-            "active_lanes": active_lanes,
-        }
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_revenue_analytics_retired_use_canonical_revenue_read_model",
+    )
+
 
 
 # ── ICP Routes ─────────────────────────────────────────────────────
@@ -3930,24 +3508,22 @@ def crm_icp_profiles():
 
 @app.get("/v1/crm/icp/analytics")
 def crm_icp_analytics_route():
-    """ICP fit analytics across all leads."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        return crm_icp_analytics(backend)
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_icp_analytics_retired_use_canonical_intelligence_materializer",
+    )
+
 
 
 @app.get("/v1/crm/icp/score/{lead_id}")
 def crm_icp_score_route(lead_id: int):
-    """Score a single lead against all ICPs."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        return crm_icp_score(backend, lead_id)
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+    """Retired legacy SQLite read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_icp_score_retired_use_canonical_intelligence_materializer",
+    )
+
 
 
 @app.post("/v1/crm/icp/batch")
