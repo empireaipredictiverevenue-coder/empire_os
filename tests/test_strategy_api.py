@@ -166,3 +166,68 @@ def test_competitive_landscape_stays_observe_only():
     assert body["publishing_enabled"] is False
     assert body["outreach_enabled"] is False
     assert body["execution_authority"] == "none"
+
+
+def test_keyword_universe_maps_search_to_product_without_publishing():
+    response = client().post(
+        "/v1/strategy/keyword-universe/preview",
+        json={"keywords": [{
+            "keyword": "predictive revenue",
+            "cluster_key": "predictive-revenue",
+            "intent_class": "category",
+            "product_key": "predictive-revenue-os",
+            "icp_key": "revenue-leader",
+            "funnel_stage": "awareness",
+            "cta_key": "review-opportunity",
+            "free_tool_key": "revenue-leak-scanner",
+            "evidence_refs": ["kw:predictive-revenue"],
+            "observed_demand": .8,
+            "commercial_intent": .7,
+            "product_fit": .95,
+            "buyer_fit": .9,
+            "coverage_gap": .8,
+            "competitor_gap": .7,
+            "ai_citation_gap": .8,
+            "conversion_evidence": .5,
+            "strategic_category_value": 1.0,
+            "confidence": .8,
+        }]},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["keywords"][0]["record"]["product_key"] == "predictive-revenue-os"
+    assert body["publishing_enabled"] is False
+    assert body["indexation_enabled"] is False
+    assert body["execution_authority"] == "none"
+
+
+def test_keyword_asset_backlog_is_draft_only():
+    response = client().post(
+        "/v1/strategy/keyword-universe/assets/preview",
+        json={"keywords": [{
+            "keyword": "permit intelligence",
+            "cluster_key": "permit-intelligence",
+            "intent_class": "product",
+            "product_key": "permit-intelligence",
+            "icp_key": "agency-data-buyer",
+            "funnel_stage": "consideration",
+            "cta_key": "view-permit-radar",
+            "free_tool_key": "permit-opportunity-checker",
+            "evidence_refs": ["kw:permit-intelligence"],
+            "observed_demand": .7,
+            "commercial_intent": .8,
+            "product_fit": .95,
+            "buyer_fit": .9,
+            "coverage_gap": .8,
+            "competitor_gap": .7,
+            "ai_citation_gap": .7,
+            "conversion_evidence": .4,
+            "strategic_category_value": .9,
+            "confidence": .8,
+        }]},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["assets"][0]["draft_only"] is True
+    assert body["publishing_enabled"] is False
+    assert body["indexation_enabled"] is False

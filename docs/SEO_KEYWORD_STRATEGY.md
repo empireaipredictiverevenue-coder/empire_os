@@ -274,6 +274,61 @@ Every keyword cluster maps to:
 
 No orphan keyword strategy.
 
+### Keyword Universe Engine V1
+
+The executable Strategy layer treats every keyword/query as a commercial object
+with:
+- keyword
+- cluster
+- intent class
+- ICP
+- product
+- funnel stage
+- asset type
+- CTA
+- free-tool/report path
+- territory when relevant
+- evidence refs
+- observed search/competitive/AI-citation signals
+- expected gross-profit evidence when available
+- attributed realized gross-profit evidence when available
+
+Supported intent classes:
+- category
+- problem
+- product
+- commercial
+- comparison
+- territory
+- event trigger
+- agency/white-label
+- enterprise/API
+- education
+
+Supported funnel stages:
+- awareness
+- consideration
+- evaluation
+- conversion
+- expansion
+
+The engine can:
+- rank evidence-backed keyword opportunities
+- preserve unscored terms when real metrics are missing
+- expose product/funnel coverage gaps
+- generate a draft-only asset backlog
+- map terms to free tools and CTAs
+- keep revenue attribution separate from ranking assumptions
+
+The engine cannot:
+- fabricate search volume
+- publish
+- index
+- redirect
+- mutate canonicals/robots
+- create backlinks
+- claim attributed revenue without evidence
+
 ## 9. Search Operating Cadence
 
 Daily:

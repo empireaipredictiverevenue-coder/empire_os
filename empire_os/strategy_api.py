@@ -22,6 +22,12 @@ from empire_os.competitive_intelligence import (
     observed_search_presence_share,
     review_competitor_profile,
 )
+from empire_os.keyword_universe import (
+    build_asset_backlog,
+    build_keyword_universe,
+    keyword_coverage_matrix,
+    review_keyword_record,
+)
 
 
 class DataRequest(BaseModel):
@@ -52,6 +58,10 @@ class PresenceShareRequest(BaseModel):
     observations: list[dict[str, Any]] = Field(default_factory=list)
     empire_domains: list[str] = Field(default_factory=list)
     competitor_domains: list[str] = Field(default_factory=list)
+
+
+class KeywordUniverseRequest(BaseModel):
+    keywords: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -158,6 +168,34 @@ def create_strategy_router() -> APIRouter:
                 ai_citation_observations=req.ai_citation_observations,
                 empire_domains=req.empire_domains,
             )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/keyword-universe/review")
+    def keyword_review(req: DataRequest):
+        try:
+            return review_keyword_record(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/keyword-universe/preview")
+    def keyword_universe(req: KeywordUniverseRequest):
+        try:
+            return build_keyword_universe(req.keywords)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/keyword-universe/coverage/preview")
+    def keyword_coverage(req: KeywordUniverseRequest):
+        try:
+            return keyword_coverage_matrix(req.keywords)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/keyword-universe/assets/preview")
+    def keyword_assets(req: KeywordUniverseRequest):
+        try:
+            return build_asset_backlog(req.keywords)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
