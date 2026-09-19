@@ -217,6 +217,8 @@ Third slice ✅ local/tested: dedicated SELECT-only Conversation reader plus `/t
 
 Fourth slice ✅ local/tested: evidence-only qualification review now accepts qualification signals only when they are explicitly attached to an inbound canonical event with transcript and evidence references. Plain transcript text is never interpreted into interest, need, authority, timing, budget or sentiment; missing transcript/signal evidence remains explicit. Send, call, voice-streaming and booking authority stay disabled.
 
+Fifth slice ✅ local/tested: qualification freshness review now checks every explicit inbound qualification signal timestamp against a bounded freshness window. Stale, future-dated or missing explicit qualification evidence blocks operator review, while plain transcript text still cannot create inferred qualification. Send, call, voice-streaming and booking authority stay disabled.
+
 ### Phase 8 — Revenue CRM
 
 Second slice ✅ local/tested: next-action recommendations now require canonical conversation/closer/fulfilment/buyer evidence refs, preserve unknown capacity as unknown, and can cite verified buyer capacity without mutating CRM state or sending follow-up.

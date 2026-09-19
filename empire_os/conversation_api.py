@@ -1,15 +1,19 @@
 """Conversation OS provider-event normalization and ingest API."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Protocol
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from empire_os.conversation_ingest import normalise_provider_event
 from empire_os.conversation_os import ConversationEventRecord
 from empire_os.conversation_qualification import (
     review_conversation_qualification,
+)
+from empire_os.conversation_qualification_freshness import (
+    review_qualification_freshness,
 )
 from empire_os.conversation_timeline import summarise_conversation_timeline
 
@@ -181,6 +185,62 @@ def create_conversation_router(
             "email_sends": False,
             "booking_execution": False,
             "qualification": review.as_dict(),
+        }
+
+    @router.get("/{conversation_id}/qualification/freshness")
+    def qualification_freshness(
+        conversation_id: str,
+        now_utc: str,
+        max_age_seconds: int = Query(default=21600, gt=0, le=604800),
+        limit: int = 200,
+    ):
+        if read_repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="conversation_reader_not_activated",
+            )
+        bounded = max(1, min(int(limit), 500))
+        conversation = read_repository.conversation(
+            conversation_id=conversation_id
+        )
+        if conversation is None:
+            raise HTTPException(
+                status_code=404,
+                detail="conversation_not_found",
+            )
+        rows = list(read_repository.timeline(
+            conversation_id=conversation_id,
+            limit=bounded,
+        ))
+        try:
+            review = review_conversation_qualification(
+                rows,
+                conversation_id=conversation_id,
+            )
+            normalized = (
+                now_utc[:-1] + "+00:00"
+                if now_utc.endswith("Z")
+                else now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            freshness = review_qualification_freshness(
+                review,
+                now=now,
+                max_age_seconds=max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "outbound_calls": False,
+            "voice_streaming": False,
+            "email_sends": False,
+            "booking_execution": False,
+            "freshness": freshness.as_dict(),
         }
 
     @router.post("/events/preview")
