@@ -56,11 +56,13 @@ The review-only proposal CLI never writes or sends. It renders the candidate-rev
 - A decision maker may be identified from public evidence without creating contact authority: one first-party official-site role claim can stand alone, while non-first-party evidence requires at least two independent source domains that agree on the same person and compatible economic/functional authority and are explicitly correlated to the same business identity.
 - Multiple different corroborated people fail closed as an ambiguous public identity, and public evidence cannot silently replace a conflicting existing decision maker.
 - Decision-maker evidence alone never makes a record review-ready or outreach-ready; a separate direct person-bound contact must still pass the existing contact gate.
+- `build_buyer_readiness_dossier` combines company identity/site evidence, decision-maker/contact readiness, and the existing commercial buyer-activation gate into one OBSERVE-only blocker list. It creates no authority and performs no DB/network action.
 - Explicit public business-directory contact evidence may bind to a decision maker only when the person identity matches exactly and the role is independently corroborated.
 - Unsupported sources, mismatched names, and uncorroborated third-party records are rejected.
 - DNS-valid public contact evidence can make a candidate `review_ready` without making it `outreach_ready`.
 - First real canonical prospect reached `review_ready=true` on 2026-09-17; it remained `outreach_ready=false` pending stronger mailbox-level evidence.
 - Later the same day, Jake Montgomery / Silverado Construction Services became the first canonical prospect to reach both `review_ready=true` and `outreach_ready=true` using an exact email published in a 2025 government permit record, current founder/owner corroboration, same-domain identity, and valid MX.
 - SMTP probing is treated as optional supporting evidence because network policy can block port 25; recent exact public publication plus current role corroboration is accepted as a stronger provenance path than inferred email patterns.
+- Current All Star Roofing read-only proof: Terry Paris is corroborated as Owner/economic buyer by two independent business-correlated public sources, but no direct person-bound contact has been accepted. The readiness dossier therefore remains `review_ready=false`, `outreach_ready=false`, `allocation_ready=false`, with `verified_person_bound_contact_missing` as the next blocker. No production buyer row or outbound action was created.
 - No production row was created and no email was sent.
 

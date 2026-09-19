@@ -1,5 +1,6 @@
 from empire_os.buyer_discovery import (
     accepted_acquisition_website,
+    build_buyer_readiness_dossier,
     build_candidate,
     classify_decision_role,
     looks_like_person_name,
@@ -703,3 +704,132 @@ def test_public_decision_maker_does_not_override_conflicting_existing_person():
     assert merged["decision_reconciliation"]["status"] == "identity_conflict"
     assert merged["decision_reconciliation"]["review_required"] is True
     assert merged["public_decision_maker_evidence_accepted"] == 0
+
+
+
+def _readiness_candidate():
+    return build_candidate({
+        "id": "11111111-1111-4111-8111-111111111111",
+        "entity_id": "22222222-2222-4222-8222-222222222222",
+        "business_name": "All Star Roofing",
+        "niche": "roofing",
+        "metro": "Austin, TX",
+        "website": "https://allstarroofingtexas.com",
+        "phone": "+1-512-477-7827",
+        "buy_signal_score": 80,
+    }, entity_id="22222222-2222-4222-8222-222222222222",
+       entity_linked=True)
+
+
+def _activated_buyer_row(**overrides):
+    row = {
+        "id": "33333333-3333-4333-8333-333333333333",
+        "buyer_name": "All Star Roofing",
+        "niche": "roofing",
+        "metro": "Austin, TX",
+        "is_active": True,
+        "status": "active",
+        "commercial_activation_state": "activated",
+        "reviewed_at": "2026-09-19T10:00:00Z",
+        "commercial_activated_at": "2026-09-19T10:01:00Z",
+        "commercial_terms_source": "manual_contract",
+        "commercial_terms_reference": "contract:test",
+        "commercial_terms_verified_at": "2026-09-19T10:01:00Z",
+        "capacity_verified_at": "2026-09-19T10:01:00Z",
+        "delivery_verified_at": "2026-09-19T10:01:00Z",
+        "destination_phone": "+15124777827",
+        "webhook_url": None,
+        "daily_cap": 10,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_buyer_readiness_dossier_exposes_real_all_star_blockers():
+    dossier = build_buyer_readiness_dossier(
+        _readiness_candidate(),
+        {
+            "decision_maker": {
+                "name": "Terry Paris",
+                "title": "Owner",
+                "decision_role": "economic_buyer",
+                "decision_score": 1.0,
+                "source": "public_web_corroborated",
+            },
+            "decision_reconciliation": {
+                "status": "public_corroborated",
+                "review_required": False,
+            },
+            "review_ready": False,
+            "outreach_ready": False,
+            "preferred_email": None,
+        },
+    )
+    assert dossier["decision_maker_ready"] is True
+    assert dossier["review_ready"] is False
+    assert dossier["outreach_ready"] is False
+    assert dossier["buyer_record_present"] is False
+    assert dossier["buyer_activation_ready"] is False
+    assert dossier["allocation_ready"] is False
+    assert dossier["blockers"] == [
+        "verified_person_bound_contact_missing",
+        "buyer_record_missing",
+    ]
+    assert dossier["next_required"] == (
+        "verified_person_bound_contact_missing"
+    )
+    assert dossier["write_authorized"] is False
+
+
+def test_buyer_readiness_dossier_reuses_commercial_activation_gate():
+    dossier = build_buyer_readiness_dossier(
+        _readiness_candidate(),
+        {
+            "decision_maker": {
+                "name": "Terry Paris",
+                "title": "Owner",
+                "decision_score": 1.0,
+            },
+            "decision_reconciliation": {
+                "review_required": False,
+            },
+            "review_ready": True,
+            "outreach_ready": True,
+            "preferred_email": "terry@example.test",
+        },
+        buyer_row=_activated_buyer_row(
+            commercial_activation_state="discovered",
+        ),
+    )
+    assert dossier["buyer_record_present"] is True
+    assert dossier["buyer_activation_ready"] is False
+    assert dossier["buyer_activation_reason"] == (
+        "buyer_not_commercially_activated"
+    )
+    assert dossier["blockers"] == [
+        "buyer_not_commercially_activated"
+    ]
+
+
+def test_buyer_readiness_dossier_is_allocation_ready_only_after_activation():
+    dossier = build_buyer_readiness_dossier(
+        _readiness_candidate(),
+        {
+            "decision_maker": {
+                "name": "Terry Paris",
+                "title": "Owner",
+                "decision_score": 1.0,
+            },
+            "decision_reconciliation": {
+                "review_required": False,
+            },
+            "review_ready": True,
+            "outreach_ready": True,
+            "preferred_email": "terry@example.test",
+        },
+        buyer_row=_activated_buyer_row(),
+    )
+    assert dossier["blockers"] == []
+    assert dossier["next_required"] is None
+    assert dossier["buyer_activation_ready"] is True
+    assert dossier["allocation_ready"] is True

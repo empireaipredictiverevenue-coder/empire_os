@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping
 from uuid import UUID
 from urllib.parse import urlparse
 
+from empire_os.buyer_allocation import buyer_activation_decision
 from empire_os.search_fabric.verification import is_directory_url
 
 ECONOMIC_BUYER_TERMS = (
@@ -745,10 +746,93 @@ def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[
         "mode": "OBSERVE",
         "write_authorized": False,
         "decision_maker": decision,
+        "decision_reconciliation": reconciliation,
         "verified_contacts": verified,
         "preferred_email": review_eligible[0]["email"] if review_eligible else None,
         "review_ready": bool(decision and decision_score >= 0.5 and review_eligible and reconciliation_clear),
         "outreach_ready": bool(decision and decision_score >= 0.5 and outreach_eligible and reconciliation_clear),
+    }
+
+
+def build_buyer_readiness_dossier(
+    candidate: BuyerCandidate,
+    contact_plan: Mapping[str, Any],
+    *,
+    buyer_row: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Summarize buyer-side readiness without creating any authority."""
+    if not isinstance(contact_plan, Mapping):
+        raise ValueError("contact plan mapping required")
+
+    decision = contact_plan.get("decision_maker")
+    if not isinstance(decision, Mapping):
+        decision = {}
+    reconciliation = contact_plan.get("decision_reconciliation")
+    if not isinstance(reconciliation, Mapping):
+        reconciliation = {}
+
+    try:
+        decision_score = float(decision.get("decision_score") or 0.0)
+    except (TypeError, ValueError):
+        decision_score = 0.0
+
+    decision_maker_ready = bool(
+        decision
+        and decision_score >= 0.5
+        and not bool(reconciliation.get("review_required"))
+    )
+    review_ready = contact_plan.get("review_ready") is True
+    outreach_ready = contact_plan.get("outreach_ready") is True
+
+    if isinstance(buyer_row, Mapping):
+        activation_ready, activation_reason = buyer_activation_decision(
+            dict(buyer_row)
+        )
+        buyer_record_present = True
+    else:
+        activation_ready = False
+        activation_reason = "missing_buyer"
+        buyer_record_present = False
+
+    blockers: list[str] = []
+    if not candidate.entity_id:
+        blockers.append("canonical_identity_missing")
+    if not candidate.website:
+        blockers.append("first_party_website_missing")
+    if not decision_maker_ready:
+        if reconciliation.get("review_required"):
+            blockers.append("decision_maker_reconciliation_required")
+        else:
+            blockers.append("decision_maker_missing")
+    elif not review_ready:
+        blockers.append("verified_person_bound_contact_missing")
+    elif not outreach_ready:
+        blockers.append("outreach_evidence_below_floor")
+
+    if not buyer_record_present:
+        blockers.append("buyer_record_missing")
+    elif not activation_ready:
+        blockers.append(activation_reason)
+
+    return {
+        "mode": "OBSERVE",
+        "write_authorized": False,
+        "prospect_id": candidate.prospect_id,
+        "entity_id": candidate.entity_id,
+        "business_name": candidate.business_name,
+        "website": candidate.website,
+        "website_source": candidate.evidence.get("website_source"),
+        "company_score": candidate.company_score,
+        "decision_maker": dict(decision) if decision else None,
+        "decision_maker_ready": decision_maker_ready,
+        "review_ready": review_ready,
+        "outreach_ready": outreach_ready,
+        "buyer_record_present": buyer_record_present,
+        "buyer_activation_ready": bool(activation_ready),
+        "buyer_activation_reason": activation_reason,
+        "allocation_ready": bool(activation_ready),
+        "blockers": blockers,
+        "next_required": blockers[0] if blockers else None,
     }
 
 
