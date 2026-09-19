@@ -340,6 +340,8 @@ Fourth slice ✅ local/tested: developer/API-access readiness now requires activ
 
 Fifth slice ✅ local/tested: SaaS quota readiness now checks freshness independently for observed usage, subscription state and tenant-isolation evidence before exposing utilization/headroom. Missing or zero limits, over-limit usage, inactive subscriptions, unverified isolation and stale/future evidence remain explicit blockers; no provisioning, billing, subscription mutation or API-key issuance is introduced.
 
+Sixth slice ✅ local/tested: API-access freshness review now requires membership, subscription and tenant-isolation evidence to remain within a bounded freshness window in addition to the existing admin-role, active-subscription and read-scope gates. Stale or future-dated evidence blocks issuance review; API-key issuance/revocation, secret generation and subscription mutation remain disabled.
+
 Multi-tenant architecture, teams/RBAC, usage billing, USDT subscriptions, white label, custom domains, affiliate/agency/client dashboards, API keys, developer platform and marketplace/partner network.
 
 ### Phase 17 — Enterprise

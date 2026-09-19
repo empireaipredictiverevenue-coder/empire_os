@@ -11,6 +11,7 @@ from empire_os.saas_api_access import (
     ApiAccessEvidence,
     assess_api_access_readiness,
 )
+from empire_os.saas_api_access_freshness import assess_api_access_freshness
 from empire_os.saas_freshness import review_saas_quota_readiness
 from empire_os.saas_registry import SaasReadinessRecord
 from empire_os.saas_readiness import (
@@ -33,6 +34,14 @@ class ApiAccessReadinessRequest(BaseModel):
     tenant_isolation_verified: bool
     requested_scopes: list[str] = Field(min_length=1)
     evidence_refs: list[str] = Field(min_length=1)
+
+
+class ApiAccessFreshnessRequest(ApiAccessReadinessRequest):
+    membership_observed_at: str
+    subscription_observed_at: str
+    isolation_observed_at: str
+    now_utc: str
+    max_age_seconds: int = Field(default=21600, gt=0)
 
 
 class SaasQuotaReadinessRequest(BaseModel):
@@ -191,6 +200,53 @@ def create_saas_router(
             "api_key_revocation": False,
             "secret_material_generated": False,
             "readiness": result.as_dict(),
+        }
+
+    @router.post("/api-access/freshness/preview")
+    def api_access_freshness(req: ApiAccessFreshnessRequest):
+        try:
+            membership = TenantMembership(
+                tenant_id=req.tenant_id,
+                user_id=req.user_id,
+                role=req.role,
+                status=req.membership_status,
+            )
+            readiness = assess_api_access_readiness(
+                ApiAccessEvidence(
+                    membership=membership,
+                    active_subscription=req.active_subscription,
+                    tenant_isolation_verified=req.tenant_isolation_verified,
+                    requested_scopes=tuple(req.requested_scopes),
+                    evidence_refs=tuple(req.evidence_refs),
+                )
+            )
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            freshness = assess_api_access_freshness(
+                readiness=readiness,
+                membership_observed_at=req.membership_observed_at,
+                subscription_observed_at=req.subscription_observed_at,
+                isolation_observed_at=req.isolation_observed_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "api_key_issuance": False,
+            "api_key_revocation": False,
+            "secret_material_generated": False,
+            "subscription_mutation": False,
+            "freshness": freshness.as_dict(),
         }
 
     @router.post("/scale-readiness/preview")
