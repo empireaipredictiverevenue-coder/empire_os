@@ -1,6 +1,7 @@
 import pytest
 
 from empire_os.coder.models import TaskPhase
+from empire_os.coder.orchestrator import local_ollama_profiles
 from empire_os.coder.plan import PlanStep, PlanStepStatus, TaskPlan
 from empire_os.coder.router import ModelProfile, ModelRouter
 from empire_os.coder.security import scan_text, scrub_text
@@ -38,6 +39,58 @@ def test_router_prefers_cheapest_capable_model():
         ModelProfile("hosted", "strong", capability=3, cost_tier=3),
     ])
     assert router.route("Implement a new endpoint and tests").model == "mid"
+
+
+def test_router_keeps_planner_only_model_out_of_writer_route():
+    router = ModelRouter([
+        ModelProfile(
+            "ollama",
+            "fast-planner",
+            capability=2,
+            cost_tier=0,
+            local=True,
+            roles=("planner",),
+        ),
+        ModelProfile(
+            "ollama",
+            "strong-writer",
+            capability=3,
+            cost_tier=0,
+            local=True,
+            roles=("writer",),
+        ),
+    ])
+    objective = "Review the current implementation plan"
+    assert router.route(
+        objective,
+        role="planner",
+    ).model == "fast-planner"
+    assert router.route(
+        objective,
+        role="writer",
+    ).model == "strong-writer"
+
+
+def test_local_fast_planner_routes_simple_work_and_escalates_hard_work():
+    router = ModelRouter(local_ollama_profiles([
+        "qwen2.5-coder:14b",
+        "qwen3-coder:30b",
+    ]))
+
+    assert router.route(
+        "Review the current implementation plan",
+        role="planner",
+    ).model == "qwen2.5-coder:14b"
+
+    assert router.route(
+        "Review the current implementation plan",
+        role="writer",
+    ).model == "qwen3-coder:30b"
+
+    assert router.route(
+        "Plan a security database migration architecture",
+        role="planner",
+    ).model == "qwen3-coder:30b"
 
 
 def test_security_scrubs_secret_and_flags_dangerous_code():

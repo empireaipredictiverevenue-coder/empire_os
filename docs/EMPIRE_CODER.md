@@ -102,11 +102,11 @@ ACTIVE sources need no promotion. QUARANTINED knowledge can never be promoted.
 
 If a promoted source changes after approval, its hash no longer matches and it automatically drops out of that task's retrieval context until re-reviewed. Promotion manifests are private runtime state and do not change the global knowledge manifest.
 
-## Distinct Writer and Verifier Models
+## Distinct Planner, Writer and Verifier Models
 
 Model routing is role-aware.
 
-The auto-detected local qwen3-coder:30b profile is writer-only. A model-based verifier must use a different configured provider/model identity; Empire Coder excludes the writer identity when selecting the verifier route.
+Model roles are separated explicitly. PLAN jobs request the `planner` role; patch/refinement work that can become a candidate change requests `writer`; advisory verification requests `verifier`. The local qwen3-coder:30b profile remains the capability-3 writer and planner fallback. When `qwen2.5-coder:14b` is locally installed, Empire Coder auto-detects it as capability-2 `planner` only; simple/medium plans may use it, while architecture/security/migration plans escalate to qwen3-coder:30b. The planner-only profile can never be selected as writer. A model-based verifier must use a different configured provider/model identity; Empire Coder excludes the writer identity when selecting the verifier route.
 
 If no distinct verifier model is configured, model review is reported as unavailable rather than letting the writer review itself. Deterministic security, syntax, tests and diff verification remain authoritative in all cases. Model review is advisory only and cannot turn a deterministic FAIL into a PASS.
 
@@ -114,7 +114,9 @@ If no distinct verifier model is configured, model review is reported as unavail
 
 Ollama is installed user-local and bound to 127.0.0.1:11434.
 
-Primary local model: qwen3-coder:30b.
+Primary local writer/escalation model: qwen3-coder:30b.
+
+Optional fast local planner profile: qwen2.5-coder:14b. It is auto-detected when installed but is never granted writer or verifier roles.
 
 Measured on this host at 16K context:
 - about 18 GB on disk

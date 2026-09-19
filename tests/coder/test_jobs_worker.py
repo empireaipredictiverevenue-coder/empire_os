@@ -116,6 +116,7 @@ def test_worker_processes_plan_without_patch_or_command_execution(tmp_path):
     assert context_call[2]["budget_chars"] == 6000
     plan_call = next(call for call in coder.calls if call[0] == "plan")
     assert plan_call[3]["max_output_chars"] == 1200
+    assert plan_call[3]["role"] == "planner"
     assert not any(call[0] == "run_tool" for call in coder.calls)
 
 

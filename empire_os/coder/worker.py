@@ -60,6 +60,7 @@ class CoderTaskWorker:
                 ),
                 context,
                 max_output_chars=1200,
+                role="planner",
             )
             return {
                 "kind": job.kind.value,

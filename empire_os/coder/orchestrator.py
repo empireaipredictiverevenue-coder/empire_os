@@ -59,6 +59,36 @@ class EmpireCoderError(RuntimeError):
     pass
 
 
+LOCAL_WRITER_MODEL = "qwen3-coder:30b"
+LOCAL_FAST_PLANNER_MODEL = "qwen2.5-coder:14b"
+
+
+def local_ollama_profiles(
+    models: Iterable[str],
+) -> tuple[ModelProfile, ...]:
+    available = {str(model).strip() for model in models if str(model).strip()}
+    profiles: list[ModelProfile] = []
+    if LOCAL_FAST_PLANNER_MODEL in available:
+        profiles.append(ModelProfile(
+            "ollama",
+            LOCAL_FAST_PLANNER_MODEL,
+            capability=2,
+            cost_tier=0,
+            local=True,
+            roles=("planner",),
+        ))
+    if LOCAL_WRITER_MODEL in available:
+        profiles.append(ModelProfile(
+            "ollama",
+            LOCAL_WRITER_MODEL,
+            capability=3,
+            cost_tier=1,
+            local=True,
+            roles=("writer", "planner"),
+        ))
+    return tuple(profiles)
+
+
 def default_task_plan() -> TaskPlan:
     plan = TaskPlan([
         PlanStep("understand", "Understand objective", TaskPhase.UNDERSTAND),
@@ -135,20 +165,13 @@ class EmpireCoder:
         self.providers = ProviderRegistry()
         self.providers.register(DisabledProvider())
         ollama = OllamaProvider(num_threads=8)
-        local_model = "qwen3-coder:30b"
-        if ollama.health() and ollama.has_model(local_model):
-            self.providers.register(ollama)
+        local_models: tuple[str, ...] = ()
+        if ollama.health():
+            local_models = ollama.models()
+            if local_models:
+                self.providers.register(ollama)
             if not requested_profiles:
-                requested_profiles = (
-                    ModelProfile(
-                        "ollama",
-                        local_model,
-                        capability=3,
-                        cost_tier=0,
-                        local=True,
-                        roles=("writer",),
-                    ),
-                )
+                requested_profiles = local_ollama_profiles(local_models)
         self.router = ModelRouter(requested_profiles)
         self.skills = SkillLoader(self.workspace)
         self.audit = AuditTrail(self.runtime_root)
@@ -585,6 +608,23 @@ class EmpireCoder:
         )
         return route
 
+    def planner_model_route(self, task_id: str) -> ModelRoute:
+        task = self.store.load(task_id)
+        route = self.router.route(
+            task.objective,
+            role="planner",
+        )
+        self._record_and_sync(
+            task_id=task_id,
+            event="planner_model_routed",
+            data={
+                "provider": route.provider,
+                "model": route.model,
+                "reason": route.reason,
+            },
+        )
+        return route
+
     def verifier_model_route(
         self,
         task_id: str,
@@ -709,9 +749,18 @@ class EmpireCoder:
         context: ContextPack,
         *,
         max_output_chars: int = 4_000,
+        role: str = "writer",
     ) -> ModelProposal:
         self.refresh_knowledge()
-        route = self.model_route(task_id)
+        role_name = str(role or "writer").strip().lower()
+        if role_name == "planner":
+            route = self.planner_model_route(task_id)
+        elif role_name == "writer":
+            route = self.model_route(task_id)
+        else:
+            raise EmpireCoderError(
+                f"unsupported polished model role: {role_name}"
+            )
         provider = self.providers.get(route.provider)
         context = self._fresh_context_pack(
             task_id,
@@ -867,11 +916,15 @@ class EmpireCoder:
     def doctor(self) -> dict:
         state = self.worktrees.inspect()
         ollama = OllamaProvider(num_threads=8)
-        local_model = "qwen3-coder:30b"
+        local_models = ollama.models() if ollama.health() else ()
         knowledge = self.refresh_knowledge()
         writer_route = self.router.route(
             "Empire Coder diagnostic",
             role="writer",
+        )
+        planner_route = self.router.route(
+            "Empire Coder diagnostic",
+            role="planner",
         )
         verifier_route = self.router.route(
             "Empire Coder diagnostic",
@@ -890,13 +943,22 @@ class EmpireCoder:
             "execution_mode": "OBSERVE",
             "permission_profile": self.permissions.name,
             "ollama_healthy": ollama.health(),
-            "ollama_models": list(ollama.models()),
-            "local_coder_ready": ollama.has_model(local_model),
-            "local_coder_model": local_model,
+            "ollama_models": list(local_models),
+            "local_coder_ready": LOCAL_WRITER_MODEL in local_models,
+            "local_coder_model": LOCAL_WRITER_MODEL,
+            "fast_planner_model_ready": (
+                LOCAL_FAST_PLANNER_MODEL in local_models
+            ),
+            "fast_planner_model": LOCAL_FAST_PLANNER_MODEL,
             "writer_model": {
                 "provider": writer_route.provider,
                 "model": writer_route.model,
                 "reason": writer_route.reason,
+            },
+            "planner_model": {
+                "provider": planner_route.provider,
+                "model": planner_route.model,
+                "reason": planner_route.reason,
             },
             "verifier_model": {
                 "provider": verifier_route.provider,
