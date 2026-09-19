@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from typing import Any, Mapping, Protocol, Sequence
 
 from fastapi import APIRouter, HTTPException, Query
@@ -11,6 +12,10 @@ from empire_os.revenue_crm_readiness import assess_close_readiness
 from empire_os.revenue_crm_retention import (
     RevenueCrmRetentionEvidence,
     assess_retention_expansion_readiness,
+)
+from empire_os.revenue_crm_retention_freshness import (
+    RevenueCrmRetentionTiming,
+    assess_retention_expansion_freshness,
 )
 
 
@@ -38,6 +43,16 @@ class RevenueCrmRetentionRequest(BaseModel):
     outcome_evidence_ref: str | None = None
     buyer_available_capacity: int | None = Field(default=None, ge=0)
     capacity_evidence_ref: str | None = None
+
+
+class RevenueCrmRetentionFreshnessRequest(RevenueCrmRetentionRequest):
+    buyer_observed_at: str
+    payment_observed_at: str | None = None
+    fulfilment_observed_at: str | None = None
+    outcome_observed_at: str | None = None
+    capacity_observed_at: str | None = None
+    now_utc: str
+    max_age_seconds: int = Field(default=86400, gt=0)
 
 
 @dataclass(frozen=True)
@@ -248,6 +263,58 @@ def create_revenue_crm_router(
             "crm_mutation": False,
             "offer_mutation": False,
             "readiness": readiness.as_dict(),
+        }
+
+    @router.post("/retention-expansion/freshness/preview")
+    def retention_expansion_freshness_preview(
+        req: RevenueCrmRetentionFreshnessRequest,
+    ):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            evidence = RevenueCrmRetentionEvidence(
+                buyer_id=req.buyer_id,
+                buyer_activated=req.buyer_activated,
+                buyer_evidence_ref=req.buyer_evidence_ref,
+                payment_verified=req.payment_verified,
+                payment_evidence_ref=req.payment_evidence_ref,
+                fulfilment_delivered=req.fulfilment_delivered,
+                fulfilment_evidence_ref=req.fulfilment_evidence_ref,
+                outcome_observed=req.outcome_observed,
+                outcome_success_verified=req.outcome_success_verified,
+                outcome_evidence_ref=req.outcome_evidence_ref,
+                buyer_available_capacity=req.buyer_available_capacity,
+                capacity_evidence_ref=req.capacity_evidence_ref,
+            )
+            freshness = assess_retention_expansion_freshness(
+                evidence=evidence,
+                timing=RevenueCrmRetentionTiming(
+                    buyer_observed_at=req.buyer_observed_at,
+                    payment_observed_at=req.payment_observed_at,
+                    fulfilment_observed_at=req.fulfilment_observed_at,
+                    outcome_observed_at=req.outcome_observed_at,
+                    capacity_observed_at=req.capacity_observed_at,
+                ),
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "follow_up_execution": False,
+            "payment_execution": False,
+            "crm_mutation": False,
+            "offer_mutation": False,
+            "freshness": freshness.as_dict(),
         }
 
     @router.get("/prospects")

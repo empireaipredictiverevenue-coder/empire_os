@@ -233,6 +233,8 @@ Third slice ✅ local/tested: prospect close-readiness now requires an engaged c
 
 Fourth slice ✅ local/tested: retention/expansion readiness now requires activated-buyer, verified-payment, delivered-fulfilment and observed-outcome evidence. Expansion additionally requires an explicitly verified successful outcome plus verified positive buyer capacity; unknown outcome success remains unknown. No follow-up, payment, CRM or offer mutation is introduced.
 
+Fifth slice ✅ local/tested: retention/expansion freshness review now validates chronology across buyer activation, verified payment, fulfilment and observed outcome, and independently checks capacity freshness for expansion. Stale, future-dated, missing or out-of-order evidence blocks the relevant review while retention remains separable from expansion-only blockers. No follow-up, payment, CRM or offer mutation is introduced.
+
 ### Phase 9 — Advertising Brain
 
 Second slice ✅ local/tested: canonical ad observations now carry deterministic payload provenance, timezone-aware observation timestamps, optional explicit canonical creative identity, and tamper-aware idempotency. Exact provider replays stay idempotent; changed metrics or creative identity under the same observation ID conflict. Campaign/budget/pause/retarget authority remains disabled.
