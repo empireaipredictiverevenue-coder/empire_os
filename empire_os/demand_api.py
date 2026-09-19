@@ -1,9 +1,12 @@
 """Recommendation-only Demand Genesis readiness API."""
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from empire_os.demand_freshness import review_demand_outcome_evidence
 from empire_os.demand_genesis import DemandPlan
 from empire_os.demand_outcome import (
     DemandOutcomeEvidence,
@@ -40,6 +43,12 @@ class DemandOutcomeRequest(BaseModel):
     observed_cost_cents: int | None = Field(default=None, ge=0)
     observed_at: str
     evidence_refs: list[str] = Field(min_length=1)
+
+
+class DemandOutcomeEvidenceReviewRequest(DemandOutcomeRequest):
+    plan_registered_at: str
+    now_utc: str
+    max_age_seconds: int = Field(default=604800, gt=0)
 
 
 class DemandEvidenceRequest(BaseModel):
@@ -100,6 +109,45 @@ def create_demand_router(registry=None) -> APIRouter:
             "ad_spend_enabled": False,
             "provider_activation_enabled": False,
             "outcome_review": review.as_dict(),
+        }
+
+    @router.post("/outcome/evidence/preview")
+    def outcome_evidence_preview(req: DemandOutcomeEvidenceReviewRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            evidence = DemandOutcomeEvidence(
+                plan_id=req.plan_id,
+                success_metric=req.success_metric,
+                baseline_value=req.baseline_value,
+                observed_value=req.observed_value,
+                observed_cost_cents=req.observed_cost_cents,
+                observed_at=req.observed_at,
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            review = review_demand_outcome_evidence(
+                evidence,
+                plan_registered_at=req.plan_registered_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "publishing_enabled": False,
+            "outbound_enabled": False,
+            "ad_spend_enabled": False,
+            "provider_activation_enabled": False,
+            "review": review.as_dict(),
         }
 
     @router.post("/readiness/preview")
