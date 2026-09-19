@@ -163,6 +163,91 @@ CREATE TABLE IF NOT EXISTS public.coder_knowledge_sources (
   last_scanned_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS public.coder_structured_patch_proposals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id text NOT NULL REFERENCES public.coder_tasks(id) ON DELETE CASCADE,
+  provider text NOT NULL,
+  model text NOT NULL,
+  candidate_texts jsonb NOT NULL
+    CHECK (
+      jsonb_typeof(candidate_texts) = 'array'
+      AND jsonb_array_length(candidate_texts) >= 2
+    ),
+  critique text NOT NULL CHECK (length(btrim(critique)) > 0),
+  synthesized_text text NOT NULL CHECK (length(btrim(synthesized_text)) > 0),
+  operation text NOT NULL CHECK (
+    operation IN (
+      'replace_exact',
+      'replace_python_symbol',
+      'create_file'
+    )
+  ),
+  target_path text NOT NULL CHECK (length(btrim(target_path)) > 0),
+  symbol text,
+  old_text text,
+  new_text text NOT NULL CHECK (length(btrim(new_text)) > 0),
+  rationale text NOT NULL DEFAULT '',
+  expected_tests jsonb NOT NULL DEFAULT '[]'::jsonb
+    CHECK (jsonb_typeof(expected_tests) = 'array'),
+  valid boolean NOT NULL DEFAULT false,
+  validation_reasons jsonb NOT NULL DEFAULT '[]'::jsonb
+    CHECK (jsonb_typeof(validation_reasons) = 'array'),
+  validation_warnings jsonb NOT NULL DEFAULT '[]'::jsonb
+    CHECK (jsonb_typeof(validation_warnings) = 'array'),
+  eligible boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (
+    operation <> 'replace_python_symbol'
+    OR (symbol IS NOT NULL AND length(btrim(symbol)) > 0)
+  ),
+  CHECK (
+    operation <> 'replace_exact'
+    OR (old_text IS NOT NULL AND length(old_text) > 0)
+  ),
+  CHECK (
+    eligible = false
+    OR (
+      valid = true
+      AND jsonb_array_length(candidate_texts) >= 2
+      AND length(btrim(critique)) > 0
+    )
+  )
+);
+
+CREATE TABLE IF NOT EXISTS public.coder_task_knowledge_promotions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id text NOT NULL REFERENCES public.coder_tasks(id) ON DELETE CASCADE,
+  path text NOT NULL CHECK (length(btrim(path)) > 0),
+  sha256 text NOT NULL CHECK (length(btrim(sha256)) > 0),
+  reason text NOT NULL CHECK (length(btrim(reason)) > 0),
+  status_at_promotion text NOT NULL
+    CHECK (status_at_promotion = 'REVIEW'),
+  approved_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (task_id, path, sha256)
+);
+
+CREATE TABLE IF NOT EXISTS public.coder_model_reviews (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id text NOT NULL REFERENCES public.coder_tasks(id) ON DELETE CASCADE,
+  writer_provider text NOT NULL,
+  writer_model text NOT NULL,
+  reviewer_provider text NOT NULL,
+  reviewer_model text NOT NULL,
+  verdict text NOT NULL CHECK (
+    verdict IN ('PASS','FAIL','PASS_WITH_WARNINGS')
+  ),
+  reasons jsonb NOT NULL DEFAULT '[]'::jsonb
+    CHECK (jsonb_typeof(reasons) = 'array'),
+  warnings jsonb NOT NULL DEFAULT '[]'::jsonb
+    CHECK (jsonb_typeof(warnings) = 'array'),
+  advisory_only boolean NOT NULL DEFAULT true CHECK (advisory_only = true),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (
+    writer_provider <> reviewer_provider
+    OR writer_model <> reviewer_model
+  )
+);
+
 CREATE TABLE IF NOT EXISTS public.coder_verifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   task_id text NOT NULL REFERENCES public.coder_tasks(id) ON DELETE CASCADE,
@@ -193,6 +278,12 @@ CREATE INDEX IF NOT EXISTS idx_coder_context_snapshots_task
   ON public.coder_context_snapshots(task_id, version DESC);
 CREATE INDEX IF NOT EXISTS idx_coder_knowledge_sources_status
   ON public.coder_knowledge_sources(status, authority DESC);
+CREATE INDEX IF NOT EXISTS idx_coder_structured_patch_proposals_task
+  ON public.coder_structured_patch_proposals(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_coder_task_knowledge_promotions_task
+  ON public.coder_task_knowledge_promotions(task_id, approved_at DESC);
+CREATE INDEX IF NOT EXISTS idx_coder_model_reviews_task
+  ON public.coder_model_reviews(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_coder_verifications_task
   ON public.coder_verifications(task_id, created_at DESC);
 
@@ -205,6 +296,9 @@ ALTER TABLE public.coder_proposals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coder_command_proposals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coder_context_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coder_knowledge_sources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.coder_structured_patch_proposals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.coder_task_knowledge_promotions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.coder_model_reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coder_verifications ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
@@ -242,6 +336,9 @@ REVOKE ALL ON
   public.coder_command_proposals,
   public.coder_context_snapshots,
   public.coder_knowledge_sources,
+  public.coder_structured_patch_proposals,
+  public.coder_task_knowledge_promotions,
+  public.coder_model_reviews,
   public.coder_verifications
 FROM PUBLIC, anon, authenticated, service_role;
 
@@ -258,6 +355,9 @@ GRANT SELECT, INSERT ON
   public.coder_proposals,
   public.coder_command_proposals,
   public.coder_context_snapshots,
+  public.coder_structured_patch_proposals,
+  public.coder_task_knowledge_promotions,
+  public.coder_model_reviews,
   public.coder_verifications
 TO empire_coder_state;
 
@@ -330,6 +430,33 @@ CREATE POLICY coder_knowledge_sources_state_role
   FOR ALL TO empire_coder_state
   USING (true) WITH CHECK (true);
 
+CREATE POLICY coder_structured_patch_proposals_state_role
+  ON public.coder_structured_patch_proposals
+  FOR SELECT TO empire_coder_state
+  USING (true);
+CREATE POLICY coder_structured_patch_proposals_insert_role
+  ON public.coder_structured_patch_proposals
+  FOR INSERT TO empire_coder_state
+  WITH CHECK (true);
+
+CREATE POLICY coder_task_knowledge_promotions_state_role
+  ON public.coder_task_knowledge_promotions
+  FOR SELECT TO empire_coder_state
+  USING (true);
+CREATE POLICY coder_task_knowledge_promotions_insert_role
+  ON public.coder_task_knowledge_promotions
+  FOR INSERT TO empire_coder_state
+  WITH CHECK (true);
+
+CREATE POLICY coder_model_reviews_state_role
+  ON public.coder_model_reviews
+  FOR SELECT TO empire_coder_state
+  USING (true);
+CREATE POLICY coder_model_reviews_insert_role
+  ON public.coder_model_reviews
+  FOR INSERT TO empire_coder_state
+  WITH CHECK (true);
+
 CREATE POLICY coder_verifications_state_role
   ON public.coder_verifications
   FOR SELECT TO empire_coder_state
@@ -349,6 +476,12 @@ COMMENT ON TABLE public.coder_knowledge_sources IS
 'Knowledge-garden metadata only; original source content remains in the repository.';
 COMMENT ON TABLE public.coder_command_proposals IS
 'Best-of-N command candidates, critique, synthesized argv and policy decision.';
+COMMENT ON TABLE public.coder_structured_patch_proposals IS
+'Best-of-N machine-checkable patch proposals; local application still requires live revalidation.';
+COMMENT ON TABLE public.coder_task_knowledge_promotions IS
+'Append-only task-scoped approvals for REVIEW knowledge pinned to exact source hashes.';
+COMMENT ON TABLE public.coder_model_reviews IS
+'Append-only advisory reviews produced by a model distinct from the writer model.';
 COMMENT ON ROLE empire_coder_state IS
 'Least-privilege engineering-state role for Empire Coder only.';
 COMMENT ON ROLE empire_coder_state_login IS

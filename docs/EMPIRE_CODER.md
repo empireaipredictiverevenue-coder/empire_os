@@ -71,6 +71,45 @@ Empire Coder now has Python AST-aware symbol replacement, dependency/reverse-dep
 
 Specialist roles are defined for Architect, Backend, Frontend, QA, Security and Reviewer. Writer and verifier authority are separated; defining a role does not grant production authority.
 
+## Structured Patch Proposals
+
+Empire Coder can now convert model output into a machine-checkable patch proposal rather than treating free-form prose as executable engineering intent.
+
+Supported bounded operations:
+- exact single-match replacement;
+- Python symbol replacement using AST symbol boundaries;
+- creation of a new file with an allowlisted source/document suffix.
+
+Structured patches follow the same best-of-N rule: two independent JSON candidates, comparative critique, new synthesized JSON proposal, then live repository validation.
+
+Validation checks target path/workspace boundaries, protected paths, live symbol existence, exact-match counts, Python syntax, requested symbol identity, security patterns and expected-test paths.
+
+A structured proposal is validated when created and **validated again immediately before local patch application**. If the repository changed between proposal and application, Empire Coder rejects the stale proposal instead of applying it approximately.
+
+Expected tests from an accepted structured proposal are carried into durable task state. HTTP still exposes no patch/apply endpoint.
+
+## Task-Scoped Knowledge Promotion
+
+The Knowledge Garden remains globally strict, but a task can explicitly promote a REVIEW source for that task only.
+
+Promotion requires:
+- explicit approval;
+- a recorded reason;
+- source status REVIEW;
+- a hash pin of the exact reviewed content.
+
+ACTIVE sources need no promotion. QUARANTINED knowledge can never be promoted.
+
+If a promoted source changes after approval, its hash no longer matches and it automatically drops out of that task's retrieval context until re-reviewed. Promotion manifests are private runtime state and do not change the global knowledge manifest.
+
+## Distinct Writer and Verifier Models
+
+Model routing is role-aware.
+
+The auto-detected local qwen3-coder:30b profile is writer-only. A model-based verifier must use a different configured provider/model identity; Empire Coder excludes the writer identity when selecting the verifier route.
+
+If no distinct verifier model is configured, model review is reported as unavailable rather than letting the writer review itself. Deterministic security, syntax, tests and diff verification remain authoritative in all cases. Model review is advisory only and cannot turn a deterministic FAIL into a PASS.
+
 ## Local Models
 
 Ollama is installed user-local and bound to 127.0.0.1:11434.

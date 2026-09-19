@@ -2,6 +2,9 @@
 
 from .context import ContextBuilder, ContextPack
 from .jobs import CoderJob, JobKind, JobStatus, LocalJobQueue
+from .model_review import (
+    DistinctModelReviewer, ModelReview, ModelReviewError,
+)
 from .models import (
     CoderTask,
     TaskPhase,
@@ -22,6 +25,14 @@ from .refinement import (
 )
 from .repo import RepoIntelligence
 from .router import ModelProfile, ModelRouter
+from .structured_patch import (
+    PatchOperation,
+    PatchValidation,
+    StructuredPatchCandidate,
+    StructuredPatchProposal,
+    StructuredPatchRefiner,
+    StructuredPatchValidator,
+)
 from .verifier import Verifier
 from .worker import CoderTaskWorker
 
@@ -37,6 +48,9 @@ __all__ = [
     "ContextPack",
     "EmpireCoder",
     "EmpireCoderError",
+    "DistinctModelReviewer",
+    "ModelReview",
+    "ModelReviewError",
     "ModelProfile",
     "ModelRouter",
     "RefinementPolicy",
@@ -45,6 +59,12 @@ __all__ = [
     "ModelProposal",
     "OBSERVE_DEVELOPER",
     "OllamaProvider",
+    "PatchOperation",
+    "PatchValidation",
+    "StructuredPatchCandidate",
+    "StructuredPatchProposal",
+    "StructuredPatchRefiner",
+    "StructuredPatchValidator",
     "PermissionProfile",
     "REVIEW_ONLY",
     "RepoIntelligence",

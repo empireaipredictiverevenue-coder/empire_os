@@ -14,7 +14,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable
 
-from .policy import resolve_workspace
+from .models import utc_now
+from .policy import resolve_runtime_root, resolve_workspace
 
 
 class KnowledgeStatus(str, Enum):
@@ -86,8 +87,26 @@ _OLD_BLUEPRINT_RE = re.compile(r"(?i)blueprint[_ -]?v([1-5])\b")
 
 
 class KnowledgeGarden:
-    def __init__(self, workspace: str | Path) -> None:
+    def __init__(
+        self,
+        workspace: str | Path,
+        *,
+        runtime_root: str | Path | None = None,
+    ) -> None:
         self.workspace = resolve_workspace(workspace)
+        self.runtime_root = resolve_runtime_root(
+            self.workspace, runtime_root
+        )
+        self.promotions_root = (
+            self.runtime_root
+            / "knowledge"
+            / "task_promotions"
+        )
+        self.promotions_root.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        self.promotions_root.chmod(0o700)
 
     def scan(self) -> GardenReport:
         candidates = list(self._candidates())
@@ -149,6 +168,130 @@ class KnowledgeGarden:
             for row in report.records
             if row.status is KnowledgeStatus.ACTIVE
         )
+
+    def promote_for_task(
+        self,
+        task_id: str,
+        paths: Iterable[str],
+        *,
+        reason: str,
+        approved: bool = False,
+    ) -> dict[str, Any]:
+        if not approved:
+            raise PermissionError(
+                "task knowledge promotion requires explicit approval"
+            )
+        why = str(reason or "").strip()
+        if not why:
+            raise ValueError("promotion reason is required")
+
+        report = self.scan()
+        by_path = {row.path: row for row in report.records}
+        entries = []
+        for raw in dict.fromkeys(str(path) for path in paths):
+            row = by_path.get(raw)
+            if row is None:
+                raise ValueError(
+                    f"knowledge source not found: {raw}"
+                )
+            if row.status is KnowledgeStatus.QUARANTINED:
+                raise PermissionError(
+                    f"quarantined knowledge cannot be promoted: {raw}"
+                )
+            if row.status is KnowledgeStatus.ACTIVE:
+                continue
+            if row.status is not KnowledgeStatus.REVIEW:
+                raise PermissionError(
+                    f"knowledge source is not reviewable: {raw}"
+                )
+            entries.append({
+                "path": row.path,
+                "sha256": row.sha256,
+                "status_at_promotion": row.status.value,
+                "reason": why,
+            })
+
+        payload = {
+            "version": 1,
+            "task_id": self._safe_task_id(task_id),
+            "approved_at": utc_now(),
+            "entries": entries,
+        }
+        path = self._promotion_path(task_id)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        tmp.chmod(0o600)
+        tmp.replace(path)
+        path.chmod(0o600)
+        return payload
+
+    def active_paths_for_task(
+        self,
+        task_id: str,
+        report: GardenReport | None = None,
+    ) -> tuple[str, ...]:
+        report = report or self.scan()
+        active = list(self.active_paths(report))
+        manifest = self._load_promotion(task_id)
+        if not manifest:
+            return tuple(active)
+
+        by_path = {row.path: row for row in report.records}
+        for entry in manifest.get("entries") or []:
+            path = str(entry.get("path") or "")
+            row = by_path.get(path)
+            if row is None:
+                continue
+            if row.status is KnowledgeStatus.QUARANTINED:
+                continue
+            if row.sha256 != str(entry.get("sha256") or ""):
+                continue
+            if path not in active:
+                active.append(path)
+        return tuple(active)
+
+    def task_promotion_status(
+        self,
+        task_id: str,
+    ) -> dict[str, Any]:
+        manifest = self._load_promotion(task_id)
+        if not manifest:
+            return {
+                "task_id": self._safe_task_id(task_id),
+                "promoted": 0,
+            }
+        return {
+            "task_id": manifest["task_id"],
+            "promoted": len(manifest.get("entries") or []),
+            "approved_at": manifest.get("approved_at"),
+        }
+
+    def _promotion_path(self, task_id: str) -> Path:
+        safe = self._safe_task_id(task_id)
+        return self.promotions_root / f"{safe}.json"
+
+    def _load_promotion(
+        self,
+        task_id: str,
+    ) -> dict[str, Any] | None:
+        path = self._promotion_path(task_id)
+        if not path.exists():
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _safe_task_id(task_id: str) -> str:
+        raw = str(task_id or "")
+        safe = "".join(
+            ch for ch in raw
+            if ch.isalnum() or ch in "_-"
+        )
+        if not safe or safe != raw:
+            raise ValueError("invalid task id")
+        return safe
 
     def sync_manifest(
         self,

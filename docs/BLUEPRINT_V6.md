@@ -113,8 +113,11 @@ Foundation status — local/tested, production activation gated:
 - Local qwen3-coder:30b installed and benchmarked on the EmpireOS host.
 - Read-before-write patching, atomic writes and rollback checkpoints.
 - Python AST-aware symbol patching plus dependency/reverse-dependency and impacted-test selection.
+- Best-of-N structured patch proposals with strict JSON schema, live-file validation and mandatory revalidation immediately before local application.
+- Task-scoped knowledge promotion for REVIEW sources only, with explicit approval, reason, content-hash pinning and automatic invalidation after source changes; QUARANTINED sources remain non-promotable.
 - Restricted subprocess runner with filtered environment, timeouts and secret-output scrubbing.
 - Specialist Architect/Backend/Frontend/QA/Security/Reviewer role definitions with writer/verifier separation.
+- Role-aware model routing: local qwen3-coder:30b is writer-only by default; advisory model verification must use a distinct configured provider/model or remain explicitly unavailable.
 - Independent verifier with security, diff and test checks.
 - Controlled self-build scope that cannot silently widen authority.
 - Staged canonical coder_* Supabase schema with a dedicated least-privilege engineering-state role.
