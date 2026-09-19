@@ -211,6 +211,8 @@ Foundation slice ✅ local/tested: `predictive_cloud_v3` now supports bounded ex
 ### Phase 11 — Experiment + Causal Engine
 Controlled experiments, counterfactuals, holdouts, creative/offer/pricing/page tests, incrementality and causal attribution.
 
+Foundation slice ✅ local/tested: deterministic holdout/treatment assignment planning and append-only experiment outcome observations are staged around the existing `gtm_experiments` model. Incrementality is computed only when each arm has sufficient observed samples; no live traffic mutation, automatic rollout, pricing change or production migration is activated.
+
 ### Phase 12 — Demand Genesis
 Create demand through content, ads, offers, voice, AEO/GEO, communities, partnerships and agent distribution rather than only harvesting existing demand.
 
