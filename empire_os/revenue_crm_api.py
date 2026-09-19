@@ -19,20 +19,60 @@ class RevenueCrmRepository(Protocol):
 
 
 @dataclass(frozen=True)
+class EvidenceRef:
+    kind: str
+    record_id: str
+    state: str | None
+    observed_at: str | None
+    detail: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class NextActionEvidence:
     available: bool
     action: str | None
     reason: str
-    evidence: tuple[str, ...]
+    evidence: tuple[EvidenceRef, ...]
     execution_authority: str = "none"
     approval_required: bool = True
 
     def as_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        data["evidence"] = [item.as_dict() for item in self.evidence]
+        return data
+
+
+def _canonical_ref(
+    *,
+    kind: str,
+    record_id: Any,
+    state: Any,
+    observed_at: Any,
+    detail: str | None = None,
+) -> EvidenceRef | None:
+    rid = str(record_id or "").strip()
+    if not rid:
+        return None
+    state_text = str(state or "").strip() or None
+    observed_text = str(observed_at or "").strip() or None
+    return EvidenceRef(
+        kind=kind,
+        record_id=rid,
+        state=state_text,
+        observed_at=observed_text,
+        detail=detail,
+    )
+
+
 def derive_next_action(
     prospect: Mapping[str, Any],
 ) -> NextActionEvidence:
-    closer_state = str(prospect.get("closer_state") or "").strip().lower()
+    closer_state = str(
+        prospect.get("closer_state") or ""
+    ).strip().lower()
     conversation_state = str(
         prospect.get("conversation_state") or ""
     ).strip().lower()
@@ -40,37 +80,90 @@ def derive_next_action(
         prospect.get("fulfilment_state") or ""
     ).strip().lower()
 
-    if closer_state == "awaiting_payment":
+    closer_ref = _canonical_ref(
+        kind="closer_case",
+        record_id=prospect.get("closer_case_id"),
+        state=prospect.get("closer_state"),
+        observed_at=prospect.get("closer_updated_at"),
+    )
+    conversation_ref = _canonical_ref(
+        kind="conversation",
+        record_id=prospect.get("conversation_id"),
+        state=prospect.get("conversation_state"),
+        observed_at=prospect.get("conversation_updated_at"),
+    )
+    fulfilment_ref = _canonical_ref(
+        kind="fulfilment_order",
+        record_id=prospect.get("fulfilment_order_id"),
+        state=prospect.get("fulfilment_state"),
+        observed_at=prospect.get("fulfilment_updated_at"),
+    )
+
+    if closer_state == "awaiting_payment" and closer_ref is not None:
         return NextActionEvidence(
             available=True,
             action="review_payment_status",
             reason="closer_case_is_waiting_on_payment",
-            evidence=("closer_state:awaiting_payment",),
+            evidence=(closer_ref,),
         )
 
-    if closer_state == "proposal_ready":
+    if closer_state == "proposal_ready" and closer_ref is not None:
         return NextActionEvidence(
             available=True,
             action="review_proposal_readiness",
             reason="closer_case_has_observed_proposal_ready_state",
-            evidence=("closer_state:proposal_ready",),
+            evidence=(closer_ref,),
         )
 
-    if conversation_state == "engaged":
+    if conversation_state == "engaged" and conversation_ref is not None:
         return NextActionEvidence(
             available=True,
             action="review_engaged_conversation",
             reason="canonical_conversation_is_engaged",
-            evidence=("conversation_state:engaged",),
+            evidence=(conversation_ref,),
         )
 
-    if fulfilment_state in {"accepted", "invoiced", "delivered", "confirmed"}:
+    if (
+        fulfilment_state
+        in {"accepted", "invoiced", "delivered", "confirmed"}
+        and fulfilment_ref is not None
+    ):
         return NextActionEvidence(
             available=True,
             action="review_fulfilment_state",
             reason="canonical_fulfilment_requires_operator_review",
-            evidence=(f"fulfilment_state:{fulfilment_state}",),
+            evidence=(fulfilment_ref,),
         )
+
+    buyer_id = str(prospect.get("buyer_id") or "").strip()
+    buyer_activation = str(
+        prospect.get("buyer_activation_state") or ""
+    ).strip().lower()
+    capacity = prospect.get("buyer_available_capacity")
+    capacity_verified_at = str(
+        prospect.get("buyer_capacity_verified_at") or ""
+    ).strip()
+    if (
+        buyer_id
+        and buyer_activation == "activated"
+        and capacity is not None
+        and capacity_verified_at
+    ):
+        capacity_value = int(capacity)
+        if capacity_value > 0:
+            buyer_ref = EvidenceRef(
+                kind="buyer_capacity",
+                record_id=buyer_id,
+                state=buyer_activation,
+                observed_at=capacity_verified_at,
+                detail=f"available_capacity:{capacity_value}",
+            )
+            return NextActionEvidence(
+                available=True,
+                action="review_buyer_capacity",
+                reason="allocated_buyer_has_verified_available_capacity",
+                evidence=(buyer_ref,),
+            )
 
     return NextActionEvidence(
         available=False,

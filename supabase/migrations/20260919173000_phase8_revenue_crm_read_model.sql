@@ -21,6 +21,14 @@ SELECT
   fulfilment.id AS fulfilment_order_id,
   fulfilment.state AS fulfilment_state,
   fulfilment.price_cents,
+  fulfilment.updated_at AS fulfilment_updated_at,
+  fulfilment.buyer_id,
+  buyer.commercial_activation_state AS buyer_activation_state,
+  CASE
+    WHEN buyer.daily_cap IS NULL OR buyer.calls_today IS NULL THEN NULL
+    ELSE greatest(buyer.daily_cap-buyer.calls_today,0)
+  END AS buyer_available_capacity,
+  buyer.capacity_verified_at AS buyer_capacity_verified_at,
   NULL::numeric AS deal_probability
 FROM public.prospects p
 LEFT JOIN LATERAL (
@@ -38,12 +46,14 @@ LEFT JOIN LATERAL (
   LIMIT 1
 ) closer ON true
 LEFT JOIN LATERAL (
-  SELECT f.id,f.state,f.price_cents,f.updated_at
+  SELECT f.id,f.state,f.price_cents,f.updated_at,f.buyer_id
   FROM public.fulfilment_orders f
   WHERE f.prospect_id=p.id
   ORDER BY f.updated_at DESC,f.id DESC
   LIMIT 1
-) fulfilment ON true;
+) fulfilment ON true
+LEFT JOIN public.buyers buyer
+  ON buyer.id=fulfilment.buyer_id;
 
 COMMENT ON VIEW public.revenue_crm_prospects IS
 'Phase 8 read-only canonical prospect CRM projection. Deal probability remains NULL until calibrated evidence exists.';
@@ -60,10 +70,10 @@ SELECT
   b.commercial_activation_state,
   b.daily_cap,
   b.calls_today,
-  greatest(
-    coalesce(b.daily_cap,0)-coalesce(b.calls_today,0),
-    0
-  ) AS available_capacity,
+  CASE
+    WHEN b.daily_cap IS NULL OR b.calls_today IS NULL THEN NULL
+    ELSE greatest(b.daily_cap-b.calls_today,0)
+  END AS available_capacity,
   b.per_lead_rate,
   b.capacity_verified_at,
   b.delivery_verified_at,

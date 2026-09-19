@@ -69,3 +69,25 @@ def test_buyer_capacity_never_goes_negative():
 def test_missing_buyer_id_fails_closed():
     with pytest.raises(ValueError, match="canonical buyer_id"):
         normalise_revenue_crm_buyer({})
+
+
+def test_missing_buyer_capacity_stays_unknown():
+    buyer = normalise_revenue_crm_buyer({
+        "buyer_id": "buyer-1",
+        "daily_cap": None,
+        "calls_today": None,
+    })
+    assert buyer.available_capacity is None
+
+
+def test_prospect_preserves_verified_buyer_capacity_evidence():
+    record = normalise_revenue_crm_prospect({
+        "prospect_id": "prospect-1",
+        "buyer_id": "buyer-1",
+        "buyer_activation_state": "activated",
+        "buyer_available_capacity": 5,
+        "buyer_capacity_verified_at": "2026-09-19T20:58:00+00:00",
+    })
+    assert record.buyer_id == "buyer-1"
+    assert record.buyer_available_capacity == 5
+    assert record.buyer_capacity_verified_at == "2026-09-19T20:58:00+00:00"
