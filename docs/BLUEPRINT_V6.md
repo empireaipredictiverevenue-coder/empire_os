@@ -311,6 +311,8 @@ Third slice ✅ local/tested: append-only capital review registry records candid
 
 Fourth slice ✅ local/tested: realized-return feedback now compares expected return against independently observed recognized revenue and observed cost. Missing revenue/cost evidence remains unknown; feedback cannot move funds or mutate budgets.
 
+Fifth slice ✅ local/tested: capital outcome calibration now checks freshness and recommendation→outcome chronology before comparing the recorded expected-return multiple with later realized-return multiple. Missing recognized revenue/cost, stale/future outcomes and pre-recommendation outcomes keep calibration unavailable; no recommendation mutation, funds movement or budget mutation is introduced.
+
 ### Phase 16 — SaaS / Network Scale
 Canonical multi-tenant teams, RBAC, usage metering, subscriptions and network-scale tenancy controls.
 

@@ -1,12 +1,14 @@
 """Read-only Capital Allocator review API."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Mapping, Protocol, Sequence
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from empire_os.capital_allocator import CapitalCandidate
+from empire_os.capital_freshness import review_capital_outcome_calibration
 from empire_os.capital_outcome import (
     CapitalOutcomeEvidence,
     review_capital_outcome,
@@ -25,6 +27,12 @@ class CapitalOutcomeRequest(BaseModel):
     observed_cost_cents: int | None = Field(default=None, ge=0)
     observed_at: str
     evidence_refs: list[str] = Field(min_length=1)
+
+
+class CapitalOutcomeCalibrationRequest(CapitalOutcomeRequest):
+    recommendation_recorded_at: str
+    now_utc: str
+    max_age_seconds: int = Field(default=604800, gt=0)
 
 
 class CapitalReviewRegisterRequest(BaseModel):
@@ -137,6 +145,44 @@ def create_capital_router(
             "funds_movement": False,
             "budget_mutation": False,
             "outcome_review": review.as_dict(),
+        }
+
+    @router.post("/outcome/calibration/preview")
+    def outcome_calibration_preview(req: CapitalOutcomeCalibrationRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            evidence = CapitalOutcomeEvidence(
+                candidate_id=req.candidate_id,
+                expected_return_cents=req.expected_return_cents,
+                required_capital_cents=req.required_capital_cents,
+                recognized_revenue_cents=req.recognized_revenue_cents,
+                observed_cost_cents=req.observed_cost_cents,
+                observed_at=req.observed_at,
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            calibration = review_capital_outcome_calibration(
+                evidence,
+                recommendation_recorded_at=req.recommendation_recorded_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "funds_movement": False,
+            "budget_mutation": False,
+            "recommendation_mutation": False,
+            "calibration": calibration.as_dict(),
         }
 
     @router.post("/reviews/register")
