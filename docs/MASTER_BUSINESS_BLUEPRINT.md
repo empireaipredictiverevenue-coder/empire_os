@@ -774,13 +774,25 @@ Raw signals
    Monte Carlo, causal measurement, optimization, portfolio intelligence and
    value-of-information.
 
-5. `BLUEPRINT_V6.md`
+5. `MARKETING_DEPARTMENT_BLUEPRINT.md`
+   Category, product marketing, demand generation, content, SEO/AEO/GEO,
+   lifecycle, brand, partner marketing, measurement and revenue contribution.
+
+6. `CHIEF_OF_STAFF_OPERATING_SYSTEM.md`
+   Founder attention, company priorities, decisions, operating cadence,
+   dependencies, cross-functional alignment and executive briefs.
+
+7. `RD_DEPARTMENT_BLUEPRINT.md`
+   Research portfolio, experiments, prototypes, evaluation, product transfer,
+   defensible IP and research-to-commercial-value loops.
+
+8. `BLUEPRINT_V6.md`
    Engineering/phase implementation roadmap and production gates.
 
-6. `COMMERCIAL_BLUEPRINT.md`
+9. `COMMERCIAL_BLUEPRINT.md`
    Buyer/seats/territories/corridors/MRR detail.
 
-7. Phase/product docs
+10. Phase/product docs
    Implementation-specific detail.
 
 No future phase document should silently redefine the company model.
@@ -821,6 +833,23 @@ one operating board across all tracks; grounded cognitive packets, memory,
 planning, model routing, specialist delegation, independent verification,
 simulation, policy and typed execution. Consequential authority remains gated
 by real evidence and explicit approval.
+
+### Track H — Marketing Department
+Build the category, product marketing, Growth/Demand, Search/SEO/AEO/GEO,
+Content, Brand/Creative, Lifecycle, Community/PR and Partner functions around
+one revenue-attributed marketing operating system.
+
+### Track I — R&D Department
+Run a governed research portfolio across Predictive Revenue, Quant, AGI,
+Data/Intelligence, multimodal/satellite/permit, product innovation and
+experimentation. Research must move through reproducible evaluation and
+independent review before transfer to Product/Engineering.
+
+### Track J — Chief of Staff / Company Operating System
+Turn founder intent into a maximum-three-priority company stack, explicit
+decision rights, cross-functional dependencies, daily/weekly/monthly operating
+reviews and a unified initiative portfolio across Marketing, R&D, Product,
+Engineering, Data, Sales and Revenue.
 
 ## 21. Non-Negotiable Principles
 

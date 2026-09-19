@@ -168,6 +168,16 @@ Phase 4 observer/calibration implementation status — ✅ production OBSERVE ac
 
 Phase 4 authority remains OBSERVE. A genuine buyer → verified payment → delivery/outcome → recognized revenue → feedback loop is still required before Astra receives consequential commercial authority. Outreach, spend, payments, pricing, allocation, model-weight changes and other mutations remain disabled.
 
+### Cross-Phase Company Operating System — Marketing / R&D / Chief of Staff
+
+Marketing Department Blueprint ✅ canonical design: category/positioning, Product Marketing, Growth/Demand, Search/SEO/AEO/GEO, Content, Brand/Creative, Lifecycle, Community/PR and Partner functions now share one revenue-attributed operating model. Marketing is measured by qualified demand, recognized revenue, realized gross profit, MRR/ARR contribution, retention/expansion and incrementality rather than content/impression volume alone.
+
+R&D Department Blueprint ✅ canonical design: research now runs as a governed portfolio across Predictive Revenue, Quant, AGI, Data/Intelligence, causal/experiment, multimodal/satellite/permit and product innovation. Lifecycle is IDEA → TRIAGE → RESEARCH → HYPOTHESIS → PROTOTYPE → EVALUATION → SHADOW → VALIDATED → TRANSFER_READY; prototype/research status cannot imply production or product readiness.
+
+Chief of Staff Operating System ✅ canonical design: founder attention, maximum-three priority stack, decision register, dependencies/blockers, operating cadence and cross-functional ownership are separated from Astra's machine-runtime coordination. Chief of Staff coordinates human/company priorities; Astra coordinates machine work.
+
+Company Operating System V1 ✅ local/tested: the /v1/company-ops/* surface exposes OBSERVE-only initiative ranking, founder-brief preview, governed marketing-brief review and R&D-candidate review. It cannot publish, send outreach, spend, launch products, deploy research, staff roles or mutate commercial state.
+
 ### Phase 5 — Organic Growth Engine
 SEO, AEO, GEO, keyword intelligence, topic clusters, programmatic pages, AI Cards, citation/mention monitoring, authority/backlink graph, competitor citation gaps, public publishing, first-party tracking and content→revenue attribution.
 
