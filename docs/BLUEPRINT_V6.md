@@ -273,6 +273,7 @@ Production repositories, provider credentials, trusted keys, migrations and cons
 - Direct public access to allocation, activation, settlement, treasury or campaign mutation endpoints.
 - Legacy public marketing/AEO publish-delete, AGI marketing publish, Solana/USDC A2A negotiation and SQLite product-registration mutation routes are retired with explicit fail-closed responses.
 - Legacy public tenant/billing, Solana payout submit/verify, buyer self-serve signup, lane seat/routing, PPC charge/invoice, SQLite outbox mutation, AGI sales tick and Innovator lane-creation routes are also retired fail-closed; canonical Supabase/BSC/governed replacements remain the only active architecture path.
+- `/v1/hub/intake` now converges business leads onto canonical Supabase prospect ingestion with no `lane_leads` fallback; storm alerts no longer create fake CRM prospects, and legacy outreach register/touched SQLite mutations are retired.
 
 ## Infrastructure Gated Until Economically Justified
 Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deployment, heavy model-serving infrastructure and continuous retraining remain later-stage tools. They activate only when measured scale, reliability or revenue requirements justify the complexity.

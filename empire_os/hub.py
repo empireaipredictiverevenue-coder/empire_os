@@ -940,51 +940,15 @@ def damage_consent_status(prospect_id: str):
 
 @app.post("/v1/satellite/strike")
 def satellite_strike(req: dict):
-    """Receive a severe weather alert from satellite-strike agent, create CRM lead."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    try:
-        event = req.get("event", "Unknown")
-        severity = req.get("severity", "Unknown")
-        area = req.get("area", "")
-        headline = req.get("headline", "")
-        event_id = req.get("id", "")
+    """Retired storm-alert-to-CRM mutation path.
 
-        # Extract metro from area description (first location + state)
-        import re
-        metro = area.split(";")[0].strip() if area else "Unknown"
-        metro = re.sub(r'\s+', ' ', metro).strip()
-        now = datetime.utcnow().isoformat()
+    Weather/damage events are opportunity signals, not business prospects.
+    """
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_satellite_strike_crm_mutation_retired_use_signal_and_canonical_acquisition_flow",
+    )
 
-        # Create CRM lead via direct SQL (matches import_from_lane_leads pattern)
-        lead_uid = f"storm_{event_id.split('/')[-1][:32]}" if event_id else f"storm_{int(time.time())}"
-        notes = f"{headline} | {area} | severity={severity}" if headline else f"{event} in {area}"
-
-        # Idempotent: skip if this storm alert already created a lead
-        existing = backend.execute(
-            "SELECT id FROM crm_leads WHERE lead_uid = ?", (lead_uid,)
-        ).fetchone()
-        if existing:
-            return {"ok": True, "notified": 0, "already": True,
-                    "lead_id": existing[0], "event": event}
-
-        backend.execute(
-            """INSERT INTO crm_leads
-               (lead_uid, source, niche, metro, business_name, notes, status, omega_score, created_at, updated_at)
-               VALUES (?, 'satellite_strike', 'roofing', ?, ?, ?, 'new', 5.0, ?, ?)""",
-            (lead_uid, metro, f"Storm Damage — {event}", notes[:500], now, now),
-        )
-        lid = backend.execute("SELECT last_insert_rowid()").fetchone()[0]
-        backend.execute(
-            "INSERT INTO crm_activities (lead_id, act_type, summary, actor) VALUES (?, 'system', ?, 'satellite_strike')",
-            (lid, f"Storm event: {event} in {metro}"),
-        )
-        backend.commit()
-
-        return {"ok": True, "notified": 1, "lead_id": lid, "event": event}
-    except Exception as e:
-        import traceback
-        raise HTTPException(500, detail=str(e)[:300] + " | " + traceback.format_exc()[:200])
 
 @app.post("/v1/leads/intake")
 def lead_intake(req: LeadIntakeRequest):
@@ -1331,106 +1295,20 @@ def update_lead_status(lead_id: str, status: str = "", notes: str = ""):
 
 @app.post("/v1/outreach/prospect/register")
 def outreach_register(req: dict):
-    """Insert or no-op for prospect in si_buyer_outreach."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    try:
-        backend.execute("""
-            CREATE TABLE IF NOT EXISTS si_buyer_outreach (
-                prospect_id TEXT PRIMARY KEY,
-                business_name TEXT,
-                email TEXT,
-                metro TEXT,
-                niche TEXT,
-                phone TEXT,
-                source TEXT,
-                score INTEGER,
-                url TEXT,
-                seq_step INTEGER DEFAULT 0,
-                first_touch_at TEXT,
-                last_touch_at TEXT,
-                touch_count INTEGER DEFAULT 0,
-                reply_state TEXT DEFAULT 'cold',
-                sample_lead_id TEXT,
-                converted INTEGER DEFAULT 0
-            )
-        """)
-        # idempotent: add seq_step to pre-existing tables
-        try:
-            backend.execute("ALTER TABLE si_buyer_outreach ADD COLUMN seq_step INTEGER DEFAULT 0")
-        except Exception:
-            pass
-        backend.execute("""
-            INSERT OR IGNORE INTO si_buyer_outreach
-                (prospect_id, business_name, email, metro, niche,
-                 phone, source, score, url, reply_state)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-        """, (
-            req.get("prospect_id", ""),
-            req.get("business_name", ""),
-            req.get("email", ""),
-            req.get("metro", ""),
-            req.get("niche", ""),
-            req.get("phone", ""),
-            req.get("source", ""),
-            int(req.get("score", 0)),
-            req.get("url", ""),
-            "cold",
-        ))
-        if req.get("email"):
-            backend.execute(
-                "UPDATE si_buyer_outreach SET email=? WHERE prospect_id=?",
-                (req.get("email", ""), req.get("prospect_id", "")),
-            )
-        backend.commit()
-        return {"ok": True}
-    except Exception as e:
-        raise HTTPException(500, str(e))
+    """Retired legacy SQLite outreach registration path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_outreach_register_retired_use_governed_resend_outbound_flow",
+    )
 
 
 @app.post("/v1/outreach/prospect/touched")
 def outreach_touched(req: dict):
-    """Mark prospect as touched (sent / failed)."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    pid = req.get("prospect_id", "")
-    sent = bool(req.get("sent", False))
-    sample_lead_id = req.get("sample_lead_id", "")
-    seq_step = req.get("seq_step", None)
-    now = datetime.now(timezone.utc).isoformat()
-    state = "contacted" if sent else "outreach_failed"
-    try:
-        if seq_step is not None:
-            backend.execute(
-                """
-                UPDATE si_buyer_outreach
-                SET first_touch_at = COALESCE(first_touch_at, ?),
-                    last_touch_at = ?,
-                    touch_count = COALESCE(touch_count, 0) + 1,
-                    reply_state = ?,
-                    sample_lead_id = COALESCE(NULLIF(?, ''), sample_lead_id),
-                    seq_step = ?
-                WHERE prospect_id = ?
-                """,
-                (now, now, state, sample_lead_id, int(seq_step), pid),
-            )
-        else:
-            backend.execute(
-                """
-                UPDATE si_buyer_outreach
-                SET first_touch_at = COALESCE(first_touch_at, ?),
-                    last_touch_at = ?,
-                    touch_count = COALESCE(touch_count, 0) + 1,
-                    reply_state = ?,
-                    sample_lead_id = COALESCE(NULLIF(?, ''), sample_lead_id)
-                WHERE prospect_id = ?
-                """,
-                (now, now, state, sample_lead_id, pid),
-            )
-        backend.commit()
-        return {"ok": True}
-    except Exception as e:
-        raise HTTPException(500, str(e))
+    """Retired legacy SQLite outreach lifecycle mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_outreach_touched_retired_use_canonical_outbound_event_flow",
+    )
 
 
 @app.get("/v1/outreach/prospect/{prospect_id}")
@@ -1797,108 +1675,67 @@ def _infer_metro(text: str) -> str | None:
 
 @app.post("/v1/hub/intake")
 def hub_intake(req: dict):
-    """Traffic Hub — central labeling + routing endpoint.
+    """Compatibility intake converged onto canonical Supabase prospects.
 
-    Inbound payload is a raw event (form fill, webhook, parsed crawl
-    result). Hub:
-      1. Labels it (niche/metro/lead_score/payload_hash)
-      2. Picks a registered worker (highest-weight match)
-      3. Routes to that worker OR falls back to default leads queue
-      4. Logs every step to /v1/swarm/audit-log
-
-    Body (any subset):
-      text          str   free-form description (preferred input)
-      email         str   optional contact
-      phone         str   optional contact
-      niche         str   override inferred niche
-      metro         str   override inferred metro
-      lead_score    int   override computed score (0-100)
-      url           str   optional source URL
-      source        str   tag (default: "hub_intake")
+    This route no longer writes lane_leads or any legacy SQLite queue.
     """
-    text = req.get("text") or req.get("details") or ""
-    email = req.get("email", "")
-    phone = req.get("phone", "")
+    from empire_os.lead_compat import (
+        CanonicalLeadConflict,
+        CanonicalLeadIntakeError,
+        canonical_lead_intake,
+    )
+    from empire_os.crawler_runner import ingest_candidate
 
-    # Step 1: Label
-    niche = req.get("niche") or _infer_niche(text)
-    metro = req.get("metro") or _infer_metro(text) or ""
-
-    # Omega 2.0 is the canonical intelligence source. Any incoming
-    # legacy lead_score remains informational and is not used to derive
-    # the stored/returned Omega score.
-    from empire_os.intelligence.compat import legacy_fields
-
-    omega = legacy_fields({
-        "business_name": req.get("name", ""),
-        "contact_name": req.get("contact_name", ""),
-        "phone": phone,
-        "email": email,
-        "website": req.get("url", ""),
-        "metro": metro,
-        "state": req.get("state", ""),
-        "niche": niche,
-        "sub_niche": req.get("sub_niche", ""),
-        "details": text,
-        "source": req.get("source", "hub_intake"),
-        "status": "pending",
-    })
-    lead_score = omega["omega_score"]
-
+    text_value = str(req.get("text") or req.get("details") or "").strip()
+    name = str(req.get("name") or req.get("business_name") or "").strip()
+    niche = str(req.get("niche") or _infer_niche(text_value) or "").strip()
+    metro = str(req.get("metro") or _infer_metro(text_value) or "").strip()
     payload_hash = hashlib.sha256(
-        (text + email + phone).encode()).hexdigest()[:16]
+        (
+            text_value
+            + str(req.get("email") or "")
+            + str(req.get("phone") or "")
+        ).encode()
+    ).hexdigest()[:16]
 
-    # Step 2: Pick worker
-    worker = _select_handler(niche, metro) if metro else None
+    payload = {
+        "name": name,
+        "niche": niche,
+        "metro": metro,
+        "source": str(req.get("source") or "hub_intake"),
+        "email": str(req.get("email") or ""),
+        "phone": str(req.get("phone") or ""),
+        "state": str(req.get("state") or ""),
+        "details": text_value,
+        "url": str(req.get("url") or ""),
+        "metadata": {
+            "compat_route": "/v1/hub/intake",
+            "payload_hash": payload_hash,
+        },
+    }
 
-    route_target = worker["worker_id"] if worker else "lead_deliverer_default"
-    route_action = worker["action"] if worker else "store_as_pending"
-
-    # Step 3: Persist as a real lead if no specific worker wants it
-    lane_id = ""
-    if not worker or worker.get("action") == "consume":
-        # Persist to lane_leads via direct SQL
-        if metro and niche and backend:
-            try:
-                lane_id = f"{niche}:{metro}".replace(" ", "_").lower()
-                tier = "gold" if lead_score >= 75 else "silver" if lead_score >= 50 else "bronze"
-                backend.execute(
-                    "INSERT INTO lane_leads "
-                    "(lane_id, prospect_id, status, omega_score, omega_tier, "
-                    "name, email, phone, source, metro, state, details, niche, "
-                    "created_at, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (lane_id, payload_hash, 'pending', lead_score, tier,
-                     req.get("name", ""), email, phone,
-                     req.get("source", "hub_intake"), metro,
-                     req.get("state", ""), text[:500], niche,
-                     datetime.now(timezone.utc).isoformat(),
-                     datetime.now(timezone.utc).isoformat()),
-                )
-                backend.commit()
-            except Exception as e:
-                _swarm_audit("hub_intake_db_error", error=str(e)[:200])
-
-    # Step 4: Audit
-    _swarm_audit("hub_intake", payload_hash=payload_hash,
-                niche=niche, metro=metro, lead_score=lead_score,
-                worker_id=route_target, action=route_action,
-                lane_id=lane_id or None)
+    try:
+        result = canonical_lead_intake(payload, ingest_candidate)
+    except CanonicalLeadConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except CanonicalLeadIntakeError as exc:
+        message = str(exc)
+        if message == "name, niche and metro required":
+            raise HTTPException(status_code=400, detail=message) from exc
+        raise HTTPException(
+            status_code=503,
+            detail="canonical_prospect_ingest_unavailable",
+        ) from exc
 
     return {
-        "ok": True,
+        **result,
         "labels": {
             "niche": niche,
             "metro": metro,
-            "lead_score": lead_score,
             "payload_hash": payload_hash,
         },
-        "route": {
-            "worker_id": route_target,
-            "action": route_action,
-            "lane_id": lane_id or None,
-        },
-        "audit": "logged to /v1/swarm/audit-log",
+        "legacy_lane_write": False,
+        "canonical_store": "supabase",
     }
 
 
