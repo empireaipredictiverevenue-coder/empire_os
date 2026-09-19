@@ -234,6 +234,10 @@ Astra evaluates expected return, risk, cost, cash, confidence and time-to-revenu
 Foundation slice ✅ local/tested: recommendation-only capital assessments now derive expected-return multiple, downside ratio, time factor and risk-adjusted score from explicit evidence-backed inputs. Recommendation records are hard-locked to `execution_authority=none`; no funds movement, budget mutation or production apply is enabled.
 
 ### Phase 16 — SaaS / Network Scale
+Canonical multi-tenant teams, RBAC, usage metering, subscriptions and network-scale tenancy controls.
+
+Foundation slice ✅ local/tested: staged `saas_tenants`, `saas_memberships`, `saas_usage_observations` and subscription-state reads establish canonical tenant identity, RBAC and usage evidence. Existing billing/subscription mutation paths are not expanded; no billing execution, tenant migration or production credential change is activated.
+
 Multi-tenant architecture, teams/RBAC, usage billing, USDT subscriptions, white label, custom domains, affiliate/agency/client dashboards, API keys, developer platform and marketplace/partner network.
 
 ### Phase 17 — Enterprise
