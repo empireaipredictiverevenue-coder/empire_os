@@ -3,8 +3,25 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Protocol, Sequence
 
-from fastapi import APIRouter, HTTPException, Query
+from empire_os.autonomous_revenue_os import compose_revenue_decision_packet
+from empire_os.revenue_os_readiness import assess_revenue_os_readiness
+from empire_os.revenue_os_registry import RevenueOsRegistryRecord
 
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+
+
+
+
+class RevenueOsRegisterRequest(BaseModel):
+    packet_key: str
+    astra_decision: dict | None = None
+    predictive_forecast: dict | None = None
+    capital_recommendation: dict | None = None
+    demand_plan_ref: str | None = None
+    enterprise_blockers: list[str] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(min_length=1)
+    evidence: dict = Field(default_factory=dict)
 
 class RevenueOsRepository(Protocol):
     def packets(self, *, limit: int) -> Sequence[Mapping[str, Any]]:
@@ -16,6 +33,7 @@ class RevenueOsRepository(Protocol):
 
 def create_revenue_os_router(
     repository: RevenueOsRepository | None = None,
+    registry=None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/revenue-os",
@@ -29,6 +47,7 @@ def create_revenue_os_router(
             "side_effects": "none",
             "execution_authority": "none",
             "repository_available": repository is not None,
+            "registry_available": registry is not None,
         }
 
     @router.get("/board")
@@ -66,6 +85,45 @@ def create_revenue_os_router(
             "side_effects": "none",
             "execution_authority": "none",
             "packet": dict(row),
+        }
+
+
+    @router.post("/packets/register")
+    def register_packet(req: RevenueOsRegisterRequest):
+        if registry is None:
+            raise HTTPException(503, "revenue_os_registry_not_activated")
+        try:
+            packet = compose_revenue_decision_packet(
+                packet_key=req.packet_key,
+                astra_decision=req.astra_decision,
+                predictive_forecast=req.predictive_forecast,
+                capital_recommendation=req.capital_recommendation,
+                demand_plan_ref=req.demand_plan_ref,
+                enterprise_blockers=tuple(req.enterprise_blockers),
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            readiness = assess_revenue_os_readiness(packet)
+            item = RevenueOsRegistryRecord(
+                packet=packet,
+                readiness=readiness,
+                evidence=dict(req.evidence),
+            )
+            item.validate()
+            row = registry.record(item)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "side_effects": "none",
+            "execution_authority": "none",
+            "spend_execution": False,
+            "outreach_execution": False,
+            "payment_execution": False,
+            "allocation_execution": False,
+            "deployment_execution": False,
+            "status": str(row.get("status") or "recorded"),
+            "registry_record": item.as_dict(),
+            "result": dict(row),
         }
 
     return router
