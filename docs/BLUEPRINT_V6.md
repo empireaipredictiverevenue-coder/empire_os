@@ -275,6 +275,8 @@ Third slice ✅ local/tested: Revenue Exchange observations now support idempote
 
 Fourth slice ✅ local/tested: exact source reconciliation now compares observed inventory, buyer capacity and verified-price sets against independent canonical evidence. Missing/mismatched evidence produces explicit blockers; allocation, pricing and settlement authority remain `none`.
 
+Fifth slice ✅ local/tested: reconciled market-drift review now checks current/baseline evidence freshness and chronology before comparing inventory, buyer capacity, supply-demand ratio and observed verified-price ranges. Drift is unavailable when the current snapshot is stale/future, the baseline is invalid/stale, or canonical reconciliation fails; unsupported ratio/price deltas remain unknown. Allocation, pricing and settlement authority stay `none`.
+
 ### Phase 14 — Digital Twin
 Simulate markets, campaigns, pricing, buyers, inventory, sales capacity, ad spend and offers before deploying real capital.
 
