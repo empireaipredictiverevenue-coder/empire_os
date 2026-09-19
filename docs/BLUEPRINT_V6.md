@@ -221,6 +221,8 @@ Foundation slice ✅ local/tested: staged read-only `revenue_crm_prospects` and 
 
 Second slice ✅ local/tested: Revenue CRM now exposes an evidence-backed `next-action` recommendation surface using only observed closer, conversation and fulfilment state. Unknown evidence yields no action; every recommendation is approval-required with `execution_authority=none` and cannot send follow-up or mutate CRM state.
 
+Third slice ✅ local/tested: prospect close-readiness now requires an engaged canonical conversation, commercially-ready closer case, verified price, activated buyer with verified positive capacity, and fulfilment readiness. Missing evidence remains an explicit blocker; follow-up, payment and CRM mutation remain disabled.
+
 ### Phase 9 — Advertising Brain
 
 Second slice ✅ local/tested: canonical ad observations now carry deterministic payload provenance, timezone-aware observation timestamps, optional explicit canonical creative identity, and tamper-aware idempotency. Exact provider replays stay idempotent; changed metrics or creative identity under the same observation ID conflict. Campaign/budget/pause/retarget authority remains disabled.

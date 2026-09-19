@@ -6,6 +6,8 @@ from typing import Any, Mapping, Protocol, Sequence
 
 from fastapi import APIRouter, HTTPException, Query
 
+from empire_os.revenue_crm_readiness import assess_close_readiness
+
 
 class RevenueCrmRepository(Protocol):
     def prospects(self, *, limit: int) -> Sequence[Mapping[str, Any]]:
@@ -228,5 +230,25 @@ def create_revenue_crm_router(
         if row is None:
             raise HTTPException(status_code=404, detail="prospect_not_found")
         return derive_next_action(row).as_dict()
+
+    @router.get("/prospects/{prospect_id}/close-readiness")
+    def close_readiness(prospect_id: str):
+        repo = require_repository()
+        row = repo.prospect(prospect_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="prospect_not_found")
+        try:
+            readiness = assess_close_readiness(row)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "follow_up_execution": False,
+            "payment_execution": False,
+            "crm_mutation": False,
+            "readiness": readiness.as_dict(),
+        }
 
     return router
