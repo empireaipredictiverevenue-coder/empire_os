@@ -119,3 +119,23 @@ def test_reader_role_can_read_figures_but_cannot_write():
         rpc("recognize_bsc_revenue", {})
     with pytest.raises(OutcomeTransportError, match="not allowed"):
         rpc("record_commercial_outcome", {})
+
+
+def test_astra_observer_can_read_operational_evidence_rpc():
+    factory = Factory({
+        "replies_waiting": 2,
+        "failed_jobs": 1,
+        "owned_inventory_count": 8,
+        "qualified_unallocated_count": 2,
+        "active_buyer_capacity": 3,
+        "buyer_candidates_due": 4,
+    })
+    rpc = PostgresOutcomeRpc(
+        "postgresql://secret",
+        "empire_astra_observer",
+        connect_factory=factory,
+    )
+    result = rpc("get_astra_operational_evidence", {})
+    assert result["replies_waiting"] == 2
+    assert result["active_buyer_capacity"] == 3
+    assert "get_astra_operational_evidence" in factory.cursor.calls[-1][0]

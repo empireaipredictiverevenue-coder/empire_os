@@ -13,6 +13,10 @@ from typing import Any, Callable, Mapping
 
 from empire_os.astra import AstraSnapshot, build_operating_board
 from empire_os.astra_feedback import build_outcome_calibration
+from empire_os.astra_evidence import (
+    astra_policy_bindings_from_env,
+    build_astra_evidence,
+)
 from empire_os.outcome_role_transport import PostgresOutcomeRpc
 
 
@@ -76,6 +80,7 @@ def run_observer_cycle(
     min_samples: int = 20,
     min_conversions: int = 5,
     operational_snapshot_json: str | None = None,
+    operational_bindings: Mapping[str, Any] | None = None,
     output_path: str | Path = "runtime/astra/latest.json",
     rpc_factory: Callable[..., Any] = PostgresOutcomeRpc,
 ) -> dict[str, Any]:
@@ -102,15 +107,44 @@ def run_observer_cycle(
         min_conversions=max(int(min_conversions), 1),
     )
     snapshot = parse_operational_snapshot(operational_snapshot_json)
+    evidence_payload: dict[str, Any] | None = None
 
     if snapshot is None:
+        raw_operational = rpc("get_astra_operational_evidence", {})
+        if raw_operational is None:
+            raw_operational = {}
+        if not isinstance(raw_operational, Mapping):
+            raise AstraObserverError(
+                "operational evidence projection must return an object"
+            )
+        evidence = build_astra_evidence(
+            actual_revenue_cents=calibration.actual_revenue_cents,
+            operational_row=raw_operational,
+            bindings=(
+                operational_bindings
+                if operational_bindings is not None
+                else astra_policy_bindings_from_env()
+            ),
+        )
+        evidence_payload = {
+            "available": evidence.available,
+            "missing": list(evidence.missing),
+            "observed": dict(evidence.observed),
+            "sources": dict(evidence.sources),
+        }
+        snapshot = evidence.snapshot
+
+    if snapshot is None:
+        missing = list((evidence_payload or {}).get("missing") or [])
         decision: dict[str, Any] = {
             "available": False,
-            "reason": "operational_snapshot_missing",
+            "reason": "operational_evidence_incomplete",
+            "missing": missing,
         }
         operating_board: dict[str, Any] = {
             "available": False,
-            "reason": "operational_snapshot_missing",
+            "reason": "operational_evidence_incomplete",
+            "missing": missing,
         }
     else:
         board = build_operating_board(
@@ -119,14 +153,19 @@ def run_observer_cycle(
             calibration_ready=calibration.calibration_ready,
             gross_margin_rate=calibration.gross_margin_rate,
         )
+        source = (
+            "explicit_operational_snapshot"
+            if operational_snapshot_json
+            else "canonical_operational_evidence"
+        )
         decision = {
             "available": True,
-            "source": "explicit_operational_snapshot",
+            "source": source,
             "result": board.primary.as_dict(),
         }
         operating_board = {
             "available": True,
-            "source": "explicit_operational_snapshot",
+            "source": source,
             "result": board.as_dict(),
         }
 
@@ -136,6 +175,7 @@ def run_observer_cycle(
         "feedback_limit": limit,
         "feedback_rows": len(rows),
         "calibration": calibration.as_dict(),
+        "operational_evidence": evidence_payload,
         "decision": decision,
         "operating_board": operating_board,
         "side_effects": "none",

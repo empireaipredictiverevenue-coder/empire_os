@@ -15,6 +15,10 @@ ROLE_FUNCTIONS = {
             "select public.get_commercial_outcome_feedback(%s)",
             ("p_limit",),
         ),
+        "get_astra_operational_evidence": (
+            "select public.get_astra_operational_evidence()",
+            (),
+        ),
     },
     "empire_outcome_recorder": {
         "record_commercial_outcome": (

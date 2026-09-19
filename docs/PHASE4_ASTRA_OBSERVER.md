@@ -71,11 +71,13 @@ Verified negative-margin outcomes may elevate a `unit_economics / review_negativ
 The outcome projection does not contain all operational signals required by `AstraSnapshot` (buyer capacity, reply backlog, owned inventory, source health, etc.).
 
 Therefore:
-- if no operational snapshot is supplied, the worker returns `decision.available=false` with `operational_snapshot_missing`;
-- an explicit snapshot must provide every current `AstraSnapshot` field;
+- canonical operational evidence is now preferred through `get_astra_operational_evidence()`;
+- the read-only projection covers reply backlog, failed GTM jobs, identity-linked unallocated inventory, qualification-ready unallocated inventory, active buyer capacity and pending buyer candidates;
+- premium-AI budget, outbound-domain verification and source-health remain explicit verified runtime bindings until canonical stores exist for them;
+- any missing evidence keeps `decision.available=false` with the missing fields listed;
+- an explicit full `AstraSnapshot` JSON remains a compatibility override only;
 - partial snapshots are rejected rather than filled with default zero/false values;
-- the snapshot execution mode must remain `observe` or `dry_run`;
-- the worker itself accepts `EMPIRE_ASTRA_MODE=OBSERVE` only.
+- the snapshot execution mode remains OBSERVE and the worker accepts `EMPIRE_ASTRA_MODE=OBSERVE` only.
 
 ## Runtime
 

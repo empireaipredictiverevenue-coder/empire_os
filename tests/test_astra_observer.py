@@ -11,20 +11,23 @@ from empire_os.astra_observer import (
 
 
 class FakeRpc:
-    def __init__(self, dsn, role, rows, calls):
+    def __init__(self, dsn, role, rows, calls, operational=None):
         self.dsn = dsn
         self.role = role
         self.rows = rows
         self.calls = calls
+        self.operational = operational
 
     def __call__(self, name, params):
         self.calls.append((self.role, name, params))
+        if name == "get_astra_operational_evidence":
+            return self.operational
         return self.rows
 
 
-def _factory(rows, calls):
+def _factory(rows, calls, operational=None):
     def build(dsn, role):
-        return FakeRpc(dsn, role, rows, calls)
+        return FakeRpc(dsn, role, rows, calls, operational)
     return build
 
 
@@ -65,21 +68,25 @@ def test_cycle_reads_feedback_and_writes_local_snapshot_without_decision(tmp_pat
         rpc_factory=_factory(rows, calls),
     )
 
-    assert calls == [(
-        "empire_astra_observer",
-        "get_commercial_outcome_feedback",
-        {"p_limit": 1000},
-    )]
+    assert calls == [
+        (
+            "empire_astra_observer",
+            "get_commercial_outcome_feedback",
+            {"p_limit": 1000},
+        ),
+        (
+            "empire_astra_observer",
+            "get_astra_operational_evidence",
+            {},
+        ),
+    ]
     assert result["mode"] == "OBSERVE"
     assert result["side_effects"] == "none"
-    assert result["decision"] == {
-        "available": False,
-        "reason": "operational_snapshot_missing",
-    }
-    assert result["operating_board"] == {
-        "available": False,
-        "reason": "operational_snapshot_missing",
-    }
+    assert result["decision"]["available"] is False
+    assert result["decision"]["reason"] == "operational_evidence_incomplete"
+    assert "active_buyer_capacity" in result["decision"]["missing"]
+    assert result["operating_board"]["available"] is False
+    assert result["operating_board"]["reason"] == "operational_evidence_incomplete"
     assert result["calibration"]["actual_revenue_cents"] == 10000
     assert result["calibration"]["calibration_ready"] is False
     assert json.loads(output.read_text()) == result
@@ -128,3 +135,51 @@ def test_feedback_limit_is_bounded():
     assert bounded_feedback_limit(10) == 10
     assert bounded_feedback_limit(50000) == 1000
     assert bounded_feedback_limit("bad") == 100
+def test_canonical_operational_evidence_can_build_board(tmp_path):
+    calls = []
+    operational = {
+        "replies_waiting": 0,
+        "failed_jobs": 0,
+        "owned_inventory_count": 8,
+        "qualified_unallocated_count": 2,
+        "active_buyer_capacity": 3,
+        "buyer_candidates_due": 0,
+        "observed_at": "2026-09-19T16:30:00+00:00",
+    }
+    bindings = {
+        "premium_ai_budget_cents": 0,
+        "outbound_domain_verified": True,
+        "source_health_ok": True,
+    }
+    result = run_observer_cycle(
+        dsn="postgresql://observer",
+        operational_bindings=bindings,
+        output_path=tmp_path / "latest.json",
+        rpc_factory=_factory([], calls, operational),
+    )
+    assert result["operational_evidence"]["available"] is True
+    assert result["decision"]["available"] is True
+    assert result["decision"]["source"] == "canonical_operational_evidence"
+    assert result["decision"]["result"]["recommended_job_type"] == "plan_controlled_allocation"
+    assert result["operating_board"]["result"]["side_effects"] == "none"
+
+
+def test_canonical_evidence_missing_policy_binding_stays_unavailable(tmp_path):
+    operational = {
+        "replies_waiting": 0,
+        "failed_jobs": 0,
+        "owned_inventory_count": 0,
+        "qualified_unallocated_count": 0,
+        "active_buyer_capacity": 0,
+        "buyer_candidates_due": 0,
+    }
+    result = run_observer_cycle(
+        dsn="postgresql://observer",
+        operational_bindings={},
+        output_path=tmp_path / "latest.json",
+        rpc_factory=_factory([], [], operational),
+    )
+    assert result["decision"]["available"] is False
+    assert "premium_ai_budget_cents" in result["decision"]["missing"]
+    assert "outbound_domain_verified" in result["decision"]["missing"]
+    assert "source_health_ok" in result["decision"]["missing"]
