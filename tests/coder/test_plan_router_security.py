@@ -71,14 +71,20 @@ def test_router_keeps_planner_only_model_out_of_writer_route():
     ).model == "strong-writer"
 
 
-def test_local_fast_planner_routes_simple_work_and_escalates_hard_work():
+def test_local_planner_ladder_routes_by_complexity():
     router = ModelRouter(local_ollama_profiles([
+        "qwen2.5-coder:7b",
         "qwen2.5-coder:14b",
         "qwen3-coder:30b",
     ]))
 
     assert router.route(
         "Review the current implementation plan",
+        role="planner",
+    ).model == "qwen2.5-coder:7b"
+
+    assert router.route(
+        "Implement a new endpoint and tests",
         role="planner",
     ).model == "qwen2.5-coder:14b"
 

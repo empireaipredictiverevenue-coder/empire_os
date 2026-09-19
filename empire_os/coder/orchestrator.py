@@ -60,7 +60,8 @@ class EmpireCoderError(RuntimeError):
 
 
 LOCAL_WRITER_MODEL = "qwen3-coder:30b"
-LOCAL_FAST_PLANNER_MODEL = "qwen2.5-coder:14b"
+LOCAL_FAST_PLANNER_MODEL = "qwen2.5-coder:7b"
+LOCAL_MEDIUM_PLANNER_MODEL = "qwen2.5-coder:14b"
 
 
 def local_ollama_profiles(
@@ -72,8 +73,17 @@ def local_ollama_profiles(
         profiles.append(ModelProfile(
             "ollama",
             LOCAL_FAST_PLANNER_MODEL,
-            capability=2,
+            capability=1,
             cost_tier=0,
+            local=True,
+            roles=("planner",),
+        ))
+    if LOCAL_MEDIUM_PLANNER_MODEL in available:
+        profiles.append(ModelProfile(
+            "ollama",
+            LOCAL_MEDIUM_PLANNER_MODEL,
+            capability=2,
+            cost_tier=1,
             local=True,
             roles=("planner",),
         ))
@@ -82,7 +92,7 @@ def local_ollama_profiles(
             "ollama",
             LOCAL_WRITER_MODEL,
             capability=3,
-            cost_tier=1,
+            cost_tier=2,
             local=True,
             roles=("writer", "planner"),
         ))
@@ -742,6 +752,65 @@ class EmpireCoder:
         )
         return response
 
+    def planner_model_draft(
+        self,
+        task_id: str,
+        instruction: str,
+        context: ContextPack,
+        *,
+        max_output_chars: int = 1_000,
+    ) -> ModelProposal:
+        """Return one non-actionable planner draft.
+
+        PLAN jobs are advisory-only and cannot execute or become an actionable
+        patch. Best-of-N refinement is therefore reserved for writer flows
+        where a candidate may later become actionable.
+        """
+        self.refresh_knowledge()
+        route = self.planner_model_route(task_id)
+        provider = self.providers.get(route.provider)
+        context = self._fresh_context_pack(
+            task_id,
+            context,
+            trigger="before_planner_draft",
+        )
+        proposal = OutputRefiner(provider).draft(
+            task_id=task_id,
+            instruction=instruction,
+            context=context,
+            route=route,
+            max_output_chars=max(
+                256, min(int(max_output_chars), 2_000)
+            ),
+        )
+        self.store.save_proposal(
+            task_id,
+            {
+                "task_id": proposal.task_id,
+                "provider": route.provider,
+                "model": route.model,
+                "stage": proposal.stage.value,
+                "draft": proposal.draft,
+                "candidate_drafts": list(proposal.candidate_drafts),
+                "critique": proposal.critique,
+                "refined": proposal.refined,
+                "revision_count": proposal.revision_count,
+                "actionable": False,
+            },
+        )
+        self._record_and_sync(
+            task_id=task_id,
+            event="planner_draft_created",
+            data={
+                "provider": route.provider,
+                "model": route.model,
+                "candidate_count": len(proposal.candidate_drafts),
+                "draft_chars": len(proposal.draft),
+                "actionable": False,
+            },
+        )
+        return proposal
+
     def polished_model_output(
         self,
         task_id: str,
@@ -950,6 +1019,10 @@ class EmpireCoder:
                 LOCAL_FAST_PLANNER_MODEL in local_models
             ),
             "fast_planner_model": LOCAL_FAST_PLANNER_MODEL,
+            "medium_planner_model_ready": (
+                LOCAL_MEDIUM_PLANNER_MODEL in local_models
+            ),
+            "medium_planner_model": LOCAL_MEDIUM_PLANNER_MODEL,
             "writer_model": {
                 "provider": writer_route.provider,
                 "model": writer_route.model,

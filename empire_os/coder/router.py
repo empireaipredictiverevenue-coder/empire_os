@@ -44,11 +44,21 @@ class ModelRouter:
                 complexity_text,
             )
 
+        def contains_term(value: str, term: str) -> bool:
+            return bool(re.search(
+                rf"(?<![a-z0-9_]){re.escape(term)}(?![a-z0-9_])",
+                value,
+            ))
+
         if len(complexity_text) > 1000 or any(
-            word in complexity_text for word in hard
+            contains_term(complexity_text, word)
+            for word in hard
         ):
             return 3
-        if len(text) > 250 or any(word in text for word in medium):
+        if len(text) > 250 or any(
+            contains_term(text, word)
+            for word in medium
+        ):
             return 2
         return 1
 
