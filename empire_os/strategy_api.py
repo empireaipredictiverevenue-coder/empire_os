@@ -11,6 +11,11 @@ from empire_os.strategy_operating_system import (
     review_market_thesis,
     review_strategic_bet,
 )
+from empire_os.market_domination import (
+    analyse_market_capture,
+    compare_adjacent_corridors,
+    rank_market_portfolio,
+)
 
 
 class DataRequest(BaseModel):
@@ -19,6 +24,15 @@ class DataRequest(BaseModel):
 
 class KeywordPortfolioRequest(BaseModel):
     keywords: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class MarketPortfolioRequest(BaseModel):
+    markets: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AdjacentCorridorRequest(BaseModel):
+    current: dict[str, Any] = Field(default_factory=dict)
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -60,6 +74,30 @@ def create_strategy_router() -> APIRouter:
     def ai_capability(req: DataRequest):
         try:
             return review_ai_capability(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/market-domination/review")
+    def market_domination(req: DataRequest):
+        try:
+            return analyse_market_capture(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/market-domination/portfolio/preview")
+    def market_domination_portfolio(req: MarketPortfolioRequest):
+        try:
+            return rank_market_portfolio(req.markets)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/market-domination/adjacent/preview")
+    def market_domination_adjacent(req: AdjacentCorridorRequest):
+        try:
+            return compare_adjacent_corridors(
+                current=req.current,
+                candidates=req.candidates,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

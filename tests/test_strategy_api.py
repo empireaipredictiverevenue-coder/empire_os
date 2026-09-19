@@ -60,3 +60,50 @@ def test_ai_capability_review_never_activates_provider():
     )
     assert response.status_code == 200
     assert response.json()["provider_activation"] is False
+
+
+def test_market_domination_review_is_observe_only():
+    response = client().post(
+        "/v1/strategy/market-domination/review",
+        json={"data": {
+            "market_key": "uk-home-services",
+            "territory_key": "manchester",
+            "corridor_key": "roofing:manchester",
+            "product_key": "territory-seat",
+            "demand_strength": .8,
+            "buyer_capacity_strength": .8,
+            "competition_inverse": .6,
+            "product_fit": .9,
+            "data_advantage": .9,
+            "search_authority": .7,
+            "ai_visibility": .6,
+            "partner_density": .7,
+            "margin_potential": .85,
+            "retention_expansion": .8,
+            "confidence": .8,
+            "verified_buyer_count": 2,
+            "verified_capacity_units": 20,
+            "verified_outcome_count": 5,
+            "repeat_outcome_count": 2,
+            "expected_gross_profit_cents": 400000,
+            "realized_gross_profit_cents": 300000,
+            "time_to_revenue_days": 18,
+            "downside_cents": 50000,
+            "evidence_refs": ["market:1", "buyer:1", "outcome:1"],
+        }},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["market_entry_execution"] is False
+    assert body["territory_allocation"] is False
+    assert body["market_control_claimed"] is False
+    assert body["execution_authority"] == "none"
+
+
+def test_market_domination_portfolio_never_allocates():
+    response = client().post(
+        "/v1/strategy/market-domination/portfolio/preview",
+        json={"markets": []},
+    )
+    assert response.status_code == 200
+    assert response.json()["allocation_execution"] is False

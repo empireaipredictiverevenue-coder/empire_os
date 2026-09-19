@@ -184,7 +184,7 @@ SEO/Keyword Strategy ✅ canonical design: keyword/query clusters are mapped to 
 
 AI Strategy ✅ canonical design: Empire manages AI as a capability portfolio across deterministic math, retrieval, statistical models, local/frontier models, multimodal, agents, planner/verifier and outcome learning. Build/buy/open-source decisions depend on proprietary-data advantage, quality, privacy, cost, switching flexibility and strategic value rather than model hype.
 
-Strategy Operating System V1 ✅ local/tested: the /v1/strategy/* surface exposes OBSERVE-only market-thesis review, strategic-bet review, keyword portfolio ranking and AI-capability review. It cannot enter markets, publish/index content, commit capital, activate providers, promote models or expand authority.
+Strategy Operating System V2 ✅ local/tested: the /v1/strategy/* surface exposes OBSERVE-only market-thesis review, strategic-bet review, keyword portfolio ranking, AI-capability review and the Market Domination Engine. Market Domination separately scores attractiveness, defensibility, expected economics and verified realized economics; classifies corridor progress as DISCOVER → VALIDATE → ESTABLISH → PROVE → DEEPEN → EXPAND; and can rank adjacent corridors only for review. It never infers market share, monopoly or control from internal scores and cannot enter markets, allocate territories, publish/index content, commit capital, activate providers, promote models or expand authority.
 
 ### Phase 5 — Organic Growth Engine
 SEO, AEO, GEO, keyword intelligence, topic clusters, programmatic pages, AI Cards, citation/mention monitoring, authority/backlink graph, competitor citation gaps, public publishing, first-party tracking and content→revenue attribution.

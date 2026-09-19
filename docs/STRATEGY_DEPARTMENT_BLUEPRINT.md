@@ -210,6 +210,46 @@ Stages:
 
 No fake scarcity or monopoly claims.
 
+### Market Domination Engine V1
+
+The executable Strategy layer uses six internal capture stages:
+
+1. **DISCOVER** — demand/product-fit evidence incomplete.
+2. **VALIDATE** — demand/product fit needs stronger evidence or verified buyers/capacity.
+3. **ESTABLISH** — verified buyer/capacity exists, but no verified commercial outcome yet.
+4. **PROVE** — outcomes exist, but positive realized gross profit and/or repeatability is not yet proven.
+5. **DEEPEN** — repeatable positive economics exist, but defensibility/search/AI/partner/data moat still needs strengthening.
+6. **EXPAND** — repeatable positive realized gross profit plus an internal defensibility threshold supports adjacent-corridor review.
+
+The stage is an operating classification, not a claim that Empire controls the
+market.
+
+The engine separately tracks:
+- market attractiveness
+- buyer/capacity strength
+- competitive pressure
+- product fit
+- proprietary data advantage
+- search authority
+- AI visibility
+- partner density
+- margin potential
+- retention/expansion
+- confidence
+- expected gross profit
+- downside/time-to-revenue
+- verified outcomes
+- repeat outcomes
+- realized gross profit
+- observed market share when real evidence exists
+
+Observed market share must be supplied as evidence; it is never inferred from
+internal scores. Even when market-share evidence exists, the engine does not
+automatically claim monopoly, dominance or control.
+
+Expansion recommendations remain review-only and require mature current-corridor
+evidence before adjacent markets are ranked.
+
 ## 8. Strategy + Marketing
 
 Strategy decides:
