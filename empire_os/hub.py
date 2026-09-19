@@ -86,6 +86,7 @@ from empire_os.revenue_crm_api import create_revenue_crm_router
 from empire_os.conversation_api import create_conversation_router
 from empire_os.a2a_identity_api import create_a2a_identity_router
 from empire_os.astra_api import create_astra_router
+from empire_os.consent_api import create_consent_router
 from empire_os.ceo import build_brief
 from empire_os.daily_revenue import DailyRevenueSnapshotter, DailyRevenueBriefWorker
 from empire_os.remote_scanner import ScoutAgentClient
@@ -485,6 +486,7 @@ app.include_router(create_revenue_crm_router())
 app.include_router(create_conversation_router())
 app.include_router(create_a2a_identity_router())
 app.include_router(create_astra_router())
+app.include_router(create_consent_router())
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
@@ -870,11 +872,19 @@ async function confirmOptIn(){
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Processing…';
   res.className='result'; res.style.display='none';
   try{
-    const r=await fetch('/v1/damage/opt-in/""" + prospect_id + r"""');
+    const r=await fetch('/v1/consent/prospects/""" + prospect_id + r"""/opt-in',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        channel:'email',
+        source:'damage_opt_in_page',
+        evidence:{surface:'damage_report'}
+      })
+    });
     const j=await r.json();
     if(j.ok){
       res.className='result success'; res.style.display='block';
-      res.innerHTML='✓ <strong>You\'re opted in!</strong><br>Your damage report will be emailed shortly. Check your inbox.';
+      res.innerHTML='✓ <strong>Your consent has been recorded.</strong><br>Report delivery is handled separately through our governed outbound process.';
       btn.style.display='none';
     } else {
       throw new Error(j.detail||'Unknown error');
@@ -897,45 +907,20 @@ async function confirmOptIn(){
 
 @app.get("/v1/damage/opt-in/{prospect_id}")
 def damage_opt_in(prospect_id: str):
-    """Flip si_prospect_consent.opted_in=1 for a satellite-damage prospect.
-
-    Idempotent. Returns the new state and the queued outbox row count
-    for that prospect so the operator can verify mail-sender will pick
-    it up on the next tick.
-    """
-    import sqlite3 as _sq
-    conn = _sq.connect("/root/empire_os/empire_os.db")
-    cur = conn.cursor()
-    cur.execute("UPDATE si_prospect_consent SET opted_in=1, opted_in_at=datetime('now') "
-                "WHERE prospect_id=?", (prospect_id,))
-    conn.commit()
-    row = cur.execute(
-        "select prospect_id, opted_in, opted_in_at, niche, source "
-        "from si_prospect_consent where prospect_id=?", (prospect_id,)).fetchone()
-    queued = cur.execute(
-        "select count(*) from si_outbox where lead_id=? and status='pending'",
-        (prospect_id,)).fetchone()[0]
-    conn.close()
-    if row is None:
-        raise HTTPException(status_code=404, detail="prospect_not_found")
-    return {"ok": True, "prospect": dict(zip(
-        ["prospect_id", "opted_in", "opted_in_at", "niche", "source"], row)),
-        "queued_outbox_rows": queued}
+    """Retired legacy SQLite consent mutation route."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_damage_opt_in_retired_use_canonical_consent_api",
+    )
 
 
 @app.get("/v1/damage/consent/{prospect_id}")
 def damage_consent_status(prospect_id: str):
-    """Read-only consent state for a prospect."""
-    import sqlite3 as _sq
-    conn = _sq.connect("/root/empire_os/empire_os.db")
-    row = conn.execute(
-        "select prospect_id, opted_in, opted_in_at, niche, source "
-        "from si_prospect_consent where prospect_id=?", (prospect_id,)).fetchone()
-    conn.close()
-    if row is None:
-        raise HTTPException(status_code=404, detail="prospect_not_found")
-    return {"prospect": dict(zip(
-        ["prospect_id", "opted_in", "opted_in_at", "niche", "source"], row))}
+    """Retired legacy SQLite consent read route."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_damage_consent_read_retired_use_canonical_consent_api",
+    )
 
 
 @app.post("/v1/satellite/strike")

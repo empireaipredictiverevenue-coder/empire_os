@@ -218,3 +218,16 @@ def test_legacy_outreach_pending_read_is_retired():
     assert response.json()["detail"] == (
         "legacy_outreach_pending_retired_use_canonical_outbound_review_flow"
     )
+
+
+def test_legacy_damage_consent_routes_are_retired():
+    opt_in = client.get("/v1/damage/opt-in/prospect-1")
+    status = client.get("/v1/damage/consent/prospect-1")
+    assert opt_in.status_code == 410
+    assert opt_in.json()["detail"] == (
+        "legacy_damage_opt_in_retired_use_canonical_consent_api"
+    )
+    assert status.status_code == 410
+    assert status.json()["detail"] == (
+        "legacy_damage_consent_read_retired_use_canonical_consent_api"
+    )

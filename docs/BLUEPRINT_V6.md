@@ -274,6 +274,8 @@ Production repositories, provider credentials, trusted keys, migrations and cons
 - Legacy public marketing/AEO publish-delete, AGI marketing publish, Solana/USDC A2A negotiation and SQLite product-registration mutation routes are retired with explicit fail-closed responses.
 - Legacy public tenant/billing, Solana payout submit/verify, buyer self-serve signup, lane seat/routing, PPC charge/invoice, SQLite outbox mutation, AGI sales tick and Innovator lane-creation routes are also retired fail-closed; canonical Supabase/BSC/governed replacements remain the only active architecture path.
 - `/v1/hub/intake` now converges business leads onto canonical Supabase prospect ingestion with no `lane_leads` fallback; storm alerts no longer create fake CRM prospects, and legacy outreach register/touched SQLite mutations are retired.
+- Canonical prospect consent is staged as append-only grant/revoke evidence with a latest-state view and governed `/v1/consent/*` API. The old damage-consent SQLite mutation/read routes are retired, the opt-in landing page now POSTs to canonical consent, and consent recording never implies outbound send authority.
+- Public hub hardening milestone: direct SQL mutation calls have been eliminated from `empire_os/hub.py`; remaining legacy carrier roster inspection is read-only and public carrier scrape/batch writers are retired.
 
 ## Infrastructure Gated Until Economically Justified
 Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deployment, heavy model-serving infrastructure and continuous retraining remain later-stage tools. They activate only when measured scale, reliability or revenue requirements justify the complexity.
