@@ -1,6 +1,7 @@
 """Fail-closed authenticated A2A commercial-intent API."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Mapping, Protocol
 
 from fastapi import APIRouter, HTTPException
@@ -13,6 +14,10 @@ from empire_os.a2a_commerce_intent import (
 from empire_os.a2a_handoff import (
     A2AManualHandoffEvidence,
     review_manual_handoff,
+)
+from empire_os.a2a_handoff_readiness import (
+    A2AHandoffTimingEvidence,
+    review_manual_handoff_readiness,
 )
 from empire_os.a2a_negotiation import preview_negotiation_transition
 from empire_os.a2a_identity import (
@@ -60,6 +65,15 @@ class ManualHandoffReviewRequest(BaseModel):
     counterparty_acknowledged: bool = False
     counterparty_evidence_ref: str | None = None
     manual_handoff_ref: str | None = None
+
+
+class ManualHandoffReadinessRequest(ManualHandoffReviewRequest):
+    negotiation_observed_at: str
+    human_approval_observed_at: str | None = None
+    counterparty_observed_at: str | None = None
+    handoff_observed_at: str | None = None
+    now_utc: str
+    max_age_seconds: int = Field(default=21600, gt=0)
 
 
 class CommercialIntentRequest(BaseModel):
@@ -159,6 +173,64 @@ def create_a2a_commerce_router(
             "task_execution": False,
             "autonomous_handoff_execution": False,
             "handoff": review.as_dict(),
+        }
+
+    @router.post("/negotiation/handoff/readiness/preview")
+    def negotiation_handoff_readiness_preview(
+        req: ManualHandoffReadinessRequest,
+    ):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            readiness = review_manual_handoff_readiness(
+                evidence=A2AManualHandoffEvidence(
+                    negotiation_id=req.negotiation_id,
+                    agent_id=req.agent_id,
+                    negotiation_state=req.negotiation_state,
+                    signed_identity_evidence_ref=(
+                        req.signed_identity_evidence_ref
+                    ),
+                    negotiation_evidence_ref=req.negotiation_evidence_ref,
+                    human_approval_present=req.human_approval_present,
+                    human_approval_evidence_ref=(
+                        req.human_approval_evidence_ref
+                    ),
+                    counterparty_acknowledged=(
+                        req.counterparty_acknowledged
+                    ),
+                    counterparty_evidence_ref=(
+                        req.counterparty_evidence_ref
+                    ),
+                    manual_handoff_ref=req.manual_handoff_ref,
+                ),
+                timing=A2AHandoffTimingEvidence(
+                    negotiation_observed_at=req.negotiation_observed_at,
+                    human_approval_observed_at=(
+                        req.human_approval_observed_at
+                    ),
+                    counterparty_observed_at=req.counterparty_observed_at,
+                    handoff_observed_at=req.handoff_observed_at,
+                ),
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "human_approval_required": True,
+            "execution_authority": "none",
+            "payment_authority": False,
+            "allocation_authority": False,
+            "task_execution": False,
+            "autonomous_handoff_execution": False,
+            "readiness": readiness.as_dict(),
         }
 
     @router.post("/intents")
