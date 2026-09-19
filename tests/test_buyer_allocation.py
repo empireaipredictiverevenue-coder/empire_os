@@ -8,6 +8,7 @@ from empire_os.buyer_allocation import (
     buyer_activation_decision,
     allocation_key,
     fetch_buyer_rows,
+    fetch_latest_qualification,
     plan_allocation,
     qualification_decision,
     rank_buyers,
@@ -34,6 +35,7 @@ def qualification(**overrides):
         "score": 82,
         "tier": "hot",
         "status": "scored",
+        "scoring_version": "v1",
     }
     row.update(overrides)
     return row
@@ -95,6 +97,55 @@ def test_qualification_gate_is_fail_closed():
         qualification(score=49, tier="cold")
     )[0] is False
     assert qualification_decision(qualification())[0] is True
+
+
+def test_v2_qualification_requires_evidence_confidence_floor():
+    allowed, reason = qualification_decision(
+        qualification(
+            scoring_version="v2",
+            evidence_confidence=0.49,
+        )
+    )
+    assert allowed is False
+    assert reason == "qualification_evidence_confidence_below_floor"
+
+    allowed, reason = qualification_decision(
+        qualification(
+            scoring_version="v2",
+            evidence_confidence=None,
+        )
+    )
+    assert allowed is False
+    assert reason == "qualification_evidence_confidence_missing"
+
+    assert qualification_decision(
+        qualification(
+            scoring_version="v2",
+            evidence_confidence=0.50,
+        )
+    ) == (True, "qualified")
+
+
+def test_fetch_latest_qualification_prefers_v2_with_v1_fallback():
+    calls = []
+
+    def reader(path, params):
+        assert path == "/rest/v1/prospect_qualifications"
+        calls.append(dict(params))
+        return [
+            qualification(scoring_version="v1", score=99),
+            qualification(
+                scoring_version="v2",
+                score=86.3,
+                evidence_confidence=0.55,
+            ),
+        ]
+
+    row = fetch_latest_qualification(reader, PROSPECT_ID)
+    assert row["scoring_version"] == "v2"
+    assert row["score"] == 86.3
+    assert calls[0]["scoring_version"] == "in.(v2,v1)"
+    assert calls[0]["limit"] == "2"
 
 
 def test_buyer_activation_gate_rejects_auto_created_capacity():

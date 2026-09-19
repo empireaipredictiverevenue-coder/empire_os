@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
+from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
 from empire_os.niche_taxonomy import (
     metro_key,
     niche_family,
@@ -132,6 +133,22 @@ def qualification_decision(
 
     status = normalise(qualification.get("status"))
     tier = normalise(qualification.get("tier"))
+    version = normalise(
+        qualification.get("scoring_version") or "v1"
+    )
+
+    if version not in {"v1", "v2"}:
+        return False, "qualification_version_not_supported"
+
+    if version == "v2":
+        try:
+            evidence_confidence = float(
+                qualification.get("evidence_confidence")
+            )
+        except (TypeError, ValueError):
+            return False, "qualification_evidence_confidence_missing"
+        if evidence_confidence < MIN_DECISION_CONFIDENCE:
+            return False, "qualification_evidence_confidence_below_floor"
 
     try:
         score = float(qualification.get("score") or 0)
@@ -318,25 +335,31 @@ def fetch_latest_qualification(
     rows = reader(
         "/rest/v1/prospect_qualifications",
         {
-            "select": "prospect_id,score,tier,status,scoring_engine,scoring_version,scored_at",
+            "select": (
+                "prospect_id,score,tier,status,scoring_engine,scoring_version,"
+                "evidence_confidence,observed_dimensions,unknown_dimensions,scored_at"
+            ),
             "prospect_id": f"eq.{prospect_id}",
             "scoring_engine": "eq.empire_os.lead_scoring",
-            "scoring_version": "eq.v1",
+            "scoring_version": "in.(v2,v1)",
             "order": "scored_at.desc",
-            "limit": "1",
+            "limit": "2",
         },
     )
 
     if not isinstance(rows, list):
         raise BuyerAllocationError("qualification reader returned invalid payload")
 
-    if not rows:
+    compatible = [row for row in rows if isinstance(row, dict)]
+    if not compatible:
         return None
 
-    row = rows[0]
-    if not isinstance(row, dict):
-        raise BuyerAllocationError("qualification reader returned invalid row")
-    return row
+    for preferred_version in ("v2", "v1"):
+        for row in compatible:
+            if normalise(row.get("scoring_version") or "v1") == preferred_version:
+                return row
+
+    raise BuyerAllocationError("qualification reader returned unsupported versions")
 
 
 def fetch_buyer_rows(

@@ -84,4 +84,4 @@ decision-maker adapters out of current reachability calculations.
 
 ## Production gate
 
-The v2 schema migration is now active in canonical Supabase. One explicitly approved bounded production qualification exists for All Star Roofing alongside its unchanged v1 row. No buyer-allocation consumer has been cut over to v2, and bulk v2 writes remain gated.
+The v2 schema migration is now active in canonical Supabase. One explicitly approved bounded production qualification exists for All Star Roofing alongside its unchanged v1 row. The buyer-allocation reader is now local/tested to prefer v2 with v1 fallback and independently requires the v2 evidence-confidence floor; allocation execution itself and bulk v2 writes remain gated.
