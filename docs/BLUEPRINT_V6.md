@@ -235,6 +235,8 @@ Second slice ✅ local/tested: provider observations can now be normalized into 
 
 Third slice ✅ local/tested: campaign economics review now aggregates observed spend/conversions and exposes ROAS/profit-ROAS only when attribution evidence is complete. Partial attribution remains unknown rather than zero; budget, pause and retarget execution stay disabled.
 
+Fourth slice ✅ local/tested: advertising evidence review now checks observation freshness and produces creative-level economics only from explicitly identified creatives. Creative comparison is available only when at least two creatives have complete revenue/profit attribution; stale/future observations, missing creative identity and incomplete attribution remain explicit blockers. No campaign creation, budget, pause or retarget mutation is introduced.
+
 ### Phase 10 — Predictive Cloud V3
 Trend Radar, market/demand/business/buyer/revenue/profit forecasts, churn, LTV, capacity, conversion, Horizon forecasts, Revenue GPS and connected Business/Buyer/Signal/Revenue graphs.
 
