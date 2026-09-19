@@ -250,6 +250,13 @@ Astra detects → predicts economics → selects market → creates acquisition/
 
 Foundation slice ✅ local/tested: OBSERVE-only `RevenueDecisionPacket` integration composes Astra workstream recommendations, Predictive Cloud direction, capital recommendation references, demand-plan references, enterprise blockers and explicit evidence refs. Missing signals remain unknown; packets are hard-locked to `side_effects=none` and `execution_authority=none`, so no autonomous spend, outreach, payment, allocation or deployment is enabled.
 
+### Governed Control-Plane API Layer — Phases 4–18
+Second-pass API layer ✅ local/tested and mounted in the hub. Health/read/preview surfaces now exist for Astra, A2A identity, Conversation OS, Revenue CRM, Advertising Brain, Predictive Cloud, Experiment/Causal analysis, Demand Genesis, Revenue Exchange, Digital Twin, Capital Review, SaaS tenancy, Enterprise readiness and Revenue OS. Repository/provider-backed surfaces mount unbound and fail closed until their canonical reader or verifier is explicitly activated; pure analysis/simulation previews remain non-mutating. All routes expose OBSERVE/SIMULATION status and explicit zero execution authority.
+
+Current route families: `/v1/astra/*`, `/v1/a2a-identity/*`, `/v1/conversations/*`, `/v1/revenue-crm/*`, `/v1/advertising/*`, `/v1/predictive/*`, `/v1/experiments/*`, `/v1/demand/*`, `/v1/revenue-exchange/*`, `/v1/digital-twin/*`, `/v1/capital/*`, `/v1/saas/*`, `/v1/enterprise/*`, `/v1/revenue-os/*`.
+
+Production repositories, provider credentials, trusted keys, migrations and consequential execution remain separate approval gates.
+
 ## Retain and Upgrade
 - Cinematic Landing, Truth Portal, Ghost Ledger privacy concepts, Hall of Fame, Sniper Leaderboard, Live Strike Zone and Partner Network.
 - Self-improving landing pages, Whale Hunter, Storm Chaser, Satellite Scout, high-ticket cinematic demos and pay-per-call.
