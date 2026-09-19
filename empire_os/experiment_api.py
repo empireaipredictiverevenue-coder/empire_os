@@ -1,6 +1,8 @@
 """Read-only experiment analysis preview API."""
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -8,6 +10,9 @@ from empire_os.experiment_analysis import analyze_observed_experiment
 from empire_os.experiment_conclusion import (
     ExperimentConclusionRecord,
     build_causal_conclusion,
+)
+from empire_os.experiment_conclusion_freshness import (
+    assess_conclusion_freshness,
 )
 from empire_os.experiment_registry import ExperimentRegistryRecord
 
@@ -40,6 +45,13 @@ class ExperimentAnalysisRequest(BaseModel):
 class ExperimentConclusionRequest(ExperimentAnalysisRequest):
     conclusion_key: str
     evidence: dict = Field(default_factory=dict)
+
+
+class ExperimentConclusionFreshnessRequest(ExperimentConclusionRequest):
+    experiment_observed_at: str
+    outcome_window_closed_at: str
+    now_utc: str
+    max_age_seconds: int = Field(default=86400, gt=0)
 
 
 def create_experiment_router(registry=None) -> APIRouter:
@@ -124,6 +136,38 @@ def create_experiment_router(registry=None) -> APIRouter:
             "pricing_mutation": False,
             "analysis": analysis.as_dict(),
             "conclusion": conclusion.as_dict(),
+        }
+
+    @router.post("/conclusions/freshness/preview")
+    def conclusion_freshness_preview(
+        req: ExperimentConclusionFreshnessRequest,
+    ):
+        try:
+            _analysis, conclusion = build_conclusion(req)
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            freshness = assess_conclusion_freshness(
+                conclusion=conclusion,
+                experiment_observed_at=req.experiment_observed_at,
+                outcome_window_closed_at=req.outcome_window_closed_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "traffic_mutation": False,
+            "rollout_enabled": False,
+            "pricing_mutation": False,
+            "freshness": freshness.as_dict(),
         }
 
     @router.post("/conclusions/register")

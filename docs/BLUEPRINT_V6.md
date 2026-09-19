@@ -269,6 +269,8 @@ Third slice ✅ local/tested: append-only experiment registry records evidence-b
 
 Fourth slice ✅ local/tested: causal-review conclusion packets/history now require sufficient observed arm samples, verified assignment integrity, verified exposure integrity and a closed outcome window. The conclusion records observed lift direction/size while explicitly marking statistical significance unavailable; the staged append-only registry recomputes lift from observed means and cannot enable traffic, rollout or pricing mutation.
 
+Fifth slice ✅ local/tested: causal-conclusion freshness review now requires the closed outcome window to occur after the experiment observation and remain within a bounded freshness window. Stale, future-dated or chronologically invalid conclusion evidence blocks current operator review without invalidating the historical observed lift packet; traffic, rollout and pricing mutation remain disabled.
+
 ### Phase 12 — Demand Genesis
 Create demand through content, ads, offers, voice, AEO/GEO, communities, partnerships and agent distribution rather than only harvesting existing demand.
 
