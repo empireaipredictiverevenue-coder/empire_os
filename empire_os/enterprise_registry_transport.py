@@ -12,7 +12,8 @@ class EnterpriseRegistryTransportError(RuntimeError):
 
 
 RPC_NAME = "record_enterprise_readiness"
-ROLE = "empire_enterprise_registry_writer"
+WRITER_ROLE = "empire_enterprise_registry_writer"
+READER_ROLE = "empire_enterprise_registry_reader"
 SQL = (
     "select public.record_enterprise_readiness("
     "%s,%s::jsonb,%s::jsonb,%s,%s,%s,%s,%s,%s,%s::jsonb)"
@@ -75,7 +76,7 @@ class PostgresEnterpriseRegistryRpc:
         try:
             with self._connect(self.dsn) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute("SET LOCAL ROLE " + ROLE)
+                    cursor.execute("SET LOCAL ROLE " + WRITER_ROLE)
                     cursor.execute(SQL, tuple(values))
                     row = cursor.fetchone()
         except Exception as exc:
@@ -90,9 +91,80 @@ class PostgresEnterpriseRegistryRpc:
         return row[0]
 
 
+READ_SQL = """
+SELECT
+  id,
+  readiness_key,
+  controls,
+  slos,
+  control_passes,
+  control_failures,
+  control_unknowns,
+  slo_passes,
+  slo_failures,
+  slo_unknowns,
+  evidence,
+  execution_authority,
+  created_at
+FROM public.enterprise_readiness_registry
+ORDER BY created_at DESC,id DESC
+LIMIT %s
+"""
+
+
+class PostgresEnterpriseRegistryReader:
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        connect_factory: Callable | None = None,
+    ) -> None:
+        self.dsn = str(dsn or "").strip()
+        if not self.dsn:
+            raise EnterpriseRegistryTransportError(
+                "dedicated enterprise registry read DSN required"
+            )
+        if connect_factory is None:
+            try:
+                import psycopg
+            except ImportError as exc:
+                raise EnterpriseRegistryTransportError(
+                    "psycopg is required for enterprise registry read"
+                ) from exc
+            connect_factory = psycopg.connect
+        self._connect = connect_factory
+
+    def __call__(self, *, limit: int) -> list[dict[str, Any]]:
+        bounded = max(1, min(int(limit), 500))
+        try:
+            with self._connect(self.dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL ROLE " + READER_ROLE)
+                    cursor.execute(READ_SQL, (bounded,))
+                    columns = [
+                        description.name
+                        for description in cursor.description
+                    ]
+                    rows = cursor.fetchall()
+        except Exception as exc:
+            raise EnterpriseRegistryTransportError(
+                "enterprise registry read failed"
+            ) from exc
+        return [
+            dict(zip(columns, row, strict=True))
+            for row in rows
+        ]
+
+
 class RpcEnterpriseRegistryRepository:
-    def __init__(self, rpc: Callable[[str, dict[str, Any]], Any]):
+    def __init__(
+        self,
+        rpc: Callable[[str, dict[str, Any]], Any],
+        *,
+        reader: Callable[..., list[dict[str, Any]]] | None = None,
+    ):
         self.rpc = rpc
+        self.reader = reader
 
     def record(self, item: EnterpriseReadinessRecord):
         item.validate()
@@ -128,3 +200,15 @@ class RpcEnterpriseRegistryRepository:
                 "enterprise registry RPC returned invalid payload"
             )
         return result
+
+    def list_readiness(self, *, limit: int):
+        if self.reader is None:
+            raise EnterpriseRegistryTransportError(
+                "enterprise registry reader not activated"
+            )
+        rows = self.reader(limit=limit)
+        if not isinstance(rows, list):
+            raise EnterpriseRegistryTransportError(
+                "enterprise registry reader returned invalid payload"
+            )
+        return rows
