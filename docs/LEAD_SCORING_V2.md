@@ -65,6 +65,20 @@ The staged v2 schema extension:
 No v1 consumer is switched by this slice. Buyer allocation remains pinned to v1
 until v2 has been validated on real enriched evidence.
 
+## Canonical address normalization
+
+Canonical prospects store published address evidence in the address field, while
+the legacy completeness scorer names its equivalent field street. v2 preserves
+the existing canonical adapter behavior by counting address as street evidence
+when an explicit street field is absent. No address components are inferred.
+
+## Targeted enrichment planning
+
+The evidence-enrichment planner uses the v2 completeness/confidence result as its
+single source of truth. It prioritizes the existing bounded first-party site
+probe for missing website/email/phone evidence and keeps unavailable registry or
+decision-maker adapters out of current reachability calculations.
+
 ## Production gate
 
 The v2 migration, v2 qualification writes and any consumer cutover remain gated.

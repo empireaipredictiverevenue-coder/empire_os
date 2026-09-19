@@ -147,8 +147,16 @@ def compute_lead_score_v2(
         )
         quality_score = round(weighted / observed_weight, 1)
 
+    completeness_input = dict(lead)
+    if (
+        not completeness_input.get("street")
+        and completeness_input.get("address")
+    ):
+        # Canonical address evidence satisfies the scorer street field.
+        completeness_input["street"] = completeness_input["address"]
+
     completeness = float(
-        score_data_completeness(dict(lead))
+        score_data_completeness(completeness_input)
     )
     evidence_coverage = round(observed_weight, 4)
     evidence_confidence = round(
