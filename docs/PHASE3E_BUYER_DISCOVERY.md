@@ -52,7 +52,10 @@ The review-only proposal CLI never writes or sends. It renders the candidate-rev
 - A materially lower current role (for example, canonical `Owner` but current official site `Project Manager`) sets `review_required=true` and blocks outreach.
 - Equivalent economic-buyer authority can confirm the candidate.
 - Public-web validation on 2026-09-17 exposed a real stale-role example, proving this gate is necessary.
-## Public-web corroborated contact evidence
+## Public-web corroborated decision-maker and contact evidence
+- A decision maker may be identified from public evidence without creating contact authority: one first-party official-site role claim can stand alone, while non-first-party evidence requires at least two independent source domains that agree on the same person and compatible economic/functional authority and are explicitly correlated to the same business identity.
+- Multiple different corroborated people fail closed as an ambiguous public identity, and public evidence cannot silently replace a conflicting existing decision maker.
+- Decision-maker evidence alone never makes a record review-ready or outreach-ready; a separate direct person-bound contact must still pass the existing contact gate.
 - Explicit public business-directory contact evidence may bind to a decision maker only when the person identity matches exactly and the role is independently corroborated.
 - Unsupported sources, mismatched names, and uncorroborated third-party records are rejected.
 - DNS-valid public contact evidence can make a candidate `review_ready` without making it `outreach_ready`.

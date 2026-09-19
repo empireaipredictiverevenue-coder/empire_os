@@ -530,3 +530,176 @@ def test_public_web_email_named_for_different_person_cannot_bind_to_decision_mak
     }])
     assert merged["public_web_evidence_accepted"] == 0
     assert merged["contact_candidates"] == []
+
+
+def test_public_decision_maker_requires_corroborated_identity_and_role():
+    from types import SimpleNamespace
+    from empire_os.buyer_discovery import (
+        merge_public_decision_maker_evidence,
+        verify_contact_plan,
+    )
+
+    enriched = {
+        "decision_maker": None,
+        "contact_candidates": [],
+    }
+    merged = merge_public_decision_maker_evidence(enriched, [
+        {
+            "name": "Terry Paris",
+            "title": "Owner",
+            "source_url": "https://www.bbb.org/example/all-star-roofing",
+            "source_kind": "public_business_directory",
+            "business_identity_correlated": True,
+        },
+        {
+            "name": "Terry Paris",
+            "title": "Owner",
+            "source_url": "https://www.buildzoom.com/example/all-star-roofing",
+            "source_kind": "public_business_directory",
+            "business_identity_correlated": True,
+        },
+    ])
+
+    assert merged["decision_maker"]["name"] == "Terry Paris"
+    assert merged["decision_maker"]["decision_role"] == "economic_buyer"
+    assert merged["decision_maker"]["source"] == "public_web_corroborated"
+    assert merged["public_decision_maker_evidence_accepted"] == 2
+    assert merged["decision_reconciliation"]["review_required"] is False
+
+    class Validator:
+        def validate(self, email):
+            return SimpleNamespace(
+                email=email,
+                is_valid=True,
+                confidence=0.75,
+                is_role_address=False,
+                is_disposable=False,
+                has_mx=True,
+                smtp_accepts=False,
+            )
+
+    plan = verify_contact_plan(merged, validator=Validator())
+    assert plan["review_ready"] is False
+    assert plan["outreach_ready"] is False
+    assert plan["preferred_email"] is None
+
+
+def test_single_directory_role_claim_cannot_create_decision_maker():
+    from empire_os.buyer_discovery import (
+        merge_public_decision_maker_evidence,
+    )
+
+    merged = merge_public_decision_maker_evidence(
+        {"decision_maker": None, "contact_candidates": []},
+        [{
+            "name": "Terry Paris",
+            "title": "Owner",
+            "source_url": "https://www.bbb.org/example/all-star-roofing",
+            "source_kind": "public_business_directory",
+            "business_identity_correlated": True,
+        }],
+    )
+    assert merged.get("decision_maker") is None
+    assert merged["public_decision_maker_evidence_accepted"] == 0
+
+
+def test_official_site_role_evidence_can_stand_alone():
+    from empire_os.buyer_discovery import (
+        merge_public_decision_maker_evidence,
+    )
+
+    merged = merge_public_decision_maker_evidence(
+        {"decision_maker": None, "contact_candidates": []},
+        [{
+            "name": "Jane Smith",
+            "title": "Founder",
+            "source_url": "https://acme.example/about",
+            "source_kind": "official_site",
+        }],
+    )
+    assert merged["decision_maker"]["name"] == "Jane Smith"
+    assert merged["public_decision_maker_evidence_accepted"] == 1
+
+
+def test_conflicting_corroborated_public_people_fail_closed():
+    from empire_os.buyer_discovery import (
+        merge_public_decision_maker_evidence,
+    )
+
+    merged = merge_public_decision_maker_evidence(
+        {"decision_maker": None, "contact_candidates": []},
+        [
+            {
+                "name": "Jane Smith",
+                "title": "Owner",
+                "source_url": "https://one.example/jane",
+                "source_kind": "public_business_directory",
+            "business_identity_correlated": True,
+            },
+            {
+                "name": "Jane Smith",
+                "title": "Owner",
+                "source_url": "https://two.example/jane",
+                "source_kind": "professional_profile",
+                "business_identity_correlated": True,
+            },
+            {
+                "name": "John Smith",
+                "title": "Owner",
+                "source_url": "https://three.example/john",
+                "source_kind": "public_business_directory",
+            "business_identity_correlated": True,
+            },
+            {
+                "name": "John Smith",
+                "title": "Owner",
+                "source_url": "https://four.example/john",
+                "source_kind": "professional_profile",
+                "business_identity_correlated": True,
+            },
+        ],
+    )
+    assert merged.get("decision_maker") is None
+    assert (
+        merged["decision_reconciliation"]["status"]
+        == "ambiguous_public_identity"
+    )
+    assert merged["decision_reconciliation"]["review_required"] is True
+    assert merged["public_decision_maker_evidence_accepted"] == 0
+
+
+def test_public_decision_maker_does_not_override_conflicting_existing_person():
+    from empire_os.buyer_discovery import (
+        merge_public_decision_maker_evidence,
+    )
+
+    merged = merge_public_decision_maker_evidence(
+        {
+            "decision_maker": {
+                "name": "Existing Person",
+                "title": "Owner",
+                "decision_score": 1.0,
+            },
+            "contact_candidates": [],
+        },
+        [
+            {
+                "name": "Jane Smith",
+                "title": "Owner",
+                "source_url": "https://one.example/jane",
+                "source_kind": "public_business_directory",
+            "business_identity_correlated": True,
+            },
+            {
+                "name": "Jane Smith",
+                "title": "Owner",
+                "source_url": "https://two.example/jane",
+                "source_kind": "professional_profile",
+                "business_identity_correlated": True,
+            },
+        ],
+    )
+    assert merged["decision_maker"]["name"] == "Existing Person"
+    assert merged["decision_reconciliation"]["status"] == "identity_conflict"
+    assert merged["decision_reconciliation"]["review_required"] is True
+    assert merged["public_decision_maker_evidence_accepted"] == 0

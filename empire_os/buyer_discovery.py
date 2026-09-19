@@ -462,6 +462,160 @@ def validate_email_candidates(candidates: Iterable[str], validator: Any, *, requ
         })
     return results
 
+def merge_public_decision_maker_evidence(
+    enriched: Mapping[str, Any],
+    evidence: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Accept a public decision maker only with first-party or corroborated evidence."""
+    result = dict(enriched)
+    allowed_sources = {
+        "official_site",
+        "public_business_directory",
+        "public_government_record",
+        "company_press_release",
+        "professional_profile",
+    }
+    candidates: list[dict[str, Any]] = []
+
+    for item in evidence or []:
+        if not isinstance(item, Mapping):
+            continue
+        name = _text(item.get("name"))
+        title = _text(item.get("title"))
+        source_url = _text(item.get("source_url"))
+        source_kind = _text(item.get("source_kind")).lower()
+        if (
+            not looks_like_person_name(name)
+            or not title
+            or not source_url
+            or source_kind not in allowed_sources
+        ):
+            continue
+
+        identity_correlated = (
+            source_kind == "official_site"
+            or item.get("business_identity_correlated") is True
+        )
+        if not identity_correlated:
+            continue
+
+        role, decision_score = classify_decision_role(title)
+        if decision_score < 0.5:
+            continue
+
+        published_at = _text(item.get("published_at"))
+        if (
+            source_kind in {
+                "public_government_record",
+                "company_press_release",
+            }
+            and not _publication_is_recent(published_at)
+        ):
+            continue
+
+        candidates.append({
+            "name": name,
+            "title": title,
+            "decision_role": role,
+            "decision_score": decision_score,
+            "source_kind": source_kind,
+            "source_url": source_url,
+            "source_domain": _host(source_url),
+            "published_at": published_at,
+            "business_identity_correlated": identity_correlated,
+        })
+
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for item in candidates:
+        grouped.setdefault(item["name"].casefold(), []).append(item)
+
+    corroborated_groups: list[list[dict[str, Any]]] = []
+    for items in grouped.values():
+        official = [
+            item for item in items
+            if item["source_kind"] == "official_site"
+        ]
+        domains = {
+            item["source_domain"]
+            for item in items
+            if item["source_domain"]
+        }
+        economic = [
+            item for item in items
+            if item["decision_role"] == "economic_buyer"
+        ]
+        functional = [
+            item for item in items
+            if item["decision_role"] == "functional_buyer"
+        ]
+
+        corroborated = (
+            bool(official)
+            or (
+                len(domains) >= 2
+                and (len(economic) >= 2 or len(functional) >= 2)
+            )
+        )
+        if not corroborated:
+            continue
+
+        corroborated_groups.append(sorted(
+            items,
+            key=lambda item: (
+                item["decision_score"],
+                item["source_kind"] == "official_site",
+            ),
+            reverse=True,
+        ))
+
+    if not corroborated_groups:
+        result["public_decision_maker_evidence_accepted"] = 0
+        return result
+
+    if len(corroborated_groups) != 1:
+        result["decision_reconciliation"] = {
+            "status": "ambiguous_public_identity",
+            "review_required": True,
+            "decision_maker": result.get("decision_maker"),
+        }
+        result["public_decision_maker_evidence_accepted"] = 0
+        return result
+
+    accepted_evidence = corroborated_groups[0]
+    accepted = accepted_evidence[0]
+
+    existing = result.get("decision_maker")
+    if isinstance(existing, Mapping) and _text(existing.get("name")):
+        existing_name = _text(existing.get("name"))
+        if existing_name.casefold() != accepted["name"].casefold():
+            result["decision_reconciliation"] = {
+                "status": "identity_conflict",
+                "review_required": True,
+                "decision_maker": dict(existing),
+                "public_candidate": accepted,
+            }
+            result["public_decision_maker_evidence_accepted"] = 0
+            return result
+
+    result["decision_maker"] = {
+        "name": accepted["name"],
+        "title": accepted["title"],
+        "decision_role": accepted["decision_role"],
+        "decision_score": accepted["decision_score"],
+        "source": "public_web_corroborated",
+    }
+    result["decision_reconciliation"] = {
+        "status": "public_corroborated",
+        "review_required": False,
+        "decision_maker": result["decision_maker"],
+    }
+    result["public_decision_maker_evidence"] = accepted_evidence
+    result["public_decision_maker_evidence_accepted"] = len(
+        accepted_evidence
+    )
+    return result
+
+
 def merge_public_web_contact_evidence(
     enriched: Mapping[str, Any], evidence: Iterable[Mapping[str, Any]]
 ) -> dict[str, Any]:
