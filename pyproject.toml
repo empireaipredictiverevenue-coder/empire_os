@@ -26,6 +26,9 @@ payment-ops = [
 outbound-email = [
     "resend>=2.21.0,<3",
 ]
+search-console = [
+    "google-auth>=2.0,<3",
+]
 
 [tool.setuptools.packages.find]
 include = ["empire_os*"]

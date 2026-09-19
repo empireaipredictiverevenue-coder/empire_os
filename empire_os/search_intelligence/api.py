@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -101,6 +102,31 @@ def create_search_router(
     @router.get("/search-console/status")
     def search_console_status():
         return search_console.status().as_dict()
+
+    @router.get("/search-console/observations")
+    def search_console_observations(
+        start_date: date,
+        end_date: date,
+        limit: int = Query(default=1000, ge=1, le=25000),
+    ):
+        status = search_console.status()
+        if not status.available:
+            raise HTTPException(status_code=503, detail=status.reason)
+        if end_date < start_date:
+            raise HTTPException(status_code=422, detail="invalid_date_range")
+        rows = [dict(row) for row in search_console.observations(
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat(),
+            limit=limit,
+        )]
+        return {
+            "available": True,
+            "source": "google_search_console",
+            "site_url": status.site_url,
+            "count": len(rows),
+            "limit": limit,
+            "items": rows,
+        }
 
     @router.get("/summary")
     def summary():
