@@ -186,6 +186,8 @@ Production database migration, Search Console credentials, sitemap/index submiss
 ### Phase 6 — A2A Commerce Network
 A2A Agent Card/protocol, authenticated agent discovery, agent buyers/suppliers, AI-to-AI quoting, negotiation and tasks, commercial gates, marketplace and revenue attribution. Public discovery stays low-risk; activation/payment/allocation remain governed.
 
+Foundation slice ✅ local/tested: `/a2a/v1/discovery` now publishes machine-readable separation between public read-only capabilities and future authenticated commercial capabilities. Quote/negotiation/task capabilities are discovery-only with authentication + human approval required; execution, payment and allocation remain unexposed.
+
 ### Phase 7 — Conversation OS
 Vonage, ElevenLabs, streaming voice, barge-in, tone mirroring, summaries/transcripts, AI qualification/closing, human escalation, booking, objections, DISC/coaching, dynamic offers and unified conversation history across email/voice/A2A/CRM.
 

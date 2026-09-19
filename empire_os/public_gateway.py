@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
+from empire_os.a2a_discovery import commerce_discovery_manifest
 from empire_os.agent_web_runtime import execute_public_capability
 
 GATEWAY_VERSION = "agent-web-v1.1"
@@ -62,6 +63,16 @@ def capabilities(surface: str | None = Query(default=None, pattern="^(webmcp|mcp
 @app.get("/.well-known/agent-card.json")
 def agent_card():
     return JSONResponse(a2a_agent_card(PUBLIC_BASE_URL), media_type="application/json")
+
+
+@app.get("/a2a/v1/discovery")
+def a2a_discovery():
+    return commerce_discovery_manifest(
+        public_base_url=PUBLIC_BASE_URL,
+        public_capability_names=[
+            item["name"] for item in capability_manifest("a2a")
+        ],
+    )
 
 
 @app.post("/a2a/v1/message:send")
