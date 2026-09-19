@@ -1,9 +1,12 @@
-"""Read-only Advertising Brain provider API."""
+"""Read-only Advertising Brain provider API plus governed observation ingest."""
 from __future__ import annotations
 
 from typing import Any, Mapping, Protocol
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from empire_os.advertising_ingest import build_canonical_ad_observation
 
 
 class AdvertisingReadAdapter(Protocol):
@@ -19,8 +22,21 @@ class AdvertisingReadAdapter(Protocol):
         ...
 
 
+class AdvertisingObservationRepository(Protocol):
+    def append(self, item):
+        ...
+
+
+class AdvertisingObservationIngestRequest(BaseModel):
+    canonical_campaign_id: str
+    provider_observation_id: str
+    row: dict[str, Any]
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
 def create_advertising_router(
     adapters: Mapping[str, AdvertisingReadAdapter] | None = None,
+    observation_repository: AdvertisingObservationRepository | None = None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/advertising",
@@ -41,6 +57,9 @@ def create_advertising_router(
             "pause_mutation": False,
             "retarget_execution": False,
             "providers": sorted(bound),
+            "observation_ingest_configured": (
+                observation_repository is not None
+            ),
         }
 
     @router.get("/{provider}/status")
@@ -106,6 +125,44 @@ def create_advertising_router(
             "count": len(items),
             "limit": limit,
             "items": items,
+        }
+
+    @router.post("/observations/ingest")
+    def ingest_observation(req: AdvertisingObservationIngestRequest):
+        if observation_repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="advertising_observation_ingest_not_activated",
+            )
+        try:
+            item = build_canonical_ad_observation(
+                canonical_campaign_id=req.canonical_campaign_id,
+                provider_observation_id=req.provider_observation_id,
+                row=req.row,
+                evidence=req.evidence,
+            )
+            result = observation_repository.append(item)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        status = str(result.get("status") or "").strip()
+        if status not in {"recorded", "existing"}:
+            raise HTTPException(
+                status_code=502,
+                detail="advertising_ingest_invalid_repository_result",
+            )
+
+        return {
+            "mode": "OBSERVE",
+            "status": status,
+            "observation_id": result.get("observation_id"),
+            "canonical_campaign_id": item.canonical_campaign_id,
+            "provider_observation_id": item.provider_observation_id,
+            "execution_authority": "none",
+            "campaign_creation": False,
+            "budget_mutation": False,
+            "pause_mutation": False,
+            "retarget_execution": False,
         }
 
     return router
