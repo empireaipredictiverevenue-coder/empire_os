@@ -107,3 +107,13 @@ def test_no_quality_evidence_is_insufficient():
     assert result["quality_band"] == "unknown"
     assert result["evidence_confidence"] == 0
     assert result["decision_tier"] == "insufficient_evidence"
+
+
+def test_canonical_address_counts_as_street_evidence():
+    result = compute_lead_score_v2({
+        "business_name": "Acme Roofing",
+        "niche": "roofing",
+        "address": "1 Test Street, London",
+    })
+
+    assert result["data_completeness_score"] == 20.0
