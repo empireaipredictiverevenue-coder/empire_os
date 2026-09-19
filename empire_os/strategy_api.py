@@ -28,6 +28,12 @@ from empire_os.keyword_universe import (
     keyword_coverage_matrix,
     review_keyword_record,
 )
+from empire_os.ai_strategy_portfolio import (
+    ai_portfolio_gaps,
+    build_ai_capability_portfolio,
+    compare_ai_options,
+    review_ai_portfolio_item,
+)
 
 
 class DataRequest(BaseModel):
@@ -62,6 +68,15 @@ class PresenceShareRequest(BaseModel):
 
 class KeywordUniverseRequest(BaseModel):
     keywords: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AiPortfolioRequest(BaseModel):
+    capabilities: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AiOptionComparisonRequest(BaseModel):
+    capability_key: str
+    options: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -196,6 +211,37 @@ def create_strategy_router() -> APIRouter:
     def keyword_assets(req: KeywordUniverseRequest):
         try:
             return build_asset_backlog(req.keywords)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/ai-portfolio/item/review")
+    def ai_portfolio_item(req: DataRequest):
+        try:
+            return review_ai_portfolio_item(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/ai-portfolio/preview")
+    def ai_portfolio(req: AiPortfolioRequest):
+        try:
+            return build_ai_capability_portfolio(req.capabilities)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/ai-portfolio/gaps/preview")
+    def ai_portfolio_gap_review(req: AiPortfolioRequest):
+        try:
+            return ai_portfolio_gaps(req.capabilities)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/ai-portfolio/options/compare/preview")
+    def ai_option_compare(req: AiOptionComparisonRequest):
+        try:
+            return compare_ai_options(
+                capability_key=req.capability_key,
+                options=req.options,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

@@ -69,6 +69,50 @@ Every model/provider is evaluated on:
 
 No single-model dependency.
 
+### AI Capability Portfolio Engine V1
+
+The Strategy layer manages AI at the capability level, not only by provider/model.
+
+Each capability tracks:
+- capability key
+- business/problem class
+- strategic advantage
+- proprietary-data advantage
+- expected quality gain
+- privacy importance
+- cost sensitivity
+- switching flexibility
+- confidence
+- owner
+- task class
+- current provider/model where applicable
+- evaluation reference
+- observed quality
+- observed cost per 1k tasks
+- switching cost
+- provider dependency weight
+
+Portfolio outputs include:
+- BUILD / BUY / HYBRID / WATCH recommendations
+- unresolved capability decisions
+- provider concentration
+- dependency risks
+- decision-evidence gaps
+- option comparisons across observed quality, reliability, privacy, switching,
+  cost and latency
+
+Provider concentration is treated as strategic risk. A strong model may still be
+a weak strategic dependency if too many critical Empire capabilities depend on
+one provider with high switching cost.
+
+The portfolio cannot:
+- activate a provider
+- change secrets
+- promote a model
+- commit AI budget
+- widen agent/tool authority
+
+
 ## 5. Proprietary Advantage
 
 Empire should own:

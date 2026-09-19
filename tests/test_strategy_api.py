@@ -231,3 +231,61 @@ def test_keyword_asset_backlog_is_draft_only():
     assert body["assets"][0]["draft_only"] is True
     assert body["publishing_enabled"] is False
     assert body["indexation_enabled"] is False
+
+
+def test_ai_portfolio_does_not_activate_or_promote():
+    response = client().post(
+        "/v1/strategy/ai-portfolio/preview",
+        json={"capabilities": [{
+            "capability_key": "entity-resolution",
+            "problem": "Resolve commercial entities.",
+            "strategic_advantage": "Improves world model quality.",
+            "evidence_refs": ["e:entity"],
+            "strategic_value": .9,
+            "proprietary_data_advantage": .95,
+            "expected_quality_gain": .8,
+            "privacy_importance": .8,
+            "cost_sensitivity": .7,
+            "switching_flexibility": .3,
+            "confidence": .8,
+            "owner": "ai-strategy",
+            "task_class": "entity-resolution",
+            "current_provider": "provider-a",
+            "current_model": "model-a",
+            "evaluation_ref": "eval:entity",
+            "observed_quality": .9,
+            "cost_per_1k_tasks_cents": 5000,
+            "switching_cost": .7,
+            "dependency_weight": .8,
+        }]},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider_activation"] is False
+    assert body["model_promotion"] is False
+    assert body["budget_commitment"] is False
+    assert body["execution_authority"] == "none"
+
+
+def test_ai_option_comparison_is_observed_evidence_only():
+    response = client().post(
+        "/v1/strategy/ai-portfolio/options/compare/preview",
+        json={
+            "capability_key": "premium-reasoning",
+            "options": [{
+                "option_key": "provider-a:model-x",
+                "observed_quality": .95,
+                "observed_reliability": .95,
+                "privacy_fit": .7,
+                "switching_flexibility": .8,
+                "cost_per_1k_tasks_cents": 10000,
+                "p95_latency_ms": 2000,
+                "evidence_refs": ["eval:a"],
+            }],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["options"][0]["available"] is True
+    assert body["provider_activation"] is False
+    assert body["model_promotion"] is False
