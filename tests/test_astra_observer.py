@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -154,6 +155,7 @@ def test_canonical_operational_evidence_can_build_board(tmp_path):
     result = run_observer_cycle(
         dsn="postgresql://observer",
         operational_bindings=bindings,
+        now_utc=datetime(2026, 9, 19, 17, 0, tzinfo=timezone.utc),
         output_path=tmp_path / "latest.json",
         rpc_factory=_factory([], calls, operational),
     )
@@ -172,10 +174,12 @@ def test_canonical_evidence_missing_policy_binding_stays_unavailable(tmp_path):
         "qualified_unallocated_count": 0,
         "active_buyer_capacity": 0,
         "buyer_candidates_due": 0,
+        "observed_at": "2026-09-19T16:30:00+00:00",
     }
     result = run_observer_cycle(
         dsn="postgresql://observer",
         operational_bindings={},
+        now_utc=datetime(2026, 9, 19, 17, 0, tzinfo=timezone.utc),
         output_path=tmp_path / "latest.json",
         rpc_factory=_factory([], [], operational),
     )
@@ -183,3 +187,32 @@ def test_canonical_evidence_missing_policy_binding_stays_unavailable(tmp_path):
     assert "premium_ai_budget_cents" in result["decision"]["missing"]
     assert "outbound_domain_verified" in result["decision"]["missing"]
     assert "source_health_ok" in result["decision"]["missing"]
+
+
+def test_stale_canonical_operational_evidence_blocks_board(tmp_path):
+    operational = {
+        "replies_waiting": 0,
+        "failed_jobs": 0,
+        "owned_inventory_count": 8,
+        "qualified_unallocated_count": 2,
+        "active_buyer_capacity": 3,
+        "buyer_candidates_due": 0,
+        "observed_at": "2026-09-19T10:00:00+00:00",
+    }
+    bindings = {
+        "premium_ai_budget_cents": 0,
+        "outbound_domain_verified": True,
+        "source_health_ok": True,
+    }
+    result = run_observer_cycle(
+        dsn="postgresql://observer",
+        operational_bindings=bindings,
+        operational_evidence_max_age_seconds=3600,
+        now_utc=datetime(2026, 9, 19, 17, 0, tzinfo=timezone.utc),
+        output_path=tmp_path / "latest.json",
+        rpc_factory=_factory([], [], operational),
+    )
+    assert result["decision"]["available"] is False
+    assert result["decision"]["reason"] == "operational_evidence_stale"
+    assert result["operating_board"]["available"] is False
+    assert result["operational_evidence"]["freshness"]["fresh"] is False

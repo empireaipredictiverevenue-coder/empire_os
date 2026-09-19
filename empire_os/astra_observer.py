@@ -13,6 +13,7 @@ from typing import Any, Callable, Mapping
 
 from empire_os.astra import AstraSnapshot, build_operating_board
 from empire_os.astra_feedback import build_outcome_calibration
+from empire_os.astra_freshness import validate_astra_operational_freshness
 from empire_os.astra_evidence import (
     astra_policy_bindings_from_env,
     build_astra_evidence,
@@ -82,6 +83,8 @@ def run_observer_cycle(
     operational_snapshot_json: str | None = None,
     operational_bindings: Mapping[str, Any] | None = None,
     output_path: str | Path = "runtime/astra/latest.json",
+    operational_evidence_max_age_seconds: int = 21600,
+    now_utc: Any | None = None,
     rpc_factory: Callable[..., Any] = PostgresOutcomeRpc,
 ) -> dict[str, Any]:
     """Run one bounded read-only Astra observation cycle."""
@@ -117,33 +120,89 @@ def run_observer_cycle(
             raise AstraObserverError(
                 "operational evidence projection must return an object"
             )
-        evidence = build_astra_evidence(
-            actual_revenue_cents=calibration.actual_revenue_cents,
-            operational_row=raw_operational,
-            bindings=(
-                operational_bindings
-                if operational_bindings is not None
-                else astra_policy_bindings_from_env()
-            ),
-        )
-        evidence_payload = {
-            "available": evidence.available,
-            "missing": list(evidence.missing),
-            "observed": dict(evidence.observed),
-            "sources": dict(evidence.sources),
-        }
-        snapshot = evidence.snapshot
+        if not raw_operational:
+            evidence = build_astra_evidence(
+                actual_revenue_cents=calibration.actual_revenue_cents,
+                operational_row=raw_operational,
+                bindings=(
+                    operational_bindings
+                    if operational_bindings is not None
+                    else astra_policy_bindings_from_env()
+                ),
+            )
+            evidence_payload = {
+                "available": evidence.available,
+                "missing": list(evidence.missing),
+                "observed": dict(evidence.observed),
+                "sources": dict(evidence.sources),
+            }
+            snapshot = evidence.snapshot
+        else:
+            freshness = validate_astra_operational_freshness(
+                raw_operational,
+                now=now_utc,
+                max_age_seconds=max(int(operational_evidence_max_age_seconds), 1),
+            )
+            if not freshness.fresh:
+                evidence_payload = {
+                    "available": False,
+                    "missing": [],
+                    "observed": {},
+                    "sources": {},
+                    "freshness": {
+                        "fresh": freshness.fresh,
+                        "observed_at": freshness.observed_at,
+                        "age_seconds": freshness.age_seconds,
+                        "reason": freshness.reason,
+                    },
+                }
+                snapshot = None
+            else:
+                evidence = build_astra_evidence(
+                    actual_revenue_cents=calibration.actual_revenue_cents,
+                    operational_row=raw_operational,
+                    bindings=(
+                        operational_bindings
+                        if operational_bindings is not None
+                        else astra_policy_bindings_from_env()
+                    ),
+                )
+                evidence_payload = {
+                    "available": evidence.available,
+                    "missing": list(evidence.missing),
+                    "observed": dict(evidence.observed),
+                    "sources": dict(evidence.sources),
+                    "freshness": {
+                        "fresh": freshness.fresh,
+                        "observed_at": freshness.observed_at,
+                        "age_seconds": freshness.age_seconds,
+                        "reason": freshness.reason,
+                    },
+                }
+                snapshot = evidence.snapshot
+
 
     if snapshot is None:
         missing = list((evidence_payload or {}).get("missing") or [])
+        freshness_reason = (
+            ((evidence_payload or {}).get("freshness") or {}).get("reason")
+        )
+        unavailable_reason = (
+            freshness_reason
+            if freshness_reason in {
+                "operational_evidence_stale",
+                "operational_evidence_from_future",
+            }
+            else "operational_evidence_incomplete"
+        )
         decision: dict[str, Any] = {
             "available": False,
-            "reason": "operational_evidence_incomplete",
+            "reason": unavailable_reason,
             "missing": missing,
         }
         operating_board: dict[str, Any] = {
             "available": False,
-            "reason": "operational_evidence_incomplete",
+            "reason": unavailable_reason,
             "missing": missing,
         }
     else:
