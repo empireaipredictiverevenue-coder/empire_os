@@ -12,7 +12,8 @@ class ExperimentRegistryTransportError(RuntimeError):
 
 
 RPC_NAME = "record_experiment_registry"
-ROLE = "empire_experiment_registry_writer"
+WRITER_ROLE = "empire_experiment_registry_writer"
+READER_ROLE = "empire_experiment_registry_reader"
 SQL = (
     "select public.record_experiment_registry("
     "%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s::jsonb)"
@@ -74,7 +75,7 @@ class PostgresExperimentRegistryRpc:
         try:
             with self._connect(self.dsn) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute("SET LOCAL ROLE " + ROLE)
+                    cursor.execute("SET LOCAL ROLE " + WRITER_ROLE)
                     cursor.execute(SQL, tuple(values))
                     row = cursor.fetchone()
         except Exception as exc:
@@ -88,9 +89,82 @@ class PostgresExperimentRegistryRpc:
         return row[0]
 
 
+READ_SQL = """
+SELECT
+  id,
+  experiment_key,
+  hypothesis,
+  metric,
+  control_variant,
+  treatment_variants,
+  assignment_integrity_verified,
+  exposure_integrity_verified,
+  outcome_window_closed,
+  evidence,
+  execution_authority,
+  traffic_mutation,
+  rollout_enabled,
+  pricing_mutation,
+  created_at
+FROM public.experiment_registry
+ORDER BY created_at DESC,id DESC
+LIMIT %s
+"""
+
+
+class PostgresExperimentRegistryReader:
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        connect_factory: Callable | None = None,
+    ) -> None:
+        self.dsn = str(dsn or "").strip()
+        if not self.dsn:
+            raise ExperimentRegistryTransportError(
+                "dedicated experiment registry read DSN required"
+            )
+        if connect_factory is None:
+            try:
+                import psycopg
+            except ImportError as exc:
+                raise ExperimentRegistryTransportError(
+                    "psycopg is required for experiment registry read"
+                ) from exc
+            connect_factory = psycopg.connect
+        self._connect = connect_factory
+
+    def __call__(self, *, limit: int) -> list[dict[str, Any]]:
+        bounded = max(1, min(int(limit), 500))
+        try:
+            with self._connect(self.dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL ROLE " + READER_ROLE)
+                    cursor.execute(READ_SQL, (bounded,))
+                    columns = [
+                        description.name
+                        for description in cursor.description
+                    ]
+                    rows = cursor.fetchall()
+        except Exception as exc:
+            raise ExperimentRegistryTransportError(
+                "experiment registry read failed"
+            ) from exc
+        return [
+            dict(zip(columns, row, strict=True))
+            for row in rows
+        ]
+
+
 class RpcExperimentRegistryRepository:
-    def __init__(self, rpc: Callable[[str, dict[str, Any]], Any]):
+    def __init__(
+        self,
+        rpc: Callable[[str, dict[str, Any]], Any],
+        *,
+        reader: Callable[..., list[dict[str, Any]]] | None = None,
+    ):
         self.rpc = rpc
+        self.reader = reader
 
     def record(self, item: ExperimentRegistryRecord):
         item.validate()
@@ -117,3 +191,15 @@ class RpcExperimentRegistryRepository:
                 "experiment registry RPC returned invalid payload"
             )
         return result
+
+    def list_experiments(self, *, limit: int):
+        if self.reader is None:
+            raise ExperimentRegistryTransportError(
+                "experiment registry reader not activated"
+            )
+        rows = self.reader(limit=limit)
+        if not isinstance(rows, list):
+            raise ExperimentRegistryTransportError(
+                "experiment registry reader returned invalid payload"
+            )
+        return rows
