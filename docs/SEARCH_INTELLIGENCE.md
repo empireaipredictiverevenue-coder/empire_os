@@ -236,7 +236,7 @@ The frontend is a product surface, not the source of truth. Search rules, attrib
 
 1. Canonical repository/transport ✅ local/tested: stable `search-v1` API repository contract plus tenant-scoped PostgreSQL reader. The staged `empire_search_reader` role is SELECT-only, RLS-enforced by transaction-local `app.tenant_key`, and reached through a transaction-read-only Python transport. The passwordless login shell, production DSN/tenant binding and migration application remain gated.
 2. Search Console adapter interface + credential gate ✅ local/tested: `/v1/search/search-console/status` exposes disabled/configured/available state without reading credential contents. Activation remains unavailable until a real adapter and credential approval are separately added.
-3. Real SERP snapshot adapter through validated Search Fabric sources.
+3. Real SERP snapshot adapter ✅ local/tested: `SearchFabricSerpAdapter` converts only observed Search Fabric results into timestamped provenance-backed snapshots, preserves engine/quality/cache evidence, rejects missing ranking positions instead of inventing them, and reports retrieval failure as unavailable rather than fake success. Runtime network use remains governed by Search Fabric provider health/credentials.
 4. Internal-link graph, cannibalisation and content-decay engines.
 5. Dynamic sitemap/robots governance based on approved canonical page records.
 6. Evidence-backed competitor gap engine.
