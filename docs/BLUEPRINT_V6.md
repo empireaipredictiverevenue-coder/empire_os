@@ -339,6 +339,8 @@ Third slice ✅ local/tested: append-only enterprise readiness registry stores o
 
 Fourth slice ✅ local/tested: preview-only enterprise evidence review now checks control/SLO observation freshness and derives SLO margin trends only from comparable observed values. Stale/future evidence is explicit, insufficient or unknown SLO values preserve `unknown` trend state, and no infrastructure, identity, backup, SLO-target or compliance mutation authority is introduced.
 
+Fifth slice ✅ local/tested: Enterprise drift review compares prior and current control/SLO evidence only when both snapshots are fresh, chronologically valid and structurally comparable. Control state direction and SLO margin trend are derived from observed evidence; missing matches, unknown SLO values and stale/future evidence remain explicit blockers. No infrastructure, identity, backup, SLO-target, compliance or control mutation authority is introduced.
+
 ### Phase 18 — Full Autonomous Revenue OS
 Astra detects → predicts economics → selects market → creates acquisition/content/ads → finds buyers → runs conversations → closes → verifies payment → delivers → measures actual profit → learns → reallocates.
 

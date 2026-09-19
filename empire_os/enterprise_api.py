@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from empire_os.enterprise_controls import ControlEvidence, SloObservation
+from empire_os.enterprise_drift import review_enterprise_drift
 from empire_os.enterprise_freshness import review_enterprise_evidence
 from empire_os.enterprise_review import review_enterprise_readiness
 from empire_os.enterprise_registry import EnterpriseReadinessRecord
@@ -47,6 +48,16 @@ class EnterpriseFreshnessRequest(BaseModel):
     max_age_seconds: int = Field(default=21600, gt=0)
     controls: list[EnterpriseControlRequest] = Field(min_length=1)
     slos: list[EnterpriseSloRequest] = Field(min_length=1)
+
+
+class EnterpriseDriftRequest(BaseModel):
+    now_utc: str
+    max_age_seconds: int = Field(default=21600, gt=0)
+    baseline_controls: list[EnterpriseControlRequest] = Field(min_length=1)
+    current_controls: list[EnterpriseControlRequest] = Field(min_length=1)
+    baseline_slos: list[EnterpriseSloRequest] = Field(min_length=1)
+    current_slos: list[EnterpriseSloRequest] = Field(min_length=1)
+
 
 class EnterpriseEvidenceRepository(Protocol):
     def controls(self, *, limit: int) -> Sequence[Mapping[str, Any]]:
@@ -111,6 +122,53 @@ def create_enterprise_router(
             "slo_target_mutation": False,
             "compliance_mutation": False,
             "review": review.as_dict(),
+        }
+
+    @router.post("/drift/preview")
+    def drift_preview(req: EnterpriseDriftRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            review = review_enterprise_drift(
+                baseline_controls=tuple(
+                    ControlEvidence(**row.model_dump())
+                    for row in req.baseline_controls
+                ),
+                current_controls=tuple(
+                    ControlEvidence(**row.model_dump())
+                    for row in req.current_controls
+                ),
+                baseline_slos=tuple(
+                    SloObservation(**row.model_dump())
+                    for row in req.baseline_slos
+                ),
+                current_slos=tuple(
+                    SloObservation(**row.model_dump())
+                    for row in req.current_slos
+                ),
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "side_effects": "none",
+            "execution_authority": "none",
+            "control_mutation": False,
+            "infrastructure_mutation": False,
+            "identity_mutation": False,
+            "backup_mutation": False,
+            "slo_target_mutation": False,
+            "compliance_mutation": False,
+            "drift": review.as_dict(),
         }
 
     @router.get("/readiness")
