@@ -17,11 +17,13 @@ class OllamaProvider:
         timeout_seconds: int = 600,
         context_length: int = 16384,
         num_threads: int | None = None,
+        think: bool = False,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.context_length = max(4096, min(int(context_length), 65536))
         self.num_threads = num_threads
+        self.think = bool(think)
 
     def complete(self, model_request: ModelRequest) -> ModelResponse:
         context = model_request.context.as_dict()
@@ -43,12 +45,16 @@ class OllamaProvider:
         payload = {
             "model": model_request.route.model,
             "stream": False,
+            "think": self.think,
             "messages": [
                 {
                     "role": "system",
                     "content": (
                         "You are Empire Coder's local coding model. "
                         "Use only supplied repository evidence. "
+                        "Treat docs/BLUEPRINT_V6.md as authoritative when "
+                        "roadmap or implementation status conflicts with "
+                        "another repository source. "
                         "Do not claim actions or tests you did not perform. "
                         "Do not propose production-changing actions without "
                         "an explicit human approval gate."

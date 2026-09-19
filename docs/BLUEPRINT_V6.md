@@ -120,9 +120,9 @@ Foundation status — local/tested, production activation gated:
 - Durable task/plan/checkpoint/proposal state plus versioned compact recovery context for long-running engineering jobs.
 - Mandatory best-of-N rule: at least two model candidates -> comparative critique -> synthesized final; first output is never actionable.
 - The same best-of-N rule governs proposed next commands before command-policy evaluation.
-- Knowledge Garden with canonical precedence, ACTIVE/REVIEW/QUARANTINED states, duplicate/stale guidance detection and active-only default retrieval.
+- Knowledge Garden with canonical precedence, ACTIVE/REVIEW/QUARANTINED states, duplicate/stale guidance detection and active-only default retrieval; Blueprint v6 is the highest roadmap/status authority when canonical sources disagree.
 - Provider-agnostic model router with local Ollama support.
-- Local qwen3-coder:30b installed and benchmarked on the EmpireOS host.
+- Local qwen3-coder:30b installed and benchmarked on the EmpireOS host; Ollama chat requests explicitly disable model-native thinking because Empire Coder already enforces two-candidate + critique + synthesis reasoning and CPU latency is the bottleneck.
 - Read-before-write patching, atomic writes and rollback checkpoints.
 - Python AST-aware symbol patching plus dependency/reverse-dependency and impacted-test selection.
 - Best-of-N structured patch proposals with strict JSON schema, live-file validation and mandatory revalidation immediately before local application.
@@ -136,7 +136,7 @@ Foundation status — local/tested, production activation gated:
 - Localhost-only Ollama systemd packaging is installed and enabled for reboot persistence on the EmpireOS host; an already-healthy pre-existing Ollama process remains undisturbed until reboot.
 - Disabled-by-default, internal-token-gated `/v1/coder/*` API for task state and proposal-job queueing only; no remote execution/patch/deploy endpoint.
 - Resumable local job queue with stale-job recovery and proposal-only PLAN / NEXT_COMMAND worker.
-- Coder worker service/timer is installed and enabled; the timer runs one proposal-only worker pass per minute with localhost-only network access and a 30-minute bounded oneshot start timeout for CPU-local 30B jobs.
+- Coder worker service/timer is installed and enabled; the timer runs one proposal-only worker pass per minute with localhost-only network access and a 30-minute bounded oneshot start timeout for CPU-local 30B jobs. First live PLAN proof completed with two independent candidates, comparative critique, refined persisted proposal, and zero patch execution. ✅ live governed proof
 
 Candidate engineering changes stop at human approval. Commit/push/merge/deploy, production DB changes, service control, outbound, payment/funds and production credentials remain gated.
 

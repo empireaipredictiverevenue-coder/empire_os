@@ -46,6 +46,10 @@ def test_garden_quarantines_stale_and_duplicates(tmp_path):
 
     assert by_path["docs/BLUEPRINT_V6.md"].status is KnowledgeStatus.ACTIVE
     assert (
+        by_path["docs/BLUEPRINT_V6.md"].authority
+        > by_path["AGENTS.md"].authority
+    )
+    assert (
         by_path["empire_os/skills_library/skills/mcp-builder/SKILL.md"].status
         is KnowledgeStatus.ACTIVE
     )

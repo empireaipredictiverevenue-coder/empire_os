@@ -67,8 +67,8 @@ class GardenReport:
 
 
 _CANONICAL_PATHS = {
+    "docs/BLUEPRINT_V6.md": 110,
     "AGENTS.md": 100,
-    "docs/BLUEPRINT_V6.md": 100,
     "docs/EMPIRE_CODER.md": 98,
 }
 

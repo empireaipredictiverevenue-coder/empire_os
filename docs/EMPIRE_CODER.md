@@ -55,8 +55,8 @@ Empire Coder does not treat all repository knowledge as equally trustworthy.
 The knowledge garden classifies engineering guidance as ACTIVE, REVIEW or QUARANTINED using provenance, canonical-source precedence, exact-duplicate detection and stale-architecture flags.
 
 Default ACTIVE knowledge is intentionally narrow:
+- docs/BLUEPRINT_V6.md (highest roadmap/status authority);
 - AGENTS.md;
-- docs/BLUEPRINT_V6.md;
 - docs/EMPIRE_CODER.md;
 - curated MCP/tooling guidance;
 - curated webapp-testing guidance.
@@ -123,7 +123,7 @@ Measured on this host at 16K context:
 - about 4.65 generated tokens/sec
 - about 35 GiB RAM still available during the benchmark
 
-CPU is the bottleneck, so Empire Coder uses targeted context windows and capped outputs. Proposal-worker PLAN jobs cap repository evidence at 6,000 characters and each best-of-N candidate/synthesis output at 1,200 characters; this keeps the mandatory multi-pass refinement while avoiding oversized CPU-local prompts that can exceed the provider request timeout.
+CPU is the bottleneck, so Empire Coder uses targeted context windows and capped outputs. Proposal-worker PLAN jobs cap repository evidence at 6,000 characters and each best-of-N candidate/synthesis output at 1,200 characters. Local Ollama requests explicitly set `think=false`; deliberate comparison still comes from the mandatory two-candidate + critique + synthesis pipeline, avoiding a second hidden reasoning pass on every CPU-local 30B request.
 
 The model router remains provider-agnostic. Local Ollama is preferred when healthy and installed; hosted providers can later be added as escalation/fallback routes.
 

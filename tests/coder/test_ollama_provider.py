@@ -72,3 +72,5 @@ def test_ollama_provider_caps_prompt_and_prediction():
     assert payload["options"]["num_predict"] == 2048
     assert payload["options"]["num_ctx"] == 16384
     assert payload["options"]["num_thread"] == 8
+    assert payload["think"] is False
+    assert "BLUEPRINT_V6.md" in payload["messages"][0]["content"]

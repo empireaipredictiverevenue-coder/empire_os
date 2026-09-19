@@ -82,11 +82,12 @@ Code may be prepared and tested for those operations, but live side effects rema
 - Phase 3A qualification: complete
 - Phase 3B market qualification materializer: complete
 - Phase 3C canonical acquisition + live buyer capacity gate: complete
-- Phase 3D buyer matching + capacity allocation: current
-- Phase 3E governed outbound: next
-- Phase 3F outcome feedback
+- Phase 3D buyer matching + capacity allocation: complete
+- Phase 3E governed outbound: complete/frozen
+- Phase 3F outcome feedback + Lead Intelligence: current
+- Phase 4 Astra operating layer: next, OBSERVE-only until separately approved
 
-Do not broaden a Phase 3C task into Phase 3D+ unless explicitly requested.
+Do not broaden a Phase 3F task into Phase 4+ unless explicitly requested.
 
 ## Phase 3C completion criteria
 
