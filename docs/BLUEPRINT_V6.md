@@ -149,6 +149,8 @@ Candidate engineering changes stop at human approval. Commit/push/merge/deploy, 
 ### Phase 4 — Astra Operating Layer ← CURRENT
 Astra becomes the top coordinator for business priorities, agent routing, bottleneck detection, expected-value decisions, resource allocation, cost control and approval policies. Premium AI is used only when expected value justifies the cost.
 
+Agentic Intelligence Control Plane V1 ✅ local/tested foundation: Empire now separates grounding, perception, temporal world model, memory, goals, planning, model routing, specialists, deliberation, independent verification, simulation, external policy, typed execution, runtime safety, learning, self-improvement, evaluation, agent identity and cognitive audit. The system does not claim proven human-level AGI/ASI; legacy `agi_*` naming grants no authority. Cognitive packets persist evidence/decision summaries rather than private chain-of-thought and cannot execute while OBSERVE.
+
 Phase 4 observer/calibration implementation status — ✅ production OBSERVE active:
 1. Astra Observer DB Role ✅ — restricted read-only `empire_astra_observer` is live in canonical Supabase; direct DB login remains unused in production.
 2. Astra Role Transport ✅ production — live HTTPS token-authenticated RPC transport permits only feedback and operational-evidence reads; raw observer token stays on EmpireOS and Supabase stores only its SHA-256 hash.

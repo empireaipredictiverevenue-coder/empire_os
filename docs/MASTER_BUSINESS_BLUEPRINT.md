@@ -146,6 +146,12 @@ repeat purchases, churn and gross profit — not generic ICP similarity alone.
 The Intelligence Fabric sits on top of the canonical data architecture defined in
 `DATA_INFRASTRUCTURE_BLUEPRINT.md`.
 
+The cognitive/agentic layer above the Intelligence Fabric is defined in
+`AGI_INTELLIGENCE_ARCHITECTURE.md`. Empire does not treat an "AGI" filename,
+autonomous loop, agent count or synthetic reasoning layer as proof of AGI.
+Capability is measured through grounded reasoning, planning, tool competence,
+memory, transfer, evaluation and verified commercial outcomes.
+
 That data plane adds:
 - immutable raw evidence
 - versioned data contracts/schema semantics
@@ -759,13 +765,17 @@ Raw signals
    Data plane, world model, lineage, replay, quality, feature/analytics serving,
    and measured infrastructure activation rules.
 
-3. `BLUEPRINT_V6.md`
+3. `AGI_INTELLIGENCE_ARCHITECTURE.md`
+   Agentic cognition layers, memory, planning, model routing, verification,
+   policy, tool execution, learning, evaluation and self-improvement.
+
+4. `BLUEPRINT_V6.md`
    Engineering/phase implementation roadmap and production gates.
 
-4. `COMMERCIAL_BLUEPRINT.md`
+5. `COMMERCIAL_BLUEPRINT.md`
    Buyer/seats/territories/corridors/MRR detail.
 
-5. Phase/product docs
+6. Phase/product docs
    Implementation-specific detail.
 
 No future phase document should silently redefine the company model.
@@ -801,8 +811,10 @@ expansion and portal.
 Revenue CRM, Conversation OS, AI Closer, BSC USDT payment, fulfilment,
 outcomes and recognized gross profit.
 
-### Track G — Astra / Revenue OS
-one operating board across all tracks; consequential authority remains gated
+### Track G — Astra / Revenue OS + Agentic Intelligence Control
+one operating board across all tracks; grounded cognitive packets, memory,
+planning, model routing, specialist delegation, independent verification,
+simulation, policy and typed execution. Consequential authority remains gated
 by real evidence and explicit approval.
 
 ## 21. Non-Negotiable Principles
