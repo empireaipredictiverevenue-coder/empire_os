@@ -4,7 +4,26 @@ from __future__ import annotations
 from typing import Any, Mapping, Protocol, Sequence
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
+from empire_os.saas_readiness import (
+    SaasScaleSnapshot,
+    assess_saas_scale_readiness,
+)
+
+
+
+
+class SaasScaleReadinessRequest(BaseModel):
+    tenant_id: str
+    active_members: int = Field(ge=0)
+    observed_monthly_usage: int = Field(ge=0)
+    observed_usage_limit: int | None = Field(default=None, ge=0)
+    active_subscription: bool
+    tenant_isolation_verified: bool
+    white_label_requested: bool = False
+    white_label_configured: bool = False
+    evidence_refs: list[str] = Field(min_length=1)
 
 class TenantScopedSaasRepository(Protocol):
     @property
@@ -55,6 +74,33 @@ def create_saas_router(
                 detail="saas_tenant_scope_missing",
             )
         return repository
+
+
+    @router.post("/scale-readiness/preview")
+    def scale_readiness(req: SaasScaleReadinessRequest):
+        snapshot = SaasScaleSnapshot(
+            tenant_id=req.tenant_id,
+            active_members=req.active_members,
+            observed_monthly_usage=req.observed_monthly_usage,
+            observed_usage_limit=req.observed_usage_limit,
+            active_subscription=req.active_subscription,
+            tenant_isolation_verified=req.tenant_isolation_verified,
+            white_label_requested=req.white_label_requested,
+            white_label_configured=req.white_label_configured,
+            evidence_refs=tuple(req.evidence_refs),
+        )
+        try:
+            result = assess_saas_scale_readiness(snapshot)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "provisioning_execution": False,
+            "billing_execution": False,
+            "readiness": result.as_dict(),
+        }
 
     @router.get("/memberships")
     def memberships(limit: int = Query(default=100, ge=1, le=500)):
