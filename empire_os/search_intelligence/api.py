@@ -13,6 +13,7 @@ from .metadata import generate_metadata
 from .models import SearchOpportunity, SearchPage
 from .quality import ContentQualityEvaluator
 from .repository import SearchRepository, bounded_limit, collection_payload
+from .postgres_repository import configured_search_repository_from_env
 from .schema import generate_schema_preview
 
 
@@ -158,4 +159,6 @@ def create_search_router(
     return router
 
 
-router = create_search_router()
+router = create_search_router(
+    configured_search_repository_from_env()
+)

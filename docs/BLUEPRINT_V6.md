@@ -172,7 +172,7 @@ Foundation scope:
 - explicit auditable indexation lifecycle;
 - OBSERVE-only SearchCommander;
 - read-only/recommendation FastAPI surface under `/v1/search/*`, now with a stable `search-v1` repository contract/envelope and fail-closed default when no canonical repository is configured;
-- forward-only canonical Supabase schema with tenant/site isolation and search→commercial attribution links;
+- forward-only canonical Supabase schema with tenant/site isolation and search→commercial attribution links; staged least-privilege `empire_search_reader` role + transaction-read-only PostgreSQL repository are local/tested, with RLS tenant scope enforced by `app.tenant_key` and no production credential/application yet;
 - Search Console/SERP adapters disabled until real evidence/credentials exist;
 - programmatic SEO prohibited from auto-publishing or auto-indexing;
 - legacy AEO direct-publish code is compatibility-only and will be governed behind the new layer rather than expanded.

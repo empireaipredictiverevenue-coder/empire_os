@@ -194,7 +194,7 @@ Foundation routes:
 
 Preview/analyse endpoints are pure recommendation functions.
 
-Repository-backed GET routes use the `SearchRepository` read-only contract and a stable `search-v1` response envelope. The default runtime still returns `503 canonical_search_repository_not_activated` instead of fabricated empty data until a real canonical repository/credentials are deliberately activated. Tests can inject a repository without changing production authority, which stabilises the future Search Command Centre contract before database activation.
+Repository-backed GET routes use the `SearchRepository` read-only contract and a stable `search-v1` response envelope. `PostgresSearchRepository` implements that contract with fixed SELECT queries, `SET TRANSACTION READ ONLY`, hard-coded `SET LOCAL ROLE empire_search_reader`, and a required tenant key that is enforced in both SQL and RLS. The default runtime still returns `503 canonical_search_repository_not_activated` instead of fabricated empty data until a real canonical repository/credentials are deliberately activated. Tests can inject a repository without changing production authority, which stabilises the future Search Command Centre contract before database activation.
 
 ## Programmatic SEO Policy
 
@@ -233,7 +233,7 @@ The frontend is a product surface, not the source of truth. Search rules, attrib
 
 ## Next Safe Build Slices
 
-1. Canonical repository/transport: API-facing read-only repository contract and stable collection envelope ✅ local/tested; concrete least-privilege PostgreSQL transport/roles remain next and production activation stays gated.
+1. Canonical repository/transport ✅ local/tested: stable `search-v1` API repository contract plus tenant-scoped PostgreSQL reader. The staged `empire_search_reader` role is SELECT-only, RLS-enforced by transaction-local `app.tenant_key`, and reached through a transaction-read-only Python transport. The passwordless login shell, production DSN/tenant binding and migration application remain gated.
 2. Search Console adapter interface and OAuth/credential gate.
 3. Real SERP snapshot adapter through validated Search Fabric sources.
 4. Internal-link graph, cannibalisation and content-decay engines.
