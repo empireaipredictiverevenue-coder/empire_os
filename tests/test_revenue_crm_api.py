@@ -89,3 +89,28 @@ def test_unknown_prospect_returns_404():
     )
     assert response.status_code == 404
     assert response.json()["detail"] == "prospect_not_found"
+
+
+def test_health_is_observe_only():
+    app = FastAPI()
+    app.include_router(create_revenue_crm_router())
+    response = TestClient(app).get("/v1/revenue-crm/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "OBSERVE"
+    assert body["read_only"] is True
+    assert body["execution_authority"] == "none"
+    assert body["follow_up_execution"] is False
+    assert body["payment_execution"] is False
+    assert body["repository_available"] is False
+
+
+def test_missing_repository_fails_closed():
+    app = FastAPI()
+    app.include_router(create_revenue_crm_router())
+    response = TestClient(app).get("/v1/revenue-crm/prospects")
+    assert response.status_code == 503
+    assert (
+        response.json()["detail"]
+        == "revenue_crm_repository_not_activated"
+    )

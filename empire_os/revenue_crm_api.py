@@ -81,13 +81,33 @@ def derive_next_action(
 
 
 def create_revenue_crm_router(
-    repository: RevenueCrmRepository,
+    repository: RevenueCrmRepository | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/v1/revenue-crm")
 
+    @router.get("/health")
+    def health():
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "follow_up_execution": False,
+            "payment_execution": False,
+            "repository_available": repository is not None,
+        }
+
+    def require_repository() -> RevenueCrmRepository:
+        if repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="revenue_crm_repository_not_activated",
+            )
+        return repository
+
     @router.get("/prospects")
     def prospects(limit: int = Query(default=100, ge=1, le=500)):
-        rows = [dict(row) for row in repository.prospects(limit=limit)]
+        repo = require_repository()
+        rows = [dict(row) for row in repo.prospects(limit=limit)]
         return {
             "source": "canonical_revenue_crm_repository",
             "count": len(rows),
@@ -98,7 +118,8 @@ def create_revenue_crm_router(
 
     @router.get("/buyers")
     def buyers(limit: int = Query(default=100, ge=1, le=500)):
-        rows = [dict(row) for row in repository.buyers(limit=limit)]
+        repo = require_repository()
+        rows = [dict(row) for row in repo.buyers(limit=limit)]
         return {
             "source": "canonical_revenue_crm_repository",
             "count": len(rows),
@@ -109,7 +130,8 @@ def create_revenue_crm_router(
 
     @router.get("/prospects/{prospect_id}/next-action")
     def next_action(prospect_id: str):
-        row = repository.prospect(prospect_id)
+        repo = require_repository()
+        row = repo.prospect(prospect_id)
         if row is None:
             raise HTTPException(status_code=404, detail="prospect_not_found")
         return derive_next_action(row).as_dict()
