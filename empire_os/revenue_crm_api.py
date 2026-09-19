@@ -5,8 +5,13 @@ from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Protocol, Sequence
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from empire_os.revenue_crm_readiness import assess_close_readiness
+from empire_os.revenue_crm_retention import (
+    RevenueCrmRetentionEvidence,
+    assess_retention_expansion_readiness,
+)
 
 
 class RevenueCrmRepository(Protocol):
@@ -18,6 +23,21 @@ class RevenueCrmRepository(Protocol):
 
     def prospect(self, prospect_id: str) -> Mapping[str, Any] | None:
         ...
+
+
+class RevenueCrmRetentionRequest(BaseModel):
+    buyer_id: str
+    buyer_activated: bool
+    buyer_evidence_ref: str | None = None
+    payment_verified: bool
+    payment_evidence_ref: str | None = None
+    fulfilment_delivered: bool
+    fulfilment_evidence_ref: str | None = None
+    outcome_observed: bool
+    outcome_success_verified: bool | None = None
+    outcome_evidence_ref: str | None = None
+    buyer_available_capacity: int | None = Field(default=None, ge=0)
+    capacity_evidence_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -198,6 +218,37 @@ def create_revenue_crm_router(
                 detail="revenue_crm_repository_not_activated",
             )
         return repository
+
+    @router.post("/retention-expansion/preview")
+    def retention_expansion_preview(req: RevenueCrmRetentionRequest):
+        try:
+            evidence = RevenueCrmRetentionEvidence(
+                buyer_id=req.buyer_id,
+                buyer_activated=req.buyer_activated,
+                buyer_evidence_ref=req.buyer_evidence_ref,
+                payment_verified=req.payment_verified,
+                payment_evidence_ref=req.payment_evidence_ref,
+                fulfilment_delivered=req.fulfilment_delivered,
+                fulfilment_evidence_ref=req.fulfilment_evidence_ref,
+                outcome_observed=req.outcome_observed,
+                outcome_success_verified=req.outcome_success_verified,
+                outcome_evidence_ref=req.outcome_evidence_ref,
+                buyer_available_capacity=req.buyer_available_capacity,
+                capacity_evidence_ref=req.capacity_evidence_ref,
+            )
+            readiness = assess_retention_expansion_readiness(evidence)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "follow_up_execution": False,
+            "payment_execution": False,
+            "crm_mutation": False,
+            "offer_mutation": False,
+            "readiness": readiness.as_dict(),
+        }
 
     @router.get("/prospects")
     def prospects(limit: int = Query(default=100, ge=1, le=500)):
