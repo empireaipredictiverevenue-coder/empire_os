@@ -78,6 +78,7 @@ from empire_os.saas_api import create_saas_router
 from empire_os.capital_api import create_capital_router
 from empire_os.digital_twin_api import create_digital_twin_router
 from empire_os.revenue_exchange_api import create_revenue_exchange_router
+from empire_os.demand_api import create_demand_router
 from empire_os.ceo import build_brief
 from empire_os.daily_revenue import DailyRevenueSnapshotter, DailyRevenueBriefWorker
 from empire_os.remote_scanner import ScoutAgentClient
@@ -469,6 +470,7 @@ app.include_router(create_saas_router())
 app.include_router(create_capital_router())
 app.include_router(create_digital_twin_router())
 app.include_router(create_revenue_exchange_router())
+app.include_router(create_demand_router())
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
