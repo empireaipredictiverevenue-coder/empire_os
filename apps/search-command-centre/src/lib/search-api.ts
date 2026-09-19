@@ -88,6 +88,25 @@ export async function getCompetitorData() {
   return { health, opportunities };
 }
 
+export async function getOpportunityData() {
+  const [health, opportunities] = await Promise.all([
+    request<Health>("/v1/search/health"),
+    request<CollectionEnvelope>("/v1/search/opportunities?limit=100"),
+  ]);
+  return { health, opportunities };
+}
+
+export async function getEvidenceTimelineData() {
+  const [health, opportunities, indexation, alerts, revenue] = await Promise.all([
+    request<Health>("/v1/search/health"),
+    request<CollectionEnvelope>("/v1/search/opportunities?limit=50"),
+    request<CollectionEnvelope>("/v1/search/indexation?limit=50"),
+    request<CollectionEnvelope>("/v1/search/alerts?limit=50"),
+    request<CollectionEnvelope>("/v1/search/revenue?limit=50"),
+  ]);
+  return { health, opportunities, indexation, alerts, revenue };
+}
+
 export async function getDashboardData() {
   const [health, summary, searchConsole, pages, opportunities, alerts, revenue] =
     await Promise.all([

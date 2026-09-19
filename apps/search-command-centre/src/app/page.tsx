@@ -241,6 +241,18 @@ export default async function Home() {
                 >
                   Competitor gaps →
                 </Link>
+                <Link
+                  href="/opportunities"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300 hover:text-emerald-200"
+                >
+                  Opportunity drill-down →
+                </Link>
+                <Link
+                  href="/evidence"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300 hover:text-emerald-200"
+                >
+                  Evidence timeline →
+                </Link>
               </div>
             </div>
 
