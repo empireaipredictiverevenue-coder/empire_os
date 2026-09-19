@@ -6,7 +6,10 @@ from pydantic import BaseModel, Field
 
 from empire_os.digital_twin import MarketBaseline, MarketScenario
 from empire_os.digital_twin_analysis import compare_market_scenario
-from empire_os.digital_twin_registry import DigitalTwinRegistryRecord
+from empire_os.digital_twin_registry import (
+    DigitalTwinRealizationRecord,
+    DigitalTwinRegistryRecord,
+)
 from empire_os.digital_twin_realization import (
     ObservedMarketOutcome,
     review_scenario_realization,
@@ -51,6 +54,12 @@ class ScenarioRealizationRequest(BaseModel):
     revenue_recognized: bool = False
     observed_at: str
     evidence_refs: list[str] = Field(min_length=1)
+
+
+class ScenarioRealizationRegistryRequest(ScenarioRealizationRequest):
+    realization_key: str
+    scenario_key: str
+    evidence: dict = Field(default_factory=dict)
 
 
 def create_digital_twin_router(registry=None) -> APIRouter:
@@ -124,9 +133,80 @@ def create_digital_twin_router(registry=None) -> APIRouter:
             "review": review.as_dict(),
         }
 
+    @router.post("/realizations/register")
+    def register_realization(req: ScenarioRealizationRegistryRequest):
+        if registry is None or not hasattr(registry, "record_realization"):
+            raise HTTPException(
+                status_code=503,
+                detail="digital_twin_realization_registry_not_activated",
+            )
+        baseline = MarketBaseline(**req.baseline.model_dump())
+        scenario = MarketScenario(**req.scenario.model_dump())
+        try:
+            comparison = compare_market_scenario(
+                baseline=baseline,
+                scenario=scenario,
+            )
+            observed = ObservedMarketOutcome(
+                observed_served_units=req.observed_served_units,
+                observed_revenue_cents=req.observed_revenue_cents,
+                revenue_recognized=req.revenue_recognized,
+                observed_at=req.observed_at,
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            review = review_scenario_realization(
+                scenario=comparison.scenario,
+                observed=observed,
+            )
+            item = DigitalTwinRealizationRecord(
+                realization_key=req.realization_key,
+                scenario_key=req.scenario_key,
+                scenario_id=req.scenario.scenario_id,
+                observed=observed,
+                review=review,
+                evidence=dict(req.evidence),
+            )
+            item.validate()
+            row = registry.record_realization(item)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "simulation_only": True,
+            "creates_actual_revenue": False,
+            "execution_authority": "none",
+            "capital_execution": False,
+            "campaign_execution": False,
+            "pricing_execution": False,
+            "status": str(row.get("status") or "recorded"),
+            "realization_record": item.as_dict(),
+            "result": dict(row),
+        }
+
+    @router.get("/realizations")
+    def list_realizations(limit: int = 100):
+        if registry is None or not hasattr(registry, "list_realizations"):
+            raise HTTPException(
+                status_code=503,
+                detail="digital_twin_realization_registry_not_activated",
+            )
+        rows = list(registry.list_realizations(limit=max(1, min(limit, 500))))
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "simulation_only": True,
+            "creates_actual_revenue": False,
+            "execution_authority": "none",
+            "capital_execution": False,
+            "campaign_execution": False,
+            "pricing_execution": False,
+            "count": len(rows),
+            "items": [dict(row) for row in rows],
+        }
+
     @router.post("/scenarios/register")
     def register_scenario(req: ScenarioRegistryRequest):
-        if registry is None:
+        if registry is None or not hasattr(registry, "record"):
             raise HTTPException(
                 status_code=503,
                 detail="digital_twin_registry_not_activated",

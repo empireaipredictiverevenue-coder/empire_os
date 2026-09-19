@@ -6,6 +6,10 @@ from typing import Any, Mapping
 
 from empire_os.digital_twin import MarketBaseline, MarketScenario
 from empire_os.digital_twin_analysis import ScenarioComparison
+from empire_os.digital_twin_realization import (
+    ObservedMarketOutcome,
+    ScenarioRealizationReview,
+)
 
 
 @dataclass(frozen=True)
@@ -58,6 +62,63 @@ class DigitalTwinRegistryRecord:
             "mode": "SIMULATION",
             "simulation_only": True,
             "actual_revenue": False,
+            "execution_authority": "none",
+            "capital_execution": False,
+            "campaign_execution": False,
+            "pricing_execution": False,
+        }
+
+
+@dataclass(frozen=True)
+class DigitalTwinRealizationRecord:
+    realization_key: str
+    scenario_key: str
+    scenario_id: str
+    observed: ObservedMarketOutcome
+    review: ScenarioRealizationReview
+    evidence: Mapping[str, Any]
+
+    def validate(self) -> None:
+        if not str(self.realization_key or "").strip():
+            raise ValueError("realization_key required")
+        if not str(self.scenario_key or "").strip():
+            raise ValueError("scenario_key required")
+        if not str(self.scenario_id or "").strip():
+            raise ValueError("scenario_id required")
+        self.observed.validate()
+        if self.review.scenario_id != self.scenario_id:
+            raise ValueError("realization scenario identity mismatch")
+        if self.review.simulation_only is not True:
+            raise ValueError("realization review must remain simulation_only")
+        if self.review.creates_actual_revenue is not False:
+            raise ValueError("realization review cannot create actual revenue")
+        if self.review.execution_authority != "none":
+            raise ValueError("realization review cannot grant execution")
+        if not isinstance(self.evidence, Mapping) or not self.evidence:
+            raise ValueError("digital twin realization registry requires evidence")
+
+    def as_dict(self) -> dict[str, Any]:
+        self.validate()
+        return {
+            "realization_key": self.realization_key,
+            "scenario_key": self.scenario_key,
+            "scenario_id": self.scenario_id,
+            "observed": {
+                "observed_served_units": self.observed.observed_served_units,
+                "observed_revenue_cents": (
+                    self.observed.observed_revenue_cents
+                    if self.observed.revenue_recognized
+                    else None
+                ),
+                "revenue_recognized": self.observed.revenue_recognized,
+                "observed_at": self.observed.observed_at,
+                "evidence_refs": list(self.observed.evidence_refs),
+            },
+            "review": self.review.as_dict(),
+            "evidence": dict(self.evidence),
+            "mode": "OBSERVE",
+            "simulation_only": True,
+            "creates_actual_revenue": False,
             "execution_authority": "none",
             "capital_execution": False,
             "campaign_execution": False,

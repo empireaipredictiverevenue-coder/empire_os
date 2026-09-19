@@ -284,6 +284,8 @@ Third slice ✅ local/tested: append-only scenario/result registry persists immu
 
 Fourth slice ✅ local/tested: realization review compares simulated served units and projected revenue with later observed outcomes. Revenue error is calculated only when recognized-revenue evidence is explicit; missing recognition stays unknown, and the review itself never creates actual revenue or execution authority.
 
+Fifth slice ✅ local/tested: append-only realization registry/history persists observed-vs-simulated review evidence behind dedicated NOLOGIN writer/reader roles. The database recomputes served-unit/revenue error from the registered scenario result, stores unrecognized revenue as NULL, and hard-locks actual-revenue creation plus capital/campaign/pricing execution to false. The migration is staged only and is not applied to production.
+
 ### Phase 15 — Capital Allocator
 Astra evaluates expected return, risk, cost, cash, confidence and time-to-revenue to decide where the next unit of capital should go.
 
