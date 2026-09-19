@@ -151,9 +151,10 @@ Phase 4 observer/calibration implementation status — ✅ local/tested, product
 3. Outcome Calibration Engine ✅ — real Phase 3F conversion/revenue/cost/gross-profit/satisfaction/repeat-purchase calibration with explicit readiness thresholds.
 4. Astra Observer Worker ✅ — bounded feedback read, OBSERVE-only runtime, atomic local snapshot, no fabricated operational counts.
 5. Astra Decision Integration ✅ — verified negative-margin outcomes can elevate a review recommendation without changing prices, budgets, model weights or commercial state.
-6. Phase 4 Test Suite ✅ — Python, isolated PostgreSQL role/permission, fail-closed CLI and systemd verification are green.
-7. Runtime Packaging ✅ staged — env template plus `empire-astra-observer.service` / timer exist but are not installed or enabled.
-8. Documentation ✅ — `docs/PHASE4_ASTRA_OBSERVER.md`.
+6. Astra Operating Board V1 ✅ — deterministic ranked executive work queue across observed workstreams, preserving approval boundaries and intelligence routing while `decide()` remains backward-compatible through the board's primary item. OBSERVE-only; no execution authority.
+7. Phase 4 Test Suite ✅ — Python, isolated PostgreSQL role/permission, fail-closed CLI and systemd verification are green.
+8. Runtime Packaging ✅ staged — env template plus `empire-astra-observer.service` / timer exist but are not installed or enabled.
+9. Documentation ✅ — `docs/PHASE4_ASTRA_OBSERVER.md`.
 
 Phase 4 authority remains OBSERVE. The canonical Supabase migration, observer credential provisioning and service activation remain production gates. A genuine buyer → verified payment → outcome → feedback loop is still required before Astra receives consequential commercial authority, but it no longer blocks Phase 4 engineering.
 

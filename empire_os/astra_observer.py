@@ -11,7 +11,7 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from empire_os.astra import AstraSnapshot, decide_with_outcomes
+from empire_os.astra import AstraSnapshot, build_operating_board
 from empire_os.astra_feedback import build_outcome_calibration
 from empire_os.outcome_role_transport import PostgresOutcomeRpc
 
@@ -108,16 +108,26 @@ def run_observer_cycle(
             "available": False,
             "reason": "operational_snapshot_missing",
         }
+        operating_board: dict[str, Any] = {
+            "available": False,
+            "reason": "operational_snapshot_missing",
+        }
     else:
+        board = build_operating_board(
+            snapshot,
+            negative_margin_orders=calibration.negative_margin_orders,
+            calibration_ready=calibration.calibration_ready,
+            gross_margin_rate=calibration.gross_margin_rate,
+        )
         decision = {
             "available": True,
             "source": "explicit_operational_snapshot",
-            "result": decide_with_outcomes(
-                snapshot,
-                negative_margin_orders=calibration.negative_margin_orders,
-                calibration_ready=calibration.calibration_ready,
-                gross_margin_rate=calibration.gross_margin_rate,
-            ).as_dict(),
+            "result": board.primary.as_dict(),
+        }
+        operating_board = {
+            "available": True,
+            "source": "explicit_operational_snapshot",
+            "result": board.as_dict(),
         }
 
     payload: dict[str, Any] = {
@@ -127,6 +137,7 @@ def run_observer_cycle(
         "feedback_rows": len(rows),
         "calibration": calibration.as_dict(),
         "decision": decision,
+        "operating_board": operating_board,
         "side_effects": "none",
     }
     atomic_write_json(Path(output_path), payload)

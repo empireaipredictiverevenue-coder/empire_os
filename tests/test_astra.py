@@ -1,4 +1,10 @@
-from empire_os.astra import AstraSnapshot, decide, decide_with_outcomes, route_intelligence
+from empire_os.astra import (
+    AstraSnapshot,
+    build_operating_board,
+    decide,
+    decide_with_outcomes,
+    route_intelligence,
+)
 
 
 def test_astra_prioritises_live_buyer_replies():
@@ -115,3 +121,73 @@ def test_verified_negative_margin_outcome_prioritises_review_not_execution():
     assert decision.side_effect_approval_required is False
     assert decision.intelligence_route == "rules"
     assert "retuning" in " ".join(decision.rationale)
+
+
+
+def test_operating_board_ranks_multiple_observed_workstreams():
+    board = build_operating_board(AstraSnapshot(
+        replies_waiting=2,
+        failed_jobs=1,
+        active_buyer_capacity=0,
+        buyer_candidates_due=4,
+        outbound_domain_verified=True,
+        owned_inventory_count=10,
+        qualified_unallocated_count=3,
+        source_health_ok=False,
+    ))
+    assert [item.priority for item in board.items] == sorted(
+        [item.priority for item in board.items],
+        reverse=True,
+    )
+    assert board.primary.recommended_job_type == "recover_failed_jobs"
+    assert [item.recommended_job_type for item in board.items] == [
+        "recover_failed_jobs",
+        "triage_buyer_replies",
+        "prepare_buyer_outreach",
+        "qualify_owned_inventory",
+        "repair_real_data_sources",
+    ]
+    assert board.as_dict()["side_effects"] == "none"
+
+
+def test_operating_board_preserves_approval_boundaries():
+    board = build_operating_board(AstraSnapshot(
+        active_buyer_capacity=3,
+        owned_inventory_count=8,
+        qualified_unallocated_count=2,
+        outbound_domain_verified=True,
+    ))
+    by_job = {
+        item.recommended_job_type: item
+        for item in board.items
+    }
+    assert by_job["plan_controlled_allocation"].side_effect_approval_required is True
+    assert by_job["qualify_owned_inventory"].side_effect_approval_required is False
+
+
+def test_operating_board_negative_margin_review_outranks_scaling():
+    board = build_operating_board(
+        AstraSnapshot(
+            active_buyer_capacity=3,
+            owned_inventory_count=8,
+            qualified_unallocated_count=2,
+            outbound_domain_verified=True,
+        ),
+        negative_margin_orders=1,
+        calibration_ready=False,
+        gross_margin_rate=-0.2,
+    )
+    assert board.primary.recommended_job_type == "review_negative_margin"
+    assert board.primary.priority == 99
+    assert board.items[1].recommended_job_type == "plan_controlled_allocation"
+
+
+def test_operating_board_unexpected_execution_mode_is_governance_only():
+    board = build_operating_board(AstraSnapshot(
+        execution_mode="live",
+        failed_jobs=5,
+        replies_waiting=5,
+    ))
+    assert len(board.items) == 1
+    assert board.primary.workstream == "governance"
+    assert board.primary.side_effect_approval_required is True

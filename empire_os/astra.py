@@ -48,6 +48,23 @@ class AstraDecision:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class AstraOperatingBoard:
+    version: str
+    mode: str
+    primary: AstraDecision
+    items: tuple[AstraDecision, ...]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "version": self.version,
+            "mode": self.mode,
+            "primary": self.primary.as_dict(),
+            "items": [item.as_dict() for item in self.items],
+            "side_effects": "none",
+        }
+
+
 def route_intelligence(
     snapshot: AstraSnapshot,
     *,
@@ -73,106 +90,23 @@ def route_intelligence(
     return "premium"
 
 
-def decide(snapshot: AstraSnapshot) -> AstraDecision:
-    mode = (snapshot.execution_mode or "observe").strip().lower()
-
-    if mode not in {"observe", "dry_run"}:
-        return AstraDecision(
-            ASTRA_VERSION, "governance", "review_execution_mode", "human", 100,
-            True, "rules",
-            ("bootstrap Astra expects observe or dry-run execution",),
-            ("unexpected_execution_mode",),
-        )
-
-    if snapshot.failed_jobs > 0:
-        return AstraDecision(
-            ASTRA_VERSION, "operations", "recover_failed_jobs", "execution_bus",
-            98, False, "rules",
-            ("failed governed work must be understood before new work",), (),
-        )
-
-    if snapshot.replies_waiting > 0:
-        return AstraDecision(
-            ASTRA_VERSION, "buyer_relationships", "triage_buyer_replies",
-            "nurture_agent", 97, False,
-            route_intelligence(snapshot, task_kind="classification"),
-            ("live buyer replies are the closest signal to revenue",), (),
-        )
-
-    if snapshot.active_buyer_capacity <= 0:
-        if not snapshot.outbound_domain_verified:
-            return AstraDecision(
-                ASTRA_VERSION, "buyer_acquisition", "repair_outbound_channel",
-                "sales_ops", 96, False, "rules",
-                (
-                    "buyer capacity is the current commercial bottleneck",
-                    "outbound must be authenticated before buyer outreach",
-                ),
-                ("outbound_domain_unverified",),
-            )
-        if snapshot.buyer_candidates_due > 0:
-            return AstraDecision(
-                ASTRA_VERSION, "buyer_acquisition", "prepare_buyer_outreach",
-                "nurture_agent", 95, True,
-                route_intelligence(snapshot, task_kind="copy"),
-                (
-                    "no commercially activated buyer capacity exists",
-                    "qualified buyer candidates are ready for outreach",
-                ),
-                (),
-            )
-        return AstraDecision(
-            ASTRA_VERSION, "buyer_acquisition", "source_buyer_candidates",
-            "buyer_agent", 94, False, "rules",
-            ("no commercially activated buyer capacity exists",), (),
-        )
-
-    if snapshot.qualified_unallocated_count > 0:
-        return AstraDecision(
-            ASTRA_VERSION, "buyer_allocation", "plan_controlled_allocation",
-            "buyer_agent", 93, True, "rules",
-            ("qualified owned inventory and verified buyer capacity exist",), (),
-        )
-
-    if snapshot.owned_inventory_count > 0:
-        return AstraDecision(
-            ASTRA_VERSION, "qualification", "qualify_owned_inventory",
-            "qualification_agent", 90, False, "rules",
-            ("owned inventory exists but none is ready for allocation",), (),
-        )
-
-    if not snapshot.source_health_ok:
-        return AstraDecision(
-            ASTRA_VERSION, "source_health", "repair_real_data_sources",
-            "acquisition_agent", 89, False, "rules",
-            (
-                "canonical acquisition must fail closed when sources are unhealthy",
-            ),
-            ("real_source_unavailable",),
-        )
-
-    return AstraDecision(
-        ASTRA_VERSION, "acquisition", "acquire_real_prospects",
-        "acquisition_agent", 88, False, "rules",
-        ("buyer capacity exists but there is no owned inventory to match",), (),
-    )
-
-
-def decide_with_outcomes(
+def _decision_candidates(
     snapshot: AstraSnapshot,
     *,
     negative_margin_orders: int = 0,
     calibration_ready: bool = False,
     gross_margin_rate: float | None = None,
-) -> AstraDecision:
-    """Overlay verified outcome signals without changing economic parameters.
+) -> list[AstraDecision]:
+    mode = (snapshot.execution_mode or "observe").strip().lower()
+    if mode not in {"observe", "dry_run"}:
+        return [AstraDecision(
+            ASTRA_VERSION, "governance", "review_execution_mode", "human", 100,
+            True, "rules",
+            ("bootstrap Astra expects observe or dry-run execution",),
+            ("unexpected_execution_mode",),
+        )]
 
-    Outcome evidence can change what Astra recommends reviewing, but this
-    function never changes prices, budgets, model weights, or commercial state.
-    """
-    baseline = decide(snapshot)
-    if baseline.workstream == "governance":
-        return baseline
+    decisions: list[AstraDecision] = []
 
     if int(negative_margin_orders or 0) > 0:
         rationale = [
@@ -187,7 +121,7 @@ def decide_with_outcomes(
             rationale.append(
                 "sample is below calibration threshold; review evidence without retuning models"
             )
-        return AstraDecision(
+        decisions.append(AstraDecision(
             ASTRA_VERSION,
             "unit_economics",
             "review_negative_margin",
@@ -197,6 +131,148 @@ def decide_with_outcomes(
             "rules",
             tuple(rationale),
             (),
-        )
+        ))
 
-    return baseline
+    if snapshot.failed_jobs > 0:
+        decisions.append(AstraDecision(
+            ASTRA_VERSION, "operations", "recover_failed_jobs", "execution_bus",
+            98, False, "rules",
+            ("failed governed work must be understood before new work",), (),
+        ))
+
+    if snapshot.replies_waiting > 0:
+        decisions.append(AstraDecision(
+            ASTRA_VERSION, "buyer_relationships", "triage_buyer_replies",
+            "nurture_agent", 97, False,
+            route_intelligence(snapshot, task_kind="classification"),
+            ("live buyer replies are the closest signal to revenue",), (),
+        ))
+
+    if snapshot.active_buyer_capacity <= 0:
+        if not snapshot.outbound_domain_verified:
+            decisions.append(AstraDecision(
+                ASTRA_VERSION, "buyer_acquisition", "repair_outbound_channel",
+                "sales_ops", 96, False, "rules",
+                (
+                    "buyer capacity is the current commercial bottleneck",
+                    "outbound must be authenticated before buyer outreach",
+                ),
+                ("outbound_domain_unverified",),
+            ))
+        elif snapshot.buyer_candidates_due > 0:
+            decisions.append(AstraDecision(
+                ASTRA_VERSION, "buyer_acquisition", "prepare_buyer_outreach",
+                "nurture_agent", 95, True,
+                route_intelligence(snapshot, task_kind="copy"),
+                (
+                    "no commercially activated buyer capacity exists",
+                    "qualified buyer candidates are ready for outreach",
+                ),
+                (),
+            ))
+        else:
+            decisions.append(AstraDecision(
+                ASTRA_VERSION, "buyer_acquisition", "source_buyer_candidates",
+                "buyer_agent", 94, False, "rules",
+                ("no commercially activated buyer capacity exists",), (),
+            ))
+    elif snapshot.qualified_unallocated_count > 0:
+        decisions.append(AstraDecision(
+            ASTRA_VERSION, "buyer_allocation", "plan_controlled_allocation",
+            "buyer_agent", 93, True, "rules",
+            ("qualified owned inventory and verified buyer capacity exist",), (),
+        ))
+
+    unqualified_inventory = max(
+        int(snapshot.owned_inventory_count or 0)
+        - int(snapshot.qualified_unallocated_count or 0),
+        0,
+    )
+    if unqualified_inventory > 0:
+        decisions.append(AstraDecision(
+            ASTRA_VERSION, "qualification", "qualify_owned_inventory",
+            "qualification_agent", 90, False, "rules",
+            ("owned inventory exists that is not yet allocation-ready",), (),
+        ))
+
+    if not snapshot.source_health_ok:
+        decisions.append(AstraDecision(
+            ASTRA_VERSION, "source_health", "repair_real_data_sources",
+            "acquisition_agent", 89, False, "rules",
+            (
+                "canonical acquisition must fail closed when sources are unhealthy",
+            ),
+            ("real_source_unavailable",),
+        ))
+
+    if (
+        snapshot.active_buyer_capacity > 0
+        and snapshot.owned_inventory_count <= 0
+    ):
+        decisions.append(AstraDecision(
+            ASTRA_VERSION, "acquisition", "acquire_real_prospects",
+            "acquisition_agent", 88, False, "rules",
+            ("buyer capacity exists but there is no owned inventory to match",), (),
+        ))
+
+    if not decisions:
+        decisions.append(AstraDecision(
+            ASTRA_VERSION, "acquisition", "acquire_real_prospects",
+            "acquisition_agent", 88, False, "rules",
+            ("no higher-priority governed workstream is currently observed",), (),
+        ))
+
+    decisions.sort(
+        key=lambda item: (
+            -item.priority,
+            item.workstream,
+            item.recommended_job_type,
+        )
+    )
+    return decisions
+
+
+def build_operating_board(
+    snapshot: AstraSnapshot,
+    *,
+    negative_margin_orders: int = 0,
+    calibration_ready: bool = False,
+    gross_margin_rate: float | None = None,
+    limit: int = 5,
+) -> AstraOperatingBoard:
+    """Build a deterministic OBSERVE-only ranked executive work queue."""
+    decisions = _decision_candidates(
+        snapshot,
+        negative_margin_orders=negative_margin_orders,
+        calibration_ready=calibration_ready,
+        gross_margin_rate=gross_margin_rate,
+    )
+    bounded_limit = max(1, min(int(limit), 20))
+    items = tuple(decisions[:bounded_limit])
+    return AstraOperatingBoard(
+        version=ASTRA_VERSION,
+        mode=(snapshot.execution_mode or "observe").strip().lower(),
+        primary=items[0],
+        items=items,
+    )
+
+
+def decide(snapshot: AstraSnapshot) -> AstraDecision:
+    return build_operating_board(snapshot, limit=1).primary
+
+
+def decide_with_outcomes(
+    snapshot: AstraSnapshot,
+    *,
+    negative_margin_orders: int = 0,
+    calibration_ready: bool = False,
+    gross_margin_rate: float | None = None,
+) -> AstraDecision:
+    """Return the highest-priority evidence-backed Astra recommendation."""
+    return build_operating_board(
+        snapshot,
+        negative_margin_orders=negative_margin_orders,
+        calibration_ready=calibration_ready,
+        gross_margin_rate=gross_margin_rate,
+        limit=1,
+    ).primary

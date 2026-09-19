@@ -13,8 +13,9 @@ The observer:
 2. calls only `get_commercial_outcome_feedback(p_limit)`;
 3. calibrates observed conversion, revenue, cost, gross profit, buyer satisfaction, repeat-purchase and negative-margin signals;
 4. optionally combines that calibration with a fully explicit operational snapshot;
-5. writes a local `runtime/astra/latest.json` observation artifact;
-6. never sends outreach, changes commercial state, recognizes revenue, moves funds, or modifies production data.
+5. builds an OBSERVE-only Astra Operating Board: a deterministic ranked executive work queue across operations, buyer relationships/acquisition, allocation, qualification, source health and unit economics, with explicit approval flags and intelligence routes;
+6. writes a local `runtime/astra/latest.json` observation artifact containing both the backward-compatible primary decision and the ranked operating board;
+7. never sends outreach, changes commercial state, recognizes revenue, moves funds, or modifies production data.
 
 ## Database Authority
 
@@ -60,6 +61,10 @@ Current metrics:
 Missing buyer-history observations remain `None`; they are not converted to fabricated false/zero evidence.
 
 Verified negative-margin outcomes may elevate a `unit_economics / review_negative_margin` recommendation. This is review-only: Astra does not automatically change prices, budgets, model weights, offers, or commercial state. Calibration readiness never auto-retunes the system.
+
+## Astra Operating Board V1
+
+`build_operating_board()` expands the single-decision bootstrap into a ranked OBSERVE-only work queue while preserving `decide()` / `decide_with_outcomes()` compatibility through the board's primary item. Priority remains deterministic: governance and verified negative-margin review outrank failed governed work, buyer replies, buyer acquisition, allocation, qualification, source repair and new acquisition. Items retain their existing `side_effect_approval_required` flags; the board itself has `side_effects=none` and creates no execution authority.
 
 ## Operational Snapshot Gate
 

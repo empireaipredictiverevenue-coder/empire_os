@@ -76,6 +76,10 @@ def test_cycle_reads_feedback_and_writes_local_snapshot_without_decision(tmp_pat
         "available": False,
         "reason": "operational_snapshot_missing",
     }
+    assert result["operating_board"] == {
+        "available": False,
+        "reason": "operational_snapshot_missing",
+    }
     assert result["calibration"]["actual_revenue_cents"] == 10000
     assert result["calibration"]["calibration_ready"] is False
     assert json.loads(output.read_text()) == result
@@ -95,6 +99,10 @@ def test_complete_observed_snapshot_can_produce_plan_only_decision(tmp_path):
     decision = result["decision"]["result"]
     assert decision["recommended_job_type"] == "qualify_owned_inventory"
     assert decision["side_effect_approval_required"] is False
+    board = result["operating_board"]["result"]
+    assert board["primary"] == decision
+    assert board["items"][0] == decision
+    assert board["side_effects"] == "none"
 
 
 def test_partial_operational_snapshot_is_rejected():
