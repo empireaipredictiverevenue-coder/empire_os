@@ -184,6 +184,8 @@ Search Command Centre foundation ✅ local/tested: `apps/search-command-centre/`
 Production database migration, Search Console credentials, sitemap/index submission, content publishing, redirects and robots/canonical mutation remain explicitly gated.
 
 ### Phase 6 — A2A Commerce Network
+
+Second slice ✅ local/tested: signed-claim freshness, one-time nonce replay protection and persisted identity provenance are staged behind dedicated roles; no execution/payment/allocation authority is enabled.
 A2A Agent Card/protocol, authenticated agent discovery, agent buyers/suppliers, AI-to-AI quoting, negotiation and tasks, commercial gates, marketplace and revenue attribution. Public discovery stays low-risk; activation/payment/allocation remain governed.
 
 Foundation slice ✅ local/tested: `/a2a/v1/discovery` now publishes machine-readable separation between public read-only capabilities and future authenticated commercial capabilities. Quote/negotiation/task capabilities are discovery-only with authentication + human approval required; execution, payment and allocation remain unexposed.

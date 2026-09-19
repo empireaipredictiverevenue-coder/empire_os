@@ -15,6 +15,8 @@ ALLOWED_COMMERCE_CAPABILITIES = frozenset({
 class CommercialIntent:
     agent_id: str
     key_id: str
+    identity_nonce: str
+    identity_issued_at: str
     capability: str
     idempotency_key: str
     request: Mapping[str, Any]
@@ -24,6 +26,8 @@ class CommercialIntent:
         for name, value in (
             ("agent_id", self.agent_id),
             ("key_id", self.key_id),
+            ("identity_nonce", self.identity_nonce),
+            ("identity_issued_at", self.identity_issued_at),
             ("idempotency_key", self.idempotency_key),
         ):
             if not str(value or "").strip():

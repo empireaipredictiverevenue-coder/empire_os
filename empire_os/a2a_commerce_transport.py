@@ -15,11 +15,13 @@ RPC_NAME = "record_a2a_commercial_intent"
 ROLE = "empire_a2a_intent_writer"
 SQL = (
     "select public.record_a2a_commercial_intent("
-    "%s,%s,%s,%s,%s::jsonb,%s::jsonb)"
+    "%s,%s,%s,%s::timestamptz,%s,%s,%s::jsonb,%s::jsonb)"
 )
 PARAM_KEYS = (
     "p_agent_id",
     "p_key_id",
+    "p_identity_nonce",
+    "p_identity_issued_at",
     "p_capability",
     "p_idempotency_key",
     "p_request",
@@ -96,6 +98,8 @@ class RpcCommercialIntentRepository:
             {
                 "p_agent_id": intent.agent_id,
                 "p_key_id": intent.key_id,
+                "p_identity_nonce": intent.identity_nonce,
+                "p_identity_issued_at": intent.identity_issued_at,
                 "p_capability": intent.capability,
                 "p_idempotency_key": intent.idempotency_key,
                 "p_request": dict(intent.request),
