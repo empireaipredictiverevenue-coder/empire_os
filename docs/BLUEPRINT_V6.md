@@ -239,6 +239,8 @@ Foundation slice ✅ local/tested: staged `revenue_exchange_observations` and a 
 
 Second slice ✅ local/tested: Revenue Exchange market assessment now classifies observed inventory-vs-capacity balance and verified price ranges for review only. Allocation, pricing and settlement authority remain `none`.
 
+Third slice ✅ local/tested: Revenue Exchange observations now support idempotent append-only ingestion through a dedicated NOLOGIN RPC role and fail-closed API. Observation keys, source provenance and evidence are preserved; allocation, pricing, exclusivity and settlement remain unexposed.
+
 ### Phase 14 — Digital Twin
 Simulate markets, campaigns, pricing, buyers, inventory, sales capacity, ad spend and offers before deploying real capital.
 
