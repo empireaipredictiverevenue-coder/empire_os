@@ -179,7 +179,7 @@ Foundation scope:
 
 Search Fabric remains the retrieval/discovery substrate. Search Intelligence is the quality, governance, AEO/GEO, opportunity and commercial-attribution layer above it.
 
-After the API contract is stable, add a Next.js + TypeScript + Tailwind Search Command Centre for Organic Revenue, opportunities, page quality, indexation, decay, cannibalisation, alerts, Search Console and metadata/schema previews. The UI consumes governed APIs and is not the source of truth.
+Search Command Centre foundation ✅ local/tested: `apps/search-command-centre/` is a Next.js 16 + TypeScript + Tailwind server-rendered dashboard for Organic Revenue, opportunities, page intelligence, alerts and Search Console readiness. It consumes governed `search-v1` APIs via a server-only API binding, renders gated/unknown states instead of fabricated zeros, and is not the source of truth. Additional indexation/decay/cannibalisation drill-down views remain follow-on UI work.
 
 Production database migration, Search Console credentials, sitemap/index submission, content publishing, redirects and robots/canonical mutation remain explicitly gated.
 

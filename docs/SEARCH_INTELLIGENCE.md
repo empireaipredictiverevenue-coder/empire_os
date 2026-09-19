@@ -241,7 +241,7 @@ The frontend is a product surface, not the source of truth. Search rules, attrib
 5. Dynamic sitemap/robots governance based on approved canonical page records.
 6. Evidence-backed competitor gap engine.
 7. Real analytics/session bridge when a canonical first-party analytics model exists.
-8. Search Command Centre frontend.
+8. Search Command Centre frontend ✅ foundation local/tested: `apps/search-command-centre/` is a Next.js 16 + TypeScript + Tailwind server-rendered dashboard consuming the governed `search-v1` API through server-only `EMPIRE_SEARCH_API_BASE_URL`. Gated/unavailable metrics remain explicit rather than fabricated. Production deployment/API binding remains gated.
 9. Controlled approval/execution layer only after OBSERVE behavior and economics are proven.
 
 ## Validation Baseline
