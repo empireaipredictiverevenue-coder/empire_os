@@ -248,6 +248,8 @@ Foundation slice ✅ local/tested: tenant-scoped enterprise control evidence and
 ### Phase 18 — Full Autonomous Revenue OS
 Astra detects → predicts economics → selects market → creates acquisition/content/ads → finds buyers → runs conversations → closes → verifies payment → delivers → measures actual profit → learns → reallocates.
 
+Foundation slice ✅ local/tested: OBSERVE-only `RevenueDecisionPacket` integration composes Astra workstream recommendations, Predictive Cloud direction, capital recommendation references, demand-plan references, enterprise blockers and explicit evidence refs. Missing signals remain unknown; packets are hard-locked to `side_effects=none` and `execution_authority=none`, so no autonomous spend, outreach, payment, allocation or deployment is enabled.
+
 ## Retain and Upgrade
 - Cinematic Landing, Truth Portal, Ghost Ledger privacy concepts, Hall of Fame, Sniper Leaderboard, Live Strike Zone and Partner Network.
 - Self-improving landing pages, Whale Hunter, Storm Chaser, Satellite Scout, high-ticket cinematic demos and pay-per-call.
