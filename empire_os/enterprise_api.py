@@ -4,10 +4,40 @@ from __future__ import annotations
 from typing import Any, Mapping, Protocol, Sequence
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from empire_os.enterprise_controls import ControlEvidence, SloObservation
 from empire_os.enterprise_review import review_enterprise_readiness
+from empire_os.enterprise_registry import EnterpriseReadinessRecord
 
+
+
+
+class EnterpriseControlRequest(BaseModel):
+    control_key: str
+    family: str
+    tenant_key: str | None = None
+    status: str
+    evidence_refs: list[str] = Field(min_length=1)
+    observed_at: str
+    source: str
+
+
+class EnterpriseSloRequest(BaseModel):
+    service_key: str
+    metric: str
+    target: float
+    observed: float | None = None
+    window: str
+    observed_at: str
+    source: str
+
+
+class EnterpriseReadinessRegisterRequest(BaseModel):
+    readiness_key: str
+    controls: list[EnterpriseControlRequest] = Field(min_length=1)
+    slos: list[EnterpriseSloRequest] = Field(min_length=1)
+    evidence: dict = Field(default_factory=dict)
 
 class EnterpriseEvidenceRepository(Protocol):
     def controls(self, *, limit: int) -> Sequence[Mapping[str, Any]]:
@@ -19,6 +49,7 @@ class EnterpriseEvidenceRepository(Protocol):
 
 def create_enterprise_router(
     repository: EnterpriseEvidenceRepository | None = None,
+    registry=None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/enterprise",
@@ -31,6 +62,7 @@ def create_enterprise_router(
             "mode": "OBSERVE",
             "execution_authority": "none",
             "repository_available": repository is not None,
+            "registry_available": registry is not None,
         }
 
     @router.get("/readiness")
@@ -83,6 +115,53 @@ def create_enterprise_router(
             "mode": "OBSERVE",
             "execution_authority": "none",
             "readiness": result.as_dict(),
+        }
+
+
+    @router.post("/readiness/register")
+    def register_readiness(req: EnterpriseReadinessRegisterRequest):
+        if registry is None:
+            raise HTTPException(503, "enterprise_registry_not_activated")
+        controls = tuple(ControlEvidence(**row.model_dump()) for row in req.controls)
+        slos = tuple(SloObservation(**row.model_dump()) for row in req.slos)
+        try:
+            review = review_enterprise_readiness(controls=controls, slos=slos)
+            item = EnterpriseReadinessRecord(
+                readiness_key=req.readiness_key,
+                controls=controls,
+                slos=slos,
+                review=review,
+                evidence=dict(req.evidence),
+            )
+            item.validate()
+            row = registry.record(item)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "control_mutation": False,
+            "infrastructure_mutation": False,
+            "identity_mutation": False,
+            "backup_mutation": False,
+            "slo_target_mutation": False,
+            "compliance_mutation": False,
+            "status": str(row.get("status") or "recorded"),
+            "readiness_record": item.as_dict(),
+            "result": dict(row),
+        }
+
+    @router.get("/readiness/history")
+    def readiness_history(limit: int = Query(default=100, ge=1, le=500)):
+        if registry is None or not hasattr(registry, "list_readiness"):
+            raise HTTPException(503, "enterprise_registry_not_activated")
+        rows = list(registry.list_readiness(limit=limit))
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "count": len(rows),
+            "items": [dict(row) for row in rows],
         }
 
     return router
