@@ -337,6 +337,48 @@ GTM modules:
 - attribution
 - outcome feedback
 
+### Outreach Revenue OS
+
+Outreach is not a bulk-email subsystem. It is an evidence-backed commercial
+decision layer connected to Predictive Revenue.
+
+For every target account Empire should answer:
+- Why this account?
+- Why this person / buying role?
+- Why now?
+- Which product / offer / corridor?
+- Which verified channel?
+- Which proof/evidence should support the message?
+- What is the expected revenue / cost / gross profit?
+- What sequence is appropriate?
+- What response should stop, snooze or escalate the sequence?
+- Which closer/human should receive a positive reply?
+- What outcome should feed the learning loop?
+
+Core upgrades:
+- trigger-based outreach from fresh market, permit, storm, territory, capacity,
+  search, AI-visibility, competitor, hiring, engagement and renewal signals
+- buying-committee reconstruction and multi-thread account strategy
+- economic-buyer vs functional-buyer vs influencer routing
+- verified person-bound channel selection
+- warm-intro / partner / referral path before cold path when available
+- account-based sequences rather than independent email blasts
+- real proof packs and corridor/territory economics
+- content-assisted outreach using reports, calculators, free tools and demos
+- meeting-prep briefs and objection intelligence
+- deterministic reply classification + next-action review
+- deliverability, bounce, complaint, suppression and opt-out health
+- dormant-account reactivation
+- renewal, seat-expansion, territory-expansion and cross-sell plays
+- campaign/account/outcome attribution back to realized gross profit
+- sequence fatigue and stop conditions
+- holdout/causal measurement before claiming incrementality
+
+Current safe slice:
+`outreach_intelligence.v1` builds an OBSERVE-only operator packet from buyer,
+market, corridor, channel, signal, proof and Predictive Revenue evidence.
+It has zero sending, booking, CRM mutation or buyer-activation authority.
+
 ## 8. Content Engine
 
 The Content Engine is not a blog generator.

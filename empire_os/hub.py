@@ -89,6 +89,7 @@ from empire_os.a2a_commerce_api import create_a2a_commerce_router
 from empire_os.astra_api import create_astra_router
 from empire_os.consent_api import create_consent_router
 from empire_os.first_revenue_api import create_first_revenue_router
+from empire_os.outreach_api import create_outreach_router
 from empire_os.ceo import build_brief
 from empire_os.daily_revenue import DailyRevenueSnapshotter, DailyRevenueBriefWorker
 from empire_os.remote_scanner import ScoutAgentClient
@@ -491,6 +492,7 @@ app.include_router(create_a2a_commerce_router())
 app.include_router(create_astra_router())
 app.include_router(create_consent_router())
 app.include_router(create_first_revenue_router())
+app.include_router(create_outreach_router())
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
