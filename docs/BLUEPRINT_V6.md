@@ -211,6 +211,8 @@ Second slice ✅ local/tested: provider-event ingestion now has a dedicated appe
 
 Third slice ✅ local/tested: dedicated SELECT-only Conversation reader plus `/timeline` and deterministic `/summary` surfaces now expose unified observed history. Missing events remain unknown, outbound-only history is explicitly unanswered, and no sentiment/qualification fact is invented; provider sends, calls, streaming and booking remain disabled.
 
+Fourth slice ✅ local/tested: evidence-only qualification review now accepts qualification signals only when they are explicitly attached to an inbound canonical event with transcript and evidence references. Plain transcript text is never interpreted into interest, need, authority, timing, budget or sentiment; missing transcript/signal evidence remains explicit. Send, call, voice-streaming and booking authority stay disabled.
+
 ### Phase 8 — Revenue CRM
 
 Second slice ✅ local/tested: next-action recommendations now require canonical conversation/closer/fulfilment/buyer evidence refs, preserve unknown capacity as unknown, and can cite verified buyer capacity without mutating CRM state or sending follow-up.

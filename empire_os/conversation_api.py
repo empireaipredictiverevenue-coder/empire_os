@@ -8,6 +8,9 @@ from pydantic import BaseModel
 
 from empire_os.conversation_ingest import normalise_provider_event
 from empire_os.conversation_os import ConversationEventRecord
+from empire_os.conversation_qualification import (
+    review_conversation_qualification,
+)
 from empire_os.conversation_timeline import summarise_conversation_timeline
 
 
@@ -140,6 +143,44 @@ def create_conversation_router(
             "read_only": True,
             "execution_authority": "none",
             "summary": result.as_dict(),
+        }
+
+    @router.get("/{conversation_id}/qualification")
+    def qualification(conversation_id: str, limit: int = 200):
+        if read_repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="conversation_reader_not_activated",
+            )
+        bounded = max(1, min(int(limit), 500))
+        conversation = read_repository.conversation(
+            conversation_id=conversation_id
+        )
+        if conversation is None:
+            raise HTTPException(
+                status_code=404,
+                detail="conversation_not_found",
+            )
+        rows = list(read_repository.timeline(
+            conversation_id=conversation_id,
+            limit=bounded,
+        ))
+        try:
+            review = review_conversation_qualification(
+                rows,
+                conversation_id=conversation_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "outbound_calls": False,
+            "voice_streaming": False,
+            "email_sends": False,
+            "booking_execution": False,
+            "qualification": review.as_dict(),
         }
 
     @router.post("/events/preview")
