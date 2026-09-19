@@ -18,6 +18,7 @@ def inputs():
         "business_name": "Acme Ltd",
         "niche": "roofing",
         "metro": "London",
+        "phone": "+44 20 7946 0958",
         "address": "1 Test Street",
         "rating": 0,
         "review_count": 0,
@@ -57,7 +58,7 @@ def test_builds_evidence_preserving_plan():
 
     assert plan.prospect_id == prospect["id"]
     assert plan.entity_id == link["entity_id"]
-    assert len(plan.fact_rows) == 7
+    assert len(plan.fact_rows) == 8
     assert len(plan.score_rows) == 1
     assert plan.skipped_fields == ()
 
@@ -66,6 +67,7 @@ def test_builds_evidence_preserving_plan():
     assert facts["rating"].fact_value["value"] == 0
     assert facts["review_count"].fact_value["value"] == 0
     assert facts["business_name"].confidence == 0.82
+    assert facts["phone"].fact_value["value"] == "+44 20 7946 0958"
     assert len(facts["business_name"].evidence_hash) == 64
 
     score = plan.score_rows[0]

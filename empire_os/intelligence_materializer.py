@@ -178,6 +178,7 @@ def build_materialization_plan(
         "business_name",
         "niche",
         "metro",
+        "phone",
         "address",
         "rating",
         "review_count",

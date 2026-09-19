@@ -86,7 +86,7 @@ class PostgresIntelligenceMaterializer:
         cursor.execute(
             """
             SELECT
-              id,created_at,business_name,niche,metro,address,
+              id,created_at,business_name,niche,metro,phone,address,
               rating,review_count,runs_ads
             FROM public.prospects
             WHERE id=%s
