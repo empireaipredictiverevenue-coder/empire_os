@@ -8,6 +8,24 @@ from pydantic import BaseModel
 
 from empire_os.conversation_ingest import normalise_provider_event
 from empire_os.conversation_os import ConversationEventRecord
+from empire_os.conversation_timeline import summarise_conversation_timeline
+
+
+class ConversationReadRepository(Protocol):
+    def timeline(
+        self,
+        *,
+        conversation_id: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        ...
+
+    def conversation(
+        self,
+        *,
+        conversation_id: str,
+    ) -> dict[str, Any] | None:
+        ...
 
 
 class ConversationEventRepository(Protocol):
@@ -29,6 +47,7 @@ class ConversationEventPreviewRequest(BaseModel):
 
 def create_conversation_router(
     repository: ConversationEventRepository | None = None,
+    read_repository: ConversationReadRepository | None = None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/conversations",
@@ -55,10 +74,72 @@ def create_conversation_router(
             "execution_authority": "none",
             "provider_activation": False,
             "provider_ingest_configured": repository is not None,
+            "reader_configured": read_repository is not None,
             "outbound_calls": False,
             "voice_streaming": False,
             "email_sends": False,
             "booking_execution": False,
+        }
+
+    @router.get("/{conversation_id}/timeline")
+    def timeline(conversation_id: str, limit: int = 200):
+        if read_repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="conversation_reader_not_activated",
+            )
+        bounded = max(1, min(int(limit), 500))
+        conversation = read_repository.conversation(
+            conversation_id=conversation_id
+        )
+        if conversation is None:
+            raise HTTPException(
+                status_code=404,
+                detail="conversation_not_found",
+            )
+        rows = list(read_repository.timeline(
+            conversation_id=conversation_id,
+            limit=bounded,
+        ))
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "conversation": dict(conversation),
+            "count": len(rows),
+            "limit": bounded,
+            "events": [dict(row) for row in rows],
+        }
+
+    @router.get("/{conversation_id}/summary")
+    def summary(conversation_id: str, limit: int = 200):
+        if read_repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="conversation_reader_not_activated",
+            )
+        bounded = max(1, min(int(limit), 500))
+        conversation = read_repository.conversation(
+            conversation_id=conversation_id
+        )
+        if conversation is None:
+            raise HTTPException(
+                status_code=404,
+                detail="conversation_not_found",
+            )
+        rows = list(read_repository.timeline(
+            conversation_id=conversation_id,
+            limit=bounded,
+        ))
+        result = summarise_conversation_timeline(
+            rows,
+            conversation_id=conversation_id,
+        )
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "summary": result.as_dict(),
         }
 
     @router.post("/events/preview")

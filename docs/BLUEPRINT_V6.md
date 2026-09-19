@@ -207,6 +207,8 @@ Foundation slice ✅ local/tested: canonical `empire_conversations` + append-onl
 
 Second slice ✅ local/tested: provider-event ingestion now has a dedicated append-only NOLOGIN RPC role and fail-closed `/v1/conversations/events/ingest` boundary. Existing canonical conversation IDs are required; provider/external IDs are consistency-checked and provider event IDs are idempotent. The default hub binding remains unconfigured, and no provider activation, send, call, voice streaming or booking authority is introduced.
 
+Third slice ✅ local/tested: dedicated SELECT-only Conversation reader plus `/timeline` and deterministic `/summary` surfaces now expose unified observed history. Missing events remain unknown, outbound-only history is explicitly unanswered, and no sentiment/qualification fact is invented; provider sends, calls, streaming and booking remain disabled.
+
 ### Phase 8 — Revenue CRM
 
 Second slice ✅ local/tested: next-action recommendations now require canonical conversation/closer/fulfilment/buyer evidence refs, preserve unknown capacity as unknown, and can cite verified buyer capacity without mutating CRM state or sending follow-up.
