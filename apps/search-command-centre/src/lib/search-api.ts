@@ -80,6 +80,14 @@ export async function getTechnicalData() {
   return { health, indexation, decay, cannibalisation };
 }
 
+export async function getCompetitorData() {
+  const [health, opportunities] = await Promise.all([
+    request<Health>("/v1/search/health"),
+    request<CollectionEnvelope>("/v1/search/opportunities?limit=50"),
+  ]);
+  return { health, opportunities };
+}
+
 export async function getDashboardData() {
   const [health, summary, searchConsole, pages, opportunities, alerts, revenue] =
     await Promise.all([
