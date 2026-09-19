@@ -1,11 +1,14 @@
 """Simulation-only Digital Twin preview API."""
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from empire_os.digital_twin import MarketBaseline, MarketScenario
 from empire_os.digital_twin_analysis import compare_market_scenario
+from empire_os.digital_twin_calibration import assess_digital_twin_calibration
 from empire_os.digital_twin_registry import (
     DigitalTwinRealizationRecord,
     DigitalTwinRegistryRecord,
@@ -54,6 +57,11 @@ class ScenarioRealizationRequest(BaseModel):
     revenue_recognized: bool = False
     observed_at: str
     evidence_refs: list[str] = Field(min_length=1)
+
+
+class ScenarioCalibrationRequest(ScenarioRealizationRequest):
+    now_utc: str
+    max_age_seconds: int = Field(default=86400, gt=0)
 
 
 class ScenarioRealizationRegistryRequest(ScenarioRealizationRequest):
@@ -131,6 +139,56 @@ def create_digital_twin_router(registry=None) -> APIRouter:
             "campaign_execution": False,
             "pricing_execution": False,
             "review": review.as_dict(),
+        }
+
+    @router.post("/realization/calibration/preview")
+    def realization_calibration_preview(req: ScenarioCalibrationRequest):
+        baseline = MarketBaseline(**req.baseline.model_dump())
+        scenario = MarketScenario(**req.scenario.model_dump())
+        try:
+            comparison = compare_market_scenario(
+                baseline=baseline,
+                scenario=scenario,
+            )
+            observed = ObservedMarketOutcome(
+                observed_served_units=req.observed_served_units,
+                observed_revenue_cents=req.observed_revenue_cents,
+                revenue_recognized=req.revenue_recognized,
+                observed_at=req.observed_at,
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            review = review_scenario_realization(
+                scenario=comparison.scenario,
+                observed=observed,
+            )
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            calibration = assess_digital_twin_calibration(
+                realization=review,
+                baseline_observed_at=req.baseline.observed_at,
+                outcome_observed_at=req.observed_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "simulation_only": True,
+            "creates_actual_revenue": False,
+            "execution_authority": "none",
+            "model_weight_mutation": False,
+            "capital_execution": False,
+            "campaign_execution": False,
+            "pricing_execution": False,
+            "calibration": calibration.as_dict(),
         }
 
     @router.post("/realizations/register")

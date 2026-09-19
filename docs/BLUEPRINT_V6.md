@@ -312,6 +312,8 @@ Fourth slice ✅ local/tested: realization review compares simulated served unit
 
 Fifth slice ✅ local/tested: append-only realization registry/history persists observed-vs-simulated review evidence behind dedicated NOLOGIN writer/reader roles. The database recomputes served-unit/revenue error from the registered scenario result, stores unrecognized revenue as NULL, and hard-locks actual-revenue creation plus capital/campaign/pricing execution to false. The migration is staged only and is not applied to production.
 
+Sixth slice ✅ local/tested: Digital Twin calibration readiness now requires a realized outcome to occur after the observed baseline, remain within a bounded freshness window and expose recognized-revenue comparison before simulation error can be used for model-review feedback. Stale/future/pre-baseline outcomes or missing recognized revenue block calibration readiness; simulation cannot mutate model weights or execute capital, campaign or pricing actions.
+
 ### Phase 15 — Capital Allocator
 Astra evaluates expected return, risk, cost, cash, confidence and time-to-revenue to decide where the next unit of capital should go.
 
