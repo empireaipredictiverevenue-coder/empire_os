@@ -183,6 +183,7 @@ Search Fabric remains the retrieval/discovery substrate. Search Intelligence is 
 
 Search Command Centre foundation ✅ local/tested: `apps/search-command-centre/` is a Next.js 16 + TypeScript + Tailwind server-rendered dashboard for Organic Revenue, opportunities, page intelligence, alerts and Search Console readiness. A `/technical` drill-down now covers repository-backed indexation, content-decay and cannibalisation evidence. It consumes governed `search-v1` APIs via a server-only API binding, renders gated/unknown states instead of fabricated zeros, and is not the source of truth.
 AEO/GEO/citation evidence slice ✅ local/tested: staged tenant-scoped `seo_ai_visibility_observations`, read-only repository/API access and evidence-only preview analysis record observed cited URLs/positions/provenance. No observation means visibility is unavailable rather than zero; no publishing, provider mutation or synthetic AI-visibility score exists.
+Authority/backlink graph slice ✅ local/tested: staged tenant-scoped `seo_backlink_observations`, read-only repository/API access and evidence-only graph analysis expose observed links, referring domains, rel state and provenance. Missing observations remain unavailable and no synthetic authority score or link-building execution exists.
 
 Production database migration, Search Console credentials, sitemap/index submission, content publishing, redirects and robots/canonical mutation remain explicitly gated.
 

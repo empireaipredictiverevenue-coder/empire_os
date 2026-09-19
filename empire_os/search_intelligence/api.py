@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .attribution import preview_search_revenue_attribution
 from .ai_visibility import AiCitationObservation, analyse_ai_visibility
+from .backlinks import BacklinkObservation, analyse_backlink_graph
 from .commander import SearchCommanderAgent
 from .competitor_gap import analyse_competitor_gap
 from .health import search_health
@@ -44,6 +45,23 @@ class AiVisibilityPreviewRequest(BaseModel):
     engine: str
     empire_domains: list[str] = Field(min_length=1)
     observations: list[AiCitationObservationRequest] = Field(default_factory=list)
+
+class BacklinkObservationRequest(BaseModel):
+    source_url: str
+    target_url: str
+    observed_at: str
+    anchor_text: str | None = None
+    rel: str | None = None
+    source: str = "observed_backlink"
+    provenance: list[str] = Field(min_length=1)
+
+
+class BacklinkGraphPreviewRequest(BaseModel):
+    empire_domains: list[str] = Field(min_length=1)
+    observations: list[BacklinkObservationRequest] = Field(
+        default_factory=list
+    )
+
 
 class AnalyseRequest(BaseModel):
     page: dict[str, Any]
@@ -224,6 +242,40 @@ def create_search_router(
     @router.get("/ai-visibility")
     def ai_visibility(limit: int = Query(default=200, ge=1, le=500)):
         return _collection("ai_visibility", limit)
+
+    @router.get("/backlinks")
+    def backlinks(limit: int = Query(default=200, ge=1, le=500)):
+        return _collection("backlinks", limit)
+
+    @router.post("/backlinks/preview")
+    def backlinks_preview(req: BacklinkGraphPreviewRequest):
+        try:
+            observations = tuple(
+                BacklinkObservation(
+                    source_url=item.source_url,
+                    target_url=item.target_url,
+                    observed_at=item.observed_at,
+                    anchor_text=item.anchor_text,
+                    rel=item.rel,
+                    source=item.source,
+                    provenance=tuple(item.provenance),
+                )
+                for item in req.observations
+            )
+            analysis = analyse_backlink_graph(
+                observations,
+                empire_domains=tuple(req.empire_domains),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_allowed": False,
+            "link_building_execution": False,
+            "authority_score_invented": False,
+            "analysis": analysis.as_dict(),
+        }
 
     @router.post("/ai-visibility/preview")
     def ai_visibility_preview(req: AiVisibilityPreviewRequest):

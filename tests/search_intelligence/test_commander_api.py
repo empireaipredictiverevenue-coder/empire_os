@@ -58,6 +58,9 @@ class FakeSearchRepository:
     def ai_visibility(self, *, limit):
         return self._rows("ai_visibility", limit)
 
+    def backlinks(self, *, limit):
+        return self._rows("backlinks", limit)
+
 
 def _repository_client(repository):
     app = FastAPI()
@@ -297,3 +300,58 @@ def test_ai_visibility_preview_keeps_missing_evidence_unknown():
     assert analysis["available"] is False
     assert analysis["empire_cited"] is None
     assert analysis["reason"] == "no_observed_ai_citation_evidence"
+
+
+def test_backlinks_repository_endpoint_uses_canonical_contract():
+    repository = FakeSearchRepository()
+    response = _repository_client(repository).get(
+        "/v1/search/backlinks?limit=13"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "canonical_search_repository"
+    assert body["limit"] == 13
+    assert body["items"] == [{"kind": "backlinks", "rank": 1}]
+
+
+def test_backlinks_preview_is_evidence_only():
+    response = _client().post(
+        "/v1/search/backlinks/preview",
+        json={
+            "empire_domains": ["empire-ai.co.uk"],
+            "observations": [{
+                "source_url": "https://partner.example/article",
+                "target_url": "https://empire-ai.co.uk/guides/revenue",
+                "observed_at": "2026-09-20T13:00:00+00:00",
+                "anchor_text": "predictive revenue",
+                "rel": "",
+                "source": "crawler_observation",
+                "provenance": ["crawler:1"],
+            }],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "OBSERVE"
+    assert body["execution_allowed"] is False
+    assert body["link_building_execution"] is False
+    assert body["authority_score_invented"] is False
+    assert body["analysis"]["available"] is True
+    assert body["analysis"]["observed_backlinks"] == 1
+    assert body["analysis"]["authority_score"] is None
+
+
+def test_backlinks_preview_keeps_missing_evidence_unknown():
+    response = _client().post(
+        "/v1/search/backlinks/preview",
+        json={
+            "empire_domains": ["empire-ai.co.uk"],
+            "observations": [],
+        },
+    )
+    assert response.status_code == 200
+    analysis = response.json()["analysis"]
+    assert analysis["available"] is False
+    assert analysis["observed_backlinks"] == 0
+    assert analysis["authority_score"] is None
+    assert analysis["reason"] == "no_observed_backlink_evidence"

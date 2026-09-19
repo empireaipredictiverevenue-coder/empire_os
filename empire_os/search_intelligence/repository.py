@@ -41,6 +41,9 @@ class SearchRepository(Protocol):
     def ai_visibility(self, *, limit: int) -> Sequence[Mapping[str, Any]]:
         ...
 
+    def backlinks(self, *, limit: int) -> Sequence[Mapping[str, Any]]:
+        ...
+
 
 def bounded_limit(value: int, *, maximum: int = 500) -> int:
     return max(1, min(int(value), maximum))

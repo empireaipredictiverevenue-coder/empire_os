@@ -310,6 +310,25 @@ class PostgresSearchRepository:
             (self.tenant_key, bounded_limit(limit)),
         )
 
+    def backlinks(
+        self,
+        *,
+        limit: int,
+    ) -> Sequence[Mapping[str, Any]]:
+        return self._read(
+            """
+            SELECT
+              b.id,b.site_id,b.source_url,b.target_url,b.anchor_text,b.rel,
+              b.source,b.provenance,b.observed_at,b.created_at
+            FROM public.seo_backlink_observations b
+            JOIN public.seo_sites s ON s.id = b.site_id
+            WHERE s.tenant_key = %s
+            ORDER BY b.observed_at DESC, b.id
+            LIMIT %s
+            """,
+            (self.tenant_key, bounded_limit(limit)),
+        )
+
 
 
 def configured_search_repository_from_env(
