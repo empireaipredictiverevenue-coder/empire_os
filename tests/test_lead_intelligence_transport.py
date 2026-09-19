@@ -246,3 +246,78 @@ def test_entity_intelligence_order_is_fixed():
                 "limit": "10",
             },
         )
+
+
+def test_prospect_parity_list_query_is_bounded_and_ordered():
+    cursor = FakeCursor(rows=[])
+    connect = FakeConnect(cursor)
+    reader = PostgresLeadIntelligenceReader(
+        "postgresql://reader@example/db",
+        connect_factory=connect,
+    )
+
+    rows = reader(
+        "/rest/v1/prospects",
+        {
+            "select": "id,business_name,niche,metro,created_at",
+            "order": "created_at.desc",
+            "limit": "250",
+        },
+    )
+
+    assert rows == []
+    select_sql, values = cursor.calls[1]
+    assert (
+        "FROM public.prospects ORDER BY created_at DESC LIMIT %s"
+        in select_sql
+    )
+    assert values == (250,)
+
+
+def test_acquisition_parity_query_is_fixed_and_bounded():
+    cursor = FakeCursor(rows=[])
+    connect = FakeConnect(cursor)
+    reader = PostgresLeadIntelligenceReader(
+        "postgresql://reader@example/db",
+        connect_factory=connect,
+    )
+
+    rows = reader(
+        "/rest/v1/prospect_acquisitions",
+        {
+            "select": (
+                "id,prospect_id,ingest_key,identity_keys,source,"
+                "source_url,evidence,created_at"
+            ),
+            "order": "created_at.desc",
+            "limit": "500",
+        },
+    )
+
+    assert rows == []
+    select_sql, values = cursor.calls[1]
+    assert (
+        "FROM public.prospect_acquisitions "
+        "ORDER BY created_at DESC LIMIT %s"
+    ) in select_sql
+    assert values == (500,)
+
+
+def test_parity_list_query_rejects_wrong_order():
+    reader = PostgresLeadIntelligenceReader(
+        "postgresql://reader@example/db",
+        connect_factory=FakeConnect(FakeCursor()),
+    )
+
+    with pytest.raises(
+        LeadIntelligenceTransportError,
+        match="created_at.desc",
+    ):
+        reader(
+            "/rest/v1/prospects",
+            {
+                "select": "id,created_at",
+                "order": "created_at.asc",
+                "limit": "50",
+            },
+        )
