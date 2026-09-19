@@ -16,6 +16,12 @@ from empire_os.market_domination import (
     compare_adjacent_corridors,
     rank_market_portfolio,
 )
+from empire_os.competitive_intelligence import (
+    build_competitive_landscape,
+    observed_ai_citation_share,
+    observed_search_presence_share,
+    review_competitor_profile,
+)
 
 
 class DataRequest(BaseModel):
@@ -33,6 +39,19 @@ class MarketPortfolioRequest(BaseModel):
 class AdjacentCorridorRequest(BaseModel):
     current: dict[str, Any] = Field(default_factory=dict)
     candidates: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CompetitiveLandscapeRequest(BaseModel):
+    competitor_profiles: list[dict[str, Any]] = Field(default_factory=list)
+    search_observations: list[dict[str, Any]] = Field(default_factory=list)
+    ai_citation_observations: list[dict[str, Any]] = Field(default_factory=list)
+    empire_domains: list[str] = Field(default_factory=list)
+
+
+class PresenceShareRequest(BaseModel):
+    observations: list[dict[str, Any]] = Field(default_factory=list)
+    empire_domains: list[str] = Field(default_factory=list)
+    competitor_domains: list[str] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -97,6 +116,47 @@ def create_strategy_router() -> APIRouter:
             return compare_adjacent_corridors(
                 current=req.current,
                 candidates=req.candidates,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/competitive/profile/review")
+    def competitive_profile(req: DataRequest):
+        try:
+            return review_competitor_profile(req.data)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/competitive/search-presence/preview")
+    def competitive_search_presence(req: PresenceShareRequest):
+        try:
+            return observed_search_presence_share(
+                req.observations,
+                empire_domains=req.empire_domains,
+                competitor_domains=req.competitor_domains,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/competitive/ai-citation-share/preview")
+    def competitive_ai_citations(req: PresenceShareRequest):
+        try:
+            return observed_ai_citation_share(
+                req.observations,
+                empire_domains=req.empire_domains,
+                competitor_domains=req.competitor_domains,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/competitive/landscape/preview")
+    def competitive_landscape(req: CompetitiveLandscapeRequest):
+        try:
+            return build_competitive_landscape(
+                competitor_profiles=req.competitor_profiles,
+                search_observations=req.search_observations,
+                ai_citation_observations=req.ai_citation_observations,
+                empire_domains=req.empire_domains,
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc

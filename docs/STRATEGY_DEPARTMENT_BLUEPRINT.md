@@ -250,6 +250,45 @@ automatically claim monopoly, dominance or control.
 Expansion recommendations remain review-only and require mature current-corridor
 evidence before adjacent markets are ranked.
 
+### Competitive Intelligence System
+
+Competitive Intelligence must separate three classes of information:
+
+**Observed facts**
+- product pages/capabilities
+- pricing/packaging when publicly evidenced
+- partnerships/distribution
+- search results
+- AI citations
+- public market-share evidence
+- customer/review evidence
+- launches/changes
+
+**Hypotheses**
+- target segment
+- strategy
+- positioning intent
+- likely expansion
+- likely economics
+- likely buyer motion
+
+Hypotheses remain labelled hypotheses until verified.
+
+Empire also separates:
+- **search presence share** — Empire vs selected competitors across observed SERP positions
+- **AI citation share** — Empire vs selected competitors across observed answer-engine citations
+- **market share** — external market evidence only
+
+Search presence and AI citation share may indicate discoverability or authority,
+but neither is market share.
+
+The Strategy API may calculate reciprocal-position-weighted search/citation
+presence from evidence-backed observations. It never converts those values into
+market-share claims.
+
+Competitive landscape outputs remain OBSERVE-only and cannot trigger outreach,
+publishing, pricing changes, market entry or spend.
+
 ## 8. Strategy + Marketing
 
 Strategy decides:
