@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Iterable
 
 from .models import ModelRoute
@@ -34,7 +35,18 @@ class ModelRouter:
             "implement", "build", "debug", "endpoint", "test",
             "module", "feature",
         )
-        if len(text) > 1000 or any(word in text for word in hard):
+        complexity_text = text
+        for word in hard:
+            token = re.escape(word)
+            complexity_text = re.sub(
+                rf"\b(?:no|without|avoid|do not|don't)\s+{token}s?\b",
+                " ",
+                complexity_text,
+            )
+
+        if len(complexity_text) > 1000 or any(
+            word in complexity_text for word in hard
+        ):
             return 3
         if len(text) > 250 or any(word in text for word in medium):
             return 2

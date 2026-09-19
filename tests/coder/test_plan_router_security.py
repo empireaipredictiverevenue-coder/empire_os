@@ -93,6 +93,15 @@ def test_local_fast_planner_routes_simple_work_and_escalates_hard_work():
     ).model == "qwen3-coder:30b"
 
 
+def test_router_does_not_escalate_on_negated_safety_guards():
+    objective = (
+        "Review the current Phase 4 plan. "
+        "No payments, no database changes, no security changes, "
+        "and do not migration."
+    )
+    assert ModelRouter.complexity(objective) == 1
+
+
 def test_security_scrubs_secret_and_flags_dangerous_code():
     text = "OPENAI_API_KEY=sk-" + ("x" * 30)
     assert "[REDACTED]" in scrub_text(text)
