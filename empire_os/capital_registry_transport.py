@@ -12,7 +12,8 @@ class CapitalRegistryTransportError(RuntimeError):
 
 
 RPC_NAME = "record_capital_review"
-ROLE = "empire_capital_registry_writer"
+WRITER_ROLE = "empire_capital_registry_writer"
+READER_ROLE = "empire_capital_registry_reader"
 SQL = (
     "select public.record_capital_review("
     "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb)"
@@ -78,7 +79,7 @@ class PostgresCapitalRegistryRpc:
         try:
             with self._connect(self.dsn) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute("SET LOCAL ROLE " + ROLE)
+                    cursor.execute("SET LOCAL ROLE " + WRITER_ROLE)
                     cursor.execute(SQL, tuple(values))
                     row = cursor.fetchone()
         except Exception as exc:
@@ -92,9 +93,86 @@ class PostgresCapitalRegistryRpc:
         return row[0]
 
 
+READ_SQL = """
+SELECT
+  id,
+  review_key,
+  candidate_id,
+  expected_return_cents,
+  required_capital_cents,
+  downside_loss_cents,
+  confidence,
+  time_to_revenue_days,
+  risk_adjusted_score,
+  review_eligible,
+  minimum_confidence,
+  maximum_downside_ratio,
+  blockers,
+  evidence,
+  recommendation_only,
+  execution_authority,
+  funds_movement,
+  budget_mutation,
+  created_at
+FROM public.capital_review_registry
+ORDER BY created_at DESC,id DESC
+LIMIT %s
+"""
+
+
+class PostgresCapitalRegistryReader:
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        connect_factory: Callable | None = None,
+    ) -> None:
+        self.dsn = str(dsn or "").strip()
+        if not self.dsn:
+            raise CapitalRegistryTransportError(
+                "dedicated capital registry read DSN required"
+            )
+        if connect_factory is None:
+            try:
+                import psycopg
+            except ImportError as exc:
+                raise CapitalRegistryTransportError(
+                    "psycopg is required for capital registry read"
+                ) from exc
+            connect_factory = psycopg.connect
+        self._connect = connect_factory
+
+    def __call__(self, *, limit: int) -> list[dict[str, Any]]:
+        bounded = max(1, min(int(limit), 500))
+        try:
+            with self._connect(self.dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL ROLE " + READER_ROLE)
+                    cursor.execute(READ_SQL, (bounded,))
+                    columns = [
+                        description.name
+                        for description in cursor.description
+                    ]
+                    rows = cursor.fetchall()
+        except Exception as exc:
+            raise CapitalRegistryTransportError(
+                "capital registry read failed"
+            ) from exc
+        return [
+            dict(zip(columns, row, strict=True))
+            for row in rows
+        ]
+
+
 class RpcCapitalRegistryRepository:
-    def __init__(self, rpc: Callable[[str, dict[str, Any]], Any]):
+    def __init__(
+        self,
+        rpc: Callable[[str, dict[str, Any]], Any],
+        *,
+        reader: Callable[..., list[dict[str, Any]]] | None = None,
+    ):
         self.rpc = rpc
+        self.reader = reader
 
     def record(self, item: CapitalReviewRecord):
         item.validate()
@@ -124,3 +202,15 @@ class RpcCapitalRegistryRepository:
                 "capital registry RPC returned invalid payload"
             )
         return result
+
+    def list_reviews(self, *, limit: int):
+        if self.reader is None:
+            raise CapitalRegistryTransportError(
+                "capital registry reader not activated"
+            )
+        rows = self.reader(limit=limit)
+        if not isinstance(rows, list):
+            raise CapitalRegistryTransportError(
+                "capital registry reader returned invalid payload"
+            )
+        return rows
