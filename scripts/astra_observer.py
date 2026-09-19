@@ -11,6 +11,7 @@ from empire_os.astra_observer import (
     AstraObserverError,
     run_observer_cycle,
 )
+from empire_os.astra_token_transport import SupabaseTokenAstraRpc
 from empire_os.outcome_role_transport import OutcomeTransportError
 
 
@@ -40,10 +41,24 @@ def parser() -> argparse.ArgumentParser:
     return p
 
 
+def _rpc_config():
+    url = os.getenv("EMPIRE_ASTRA_SUPABASE_URL", "").strip()
+    key = os.getenv("EMPIRE_ASTRA_SUPABASE_PUBLISHABLE_KEY", "").strip()
+    token_file = os.getenv("EMPIRE_ASTRA_OBSERVER_TOKEN_FILE", "").strip()
+    if url or key or token_file:
+        if not (url and key and token_file):
+            raise AstraObserverError("incomplete token-authenticated Astra RPC config")
+        def factory(_dsn, _role):
+            return SupabaseTokenAstraRpc(url, key, token_file)
+        return "token-rpc", factory
+    return os.getenv("EMPIRE_ASTRA_OBSERVER_DSN", ""), None
+
+
 def main(argv=None) -> int:
     args = parser().parse_args(argv)
+    dsn, rpc_factory = _rpc_config()
     payload = run_observer_cycle(
-        dsn=os.getenv("EMPIRE_ASTRA_OBSERVER_DSN", ""),
+        dsn=dsn,
         mode=args.mode,
         feedback_limit=args.limit,
         min_samples=args.min_samples,
@@ -52,6 +67,7 @@ def main(argv=None) -> int:
             "EMPIRE_ASTRA_OPERATIONAL_SNAPSHOT_JSON"
         ),
         output_path=args.output,
+        **({"rpc_factory": rpc_factory} if rpc_factory is not None else {}),
     )
     print(json.dumps(payload, indent=2, sort_keys=True, default=str))
     return 0

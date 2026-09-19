@@ -1,6 +1,6 @@
 # Phase 4 Astra Observer and Outcome Calibration
 
-Status: local implementation; production activation gated
+Status: production OBSERVE active
 Execution authority: OBSERVE only
 
 ## Purpose
@@ -9,8 +9,8 @@ Phase 4 begins by giving Astra a bounded, evidence-backed view of Phase 3F comme
 
 The observer:
 
-1. connects with the dedicated `empire_astra_observer` database role;
-2. calls only `get_commercial_outcome_feedback(p_limit)`;
+1. uses the production HTTPS token-authenticated observer transport; the raw observer token stays on EmpireOS and Supabase stores only its SHA-256 hash;
+2. calls only the token-wrapped read RPCs for `get_commercial_outcome_feedback(p_limit)` and `get_astra_operational_evidence()`;
 3. calibrates observed conversion, revenue, cost, gross profit, buyer satisfaction, repeat-purchase and negative-margin signals;
 4. optionally combines that calibration with a fully explicit operational snapshot;
 5. builds an OBSERVE-only Astra Operating Board: a deterministic ranked executive work queue across operations, buyer relationships/acquisition, allocation, qualification, source health and unit economics, with explicit approval flags and intelligence routes;
@@ -21,9 +21,12 @@ The observer:
 
 Required migration chain:
 
-- `supabase/migrations/20260918123504_phase3f_outcome_feedback.sql` — creates the canonical outcome-feedback projection consumed by Astra;
-- `supabase/migrations/20260918133000_phase4_astra_observer.sql` — creates the restricted Astra observer roles and feedback RPC grant;
-- `supabase/migrations/20260919164500_phase4_astra_operational_evidence.sql` — creates the canonical read-only operational-evidence projection and grants it to the observer role.
+- `supabase/migrations/20260918123504_phase3f_outcome_feedback.sql` — canonical outcome table, recorder/recognizer roles and outcome/revenue functions;
+- `supabase/migrations/20260918124631_phase3f_runtime_identities.sql` — passwordless runtime login identities used by the Phase 3F role model;
+- `supabase/migrations/20260918191547_phase3f_commercial_figures.sql` — read-only commercial figures and `empire_outcome_reader` role;
+- `supabase/migrations/20260918133000_phase4_astra_observer.sql` — restricted Astra observer role and feedback RPC grant;
+- `supabase/migrations/20260919164500_phase4_astra_operational_evidence.sql` — canonical read-only operational-evidence projection;
+- `supabase/migrations/20260919223136_phase4_astra_token_rpc_observe.sql` — production HTTPS token-authenticated read wrappers; Supabase stores only the token SHA-256 hash.
 
 The Phase 4 observer migration stages:
 
@@ -35,7 +38,7 @@ The Phase 4 observer migration stages:
 
 The observer role cannot record commercial outcomes, recognize revenue, or write directly to commercial tables.
 
-The required Phase 3F/4 migration chain has not been applied to canonical Supabase and no production observer password has been provisioned. Read-only verification on 2026-09-19 confirmed the canonical project does not yet contain the Astra observer roles or either Astra feedback/operational-evidence RPC.
+Production activation completed on 2026-09-19 after explicit approval. Canonical Supabase now contains the Phase 3F outcome/revenue foundation, commercial-figures reader, restricted Astra observer role, operational-evidence RPC and token-authenticated read wrappers. The direct database-login password path was deliberately not used in production; the live observer uses HTTPS RPC with a server-held random token and a hash-only verifier in Supabase.
 
 ## Calibration
 
@@ -105,26 +108,29 @@ Secret-safe runtime preflight:
 
 `/srv/empire_os/.venv/bin/python scripts/astra_activation_preflight.py`
 
-The preflight reports booleans/blockers only and never emits the observer DSN. It verifies the dedicated env file exists with owner-only permissions, OBSERVE mode, observer DSN and explicit policy bindings, plus service/timer installation and timer enablement.
+The preflight reports booleans/blockers only and never emits observer secrets. It verifies the dedicated env file exists with owner-only permissions, OBSERVE mode, either a dedicated DB DSN or the production HTTPS token-RPC transport, explicit policy bindings, and a persistent scheduler.
 
-The service is not installed or enabled. It runs as `ubuntu`, uses `ProtectSystem=strict`, and only needs the repository runtime area writable for the local observation artifact.
+Production scheduling is active through the host's existing `cron` service every five minutes with `flock` protection and `scripts/run_astra_observer_cron.sh`. The root-level systemd units remain staged and compatible with the same env/script, but the remote host policy blocks `sudo`; therefore systemd installation was not required for OBSERVE activation.
 
-## Production Gates
+## Production Activation
 
-Before activation, Phil must explicitly approve:
-1. applying the Phase 4 observer migration to canonical Supabase;
-2. provisioning the dedicated observer login password/DSN;
-3. installing/enabling the systemd service/timer.
+Explicit Phase 4 OBSERVE production approval was granted on 2026-09-19. Activation completed with:
+1. forward-only Phase 3F → Phase 4 canonical Supabase migrations;
+2. least-privilege feedback and operational-evidence projections;
+3. token-authenticated HTTPS observer transport with no raw token stored in Supabase;
+4. owner-only runtime env/token files on EmpireOS;
+5. a locked five-minute cron scheduler;
+6. a successful live observer cycle writing `runtime/astra/latest.json` with `side_effects=none`.
 
-Those actions are deliberately outside the local implementation batch.
+Consequential authority remains gated. Phase 4 activation does not authorize outreach, spending, payments, pricing, allocation, model-weight changes or other commercial mutation.
 
 ## Validation
 
-Required before commit:
-- Astra calibration unit tests;
-- observer worker unit tests with fake transport;
-- outcome role transport tests;
-- isolated PostgreSQL observer-role permission test;
-- Python compile checks;
-- `git diff --check`;
-- no canonical Supabase contact.
+Validation completed for production OBSERVE activation:
+- Astra calibration/observer/preflight/token-transport Python tests;
+- isolated PostgreSQL observer-role and operational-evidence permission tests;
+- live canonical migration/object/permission verification;
+- live HTTPS token-RPC observer cycle;
+- secret-safe runtime preflight with zero blockers;
+- locked cron runner verification;
+- Python compile checks and `git diff --check` before commit.

@@ -146,20 +146,21 @@ Candidate engineering changes stop at human approval. Commit/push/merge/deploy, 
 ### Phase 4 — Astra Operating Layer ← CURRENT
 Astra becomes the top coordinator for business priorities, agent routing, bottleneck detection, expected-value decisions, resource allocation, cost control and approval policies. Premium AI is used only when expected value justifies the cost.
 
-Phase 4 observer/calibration implementation status — ✅ local/tested, production activation gated:
-1. Astra Observer DB Role ✅ — restricted read-only `empire_astra_observer`; dedicated login remains passwordless/unprovisioned.
-2. Astra Role Transport ✅ — locked RPC transport permits only `get_commercial_outcome_feedback(integer)` for the observer role.
+Phase 4 observer/calibration implementation status — ✅ production OBSERVE active:
+1. Astra Observer DB Role ✅ — restricted read-only `empire_astra_observer` is live in canonical Supabase; direct DB login remains unused in production.
+2. Astra Role Transport ✅ production — live HTTPS token-authenticated RPC transport permits only feedback and operational-evidence reads; raw observer token stays on EmpireOS and Supabase stores only its SHA-256 hash.
 3. Outcome Calibration Engine ✅ — real Phase 3F conversion/revenue/cost/gross-profit/satisfaction/repeat-purchase calibration with explicit readiness thresholds.
 4. Astra Observer Worker ✅ — bounded feedback read, OBSERVE-only runtime, atomic local snapshot, no fabricated operational counts.
 5. Astra Decision Integration ✅ — verified negative-margin outcomes can elevate a review recommendation without changing prices, budgets, model weights or commercial state.
 6. Astra Operating Board V1 ✅ — deterministic ranked executive work queue across observed workstreams, preserving approval boundaries and intelligence routing while `decide()` remains backward-compatible through the board's primary item. OBSERVE-only; no execution authority.
 7. Phase 4 Test Suite ✅ — Python, isolated PostgreSQL role/permission, fail-closed CLI and systemd verification are green.
-8. Runtime Packaging ✅ staged — env template plus `empire-astra-observer.service` / timer exist but are not installed or enabled.
+8. Runtime Packaging ✅ production — owner-only env/token files are active; five-minute cron scheduling with `flock` is live. Systemd service/timer packaging remains staged for a future root-managed install.
 9. Documentation ✅ — `docs/PHASE4_ASTRA_OBSERVER.md`.
 10. Activation Readiness Gate ✅ local/tested — preview-only readiness distinguishes OBSERVE deployment prerequisites from consequential-authority prerequisites; the latter cannot pass until the genuine first-revenue loop is verified.
-11. Secret-safe Activation Preflight ✅ local/tested — runtime preflight verifies owner-only env permissions, OBSERVE mode, dedicated observer DSN presence, policy bindings, service/timer installation and timer enablement without emitting secrets. Read-only canonical verification on 2026-09-19 confirmed the required Phase 3F/4 migration chain, observer roles and Astra feedback/operational-evidence RPCs are not yet present in production.
+11. Secret-safe Activation Preflight ✅ production — owner-only env permissions, OBSERVE mode, HTTPS token transport, policy bindings and persistent scheduler all verify with zero blockers; no secrets are emitted.
+12. Production OBSERVE Activation ✅ — explicit approval granted 2026-09-19; Phase 3F/4 canonical migrations are live, token-authenticated read RPCs are verified, the live observer cycle succeeds against fresh canonical evidence, and `runtime/astra/latest.json` reports `side_effects=none`.
 
-Phase 4 authority remains OBSERVE. The canonical Supabase migration chain, observer credential provisioning and service activation remain production gates. A genuine buyer → verified payment → outcome → feedback loop is still required before Astra receives consequential commercial authority, but it no longer blocks Phase 4 engineering.
+Phase 4 authority remains OBSERVE. A genuine buyer → verified payment → delivery/outcome → recognized revenue → feedback loop is still required before Astra receives consequential commercial authority. Outreach, spend, payments, pricing, allocation, model-weight changes and other mutations remain disabled.
 
 ### Phase 5 — Organic Growth Engine
 SEO, AEO, GEO, keyword intelligence, topic clusters, programmatic pages, AI Cards, citation/mention monitoring, authority/backlink graph, competitor citation gaps, public publishing, first-party tracking and content→revenue attribution.

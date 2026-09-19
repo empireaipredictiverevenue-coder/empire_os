@@ -20,6 +20,20 @@ def _is_enabled(unit: str) -> bool:
     return result.returncode == 0 and result.stdout.strip() == "enabled"
 
 
+def _cron_enabled() -> bool:
+    result = subprocess.run(
+        ["crontab", "-l"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return (
+        result.returncode == 0
+        and "EMPIRE_ASTRA_OBSERVER" in result.stdout
+        and "run_astra_observer_cron.sh" in result.stdout
+    )
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Phase 4 Astra activation preflight")
     p.add_argument(
@@ -43,6 +57,7 @@ def main(argv=None) -> int:
         service_installed=service.exists(),
         timer_installed=timer.exists(),
         timer_enabled=_is_enabled("empire-astra-observer.timer"),
+        cron_scheduler_enabled=_cron_enabled(),
     )
     payload = {
         "mode": "OBSERVE",
