@@ -733,13 +733,12 @@ def damage_scan(req: dict):
 
 @app.get("/v1/damage/scan/recent")
 def damage_scan_recent(limit: int = 5):
-    """Tail the most recent satellite_damage.jsonl entries."""
-    p = Path("/root/feedback/satellite_damage.jsonl")
-    if not p.exists():
-        return {"events": []}
-    lines = p.read_text().splitlines()[-limit:]
-    events = [json.loads(l) for l in lines if l.strip()]
-    return {"events": events}
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_damage_scan_history_retired_use_canonical_source_observations",
+    )
+
 
 
 @app.get("/v1/damage/scan-all")
@@ -1006,11 +1005,12 @@ async def resend_webhook(request: Request):
 
 @app.get("/v1/resend/webhook/recent")
 def resend_webhook_recent(limit: int = 20):
-    """Recent Resend webhook events (for debugging)."""
-    if not RESEND_WEBHOOK_LOG.exists():
-        return {"events": []}
-    lines = RESEND_WEBHOOK_LOG.read_text().splitlines()
-    return {"events": [json.loads(l) for l in lines[-limit:]]}
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_resend_webhook_history_retired_use_canonical_outbound_provider_events",
+    )
+
 
 
 @app.get("/v1/leads/sample")
@@ -1025,14 +1025,12 @@ def sample_lead_for_outreach(niche: str, metro: str):
 
 @app.get("/v1/leads/{lead_id}")
 def get_lead_by_id(lead_id: str):
-    """Get a single lead record."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    from empire_os.crm import get_lead
-    lead = get_lead(backend, lead_id)
-    if not lead:
-        raise HTTPException(404, f"Lead '{lead_id}' not found")
-    return lead
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_single_lead_read_retired_use_v1_revenue_crm_prospects",
+    )
+
 
 
 @app.get("/v1/leads")
@@ -1472,21 +1470,12 @@ def seo_audit(req: dict):
 
 @app.get("/v1/seo/recent")
 def seo_recent(n: int = 20, kind: str = ""):
-    """Read back the latest N entries from seo_history."""
-    out = "/root/feedback/seo_history.jsonl"
-    p = Path(out)
-    if not p.exists():
-        return {"entries": [], "count": 0}
-    lines = [l for l in p.read_text().splitlines() if l.strip()]
-    rows = []
-    for line in lines[-n*2:]:
-        try:
-            e = json.loads(line)
-            if kind and e.get("kind") != kind: continue
-            rows.append(e)
-        except Exception:
-            pass
-    return {"entries": rows[-n:], "count": len(rows)}
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_seo_history_retired_use_search_intelligence_evidence",
+    )
+
 
 
 @app.post("/v1/mass-torts/direct")
@@ -1583,25 +1572,12 @@ def swarm_audit_log(limit: int = 50,
 
 @app.get("/v1/swarm/prompt/{agent}")
 def swarm_prompt(agent: str):
-    """Voice-to-infrastructure surface.
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_swarm_prompt_retired_use_governed_agent_catalog",
+    )
 
-    Returns an agent\'s SOUL.md as a structured prompt for voice
-    control. The Commander agent uses this to expose "what does
-    <agent> think?" to a voice interface.
-    """
-    candidates = [
-        Path(f"/root/empire_os/empire_os/agents/souls/{agent}_SOUL.md"),
-        Path(f"/root/feedback/souls/{agent}_SOUL.md"),
-        Path(f"/root/{agent}_SOUL.md"),
-    ]
-    for p in candidates:
-        if p.exists():
-            return {
-                "agent": agent,
-                "soul": p.read_text(),
-                "path": str(p),
-            }
-    raise HTTPException(404, f"No SOUL.md found for agent: {agent}")
 
 
 @app.get("/v1/swarm/ledger")
@@ -2337,38 +2313,22 @@ def prompts_tiers():
 
 @app.get("/v1/prompts/list")
 def prompts_list(tier: str = "bronze", q: str = ""):
-    """List prompts accessible to a given tier."""
-    idx = Path("/root/empire_os/empire_os/data/prompts_index.json")
-    if not idx.exists():
-        return {"prompts": [], "error": "index missing"}
-    data = json.loads(idx.read_text())
-    counts = {"bronze": 50, "silver": 200, "gold": 382,
-              "diamond": 382, "empire": 382, "titanium": 382}
-    limit = counts.get(tier, 50)
-    out = []
-    for p in data["prompts"][:limit]:
-        if q and q.lower() not in p["name"].lower():
-            continue
-        out.append({"name": p["name"], "slug": p["slug"]})
-    return {"tier": tier, "prompts": out, "count": len(out)}
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_prompt_list_retired_use_governed_product_catalog",
+    )
+
 
 
 @app.get("/v1/prompts/get")
 def prompts_get(slug: str = ""):
-    """Fetch a specific prompt body."""
-    idx = Path("/root/empire_os/empire_os/data/prompts_index.json")
-    if not idx.exists():
-        return {"error": "index missing"}
-    data = json.loads(idx.read_text())
-    for p in data["prompts"]:
-        if p["slug"] == slug:
-            body_path = Path(p["path"])
-            if body_path.exists():
-                return {"slug": slug,
-                        "name": p["name"],
-                        "body": body_path.read_text()[:8000]}
-            return {"slug": slug, "error": "file missing"}
-    return {"error": "not found"}
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_prompt_body_retired_use_governed_product_entitlement",
+    )
+
 
 
 @app.post("/v1/agi/sales/tick")
@@ -2589,20 +2549,12 @@ AGENT_REGISTRY = {
 
 @app.get("/v1/agents")
 def list_agents():
-    """List all registered agents in the empire tree."""
-    out = []
-    for name, info in AGENT_REGISTRY.items():
-        entry = {"name": name, **info}
-        try:
-            import urllib.request
-            # Note: timeout is set on urlopen, not Request
-            req = urllib.request.Request(f"http://{info['host']}:{info['port']}/health")
-            with urllib.request.urlopen(req, timeout=2) as resp:
-                entry["health"] = json.loads(resp.read().decode())
-        except Exception as e:
-            entry["health"] = {"status": "unreachable", "error": str(e)[:80]}
-        out.append(entry)
-    return {"agents": out, "count": len(out)}
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_agent_topology_retired_use_canonical_observability",
+    )
+
 
 
 @app.post("/v1/agents/{agent_name}/dispatch")
@@ -3074,30 +3026,12 @@ def leads_by_source():
 
 @app.get("/v1/agents/status")
 def agents_status():
-    """Return agent fleet status for Commander agent to read."""
-    pm2_dump = Path("/root/.pm2/dump.pm2")
-    if not pm2_dump.exists():
-        return {"error": "pm2 dump not visible", "agents": []}
-    try:
-        data = json.loads(pm2_dump.read_text())
-        # Dump is a list, not dict — handle both shapes
-        apps = data if isinstance(data, list) else (data.get("apps", []) if isinstance(data, dict) else [])
-        agents = []
-        if isinstance(apps, list):
-            for p in apps:
-                # status is at top level (pm2 dump format); fallback to pm2_env
-                status = p.get("status") or p.get("pm2_env", {}).get("status", "unknown")
-                pid = p.get("pid") or p.get("pm2_env", {}).get("pid")
-                restarts = p.get("restart_time") or p.get("pm2_env", {}).get("restart_time", 0)
-                agents.append({
-                    "name": p.get("name", "?"),
-                    "status": status,
-                    "pid": pid,
-                    "restarts": restarts,
-                })
-        return {"total": len(agents), "agents": agents}
-    except Exception as e:
-        return {"error": str(e), "agents": []}
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_agent_process_status_retired_use_canonical_observability",
+    )
+
 
 
 class RouteLeadRequest(BaseModel):
@@ -3225,26 +3159,12 @@ async def swarm_log_event(request: Request):
 
 @app.get("/v1/swarms/events")
 async def swarm_poll_events(since: str = "", limit: int = 50):
-    """Station 1 (synthetic-analyst) calls this to poll new events.
-    Optional ?since=<ts> filters by timestamp. Returns last N lines."""
-    if not SWARMS_LOG.exists():
-        return {"events": [], "count": 0}
-    try:
-        lines = SWARMS_LOG.read_text().splitlines()
-    except Exception as e:
-        raise HTTPException(500, f"read failed: {e}")
-    out = []
-    for ln in lines[-limit*5:]:  # over-fetch then filter
-        try:
-            d = json.loads(ln)
-        except Exception:
-            continue
-        if since and d.get("ts", "") < since:
-            continue
-        out.append(d)
-        if len(out) >= limit:
-            break
-    return {"events": out, "count": len(out), "path": str(SWARMS_LOG)}
+    """Retired legacy internal/read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_swarm_event_read_retired_use_canonical_observability",
+    )
+
 
 
 # ── Carrier DRP Roster Compatibility ───────────────────────────────
