@@ -163,6 +163,12 @@ Synthetic/simulated examples never become real-outcome memory.
 
 Goals must be explicit and bounded.
 
+The mathematical decision layer beneath this utility system is defined in
+`QUANTITATIVE_INTELLIGENCE_ARCHITECTURE.md`. LLM reasoning proposes and
+interprets options; the Quant Brain computes probability, uncertainty,
+expected economics, downside, calibration, value of information and portfolio
+risk from explicit evidence.
+
 Primary business objective:
 **maximize expected long-run realized gross profit subject to risk,
 customer value, legal/compliance, capital, capacity and authority constraints.**

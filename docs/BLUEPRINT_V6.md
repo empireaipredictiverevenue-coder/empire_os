@@ -262,6 +262,8 @@ Fifth slice ✅ local/tested: creative economics drift review compares fresh bas
 ### Phase 10 — Predictive Cloud V3
 Trend Radar, market/demand/business/buyer/revenue/profit forecasts, churn, LTV, capacity, conversion, Horizon forecasts, Revenue GPS and connected Business/Buyer/Signal/Revenue graphs.
 
+Quantitative Intelligence Brain V1 ✅ local/tested foundation: deterministic Bayesian updating from verified real outcomes, expected revenue/cost/gross-profit math, calibration scoring, risk/time/confidence-adjusted candidate ranking, Monte Carlo scenario distributions, value-of-information and portfolio concentration are mounted under `/v1/quant-brain/*`. All outputs remain prediction/simulation/recommendation only with zero capital/commercial execution authority.
+
 Foundation slice ✅ local/tested: `predictive_cloud_v3` now supports bounded explainable directional forecasts from canonical observed time series only, with a seven-observation minimum gate, explicit trend slope/R²/evidence confidence, and `insufficient_history` instead of guessed direction. Staged forecast/signal tables are read-only to the current service role; no autonomous commercial execution or production migration is activated.
 
 Second slice ✅ local/tested: an idempotent forecast registry now records only available forecasts that satisfy the seven-observation evidence gate, with model name/version, forecast key and provenance. Insufficient-history previews cannot be registered. The fail-closed registry/read API remains OBSERVE-only with no commercial execution authority.

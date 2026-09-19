@@ -769,13 +769,18 @@ Raw signals
    Agentic cognition layers, memory, planning, model routing, verification,
    policy, tool execution, learning, evaluation and self-improvement.
 
-4. `BLUEPRINT_V6.md`
+4. `QUANTITATIVE_INTELLIGENCE_ARCHITECTURE.md`
+   Bayesian inference, uncertainty, calibration, expected economics, risk,
+   Monte Carlo, causal measurement, optimization, portfolio intelligence and
+   value-of-information.
+
+5. `BLUEPRINT_V6.md`
    Engineering/phase implementation roadmap and production gates.
 
-5. `COMMERCIAL_BLUEPRINT.md`
+6. `COMMERCIAL_BLUEPRINT.md`
    Buyer/seats/territories/corridors/MRR detail.
 
-6. Phase/product docs
+7. Phase/product docs
    Implementation-specific detail.
 
 No future phase document should silently redefine the company model.
