@@ -167,6 +167,59 @@ def qualification_decision(
     return True, "qualified"
 
 
+def qualification_identity_decision(
+    prospect_id: str,
+    qualification: dict[str, Any] | None,
+    identity_link: dict[str, Any] | None,
+) -> tuple[bool, str]:
+    if not isinstance(identity_link, dict):
+        return False, "missing_active_identity_link"
+
+    if identity_link.get("active") is not True:
+        return False, "identity_link_not_active"
+
+    link_prospect_id = str(
+        identity_link.get("prospect_id") or ""
+    ).strip()
+    if link_prospect_id != str(prospect_id or "").strip():
+        return False, "identity_link_prospect_mismatch"
+
+    entity_id = str(identity_link.get("entity_id") or "").strip()
+    if not entity_id:
+        return False, "identity_link_entity_missing"
+
+    if not isinstance(qualification, dict):
+        return False, "missing_qualification"
+
+    qualification_prospect_id = str(
+        qualification.get("prospect_id") or ""
+    ).strip()
+    if qualification_prospect_id != str(prospect_id or "").strip():
+        return False, "qualification_prospect_mismatch"
+
+    version = normalise(
+        qualification.get("scoring_version") or "v1"
+    )
+    qualification_entity_id = str(
+        qualification.get("entity_id") or ""
+    ).strip()
+
+    if version == "v2" and not qualification_entity_id:
+        return False, "qualification_entity_missing"
+
+    if (
+        qualification_entity_id
+        and qualification_entity_id != entity_id
+    ):
+        return False, "qualification_entity_mismatch"
+
+    return True, (
+        "identity_bound"
+        if qualification_entity_id
+        else "identity_bound_v1_compatibility"
+    )
+
+
 def allocation_key(prospect_id: str) -> str:
     prospect_id = str(prospect_id or "").strip()
     if not prospect_id:
@@ -288,6 +341,7 @@ def rank_buyers(
 def plan_allocation(
     prospect: dict[str, Any],
     qualification: dict[str, Any] | None,
+    identity_link: dict[str, Any] | None,
     buyers: list[dict[str, Any]],
 ) -> dict[str, Any]:
     prospect_id, family, metro = _prospect_market(prospect)
@@ -297,6 +351,23 @@ def plan_allocation(
         return {
             "decision": "not_qualified",
             "reason": reason,
+            "prospect_id": prospect_id,
+            "niche_family": family,
+            "metro": metro,
+            "candidates": [],
+        }
+
+    identity_allowed, identity_reason = (
+        qualification_identity_decision(
+            prospect_id,
+            qualification,
+            identity_link,
+        )
+    )
+    if not identity_allowed:
+        return {
+            "decision": "not_qualified",
+            "reason": identity_reason,
             "prospect_id": prospect_id,
             "niche_family": family,
             "metro": metro,
@@ -336,7 +407,7 @@ def fetch_latest_qualification(
         "/rest/v1/prospect_qualifications",
         {
             "select": (
-                "prospect_id,score,tier,status,scoring_engine,scoring_version,"
+                "prospect_id,entity_id,score,tier,status,scoring_engine,scoring_version,"
                 "evidence_confidence,observed_dimensions,unknown_dimensions,scored_at"
             ),
             "prospect_id": f"eq.{prospect_id}",
@@ -360,6 +431,36 @@ def fetch_latest_qualification(
                 return row
 
     raise BuyerAllocationError("qualification reader returned unsupported versions")
+
+
+def fetch_active_identity_link(
+    reader: Reader,
+    prospect_id: str,
+) -> dict[str, Any] | None:
+    rows = reader(
+        "/rest/v1/prospect_entity_links",
+        {
+            "select": "prospect_id,entity_id,match_score,active,created_at",
+            "prospect_id": f"eq.{prospect_id}",
+            "active": "eq.true",
+            "order": "created_at.desc",
+            "limit": "2",
+        },
+    )
+
+    if not isinstance(rows, list):
+        raise BuyerAllocationError(
+            "identity-link reader returned invalid payload"
+        )
+
+    links = [row for row in rows if isinstance(row, dict)]
+    if not links:
+        return None
+    if len(links) != 1:
+        raise BuyerAllocationError(
+            "prospect must have exactly one active identity link"
+        )
+    return links[0]
 
 
 def fetch_buyer_rows(
@@ -413,8 +514,14 @@ def allocate_owned_prospect(
 ) -> dict[str, Any]:
     prospect_id, _, _ = _prospect_market(prospect)
     qualification = fetch_latest_qualification(reader, prospect_id)
+    identity_link = fetch_active_identity_link(reader, prospect_id)
     buyers = fetch_buyer_rows(reader)
-    plan = plan_allocation(prospect, qualification, buyers)
+    plan = plan_allocation(
+        prospect,
+        qualification,
+        identity_link,
+        buyers,
+    )
 
     if plan["decision"] != "ready":
         return plan

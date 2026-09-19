@@ -168,6 +168,14 @@ def test_approved_child_adapter_calls_atomic_rpc(monkeypatch):
             return [prospect(pid)]
         if path == "/rest/v1/prospect_qualifications":
             return [qualification(pid)]
+        if path == "/rest/v1/prospect_entity_links":
+            return [{
+                "prospect_id": pid,
+                "entity_id": "99999999-9999-4999-8999-999999999999",
+                "match_score": 1.0,
+                "active": True,
+                "created_at": "2026-09-17T00:00:00Z",
+            }]
         if path == "/rest/v1/buyers":
             return [buyer_row()]
         raise AssertionError(f"unexpected request: {method} {path}")

@@ -7,15 +7,18 @@ from empire_os.buyer_allocation import (
     allocate_owned_prospect,
     buyer_activation_decision,
     allocation_key,
+    fetch_active_identity_link,
     fetch_buyer_rows,
     fetch_latest_qualification,
     plan_allocation,
     qualification_decision,
+    qualification_identity_decision,
     rank_buyers,
 )
 
 
 PROSPECT_ID = "11111111-1111-4111-8111-111111111111"
+ENTITY_ID = "22222222-2222-4222-8222-222222222222"
 
 
 def prospect(**overrides):
@@ -32,10 +35,23 @@ def prospect(**overrides):
 def qualification(**overrides):
     row = {
         "prospect_id": PROSPECT_ID,
+        "entity_id": ENTITY_ID,
         "score": 82,
         "tier": "hot",
         "status": "scored",
         "scoring_version": "v1",
+    }
+    row.update(overrides)
+    return row
+
+
+def identity_link(**overrides):
+    row = {
+        "prospect_id": PROSPECT_ID,
+        "entity_id": ENTITY_ID,
+        "match_score": 1.0,
+        "active": True,
+        "created_at": "2026-09-19T10:00:00Z",
     }
     row.update(overrides)
     return row
@@ -148,6 +164,67 @@ def test_fetch_latest_qualification_prefers_v2_with_v1_fallback():
     assert calls[0]["limit"] == "2"
 
 
+def test_identity_binding_is_fail_closed_and_v2_is_entity_bound():
+    assert qualification_identity_decision(
+        PROSPECT_ID,
+        qualification(scoring_version="v2", evidence_confidence=0.55),
+        None,
+    ) == (False, "missing_active_identity_link")
+
+    assert qualification_identity_decision(
+        PROSPECT_ID,
+        qualification(
+            scoring_version="v2",
+            evidence_confidence=0.55,
+            entity_id=None,
+        ),
+        identity_link(),
+    ) == (False, "qualification_entity_missing")
+
+    assert qualification_identity_decision(
+        PROSPECT_ID,
+        qualification(
+            scoring_version="v2",
+            evidence_confidence=0.55,
+            entity_id="33333333-3333-4333-8333-333333333333",
+        ),
+        identity_link(),
+    ) == (False, "qualification_entity_mismatch")
+
+    assert qualification_identity_decision(
+        PROSPECT_ID,
+        qualification(
+            scoring_version="v2",
+            evidence_confidence=0.55,
+        ),
+        identity_link(),
+    ) == (True, "identity_bound")
+
+
+def test_v1_identity_binding_allows_null_entity_only_as_compatibility():
+    allowed, reason = qualification_identity_decision(
+        PROSPECT_ID,
+        qualification(scoring_version="v1", entity_id=None),
+        identity_link(),
+    )
+    assert allowed is True
+    assert reason == "identity_bound_v1_compatibility"
+
+
+def test_fetch_active_identity_link_requires_exactly_one_active_link():
+    calls = []
+
+    def reader(path, params):
+        assert path == "/rest/v1/prospect_entity_links"
+        calls.append(dict(params))
+        return [identity_link()]
+
+    row = fetch_active_identity_link(reader, PROSPECT_ID)
+    assert row["entity_id"] == ENTITY_ID
+    assert calls[0]["active"] == "eq.true"
+    assert calls[0]["limit"] == "2"
+
+
 def test_buyer_activation_gate_rejects_auto_created_capacity():
     row = buyer(
         "auto-created",
@@ -209,6 +286,7 @@ def test_plan_allocation_keeps_unmatched_prospect_as_overflow():
     plan = plan_allocation(
         prospect(),
         qualification(),
+        identity_link(),
         [buyer("full", daily_cap=1, calls_today=1)],
     )
 
@@ -248,6 +326,8 @@ def test_allocate_owned_prospect_calls_atomic_allocator_once():
     def reader(path, params):
         if path == "/rest/v1/prospect_qualifications":
             return [qualification()]
+        if path == "/rest/v1/prospect_entity_links":
+            return [identity_link()]
         if path == "/rest/v1/buyers":
             return [buyer("buyer-1")]
         raise AssertionError(path)
@@ -284,6 +364,8 @@ def test_unqualified_prospect_never_calls_allocator():
     def reader(path, params):
         if path == "/rest/v1/prospect_qualifications":
             return [qualification(score=30, tier="cold")]
+        if path == "/rest/v1/prospect_entity_links":
+            return [identity_link()]
         if path == "/rest/v1/buyers":
             return [buyer("buyer-1")]
         raise AssertionError(path)
@@ -299,11 +381,43 @@ def test_unqualified_prospect_never_calls_allocator():
     assert called is False
 
 
+def test_missing_identity_link_never_calls_allocator():
+    called = False
+
+    def reader(path, params):
+        if path == "/rest/v1/prospect_qualifications":
+            return [
+                qualification(
+                    scoring_version="v2",
+                    evidence_confidence=0.55,
+                )
+            ]
+        if path == "/rest/v1/prospect_entity_links":
+            return []
+        if path == "/rest/v1/buyers":
+            return [buyer("buyer-1")]
+        raise AssertionError(path)
+
+    def allocator(payload):
+        nonlocal called
+        called = True
+        return {"decision": "allocated"}
+
+    result = allocate_owned_prospect(prospect(), reader, allocator)
+    assert result["decision"] == "not_qualified"
+    assert result["reason"] == "missing_active_identity_link"
+    assert called is False
+
+
 def test_allocator_unknown_decision_fails_closed():
     def reader(path, params):
         if path == "/rest/v1/prospect_qualifications":
             return [qualification()]
-        return [buyer("buyer-1")]
+        if path == "/rest/v1/prospect_entity_links":
+            return [identity_link()]
+        if path == "/rest/v1/buyers":
+            return [buyer("buyer-1")]
+        raise AssertionError(path)
 
     with pytest.raises(
         BuyerAllocationError,

@@ -65,8 +65,7 @@ The staged v2 schema extension:
 - relies on the existing unique key
   (prospect_id, scoring_engine, scoring_version) so v1 and v2 coexist.
 
-No v1 consumer is switched by this slice. Buyer allocation remains pinned to v1
-until v2 has been validated on real enriched evidence.
+Buyer allocation now prefers v2 when present, keeps v1 only as an explicit compatibility fallback, and fails closed when v2 evidence confidence is below the governed decision floor. Allocation planning also requires an active canonical prospect→entity link; a v2 qualification must carry the same entity_id. Legacy v1 rows with null entity_id are compatibility-only and still require the active canonical identity link.
 
 ## Canonical address normalization
 
@@ -84,4 +83,4 @@ decision-maker adapters out of current reachability calculations.
 
 ## Production gate
 
-The v2 schema migration is now active in canonical Supabase. One explicitly approved bounded production qualification exists for All Star Roofing alongside its unchanged v1 row. The buyer-allocation reader is now local/tested to prefer v2 with v1 fallback and independently requires the v2 evidence-confidence floor; allocation execution itself and bulk v2 writes remain gated.
+The v2 schema migration is now active in canonical Supabase. One explicitly approved bounded production qualification exists for All Star Roofing alongside its unchanged v1 row. The buyer-allocation reader is local/tested to prefer v2 with v1 fallback, requires the v2 evidence-confidence floor, and binds allocation planning to the active canonical entity identity; allocation execution itself and bulk v2 writes remain gated.
