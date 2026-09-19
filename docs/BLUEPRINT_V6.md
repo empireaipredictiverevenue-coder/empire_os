@@ -201,6 +201,8 @@ Foundation slice ✅ local/tested: staged read-only `revenue_crm_prospects` and 
 ### Phase 9 — Advertising Brain
 Google/Meta integrations, video/ad factory, UGC/avatar creative, A/B testing, media buying, ROAS/profit optimisation, budget allocation, retargeting and landing-page feedback loops.
 
+Foundation slice ✅ local/tested: staged canonical `ad_accounts`, `ad_campaigns`, `ad_creatives` and append-only `ad_performance_observations` provide a measurement spine for spend, attributed revenue, attributed gross profit, clicks, impressions and conversions. ROAS/profit-ROAS stay unknown when attribution is missing; no campaign launch, budget mutation, pause, retargeting or production migration is activated.
+
 ### Phase 10 — Predictive Cloud V3
 Trend Radar, market/demand/business/buyer/revenue/profit forecasts, churn, LTV, capacity, conversion, Horizon forecasts, Revenue GPS and connected Business/Buyer/Signal/Revenue graphs.
 
