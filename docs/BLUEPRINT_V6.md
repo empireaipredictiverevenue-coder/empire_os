@@ -297,6 +297,8 @@ Fourth slice ✅ local/tested: exact source reconciliation now compares observed
 
 Fifth slice ✅ local/tested: reconciled market-drift review now checks current/baseline evidence freshness and chronology before comparing inventory, buyer capacity, supply-demand ratio and observed verified-price ranges. Drift is unavailable when the current snapshot is stale/future, the baseline is invalid/stale, or canonical reconciliation fails; unsupported ratio/price deltas remain unknown. Allocation, pricing and settlement authority stay `none`.
 
+Sixth slice ✅ local/tested: allocation-readiness review now requires a fresh current snapshot, exact canonical reconciliation, positive qualified inventory, positive verified buyer capacity and at least one verified price before an operator allocation review is considered ready. Allocation, pricing, exclusivity and settlement authority remain `none`; no matching or funds movement is introduced.
+
 ### Phase 14 — Digital Twin
 Simulate markets, campaigns, pricing, buyers, inventory, sales capacity, ad spend and offers before deploying real capital.
 

@@ -8,6 +8,9 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from empire_os.revenue_exchange import normalise_exchange_snapshot
+from empire_os.revenue_exchange_allocation_readiness import (
+    assess_exchange_allocation_readiness,
+)
 from empire_os.revenue_exchange_analysis import assess_exchange_market
 from empire_os.revenue_exchange_freshness import review_exchange_drift
 from empire_os.revenue_exchange_ingest import build_exchange_observation
@@ -47,6 +50,11 @@ class ExchangeDriftReviewRequest(BaseModel):
     now_utc: str
     max_current_age_seconds: int = Field(default=21600, gt=0)
     max_baseline_age_seconds: int = Field(default=604800, gt=0)
+
+
+class ExchangeAllocationReadinessRequest(ExchangeReconciliationRequest):
+    now_utc: str
+    max_age_seconds: int = Field(default=21600, gt=0)
 
 
 class ExchangeObservationIngestRequest(BaseModel):
@@ -168,6 +176,51 @@ def create_revenue_exchange_router(
             "settlement_authority": "none",
             "pricing_authority": "none",
             "review": result.as_dict(),
+        }
+
+    @router.post("/allocation/readiness/preview")
+    def allocation_readiness_preview(
+        req: ExchangeAllocationReadinessRequest,
+    ):
+        try:
+            snapshot = normalise_exchange_snapshot(req.row)
+            evidence = ExchangeEvidenceSnapshot(
+                inventory_count=req.inventory_count,
+                buyer_capacity=req.buyer_capacity,
+                verified_prices_cents=(
+                    tuple(req.verified_prices_cents)
+                    if req.verified_prices_cents is not None
+                    else None
+                ),
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            reconciliation = reconcile_exchange_snapshot(
+                snapshot,
+                evidence,
+            )
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            readiness = assess_exchange_allocation_readiness(
+                snapshot=snapshot,
+                reconciliation=reconciliation,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "allocation_authority": "none",
+            "settlement_authority": "none",
+            "pricing_authority": "none",
+            "exclusivity_authority": "none",
+            "readiness": readiness.as_dict(),
         }
 
     @router.post("/observations/ingest")
