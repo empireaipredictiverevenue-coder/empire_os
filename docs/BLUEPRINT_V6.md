@@ -257,6 +257,8 @@ Second slice ✅ local/tested: Revenue Exchange market assessment now classifies
 
 Third slice ✅ local/tested: Revenue Exchange observations now support idempotent append-only ingestion through a dedicated NOLOGIN RPC role and fail-closed API. Observation keys, source provenance and evidence are preserved; allocation, pricing, exclusivity and settlement remain unexposed.
 
+Fourth slice ✅ local/tested: exact source reconciliation now compares observed inventory, buyer capacity and verified-price sets against independent canonical evidence. Missing/mismatched evidence produces explicit blockers; allocation, pricing and settlement authority remain `none`.
+
 ### Phase 14 — Digital Twin
 Simulate markets, campaigns, pricing, buyers, inventory, sales capacity, ad spend and offers before deploying real capital.
 

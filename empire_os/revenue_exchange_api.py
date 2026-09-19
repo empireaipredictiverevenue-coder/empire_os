@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field
 from empire_os.revenue_exchange import normalise_exchange_snapshot
 from empire_os.revenue_exchange_analysis import assess_exchange_market
 from empire_os.revenue_exchange_ingest import build_exchange_observation
+from empire_os.revenue_exchange_reconciliation import (
+    ExchangeEvidenceSnapshot,
+    reconcile_exchange_snapshot,
+)
 
 
 class RevenueExchangeRepository(Protocol):
@@ -20,6 +24,15 @@ class RevenueExchangeIngestRepository(Protocol):
     def append(self, item):
         ...
 
+
+
+
+class ExchangeReconciliationRequest(BaseModel):
+    row: dict[str, Any]
+    inventory_count: int | None = Field(default=None, ge=0)
+    buyer_capacity: int | None = Field(default=None, ge=0)
+    verified_prices_cents: list[int] | None = None
+    evidence_refs: list[str] = Field(min_length=1)
 
 class ExchangeObservationIngestRequest(BaseModel):
     observation_key: str
@@ -72,6 +85,32 @@ def create_revenue_exchange_router(
             "count": len(items),
             "limit": limit,
             "items": items,
+        }
+
+
+    @router.post("/reconciliation/preview")
+    def reconciliation_preview(req: ExchangeReconciliationRequest):
+        try:
+            snapshot = normalise_exchange_snapshot(req.row)
+            evidence = ExchangeEvidenceSnapshot(
+                inventory_count=req.inventory_count,
+                buyer_capacity=req.buyer_capacity,
+                verified_prices_cents=(
+                    tuple(req.verified_prices_cents)
+                    if req.verified_prices_cents is not None
+                    else None
+                ),
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            result = reconcile_exchange_snapshot(snapshot, evidence)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "allocation_authority": "none",
+            "settlement_authority": "none",
+            "pricing_authority": "none",
+            "reconciliation": result.as_dict(),
         }
 
     @router.post("/observations/ingest")
