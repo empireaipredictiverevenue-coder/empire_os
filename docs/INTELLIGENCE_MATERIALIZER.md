@@ -1,6 +1,6 @@
 # Phase 3F Intelligence Materializer
 
-Status: local/tested. Production writer activation is gated.
+Status: schema/role contract active in canonical Supabase with one bounded production proof. Runtime credential activation and bulk materialization remain gated.
 
 ## Purpose
 
@@ -41,8 +41,7 @@ The staged empire_intelligence_materializer role has:
 - RLS insert policies limited to canonical company facts and explicitly
   supported empire_os.lead_scoring:v1/v2 qualification scores.
 
-The runtime login is NOINHERIT, passwordless in the staged migration, and must
-be provisioned separately before production activation.
+The runtime login is NOINHERIT and remains passwordless/unprovisioned in production. The production role contract is active, but no long-lived materializer credential has been issued.
 
 ## Current production evidence
 
@@ -52,4 +51,6 @@ prospects with both active identity and qualification. The acquisition ledger
 contains only one row, so historical acquisition provenance is not yet
 backfilled and must not be treated as complete history.
 
-No bulk historical Intelligence Fabric write has been activated. The staged operator entrypoint is scripts/intelligence_materialize.py and accepts exactly one canonical prospect UUID per invocation.
+No bulk historical Intelligence Fabric write has been activated. The operator entrypoint is scripts/intelligence_materialize.py and accepts exactly one canonical prospect UUID per invocation.
+
+The first explicitly approved production proof materialized All Star Roofing only: four canonical prospect facts (business_name, niche, metro, phone) and one empire_os.lead_scoring:v2 score at 86.3 with evidence confidence 0.55. Missing canonical address/rating/review_count/runs_ads and canonical website evidence were not invented. The Supabase MCP control connection cannot SET ROLE to empire_intelligence_materializer, so the one-off proof insert was executed through the admin control plane after exact entity/link/qualification precondition checks; production role grants and RLS policies were verified structurally, while embedded PostgreSQL tests exercise the role directly.

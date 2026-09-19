@@ -176,7 +176,7 @@ Long model work is placed in `runtime/coder/jobs` rather than executed inside th
 - PLAN — best-of-N implementation planning, proposal only;
 - NEXT_COMMAND — best-of-N command synthesis and policy classification, never execution.
 
-`empire-coder-worker.service` and timer are staged but not installed/enabled. The staged worker service is filesystem-restricted and network-restricted to localhost so it can reach local Ollama without receiving general outbound network access.
+`empire-coder-worker.service` and timer are staged but not installed/enabled by repository automation. The staged worker service is filesystem-restricted and network-restricted to localhost so it can reach local Ollama without receiving general outbound network access. Its oneshot start timeout is explicitly 30 minutes so bounded CPU-local 30B planning jobs are not killed by the shorter systemd default timeout.
 
 ## Runtime Packaging
 

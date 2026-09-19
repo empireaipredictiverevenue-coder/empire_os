@@ -10,6 +10,7 @@ Group=ubuntu
 WorkingDirectory=/srv/empire_os
 EnvironmentFile=-/srv/empire_os/.env.empire_coder
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/empire_coder_worker.py --once
+TimeoutStartSec=30min
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
