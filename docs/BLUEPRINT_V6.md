@@ -231,6 +231,8 @@ Foundation slice ✅ local/tested: deterministic market scenarios now require an
 ### Phase 15 — Capital Allocator
 Astra evaluates expected return, risk, cost, cash, confidence and time-to-revenue to decide where the next unit of capital should go.
 
+Foundation slice ✅ local/tested: recommendation-only capital assessments now derive expected-return multiple, downside ratio, time factor and risk-adjusted score from explicit evidence-backed inputs. Recommendation records are hard-locked to `execution_authority=none`; no funds movement, budget mutation or production apply is enabled.
+
 ### Phase 16 — SaaS / Network Scale
 Multi-tenant architecture, teams/RBAC, usage billing, USDT subscriptions, white label, custom domains, affiliate/agency/client dashboards, API keys, developer platform and marketplace/partner network.
 
