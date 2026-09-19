@@ -1409,7 +1409,7 @@ def email_compose(req: dict):
         "tier":     req.get("tier", "silver"),
         "subject_template":
                    req.get("subject_template",
-                           "Empire OS for {metro} {niche}: real leads, USDC billing"),
+                           "Empire AI for {metro} {niche}: governed lead intelligence"),
     }
 
     # Compliance pre-check: in-process call to avoid HTTP self-loop
@@ -1428,20 +1428,29 @@ def email_compose(req: dict):
         metro=brief["metro"], niche=brief["niche"].title())
     body = (
         f"Hey {brief['name']},\n\n"
-        f"this is the Empire OS team reaching out about your "
-        f"{brief['niche']} project in {brief['metro']}. We deliver "
-        f"exclusive leads to high-revenue agencies across 462 lanes. "
-        f"All billing is in USDC on Solana - no Stripe, no contracts, "
-        f"no churn risk.\n\n"
-        f"The {brief['tier'].title()} tier is the best fit. Want a "
-        f"free 1-day trial of the pipeline?\n\n"
-        f"First 14 days free. Cancel anytime.\n\n"
-        f"---\nEmpire OS - {subject}\n"
+        f"this is the Empire AI team reaching out about your "
+        f"{brief['niche']} project in {brief['metro']}. We provide "
+        f"governed lead-intelligence and commercial service options "
+        f"subject to verified terms and capacity. "
+        f"Commercial settlement uses governed USDT on BSC after "
+        f"verified terms and payment evidence.\n\n"
+        f"If useful, we can share the available service options for "
+        f"your market before anything is activated.\n\n"
+        f"Commercial terms are confirmed before activation.\n\n"
+        f"---\nEmpire AI - {subject}\n"
         f"Unsubscribe: https://empire-ai.co.uk/unsub/{brief['niche']}-{brief['metro']}\n"
     )
     audit_id = "ec_" + hex(int(time.time()))[2:]
-    return {"ok": True, "subject": subject, "body": body,
-            "compliance": compliance, "audit_id": audit_id}
+    return {
+        "ok": True,
+        "mode": "DRAFT",
+        "sent": False,
+        "execution_authority": "none",
+        "subject": subject,
+        "body": body,
+        "compliance": compliance,
+        "audit_id": audit_id,
+    }
 
 
 @app.post("/v1/copy")
@@ -1465,56 +1474,39 @@ def copy_draft(req: dict):
     audience = req.get("audience", "agency_founder_50M_revenue")
     tier     = req.get("tier", "silver")
     subject_template = req.get("subject_template",
-                              "Empire OS for {metro} {niche}: real leads, USDC billing")
+                              "Empire AI for {metro} {niche}: governed lead intelligence")
     subject = subject_template.format(metro=metro, niche=niche.title())
 
     # Pre-defined copy per kind. The copywriting-agent can extend later.
     body = (
         f"Hey {name},\n\n"
-        f"this is the Empire OS team reaching out about your {niche} project "
-        f"in {metro}. We deliver exclusive leads (one agency per (niche x metro), "
-        f"no recycled leads, real-time webhook delivery) to high-revenue agencies. "
-        f"All billing is in USDC on Solana - no Stripe, no contracts, no churn risk.\n"
-        f"\nThe {tier.title()} tier is the best fit for agencies like yours. "
-        f"Want a free 1-day trial of the pipeline?\n"
-        f"\nFirst 14 days free. Cancel anytime. Empire OS\n"
+        f"this is the Empire AI team reaching out about your {niche} project "
+        f"in {metro}. We provide governed lead-intelligence and commercial "
+        f"service options subject to verified terms, evidence and capacity. "
+        f"Commercial settlement uses governed USDT on BSC after verified terms and payment evidence.\n"
+        f"\nIf useful, we can share the available governed service options "
+        f"and confirm which terms, if any, apply to your requirements.\n"
+        f"\nCommercial terms are confirmed before activation. Empire AI\n"
     )
 
-    return {"ok": True, "subject": subject, "body": body}
+    return {
+        "ok": True,
+        "mode": "DRAFT",
+        "sent": False,
+        "execution_authority": "none",
+        "subject": subject,
+        "body": body,
+    }
 
 
 @app.post("/v1/seo/audit")
 def seo_audit(req: dict):
-    """Receive an SEO audit batch from seo-agent or ai-seo-agent.
+    """Retired file-backed SEO audit ingestion path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_seo_audit_retired_use_search_intelligence_evidence_flow",
+    )
 
-    Body:
-      results  list  of { url, status, size_bytes, ... } or
-                  { url, title, h1, intent, has_faq_block, ... }
-      kind     str   "seo" or "ai_seo"
-      ts       str   ISO timestamp
-
-    Effect:
-      - persists the audit batch into /root/feedback/seo_history.jsonl
-      - exposes GET /v1/seo/recent to read it back
-    """
-    results = req.get("results") or []
-    kind    = req.get("kind", "seo")
-    ts      = req.get("ts", "")
-    if not isinstance(results, list):
-        raise HTTPException(400, "results must be list")
-    if not results:
-        return {"ok": True, "count": 0, "note": "no rows"}
-
-    try:
-        out = "/root/feedback/seo_history.jsonl"
-        with open(out, "a") as f:
-            for r in results:
-                f.write(json.dumps({"kind": kind, "ts": ts,
-                                    "result": r}) + "\n")
-    except Exception as e:
-        raise HTTPException(500, f"persist failed: {e}")
-
-    return {"ok": True, "count": len(results), "kind": kind}
 
 
 @app.get("/v1/seo/recent")
@@ -1556,7 +1548,14 @@ def mass_torts_direct(req: dict):
         "ts": datetime.now(timezone.utc).isoformat(),
     }
     rec_id = "mt_" + niche + "_" + record["ts"].replace(":", "")
-    return {"ok": True, "record_id": rec_id, **record}
+    return {
+        "ok": True,
+        "mode": "OBSERVE",
+        "persisted": False,
+        "execution_authority": "none",
+        "record_id": rec_id,
+        **record,
+    }
 
 
 @app.post("/v1/finance/replay")
