@@ -7,10 +7,24 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from empire_os.capital_allocator import CapitalCandidate
+from empire_os.capital_outcome import (
+    CapitalOutcomeEvidence,
+    review_capital_outcome,
+)
 from empire_os.capital_registry import CapitalReviewRecord
 from empire_os.capital_review import CapitalReviewPolicy, review_capital_candidate
 
 
+
+
+class CapitalOutcomeRequest(BaseModel):
+    candidate_id: str
+    expected_return_cents: int = Field(ge=0)
+    required_capital_cents: int = Field(gt=0)
+    recognized_revenue_cents: int | None = Field(default=None, ge=0)
+    observed_cost_cents: int | None = Field(default=None, ge=0)
+    observed_at: str
+    evidence_refs: list[str] = Field(min_length=1)
 
 
 class CapitalReviewRegisterRequest(BaseModel):
@@ -99,6 +113,31 @@ def create_capital_router(
             "recommendation": dict(row),
         }
 
+
+    @router.post("/outcome/preview")
+    def outcome_preview(req: CapitalOutcomeRequest):
+        try:
+            review = review_capital_outcome(
+                CapitalOutcomeEvidence(
+                    candidate_id=req.candidate_id,
+                    expected_return_cents=req.expected_return_cents,
+                    required_capital_cents=req.required_capital_cents,
+                    recognized_revenue_cents=req.recognized_revenue_cents,
+                    observed_cost_cents=req.observed_cost_cents,
+                    observed_at=req.observed_at,
+                    evidence_refs=tuple(req.evidence_refs),
+                )
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "funds_movement": False,
+            "budget_mutation": False,
+            "outcome_review": review.as_dict(),
+        }
 
     @router.post("/reviews/register")
     def register_review(req: CapitalReviewRegisterRequest):

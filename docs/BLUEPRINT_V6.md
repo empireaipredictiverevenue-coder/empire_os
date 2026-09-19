@@ -293,6 +293,8 @@ Second slice ✅ local/tested: operator capital-review policy now blocks recomme
 
 Third slice ✅ local/tested: append-only capital review registry records candidate economics, policy thresholds, blockers and evidence for operator review. Funds movement and budget mutation remain impossible from this surface.
 
+Fourth slice ✅ local/tested: realized-return feedback now compares expected return against independently observed recognized revenue and observed cost. Missing revenue/cost evidence remains unknown; feedback cannot move funds or mutate budgets.
+
 ### Phase 16 — SaaS / Network Scale
 Canonical multi-tenant teams, RBAC, usage metering, subscriptions and network-scale tenancy controls.
 
