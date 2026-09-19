@@ -155,6 +155,7 @@ Phase 4 observer/calibration implementation status — ✅ local/tested, product
 7. Phase 4 Test Suite ✅ — Python, isolated PostgreSQL role/permission, fail-closed CLI and systemd verification are green.
 8. Runtime Packaging ✅ staged — env template plus `empire-astra-observer.service` / timer exist but are not installed or enabled.
 9. Documentation ✅ — `docs/PHASE4_ASTRA_OBSERVER.md`.
+10. Activation Readiness Gate ✅ local/tested — preview-only readiness distinguishes OBSERVE deployment prerequisites from consequential-authority prerequisites; the latter cannot pass until the genuine first-revenue loop is verified.
 
 Phase 4 authority remains OBSERVE. The canonical Supabase migration, observer credential provisioning and service activation remain production gates. A genuine buyer → verified payment → outcome → feedback loop is still required before Astra receives consequential commercial authority, but it no longer blocks Phase 4 engineering.
 
