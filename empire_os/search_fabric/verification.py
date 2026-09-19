@@ -20,6 +20,10 @@ DIRECTORY_DOMAINS = {
     "thumbtack.com",
     "yellowpages.com",
     "yelp.com",
+    "facebook.com",
+    "linkedin.com",
+    "instagram.com",
+    "youtube.com",
 }
 
 ARTICLE_HINTS = {
@@ -69,10 +73,26 @@ def _tokens(value: str) -> list[str]:
 
 def _domain(value: str) -> str:
     try:
-        host = urlparse(value).netloc.lower()
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        if "://" not in text:
+            text = "https://" + text
+        host = urlparse(text).netloc.lower()
         return host[4:] if host.startswith("www.") else host
     except Exception:
         return ""
+
+
+def is_directory_url(url: str | None) -> bool:
+    """True when a URL is a known directory/social platform, not first-party."""
+    domain = _domain(str(url or ""))
+    if not domain:
+        return False
+    return any(
+        domain == item or domain.endswith("." + item)
+        for item in DIRECTORY_DOMAINS
+    )
 
 
 def infer_geo_terms(query: str) -> list[str]:
@@ -125,10 +145,7 @@ def classify_result(
     domain = _domain(url)
     title_tokens = set(_tokens(title))
 
-    if any(
-        domain == item or domain.endswith("." + item)
-        for item in DIRECTORY_DOMAINS
-    ):
+    if is_directory_url(url):
         return "directory"
 
     if title_tokens & ARTICLE_HINTS:

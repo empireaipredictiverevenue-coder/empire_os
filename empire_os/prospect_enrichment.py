@@ -20,32 +20,13 @@ from urllib.request import Request, urlopen
 from empire_os.search_fabric.fusion import fused_search
 from empire_os.search_fabric.site_probe import probe_site
 from empire_os.search_fabric.identity_guard import assess_first_party_identity
+from empire_os.search_fabric.verification import is_directory_url
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/153.0.0.0 Safari/537.36"
 )
-
-DIRECTORY_DOMAINS = {
-    "bbb.org",
-    "yelp.com",
-    "yellowpages.com",
-    "manta.com",
-    "nextdoor.com",
-    "mapquest.com",
-    "angi.com",
-    "homeadvisor.com",
-    "thumbtack.com",
-    "facebook.com",
-    "linkedin.com",
-    "instagram.com",
-    "youtube.com",
-    "houzz.com",
-    "expertise.com",
-    "chamberofcommerce.com",
-    "mapquest.com",
-}
 
 SOURCE_WEIGHTS = {
     # Conservative evidence contribution.
@@ -70,10 +51,9 @@ def _domain(value: str | None) -> str:
 
 
 def _is_directory(url: str | None) -> bool:
-    domain = _domain(url)
-    if not domain:
+    if not _domain(url):
         return True
-    return any(domain == d or domain.endswith("." + d) for d in DIRECTORY_DOMAINS)
+    return is_directory_url(url)
 
 
 def _get(url: str, timeout: int = 8) -> tuple[str, str]:

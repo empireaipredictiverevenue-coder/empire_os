@@ -38,6 +38,24 @@ def test_existing_phone_reduces_site_probe_target():
     assert plan["projected_completeness_upper_bound"] == 55
 
 
+def test_directory_profile_remains_missing_website_evidence():
+    plan = plan_evidence_enrichment({
+        "business_name": "Acme Roofing",
+        "niche": "roofing",
+        "phone": "+18035551212",
+        "website": (
+            "https://www.bbb.org/us/nc/charlotte/profile/"
+            "roofing-contractors/acme-roofing"
+        ),
+    })
+
+    action = plan["selected_actions"][0]
+    assert action["key"] == "first_party_site_probe"
+    assert action["target_fields"] == ["website", "email"]
+    assert plan["current_completeness"] == 30
+    assert plan["current_evidence_confidence"] == 0.30
+
+
 def test_existing_enough_evidence_needs_no_action():
     plan = plan_evidence_enrichment({
         "business_name": "Acme Roofing",

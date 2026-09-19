@@ -13,6 +13,7 @@ from empire_os.lead_scoring import (
     score_data_completeness,
     score_market_fit,
 )
+from empire_os.search_fabric.verification import classify_result
 
 
 QUALITY_WEIGHTS = {
@@ -43,8 +44,17 @@ def _bounded_100(value: Any, *, field: str) -> float:
     return number
 
 
+def is_first_party_website(value: Any) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    return classify_result(title="", url=text) == "direct_business"
+
+
 def _has_presence_evidence(lead: Mapping[str, Any]) -> bool:
-    for key in ("website", "email", "phone", "bbb_rating"):
+    if is_first_party_website(lead.get("website")):
+        return True
+    for key in ("email", "phone", "bbb_rating"):
         if lead.get(key):
             return True
 
@@ -99,9 +109,13 @@ def compute_lead_score_v2(
             score_market_fit(dict(lead))
         )
 
+    scoring_input = dict(lead)
+    if not is_first_party_website(scoring_input.get("website")):
+        scoring_input["website"] = None
+
     if business_presence_checked or _has_presence_evidence(lead):
         dimensions["business_presence"] = float(
-            score_business_presence(dict(lead))
+            score_business_presence(scoring_input)
         )
 
     if buy_signal_observed:
@@ -147,7 +161,7 @@ def compute_lead_score_v2(
         )
         quality_score = round(weighted / observed_weight, 1)
 
-    completeness_input = dict(lead)
+    completeness_input = dict(scoring_input)
     if (
         not completeness_input.get("street")
         and completeness_input.get("address")

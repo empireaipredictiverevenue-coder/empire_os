@@ -59,6 +59,33 @@ def test_strong_evidence_can_reach_hot_decision():
     assert result["decision_tier"] == "hot"
 
 
+def test_directory_profile_is_not_first_party_website_evidence():
+    result = compute_lead_score_v2({
+        "business_name": "Acme Roofing",
+        "niche": "roofing",
+        "phone": "+18035551212",
+        "website": (
+            "https://www.bbb.org/us/nc/charlotte/profile/"
+            "roofing-contractors/acme-roofing"
+        ),
+    })
+
+    assert result["dimensions"]["business_presence"] == 20.0
+    assert result["data_completeness_score"] == 30.0
+    assert result["evidence_confidence"] == 0.30
+
+
+def test_social_profile_is_not_first_party_website_evidence():
+    result = compute_lead_score_v2({
+        "business_name": "Acme Roofing",
+        "niche": "roofing",
+        "website": "https://www.facebook.com/acmeroofing",
+    })
+
+    assert result["dimensions"]["business_presence"] is None
+    assert result["data_completeness_score"] == 15.0
+
+
 def test_low_confidence_never_uses_quality_band_as_decision():
     result = compute_lead_score_v2({
         "business_name": "Acme Roofing",

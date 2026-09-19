@@ -33,6 +33,9 @@ Quality dimensions:
 - enrichment quality.
 
 Data completeness is evidence sufficiency rather than direct commercial quality.
+Known directory and social-profile URLs are not counted as first-party website
+presence or website completeness. They remain discovery/provenance evidence until
+a first-party business site is independently identified and verified.
 
 A quality band may be hot/warm/cold/dead, but when evidence confidence is below
 0.50 the decision tier is insufficient_evidence.

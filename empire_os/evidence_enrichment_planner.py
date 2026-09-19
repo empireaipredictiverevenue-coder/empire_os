@@ -11,6 +11,7 @@ from typing import Any, Mapping
 from empire_os.lead_scoring_v2 import (
     MIN_DECISION_CONFIDENCE,
     compute_lead_score_v2,
+    is_first_party_website,
 )
 
 
@@ -62,6 +63,9 @@ def _missing_fields(prospect: Mapping[str, Any]) -> list[str]:
     def value_for(field: str) -> Any:
         if field == "street" and not prospect.get("street"):
             return prospect.get("address")
+        if field == "website":
+            value = prospect.get("website")
+            return value if is_first_party_website(value) else None
         return prospect.get(field)
 
     return [
