@@ -67,3 +67,25 @@ def test_unknown_platform_fails_closed():
             "observed_at": "2026-09-19T18:00:00+00:00",
             "source": "adapter",
         })
+
+
+def test_observed_at_requires_timezone():
+    with pytest.raises(ValueError, match="include timezone"):
+        normalise_ad_observation({
+            "platform": "google",
+            "campaign_id": "campaign-1",
+            "spend_cents": 100,
+            "observed_at": "2026-09-19T20:55:00",
+            "source": "google_ads_read_adapter",
+        })
+
+
+def test_observed_at_requires_iso_timestamp():
+    with pytest.raises(ValueError, match="ISO-8601"):
+        normalise_ad_observation({
+            "platform": "google",
+            "campaign_id": "campaign-1",
+            "spend_cents": 100,
+            "observed_at": "not-a-time",
+            "source": "google_ads_read_adapter",
+        })

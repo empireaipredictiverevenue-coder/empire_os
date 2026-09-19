@@ -30,6 +30,7 @@ class AdvertisingObservationRepository(Protocol):
 class AdvertisingObservationIngestRequest(BaseModel):
     canonical_campaign_id: str
     provider_observation_id: str
+    canonical_creative_id: str | None = None
     row: dict[str, Any]
     evidence: dict[str, Any] = Field(default_factory=dict)
 
@@ -138,6 +139,7 @@ def create_advertising_router(
             item = build_canonical_ad_observation(
                 canonical_campaign_id=req.canonical_campaign_id,
                 provider_observation_id=req.provider_observation_id,
+                canonical_creative_id=req.canonical_creative_id,
                 row=req.row,
                 evidence=req.evidence,
             )
@@ -146,6 +148,14 @@ def create_advertising_router(
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         status = str(result.get("status") or "").strip()
+        if status == "conflict":
+            raise HTTPException(
+                status_code=409,
+                detail=str(
+                    result.get("reason")
+                    or "advertising_observation_conflict"
+                ),
+            )
         if status not in {"recorded", "existing"}:
             raise HTTPException(
                 status_code=502,

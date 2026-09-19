@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from typing import Any, Mapping
 
 
@@ -33,6 +34,20 @@ class AdPerformanceObservation:
         if self.spend_cents <= 0 or self.attributed_gross_profit_cents is None:
             return None
         return self.attributed_gross_profit_cents / self.spend_cents
+def _validate_timestamp(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("observed_at is required")
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError("observed_at must be ISO-8601") from exc
+    if parsed.tzinfo is None:
+        raise ValueError("observed_at must include timezone")
+    return raw
+
+
 def _nonnegative_int(name: str, value: Any) -> int | None:
     if value is None:
         return None
@@ -52,12 +67,12 @@ def normalise_ad_observation(
 ) -> AdPerformanceObservation:
     platform = str(row.get("platform") or "").strip().lower()
     campaign_id = str(row.get("campaign_id") or "").strip()
-    observed_at = str(row.get("observed_at") or "").strip()
+    observed_at = _validate_timestamp(row.get("observed_at"))
     source = str(row.get("source") or "").strip()
     if platform not in {"google", "meta", "tiktok", "linkedin", "other"}:
         raise ValueError("unsupported ad platform")
-    if not campaign_id or not observed_at or not source:
-        raise ValueError("campaign_id, observed_at and source are required")
+    if not campaign_id or not source:
+        raise ValueError("campaign_id and source are required")
 
     spend = _nonnegative_int("spend_cents", row.get("spend_cents"))
     if spend is None:

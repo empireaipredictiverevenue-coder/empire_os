@@ -113,12 +113,13 @@ class RpcAdvertisingObservationRepository:
                 "p_clicks": obs.clicks,
                 "p_conversions": obs.conversions,
                 "p_source": obs.source,
-                "p_creative_id": None,
+                "p_creative_id": item.canonical_creative_id,
                 "p_evidence": {
                     **dict(item.evidence),
                     "platform": obs.platform,
                     "external_campaign_id": obs.campaign_id,
                     "external_creative_id": obs.creative_id,
+                    "payload_sha256": item.payload_sha256,
                 },
             },
         )
