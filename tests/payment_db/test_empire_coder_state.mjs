@@ -91,6 +91,46 @@ try{
     await asRole("update coder_knowledge_sources set last_scanned_at=now() where path='docs/BLUEPRINT_V6.md'");
   });
 
+  await test('structured patch requires best-of-N and valid operation shape',async()=>{
+    await assert.rejects(
+      asRole("insert into coder_structured_patch_proposals(task_id,provider,model,candidate_texts,critique,synthesized_text,operation,target_path,symbol,new_text,valid,eligible) values('coder_test','ollama','qwen3-coder:30b','[\"one\"]'::jsonb,'review','{}','replace_python_symbol','empire_os/core.py','value','def value(): return 2',true,true)"),
+      /violates check constraint/
+    );
+    await assert.rejects(
+      asRole("insert into coder_structured_patch_proposals(task_id,provider,model,candidate_texts,critique,synthesized_text,operation,target_path,new_text,valid,eligible) values('coder_test','ollama','qwen3-coder:30b','[\"one\",\"two\"]'::jsonb,'review','{}','replace_python_symbol','empire_os/core.py','def value(): return 2',true,true)"),
+      /violates check constraint/
+    );
+    await asRole("insert into coder_structured_patch_proposals(task_id,provider,model,candidate_texts,critique,synthesized_text,operation,target_path,symbol,new_text,expected_tests,valid,eligible) values('coder_test','ollama','qwen3-coder:30b','[\"one\",\"two\"]'::jsonb,'comparative review','{}','replace_python_symbol','empire_os/core.py','value','def value(): return 2','[\"tests/test_core.py\"]'::jsonb,true,true)");
+  });
+
+  await test('task knowledge promotion is REVIEW-only and append-only',async()=>{
+    await assert.rejects(
+      asRole("insert into coder_task_knowledge_promotions(task_id,path,sha256,reason,status_at_promotion) values('coder_test','skill.md','abc','needed','ACTIVE')"),
+      /violates check constraint/
+    );
+    await asRole("insert into coder_task_knowledge_promotions(task_id,path,sha256,reason,status_at_promotion) values('coder_test','skill.md','abc','needed for task','REVIEW')");
+    await assert.rejects(
+      asRole("update coder_task_knowledge_promotions set reason='tampered' where task_id='coder_test'"),
+      /permission denied/
+    );
+  });
+
+  await test('model review must be distinct from writer and advisory-only',async()=>{
+    await assert.rejects(
+      asRole("insert into coder_model_reviews(task_id,writer_provider,writer_model,reviewer_provider,reviewer_model,verdict) values('coder_test','ollama','qwen3-coder:30b','ollama','qwen3-coder:30b','PASS')"),
+      /violates check constraint/
+    );
+    await assert.rejects(
+      asRole("insert into coder_model_reviews(task_id,writer_provider,writer_model,reviewer_provider,reviewer_model,verdict,advisory_only) values('coder_test','ollama','qwen3-coder:30b','other','verify-model','PASS',false)"),
+      /violates check constraint/
+    );
+    await asRole("insert into coder_model_reviews(task_id,writer_provider,writer_model,reviewer_provider,reviewer_model,verdict,reasons,warnings) values('coder_test','ollama','qwen3-coder:30b','other','verify-model','PASS','[\"bounded\"]'::jsonb,'[]'::jsonb)");
+    await assert.rejects(
+      asRole("update coder_model_reviews set verdict='FAIL' where task_id='coder_test'"),
+      /permission denied/
+    );
+  });
+
   await test('evidence tables append-only',async()=>{
     await asRole("insert into coder_tool_runs(task_id,tool,arguments_summary,policy_decision) values('coder_test','git','status --short','allow')");
     await assert.rejects(asRole("update coder_tool_runs set tool='tampered' where task_id='coder_test'"),/permission denied/);

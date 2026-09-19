@@ -1,4 +1,4 @@
-"""Provider-agnostic model routing for Empire Coder."""
+"""Provider-agnostic, role-aware model routing for Empire Coder."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,6 +15,7 @@ class ModelProfile:
     cost_tier: int = 0
     local: bool = False
     available: bool = True
+    roles: tuple[str, ...] = ("writer", "verifier")
 
 
 class ModelRouter:
@@ -39,10 +40,23 @@ class ModelRouter:
             return 2
         return 1
 
-    def route(self, objective: str) -> ModelRoute:
+    def route(
+        self,
+        objective: str,
+        *,
+        role: str = "writer",
+        exclude: Iterable[tuple[str, str]] = (),
+    ) -> ModelRoute:
         need = self.complexity(objective)
+        excluded = set(exclude)
+        role_name = str(role or "writer").strip().lower()
         candidates = sorted(
-            self.profiles,
+            (
+                profile
+                for profile in self.profiles
+                if role_name in profile.roles
+                and (profile.provider, profile.model) not in excluded
+            ),
             key=lambda p: (
                 p.capability < need,
                 p.cost_tier,
@@ -54,7 +68,10 @@ class ModelRouter:
             return ModelRoute(
                 "unconfigured",
                 "none",
-                "no model profile configured; orchestration remains tool-only",
+                (
+                    f"no distinct {role_name} model profile configured; "
+                    "deterministic verification remains authoritative"
+                ),
                 local=False,
                 cost_tier=0,
             )
@@ -62,7 +79,10 @@ class ModelRouter:
         return ModelRoute(
             chosen.provider,
             chosen.model,
-            f"complexity={need}; capability={chosen.capability}",
+            (
+                f"role={role_name}; complexity={need}; "
+                f"capability={chosen.capability}"
+            ),
             local=chosen.local,
             cost_tier=chosen.cost_tier,
         )

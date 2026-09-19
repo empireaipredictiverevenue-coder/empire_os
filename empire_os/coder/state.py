@@ -35,13 +35,21 @@ class LocalTaskStore:
         self.tasks_dir = self.root / "tasks"
         self.proposals_dir = self.root / "proposals"
         self.commands_dir = self.root / "command_proposals"
+        self.structured_patches_dir = (
+            self.root / "structured_patch_proposals"
+        )
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
         self.proposals_dir.mkdir(parents=True, exist_ok=True)
         self.commands_dir.mkdir(parents=True, exist_ok=True)
+        self.structured_patches_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
         os.chmod(self.root, 0o700)
         os.chmod(self.tasks_dir, 0o700)
         os.chmod(self.proposals_dir, 0o700)
         os.chmod(self.commands_dir, 0o700)
+        os.chmod(self.structured_patches_dir, 0o700)
 
     def create(self, objective: str, *, blueprint_path: str) -> CoderTask:
         text = str(objective or "").strip()
@@ -98,7 +106,8 @@ class LocalTaskStore:
         path = task_dir / filename
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(
-            json.dumps(proposal, indent=2, sort_keys=True) + "\n",
+            json.dumps(proposal, indent=2, sort_keys=True) + '\n',
+            encoding="utf-8",
         )
         os.chmod(tmp, 0o600)
         tmp.replace(path)
@@ -143,6 +152,40 @@ class LocalTaskStore:
     ) -> dict[str, Any] | None:
         self._path(task_id)
         task_dir = self.commands_dir / task_id
+        if not task_dir.exists():
+            return None
+        files = sorted(task_dir.glob("*.json"))
+        if not files:
+            return None
+        return json.loads(files[-1].read_text(encoding="utf-8"))
+
+    def save_structured_patch_proposal(
+        self,
+        task_id: str,
+        proposal: dict[str, Any],
+    ) -> Path:
+        self._path(task_id)
+        task_dir = self.structured_patches_dir / task_id
+        task_dir.mkdir(parents=True, exist_ok=True)
+        os.chmod(task_dir, 0o700)
+        sequence = len(list(task_dir.glob("*.json"))) + 1
+        path = task_dir / f"{sequence:04d}_patch.json"
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(
+            json.dumps(proposal, indent=2, sort_keys=True) + '\n',
+            encoding="utf-8",
+        )
+        os.chmod(tmp, 0o600)
+        tmp.replace(path)
+        os.chmod(path, 0o600)
+        return path
+
+    def latest_structured_patch_proposal(
+        self,
+        task_id: str,
+    ) -> dict[str, Any] | None:
+        self._path(task_id)
+        task_dir = self.structured_patches_dir / task_id
         if not task_dir.exists():
             return None
         files = sorted(task_dir.glob("*.json"))

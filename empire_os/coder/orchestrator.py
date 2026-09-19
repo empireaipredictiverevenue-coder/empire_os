@@ -12,6 +12,7 @@ from .context import ContextBuilder, ContextPack
 from .dependencies import DependencyIndex
 from .knowledge_garden import KnowledgeGarden
 from .memory import ContextMemory
+from .model_review import DistinctModelReviewer, ModelReview
 from .models import (
     CoderTask,
     ModelRoute,
@@ -43,6 +44,13 @@ from .runner import SafeCommandRunner
 from .self_build import validate_self_build_scope
 from .skills import SkillLoader
 from .state import LocalTaskStore, compact_task_context
+from .structured_patch import (
+    PatchOperation,
+    StructuredPatchCandidate,
+    StructuredPatchError,
+    StructuredPatchRefiner,
+    StructuredPatchValidator,
+)
 from .verifier import Verifier
 from .worktree import WorktreeController
 
@@ -105,7 +113,10 @@ class EmpireCoder:
             self.workspace, self.runtime_root
         )
         self.repo = RepoIntelligence(self.workspace)
-        self.knowledge = KnowledgeGarden(self.workspace)
+        self.knowledge = KnowledgeGarden(
+            self.workspace,
+            runtime_root=self.runtime_root,
+        )
         self._knowledge_report = None
         self.context = ContextBuilder(self.repo)
         self.runner = SafeCommandRunner(
@@ -115,6 +126,9 @@ class EmpireCoder:
             self.workspace, runtime_root=self.runtime_root
         )
         self.ast_patch = AstPatchEngine(self.patch)
+        self.structured_patch_validator = StructuredPatchValidator(
+            self.workspace
+        )
         self.dependencies = DependencyIndex(self.repo)
         self.verifier = Verifier(self.workspace)
         requested_profiles = tuple(model_profiles)
@@ -132,6 +146,7 @@ class EmpireCoder:
                         capability=3,
                         cost_tier=0,
                         local=True,
+                        roles=("writer",),
                     ),
                 )
         self.router = ModelRouter(requested_profiles)
@@ -246,6 +261,19 @@ class EmpireCoder:
         self._require(Capability.SEARCH_REPO)
         task = self.store.load(task_id)
         knowledge = self.refresh_knowledge()
+        report = self._knowledge_report or self.knowledge.scan()
+        task_active_paths = self.knowledge.active_paths_for_task(
+            task.id,
+            report,
+        )
+        self.context.set_active_knowledge_paths(task_active_paths)
+        self.skills.set_active_knowledge_paths(task_active_paths)
+        promotion = self.knowledge.task_promotion_status(task.id)
+        knowledge = {
+            **knowledge,
+            "task_active": len(task_active_paths),
+            "task_promoted": promotion["promoted"],
+        }
         pack = self.context.build(
             task,
             terms=terms,
@@ -273,6 +301,35 @@ class EmpireCoder:
             pack,
             trigger="context_ready",
         )
+
+    def promote_task_knowledge(
+        self,
+        task_id: str,
+        paths: Iterable[str],
+        *,
+        reason: str,
+        approved: bool = False,
+    ) -> dict:
+        self.store.load(task_id)
+        payload = self.knowledge.promote_for_task(
+            task_id,
+            paths,
+            reason=reason,
+            approved=approved,
+        )
+        status = self.knowledge.task_promotion_status(task_id)
+        self._record_and_sync(
+            task_id=task_id,
+            event="task_knowledge_promoted",
+            data={
+                "promoted": status["promoted"],
+                "paths": [
+                    entry["path"]
+                    for entry in payload.get("entries") or []
+                ],
+            },
+        )
+        return status
 
     def read_for_patch(self, task_id: str, path: str) -> str:
         self._require(Capability.READ_REPO)
@@ -338,6 +395,137 @@ class EmpireCoder:
         )
         return result
 
+    def propose_structured_patch(
+        self,
+        task_id: str,
+        objective: str,
+        context: ContextPack,
+    ) -> StructuredPatchCandidate:
+        self.refresh_knowledge()
+        route = self.model_route(task_id)
+        provider = self.providers.get(route.provider)
+        context = self._fresh_context_pack(
+            task_id,
+            context,
+            trigger="before_structured_patch_refinement",
+        )
+        candidate = StructuredPatchRefiner(
+            provider,
+            self.structured_patch_validator,
+        ).propose(
+            task_id=task_id,
+            objective=objective,
+            context=context,
+            route=route,
+        )
+        proposal = candidate.proposal
+        self.store.save_structured_patch_proposal(
+            task_id,
+            {
+                "task_id": task_id,
+                "provider": route.provider,
+                "model": route.model,
+                "candidate_texts": list(candidate.candidate_texts),
+                "candidate_count": len(candidate.candidate_texts),
+                "critique": candidate.critique,
+                "synthesized_text": candidate.synthesized_text,
+                **proposal.as_dict(),
+                "valid": candidate.validation.valid,
+                "validation_reasons": list(
+                    candidate.validation.reasons
+                ),
+                "validation_warnings": list(
+                    candidate.validation.warnings
+                ),
+                "eligible": candidate.eligible,
+            },
+        )
+        self._record_and_sync(
+            task_id=task_id,
+            event="structured_patch_refined",
+            data={
+                "provider": route.provider,
+                "model": route.model,
+                "candidate_count": len(candidate.candidate_texts),
+                "path": proposal.target_path,
+                "symbol": proposal.symbol,
+                "valid": candidate.validation.valid,
+                "eligible": candidate.eligible,
+            },
+        )
+        return candidate
+
+    def apply_structured_patch(
+        self,
+        task_id: str,
+        candidate: StructuredPatchCandidate,
+    ) -> dict:
+        self._require(Capability.CREATE_PATCH)
+        if not candidate.eligible:
+            raise EmpireCoderError(
+                "structured patch has not passed best-of-N and validation"
+            )
+
+        live_validation = self.structured_patch_validator.validate(
+            candidate.proposal
+        )
+        if not live_validation.valid:
+            raise EmpireCoderError(
+                "structured patch no longer matches live repository: "
+                + "; ".join(live_validation.reasons)
+            )
+
+        proposal = candidate.proposal
+        if proposal.operation is PatchOperation.REPLACE_EXACT:
+            self.read_for_patch(task_id, proposal.target_path)
+            result = self.patch_exact(
+                task_id,
+                proposal.target_path,
+                proposal.old_text or "",
+                proposal.new_text,
+            )
+        elif (
+            proposal.operation
+            is PatchOperation.REPLACE_PYTHON_SYMBOL
+        ):
+            result = self.patch_python_symbol(
+                task_id,
+                proposal.target_path,
+                proposal.symbol or "",
+                proposal.new_text,
+            )
+        elif proposal.operation is PatchOperation.CREATE_FILE:
+            result = self.patch.create_file(
+                task_id,
+                proposal.target_path,
+                proposal.new_text,
+            )
+            task = self.store.load(task_id)
+            task.phase = TaskPhase.PATCH
+            self.store.save(task)
+        else:
+            raise EmpireCoderError(
+                f"unsupported structured patch operation: "
+                f"{proposal.operation.value}"
+            )
+
+        task = self.store.load(task_id)
+        for test_path in proposal.expected_tests:
+            if test_path not in task.tests_required:
+                task.tests_required.append(test_path)
+        self.store.save(task)
+        self._record_and_sync(
+            task_id=task_id,
+            event="structured_patch_applied",
+            data={
+                **result,
+                "operation": proposal.operation.value,
+                "symbol": proposal.symbol,
+                "expected_tests": list(proposal.expected_tests),
+            },
+        )
+        return result
+
     def impacted_tests(
         self,
         changed_files: Iterable[str],
@@ -381,7 +569,10 @@ class EmpireCoder:
 
     def model_route(self, task_id: str) -> ModelRoute:
         task = self.store.load(task_id)
-        route = self.router.route(task.objective)
+        route = self.router.route(
+            task.objective,
+            role="writer",
+        )
         self._record_and_sync(
             task_id=task_id,
             event="model_routed",
@@ -392,6 +583,81 @@ class EmpireCoder:
             },
         )
         return route
+
+    def verifier_model_route(
+        self,
+        task_id: str,
+    ) -> ModelRoute:
+        task = self.store.load(task_id)
+        writer = self.router.route(
+            task.objective,
+            role="writer",
+        )
+        route = self.router.route(
+            task.objective,
+            role="verifier",
+            exclude=((writer.provider, writer.model),),
+        )
+        self._record_and_sync(
+            task_id=task_id,
+            event="verifier_model_routed",
+            data={
+                "provider": route.provider,
+                "model": route.model,
+                "reason": route.reason,
+                "writer_provider": writer.provider,
+                "writer_model": writer.model,
+                "distinct": (
+                    (route.provider, route.model)
+                    != (writer.provider, writer.model)
+                    and route.provider != "unconfigured"
+                ),
+            },
+        )
+        return route
+
+    def advisory_model_review(
+        self,
+        task_id: str,
+        *,
+        changed_files: Iterable[str],
+        context: ContextPack,
+        diff_excerpt: str,
+    ) -> ModelReview | None:
+        """Run a distinct-model advisory review if configured.
+
+        Deterministic verifier results remain authoritative.
+        """
+        route = self.verifier_model_route(task_id)
+        if route.provider == "unconfigured":
+            self._record_and_sync(
+                task_id=task_id,
+                event="advisory_model_review_unavailable",
+                data={"reason": route.reason},
+            )
+            return None
+
+        provider = self.providers.get(route.provider)
+        context = self._fresh_context_pack(
+            task_id,
+            context,
+            trigger="before_advisory_model_review",
+        )
+        task = self.store.load(task_id)
+        review = DistinctModelReviewer(provider).review(
+            task_id=task_id,
+            objective=task.objective,
+            context=context,
+            route=route,
+            changed_files=tuple(dict.fromkeys(changed_files)),
+            diff_excerpt=diff_excerpt,
+        )
+        self._record_and_sync(
+            task_id=task_id,
+            event="advisory_model_review_completed",
+            data=review.as_dict(),
+        )
+        return review
 
     def ask_model(
         self,
@@ -602,6 +868,15 @@ class EmpireCoder:
         ollama = OllamaProvider(num_threads=8)
         local_model = "qwen3-coder:30b"
         knowledge = self.refresh_knowledge()
+        writer_route = self.router.route(
+            "Empire Coder diagnostic",
+            role="writer",
+        )
+        verifier_route = self.router.route(
+            "Empire Coder diagnostic",
+            role="verifier",
+            exclude=((writer_route.provider, writer_route.model),),
+        )
         return {
             "ok": True,
             "workspace": str(self.workspace),
@@ -617,6 +892,20 @@ class EmpireCoder:
             "ollama_models": list(ollama.models()),
             "local_coder_ready": ollama.has_model(local_model),
             "local_coder_model": local_model,
+            "writer_model": {
+                "provider": writer_route.provider,
+                "model": writer_route.model,
+                "reason": writer_route.reason,
+            },
+            "verifier_model": {
+                "provider": verifier_route.provider,
+                "model": verifier_route.model,
+                "reason": verifier_route.reason,
+            },
+            "distinct_verifier_model_ready": (
+                verifier_route.provider != "unconfigured"
+            ),
+            "deterministic_verifier_authoritative": True,
             "knowledge": knowledge,
             "production_authority": False,
         }

@@ -66,6 +66,9 @@ class ContextMemory:
         events = self.audit.read_task(task_id)[-self.max_events:]
         proposal = self.store.latest_proposal(task_id)
         command_proposal = self.store.latest_command_proposal(task_id)
+        structured_patch = (
+            self.store.latest_structured_patch_proposal(task_id)
+        )
 
         core = compact_task_context(task)
         core["discovered_files"] = _bounded_strings(
@@ -110,6 +113,21 @@ class ContextMemory:
                 "eligible": bool(command_proposal.get("eligible")),
             }
 
+        latest_structured_patch = None
+        if structured_patch:
+            latest_structured_patch = {
+                "operation": structured_patch.get("operation"),
+                "target_path": structured_patch.get("target_path"),
+                "symbol": structured_patch.get("symbol"),
+                "candidate_count": structured_patch.get(
+                    "candidate_count"
+                ),
+                "valid": structured_patch.get("valid"),
+                "expected_tests": list(
+                    structured_patch.get("expected_tests") or []
+                )[:20],
+            }
+
         snapshot = {
             "version": version,
             "updated_at": utc_now(),
@@ -118,6 +136,7 @@ class ContextMemory:
             "recent_events": [_compact_event(row) for row in events],
             "latest_proposal": latest_proposal,
             "latest_command_proposal": latest_command,
+            "latest_structured_patch_proposal": latest_structured_patch,
             "git_state": git_state or {},
             "recovery_instructions": (
                 "Resume from task.phase and unresolved_issues. "
