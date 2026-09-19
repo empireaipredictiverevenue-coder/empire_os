@@ -199,3 +199,22 @@ def test_legacy_innovator_ship_is_retired():
         json={"ship_action": {"kind": "create_lane", "args": {}}},
     )
     assert response.status_code == 410
+
+
+def test_legacy_a2a_catalog_and_product_reads_are_retired():
+    assert client.get("/v1/a2a/catalog").status_code == 410
+    assert client.get("/v1/products/pricing").status_code == 410
+    assert client.get("/v1/products/example").status_code == 410
+
+
+def test_legacy_outbox_reads_are_retired():
+    assert client.get("/v1/outbox/pending").status_code == 410
+    assert client.get("/v1/outbox/recent").status_code == 410
+
+
+def test_legacy_outreach_pending_read_is_retired():
+    response = client.get("/v1/outreach/prospects/pending")
+    assert response.status_code == 410
+    assert response.json()["detail"] == (
+        "legacy_outreach_pending_retired_use_canonical_outbound_review_flow"
+    )

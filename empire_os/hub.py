@@ -1335,214 +1335,43 @@ def outreach_get(prospect_id: str):
 
 @app.get("/v1/outreach/prospects/pending")
 def outreach_pending(metro: str = None, niche: str = None, limit: int = 20):
-    """List cold prospects (or by metro/niche) the outreach agent should review."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    try:
-        backend.execute("""
-            CREATE TABLE IF NOT EXISTS si_buyer_outreach (
-                prospect_id TEXT PRIMARY KEY, business_name TEXT,
-                email TEXT, metro TEXT, niche TEXT, phone TEXT,
-                source TEXT, score INTEGER, url TEXT,
-                first_touch_at TEXT, last_touch_at TEXT,
-                touch_count INTEGER DEFAULT 0,
-                reply_state TEXT DEFAULT 'cold',
-                sample_lead_id TEXT, converted INTEGER DEFAULT 0
-            )
-        """)
-        backend.commit()
-    except Exception:
-        pass
-
-    q = """
-        SELECT prospect_id, business_name, email, metro, niche,
-               phone, source, score, url, seq_step, last_touch_at
-        FROM si_buyer_outreach
-        WHERE (reply_state = 'cold' OR touch_count IS NULL OR touch_count = 0)
-    """
-    if metro:
-        q += f" AND metro='{metro}'"
-    if niche:
-        q += f" AND niche='{niche}'"
-    q += f" ORDER BY (email IS NOT NULL AND email != '') DESC, score DESC LIMIT {limit}"
-    rows = backend.execute(q).fetchall()
-    return {
-        "prospects": [
-            {
-                "prospect_id": r[0], "business_name": r[1],
-                "email": r[2], "metro": r[3], "niche": r[4],
-                "phone": r[5], "source": r[6], "score": r[7],
-                "url": r[8], "seq_step": r[9] or 0,
-                "last_touch_at": r[10] or "",
-            }
-            for r in rows
-        ]
-    }
+    """Retired legacy SQLite outreach queue read."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_outreach_pending_retired_use_canonical_outbound_review_flow",
+    )
 
 
 
-# ─────────────────────────────────────────────────────────────────
-# A2A SALES MESH — agent-to-agent commerce.
-# Other agents (lead exchanges, procurement bots, Empire nodes) post
-# buy-intent; hub matches open inventory and returns a USDC settle
-# instruction. No human in the loop. Same vault as human buyers.
-# Satellite wastage + warehouse asset reports are first-class SKUs.
-# ─────────────────────────────────────────────────────────────────
-
-VAULT = os.environ.get("SOLANA_VAULT_WALLET", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
-
-PRODUCT_CATALOG = {
-    "lead_lane": "Exclusive lead lane (niche+metro). Pay-per-lead in USDC.",
-    "satellite_wastage": "Idle-asset / logistics wastage monitor report (satellite).",
-    "warehouse_asset": "Warehouse inventory + asset reporting feed.",
-    "strike_pack": "Tiered emergency lead burst for a niche/metro event.",
-    "ai_closer": "Tiered MRR: AI closes your leads, settles in USDC.",
-}
-PRODUCT_PRICES = {"satellite_wastage": 99.0, "warehouse_asset": 79.0,
-                  "strike_pack": 199.0, "ai_closer": 299.0}
-
-
-def ensure_products_table():
-    """Dynamic product registry — GitHub-sourced OSS wrapped as B2B SKUs."""
-    try:
-        backend.execute("""CREATE TABLE IF NOT EXISTS si_products (
-            sku TEXT PRIMARY KEY,
-            name TEXT,
-            repo_url TEXT,
-            license TEXT,
-            description TEXT,
-            b2b_angle TEXT,
-            tier1_usdc REAL,
-            tier2_usdc REAL,
-            tier3_usdc REAL,
-            tier4_usdc REAL,
-            active INTEGER DEFAULT 1,
-            created_at TEXT
-        )""")
-        # migrate: add tier4 if missing (idempotent)
-        try:
-            backend.execute("ALTER TABLE si_products ADD COLUMN tier4_usdc REAL")
-        except Exception:
-            pass
-        backend.commit()
-    except Exception:
-        pass
-
-
-def load_product_catalog():
-    """Merge static catalog + dynamic DB products."""
-    cat = dict(PRODUCT_CATALOG)
-    prices = dict(PRODUCT_PRICES)
-    try:
-        ensure_products_table()
-        rows = backend.execute(
-            "SELECT sku, name, description, tier1_usdc FROM si_products "
-            "WHERE active=1").fetchall()
-        for sku, name, desc, t1 in rows:
-            cat[sku] = desc or name
-            if t1:
-                prices[sku] = float(t1)
-    except Exception:
-        pass
-    return cat, prices
+# Legacy Solana/USDC product-catalog runtime removed.
+# Governed A2A discovery and canonical product/commercial flows are active.
 
 
 @app.get("/v1/a2a/catalog")
 def a2a_catalog():
-    """What's for sale, machine-readable (static + GitHub-sourced)."""
-    cat, _ = load_product_catalog()
-    return {"vault": VAULT, "products": cat, "settlement": "solana_usdc"}
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_a2a_catalog_retired_use_a2a_v1_discovery",
+    )
 
 
 @app.get("/v1/products/pricing")
 def products_pricing():
-    """Full tiered pricing + one-time white-label setup fees (USDC/mo)."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    ensure_products_table()
-    # load static specs for PRODUCT_PRICES SKUs (not in DB)
-    import os as _os
-    specs = {}
-    sf = "/root/empire_os/empire_os/data/sku_specs.json"
-    if _os.path.exists(sf):
-        try:
-            specs = json.loads(open(sf).read())
-        except Exception:
-            specs = {}
-    rows = backend.execute(
-        "SELECT sku, name, tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, "
-        "setup_fee_usdc, active, features, benefits, deliverables "
-        "FROM si_products WHERE active=1").fetchall()
-    out = {}
-    for sku, name, t1, t2, t3, t4, sfee, act, feats, bens, dels in rows:
-        sp = specs.get(sku, {})
-        out[sku] = {
-            "name": name,
-            "tiers": {
-                "T1": float(t1 or 0), "T2": float(t2 or 0),
-                "T3": float(t3 or 0), "T4_titanium": float(t4 or 0),
-            },
-            "setup_fee_usdc": float(sfee or 0),
-            "whitelabel": float(sfee or 0) > 0,
-            "features": json.loads(feats) if feats else sp.get("features", []),
-            "benefits": json.loads(bens) if bens else sp.get("benefits", []),
-            "deliverables": json.loads(dels) if dels else sp.get("deliverables", []),
-        }
-    # include PRODUCT_PRICES SKUs (not in DB)
-    for sku, price in PRODUCT_PRICES.items():
-        if sku not in out:
-            sp = specs.get(sku, {})
-            out[sku] = {"name": sku, "tiers": {"T1": price, "T2": price * 2.5,
-                        "T3": price * 5, "T4_titanium": price * 10},
-                        "setup_fee_usdc": 0.0, "whitelabel": False,
-                        "features": sp.get("features", []),
-                        "benefits": sp.get("benefits", []),
-                        "deliverables": sp.get("deliverables", [])}
-    return {"vault": VAULT, "settlement": "solana_usdc", "pricing": out}
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_product_pricing_retired_use_governed_product_catalog",
+    )
 
 
 @app.get("/v1/products/{sku}")
 def product_detail(sku: str):
-    """Full spec: tiers, setup fee, features, benefits, deliverables."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    ensure_products_table()
-    import os as _os
-    specs = {}
-    sf = "/root/empire_os/empire_os/data/sku_specs.json"
-    if _os.path.exists(sf):
-        try:
-            specs = json.loads(open(sf).read())
-        except Exception:
-            pass
-    row = backend.execute(
-        "SELECT name, tier1_usdc, tier2_usdc, tier3_usdc, tier4_usdc, "
-        "setup_fee_usdc, description, features, benefits, deliverables "
-        "FROM si_products WHERE sku=? AND active=1", (sku,)).fetchone()
-    if row:
-        sp = specs.get(sku, {})
-        return {"sku": sku, "name": row[0],
-                "tiers": {"T1": float(row[1] or 0), "T2": float(row[2] or 0),
-                          "T3": float(row[3] or 0), "T4_titanium": float(row[4] or 0)},
-                "setup_fee_usdc": float(row[5] or 0),
-                "whitelabel": float(row[5] or 0) > 0,
-                "description": row[6],
-                "features": json.loads(row[7]) if row[7] else sp.get("features", []),
-                "benefits": json.loads(row[8]) if row[8] else sp.get("benefits", []),
-                "deliverables": json.loads(row[9]) if row[9] else sp.get("deliverables", []),
-                "vault": VAULT, "settlement": "solana_usdc"}
-    # PRODUCT_PRICES SKU
-    if sku in PRODUCT_PRICES:
-        sp = specs.get(sku, {})
-        price = PRODUCT_PRICES[sku]
-        return {"sku": sku, "name": sku,
-                "tiers": {"T1": price, "T2": price * 2.5, "T3": price * 5,
-                          "T4_titanium": price * 10},
-                "setup_fee_usdc": 0.0, "whitelabel": False,
-                "features": sp.get("features", []), "benefits": sp.get("benefits", []),
-                "deliverables": sp.get("deliverables", []),
-                "vault": VAULT, "settlement": "solana_usdc"}
-    raise HTTPException(404, "sku not found")
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_product_detail_retired_use_governed_product_catalog",
+    )
 
 
 @app.post("/v1/a2a/negotiate")
@@ -2076,9 +1905,11 @@ _HM_BACKEND = None  # set during lifespan startup
 
 @app.post("/v1/carrier-rosters/scrape")
 def carrier_rosters_scrape():
-    """Run all carrier scrapers and store results."""
-    from empire_os.carrier_rosters import run_all
-    return run_all(store=True)
+    """Retired public carrier-roster scrape mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_carrier_roster_scrape_retired_use_governed_source_mesh",
+    )
 
 @app.get("/v1/carrier-rosters")
 def carrier_rosters_list(carrier: str = None, limit: int = 100):
@@ -2376,61 +2207,11 @@ def buyers_enterprise_retired(req: dict):
 
 @app.get("/v1/outbox/pending")
 def outbox_pending(n: int = 10):
-    """List queued outbound emails awaiting send.
-
-    Owner-recipient rows (recipient_kind='owner') are gated on
-    si_prospect_consent.opted_in=1 for the matching prospect_id. Buyer
-    rows are returned unconditionally. This is the safety rail that
-    keeps the satellite-damage queue silent until each property owner
-    has explicitly opted in.
-    """
-    import sqlite3 as _sq3
-    cnx = _sq3.connect("/root/empire_os/empire_os.db")
-    try:
-        # Ensure the table exists with the columns mail-sender expects.
-        cnx.execute(
-            "CREATE TABLE IF NOT EXISTS si_outbox ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "to_email TEXT, subject TEXT, body TEXT,"
-            "lane TEXT, tier TEXT, lead_id TEXT, source TEXT,"
-            "status TEXT DEFAULT 'pending',"
-            "created_at TEXT DEFAULT (datetime('now')),"
-            "sent_at TEXT, resend_id TEXT,"
-            "recipient_kind TEXT DEFAULT 'buyer',"
-            "meta_json TEXT)"
-        )
-        cnx.commit()
-        rows = []
-        for r in cnx.execute(
-            "SELECT o.id, o.to_email, o.subject, o.body, o.lane, o.tier, "
-            "o.lead_id, o.source, o.status, o.created_at, "
-            "o.recipient_kind, o.meta_json "
-            "FROM si_outbox o "
-            "WHERE o.status='pending' "
-            "AND (o.recipient_kind IS NULL OR o.recipient_kind='buyer' "
-            "     OR (o.recipient_kind='owner' "
-            "         AND EXISTS (SELECT 1 FROM si_prospect_consent c "
-            "                     WHERE c.prospect_id = o.lead_id "
-            "                     AND c.opted_in = 1))) "
-            "ORDER BY o.id LIMIT ?",
-            (n,)):
-            rows.append({
-                "id":             r[0],
-                "to_email":       r[1],
-                "subject":        r[2],
-                "body":           r[3],
-                "lane":           r[4],
-                "tier":           r[5],
-                "lead_id":        r[6],
-                "source":         r[7],
-                "status":         r[8],
-                "created_at":     r[9],
-                "recipient_kind": r[10],
-                "meta_json":      r[11],
-            })
-        return {"rows": rows, "count": len(rows)}
-    finally:
-        cnx.close()
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_outbox_pending_retired_use_canonical_outbound_events",
+    )
 
 
 @app.post("/v1/outbox/{out_id}/mark")
@@ -2444,18 +2225,11 @@ def outbox_mark(out_id: int, req: dict):
 
 @app.get("/v1/outbox/recent")
 def outbox_recent(n: int = 50):
-    """Last N outbox items."""
-    import sqlite3 as _sq3
-    cnx = _sq3.connect("/root/empire_os/empire_os.db")
-    try:
-        rows = list(cnx.execute(
-            "SELECT id, to_email, status, sent_at, resend_id FROM si_outbox "
-            "ORDER BY id DESC LIMIT ?", (n,)))
-        return {"rows": [{"id": r[0], "to_email": r[1],
-                          "status": r[2], "sent_at": r[3],
-                          "resend_id": r[4]} for r in rows]}
-    finally:
-        cnx.close()
+    """Retired legacy read surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_outbox_recent_retired_use_canonical_outbound_events",
+    )
 
 
 @app.post("/v1/innovator/ship")
@@ -4585,145 +4359,9 @@ async def swarm_poll_events(since: str = "", limit: int = 50):
     return {"events": out, "count": len(out), "path": str(SWARMS_LOG)}
 
 
-# ── Carrier DRP Roster Endpoints ────────────────────────────────────
-
-
-def _ensure_carrier_rosters_table():
-    """Bootstrap carrier_rosters table on first use."""
-    import sqlite3 as _sq
-    cnx = _sq.connect("/root/empire_os/empire_os.db")
-    try:
-        cnx.execute(
-            "CREATE TABLE IF NOT EXISTS carrier_rosters ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "carrier TEXT NOT NULL,"
-            "company_name TEXT NOT NULL DEFAULT '',"
-            "license_no TEXT NOT NULL DEFAULT '',"
-            "city TEXT NOT NULL DEFAULT '',"
-            "state TEXT NOT NULL DEFAULT '',"
-            "zip TEXT NOT NULL DEFAULT '',"
-            "service_areas TEXT NOT NULL DEFAULT '',"
-            "specializations TEXT NOT NULL DEFAULT '',"
-            "phone TEXT NOT NULL DEFAULT '',"
-            "website TEXT NOT NULL DEFAULT '',"
-            "scraped_at TEXT NOT NULL DEFAULT '',"
-            "source_url TEXT NOT NULL DEFAULT '',"
-            "UNIQUE(carrier, company_name, license_no, city, state)"
-            ")"
-        )
-        cnx.commit()
-    finally:
-        cnx.close()
-
-
-@app.get("/v1/carrier-rosters")
-def list_carrier_rosters(carrier: str = None, limit: int = 100, offset: int = 0):
-    """List carrier roster entries, optionally filtered by carrier name."""
-    _ensure_carrier_rosters_table()
-    import sqlite3 as _sq
-    cnx = _sq.connect("/root/empire_os/empire_os.db")
-    cnx.row_factory = _sq.Row
-    try:
-        q = "SELECT * FROM carrier_rosters WHERE 1=1"
-        args = []
-        if carrier:
-            q += " AND carrier=?"
-            args.append(carrier)
-        q += " ORDER BY id DESC LIMIT ? OFFSET ?"
-        args.extend([limit, offset])
-        rows = [dict(r) for r in cnx.execute(q, args).fetchall()]
-        # count total (without limit/offset)
-        count_q = "SELECT COUNT(*) FROM carrier_rosters WHERE 1=1"
-        count_args = []
-        if carrier:
-            count_q += " AND carrier=?"
-            count_args.append(carrier)
-        total = cnx.execute(count_q, count_args).fetchone()[0]
-        return {"rows": rows, "total": total, "limit": limit, "offset": offset}
-    finally:
-        cnx.close()
-
-
-@app.post("/v1/carrier-rosters/scrape-all")
-def scrape_all_carrier_rosters():
-    """Trigger all carrier scrapers. Returns summary counts per carrier.
-
-    Runs synchronously; for larger sets this should be made async.
-    """
-    # Import here to avoid circular import at module level
-    from empire_os.carrier_rosters import run_all_scrapers
-    result = run_all_scrapers(
-        hub_url=f"http://localhost:{int(os.environ.get('EMPIRE_PORT', '8080'))}",
-        db_path="/root/empire_os/empire_os.db",
-    )
-    return result
-
-
-@app.get("/v1/carrier-rosters/stats")
-def carrier_roster_stats():
-    """Return row counts grouped by carrier."""
-    _ensure_carrier_rosters_table()
-    import sqlite3 as _sq
-    cnx = _sq.connect("/root/empire_os/empire_os.db")
-    try:
-        rows = cnx.execute(
-            "SELECT carrier, COUNT(*) as cnt FROM carrier_rosters "
-            "GROUP BY carrier ORDER BY cnt DESC"
-        ).fetchall()
-        counts = {r[0]: r[1] for r in rows}
-        total = sum(counts.values())
-        return {"counts": counts, "total": total, "carriers": len(counts)}
-    finally:
-        cnx.close()
-
-
-@app.post("/v1/carrier-rosters/batch")
-def batch_insert_carrier_rosters(req: dict):
-    """Internal batch insert endpoint — used by the scraper module to
-    POST scraped rows to the hub for centralised storage.
-
-    Body: { carrier: str, rows: [{company_name, license_no, ...}] }
-    """
-    carrier = req.get("carrier", "")
-    rows = req.get("rows", [])
-    if not carrier or not rows:
-        raise HTTPException(400, "carrier and rows required")
-    _ensure_carrier_rosters_table()
-    import sqlite3 as _sq
-    cnx = _sq.connect("/root/empire_os/empire_os.db")
-    try:
-        inserted = 0
-        for row in rows:
-            try:
-                cnx.execute(
-                    "INSERT OR IGNORE INTO carrier_rosters "
-                    "(carrier, company_name, license_no, city, state, "
-                    " zip, service_areas, specializations, phone, "
-                    " website, scraped_at, source_url) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        row.get("carrier", carrier),
-                        row.get("company_name", ""),
-                        row.get("license_no", ""),
-                        row.get("city", ""),
-                        row.get("state", ""),
-                        row.get("zip", ""),
-                        row.get("service_areas", ""),
-                        row.get("specializations", ""),
-                        row.get("phone", ""),
-                        row.get("website", ""),
-                        row.get("scraped_at", ""),
-                        row.get("source_url", ""),
-                    ),
-                )
-                if cnx.total_changes:
-                    inserted += 1
-            except Exception as e:
-                logger.warning("batch_insert_skipped: %s", e)
-        cnx.commit()
-        return {"ok": True, "carrier": carrier, "received": len(rows), "inserted": inserted}
-    finally:
-        cnx.close()
+# ── Carrier DRP Roster Compatibility ───────────────────────────────
+# Read-only roster inspection is provided by the earlier canonical route set.
+# Duplicate SQLite table-bootstrap/scrape/batch routes were removed.
 
 
 # ── Carrier Application Portal Auto-Filler (Blueprint v5 #3) ───────────
