@@ -169,10 +169,12 @@ class TestDecisions:
         assert "decisions" in data
         assert isinstance(data["decisions"], list)
 
-    def test_decision_approve_404(self, client):
-        """Approving a non-existent prospect returns 404."""
+    def test_decision_approve_is_retired(self, client):
         resp = client.post("/v1/decisions/no_such_id/approve")
-        assert resp.status_code == 404
+        assert resp.status_code == 410
+        assert resp.json()["detail"] == (
+            "legacy_decision_approve_retired_use_governed_approval_execution_bus"
+        )
 
     def test_decision_deny_404(self, client):
         """Denying a non-existent prospect returns 404."""
@@ -197,31 +199,25 @@ class TestDashboard:
 
 
 class TestTelegramRoutes:
-    def test_telegram_brief_no_token(self, client):
+    def test_telegram_brief_is_retired(self, client):
         resp = client.post("/v1/telegram/brief", json={})
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["ok"] is False  # no token configured
+        assert resp.status_code == 410
 
-    def test_telegram_alert_no_token(self, client):
+    def test_telegram_alert_is_retired(self, client):
         resp = client.post("/v1/telegram/alert", json={}, params={"message": "test"})
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["ok"] is False
+        assert resp.status_code == 410
 
 
 class TestWaterfallRoutes:
-    def test_leads_enrich(self, client):
+    def test_leads_enrich_is_retired(self, client):
         resp = client.post(
             "/v1/leads/enrich",
             json={"company": "Acme Roofing", "phone": "555-1234"},
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        # All providers are unconfigured by default, so should fail validation
-        assert "success" in data
-        assert "providers_tried" in data
-        assert "cost_cents" in data
+        assert resp.status_code == 410
+        assert resp.json()["detail"] == (
+            "legacy_lead_enrich_retired_use_evidence_enrichment_planner"
+        )
 
     def test_waterfall_metrics(self, client):
         resp = client.get("/v1/waterfall/metrics")

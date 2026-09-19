@@ -720,30 +720,13 @@ METRO_ZIPS: dict[str, str] = {
 
 
 @app.post("/v1/damage/scan")
-def damage_scan(req: DamageScanRequest):
-    """Run a satellite damage scan.
+def damage_scan(req: dict):
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_damage_scan_retired_use_governed_source_mesh",
+    )
 
-    Body: {"postcode": "75201"} or {"bbox": {...}, "metro_code": "DFW"}.
-    Optional: {"use_bda": true, "bda_checkpoint": "/path/to/ckpt.pt"}.
-    Returns scan_id, bbox, parcel count, top damaged parcels, db counts.
-    """
-    try:
-        kwargs = {}
-        if req.postcode:
-            kwargs["postcode"] = req.postcode
-            kwargs["country"] = "us"
-        if req.metro_code:
-            kwargs["metro_code"] = req.metro_code
-        if req.bbox:
-            kwargs["bbox"] = req.bbox
-        if req.use_bda:
-            kwargs["use_bda"] = True
-        if req.bda_checkpoint:
-            kwargs["bda_checkpoint"] = req.bda_checkpoint
-        result = _damage_scan(**kwargs)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)[:300])
 
 
 @app.get("/v1/damage/scan/recent")
@@ -759,35 +742,12 @@ def damage_scan_recent(limit: int = 5):
 
 @app.get("/v1/damage/scan-all")
 def damage_scan_all():
-    """Run one damage scan per metro and return consolidated results.
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_damage_scan_all_retired_use_governed_source_mesh",
+    )
 
-    This is the daily-strike endpoint: iterates all 11 metros, runs
-    run_scan on each representative zip, and returns per-metro results
-    plus a total. Intended for cron or on-demand storm sweeps.
-    """
-    from empire_os.agents.satellite_damage_agent import run_scan as _ds
-    results: dict[str, dict] = {}
-    totals = {"prospects": 0, "lane_leads": 0, "outbox": 0, "skipped": 0}
-    for metro_code, postcode in METRO_ZIPS.items():
-        try:
-            r = _ds(postcode=postcode, metro_code=metro_code, use_bda=True)
-            results[metro_code] = {
-                "parcel_count": r.get("parcel_count"),
-                "counts": r.get("counts"),
-                "scan_id": r.get("scan_id"),
-                "bda": r.get("bda"),
-                "error": None,
-            }
-            c = r.get("counts", {})
-            for k in totals:
-                totals[k] += c.get(k, 0)
-        except Exception as e:
-            results[metro_code] = {"error": str(e)[:200]}
-    n_ok = sum(1 for v in results.values() if not v.get("error"))
-    n_err = len(results) - n_ok
-    return {"ok": True, "metros": len(results),
-            "ok_metros": n_ok, "error_metros": n_err,
-            "totals": totals, "details": results}
 
 
 @app.get("/v1/damage/optin-landing/{prospect_id}", response_class=HTMLResponse)
@@ -1034,67 +994,12 @@ RESEND_WEBHOOK_LOG.parent.mkdir(parents=True, exist_ok=True)
 
 @app.post("/v1/resend/webhook")
 async def resend_webhook(request: Request):
-    """Receive Resend delivery events.
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_resend_webhook_retired_use_signed_canonical_webhook_service",
+    )
 
-    Headers:
-        svix-id, svix-timestamp, svix-signature — Svix signature scheme
-
-    Resend events: email.sent, email.delivered, email.bounced,
-                   email.complained, email.opened, email.clicked,
-                   delivery.delayed, recipient.complained
-    """
-    body_bytes = await request.body()
-    sig_header = request.headers.get("svix-signature", "")
-    resend_secret = ""
-    env_path = Path("/root/empire_os/.env")
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            if line.startswith("RESEND_WEBHOOK_SECRET="):
-                resend_secret = line.split("=", 1)[1].strip()
-                break
-
-    # Verify Svix signature if secret set (skip if missing secret — dev mode)
-    if resend_secret and sig_header:
-        try:
-            ts = request.headers.get("svix-timestamp", "")
-            msg_id = request.headers.get("svix-id", "")
-            signed = f"{msg_id}.{ts}.{body_bytes.decode()}"
-            # svix-signature can have multiple "v1,<sig>" entries separated by space
-            expected = _hmac.new(
-                resend_secret.encode(),
-                signed.encode(),
-                _hashlib.sha256,
-            ).hexdigest()
-            sigs = [s.split(",", 1)[1] for s in sig_header.split() if s.startswith("v1,")]
-            if not any(_hmac.compare_digest(expected, s) for s in sigs):
-                raise HTTPException(401, "invalid signature")
-        except HTTPException:
-            raise
-        except Exception:
-            raise HTTPException(400, "signature parse failed")
-
-    try:
-        payload = json.loads(body_bytes.decode())
-    except Exception:
-        raise HTTPException(400, "invalid JSON")
-
-    # Log every event to disk
-    event = {
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "type": payload.get("type"),
-        "created_at": payload.get("created_at"),
-        "data": payload.get("data", {}),
-    }
-    with open(RESEND_WEBHOOK_LOG, "a") as f:
-        f.write(json.dumps(event) + "\n")
-
-    # Update any matched lead via Resend's metadata
-    # Resend forward custom metadata from sends — we set lead_id in
-    # send_email to attach it to each delivery
-    md = payload.get("data", {}).get("metadata", {}) or {}
-    lead_id = md.get("lead_id") if isinstance(md, dict) else None
-
-    return {"received": True, "type": payload.get("type"), "lead_id": lead_id}
 
 
 @app.get("/v1/resend/webhook/recent")
@@ -2364,45 +2269,13 @@ class SweepPayload(BaseModel):
 
 
 @app.post("/v1/sweep/run")
-def run_sweep(payload: SweepPayload):
-    """Run a market sweep — the core Neural Scout operation.
-    
-    This is the legacy D:\\EmpireHermes market-sweep entry point,
-    now running on the Linux infrastructure.  'local' uses the
-    hub's built-in Neural Scout; 'scout-agent' proxies to the
-    dedicated scanner container on empire-net.
-    """
-    global backend, scout, scout_agent
-    if payload.target == "scout-agent":
-        if not scout_agent:
-            raise HTTPException(503, "scout-agent not configured")
-        if not scout_agent.check_health():
-            raise HTTPException(502, "scout-agent unreachable")
-        prev = scout.min_score if scout else 0.30
-        result = scout_agent.scan(niches=payload.markets, min_score=payload.min_score)
-        return {"target": "scout-agent", **result, "niches": payload.markets}
+def sweep_run(req: dict = None):
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_sweep_run_retired_use_governed_source_mesh",
+    )
 
-    # Local — run on hub's Neural Scout
-    if not scout:
-        raise HTTPException(503, "scout not initialized")
-    prev = scout.min_score
-    scout.min_score = payload.min_score
-    try:
-        result = scout.tick(niches=payload.markets)
-        return {
-            "target": "local",
-            "scanned": result["scanned"],
-            "registered": result["registered"],
-            "niches": payload.markets,
-            "leads": [
-                {"prospect_id": l["prospect_id"],
-                 "niche": l["niche"],
-                 "score": l["score"]}
-                for l in result.get("leads", [])
-            ],
-        }
-    finally:
-        scout.min_score = prev
 
 
 # --- AGI Agents (delegated to dedicated containers) ---
@@ -3120,37 +2993,12 @@ def marketingskills_access(req: dict):
 
 @app.post("/v1/strike-pack/claim")
 def strike_pack_claim(req: dict):
-    """B2B: buyer with active sku_strike_pack gets an immediate lead burst
-    (pack) from a niche/metro."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "strike_pack"):
-        raise HTTPException(402, "no active strike_pack subscription")
-    niche = req.get("niche", "")
-    metro = req.get("metro", "")
-    size = int(req.get("size", 10))
-    # pull real leads from lane_leads matching niche+metro (or sample)
-    rows = backend.execute(
-        "SELECT id, prospect_id, niche FROM lane_leads "
-        "WHERE (? = '' OR niche = ?) LIMIT ?",
-        (niche, niche, size)).fetchall()
-    if not rows:
-        rows = [("sample", f"sample_{i}", niche) for i in range(min(size, 3))]
-    pack = [{"lead_id": r[0], "prospect_id": r[1], "niche": r[2]}
-            for r in rows[:size]]
-    try:
-        with open("/root/feedback/b2b_strike_pack.jsonl", "a") as f:
-            f.write(json.dumps({
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "tenant": tenant, "pack_size": len(pack),
-                "niche": niche, "metro": metro,
-            }) + "\n")
-    except Exception:
-        pass
-    return {"ok": True, "pack_size": len(pack), "niche": niche,
-            "metro": metro, "leads": pack,
-            "note": "pack delivered; per-lead billing on delivery"}
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_strike_pack_claim_retired_use_revenue_exchange_and_governed_fulfilment",
+    )
+
 
 
 # --- AGI Loop (continuous orchestrator) ---
@@ -3257,69 +3105,12 @@ def decisions_list():
 
 @app.post("/v1/decisions/{decision_id}/approve")
 def decisions_approve(decision_id: str):
-    """Approve a CEO decision — trigger the corresponding action."""
-    from empire_os.funnel import transition, get_state, FunnelState
-    if not backend:
-        raise HTTPException(503, "Engine not initialized")
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_decision_approve_retired_use_governed_approval_execution_bus",
+    )
 
-    # Map decision kinds to actions
-    state = get_state(backend, decision_id)
-    if not state:
-        raise HTTPException(404, f"Prospect {decision_id} not found")
-
-    current = state.current_state
-    result = {"prospect_id": decision_id, "from_state": current}
-
-    # Matched → Outreach_drafted (generate draft via sales agent)
-    if current == FunnelState.MATCHED.value:
-        # Trigger an AGI Sales draft action
-        global agi_sales
-        if not agi_sales:
-            raise HTTPException(503, "agi-sales not ready")
-        ev = events_for(backend, decision_id)
-        niche = "general"
-        for e in ev:
-            if "niche=" in e.notes:
-                niche = e.notes.split("niche=")[-1].split(",")[0].strip()
-                break
-        out = agi_sales.act(
-            f'{{"action":"draft","prospect_id":"{decision_id}","niche":"{niche}","angle":"operator_approved"}}'
-        )
-        result["action"] = "draft"
-        result["draft"] = out.get("draft", "")
-        return result
-
-    # Replied → Claimed
-    elif current == FunnelState.REPLIED.value:
-        eid = transition(backend, decision_id, FunnelState.CLAIMED.value, "operator", notes="operator_approved")
-        result["action"] = "claim"
-        result["event_id"] = eid
-        return result
-
-    # Claimed → Settled (manual settlement)
-    elif current == FunnelState.CLAIMED.value:
-        amount_cents = 150000  # default settlement
-        eid = transition(
-            backend, decision_id, FunnelState.SETTLED.value,
-            "operator", notes=f"settled ${amount_cents/100:.2f}, operator_approved",
-        )
-        result["action"] = "settle"
-        result["event_id"] = eid
-        result["amount_cents"] = amount_cents
-        return result
-
-    # Outreach_drafted → Outreach_sent (operator pushes it live)
-    elif current == FunnelState.OUTREACH_DRAFTED.value:
-        eid = transition(
-            backend, decision_id, FunnelState.OUTREACH_SENT.value,
-            "operator", notes="outreach_sent, operator_approved",
-        )
-        result["action"] = "send"
-        result["event_id"] = eid
-        return result
-
-    else:
-        raise HTTPException(400, f"No actionable transition from state '{current}'")
 
 
 @app.post("/v1/decisions/{decision_id}/deny")
@@ -3349,28 +3140,13 @@ class FunnelTransitionRequest(BaseModel):
 
 
 @app.post("/v1/funnel/{prospect_id}/transition")
-def funnel_transition(prospect_id: str, req: FunnelTransitionRequest):
-    """Move a prospect to a new funnel state.
+def funnel_transition(prospect_id: str, req: dict):
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_funnel_transition_retired_use_revenue_crm_and_governed_state_flow",
+    )
 
-    Used by agents (AGI Closer, Reddit Sniper, Storm) to advance
-    prospects through the pipeline. Validates the transition is
-    allowed by the funnel invariants.
-    """
-    from empire_os.funnel import transition, get_state, FunnelState
-    if not backend:
-        raise HTTPException(503, "Engine not initialized")
-    state = get_state(backend, prospect_id)
-    if not state:
-        raise HTTPException(404, f"Prospect {prospect_id} not found")
-    try:
-        eid = transition(
-            backend, prospect_id, req.to_state,
-            actor=req.actor, notes=req.notes,
-        )
-        return {"event_id": eid, "prospect_id": prospect_id,
-                "to_state": req.to_state, "actor": req.actor}
-    except Exception as e:
-        raise HTTPException(400, str(e))
 
 
 # --- Price-and-Settle (LLM-priced settlements with fee split) ---
@@ -3555,20 +3331,13 @@ class LeadEnrichRequest(BaseModel):
 
 
 @app.post("/v1/leads/enrich")
-def leads_enrich(req: LeadEnrichRequest):
-    """Run a lead through the Waterfall to get verified contact info."""
-    global waterfall
-    if not waterfall:
-        raise HTTPException(503, "Waterfall not initialized")
-    lead_info = {
-        "company": req.company,
-        "phone": req.phone,
-        "email": req.email,
-        "name": req.name,
-        "vertical": req.vertical,
-    }
-    result = waterfall.enrich(lead_info)
-    return result.to_dict()
+def leads_enrich(req: dict):
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lead_enrich_retired_use_evidence_enrichment_planner",
+    )
+
 
 
 @app.get("/v1/waterfall/metrics")
@@ -3590,33 +3359,23 @@ class TelegramPayload(BaseModel):
 
 
 @app.post("/v1/telegram/brief")
-def telegram_brief(payload: TelegramPayload):
-    """Send CEO brief to Telegram. Falls back to env vars."""
-    if not backend:
-        raise HTTPException(503, "Engine not initialized")
-    result = send_brief(
-        backend,
-        token=payload.token,
-        chat_id=payload.chat_id,
+def telegram_brief(req: dict = None):
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_telegram_brief_retired_use_governed_notification_flow",
     )
-    return result
+
 
 
 @app.post("/v1/telegram/alert")
-def telegram_alert(payload: TelegramPayload, message: str = ""):
-    """Send an alert to Telegram.
-
-    `message` may arrive either as a query param OR in the JSON body
-    (payload.message). Body wins when present. This lets callers POST
-    a structured payload (e.g. payment links) instead of URL-encoding.
-    """
-    text = payload.message or message or "Empire OS alert triggered"
-    result = send_alert(
-        text,
-        token=payload.token,
-        chat_id=payload.chat_id,
+def telegram_alert(req: dict = None, message: str = ""):
+    """Retired legacy execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_telegram_alert_retired_use_governed_notification_flow",
     )
-    return result
+
 
 
 # --- Wallet signing UI + Solana Pay Transaction Request ---
@@ -4332,15 +4091,13 @@ def crm_list(request: Request):
 
 
 @app.post("/v1/crm/leads/batch-enrich")
-def crm_batch_enrich_endpoint():
-    """Enrich up to 50 leads with lowest enrichment scores."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        result = crm_batch_enrich(backend, limit=50)
-        return {"ok": True, **result}
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+def crm_batch_enrich_retired():
+    """Retired legacy CRM mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_batch_enrich_retired_use_evidence_enrichment_planner",
+    )
+
 
 
 @app.get("/v1/crm/leads/{lead_id}")
@@ -4369,59 +4126,43 @@ class CrmUpdateRequest(BaseModel):
 
 
 @app.post("/v1/crm/leads/{lead_id}")
-def crm_update(lead_id: int, req: CrmUpdateRequest):
-    """Update lead fields."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        updates = {k: v for k, v in req.dict(exclude_none=True).items() if v is not None}
-        return crm_update_lead(backend, lead_id, updates)
-    except ValueError as e:
-        raise HTTPException(404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+def crm_update_retired(lead_id: int, req: dict):
+    """Retired legacy CRM mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_lead_update_retired_use_revenue_crm_governed_state_flow",
+    )
+
 
 
 @app.post("/v1/crm/leads/{lead_id}/status")
-def crm_set_status(lead_id: int, req: CrmUpdateRequest):
-    """Move lead to a pipeline stage."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    if not req.status:
-        raise HTTPException(400, detail="status required")
-    try:
-        return crm_set_stage(backend, lead_id, req.status)
-    except ValueError as e:
-        raise HTTPException(400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+def crm_status_retired(lead_id: int, req: dict):
+    """Retired legacy CRM mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_status_retired_use_revenue_crm_governed_state_flow",
+    )
+
 
 
 @app.post("/v1/crm/leads/{lead_id}/enrich")
-def crm_enrich(lead_id: int):
-    """Run enrichment waterfall for a single lead."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        import asyncio
-        result = asyncio.run(crm_enrich_lead(backend, lead_id))
-        return {"ok": True, **result}
-    except ValueError as e:
-        raise HTTPException(404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+def crm_enrich_retired(lead_id: int):
+    """Retired legacy CRM mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_enrich_retired_use_evidence_enrichment_planner",
+    )
+
 
 
 @app.post("/v1/crm/leads/batch-enrich")
-def crm_batch_enrich_endpoint():
-    """Enrich up to 50 leads with lowest enrichment scores."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        result = crm_batch_enrich(backend, limit=50)
-        return {"ok": True, **result}
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+def crm_batch_enrich_retired():
+    """Retired legacy CRM mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_batch_enrich_retired_use_evidence_enrichment_planner",
+    )
+
 
 
 @app.get("/v1/crm/pipeline")
@@ -4458,15 +4199,13 @@ def crm_qualification():
 
 
 @app.post("/v1/crm/import-lane-leads")
-def crm_import():
-    """Import all lane_leads into CRM. Idempotent."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        result = crm_import_lane_leads(backend)
-        return {"ok": True, **result}
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+def crm_import_retired():
+    """Retired legacy CRM mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_lane_import_retired_use_canonical_prospect_intake",
+    )
+
 
 
 @app.get("/v1/crm/analytics")
@@ -4663,26 +4402,23 @@ def crm_icp_score_route(lead_id: int):
 
 
 @app.post("/v1/crm/icp/batch")
-def crm_icp_batch_route():
-    """Update ICP scores for all unscored leads."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        return crm_icp_batch(backend)
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+def crm_icp_batch_retired():
+    """Retired legacy CRM mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_icp_batch_retired_use_canonical_intelligence_materializer",
+    )
+
 
 
 @app.post("/v1/crm/icp/score/{lead_id}")
-def crm_icp_refresh_route(lead_id: int):
-    """Refresh ICP score for a lead."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        from empire_os.icp import update_lead_icp_score
-        return update_lead_icp_score(backend, lead_id)
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:500])
+def crm_icp_refresh_retired(lead_id: int):
+    """Retired legacy CRM mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crm_icp_refresh_retired_use_canonical_intelligence_materializer",
+    )
+
 
 
 # --- Direct execution ---
