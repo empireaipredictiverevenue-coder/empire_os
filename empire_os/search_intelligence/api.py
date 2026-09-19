@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from .attribution import preview_search_revenue_attribution
 from .ai_visibility import AiCitationObservation, analyse_ai_visibility
 from .backlinks import BacklinkObservation, analyse_backlink_graph
+from .citation_gap import analyse_citation_gap
 from .commander import SearchCommanderAgent
 from .competitor_gap import analyse_competitor_gap
 from .health import search_health
@@ -45,6 +46,16 @@ class AiVisibilityPreviewRequest(BaseModel):
     engine: str
     empire_domains: list[str] = Field(min_length=1)
     observations: list[AiCitationObservationRequest] = Field(default_factory=list)
+
+class CitationGapPreviewRequest(BaseModel):
+    query: str
+    engine: str
+    empire_domains: list[str] = Field(min_length=1)
+    competitor_domains: list[str] = Field(min_length=1)
+    observations: list[AiCitationObservationRequest] = Field(
+        default_factory=list
+    )
+
 
 class BacklinkObservationRequest(BaseModel):
     source_url: str
@@ -242,6 +253,38 @@ def create_search_router(
     @router.get("/ai-visibility")
     def ai_visibility(limit: int = Query(default=200, ge=1, le=500)):
         return _collection("ai_visibility", limit)
+
+    @router.post("/citation-gap/preview")
+    def citation_gap_preview(req: CitationGapPreviewRequest):
+        try:
+            observations = tuple(
+                AiCitationObservation(
+                    query=item.query,
+                    engine=item.engine,
+                    observed_at=item.observed_at,
+                    cited_url=item.cited_url,
+                    source_url=item.source_url,
+                    citation_position=item.citation_position,
+                    mention_text=item.mention_text,
+                    provenance=tuple(item.provenance),
+                )
+                for item in req.observations
+            )
+            analysis = analyse_citation_gap(
+                observations,
+                query=req.query,
+                engine=req.engine,
+                empire_domains=tuple(req.empire_domains),
+                competitor_domains=tuple(req.competitor_domains),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_allowed": False,
+            "analysis": analysis.as_dict(),
+        }
 
     @router.get("/backlinks")
     def backlinks(limit: int = Query(default=200, ge=1, le=500)):
