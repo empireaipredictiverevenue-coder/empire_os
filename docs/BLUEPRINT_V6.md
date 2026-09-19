@@ -99,7 +99,9 @@ Phase 3F deliverables:
 - OBSERVE-first bounded revenue-recognition worker + systemd timer. ✅ local/tested
 - Canonical Lead Intelligence convergence: both lead intake compatibility URLs now feed canonical prospects; evidence-preserving read projection over prospects → acquisition provenance → identity → Intelligence Fabric → qualification is local/tested with a dedicated SELECT-only role. ✅ local/tested
 - Read-only canonical-vs-legacy parity engine/CLI is local/tested; it uses only the dedicated Lead Intelligence DSN plus SQLite mode=ro, reports ambiguity/mismatches without reconciling or mutating data. ✅ local/tested
-- Lead Intelligence reader-role migration/credential activation, production parity execution, internal API exposure, and legacy CRM consumer migration remain gated.
+- Lead Intelligence SELECT-only reader role migration is applied in canonical Supabase; runtime credential activation remains gated. Production inspection found 29,807 prospects, 12,184 active identity links, 1,177 qualifications, 466 prospects with both identity + qualification, and only 1 acquisition-ledger row; legacy SQLite crm_leads/lane_leads are empty.
+- Intelligence Materializer planner + dedicated append-only writer contract are local/tested: observed prospect facts and v1 qualification scores only, deterministic evidence hashes, no synthetic enrichment/confidence, INSERT-only facts/scores, no unrelated commercial authority. ✅ local/tested
+- Intelligence Materializer production writer migration/credential activation and any bulk historical materialization remain gated.
 - Production migration/runtime credential activation and live evidence observation remain gated.
 
 ### Empire Coder — Developer Intelligence Layer (HIGH PRIORITY PARALLEL FOUNDATION)
