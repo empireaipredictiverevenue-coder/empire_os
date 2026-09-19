@@ -226,6 +226,8 @@ Foundation slice ✅ local/tested: staged `revenue_exchange_observations` and a 
 ### Phase 14 — Digital Twin
 Simulate markets, campaigns, pricing, buyers, inventory, sales capacity, ad spend and offers before deploying real capital.
 
+Foundation slice ✅ local/tested: deterministic market scenarios now require an observed baseline with provenance plus explicit demand/capacity/price assumptions. Results are permanently labeled `simulation_only=true` and `actual_revenue=false`; no real spend, campaign/pricing mutation or production execution is enabled.
+
 ### Phase 15 — Capital Allocator
 Astra evaluates expected return, risk, cost, cash, confidence and time-to-revenue to decide where the next unit of capital should go.
 
