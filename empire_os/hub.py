@@ -2505,15 +2505,6 @@ def agi_closer_tick():
     )
 
 
-def has_active_sku(tenant: str, sku: str) -> bool:
-    """True if tenant holds an active si_subscription for this SKU."""
-    if not backend:
-        return False
-    row = backend.execute(
-        "SELECT subscription_id FROM si_subscription "
-        "WHERE tenant_id = ? AND plan = ? AND status IN ('active','paid')",
-        (tenant, f"sku_{sku}")).fetchone()
-    return bool(row)
 
 
 @app.post("/v1/ai-closer/close")
@@ -2527,468 +2518,108 @@ def ai_closer_close(req: dict):
 
 @app.post("/v1/satellite/idle-watch/report")
 def idle_watch_report(req: dict):
-    """B2B: buyer with active sku_satellite_idle_watch gets a tiered
-    idle-asset / logistics-waste opportunity report (rule-based, no LLM).
-    Tiers via subscription seats: 1=T1 summary, 2=T2 top-10, 3=T3 full+KILL."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "satellite_idle_watch"):
-        raise HTTPException(402, "no active satellite_idle_watch subscription")
-    # determine tier from subscription seats (default 1)
-    tier = int(req.get("tier", 0) or 0)
-    if tier < 1:
-        row = backend.execute(
-            "SELECT seats FROM si_subscription WHERE tenant_id=? "
-            "AND plan=? AND status IN ('active','paid')",
-            (tenant, "sku_satellite_idle_watch")).fetchone()
-        tier = int(row[0]) if row and row[0] else 1
-    tier = min(max(tier, 1), 4)
-    # run on-demand scan (reuse idle_asset_sniper logic; skip Supabase)
-    try:
-        import importlib.util as _iu
-        spec = _iu.spec_from_file_location(
-            "idle_asset_sniper_agent",
-            "/root/empire_os/empire_os/agents/idle_asset_sniper_agent.py")
-        mod = _iu.module_from_spec(spec); spec.loader.exec_module(mod)
-        finds = []
-        for name, url in mod.FEEDS:
-            for a in mod._scan_feed(name, url):
-                score, atype = mod._score(a)
-                if score >= 0.5:
-                    finds.append({"title": a["title"][:120], "url": a["url"],
-                                  "asset_type": atype, "score": round(score, 3)})
-        finds.sort(key=lambda x: x["score"], reverse=True)
-        kills = [f for f in finds if f["score"] >= mod.KILL_THRESHOLD]
-    except Exception as e:
-        finds, kills = [], []
-        note = f"scan_error: {str(e)[:120]}"
-    else:
-        note = None
-    # tier the report
-    if tier == 1:
-        shown = finds[:3]
-        body = {"tier": "T1", "total_opportunities": len(finds),
-                "top": shown, "kill_alerts": len(kills)}
-    elif tier == 2:
-        shown = finds[:10]
-        body = {"tier": "T2", "total_opportunities": len(finds),
-                "opportunities": shown, "kill_alerts": len(kills)}
-    else:
-        body = {"tier": "T3", "total_opportunities": len(finds),
-                "opportunities": finds, "kill_alerts": kills}
-    if tier == 4:
-        # TITANIUM — full feed + kills + dedicated real-time monitoring flag
-        body = {"tier": "T4 (titanium)", "total_opportunities": len(finds),
-                "opportunities": finds, "kill_alerts": kills,
-                "dedicated_monitoring": True,
-                "api_webhook_ready": True,
-                "priority_support": True}
-    body["sku"] = "satellite_idle_watch"
-    body["generated_at"] = datetime.now(timezone.utc).isoformat()
-    if note:
-        body["note"] = note
-    try:
-        with open("/root/feedback/b2b_idle_watch.jsonl", "a") as f:
-            f.write(json.dumps({"ts": body["generated_at"], "tenant": tenant,
-                                "tier": tier, "opportunities": len(finds),
-                                "kills": len(kills)}) + "\n")
-    except Exception:
-        pass
-    return {"ok": True, "report": body}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_idle_watch_report_retired_use_revenue_exchange_and_governed_product_delivery",
+    )
+
 
 
 @app.post("/v1/warehouse/asset/report")
 def warehouse_asset_report(req: dict):
-    """B2B: buyer with active sku_warehouse_asset gets a tiered warehouse /
-    idle-industrial opportunity report (reuses idle-asset feed scan, filtered
-    to logistics_waste / vacant-warehouse signals). Rule-based, no LLM."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "warehouse_asset"):
-        raise HTTPException(402, "no active warehouse_asset subscription")
-    tier = int(req.get("tier", 0) or 0)
-    if tier < 1:
-        row = backend.execute(
-            "SELECT seats FROM si_subscription WHERE tenant_id=? "
-            "AND plan=? AND status IN ('active','paid')",
-            (tenant, "sku_warehouse_asset")).fetchone()
-        tier = int(row[0]) if row and row[0] else 1
-    tier = min(max(tier, 1), 4)
-    try:
-        import importlib.util as _iu
-        spec = _iu.spec_from_file_location(
-            "idle_asset_sniper_agent",
-            "/root/empire_os/empire_os/agents/idle_asset_sniper_agent.py")
-        mod = _iu.module_from_spec(spec); spec.loader.exec_module(mod)
-        finds = []
-        for name, url in mod.FEEDS:
-            for a in mod._scan_feed(name, url):
-                score, atype = mod._score(a)
-                # warehouse-focused: logistics_waste + warehouse keywords
-                if atype == "logistics_waste" or any(
-                        w in a["title"].lower() for w in
-                        ["warehouse", "storage", "industrial", "distribution",
-                         "fulfillment", "cold storage"]):
-                    if score >= 0.5:
-                        finds.append({"title": a["title"][:120], "url": a["url"],
-                                      "asset_type": atype, "score": round(score, 3)})
-        finds.sort(key=lambda x: x["score"], reverse=True)
-        kills = [f for f in finds if f["score"] >= mod.KILL_THRESHOLD]
-    except Exception as e:
-        finds, kills = [], []
-        note = f"scan_error: {str(e)[:120]}"
-    else:
-        note = None
-    if tier == 1:
-        body = {"tier": "T1", "total_opportunities": len(finds),
-                "top": finds[:3], "kill_alerts": len(kills)}
-    elif tier == 2:
-        body = {"tier": "T2", "total_opportunities": len(finds),
-                "opportunities": finds[:10], "kill_alerts": len(kills)}
-    else:
-        body = {"tier": "T3", "total_opportunities": len(finds),
-                "opportunities": finds, "kill_alerts": kills}
-    if tier == 4:
-        body = {"tier": "T4 (titanium)", "total_opportunities": len(finds),
-                "opportunities": finds, "kill_alerts": kills,
-                "dedicated_monitoring": True,
-                "api_webhook_ready": True,
-                "priority_support": True}
-    body["sku"] = "warehouse_asset"
-    body["generated_at"] = datetime.now(timezone.utc).isoformat()
-    if note:
-        body["note"] = note
-    try:
-        with open("/root/feedback/b2b_warehouse.jsonl", "a") as f:
-            f.write(json.dumps({"ts": body["generated_at"], "tenant": tenant,
-                                "tier": tier, "opportunities": len(finds),
-                                "kills": len(kills)}) + "\n")
-    except Exception:
-        pass
-    return {"ok": True, "report": body}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_warehouse_asset_report_retired_use_revenue_exchange_and_governed_product_delivery",
+    )
+
 
 
 @app.post("/v1/leads/engine/discover")
 def leads_engine_discover(req: dict):
-    """B2B: buyer with active sku_empire_leads_engine runs real zero-Chrome
-    lead discovery (empire-leads engine, Overpass/OSM). Tiered by count."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "empire_leads_engine"):
-        raise HTTPException(402, "no active empire_leads_engine subscription")
-    niche = (req.get("niche") or "roofing").strip()
-    near = req.get("near") or "Phoenix, AZ"
-    tier = int(req.get("tier", 0) or 0)
-    if tier < 1:
-        row = backend.execute(
-            "SELECT seats FROM si_subscription WHERE tenant_id=? "
-            "AND plan=? AND status IN ('active','paid')",
-            (tenant, "sku_empire_leads_engine")).fetchone()
-        tier = int(row[0]) if row and row[0] else 1
-    tier = min(max(tier, 1), 4)
-    cap = {1: 5, 2: 15, 3: 50, 4: 200}[tier]
-    try:
-        import sys as _sys
-        _sys.path.insert(0, "/root/empire-leads")
-        from empire_leads import engine as _el
-        result = _el.discover(niche, near=near, sources=["overpass"],
-                              limit_per_source=cap)
-        leads = [l.to_dict() for l in result.leads[:cap]]
-    except Exception as e:
-        leads = []
-        note = f"engine_error: {str(e)[:160]}"
-    else:
-        note = None
-    body = {
-        "sku": "empire_leads_engine",
-        "tier": f"T{tier}",
-        "niche": niche,
-        "near": near,
-        "leads_returned": len(leads),
-        "leads": leads,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    if note:
-        body["note"] = note
-    try:
-        with open("/root/feedback/b2b_leads_engine.jsonl", "a") as f:
-            f.write(json.dumps({"ts": body["generated_at"], "tenant": tenant,
-                                "tier": tier, "niche": niche,
-                                "leads": len(leads)}) + "\n")
-    except Exception:
-        pass
-    if tier == 4:
-        _titanium_upgrade(body)
-    return {"ok": True, "result": body}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_leads_engine_discover_retired_use_source_mesh_and_governed_product_delivery",
+    )
 
 
-def _sku_tier(tenant: str, sku: str) -> int:
-    """Resolve subscription tier (1/2/3) from seats, default 1."""
-    row = backend.execute(
-        "SELECT seats FROM si_subscription WHERE tenant_id=? "
-        "AND plan=? AND status IN ('active','paid')",
-        (tenant, f"sku_{sku}")).fetchone()
-    return int(row[0]) if row and row[0] else 1
 
 
-def _audit_jsonl(sku: str, tenant: str, summary: dict):
-    try:
-        with open(f"/root/feedback/b2b_{sku}.jsonl", "a") as f:
-            f.write(json.dumps({"ts": datetime.now(timezone.utc).isoformat(),
-                                "tenant": tenant, **summary}) + "\n")
-    except Exception:
-        pass
 
 
-def _titanium_upgrade(body: dict):
-    """Add titanium (T4) premium flags to any SKU delivery body."""
-    body["tier"] = "T4 (titanium)"
-    body["dedicated_monitoring"] = True
-    body["api_webhook_ready"] = True
-    body["priority_support"] = True
-    return body
+
 
 
 @app.post("/v1/skillspector/audit")
 def skillspector_audit(req: dict):
-    """B2B: buyer with active sku_skillspector_audit gets a real NVIDIA/GPU/
-    system audit (rule-based, no LLM). Tiered: T1 summary / T2 findings /
-    T3 full + recommendations."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "skillspector_audit"):
-        raise HTTPException(402, "no active skillspector_audit subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "skillspector_audit"), 1), 4)
-    import subprocess
-    findings = []
-    # real local checks
-    try:
-        out = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total,"
-                              "memory.used,utilization.gpu",
-                              "--format=csv,noheader"], capture_output=True,
-                             text=True, timeout=10)
-        for i, line in enumerate(out.stdout.strip().splitlines()):
-            parts = [p.strip() for p in line.split(",")]
-            if len(parts) >= 4:
-                findings.append({"gpu": i, "name": parts[0],
-                                 "mem_total": parts[1], "mem_used": parts[2],
-                                 "util": parts[3]})
-    except Exception:
-        findings.append({"note": "nvidia-smi unavailable — no GPU detected"})
-    # CPU / RAM
-    try:
-        import shutil
-        ram = shutil.disk_usage("/")
-        findings.append({"storage_total_gb": round(ram.total / 1e9, 1)})
-    except Exception:
-        pass
-    rec = ("Provision NVIDIA A100/H100 for training workloads; enable "
-           "MIG for multi-tenant isolation" if findings and
-           "no GPU" not in str(findings) else
-           "No GPU present — rent cloud compute (Lambda/Vast) for AI loads")
-    if tier == 1:
-        body = {"tier": "T1", "gpus": len([f for f in findings if "gpu" in f]),
-                "summary": "GPU audit complete"}
-    elif tier == 2:
-        body = {"tier": "T2", "findings": findings[:10], "recommendation": rec}
-    else:
-        body = {"tier": "T3", "findings": findings, "recommendation": rec}
-    if tier == 4:
-        body = {"tier": "T4 (titanium)", "findings": findings,
-                "recommendation": rec, "dedicated_monitoring": True,
-                "api_webhook_ready": True, "priority_support": True}
-    body["sku"] = "skillspector_audit"
-    body["generated_at"] = datetime.now(timezone.utc).isoformat()
-    _audit_jsonl("skillspector_audit", tenant,
-                 {"tier": tier, "gpus": len([f for f in findings if "gpu" in f])})
-    return {"ok": True, "report": body}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_skillspector_audit_retired_use_governed_product_delivery",
+    )
+
 
 
 @app.post("/v1/opencut/studio")
 def opencut_studio(req: dict):
-    """B2B: buyer with active sku_opencut_studio gets deploy instructions +
-    instance provisioning info for the OpenCut video studio (Rust API +
-    React web). Tiered: T1 info / T2 + API endpoint / T3 + desktop build."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "opencut_studio"):
-        raise HTTPException(402, "no active opencut_studio subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "opencut_studio"), 1), 4)
-    repo = "https://github.com/opencut-app/opencut"
-    info = {
-        "repo": repo, "license": "custom (permissive)",
-        "stack": "Rust (api) + React/Next.js (web) + GPUI (desktop)",
-        "deploy": "docker compose up -d  (api on :3000, web on :3001)",
-    }
-    if tier >= 2:
-        info["api_endpoint"] = "wss://your-instance:3000/api"
-        info["web_app"] = "https://your-instance:3001"
-    if tier >= 3:
-        info["desktop_build"] = "cargo build --release -p opencut-desktop"
-        info["white_label"] = True
-    info["sku"] = "opencut_studio"
-    info["tier"] = f"T{tier}"
-    info["generated_at"] = datetime.now(timezone.utc).isoformat()
-    _audit_jsonl("opencut_studio", tenant, {"tier": tier})
-    if tier == 4:
-        _titanium_upgrade(info)
-    return {"ok": True, "result": info}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_opencut_studio_retired_use_governed_product_delivery",
+    )
+
 
 
 @app.post("/v1/templates/list")
 def empire_templates_list(req: dict):
-    """B2B: buyer with active sku_empire_templates gets the real template
-    catalogue from empire-os-templates-repo. Tiered: T1 names / T2 + paths /
-    T3 + full tree."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "empire_templates"):
-        raise HTTPException(402, "no active empire_templates subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "empire_templates"), 1), 4)
-    import os as _os
-    root = "/root/empire-os-templates-repo"
-    def walk(d, depth=0, maxd=3):
-        out = []
-        if depth > maxd:
-            return out
-        for name in sorted(_os.listdir(d)):
-            p = _os.path.join(d, name)
-            if _os.path.isdir(p):
-                out.append({"type": "dir", "name": name,
-                            "children": walk(p, depth + 1, maxd) if tier >= 3 else []})
-            else:
-                out.append({"type": "file", "name": name,
-                            "path": p if tier >= 2 else name})
-        return out
-    tree = walk(root) if _os.path.isdir(root) else []
-    body = {"sku": "empire_templates", "tier": f"T{tier}",
-            "categories": [t["name"] for t in tree if t["type"] == "dir"],
-            "tree": tree if tier >= 2 else [t["name"] for t in tree]}
-    body["generated_at"] = datetime.now(timezone.utc).isoformat()
-    _audit_jsonl("empire_templates", tenant, {"tier": tier, "items": len(tree)})
-    if tier == 4:
-        _titanium_upgrade(body)
-    return {"ok": True, "result": body}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_templates_list_retired_use_governed_product_delivery",
+    )
+
 
 
 @app.post("/v1/hermes/framework")
 def hermes_framework(req: dict):
-    """B2B: buyer with active sku_hermes_framework gets white-label agent
-    framework access info (EmpireHermes). Tiered access detail."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "hermes_framework"):
-        raise HTTPException(402, "no active hermes_framework subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "hermes_framework"), 1), 4)
-    caps = ["CLI agent core", "messaging gateway (Telegram/Discord/Slack)",
-            "TUI + Electron desktop", "memory + skills system",
-            "subagent delegation", "scheduled jobs", "terminal + browser control"]
-    info = {"sku": "hermes_framework", "tier": f"T{tier}",
-            "repo": "/root/EmpireHermes", "capabilities": caps[:3 if tier == 1 else 5 if tier == 2 else len(caps)],
-            "white_label": tier >= 2,
-            "generated_at": datetime.now(timezone.utc).isoformat()}
-    _audit_jsonl("hermes_framework", tenant, {"tier": tier})
-    if tier == 4:
-        _titanium_upgrade(info)
-    return {"ok": True, "result": info}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_hermes_framework_retired_use_governed_product_delivery",
+    )
+
 
 
 @app.post("/v1/lead-lane/access")
 def lead_lane_access(req: dict):
-    """B2B: buyer with active sku_lead_lane gets open lane inventory."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "lead_lane"):
-        raise HTTPException(402, "no active lead_lane subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "lead_lane"), 1), 4)
-    cap = {1: 3, 2: 10, 3: 50, 4: 200}[tier]
-    lanes = []
-    try:
-        rows = backend.execute(
-            "SELECT lane_id, niche, metro, seat_price_usdc FROM lead_lanes "
-            "WHERE open_seats > 0 LIMIT ?", (cap,)).fetchall() if backend else []
-        lanes = [{"lane_id": r[0], "niche": r[1], "metro": r[2],
-                  "seat_price_usdc": float(r[3]) if r[3] else 0.0} for r in rows]
-    except Exception:
-        lanes = []
-    body = {"sku": "lead_lane", "tier": f"T{tier}",
-            "open_lanes": lanes, "count": len(lanes),
-            "generated_at": datetime.now(timezone.utc).isoformat()}
-    _audit_jsonl("lead_lane", tenant, {"tier": tier, "lanes": len(lanes)})
-    if tier == 4:
-        _titanium_upgrade(body)
-    return {"ok": True, "result": body}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lead_lane_access_retired_use_revenue_exchange_and_buyer_allocation",
+    )
+
 
 
 @app.post("/v1/satellite/wastage/report")
 def satellite_wastage_report(req: dict):
-    """B2B: buyer with active sku_satellite_wastage gets waste-leakage
-    opportunity report (reuses idle-asset scan, waste_leakage filtered)."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "satellite_wastage"):
-        raise HTTPException(402, "no active satellite_wastage subscription")
-    tier = min(max(int(req.get("tier", 0) or 0) or _sku_tier(tenant, "satellite_wastage"), 1), 4)
-    try:
-        import importlib.util as _iu
-        spec = _iu.spec_from_file_location(
-            "idle_asset_sniper_agent",
-            "/root/empire_os/empire_os/agents/idle_asset_sniper_agent.py")
-        mod = _iu.module_from_spec(spec); spec.loader.exec_module(mod)
-        finds = []
-        for name, url in mod.FEEDS:
-            for a in mod._scan_feed(name, url):
-                score, atype = mod._score(a)
-                if atype == "waste_leakage" and score >= 0.5:
-                    finds.append({"title": a["title"][:120], "url": a["url"],
-                                  "score": round(score, 3)})
-        finds.sort(key=lambda x: x["score"], reverse=True)
-    except Exception as e:
-        finds = []
-        note = f"scan_error: {str(e)[:120]}"
-    else:
-        note = None
-    body = {"tier": f"T{tier}",
-            "total": len(finds),
-            "opportunities": finds[:3 if tier == 1 else 10 if tier == 2 else len(finds)],
-            "sku": "satellite_wastage",
-            "generated_at": datetime.now(timezone.utc).isoformat()}
-    if note:
-        body["note"] = note
-    _audit_jsonl("satellite_wastage", tenant, {"tier": tier, "total": len(finds)})
-    if tier == 4:
-        _titanium_upgrade(body)
-    return {"ok": True, "report": body}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_satellite_wastage_report_retired_use_revenue_exchange_and_governed_product_delivery",
+    )
+
 
 
 @app.post("/v1/marketingskills/access")
 def marketingskills_access(req: dict):
-    """B2B: buyer with active sku_marketingskills. Repo not yet cloned locally
-    — returns honest status + provisioning path (no fabricated content)."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "marketingskills"):
-        raise HTTPException(402, "no active marketingskills subscription")
-    status = "not_cloned"
-    body = {"sku": "marketingskills", "status": status,
-            "message": "marketingskills repo not yet cloned to this host; "
-                       "provisioning pending operator action (coder-org repo name required)",
-            "provision_on": "repo cloned + /v1/products/register",
-            "generated_at": datetime.now(timezone.utc).isoformat()}
-    _audit_jsonl("marketingskills", tenant, {"status": status})
-    if tier == 4:
-        _titanium_upgrade(body)
-    return {"ok": True, "result": body}
+    """Retired legacy paid-product execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_marketingskills_access_retired_use_governed_product_delivery",
+    )
+
 
 
 @app.post("/v1/strike-pack/claim")
@@ -3892,49 +3523,14 @@ class UpdateCarrierAppRequest(BaseModel):
     notes: Optional[str] = None
 
 
-@app.post("/v1/carrier-applications")
-def carrier_application_create_retired():
-    """Retired legacy state mutation path."""
-    raise HTTPException(
-        status_code=410,
-        detail="legacy_carrier_application_create_retired_use_governed_partner_flow",
-    )
 
 
 
-@app.get("/v1/carrier-applications")
-def list_carrier_applications(
-    carrier: Optional[str] = None,
-    status: Optional[str] = None,
-    limit: int = 100,
-):
-    """List carrier applications, optionally filtered by carrier and/or status."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        apps = list_carrier_apps(backend, carrier=carrier, status=status, limit=limit)
-        return {"ok": True, "applications": [a.to_dict() for a in apps], "count": len(apps)}
-    except Exception as e:
-        raise HTTPException(400, detail=str(e)[:300])
-
-
-@app.patch("/v1/carrier-applications/{app_id}")
-def carrier_application_update_retired(app_id: int):
-    """Retired legacy state mutation path."""
-    raise HTTPException(
-        status_code=410,
-        detail="legacy_carrier_application_update_retired_use_governed_partner_flow",
-    )
 
 
 
-@app.post("/v1/carrier-applications/{app_id}/auto-fill")
-def carrier_application_autofill_retired(app_id: int):
-    """Retired legacy state mutation path."""
-    raise HTTPException(
-        status_code=410,
-        detail="legacy_carrier_application_autofill_retired_use_governed_partner_flow",
-    )
+
+
 
 
 
@@ -3959,42 +3555,11 @@ class UpdateMatchStatusRequest(BaseModel):
     status: str
 
 
-@app.post("/v1/homeowner/jobs")
-def homeowner_create_job_retired():
-    """Retired legacy state mutation path."""
-    raise HTTPException(
-        status_code=410,
-        detail="legacy_homeowner_job_create_retired_use_canonical_marketplace_flow",
-    )
 
 
 
-@app.get("/v1/homeowner/jobs/{job_id}")
-def homeowner_get_job(job_id: int):
-    """Get a job by id, including its match records."""
-    if not backend:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-    try:
-        result = hm_get_job_with_matches(backend, job_id)
-        return {"ok": True, **result}
-    except JobNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)[:300])
 
 
-@app.get("/v1/homeowner/jobs")
-def homeowner_list_jobs(status: Optional[str] = None, limit: int = 20):
-    """List jobs with optional ?status filter & ?limit (default 20)."""
-    if not backend:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-    try:
-        jobs = hm_list_jobs(backend, status=status, limit=min(limit, 200))
-        return {"ok": True, "jobs": jobs, "count": len(jobs)}
-    except InvalidJobStatusError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)[:300])
 
 
 @app.get("/v1/homeowner/matches/{job_id}")
@@ -4036,16 +3601,6 @@ class HomeownerTransitionRequest(BaseModel):
     notes: str = ""
 
 
-@app.get("/v1/homeowner/pipeline/stats")
-def homeowner_pipeline_stats():
-    """Get job counts at each homeowner pipeline state."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        stats = homeowner_stats(backend)
-        return {"ok": True, "stats": stats, "total": sum(stats.values())}
-    except Exception as e:
-        raise HTTPException(500, detail=str(e)[:300])
 
 
 @app.get("/v1/homeowner/pipeline/{job_id}/timeline")
@@ -4155,13 +3710,6 @@ def crm_enrich_retired(lead_id: int):
 
 
 
-@app.post("/v1/crm/leads/batch-enrich")
-def crm_batch_enrich_retired():
-    """Retired legacy CRM mutation path."""
-    raise HTTPException(
-        status_code=410,
-        detail="legacy_crm_batch_enrich_retired_use_evidence_enrichment_planner",
-    )
 
 
 
