@@ -101,7 +101,7 @@ def cycle():
             total += n
             # POST to hub if we have any
             if n > 0:
-                # heuristic - simulate finding attorney-firm landing page
+                # Record observed Reddit search evidence only; never fabricate a firm record
                 requests.post(f"{HUB}/v1/mass-torts/direct",
                               json={"niche": niche,
                                     "label": label,

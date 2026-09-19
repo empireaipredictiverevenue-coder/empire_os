@@ -10,11 +10,10 @@ Flow:
   1. Each agent auto-lists services on init (e.g. "scout: discover
      10 leads in <niche> = 0.50 USDC, ETA 5 min")
   2. Other agents submit orders via hub POST /v1/marketplace/order
-  3. Marketplace agent polls pending orders, assigns to provider,
-     waits for completion
-  4. On completion: simulate USDC transfer provider→vault
-     (real settlement once we have a funded vault)
-  5. Provider agent's wallet credited; vault ledger updated
+  3. Marketplace agent polls pending orders and waits for independently
+     evidenced provider completion.
+  4. Settlement/revenue must use the canonical governed BSC USDT rail.
+  5. No local wallet credit or fabricated transaction hash is permitted.
 
 State:
   /root/marketplace/services.json  — list of services (id, provider, name, price, eta, active)
@@ -34,7 +33,6 @@ import json
 import os
 import sys
 import time
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -43,7 +41,8 @@ sys.path.insert(0, "/root/empire_os")
 from empire_os.agent_core import OllamaClient
 from empire_os.synthetic_agents import SyntheticAgent
 
-DIR = Path("/root/marketplace")
+DEFAULT_MARKETPLACE_DIR = Path(__file__).resolve().parents[2] / "runtime" / "marketplace"
+DIR = Path(os.environ.get("EMPIRE_MARKETPLACE_DIR", str(DEFAULT_MARKETPLACE_DIR)))
 DIR.mkdir(parents=True, exist_ok=True)
 SERVICES_PATH = DIR / "services.json"
 ORDERS_PATH = DIR / "orders.json"
@@ -200,7 +199,7 @@ class MarketplaceAgent(SyntheticAgent):
         wallets = load_json(WALLETS_PATH, {})
         n_pending = sum(1 for o in orders if o.get("status") == "pending")
         n_complete = sum(1 for o in orders if o.get("status") == "complete")
-        total_revenue_usdc = sum(
+        legacy_unverified_value_usdc = sum(
             o.get("price_usdc", 0) for o in orders
             if o.get("status") == "complete")
         return {
@@ -208,7 +207,11 @@ class MarketplaceAgent(SyntheticAgent):
             "n_services": len([s for s in services if s.get("active")]),
             "n_orders_pending": n_pending,
             "n_orders_complete": n_complete,
-            "total_revenue_usdc": round(total_revenue_usdc, 3),
+            "total_revenue_usdc": 0.0,
+            "legacy_unverified_complete_value_usdc": round(
+                legacy_unverified_value_usdc, 3
+            ),
+            "actual_revenue_source": "canonical_phase3f_only",
             "wallets": wallets,
         }
 
@@ -234,37 +237,15 @@ class MarketplaceAgent(SyntheticAgent):
         return self._snapshot_revenue()
 
     def _process_orders(self) -> dict:
-        """Fulfill pending orders: simulate provider work + USDC settle."""
+        """Hold orders until real fulfilment and settlement evidence exists."""
         orders = load_json(ORDERS_PATH, [])
-        wallets = load_json(WALLETS_PATH, {})
+        pending = [o for o in orders if o.get("status") == "pending"]
         processed = 0
-        for o in orders:
-            if o.get("status") != "pending":
-                continue
-            # Simulate provider work — in production the provider
-            # agent would actually do the work. Here we just mark
-            # complete + transfer USDC vault credit.
-            o["status"] = "complete"
-            o["completed_at"] = datetime.now(timezone.utc).isoformat()
-            o["tx_hash"] = "solana-mock-" + uuid.uuid4().hex[:16]
-            # Wallet updates
-            provider = o.get("provider", "?")
-            price = o.get("price_usdc", 0)
-            wallets[provider] = round(wallets.get(provider, 0) + price, 3)
-            # Vault ledger entry
-            append_ledger({
-                "kind": "order_complete",
-                "order_id": o["id"],
-                "buyer": o.get("buyer", "?"),
-                "provider": provider,
-                "service": o.get("service", "?"),
-                "price_usdc": price,
-                "tx_hash": o["tx_hash"],
-                "vault": USDC_VAULT,
-            })
-            processed += 1
-        save_json(ORDERS_PATH, orders)
-        save_json(WALLETS_PATH, wallets)
+
+        # This legacy agent no longer mutates fulfilment, wallets, revenue, or
+        # transaction evidence. Canonical order completion and BSC USDT
+        # recognition live behind the governed commercial control plane.
+
         # Sync catalog to hub so external consumers can discover
         try:
             import requests
@@ -276,35 +257,31 @@ class MarketplaceAgent(SyntheticAgent):
                     json=s, timeout=4)
         except Exception:
             pass
-        return {"summary": f"processed {processed} orders",
-                "n_processed": processed}
+        return {
+            "ok": True,
+            "summary": (
+                f"held {len(pending)} pending orders; "
+                "legacy mock fulfilment/settlement is disabled"
+            ),
+            "n_processed": processed,
+            "n_pending": len(pending),
+            "mode": "real_evidence_only",
+        }
 
     def _snapshot_revenue(self) -> dict:
         snap = self.observe()
         snap_path = DIR / "snapshot.json"
         snap_path.write_text(json.dumps(snap, indent=2, default=str))
-        # Alert operator if total revenue crossed $1
-        total = snap["total_revenue_usdc"]
-        prev_path = DIR / "last_total.json"
-        if prev_path.exists():
-            prev = json.loads(prev_path.read_text())["total"]
-        else:
-            prev = 0
-        if total - prev >= 1.0:
-            try:
-                import requests
-                requests.post(
-                    f"{HERMES_GATEWAY_URL}/v1/notify/alert",
-                    json={
-                        "title": f"marketplace: ${total:.2f} USDC cumulative",
-                        "body": f"prev=${prev:.2f} now=${total:.2f}",
-                        "severity": "info",
-                        "source": "marketplace-agent",
-                    }, timeout=5)
-            except Exception:
-                pass
-        prev_path.write_text(json.dumps({"total": total}))
-        return {"summary": f"revenue=${total:.2f} USDC"}
+        legacy_value = snap["legacy_unverified_complete_value_usdc"]
+        return {
+            "summary": (
+                "legacy marketplace snapshot only; actual revenue is sourced "
+                "from canonical Phase 3F recognition"
+            ),
+            "actual_revenue_usdt": 0.0,
+            "legacy_unverified_complete_value_usdc": legacy_value,
+            "mode": "real_evidence_only",
+        }
 
 
 if __name__ == "__main__":

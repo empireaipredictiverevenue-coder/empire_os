@@ -33,7 +33,8 @@ import urllib.error
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, "/root/empire_os")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, "/opt/repo_skills/cap-tools/src")
 
 try:
@@ -43,12 +44,13 @@ try:
 except Exception:
     HAVE_CAP = False
 
-LOG = Path("/root/feedback/satellite_strike.jsonl")
+RUNTIME_DIR = Path(os.environ.get("EMPIRE_RUNTIME_DIR", str(REPO_ROOT / "runtime")))
+LOG = RUNTIME_DIR / "feedback" / "satellite_strike.jsonl"
 LOG.parent.mkdir(parents=True, exist_ok=True)
-STATE = Path("/root/feedback/satellite_strike_state.json")
+STATE = RUNTIME_DIR / "feedback" / "satellite_strike_state.json"
 
 NWS_ALERTS_URL = "https://api.weather.gov/alerts/active"
-LANE_HUB_DB = "/root/empire_os/empire_os.db"
+LANE_HUB_DB = os.environ.get("EMPIRE_DB_PATH", str(REPO_ROOT / "empire_os.db"))
 
 # Risk → niche mapping. Conservative; one alert can map to multiple niches.
 EVENT_TO_NICHES = {
@@ -253,41 +255,11 @@ def run_loop(interval: int = 60) -> None:
         time.sleep(interval)
 
 
-def synthetic_fire_test(lane_id: str = "residential_roofing:DFW",
-                        nws_event: str = "Tornado Warning",
-                        area_desc: str = "Dallas-Fort Worth Metro, Northern Texas") -> dict:
-    """Proof-of-pipeline: emit a fake alert and confirm lane matching + diff."""
-    blob = ("__json__:" + json.dumps({
-        "properties": {
-            "event": nws_event,
-            "headline": f"TEST: {nws_event} for {area_desc}",
-            "areaDesc": area_desc,
-            "severity": "Severe",
-            "certainty": "Observed",
-            "urgency": "Immediate",
-        }
-    })).encode()
-    alert = parse_alert(blob)
-    lanes = load_lanes()
-    matched = match_lanes(alert, lanes)
-    state = load_state()
-    state["seen_ids"] = []
-    save_state(state)
-    kind = diff(alert, matched, state)
-    save_state(state)
-    if not kind:
-        return {"ok": False, "err": "diff produced no event (should have)"}
-    for lid in matched:
-        _log("EVENT", "satellite_strike_test",
-             lane_id=lid, nws_event=nws_event,
-             severity=alert["severity"], area_desc=area_desc)
-    return {"ok": True, "matched": matched, "event_kind": kind}
-
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "once":
         print(json.dumps(tick(), indent=2))
-    elif len(sys.argv) > 1 and sys.argv[1] == "synthetic":
-        print(json.dumps(synthetic_fire_test(), indent=2))
+    elif len(sys.argv) > 1:
+        raise SystemExit("unsupported mode; use 'once' or run the live loop")
     else:
         run_loop(int(os.environ.get("INTERVAL", "60")))

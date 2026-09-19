@@ -8,13 +8,12 @@ import pytest
 from empire_os.funnel import SQLiteBackend, get_state, list_states
 from empire_os.neural_scout import (
     NeuralScout,
-    calculate_synthetic_score,
+    calculate_observed_score,
     ScoredLead,
 )
 from empire_os.scanner import (
     StaticFileScanner,
     DBPRScanner,
-    _generate_leads_for_niche,
 )
 
 
@@ -27,7 +26,7 @@ def backend():
 
 class TestScoring:
     def test_high_score_roofing(self):
-        score = calculate_synthetic_score(
+        score = calculate_observed_score(
             niche="roofing",
             details="Commercial warehouse roof has storm damage from recent hail. "
                      "Multiple leaks reported. Facility needs urgent repair. "
@@ -38,7 +37,7 @@ class TestScoring:
         assert score >= 0.70, f"Expected high score, got {score}"
 
     def test_low_score_no_details(self):
-        score = calculate_synthetic_score(
+        score = calculate_observed_score(
             niche="landscaping",
             details="Lawn service",
             phone="",
@@ -47,7 +46,7 @@ class TestScoring:
         assert score < 0.50, f"Expected low score, got {score}"
 
     def test_mass_torts_base_weight(self):
-        score = calculate_synthetic_score(
+        score = calculate_observed_score(
             niche="mass_torts",
             details="Exposed to toxic chemicals at work for 5 years. "
                      "Multiple health issues diagnosed. Seeking legal counsel "
@@ -57,7 +56,7 @@ class TestScoring:
         assert score >= 0.55
 
     def test_unknown_niche_default(self):
-        score = calculate_synthetic_score(
+        score = calculate_observed_score(
             niche="dog_walking",
             details="Looking for dog walker in downtown area",
             phone="",
@@ -122,6 +121,12 @@ class TestNeuralScout:
         state = get_state(backend, "test-p1")
         assert state is not None
         assert state.current_state == "discovered"
+        consent = backend.execute(
+            "SELECT opted_in, opted_in_at FROM si_prospect_consent WHERE prospect_id=?",
+            ("test-p1",),
+        ).fetchone()
+        assert consent["opted_in"] == 0
+        assert consent["opted_in_at"] is None
 
     def test_tick_with_static_scanner(self, backend, tmp_path):
         leads_file = tmp_path / "leads.json"
@@ -151,32 +156,56 @@ class TestNeuralScout:
         states = list_states(backend)
         assert len(states) >= 1
 
-    def test_dbpr_scanner_fallback_produces_leads(self):
-        """DBPR fallback should generate seed leads without network calls."""
-        scanner = DBPRScanner()
-        leads = scanner._fallback(niches=["roofing", "hvac"])
-        assert len(leads) > 0
-        for l in leads:
-            assert "niche" in l
-            assert "name" in l
-            assert l["source"] == "generated"
-
-    def test_scout_with_dbpr_fallback_wires_into_tick(self, backend, monkeypatch):
-        """Single scanner flows through scout.evaluate into funnel (fallback path)."""
+    def test_dbpr_scanner_returns_no_fabricated_leads(self, monkeypatch):
+        """DBPR returns no leads when the live source yields no records."""
         import requests
-        monkeypatch.setattr(requests, "get", lambda *a, **kw: type("R",(),{
-            "status_code": 200,
-            "text": "",
-            "raise_for_status": lambda self: None,
-        })())
-        scout = self._make_scout(backend, min_score=0.30)
+
+        monkeypatch.setattr("empire_os.scanner.time.sleep", lambda *_: None)
+        monkeypatch.setattr(
+            requests,
+            "get",
+            lambda *a, **kw: type(
+                "R",
+                (),
+                {
+                    "status_code": 200,
+                    "text": "",
+                    "raise_for_status": lambda self: None,
+                },
+            )(),
+        )
+
         scanner = DBPRScanner()
-        scout.register_scanner(scanner)
+        leads = scanner.scan(niches=["roofing", "hvac"])
+        assert leads == []
+
+    def test_scout_with_empty_dbpr_does_not_register_fake_leads(
+            self, backend, monkeypatch):
+        """An empty live DBPR result must stay empty through the scout."""
+        import requests
+
+        monkeypatch.setattr("empire_os.scanner.time.sleep", lambda *_: None)
+        monkeypatch.setattr(
+            requests,
+            "get",
+            lambda *a, **kw: type(
+                "R",
+                (),
+                {
+                    "status_code": 200,
+                    "text": "",
+                    "raise_for_status": lambda self: None,
+                },
+            )(),
+        )
+
+        scout = self._make_scout(backend, min_score=0.30)
+        scout.register_scanner(DBPRScanner())
         results = scout.tick()
-        # With empty HTML from our monkey-patched request, _parse_html returns []
-        # which means _search returns [], so scan() hits _fallback → generates leads
-        assert results["scanned"] > 0
-        assert results["registered"] >= 0
+
+        assert results["scanned"] == 0
+        assert results["registered"] == 0
+        assert list_states(backend) == []
 
     def test_scout_pipeline_integration(self, backend):
         scout = self._make_scout(backend)
@@ -201,11 +230,3 @@ class TestNeuralScout:
         state = get_state(backend, l1.prospect_id)
         assert state is not None
         assert state.current_state == "discovered"
-
-    def test_generate_leads_for_niche(self):
-        leads = _generate_leads_for_niche("roofing", count=3, location="FL")
-        assert len(leads) == 3
-        for l in leads:
-            assert l["niche"] == "roofing"
-            assert "phone" in l
-            assert "zip_code" in l

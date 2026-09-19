@@ -1,22 +1,21 @@
-"""Empire OS v3 — Lead Source Crawler Runner (hardened)
+"""Empire OS v3 — canonical lead-source crawler.
 
-Runs all registered REAL lead sources, posts each LeadCandidate
-to /v1/leads/direct for routing + delivery.
+Runs registered REAL lead sources and materializes each LeadCandidate into
+the canonical Supabase prospect inventory.
 
-Designed to run as a systemd timer (every 6h) or as a one-off CLI.
+Canonical path:
+    LeadCandidate
+      -> prepare_candidate
+      -> lookup_existing_prospect
+      -> materialize_prospect
+      -> ingest_prospect_atomic RPC
 
-Safety layer (prevents the 29h-stuck pattern):
-  - signal.alarm(1800) kills the entire process at 30 min
-  - each source run_fn is try/except wrapped — one broken source
-    never kills the whole batch
-  - explicit sys.exit(0) at end (clean oneshot exit)
-  - ALL outbound http calls in lead_sources/* have timeouts 10-30s
-  - systemd TimeoutStartSec=1800 as final safety net
+NO FALLBACK:
+  - /v1/leads/direct is not used for canonical identity;
+  - lane_leads is not written by this crawler;
+  - if canonical Supabase ingest is unavailable, the candidate fails closed.
 
-Usage:
-    /root/venv/bin/python3 -m empire_os.crawler_runner
-    /root/venv/bin/python3 -m empire_os.crawler_runner --metro NYC
-    /root/venv/bin/python3 -m empire_os.crawler_runner --dry-run
+Designed for autonomous execution or one-off CLI runs.
 """
 
 import argparse
@@ -28,26 +27,30 @@ import time
 import traceback
 from pathlib import Path
 
-import requests
-
-from empire_os.lead_sources import list_sources, run_all_sources, _import_sources
-
-
-# ── hub URL: point at the REAL container hub (not the dead 8081 stub) ──
-HUB_URL = os.environ.get(
-    "EMPIRE_HUB_URL",
-    "http://10.118.155.218:8000/v1/leads/direct",
+from empire_os.candidate_quality import (
+    assess_candidate,
+    enforce_candidate_quality,
 )
-LOG_PATH = Path("/root/feedback/crawler_runs.jsonl")
+from empire_os.lead_sources import list_sources, _import_sources
+from empire_os.prospect_ingest import (
+    lookup_existing_prospect,
+    materialize_prospect,
+    prepare_candidate,
+)
+
+LOG_PATH = Path(
+    os.environ.get(
+        "CRAWLER_LOG_PATH",
+        "/srv/empire_os/runtime/feedback/crawler_runs.jsonl",
+    )
+)
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-# hard global timeout (seconds) — process dies if running longer
 MAX_RUN_SEC = int(os.environ.get("CRAWLER_TIMEOUT", "1800"))
 
 
 def _die_on_hang(signum, frame):
-    msg = f"FATAL: crawler exceeded {MAX_RUN_SEC}s global timeout — killed"
-    log("FATAL", msg)
+    log("FATAL", f"crawler exceeded {MAX_RUN_SEC}s global timeout")
     sys.exit(124)
 
 
@@ -58,124 +61,261 @@ def log(level, msg, **fields):
         "msg": msg,
         **fields,
     }
-    with open(LOG_PATH, "a") as f:
-        f.write(json.dumps(event) + "\n")
+    with LOG_PATH.open("a") as fh:
+        fh.write(json.dumps(event) + "\n")
     print(json.dumps(event))
 
 
-def post_lead(payload: dict) -> tuple[bool, dict]:
+def _canonical_reader(path: str, params: dict[str, str]):
+    # Lazy import avoids making crawler module import depend on live bus config.
+    from empire_os.autonomous_execution_bus import _rest_json
+    return _rest_json("GET", path, params=params)
+
+
+def _canonical_writer(payload: dict):
+    # The writer calls the migration-003 ingest_prospect_atomic RPC.
+    from empire_os.autonomous_execution_bus import _write_canonical_prospect
+    return _write_canonical_prospect(payload)
+
+
+def ingest_candidate(candidate, *, reader=None, writer=None) -> dict:
+    """Run one candidate through conservative canonical acquisition."""
+    reader = reader or _canonical_reader
+    writer = writer or _canonical_writer
+
+    quality = enforce_candidate_quality(candidate)
+    prepared = prepare_candidate(candidate)
+    prepared.setdefault("evidence", {})["quality"] = quality.to_evidence()
+
+    lookup = lookup_existing_prospect(prepared, reader)
+    return materialize_prospect(prepared, lookup, writer)
+
+
+def _required_env_available(src) -> bool:
+    if not src.requires:
+        return True
+
+    # Prefer already-exported environment variables.
+    missing = [name for name in src.requires if not os.environ.get(name)]
+    if not missing:
+        return True
+
+    # Live host/service configuration.
+    env_path = Path(os.environ.get("EMPIRE_ENV_PATH", "/etc/empire_os.env"))
     try:
-        r = requests.post(HUB_URL, json=payload, timeout=15)
-        return r.status_code == 200, r.json() if r.status_code == 200 else {}
-    except Exception as e:
-        return False, {"error": str(e)}
+        content = env_path.read_text()
+    except (OSError, PermissionError):
+        return False
+
+    for name in missing:
+        found = False
+        for line in content.splitlines():
+            if line.startswith(name + "=") and line.split("=", 1)[1].strip():
+                found = True
+                break
+        if not found:
+            return False
+    return True
 
 
-def run_source_safe(src, metro, dry_run):
-    """Run one source with error isolation.  Never propagates exceptions."""
+def run_source_safe(src, metro, dry_run, max_candidates=None):
+    """Run one real source with candidate-level failure isolation."""
     if src.tier != "real":
         log("SKIP", "source_not_real", source=src.name, tier=src.tier)
         return 0, 0, 0
 
-    # env check (quick — just check missing vars)
-    env_ok = True
-    for env_var in src.requires:
-        env_path = Path("/root/empire_os/.env")
-        if not env_path.exists():
-            env_ok = False
-            break
-        content = env_path.read_text()
-        if f"{env_var}=" not in content or content.count(f"{env_var}=\n") > 0:
-            env_ok = False
-            break
-    if not env_ok:
-        log("SKIP", "missing_required_env",
-            source=src.name, requires=src.requires)
+    if not _required_env_available(src):
+        log(
+            "SKIP",
+            "missing_required_env",
+            source=src.name,
+            requires=src.requires,
+        )
         return 0, 0, 0
 
     log("INFO", "source_run_start", source=src.name)
-    candidates = posted = errors = 0
+    candidates = accepted = errors = 0
+
     try:
-        for cand in src.run_fn(metro=metro):
+        iterator = src.run_fn(metro=metro)
+        for cand in iterator:
+            if max_candidates is not None and candidates >= max_candidates:
+                break
             candidates += 1
-            if dry_run:
-                log("DRYRUN", "candidate",
-                    source=cand.source, niche=cand.niche,
-                    metro=cand.metro, name=cand.name[:40])
+
+            quality = assess_candidate(cand)
+            if not quality.accepted:
+                log(
+                    "SKIP",
+                    "candidate_quality_rejected",
+                    source=cand.source,
+                    niche=cand.niche,
+                    metro=cand.metro,
+                    name=cand.name[:40],
+                    reason_codes=list(quality.reason_codes),
+                    quality_confidence=quality.confidence,
+                    entity_kind=quality.entity_kind,
+                    source_role=quality.source_role,
+                )
                 continue
-            ok, resp = post_lead(cand.to_intake_payload())
-            if ok:
-                posted += 1
-                log("POSTED", "lead",
-                    source=cand.source, db_id=resp.get("db_id"),
-                    lane=resp.get("lane_id"), name=cand.name[:40])
-            else:
+
+            if dry_run:
+                log(
+                    "DRYRUN",
+                    "candidate",
+                    source=cand.source,
+                    niche=cand.niche,
+                    metro=cand.metro,
+                    name=cand.name[:40],
+                    quality_confidence=quality.confidence,
+                    entity_kind=quality.entity_kind,
+                )
+                continue
+
+            try:
+                result = ingest_candidate(cand)
+            except Exception as exc:
+                # Fail closed: never fall back to legacy /v1/leads/direct.
                 errors += 1
-                log("ERROR", "lead_post_failed",
-                    source=cand.source, error=str(resp.get("error", resp)))
-            time.sleep(0.5)  # polite to hub
-    except Exception as e:
+                log(
+                    "ERROR",
+                    "canonical_ingest_failed",
+                    source=cand.source,
+                    name=cand.name[:40],
+                    error=str(exc)[:500],
+                )
+                continue
+
+            decision = str(result.get("decision") or "unknown")
+
+            if decision == "ambiguous":
+                log(
+                    "SKIP",
+                    "canonical_identity_ambiguous",
+                    source=cand.source,
+                    name=cand.name[:40],
+                    reason=result.get("reason"),
+                )
+                continue
+
+            accepted += 1
+            prospect = result.get("prospect")
+            prospect_id = (
+                prospect.get("id")
+                if isinstance(prospect, dict)
+                else result.get("prospect_id")
+            )
+            log(
+                "CANONICAL",
+                "prospect_acquired",
+                source=cand.source,
+                name=cand.name[:40],
+                decision=decision,
+                prospect_id=prospect_id,
+            )
+
+    except Exception as exc:
         errors += 1
-        log("ERROR", "source_crashed",
-            source=src.name, error=str(e),
-            tb=traceback.format_exc()[-200:])
-    log("INFO", "source_run_done",
-        source=src.name, candidates=candidates,
-        posted=posted, errors=errors)
-    return candidates, posted, errors
+        log(
+            "ERROR",
+            "source_crashed",
+            source=src.name,
+            error=str(exc),
+            tb=traceback.format_exc()[-200:],
+        )
+
+    log(
+        "INFO",
+        "source_run_done",
+        source=src.name,
+        candidates=candidates,
+        accepted=accepted,
+        errors=errors,
+    )
+    return candidates, accepted, errors
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--metro", default=None,
-                        help="Filter sources to one metro")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Don't POST to /v1/leads/direct")
-    parser.add_argument("--source", default=None,
-                        help="Run only one source by name")
+    parser.add_argument("--metro", default=None, help="Filter sources to one metro")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Discover candidates without writing canonical prospects",
+    )
+    parser.add_argument("--source", default=None, help="Run one source by name")
+    parser.add_argument(
+        "--max-candidates",
+        type=int,
+        default=None,
+        help="Stop after discovering at most N candidates across the run",
+    )
     args = parser.parse_args()
 
-    # ── global dead-man's switch: process dies at MAX_RUN_SEC ──
+    if args.max_candidates is not None and args.max_candidates < 1:
+        parser.error("--max-candidates must be >= 1")
+
     signal.signal(signal.SIGALRM, _die_on_hang)
     signal.alarm(MAX_RUN_SEC)
 
-    log("INFO", "crawler_run_start",
-        metro=args.metro, dry_run=args.dry_run,
-        source=args.source, hub_url=HUB_URL,
-        timeout_s=MAX_RUN_SEC)
+    log(
+        "INFO",
+        "crawler_run_start",
+        metro=args.metro,
+        dry_run=args.dry_run,
+        source=args.source,
+        max_candidates=args.max_candidates,
+        canonical_store="supabase",
+        timeout_s=MAX_RUN_SEC,
+    )
 
-    candidates_total = posted_total = errored_total = 0
-    sources_ok = sources_skip = sources_err = 0
+    candidates_total = accepted_total = errored_total = 0
+    sources_ok = sources_err = 0
 
-    sources = list_sources() if not args.source else None
-    if sources is None:
-        from empire_os.lead_sources import get_source, _REGISTRY
-        _import_sources()
+    _import_sources()
+
+    if args.source:
+        from empire_os.lead_sources import _REGISTRY
         sources = [_REGISTRY[args.source]] if args.source in _REGISTRY else []
     else:
-        from empire_os.lead_sources import _import_sources as _do_import
-        _do_import()
         sources = list_sources()
 
+    remaining = args.max_candidates
+
     for src in sources:
-        c, p, e = run_source_safe(src, args.metro, args.dry_run)
+        if remaining is not None and remaining <= 0:
+            break
+
+        c, accepted, errors = run_source_safe(
+            src,
+            args.metro,
+            args.dry_run,
+            max_candidates=remaining,
+        )
         candidates_total += c
-        posted_total += p
-        errored_total += e
-        if e:
+
+        if remaining is not None:
+            remaining -= c
+        accepted_total += accepted
+        errored_total += errors
+        if errors:
             sources_err += 1
         else:
             sources_ok += 1
 
-    # disarm timeout (we finished within limit)
     signal.alarm(0)
 
-    log("INFO", "crawler_run_done",
-        candidates=candidates_total, posted=posted_total,
+    log(
+        "INFO",
+        "crawler_run_done",
+        candidates=candidates_total,
+        accepted=accepted_total,
         errors=errored_total,
-        sources_ok=sources_ok, sources_err=sources_err)
-    sys.exit(0)
+        sources_ok=sources_ok,
+        sources_err=sources_err,
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

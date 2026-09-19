@@ -48,7 +48,7 @@ from fastapi.responses import HTMLResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import hmac as _hmac
 import hashlib as _hashlib
@@ -61,7 +61,7 @@ from empire_os.funnel import (
     events_for,
     count_by_state,
 )
-from empire_os.neural_scout import NeuralScout, calculate_synthetic_score
+from empire_os.neural_scout import NeuralScout, calculate_observed_score
 from empire_os.traffic_specialist import (
     DiscoveredProspect,
     discover_one,
@@ -70,6 +70,8 @@ from empire_os.traffic_specialist import (
 )
 from empire_os.marketing import tick as marketing_tick, draft_spec_for_niche
 from empire_os.aeo_surface import deploy_spec, list_pages, remove_page
+from empire_os.search_intelligence.api import router as search_intelligence_router
+from empire_os.coder.api import router as empire_coder_router
 from empire_os.ceo import build_brief
 from empire_os.daily_revenue import DailyRevenueSnapshotter, DailyRevenueBriefWorker
 from empire_os.remote_scanner import ScoutAgentClient
@@ -453,6 +455,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+app.include_router(search_intelligence_router)
+app.include_router(empire_coder_router)
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
@@ -497,7 +501,7 @@ async def incoming_lead(lead: LeadPayload, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=400, detail="Missing lead data")
 
     # Score
-    score = calculate_synthetic_score(lead.niche, lead.details, lead.phone, lead.zip_code)
+    score = calculate_observed_score(lead.niche, lead.details, lead.phone, lead.zip_code)
 
     # Evaluate and register
     scored = scout.evaluate(
@@ -672,16 +676,23 @@ def scan_competitor_niche(niche: str):
 # --- CRM / Lead Intake ---
 
 class LeadIntakeRequest(BaseModel):
+    lead_id: str = ""
     name: str = ""
     email: str = ""
     phone: str = ""
     state: str = ""
+    metro: str = ""
     zip: str = ""
     niche: str = ""
     details: str = ""
     source: str = "aeo_form"
     ip_address: str = ""
     user_agent: str = ""
+    intent: str = ""
+    consent: str = ""
+    url: str = ""
+    lead_score: int | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class DamageScanRequest(BaseModel):
@@ -948,29 +959,37 @@ def satellite_strike(req: dict):
         import traceback
         raise HTTPException(500, detail=str(e)[:300] + " | " + traceback.format_exc()[:200])
 
+@app.post("/v1/leads/intake")
 def lead_intake(req: LeadIntakeRequest):
-    """Capture a lead from AEO form → route → score → store."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
+    """Compatibility URL backed only by canonical Supabase prospects."""
+    from empire_os.lead_compat import (
+        CanonicalLeadConflict,
+        CanonicalLeadIntakeError,
+        canonical_lead_intake,
+    )
+    from empire_os.crawler_runner import ingest_candidate
+
+    payload = (
+        req.model_dump()
+        if hasattr(req, "model_dump")
+        else req.dict()
+    )
     try:
-        from empire_os.crm import intake_lead
-        result = intake_lead(
-            backend,
-            name=req.name,
-            email=req.email,
-            phone=req.phone,
-            state=req.state,
-            niche=req.niche,
-            details=req.details,
-            source=req.source,
-            ip_address=req.ip_address,
-            user_agent=req.user_agent,
+        return canonical_lead_intake(payload, ingest_candidate)
+    except CanonicalLeadConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except CanonicalLeadIntakeError as exc:
+        logging.getLogger(__name__).warning(
+            "canonical lead intake failed: %s",
+            exc,
         )
-        if "error" in result:
-            raise HTTPException(500, result["error"])
-        return result
-    except ImportError as e:
-        raise HTTPException(503, f"CRM module not available: {e}")
+        message = str(exc)
+        if message == "name, niche and metro required":
+            raise HTTPException(400, message) from exc
+        raise HTTPException(
+            503,
+            "canonical prospect ingest temporarily unavailable",
+        ) from exc
 
 
 @app.get("/v1/leads/counts")
@@ -984,73 +1003,30 @@ def lead_counts():
 
 @app.post("/v1/leads/direct")
 def direct_lead_intake(req: dict):
-    """Direct lead intake — writes to lane_leads without going through crm routing.
-
-    Use this for partner webhooks, AEO forms, or any external system
-    that has already determined the niche+metro. The lead_deliverer
-    picks it up on its 30s poll.
-
-    Body:
-        name, email, phone, niche (required), metro (required),
-        state, details, source, lead_score (0-100)
-    """
-    niche = (req.get("niche") or "").strip()
-    metro = (req.get("metro") or "").strip().upper()
-    if not niche or not metro:
-        raise HTTPException(400, "niche and metro required")
-
-    score = int(req.get("lead_score", 50))
-    score = max(0, min(100, score))
-    if score >= 75:
-        tier = "gold"
-    elif score >= 50:
-        tier = "silver"
-    else:
-        tier = "bronze"
-
-    # We're inside empire-hub, so we can write directly to the DB
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-
-    import uuid
-    from datetime import datetime, timezone as _tz
-    lead_id = "lead_" + datetime.now(_tz.utc).strftime("%y%m%d%H%M%S%f")
-    lane_id = f"{niche}:{metro}"
-    prospect_id = "prospect_" + datetime.now(_tz.utc).strftime("%y%m%d%H%M%S%f")
-    now = datetime.now(_tz.utc).isoformat()
+    """Compatibility intake backed only by canonical Supabase prospects."""
+    from empire_os.lead_compat import (
+        CanonicalLeadConflict,
+        CanonicalLeadIntakeError,
+        canonical_lead_intake,
+    )
+    from empire_os.crawler_runner import ingest_candidate
 
     try:
-        backend.execute(
-            "INSERT INTO lane_leads "
-            "(lane_id, prospect_id, status, omega_score, omega_tier, "
-            "notes, niche, created_at) "
-            "VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)",
-            (lane_id, prospect_id, score, tier,
-             f"name={req.get('name','')} email={req.get('email','')} "
-             f"phone={req.get('phone','')} metro={metro} "
-             f"state={req.get('state','')} details={req.get('details','')}",
-             niche, now)
+        return canonical_lead_intake(req, ingest_candidate)
+    except CanonicalLeadConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except CanonicalLeadIntakeError as exc:
+        logging.getLogger(__name__).warning(
+            "canonical direct lead ingest failed: %s",
+            exc,
         )
-        backend.commit()
-        # Get the inserted ID
-        row = backend.execute(
-            "SELECT id FROM lane_leads WHERE prospect_id=?",
-            (prospect_id,)).fetchone()
-        db_id = row[0] if row else None
-    except Exception as e:
-        raise HTTPException(500, f"DB write failed: {e}")
-
-    return {
-        "ok": True,
-        "lead_id": lead_id,
-        "db_id": db_id,
-        "lane_id": lane_id,
-        "niche": niche,
-        "metro": metro,
-        "tier": tier,
-        "score": score,
-        "status": "pending",
-    }
+        message = str(exc)
+        if message == "name, niche and metro required":
+            raise HTTPException(400, message) from exc
+        raise HTTPException(
+            503,
+            "canonical prospect ingest temporarily unavailable",
+        ) from exc
 
 
 class BuyerApplyRequest(BaseModel):
@@ -1130,7 +1106,12 @@ async def buy_leads_page():
 
 
 
-RESEND_WEBHOOK_LOG = Path("/root/feedback/resend_webhook.jsonl")
+RESEND_WEBHOOK_LOG = Path(
+    os.getenv(
+        "RESEND_WEBHOOK_LOG",
+        "/srv/empire_os/runtime/feedback/resend_webhook.jsonl",
+    )
+)
 RESEND_WEBHOOK_LOG.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -1258,33 +1239,60 @@ def list_leads(
     """List leads with optional filters."""
     if not backend:
         raise HTTPException(503, "backend not initialized")
-    from empire_os.crm import list_leads
-    rows, total = list_leads(backend, status=status, niche=niche,
-                              metro=metro, limit=limit, offset=offset)
-    return {"leads": rows, "total": total, "limit": limit, "offset": offset}
-
-
-@app.get("/v1/leads/counts")
-def lead_counts():
-    """Get lead counts by status and niche."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    from empire_os.crm import get_lead_counts
-    return get_lead_counts(backend)
+    from empire_os.crm import list_leads as crm_list_leads
+    return crm_list_leads(
+        backend,
+        status=status or None,
+        niche=niche or None,
+        metro=metro or None,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @app.patch("/v1/leads/{lead_id}/status")
 def update_lead_status(lead_id: str, status: str = "", notes: str = ""):
-    """Update a lead's funnel status."""
+    """Compatibility mutation for legacy CRM pipeline state only."""
     if not backend:
         raise HTTPException(503, "backend not initialized")
     if not status:
         raise HTTPException(400, "status is required")
-    from empire_os.crm import update_lead_status
-    ok = update_lead_status(backend, lead_id, status, notes)
-    if not ok:
-        raise HTTPException(500, "Failed to update lead status")
-    return {"ok": True, "lead_id": lead_id, "status": status}
+    try:
+        numeric_id = int(lead_id)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            400,
+            "legacy CRM lead_id must be an integer",
+        ) from exc
+
+    from empire_os.crm import add_activity, set_pipeline_stage
+
+    try:
+        result = set_pipeline_stage(
+            backend,
+            numeric_id,
+            status,
+            actor="api",
+        )
+        if notes.strip():
+            add_activity(
+                backend,
+                numeric_id,
+                "note",
+                "Lead status update note",
+                notes.strip(),
+                actor="api",
+            )
+    except ValueError as exc:
+        message = str(exc)
+        code = 404 if "not found" in message else 400
+        raise HTTPException(code, message) from exc
+
+    return {
+        "ok": True,
+        "lead_id": numeric_id,
+        "status": result["stage"],
+    }
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -1770,13 +1778,13 @@ def product_register(req: dict):
 # ─────────────────────────────────────────────────────────────────
 
 SWARM_REGISTRY_PATH = "/root/feedback/swarm_registry.jsonl"
-SWARM_AUDIT_PATH = "/root/feedback/swarm_audit.jsonl"
+SWARM_AUDIT_PATH = os.environ.get("SWARM_AUDIT_PATH", os.path.join(os.environ.get("SWARM_AUDIT_DIR", "/srv/empire_os/runtime/feedback"), "swarm_audit.jsonl"))
 import json as _json
 
 
 def _swarm_audit(event_type: str, **fields):
     """Append-only audit trail for every swarm routing decision."""
-    Path("/root/feedback").mkdir(parents=True, exist_ok=True)
+    Path(os.getenv("SWARM_AUDIT_DIR", "/srv/empire_os/runtime/feedback")).mkdir(parents=True, exist_ok=True)
     entry = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "event": event_type,
@@ -1900,14 +1908,27 @@ def hub_intake(req: dict):
     # Step 1: Label
     niche = req.get("niche") or _infer_niche(text)
     metro = req.get("metro") or _infer_metro(text) or ""
-    lead_score = req.get("lead_score")
-    if lead_score is None:
-        # Heuristic: keyword density * 10 + contact-presence bump
-        kw_score = sum(1 for kw in ["need ", " quote", " emergency",
-                                     " asap", " urgent", " broken"]
-                       if kw in text.lower()) * 12
-        contact_score = (10 if email else 0) + (10 if phone else 0)
-        lead_score = min(100, 35 + kw_score + contact_score)
+
+    # Omega 2.0 is the canonical intelligence source. Any incoming
+    # legacy lead_score remains informational and is not used to derive
+    # the stored/returned Omega score.
+    from empire_os.intelligence.compat import legacy_fields
+
+    omega = legacy_fields({
+        "business_name": req.get("name", ""),
+        "contact_name": req.get("contact_name", ""),
+        "phone": phone,
+        "email": email,
+        "website": req.get("url", ""),
+        "metro": metro,
+        "state": req.get("state", ""),
+        "niche": niche,
+        "sub_niche": req.get("sub_niche", ""),
+        "details": text,
+        "source": req.get("source", "hub_intake"),
+        "status": "pending",
+    })
+    lead_score = omega["omega_score"]
 
     payload_hash = hashlib.sha256(
         (text + email + phone).encode()).hexdigest()[:16]
@@ -2163,244 +2184,17 @@ def mass_torts_direct(req: dict):
 
 @app.post("/v1/finance/replay")
 def finance_replay(req: dict):
-    """Simulate an inbound USDC deposit for testing the listener flow.
+    """Retired legacy simulation endpoint.
 
-    Body:
-      amount_usdc        float  required  (e.g. 100.00)
-      memo               str    required  (e.g. "SEAT_sub_ad55f6264deb")
-      wallet_from        str    optional  (any string, defaults to "replay")
-      tx_signature       str    optional  (any string, defaults to "replay_<ts>")
-      force_status       str    optional  "pending" or "paid" - if "paid"
-                                            the matching invoice is flipped immediately
-
-    Effect:
-      - writes a row to /root/feedback/finance_log.jsonl (host-side agent reads)
-      - if memo matches a pending si_subscription.seat_* row, marks it paid
-      - if force_status="paid" - even if no row matches, flips any matching
-        si_invoice with matching memo amount
-
-    Returns: { "ok": True, "matched_to": "...", "balance_after": float }
+    The former implementation fabricated Solana/USDC deposit evidence and
+    mutated invoices, subscriptions, settlements and a pseudo vault balance.
+    Canonical production settlement is BSC USDT with independently verified
+    chain evidence, so replay-based finance mutation is permanently fail-closed.
     """
-    amount = float(req.get("amount_usdc", 0))
-    memo   = (req.get("memo") or "").strip()
-    sig    = req.get("tx_signature") or f"replay_{int(time.time())}"
-    wallet = req.get("wallet_from", "replay")
-
-    if amount <= 0:
-        raise HTTPException(400, "amount_usdc must be > 0")
-    # memo is OPTIONAL (TokenPocket / Trust Wallet USDC transfers carry none)
-
-    matched_to = None
-    paid_inv   = None
-    paid_sub   = None
-
-    try:
-        import sqlite3 as _sq3
-        cnx = _sq3.connect("/root/empire_os/empire_os.db", timeout=10,
-                           check_same_thread=False)
-        try:
-            # ensure app_kv table exists (tiny key-value store)
-            cnx.execute(
-                "CREATE TABLE IF NOT EXISTS app_kv "
-                "(key TEXT PRIMARY KEY, value TEXT, ts TEXT)"
-            )
-            cnx.commit()
-            # extract id from memo
-            sub_id = None
-            inv_id = None
-            m = memo
-            if m.startswith("SEAT_") or m.startswith("SEAT_"):
-                sub_id = m.replace("SEAT_", "", 1).strip()
-            if m.startswith("INV_"):
-                inv_id = m.replace("INV_", "", 1).strip()
-            # --- A2A: LANE_ memo seats an open lane ---
-            if m.startswith("LANE_"):
-                lane_id = m.replace("LANE_", "", 1).strip()
-                row = cnx.execute(
-                    "SELECT id, occupied_by FROM lanes WHERE id = ?",
-                    (lane_id,)).fetchone()
-                if row:
-                    matched_to = f"lane {lane_id}"
-                    cnx.execute(
-                        "UPDATE lanes SET occupied_by = ?, "
-                        "seat_expires_at = datetime('now','+30 days') "
-                        "WHERE id = ?",
-                        (buyer_agent or "a2a", lane_id))
-                    paid_lane = lane_id
-            # --- A2A: SKU_ memo activates a product subscription ---
-            if m.startswith("SKU_"):
-                sku = m.replace("SKU_", "", 1).strip().lower()
-                sub_id = f"sku_{sku}_{int(datetime.now().timestamp())}"
-                # price: dynamic from si_products, else static fallback
-                prow = cnx.execute(
-                    "SELECT tier1_usdc FROM si_products WHERE sku = ?",
-                    (sku,)).fetchone()
-                price = float(prow[0]) if prow else PRODUCT_PRICES.get(sku, 0.0)
-                cnx.execute(
-                    "INSERT OR REPLACE INTO si_subscription "
-                    "(subscription_id, tenant_id, plan, billing_cycle, seats, "
-                    "price_cents, status, payment_method, payment_ref, "
-                    "started_at, current_period_end, created_at) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (sub_id, wallet or "a2a", f"sku_{sku}", "usdc_prepaid",
-                     1, int(price * 100),
-                     "active", "solana", sig,
-                     datetime.now(timezone.utc).isoformat(),
-                     datetime.now(timezone.utc).isoformat(),
-                     datetime.now(timezone.utc).isoformat()))
-                matched_to = f"si_subscription {sub_id}"
-                paid_sub = sub_id
-            # try matching subscription
-            if sub_id:
-                row = cnx.execute(
-                    "SELECT subscription_id, tenant_id, status "
-                    "FROM si_subscription WHERE subscription_id = ?",
-                    (sub_id,)).fetchone()
-                if row:
-                    matched_to = f"si_subscription {row[0]}"
-                    cnx.execute(
-                        "UPDATE si_subscription SET status = 'paid', "
-                        "payment_ref = ? WHERE subscription_id = ?",
-                        (sig, sub_id))
-                    paid_sub = sub_id
-            # try matching invoice by memo id (si_ppc_invoices first, legacy si_invoice)
-            if inv_id:
-                for _tbl in ("si_ppc_invoices", "si_invoice"):
-                    try:
-                        row = cnx.execute(
-                            f"SELECT invoice_id, amount_cents, status "
-                            f"FROM {_tbl} WHERE invoice_id = ?",
-                            (inv_id,)).fetchone()
-                    except Exception:
-                        row = None
-                    if row:
-                        matched_to = f"{_tbl} {row[0]}"
-                        if _tbl == "si_invoice":
-                            cnx.execute(
-                                "UPDATE si_invoice SET status = 'paid', "
-                                "reference = ? WHERE invoice_id = ?",
-                                (sig, inv_id))
-                        else:
-                            cnx.execute(
-                                "UPDATE si_ppc_invoices SET status = 'paid', "
-                                "paid_at = ? WHERE invoice_id = ?",
-                                (datetime.now(timezone.utc).isoformat(), inv_id))
-                        paid_inv = inv_id
-                        break
-            # --- pay-per-lead: match OPEN si_ppc_invoices by amount ---
-            # incoming amount is in micro-USDC (int); invoice.amount_usdc
-            # stored as micro-units too (e.g. 528861 = 0.528861 USDC).
-            amt_micro = int(round(amount))
-            if not paid_inv:
-                cand = cnx.execute(
-                    "SELECT invoice_id, amount_usdc, status "
-                    "FROM si_ppc_invoices WHERE status = 'open'"
-                ).fetchall()
-                best = None
-                for iid, aud, st in cand:
-                    try:
-                        diff = abs(int(round(float(aud))) - amt_micro)
-                    except Exception:
-                        continue
-                    if diff <= 1:   # 1 micro-USDC tolerance
-                        best = iid
-                        break
-                if best:
-                    matched_to = f"si_ppc_invoices {best}"
-                    cnx.execute(
-                        "UPDATE si_ppc_invoices SET status = 'paid', "
-                        "paid_at = ? WHERE invoice_id = ?",
-                        (datetime.now(timezone.utc).isoformat(), best))
-                    paid_inv = best
-            # --- buyer activation: match PENDING si_subscription by seat amount ---
-            # Real USDC transfers (Trust/TokenPocket) carry no memo. A buyer who
-            # applied is parked as pending_deposit with price_cents set. Match the
-            # incoming deposit (micro-USDC) to the nearest pending seat price.
-            if not paid_sub:
-                pend = cnx.execute(
-                    "SELECT subscription_id, price_cents, tenant_id "
-                    "FROM si_subscription WHERE status = 'pending_deposit'"
-                ).fetchall()
-                for sid, pc, tid in pend:
-                    try:
-                        # price_cents (e.g. 1800) -> micro-USDC (1800*10000)
-                        seat_micro = int(round(float(pc))) * 10000
-                    except Exception:
-                        continue
-                    if abs(seat_micro - amt_micro) <= 1:
-                        matched_to = f"si_subscription {sid}"
-                        cnx.execute(
-                            "UPDATE si_subscription SET status = 'active', "
-                            "payment_ref = ? WHERE subscription_id = ?",
-                            (sig, sid))
-                        paid_sub = sid
-                        break
-            # if force_status paid but nothing matched, still log
-            cnx.commit()
-            # --- settlement + MONEY alert when a real invoice got paid ---
-            if paid_inv:
-                try:
-                    inv_row = cnx.execute(
-                        "SELECT invoice_id, amount_cents, amount_usdc, buyer_id "
-                        "FROM si_ppc_invoices WHERE invoice_id = ?",
-                        (paid_inv,)).fetchone()
-                    amt_c = int(inv_row[1]) if inv_row and inv_row[1] else 0
-                    cnx.execute(
-                        "INSERT INTO si_settlements "
-                        "(prospect_id, tenant_id, amount_cents, settled_at, "
-                        "settled_by, notes) VALUES (?,?,?,?,?,?)",
-                        (paid_inv, (inv_row[3] if inv_row and inv_row[3] else ""),
-                         amt_c, datetime.now(timezone.utc).isoformat(),
-                         "solana_listener", f"replay {sig}"))
-                    cnx.commit()
-                    _rev_paid(paid_inv, amt_c / 1e6,
-                              (inv_row[3] if inv_row and inv_row[3] else ""))
-                except Exception as _se:
-                    log("ERROR", "settlement_write_fail", err=str(_se)[:150])
-            # simulate vault balance accretion
-            cur_row = cnx.execute(
-                "SELECT value FROM app_kv WHERE key = 'vault_balance_usdc'"
-            ).fetchone()
-            new_bal = (float(cur_row[0]) if cur_row else 0.0) + amount
-            cnx.execute("DELETE FROM app_kv WHERE key = 'vault_balance_usdc'")
-            cnx.execute(
-                "INSERT INTO app_kv (key, value, ts) VALUES "
-                "('vault_balance_usdc', ?, ?)",
-                (str(new_bal), datetime.now(timezone.utc).isoformat()))
-            cnx.commit()
-        finally:
-            cnx.close()
-    except Exception as e:
-        raise HTTPException(500, f"replay failed: {e}")
-
-    # log to feedback log (host mount)
-    try:
-        with open("/root/feedback/finance_log.jsonl", "a") as f:
-            f.write(json.dumps({
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "level": "REPLAY_DEPOSIT",
-                "msg": "replay_deposit",
-                "amount_usdc": amount,
-                "memo": memo,
-                "tx_signature": sig,
-                "wallet_from": wallet,
-                "matched_to": matched_to,
-                "paid_subscription_id": paid_sub,
-                "paid_invoice_id": paid_inv,
-            }) + "\n")
-    except Exception:
-        pass
-
-    return {
-        "ok": True,
-        "matched_to": matched_to,
-        "paid_subscription_id": paid_sub,
-        "paid_invoice_id": paid_inv,
-        "amount_usdc": amount,
-        "memo": memo,
-        "tx_signature": sig,
-        "balance_after_usdc": new_bal if "new_bal" in dir() else None,
-    }
+    raise HTTPException(
+        410,
+        "finance replay retired; use governed BSC USDT verification evidence",
+    )
 
 
 @app.post("/v1/swarm/worker-config")
@@ -3746,11 +3540,11 @@ def agi_closer_state():
 
 @app.post("/v1/agi/closer/tick")
 def agi_closer_tick():
-    """Run one AGI Closer observe-reason-act cycle."""
-    global agi_closer
-    if not agi_closer:
-        raise HTTPException(503, "agi-closer not initialized")
-    return agi_closer.tick()
+    """Legacy closer execution is retired in favor of the governed closer."""
+    raise HTTPException(
+        410,
+        "legacy_agi_closer_execution_retired_use_canonical_supabase_closer",
+    )
 
 
 def has_active_sku(tenant: str, sku: str) -> bool:
@@ -3766,44 +3560,11 @@ def has_active_sku(tenant: str, sku: str) -> bool:
 
 @app.post("/v1/ai-closer/close")
 def ai_closer_close(req: dict):
-    """B2B: buyer with active sku_ai_closer runs a close sequence on a lead.
-    Rule-based (LLM down) — sends a claim/settlement nudge via Resend."""
-    tenant = (req.get("tenant") or req.get("wallet_from") or "").strip()
-    if not tenant:
-        raise HTTPException(400, "tenant required")
-    if not has_active_sku(tenant, "ai_closer"):
-        raise HTTPException(402, "no active ai_closer subscription")
-    lead_email = req.get("lead_email", "")
-    niche = req.get("niche", "your service")
-    if not lead_email:
-        raise HTTPException(400, "lead_email required")
-    # rule-based close nudge (LLM disabled)
-    subject = f"Your {niche} quote is ready — confirm to lock pricing"
-    body = (f"Hi,\n\nFollowing up on your {niche} enquiry. "
-             f"Your tailored quote is ready. Reply CONFIRM to lock "
-             f"pricing and schedule your consultation.\n\n"
-             f"— Empire AI Closer (automated, USDC-settled)")
-    try:
-        import requests as _r
-        _s = _r.Session(); _s.trust_env = False
-        resp = _s.post(f"{HUB}/v1/outreach/send",
-                       json={"to": lead_email, "subject": subject,
-                             "body": body, "source": "ai_closer_b2b",
-                             "tenant": tenant}, timeout=12)
-        sent = resp.status_code == 200
-    except Exception:
-        sent = False
-    try:
-        with open("/root/feedback/b2b_ai_closer.jsonl", "a") as f:
-            f.write(json.dumps({
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "tenant": tenant, "lead_email": lead_email,
-                "niche": niche, "sent": sent,
-            }) + "\n")
-    except Exception:
-        pass
-    return {"ok": True, "closed_via": "rule-based", "sent": sent,
-            "note": "lead nudged to claimed; LLM reasoning resumes ~2026-07-23"}
+    """Retired direct-send closer path; canonical governed flow is required."""
+    raise HTTPException(
+        410,
+        "legacy_ai_closer_close_retired_use_canonical_closer_and_outbound",
+    )
 
 
 @app.post("/v1/satellite/idle-watch/report")
@@ -4552,92 +4313,11 @@ class PriceAndSettleRequest(BaseModel):
 
 @app.post("/v1/funnel/price-and-settle")
 def price_and_settle(req: PriceAndSettleRequest):
-    """LLM-price a deal, split the fee, and (optionally) settle.
-
-    Used by the auto-pilot and AGI Closer. Reads the prospect's details
-    from the funnel, asks the LLM for a realistic deal amount, computes
-    the fee split, transitions claimed → settled, returns the full record.
-    """
-    from empire_os.funnel import transition, get_state, FunnelState
-    if not backend:
-        raise HTTPException(503, "Engine not initialized")
-    if not fee_agent:
-        raise HTTPException(503, "Fee agent not initialized")
-
-    state = get_state(backend, req.prospect_id)
-    if not state:
-        raise HTTPException(404, f"Prospect {req.prospect_id} not found")
-    if state.current_state != FunnelState.CLAIMED.value:
-        raise HTTPException(400, f"Prospect must be in claimed state, "
-                                f"got {state.current_state}")
-
-    # Get all event notes to give the LLM context for pricing
-    ev_rows = backend.execute(
-        "SELECT notes FROM si_funnel_event WHERE prospect_id=? "
-        "ORDER BY id ASC", (req.prospect_id,),
-    ).fetchall()
-    notes = " ".join((r["notes"] or "") for r in ev_rows)
-    niche = req.niche
-    for n in ["roofing", "hvac", "solar", "plumbing", "electrical", "mass_tort"]:
-        if n in notes.lower():
-            niche = n
-            break
-
-    # Ask LLM for price
-    from empire_os.agent_core import OllamaClient
-    llm = OllamaClient()
-    prompt = (
-        f"You are a sales estimator for a B2B home-services company.\n"
-        f"Niche: {niche or 'general'}\n"
-        f"Deal details: {notes[:400]}\n"
-        f"Estimate the realistic contract value in USD for closing this deal.\n"
-        f"Respond with ONLY a single integer dollar amount, no other text."
+    """Retired LLM-priced settlement path; verified canonical terms are required."""
+    raise HTTPException(
+        410,
+        "legacy_price_and_settle_retired_use_verified_bsc_usdt_commercial_flow",
     )
-    import re
-    try:
-        amount_dollars = 1500  # default
-        raw = llm.chat(
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
-        match = re.search(r"\d[\d,]*", raw.replace(",", ""))
-        if match:
-            amount_dollars = max(500, min(int(match.group(0)), 20000))
-    except Exception as e:
-        logger.warning("LLM price failed for %s: %s — using $1500 default",
-                       req.prospect_id, e)
-        amount_dollars = 1500
-
-    amount_cents = amount_dollars * 100
-    split = fee_agent.calculate(amount_cents)
-
-    result = {
-        "ok": True,
-        "prospect_id": req.prospect_id,
-        "niche": niche,
-        "amount_cents": amount_cents,
-        "fee_bps": split["fee_bps"],
-        "fee_cents": split["fee_cents"],
-        "client_cents": split["client_cents"],
-    }
-
-    if req.settle:
-        notes_text = (
-            f"settled ${amount_cents/100:.2f} "
-            f"(llm-priced, fee ${split['fee_cents']/100:.2f}, "
-            f"client ${split['client_cents']/100:.2f})"
-        )
-        eid = transition(
-            backend, req.prospect_id, FunnelState.SETTLED.value,
-            "agi-closer", notes=notes_text,
-        )
-        # Record fee
-        fee_agent.record(str(eid), amount_cents)
-        # Create payout
-        if payout_engine:
-            payout_engine.payout(str(eid), req.prospect_id, split["client_cents"])
-        result["event_id"] = eid
-    return result
 
 
 # --- Payouts ---
@@ -5572,7 +5252,12 @@ def score_prospect(prospect_id: str):
 
 
 # --- Swarm pub/sub (file-backed, lets containers share events) ---
-SWARMS_LOG = Path("/root/swarms/events.jsonl")
+SWARMS_LOG = Path(
+    os.getenv(
+        "SWARMS_LOG",
+        "/srv/empire_os/runtime/swarms/events.jsonl",
+    )
+)
 SWARMS_LOG.parent.mkdir(parents=True, exist_ok=True)
 SWARMS_MAX_LINES = 5000  # bounded
 

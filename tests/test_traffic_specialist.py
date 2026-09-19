@@ -36,6 +36,12 @@ class TestTrafficSpecialist:
         state = get_state(backend, "p1")
         assert state is not None
         assert state.current_state == "discovered"
+        consent = backend.execute(
+            "SELECT opted_in, opted_in_at FROM si_prospect_consent WHERE prospect_id=?",
+            ("p1",),
+        ).fetchone()
+        assert consent["opted_in"] == 0
+        assert consent["opted_in_at"] is None
 
     def test_mark_matched(self, backend):
         # First discover

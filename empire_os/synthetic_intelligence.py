@@ -10,7 +10,6 @@ next reasoning cycle.
 Free, runs on the same LLM we already use. No external dependency.
 
 Helpers exposed for other agents:
-  - generate_synthetic_leads(niche, count, llm) -> list[dict]
   - analyze_market(niche, backend, llm) -> MarketAnalysis
   - analyze_lead(lead, llm) -> LeadAnalysis  (cross-niche scoring)
   - score_niche_fit(lead, niche) -> float    (heuristic, no LLM)
@@ -165,67 +164,6 @@ def score_niche_fit(lead: dict, niche: str) -> float:
     if str(lead.get("niche", "")).lower() == niche:
         hits += 1
     return min(1.0, hits / 3.0)
-
-
-def generate_synthetic_leads(niche: str, count: int,
-                              llm) -> list[dict]:
-    """Generate plausible synthetic prospect leads for a niche.
-
-    Used by agi-scout when real scanners are silent or thin. Each lead
-    is a dict with name, phone, zip, details. Phone is left blank
-    (synthetic — no real human to call).
-
-    Returns list[dict] (may be empty on LLM failure).
-    """
-    prompt = f"""Generate {count} plausible synthetic business leads for the
-{niche} niche in the US. Vary across metros (use real US metro names).
-
-Each lead must be a JSON object with: business_name, phone (use format
-555-0100 to 555-0199 to mark as synthetic), zip (5 digits), details
-(1-2 sentence description of the business).
-
-Output a JSON array of exactly {count} objects, nothing else."""
-    try:
-        result = llm.structured_chat(
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-        )
-    except Exception as e:
-        logger.warning("generate_synthetic_leads failed: %s", e)
-        return []
-
-    if isinstance(result, list):
-        leads = result
-    elif isinstance(result, dict):
-        leads = result.get("leads",
-                           result.get("data",
-                                      result.get("examples", [])))
-    else:
-        return []
-
-    out = []
-    for raw in leads[:count]:
-        if not isinstance(raw, dict):
-            continue
-        out.append({
-            "business_name": raw.get("business_name", ""),
-            "phone":         raw.get("phone", ""),
-            "zip":           raw.get("zip", ""),
-            "details":       raw.get("details", ""),
-            "_synthetic":    True,
-            "_generated_at": datetime.now(timezone.utc).isoformat(),
-        })
-    return out
-
-
-@dataclass
-class MarketAnalysis:
-    """Result of analyze_market()."""
-    niche: str
-    urgency: str          # "low" | "medium" | "high"
-    recommended_angle: str
-    top_opportunities: list[str] = field(default_factory=list)
-    risks: list[str] = field(default_factory=list)
 
 
 def analyze_market(niche: str, backend, llm) -> MarketAnalysis:

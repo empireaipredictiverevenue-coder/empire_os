@@ -2,7 +2,7 @@
 Empire OS v3 — Lead Source Registry
 ====================================
 
-Lead sources that produce LeadCandidate objects, fed into /v1/leads/direct.
+Lead sources that produce LeadCandidate objects for canonical prospect ingest.
 Each source has:
   - name: identifier
   - tier: real | stub (real means actively running, stub means wired but disabled)
@@ -18,7 +18,7 @@ import json
 
 @dataclass
 class LeadCandidate:
-    """A potential lead found by a source. Maps to /v1/leads/direct payload."""
+    """A potential lead found by a real source for canonical prospect ingest."""
     name: str
     email: str = ""
     phone: str = ""
