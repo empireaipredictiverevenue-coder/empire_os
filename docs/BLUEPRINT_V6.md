@@ -97,6 +97,8 @@ Phase 3F deliverables:
 - Canonical feedback projection + Python adapter for Omega/revenue intelligence and Astra priorities. ✅ local/tested
 - Hard commercial figures scorecard: actual revenue/cost/gross profit/margin, conversion, buyer satisfaction and buyer/niche profitability via a dedicated read-only role. ✅ local/tested
 - OBSERVE-first bounded revenue-recognition worker + systemd timer. ✅ local/tested
+- Canonical Lead Intelligence convergence: both lead intake compatibility URLs now feed canonical prospects; evidence-preserving read projection over prospects → identity → Intelligence Fabric → qualification is local/tested with a dedicated SELECT-only role. ✅ local/tested
+- Lead Intelligence reader-role migration/credential activation, internal API exposure, and legacy CRM consumer migration remain gated.
 - Production migration/runtime credential activation and live evidence observation remain gated.
 
 ### Empire Coder — Developer Intelligence Layer (HIGH PRIORITY PARALLEL FOUNDATION)
@@ -226,19 +228,20 @@ Astra detects → predicts economics → selects market → creates acquisition/
 Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deployment, heavy model-serving infrastructure and continuous retraining remain later-stage tools. They activate only when measured scale, reliability or revenue requirements justify the complexity.
 
 ## Immediate Execution Order
-1. Activate the staged Phase 3E outbound/reply hardening migrations and inbound runtime under the existing production gates.
-2. Activate Phase 3F outcome/revenue migration and dedicated runtime identities in OBSERVE first.
-3. Send/deliver the first genuine governed buyer opportunity and capture real delivery/conversion evidence.
-4. Recognize the first independently verified paid outcome as actual revenue and gross profit.
-5. Feed the canonical Phase 3F outcome projection into Astra/Omega/revenue intelligence calibration.
-6. Supabase-backed AI Closer production state-machine gate ✅ local/tested; activate its canonical migrations, separated runtime credentials and OBSERVE worker only under production gates.
-7. Move the CURRENT marker to Phase 4 Astra Operating Layer once first-revenue feedback is proven end to end.
-8. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution in parallel where they do not bypass gates. Build the Search Intelligence foundation first; stabilize its API contract, then build the Search Command Centre frontend.
-9. Expand Astra operating authority only after proven controls and economics.
+1. Complete canonical Lead Intelligence convergence: prove parity, provision the dedicated reader identity under the production gate, and migrate legacy lead consumers incrementally without creating another lead database.
+2. Activate the staged Phase 3E outbound/reply hardening migrations and inbound runtime under the existing production gates.
+3. Activate Phase 3F outcome/revenue migration and dedicated runtime identities in OBSERVE first.
+4. Send/deliver the first genuine governed buyer opportunity and capture real delivery/conversion evidence.
+5. Recognize the first independently verified paid outcome as actual revenue and gross profit.
+6. Feed the canonical Phase 3F outcome projection into Astra/Omega/revenue intelligence calibration.
+7. Supabase-backed AI Closer production state-machine gate ✅ local/tested; activate its canonical migrations, separated runtime credentials and OBSERVE worker only under production gates.
+8. Move the CURRENT marker to Phase 4 Astra Operating Layer once first-revenue feedback is proven end to end.
+9. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution in parallel where they do not bypass gates. Build the Search Intelligence foundation first; stabilize its API contract, then build the Search Command Centre frontend.
+10. Expand Astra operating authority only after proven controls and economics.
 
-10. BSC USDT smart-contract escrow: local contract + verifier + database rail ✅;
+11. BSC USDT smart-contract escrow: local contract + verifier + database rail ✅;
     canonical Supabase migration ✅; external audit, production identities and mainnet contract deployment pending.
-11. Empire Intelligence Fabric: canonical schema + provenance/temporal graph ← ACTIVE SUPPORT WORK;
+12. Empire Intelligence Fabric: canonical schema + provenance/temporal graph ← ACTIVE SUPPORT WORK;
     integrate real source adapters and TAM segmentation while primary effort completes Phase 3F outcome/revenue feedback.
 
 ## Definition of Actual Revenue

@@ -48,7 +48,7 @@ from fastapi.responses import HTMLResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import hmac as _hmac
 import hashlib as _hashlib
@@ -688,6 +688,11 @@ class LeadIntakeRequest(BaseModel):
     source: str = "aeo_form"
     ip_address: str = ""
     user_agent: str = ""
+    intent: str = ""
+    consent: str = ""
+    url: str = ""
+    lead_score: int | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class DamageScanRequest(BaseModel):
@@ -956,107 +961,35 @@ def satellite_strike(req: dict):
 
 @app.post("/v1/leads/intake")
 def lead_intake(req: LeadIntakeRequest):
-    """Capture and persist an inbound lead through the Omega 2.0 boundary."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
+    """Compatibility URL backed only by canonical Supabase prospects."""
+    from empire_os.lead_compat import (
+        CanonicalLeadConflict,
+        CanonicalLeadIntakeError,
+        canonical_lead_intake,
+    )
+    from empire_os.crawler_runner import ingest_candidate
 
-    from empire_os.intelligence.compat import analyze_with_legacy_fields
-
-    external_id = req.lead_id or ""
-    stable_uid = external_id.strip() or (f"lead:{req.email.strip()}" if req.email.strip() else "")
-
-    if not stable_uid:
-        import uuid
-        stable_uid = f"lead:{uuid.uuid4()}"
-
-    metro = req.metro.strip()
-    lead = {
-        "business_name": req.name,
-        "email": req.email,
-        "phone": req.phone,
-        "state": req.state,
-        "zip": req.zip,
-        "metro": metro,
-        "niche": req.niche,
-        "details": req.details,
-        "source": req.source,
-        "status": "raw",
-    }
-
-    prediction, omega_fields = analyze_with_legacy_fields(lead)
-
-    existing = backend.execute(
-        "SELECT id FROM crm_leads WHERE lead_uid = ?",
-        (stable_uid,),
-    ).fetchone()
-    if existing:
-        return {
-            "ok": True,
-            "already": True,
-            "lead_id": existing[0],
-            "lead_uid": stable_uid,
-            "score": omega_fields["omega_score"],
-            "tier": omega_fields["omega_tier"],
-            "prediction": prediction.to_dict(),
-        }
-
-    now = datetime.now(timezone.utc).isoformat()
-
+    payload = (
+        req.model_dump()
+        if hasattr(req, "model_dump")
+        else req.dict()
+    )
     try:
-        backend.execute(
-            """INSERT INTO crm_leads
-               (lead_uid, source, business_name, email, phone, metro, niche,
-                state, zip, omega_score, omega_tier, status, notes,
-                created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'raw', ?, ?, ?)""",
-            (
-                stable_uid,
-                req.source,
-                req.name,
-                req.email,
-                req.phone,
-                metro,
-                req.niche,
-                req.state,
-                req.zip,
-                omega_fields["omega_score"],
-                omega_fields["omega_tier"],
-                req.details[:1000],
-                now,
-                now,
-            ),
+        return canonical_lead_intake(payload, ingest_candidate)
+    except CanonicalLeadConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except CanonicalLeadIntakeError as exc:
+        logging.getLogger(__name__).warning(
+            "canonical lead intake failed: %s",
+            exc,
         )
-        crm_id = backend.execute("SELECT last_insert_rowid()").fetchone()[0]
-
-        backend.execute(
-            "INSERT INTO crm_activities "
-            "(lead_id, act_type, summary, detail, actor) "
-            "VALUES (?, 'system', ?, ?, 'omega-2.0')",
-            (
-                crm_id,
-                "Inbound lead scored by Omega 2.0",
-                json.dumps({
-                    "model_version": prediction.model_version,
-                    "opportunity_score": prediction.opportunity_score,
-                    "confidence": prediction.confidence,
-                    "next_best_action": prediction.next_best_action,
-                }),
-            ),
-        )
-        backend.commit()
-    except Exception as e:
-        raise HTTPException(500, f"CRM write failed: {e}")
-
-    return {
-        "ok": True,
-        "already": False,
-        "lead_id": crm_id,
-        "lead_uid": stable_uid,
-        "score": omega_fields["omega_score"],
-        "tier": omega_fields["omega_tier"],
-        "status": "raw",
-        "prediction": prediction.to_dict(),
-    }
+        message = str(exc)
+        if message == "name, niche and metro required":
+            raise HTTPException(400, message) from exc
+        raise HTTPException(
+            503,
+            "canonical prospect ingest temporarily unavailable",
+        ) from exc
 
 
 @app.get("/v1/leads/counts")
@@ -1070,70 +1003,30 @@ def lead_counts():
 
 @app.post("/v1/leads/direct")
 def direct_lead_intake(req: dict):
-    """Compatibility intake route backed only by canonical Supabase prospects.
-
-    Existing AEO/forms and acquisition agents may continue posting here, but
-    this route no longer fabricates prospect IDs or inserts into lane_leads.
-    Allocation/delivery belongs to the governed commercial pipeline.
-    """
-    name = str(req.get("name") or "").strip()
-    niche = str(req.get("niche") or "").strip()
-    metro = str(req.get("metro") or "").strip()
-
-    if not name or not niche or not metro:
-        raise HTTPException(400, "name, niche and metro required")
-
-    payload = dict(req)
-    payload["name"] = name
-    payload["niche"] = niche
-    payload["metro"] = metro
-    payload["source"] = str(req.get("source") or "api").strip() or "api"
+    """Compatibility intake backed only by canonical Supabase prospects."""
+    from empire_os.lead_compat import (
+        CanonicalLeadConflict,
+        CanonicalLeadIntakeError,
+        canonical_lead_intake,
+    )
+    from empire_os.crawler_runner import ingest_candidate
 
     try:
-        # Lazy import: canonical writer loads live Supabase service config only
-        # when this endpoint actually receives an intake request.
-        from empire_os.crawler_runner import ingest_candidate
-
-        result = ingest_candidate(payload)
-    except Exception:
-        logging.getLogger(__name__).exception(
-            "canonical direct lead ingest failed"
+        return canonical_lead_intake(req, ingest_candidate)
+    except CanonicalLeadConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except CanonicalLeadIntakeError as exc:
+        logging.getLogger(__name__).warning(
+            "canonical direct lead ingest failed: %s",
+            exc,
         )
-        # Fail closed. Never fall back to lane_leads/SQLite identity creation.
+        message = str(exc)
+        if message == "name, niche and metro required":
+            raise HTTPException(400, message) from exc
         raise HTTPException(
             503,
             "canonical prospect ingest temporarily unavailable",
-        )
-
-    if not isinstance(result, dict):
-        raise HTTPException(502, "invalid canonical ingest response")
-
-    decision = str(result.get("decision") or "").strip()
-    if not decision:
-        raise HTTPException(502, "canonical ingest missing decision")
-
-    if decision in {"ambiguous", "conflict"}:
-        raise HTTPException(
-            409,
-            "prospect identity requires manual resolution",
-        )
-
-    prospect = result.get("prospect")
-    prospect_id = (
-        prospect.get("id")
-        if isinstance(prospect, dict)
-        else result.get("prospect_id")
-    )
-
-    return {
-        "ok": True,
-        "decision": decision,
-        "prospect_id": prospect_id,
-        "niche": niche,
-        "metro": metro,
-        "status": "canonical_owned",
-    }
-
+        ) from exc
 
 
 class BuyerApplyRequest(BaseModel):
@@ -1346,33 +1239,60 @@ def list_leads(
     """List leads with optional filters."""
     if not backend:
         raise HTTPException(503, "backend not initialized")
-    from empire_os.crm import list_leads
-    rows, total = list_leads(backend, status=status, niche=niche,
-                              metro=metro, limit=limit, offset=offset)
-    return {"leads": rows, "total": total, "limit": limit, "offset": offset}
-
-
-@app.get("/v1/leads/counts")
-def lead_counts():
-    """Get lead counts by status and niche."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    from empire_os.crm import get_lead_counts
-    return get_lead_counts(backend)
+    from empire_os.crm import list_leads as crm_list_leads
+    return crm_list_leads(
+        backend,
+        status=status or None,
+        niche=niche or None,
+        metro=metro or None,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @app.patch("/v1/leads/{lead_id}/status")
 def update_lead_status(lead_id: str, status: str = "", notes: str = ""):
-    """Update a lead's funnel status."""
+    """Compatibility mutation for legacy CRM pipeline state only."""
     if not backend:
         raise HTTPException(503, "backend not initialized")
     if not status:
         raise HTTPException(400, "status is required")
-    from empire_os.crm import update_lead_status
-    ok = update_lead_status(backend, lead_id, status, notes)
-    if not ok:
-        raise HTTPException(500, "Failed to update lead status")
-    return {"ok": True, "lead_id": lead_id, "status": status}
+    try:
+        numeric_id = int(lead_id)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            400,
+            "legacy CRM lead_id must be an integer",
+        ) from exc
+
+    from empire_os.crm import add_activity, set_pipeline_stage
+
+    try:
+        result = set_pipeline_stage(
+            backend,
+            numeric_id,
+            status,
+            actor="api",
+        )
+        if notes.strip():
+            add_activity(
+                backend,
+                numeric_id,
+                "note",
+                "Lead status update note",
+                notes.strip(),
+                actor="api",
+            )
+    except ValueError as exc:
+        message = str(exc)
+        code = 404 if "not found" in message else 400
+        raise HTTPException(code, message) from exc
+
+    return {
+        "ok": True,
+        "lead_id": numeric_id,
+        "status": result["stage"],
+    }
 
 
 # ─────────────────────────────────────────────────────────────────
