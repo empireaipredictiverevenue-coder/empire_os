@@ -182,6 +182,8 @@ Long model work is placed in `runtime/coder/jobs` rather than executed inside th
 
 empire-ollama.service is staged only and is not installed/enabled automatically. It binds Ollama to localhost, loads one model at a time, allows one parallel generation and runs as ubuntu with restrictive systemd protections.
 
+`scripts/install_empire_coder_services.sh` is the explicit root activation helper. `--check` performs non-mutating unit validation. Root installation verifies all units again, installs them under `/etc/systemd/system`, enables Ollama for reboot persistence, enables/starts the Coder worker timer, preserves an already-healthy localhost Ollama process, and refuses to launch a duplicate worker. It does not enable the internal Coder API or provision production credentials.
+
 ## Next Slices
 
 1. Canonical PostgreSQL state transport after migration and credential approval.
