@@ -45,6 +45,33 @@ Why these three:
 - empire_revenue_ledger has no current repo consumer;
 - crypto_payment_requests is explicitly legacy and superseded by the governed BSC flow.
 
+
+## Second bounded remediation slice
+
+Migration:
+supabase/migrations/20260919112855_lock_internal_operational_surfaces.sql
+
+Targets internal operational/control-plane tables only:
+- agent_activity, agent_config, agent_roles, agent_task_queue
+- agent_baselines, agent_improvements
+- watcher_findings, self_healer_log
+- media_pipeline_runs, enrichment_pipeline_runs
+- business_actions_log, business_recommendations
+
+Behavior matches the first internal-only pattern:
+- revoke all table privileges from anon and authenticated;
+- enable RLS with no client policies;
+- preserve existing rows;
+- preserve service_role/admin access;
+- do not alter RPC ownership or existing server-side execution paths.
+
+Repo inspection found no frontend/static consumers for these tables. The
+agent_task_queue surface is server-side and its legacy task RPCs are already
+separately hardened.
+
+Isolated PostgreSQL tests prove row preservation, RLS activation, client read/write
+denial and continued service_role access for every table in this slice.
+
 ## Next classes
 
 1. Internal-only: revoke client access and enable RLS.
