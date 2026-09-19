@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from empire_os.capital_allocator import CapitalCandidate
+from empire_os.capital_calibration_registry import CapitalCalibrationRecord
 from empire_os.capital_freshness import review_capital_outcome_calibration
 from empire_os.capital_outcome import (
     CapitalOutcomeEvidence,
@@ -35,6 +36,12 @@ class CapitalOutcomeCalibrationRequest(CapitalOutcomeRequest):
     max_age_seconds: int = Field(default=604800, gt=0)
 
 
+class CapitalOutcomeCalibrationRegisterRequest(
+    CapitalOutcomeCalibrationRequest
+):
+    evidence: dict = Field(default_factory=dict)
+
+
 class CapitalReviewRegisterRequest(BaseModel):
     review_key: str
     candidate_id: str
@@ -60,6 +67,7 @@ class CapitalReviewRepository(Protocol):
 def create_capital_router(
     repository: CapitalReviewRepository | None = None,
     registry=None,
+    calibration_registry=None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/capital",
@@ -76,6 +84,7 @@ def create_capital_router(
             "budget_mutation": False,
             "repository_available": repository is not None,
             "registry_available": registry is not None,
+            "calibration_registry_available": calibration_registry is not None,
         }
 
     @router.get("/recommendations")
@@ -183,6 +192,89 @@ def create_capital_router(
             "budget_mutation": False,
             "recommendation_mutation": False,
             "calibration": calibration.as_dict(),
+        }
+
+    @router.post("/outcome/calibration/register")
+    def register_outcome_calibration(
+        req: CapitalOutcomeCalibrationRegisterRequest,
+    ):
+        if calibration_registry is None or not hasattr(
+            calibration_registry,
+            "record_calibration",
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail="capital_calibration_registry_not_activated",
+            )
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            evidence = CapitalOutcomeEvidence(
+                candidate_id=req.candidate_id,
+                expected_return_cents=req.expected_return_cents,
+                required_capital_cents=req.required_capital_cents,
+                recognized_revenue_cents=req.recognized_revenue_cents,
+                observed_cost_cents=req.observed_cost_cents,
+                observed_at=req.observed_at,
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            calibration = review_capital_outcome_calibration(
+                evidence,
+                recommendation_recorded_at=req.recommendation_recorded_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+            item = CapitalCalibrationRecord(
+                calibration=calibration,
+                evidence=dict(req.evidence),
+            )
+            item.validate()
+            row = calibration_registry.record_calibration(item)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "funds_movement": False,
+            "budget_mutation": False,
+            "recommendation_mutation": False,
+            "model_weight_mutation": False,
+            "status": str(row.get("status") or "recorded"),
+            "calibration_record": item.as_dict(),
+            "result": dict(row),
+        }
+
+    @router.get("/outcome/calibrations")
+    def list_outcome_calibrations(
+        limit: int = Query(default=100, ge=1, le=500),
+    ):
+        if calibration_registry is None or not hasattr(
+            calibration_registry,
+            "list_calibrations",
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail="capital_calibration_registry_not_activated",
+            )
+        rows = list(calibration_registry.list_calibrations(limit=limit))
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "funds_movement": False,
+            "budget_mutation": False,
+            "recommendation_mutation": False,
+            "model_weight_mutation": False,
+            "count": len(rows),
+            "items": [dict(row) for row in rows],
         }
 
     @router.post("/reviews/register")
