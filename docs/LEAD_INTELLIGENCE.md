@@ -74,15 +74,21 @@ Local/tested:
   mode=ro; exact UUID, acquisition external-ID and unique identity fallback
   matches are reported with explicit confidence and ambiguity handling.
 
+Production status:
+- the SELECT-only reader-role migration is applied in canonical Supabase;
+- the dedicated login remains passwordless/unprovisioned.
+
 Still gated:
-- applying the reader-role migration to canonical Supabase;
 - provisioning the dedicated login password/DSN;
 - exposing any internal Lead Intelligence API;
-- running parity against production after the dedicated reader identity is
-  provisioned;
-- migrating legacy CRM readers/agents onto the canonical projection after
-  parity evidence is reviewed;
-- retiring `lane_leads` / `crm_leads` compatibility storage after consumer parity.
+- runtime parity through the dedicated reader identity once provisioned;
+- any legacy-consumer retirement that changes live behavior.
 
-No production database migration or runtime credential activation occurs as part
-of this foundation slice.
+Production inspection found 29,807 canonical prospects, 12,184 active identity
+links, 1,177 v1 qualifications and 466 prospects with both identity and
+qualification. Legacy SQLite crm_leads and lane_leads are empty, so there is
+no meaningful SQLite lead inventory to migrate. The acquisition ledger currently
+contains only one row and must not be treated as historical provenance coverage.
+
+No runtime credential activation or lead mutation occurs as part of the current
+reader foundation.
