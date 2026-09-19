@@ -116,26 +116,61 @@ class PostgresLeadIntelligenceReader:
             )
 
         if path == "/rest/v1/prospects":
+            allowed = {
+                "id","created_at","business_name","niche","metro",
+                "phone","website","address","rating","review_count",
+                "buy_signal_score","runs_ads","status","notes",
+                "contacted_at","contact_name","contact_title",
+                "contact_source","contacted_status",
+            }
+            if set(params) == {"select", "id", "limit"}:
+                prospect_id = _eq_uuid(
+                    params["id"],
+                    field="prospect id",
+                )
+                limit = _limit(params["limit"], maximum=1)
+                sql = (
+                    "SELECT " + self._safe_select(select, allowed)
+                    + " FROM public.prospects WHERE id=%s LIMIT %s"
+                )
+                return sql, (prospect_id, limit)
+
+            if set(params) == {"select", "order", "limit"}:
+                if params["order"] != "created_at.desc":
+                    raise LeadIntelligenceTransportError(
+                        "prospect parity ordering must be created_at.desc"
+                    )
+                limit = _limit(params["limit"], maximum=10000)
+                sql = (
+                    "SELECT " + self._safe_select(select, allowed)
+                    + " FROM public.prospects "
+                    "ORDER BY created_at DESC LIMIT %s"
+                )
+                return sql, (limit,)
+
+            raise LeadIntelligenceTransportError(
+                "unexpected Lead Intelligence query parameters"
+            )
+
+        if path == "/rest/v1/prospect_acquisitions":
             self._expect_keys(
                 params,
-                {"select", "id", "limit"},
+                {"select", "order", "limit"},
             )
-            prospect_id = _eq_uuid(
-                params["id"],
-                field="prospect id",
-            )
-            limit = _limit(params["limit"], maximum=1)
+            if params["order"] != "created_at.desc":
+                raise LeadIntelligenceTransportError(
+                    "acquisition parity ordering must be created_at.desc"
+                )
+            limit = _limit(params["limit"], maximum=10000)
             sql = (
                 "SELECT " + self._safe_select(select, {
-                    "id","created_at","business_name","niche","metro",
-                    "phone","website","address","rating","review_count",
-                    "buy_signal_score","runs_ads","status","notes",
-                    "contacted_at","contact_name","contact_title",
-                    "contact_source","contacted_status",
+                    "id","prospect_id","ingest_key","identity_keys",
+                    "source","source_url","evidence","created_at",
                 })
-                + " FROM public.prospects WHERE id=%s LIMIT %s"
+                + " FROM public.prospect_acquisitions "
+                "ORDER BY created_at DESC LIMIT %s"
             )
-            return sql, (prospect_id, limit)
+            return sql, (limit,)
 
         if path == "/rest/v1/prospect_entity_links":
             self._expect_keys(

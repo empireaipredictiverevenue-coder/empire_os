@@ -59,6 +59,7 @@ try{
     create table prospect_entity_links(id uuid primary key);
     create table business_entities(id uuid primary key);
     create table prospect_qualifications(id uuid primary key);
+    create table prospect_acquisitions(id uuid primary key);
     create table intelligence_facts(id uuid primary key);
     create table intelligence_signals(id uuid primary key);
     create table intelligence_scores(id uuid primary key);
@@ -70,6 +71,7 @@ try{
     alter table prospect_entity_links enable row level security;
     alter table business_entities enable row level security;
     alter table prospect_qualifications enable row level security;
+    alter table prospect_acquisitions enable row level security;
     alter table intelligence_facts enable row level security;
     alter table intelligence_signals enable row level security;
     alter table intelligence_scores enable row level security;
@@ -157,6 +159,12 @@ try{
       'select id from intelligence_signals',
     );
     assert.equal(signals.rowCount,1);
+
+    const acquisitions=await asRole(
+      'empire_lead_intelligence_reader',
+      'select id from prospect_acquisitions',
+    );
+    assert.equal(acquisitions.rowCount,0);
   });
 
   await test('reader cannot write canonical tables',async()=>{

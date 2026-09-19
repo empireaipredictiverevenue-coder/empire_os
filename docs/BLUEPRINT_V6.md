@@ -97,8 +97,9 @@ Phase 3F deliverables:
 - Canonical feedback projection + Python adapter for Omega/revenue intelligence and Astra priorities. ✅ local/tested
 - Hard commercial figures scorecard: actual revenue/cost/gross profit/margin, conversion, buyer satisfaction and buyer/niche profitability via a dedicated read-only role. ✅ local/tested
 - OBSERVE-first bounded revenue-recognition worker + systemd timer. ✅ local/tested
-- Canonical Lead Intelligence convergence: both lead intake compatibility URLs now feed canonical prospects; evidence-preserving read projection over prospects → identity → Intelligence Fabric → qualification is local/tested with a dedicated SELECT-only role. ✅ local/tested
-- Lead Intelligence reader-role migration/credential activation, internal API exposure, and legacy CRM consumer migration remain gated.
+- Canonical Lead Intelligence convergence: both lead intake compatibility URLs now feed canonical prospects; evidence-preserving read projection over prospects → acquisition provenance → identity → Intelligence Fabric → qualification is local/tested with a dedicated SELECT-only role. ✅ local/tested
+- Read-only canonical-vs-legacy parity engine/CLI is local/tested; it uses only the dedicated Lead Intelligence DSN plus SQLite mode=ro, reports ambiguity/mismatches without reconciling or mutating data. ✅ local/tested
+- Lead Intelligence reader-role migration/credential activation, production parity execution, internal API exposure, and legacy CRM consumer migration remain gated.
 - Production migration/runtime credential activation and live evidence observation remain gated.
 
 ### Empire Coder — Developer Intelligence Layer (HIGH PRIORITY PARALLEL FOUNDATION)

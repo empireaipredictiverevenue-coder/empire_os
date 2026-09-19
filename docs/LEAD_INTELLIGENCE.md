@@ -10,6 +10,7 @@ another lead database or silently widening commercial authority.
 
 ```text
 prospects
+  -> prospect_acquisitions
   -> prospect_entity_links
   -> business_entities
   -> prospect_qualifications
@@ -67,13 +68,20 @@ Local/tested:
 - repaired legacy lead list/status endpoint contracts;
 - conflict-safe identity handling;
 - bounded limits and strict UUID/filter validation;
-- isolated RLS/permission tests.
+- isolated RLS/permission tests;
+- read-only canonical-vs-legacy parity engine;
+- bounded parity CLI using the dedicated Lead Intelligence DSN and SQLite
+  mode=ro; exact UUID, acquisition external-ID and unique identity fallback
+  matches are reported with explicit confidence and ambiguity handling.
 
 Still gated:
 - applying the reader-role migration to canonical Supabase;
 - provisioning the dedicated login password/DSN;
 - exposing any internal Lead Intelligence API;
-- migrating legacy CRM readers/agents onto the canonical projection;
+- running parity against production after the dedicated reader identity is
+  provisioned;
+- migrating legacy CRM readers/agents onto the canonical projection after
+  parity evidence is reviewed;
 - retiring `lane_leads` / `crm_leads` compatibility storage after consumer parity.
 
 No production database migration or runtime credential activation occurs as part
