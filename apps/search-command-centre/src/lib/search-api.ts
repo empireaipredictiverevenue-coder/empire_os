@@ -129,3 +129,11 @@ export async function getDashboardData() {
     ]);
   return { health, summary, searchConsole, pages, opportunities, alerts, revenue };
 }
+
+export async function getRevenueAttributionData() {
+  const [health, revenue] = await Promise.all([
+    request<Health>("/v1/search/health"),
+    request<CollectionEnvelope>("/v1/search/revenue?limit=200"),
+  ]);
+  return { health, revenue };
+}
