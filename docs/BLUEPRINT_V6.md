@@ -102,6 +102,7 @@ Phase 3F deliverables:
 - Lead Intelligence SELECT-only reader role migration is applied in canonical Supabase; runtime credential activation remains gated. Production inspection found 29,807 prospects, 12,184 active identity links, 1,177 qualifications, 466 prospects with both identity + qualification, and only 1 acquisition-ledger row; legacy SQLite crm_leads/lane_leads are empty.
 - Intelligence Materializer planner + dedicated append-only writer contract are local/tested: observed prospect facts and v1 qualification scores only, deterministic evidence hashes, no synthetic enrichment/confidence, INSERT-only facts/scores, no unrelated commercial authority. ✅ local/tested
 - Intelligence Materializer production writer migration/credential activation and any bulk historical materialization remain gated.
+- Supabase production security audit found materially over-broad client grants on legacy/internal public-schema tables. First bounded lockdown slice for b2b_leads, empire_revenue_ledger and legacy crypto_payment_requests is local/tested; it revokes anon/authenticated access, enables RLS, preserves service_role/admin access and preserves rows. Production application remains gated.
 - Production migration/runtime credential activation and live evidence observation remain gated.
 
 ### Empire Coder — Developer Intelligence Layer (HIGH PRIORITY PARALLEL FOUNDATION)
@@ -231,7 +232,7 @@ Astra detects → predicts economics → selects market → creates acquisition/
 Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deployment, heavy model-serving infrastructure and continuous retraining remain later-stage tools. They activate only when measured scale, reliability or revenue requirements justify the complexity.
 
 ## Immediate Execution Order
-1. Complete canonical Lead Intelligence convergence: prove parity, provision the dedicated reader identity under the production gate, and migrate legacy lead consumers incrementally without creating another lead database.
+1. Complete canonical Lead Intelligence convergence and security prerequisites: keep the dedicated reader/runtime identities least-privilege, apply only reviewed Supabase lockdown slices, then activate the Intelligence Materializer on bounded real prospects before any bulk historical write.
 2. Activate the staged Phase 3E outbound/reply hardening migrations and inbound runtime under the existing production gates.
 3. Activate Phase 3F outcome/revenue migration and dedicated runtime identities in OBSERVE first.
 4. Send/deliver the first genuine governed buyer opportunity and capture real delivery/conversion evidence.
