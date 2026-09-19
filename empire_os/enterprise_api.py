@@ -1,12 +1,14 @@
 """Read-only enterprise control and SLO status API."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Mapping, Protocol, Sequence
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from empire_os.enterprise_controls import ControlEvidence, SloObservation
+from empire_os.enterprise_freshness import review_enterprise_evidence
 from empire_os.enterprise_review import review_enterprise_readiness
 from empire_os.enterprise_registry import EnterpriseReadinessRecord
 
@@ -39,6 +41,13 @@ class EnterpriseReadinessRegisterRequest(BaseModel):
     slos: list[EnterpriseSloRequest] = Field(min_length=1)
     evidence: dict = Field(default_factory=dict)
 
+
+class EnterpriseFreshnessRequest(BaseModel):
+    now_utc: str
+    max_age_seconds: int = Field(default=21600, gt=0)
+    controls: list[EnterpriseControlRequest] = Field(min_length=1)
+    slos: list[EnterpriseSloRequest] = Field(min_length=1)
+
 class EnterpriseEvidenceRepository(Protocol):
     def controls(self, *, limit: int) -> Sequence[Mapping[str, Any]]:
         ...
@@ -63,6 +72,45 @@ def create_enterprise_router(
             "execution_authority": "none",
             "repository_available": repository is not None,
             "registry_available": registry is not None,
+        }
+
+    @router.post("/freshness/preview")
+    def freshness_preview(req: EnterpriseFreshnessRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            controls = tuple(
+                ControlEvidence(**row.model_dump()) for row in req.controls
+            )
+            slos = tuple(
+                SloObservation(**row.model_dump()) for row in req.slos
+            )
+            review = review_enterprise_evidence(
+                controls=controls,
+                slos=slos,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "side_effects": "none",
+            "execution_authority": "none",
+            "control_mutation": False,
+            "infrastructure_mutation": False,
+            "identity_mutation": False,
+            "backup_mutation": False,
+            "slo_target_mutation": False,
+            "compliance_mutation": False,
+            "review": review.as_dict(),
         }
 
     @router.get("/readiness")
