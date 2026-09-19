@@ -157,8 +157,9 @@ Phase 4 observer/calibration implementation status — ✅ local/tested, product
 8. Runtime Packaging ✅ staged — env template plus `empire-astra-observer.service` / timer exist but are not installed or enabled.
 9. Documentation ✅ — `docs/PHASE4_ASTRA_OBSERVER.md`.
 10. Activation Readiness Gate ✅ local/tested — preview-only readiness distinguishes OBSERVE deployment prerequisites from consequential-authority prerequisites; the latter cannot pass until the genuine first-revenue loop is verified.
+11. Secret-safe Activation Preflight ✅ local/tested — runtime preflight verifies owner-only env permissions, OBSERVE mode, dedicated observer DSN presence, policy bindings, service/timer installation and timer enablement without emitting secrets. Read-only canonical verification on 2026-09-19 confirmed the required Phase 3F/4 migration chain, observer roles and Astra feedback/operational-evidence RPCs are not yet present in production.
 
-Phase 4 authority remains OBSERVE. The canonical Supabase migration, observer credential provisioning and service activation remain production gates. A genuine buyer → verified payment → outcome → feedback loop is still required before Astra receives consequential commercial authority, but it no longer blocks Phase 4 engineering.
+Phase 4 authority remains OBSERVE. The canonical Supabase migration chain, observer credential provisioning and service activation remain production gates. A genuine buyer → verified payment → outcome → feedback loop is still required before Astra receives consequential commercial authority, but it no longer blocks Phase 4 engineering.
 
 ### Phase 5 — Organic Growth Engine
 SEO, AEO, GEO, keyword intelligence, topic clusters, programmatic pages, AI Cards, citation/mention monitoring, authority/backlink graph, competitor citation gaps, public publishing, first-party tracking and content→revenue attribution.

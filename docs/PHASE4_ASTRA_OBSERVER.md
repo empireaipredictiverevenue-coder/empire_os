@@ -19,11 +19,13 @@ The observer:
 
 ## Database Authority
 
-Migration:
+Required migration chain:
 
-`supabase/migrations/20260918133000_phase4_astra_observer.sql`
+- `supabase/migrations/20260918123504_phase3f_outcome_feedback.sql` — creates the canonical outcome-feedback projection consumed by Astra;
+- `supabase/migrations/20260918133000_phase4_astra_observer.sql` — creates the restricted Astra observer roles and feedback RPC grant;
+- `supabase/migrations/20260919164500_phase4_astra_operational_evidence.sql` — creates the canonical read-only operational-evidence projection and grants it to the observer role.
 
-It stages:
+The Phase 4 observer migration stages:
 
 - `empire_astra_observer` — NOLOGIN, NOINHERIT, non-superuser, no bypass RLS;
 - `empire_astra_observer_login` — restricted login, password NULL, connection limit 5;
@@ -33,7 +35,7 @@ It stages:
 
 The observer role cannot record commercial outcomes, recognize revenue, or write directly to commercial tables.
 
-The migration has not been applied to canonical Supabase and no production password has been provisioned.
+The required Phase 3F/4 migration chain has not been applied to canonical Supabase and no production observer password has been provisioned. Read-only verification on 2026-09-19 confirmed the canonical project does not yet contain the Astra observer roles or either Astra feedback/operational-evidence RPC.
 
 ## Calibration
 
@@ -98,6 +100,12 @@ The write is atomic (`.tmp` then replace).
 Systemd packaging is staged as:
 - `empire-astra-observer.service`
 - `empire-astra-observer.timer`
+
+Secret-safe runtime preflight:
+
+`/srv/empire_os/.venv/bin/python scripts/astra_activation_preflight.py`
+
+The preflight reports booleans/blockers only and never emits the observer DSN. It verifies the dedicated env file exists with owner-only permissions, OBSERVE mode, observer DSN and explicit policy bindings, plus service/timer installation and timer enablement.
 
 The service is not installed or enabled. It runs as `ubuntu`, uses `ProtectSystem=strict`, and only needs the repository runtime area writable for the local observation artifact.
 
