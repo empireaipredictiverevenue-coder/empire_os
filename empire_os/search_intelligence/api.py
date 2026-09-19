@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from .attribution import preview_search_revenue_attribution
 from .commander import SearchCommanderAgent
 from .competitor_gap import analyse_competitor_gap
 from .health import search_health
@@ -68,6 +69,17 @@ class SerpSnapshotRequest(BaseModel):
 class CompetitorGapPreviewRequest(BaseModel):
     snapshot: SerpSnapshotRequest
     empire_domains: list[str] = Field(min_length=1)
+
+
+class RevenueAttributionPreviewRequest(BaseModel):
+    site_id: str
+    page_id: str | None = None
+    query: str | None = None
+    external_session_id: str | None = None
+    prospect_id: str | None = None
+    opportunity_id: str | None = None
+    attribution_kind: str = "observed_search_touch"
+    commercial_event: dict[str, Any]
 
 
 def _repository_unavailable() -> None:
@@ -188,6 +200,28 @@ def create_search_router(
     @router.get("/internal-links")
     def internal_links(limit: int = Query(default=200, ge=1, le=500)):
         return _collection("internal_links", limit)
+
+    @router.post("/revenue/preview")
+    def revenue_attribution_preview(req: RevenueAttributionPreviewRequest):
+        try:
+            preview = preview_search_revenue_attribution(
+                site_id=req.site_id,
+                page_id=req.page_id,
+                query=req.query,
+                external_session_id=req.external_session_id,
+                prospect_id=req.prospect_id,
+                opportunity_id=req.opportunity_id,
+                attribution_kind=req.attribution_kind,
+                commercial_event=req.commercial_event,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_allowed": False,
+            "preview": preview.as_dict(),
+        }
 
     @router.post("/competitor-gap/preview")
     def competitor_gap_preview(req: CompetitorGapPreviewRequest):
