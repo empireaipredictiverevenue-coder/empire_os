@@ -253,6 +253,12 @@ export default async function Home() {
                 >
                   Evidence timeline →
                 </Link>
+                <Link
+                  href="/links"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300 hover:text-emerald-200"
+                >
+                  Internal-link graph →
+                </Link>
               </div>
             </div>
 

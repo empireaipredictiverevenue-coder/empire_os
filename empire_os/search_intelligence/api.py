@@ -159,6 +159,10 @@ def create_search_router(
     def revenue(limit: int = Query(default=100, ge=1, le=500)):
         return _collection("revenue", limit)
 
+    @router.get("/internal-links")
+    def internal_links(limit: int = Query(default=200, ge=1, le=500)):
+        return _collection("internal_links", limit)
+
     @router.post("/competitor-gap/preview")
     def competitor_gap_preview(req: CompetitorGapPreviewRequest):
         snapshot = SerpSnapshot(

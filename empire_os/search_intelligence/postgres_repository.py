@@ -269,6 +269,27 @@ class PostgresSearchRepository:
         )
 
 
+    def internal_links(
+        self,
+        *,
+        limit: int,
+    ) -> Sequence[Mapping[str, Any]]:
+        return self._read(
+            """
+            SELECT
+              l.id,l.site_id,l.source_page_id,l.target_page_id,
+              l.source_url,l.target_url,l.anchor_text,l.rel,
+              l.first_observed_at,l.last_observed_at,l.evidence
+            FROM public.seo_internal_links l
+            JOIN public.seo_sites s ON s.id = l.site_id
+            WHERE s.tenant_key = %s
+            ORDER BY l.last_observed_at DESC, l.id
+            LIMIT %s
+            """,
+            (self.tenant_key, bounded_limit(limit)),
+        )
+
+
 
 def configured_search_repository_from_env(
     *,

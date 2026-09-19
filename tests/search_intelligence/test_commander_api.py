@@ -52,6 +52,9 @@ class FakeSearchRepository:
     def revenue(self, *, limit):
         return self._rows("revenue", limit)
 
+    def internal_links(self, *, limit):
+        return self._rows("internal_links", limit)
+
 
 def _repository_client(repository):
     app = FastAPI()
@@ -221,3 +224,14 @@ def test_competitor_gap_preview_rejects_missing_empire_domain():
         },
     )
     assert response.status_code == 422
+
+
+def test_internal_links_endpoint_uses_canonical_repository_contract():
+    repository = FakeSearchRepository()
+    response = _repository_client(repository).get("/v1/search/internal-links?limit=9")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "canonical_search_repository"
+    assert body["limit"] == 9
+    assert body["items"] == [{"kind": "internal_links", "rank": 1}]
+    assert repository.calls[-1] == ("internal_links", 9)

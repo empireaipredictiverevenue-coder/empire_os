@@ -107,6 +107,15 @@ export async function getEvidenceTimelineData() {
   return { health, opportunities, indexation, alerts, revenue };
 }
 
+export async function getInternalLinkData() {
+  const [health, pages, links] = await Promise.all([
+    request<Health>("/v1/search/health"),
+    request<CollectionEnvelope>("/v1/search/pages?limit=200"),
+    request<CollectionEnvelope>("/v1/search/internal-links?limit=500"),
+  ]);
+  return { health, pages, links };
+}
+
 export async function getDashboardData() {
   const [health, summary, searchConsole, pages, opportunities, alerts, revenue] =
     await Promise.all([

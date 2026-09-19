@@ -36,6 +36,17 @@ class FakeCursor:
                 Column("revenue_cents"),
             ]
             self._rows = [(2, 3, 1, 4, 5000)]
+        elif "FROM public.seo_internal_links l" in normalized:
+            self.description = [
+                Column("id"),
+                Column("source_url"),
+                Column("target_url"),
+            ]
+            self._rows = [(
+                "link-1",
+                "https://example.test/a",
+                "https://example.test/b",
+            )]
         elif "FROM public.seo_pages p" in normalized:
             self.description = [Column("id"), Column("url")]
             self._rows = [("page-1", "https://example.test/a")]
@@ -134,3 +145,22 @@ def test_configured_repository_requires_both_env_bindings(monkeypatch):
     )
     assert repository is not None
     assert repository.tenant_key == "tenant-a"
+
+
+def test_internal_links_read_is_tenant_scoped_and_bounded():
+    calls = []
+    repository = PostgresSearchRepository(
+        "test-dsn",
+        "tenant-a",
+        connect_factory=connect_factory(calls),
+    )
+    rows = repository.internal_links(limit=11)
+    assert rows == [{
+        "id": "link-1",
+        "source_url": "https://example.test/a",
+        "target_url": "https://example.test/b",
+    }]
+    sql, params = calls[-1]
+    assert "FROM public.seo_internal_links l" in sql
+    assert "WHERE s.tenant_key = %s" in sql
+    assert params == ("tenant-a", 11)
