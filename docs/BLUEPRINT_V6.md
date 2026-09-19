@@ -216,6 +216,8 @@ Foundation slice ✅ local/tested: deterministic holdout/treatment assignment pl
 ### Phase 12 — Demand Genesis
 Create demand through content, ads, offers, voice, AEO/GEO, communities, partnerships and agent distribution rather than only harvesting existing demand.
 
+Foundation slice ✅ local/tested: governed demand-plan and evidence records are staged across content/AEO/GEO/community/partnership/agent-distribution/ads/voice channels. Plans require evidence, explicit success metrics and approval, while execution authority is hard-locked to `none`; no publishing, outbound, ad spend, provider activation or production migration is enabled.
+
 ### Phase 13 — Revenue Exchange
 Inventory marketplace, real-time pricing, exclusives, territories, human/agent buyers, supply-demand pricing, capacity-aware allocation and Revenue Lanes.
 
