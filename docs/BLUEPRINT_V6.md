@@ -195,6 +195,8 @@ Foundation slice ✅ local/tested: `/a2a/v1/discovery` now publishes machine-rea
 
 Second slice ✅ local/tested: authenticated agent identity now supports a non-executing `commerce.intent` scope in addition to discovery. A staged append-only `a2a_commercial_intents` contract + dedicated NOLOGIN RPC role records quote/negotiation/task requests as `pending_approval`; the fail-closed `/v1/a2a-commerce/intents` API remains unbound by default. No approval, execution, payment or allocation RPC exists in this slice.
 
+Third slice ✅ local/tested: deterministic A2A negotiation transition previews now enforce human approval and terminal-state rules. `approved_for_manual_execution` never grants payment, allocation or task-execution authority; all negotiation lifecycle outputs remain OBSERVE-only.
+
 ### Phase 7 — Conversation OS
 
 Second slice ✅ local/tested: provider ingestion now records deterministic payload hashes, requires timezone-aware event timestamps and treats exact replay as idempotent while rejecting altered payloads under the same provider-event ID. Persistence remains append-only and provider sends/calls/bookings stay disabled.

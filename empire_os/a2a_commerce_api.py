@@ -10,6 +10,7 @@ from empire_os.a2a_commerce_intent import (
     CommercialIntent,
     normalize_intent_record,
 )
+from empire_os.a2a_negotiation import preview_negotiation_transition
 from empire_os.a2a_identity import (
     AgentIdentityClaim,
     Clock,
@@ -35,6 +36,13 @@ class IdentityClaimRequest(BaseModel):
     issued_at: str
     signature: str
 
+
+
+
+class NegotiationTransitionRequest(BaseModel):
+    current_state: str
+    requested_state: str
+    human_approval_present: bool = False
 
 class CommercialIntentRequest(BaseModel):
     identity: IdentityClaimRequest
@@ -74,6 +82,27 @@ def create_a2a_commerce_router(
             "execution_authority": "none",
             "payment_authority": False,
             "allocation_authority": False,
+        }
+
+
+    @router.post("/negotiation/transition/preview")
+    def negotiation_transition_preview(req: NegotiationTransitionRequest):
+        try:
+            result = preview_negotiation_transition(
+                current_state=req.current_state,
+                requested_state=req.requested_state,
+                human_approval_present=req.human_approval_present,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "human_approval_required": True,
+            "execution_authority": "none",
+            "payment_authority": False,
+            "allocation_authority": False,
+            "task_execution": False,
+            "transition": result.as_dict(),
         }
 
     @router.post("/intents")
