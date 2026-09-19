@@ -276,6 +276,8 @@ Second slice ✅ local/tested: Digital Twin scenario comparison now quantifies s
 
 Third slice ✅ local/tested: append-only scenario/result registry persists immutable observed-baseline provenance plus simulated results with idempotent history. Capital, campaign and pricing execution remain hard-disabled.
 
+Fourth slice ✅ local/tested: realization review compares simulated served units and projected revenue with later observed outcomes. Revenue error is calculated only when recognized-revenue evidence is explicit; missing recognition stays unknown, and the review itself never creates actual revenue or execution authority.
+
 ### Phase 15 — Capital Allocator
 Astra evaluates expected return, risk, cost, cash, confidence and time-to-revenue to decide where the next unit of capital should go.
 

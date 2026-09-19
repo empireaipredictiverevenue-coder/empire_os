@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field
 from empire_os.digital_twin import MarketBaseline, MarketScenario
 from empire_os.digital_twin_analysis import compare_market_scenario
 from empire_os.digital_twin_registry import DigitalTwinRegistryRecord
+from empire_os.digital_twin_realization import (
+    ObservedMarketOutcome,
+    review_scenario_realization,
+)
 
 
 class MarketBaselineRequest(BaseModel):
@@ -37,6 +41,16 @@ class ScenarioRegistryRequest(BaseModel):
 class ScenarioPreviewRequest(BaseModel):
     baseline: MarketBaselineRequest
     scenario: MarketScenarioRequest
+
+
+class ScenarioRealizationRequest(BaseModel):
+    baseline: MarketBaselineRequest
+    scenario: MarketScenarioRequest
+    observed_served_units: int = Field(ge=0)
+    observed_revenue_cents: int | None = Field(default=None, ge=0)
+    revenue_recognized: bool = False
+    observed_at: str
+    evidence_refs: list[str] = Field(min_length=1)
 
 
 def create_digital_twin_router(registry=None) -> APIRouter:
@@ -75,6 +89,40 @@ def create_digital_twin_router(registry=None) -> APIRouter:
             "comparison": comparison.as_dict(),
         }
 
+
+    @router.post("/realization/preview")
+    def realization_preview(req: ScenarioRealizationRequest):
+        baseline = MarketBaseline(**req.baseline.model_dump())
+        scenario = MarketScenario(**req.scenario.model_dump())
+        try:
+            comparison = compare_market_scenario(
+                baseline=baseline,
+                scenario=scenario,
+            )
+            observed = ObservedMarketOutcome(
+                observed_served_units=req.observed_served_units,
+                observed_revenue_cents=req.observed_revenue_cents,
+                revenue_recognized=req.revenue_recognized,
+                observed_at=req.observed_at,
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            review = review_scenario_realization(
+                scenario=comparison.scenario,
+                observed=observed,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "simulation_only": True,
+            "creates_actual_revenue": False,
+            "execution_authority": "none",
+            "capital_execution": False,
+            "campaign_execution": False,
+            "pricing_execution": False,
+            "review": review.as_dict(),
+        }
 
     @router.post("/scenarios/register")
     def register_scenario(req: ScenarioRegistryRequest):
