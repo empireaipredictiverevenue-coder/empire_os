@@ -5,7 +5,21 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from empire_os.experiment_analysis import analyze_observed_experiment
+from empire_os.experiment_registry import ExperimentRegistryRecord
 
+
+
+
+class ExperimentRegistryRequest(BaseModel):
+    experiment_key: str
+    hypothesis: str
+    metric: str
+    control_variant: str
+    treatment_variants: list[str] = Field(min_length=1)
+    assignment_integrity_verified: bool = False
+    exposure_integrity_verified: bool = False
+    outcome_window_closed: bool = False
+    evidence: dict = Field(default_factory=dict)
 
 class ExperimentAnalysisRequest(BaseModel):
     experiment_key: str
@@ -19,7 +33,7 @@ class ExperimentAnalysisRequest(BaseModel):
     minimum_per_arm: int = Field(default=5, ge=1, le=100000)
 
 
-def create_experiment_router() -> APIRouter:
+def create_experiment_router(registry=None) -> APIRouter:
     router = APIRouter(
         prefix="/v1/experiments",
         tags=["experiments"],
@@ -33,6 +47,7 @@ def create_experiment_router() -> APIRouter:
             "traffic_mutation": False,
             "rollout_enabled": False,
             "pricing_mutation": False,
+            "registry_available": registry is not None,
         }
 
     @router.post("/analysis/preview")
@@ -63,6 +78,60 @@ def create_experiment_router() -> APIRouter:
             "rollout_enabled": False,
             "pricing_mutation": False,
             "analysis": result.as_dict(),
+        }
+
+
+    @router.post("/registry")
+    def register_experiment(req: ExperimentRegistryRequest):
+        if registry is None:
+            raise HTTPException(
+                status_code=503,
+                detail="experiment_registry_not_activated",
+            )
+        item = ExperimentRegistryRecord(
+            experiment_key=req.experiment_key,
+            hypothesis=req.hypothesis,
+            metric=req.metric,
+            control_variant=req.control_variant,
+            treatment_variants=tuple(req.treatment_variants),
+            assignment_integrity_verified=req.assignment_integrity_verified,
+            exposure_integrity_verified=req.exposure_integrity_verified,
+            outcome_window_closed=req.outcome_window_closed,
+            evidence=dict(req.evidence),
+        )
+        try:
+            item.validate()
+            row = registry.record(item)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "traffic_mutation": False,
+            "rollout_enabled": False,
+            "pricing_mutation": False,
+            "status": str(row.get("status") or "recorded"),
+            "registry_record": item.as_dict(),
+            "result": dict(row),
+        }
+
+    @router.get("/registry")
+    def list_registry(limit: int = 100):
+        if registry is None or not hasattr(registry, "list_experiments"):
+            raise HTTPException(
+                status_code=503,
+                detail="experiment_registry_not_activated",
+            )
+        rows = list(registry.list_experiments(limit=max(1, min(limit, 500))))
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "traffic_mutation": False,
+            "rollout_enabled": False,
+            "pricing_mutation": False,
+            "count": len(rows),
+            "items": [dict(row) for row in rows],
         }
 
     return router

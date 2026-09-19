@@ -213,6 +213,9 @@ Foundation slice ✅ local/tested: staged read-only `revenue_crm_prospects` and 
 Second slice ✅ local/tested: Revenue CRM now exposes an evidence-backed `next-action` recommendation surface using only observed closer, conversation and fulfilment state. Unknown evidence yields no action; every recommendation is approval-required with `execution_authority=none` and cannot send follow-up or mutate CRM state.
 
 ### Phase 9 — Advertising Brain
+
+Second slice ✅ local/tested: canonical ad observations now carry deterministic payload provenance, timezone-aware observation timestamps, optional explicit canonical creative identity, and tamper-aware idempotency. Exact provider replays stay idempotent; changed metrics or creative identity under the same observation ID conflict. Campaign/budget/pause/retarget authority remains disabled.
+
 Google/Meta integrations, video/ad factory, UGC/avatar creative, A/B testing, media buying, ROAS/profit optimisation, budget allocation, retargeting and landing-page feedback loops.
 
 Foundation slice ✅ local/tested: staged canonical `ad_accounts`, `ad_campaigns`, `ad_creatives` and append-only `ad_performance_observations` provide a measurement spine for spend, attributed revenue, attributed gross profit, clicks, impressions and conversions. ROAS/profit-ROAS stay unknown when attribution is missing; no campaign launch, budget mutation, pause, retargeting or production migration is activated.
