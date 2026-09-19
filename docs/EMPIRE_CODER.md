@@ -123,7 +123,7 @@ Measured on this host at 16K context:
 - about 4.65 generated tokens/sec
 - about 35 GiB RAM still available during the benchmark
 
-CPU is the bottleneck, so Empire Coder uses targeted context windows and capped outputs.
+CPU is the bottleneck, so Empire Coder uses targeted context windows and capped outputs. Proposal-worker PLAN jobs cap repository evidence at 6,000 characters and each best-of-N candidate/synthesis output at 1,200 characters; this keeps the mandatory multi-pass refinement while avoiding oversized CPU-local prompts that can exceed the provider request timeout.
 
 The model router remains provider-agnostic. Local Ollama is preferred when healthy and installed; hosted providers can later be added as escalation/fallback routes.
 

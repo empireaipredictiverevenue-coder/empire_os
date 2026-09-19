@@ -40,11 +40,12 @@ class CoderTaskWorker:
         terms = tuple(job.payload.get("terms") or ())
         symbols = tuple(job.payload.get("symbols") or ())
         budget = int(job.payload.get("budget_chars") or 12000)
+        budget_cap = 6000 if job.kind is JobKind.PLAN else 5000
         context = self.coder.build_context(
             task.id,
             terms=terms,
             symbols=symbols,
-            budget_chars=max(4000, min(budget, 24000)),
+            budget_chars=max(4000, min(budget, budget_cap)),
         )
 
         if job.kind is JobKind.PLAN:
@@ -58,7 +59,7 @@ class CoderTaskWorker:
                     "approval gates. The result remains a proposal."
                 ),
                 context,
-                max_output_chars=1800,
+                max_output_chars=1200,
             )
             return {
                 "kind": job.kind.value,
