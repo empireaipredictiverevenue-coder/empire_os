@@ -1,9 +1,11 @@
 """Read-only operator board API for Phase 18 Revenue OS."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Mapping, Protocol, Sequence
 
 from empire_os.autonomous_revenue_os import compose_revenue_decision_packet
+from empire_os.revenue_os_freshness import assess_revenue_os_freshness
 from empire_os.revenue_os_readiness import assess_revenue_os_readiness
 from empire_os.revenue_os_registry import RevenueOsRegistryRecord
 
@@ -11,6 +13,16 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 
+
+
+class RevenueOsFreshnessRequest(BaseModel):
+    now_utc: str
+    max_age_seconds: int = Field(default=21600, gt=0)
+    astra_observed_at: str | None = None
+    predictive_observed_at: str | None = None
+    capital_observed_at: str | None = None
+    demand_observed_at: str | None = None
+    enterprise_observed_at: str | None = None
 
 
 class RevenueOsRegisterRequest(BaseModel):
@@ -48,6 +60,43 @@ def create_revenue_os_router(
             "execution_authority": "none",
             "repository_available": repository is not None,
             "registry_available": registry is not None,
+        }
+
+    @router.post("/freshness/preview")
+    def freshness_preview(req: RevenueOsFreshnessRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            result = assess_revenue_os_freshness(
+                {
+                    "astra": req.astra_observed_at,
+                    "predictive": req.predictive_observed_at,
+                    "capital": req.capital_observed_at,
+                    "demand": req.demand_observed_at,
+                    "enterprise": req.enterprise_observed_at,
+                },
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "side_effects": "none",
+            "execution_authority": "none",
+            "spend_execution": False,
+            "outreach_execution": False,
+            "payment_execution": False,
+            "allocation_execution": False,
+            "deployment_execution": False,
+            "freshness": result.as_dict(),
         }
 
     @router.get("/board")

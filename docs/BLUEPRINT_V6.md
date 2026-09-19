@@ -318,6 +318,8 @@ Second slice ✅ local/tested: Revenue OS readiness now gates operator review on
 
 Third slice ✅ local/tested: governed Revenue OS packet registry now persists composed packets together with readiness state and evidence while hard-locking spend, outreach, payment, allocation and deployment execution to false.
 
+Fourth slice ✅ local/tested: component-level freshness review now gates Astra, Predictive, Capital, Demand and Enterprise evidence by explicit observed timestamps. Missing, stale or future-dated evidence blocks operator review; no execution path is introduced.
+
 ### Governed Control-Plane API Layer — Phases 4–18
 Second-pass API layer ✅ local/tested and mounted in the hub. Health/read/preview surfaces now exist for Astra, A2A identity, Conversation OS, Revenue CRM, Advertising Brain, Predictive Cloud, Experiment/Causal analysis, Demand Genesis, Revenue Exchange, Digital Twin, Capital Review, SaaS tenancy, Enterprise readiness and Revenue OS. Repository/provider-backed surfaces mount unbound and fail closed until their canonical reader or verifier is explicitly activated; pure analysis/simulation previews remain non-mutating. All routes expose OBSERVE/SIMULATION status and explicit zero execution authority.
 
