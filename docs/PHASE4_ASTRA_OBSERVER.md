@@ -77,8 +77,8 @@ The outcome projection does not contain all operational signals required by `Ast
 
 Therefore:
 - canonical operational evidence is now preferred through `get_astra_operational_evidence()`;
-- the read-only projection covers reply backlog, failed GTM jobs, identity-linked unallocated inventory, qualification-ready unallocated inventory, active buyer capacity and pending buyer candidates;
-- premium-AI budget, outbound-domain verification and source-health remain explicit verified runtime bindings until canonical stores exist for them;
+- the read-only projection covers reply backlog, real failed GTM jobs, separately audit-visible smoke/diagnostic failures, identity-linked unallocated inventory, qualification-ready unallocated inventory, active buyer capacity, outreach-ready pending buyer candidates and total pending buyer reviews;
+- premium-AI budget, outbound-domain verification and source-health remain explicit verified runtime bindings until canonical stores exist for them; production outbound-domain verification is currently proven by live Resend domain state, while source health remains false because canonical acquisition has no fresh end-to-end ingest despite a successful no-write Overpass probe;
 - any missing evidence keeps `decision.available=false` with the missing fields listed;
 - an explicit full `AstraSnapshot` JSON remains a compatibility override only;
 - partial snapshots are rejected rather than filled with default zero/false values;

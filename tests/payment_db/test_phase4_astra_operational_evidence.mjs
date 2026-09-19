@@ -52,13 +52,19 @@ try{
       daily_cap integer, calls_today integer
     );
     create table outbound_replies(classification text);
-    create table gtm_jobs(status text);
-    create table buyer_candidate_reviews(status text);
+    create table gtm_jobs(status text, created_by text);
+    create table buyer_candidate_reviews(status text, evidence jsonb);
   `);
 
   await admin.query(await readFile(
     join(root,'supabase/migrations',
       '20260919164500_phase4_astra_operational_evidence.sql'),'utf8'));
+  await admin.query(await readFile(
+    join(root,'supabase/migrations',
+      '20260919224500_phase4_astra_filter_diagnostic_failures.sql'),'utf8'));
+  await admin.query(await readFile(
+    join(root,'supabase/migrations',
+      '20260919225000_phase4_astra_outreach_ready_candidates.sql'),'utf8'));
 
   await test('observer can execute operational evidence only',async()=>{
     const result=(await asRole(
@@ -67,10 +73,12 @@ try{
     )).rows[0].result;
     assert.equal(result.replies_waiting,0);
     assert.equal(result.failed_jobs,0);
+    assert.equal(result.diagnostic_failed_jobs,0);
     assert.equal(result.owned_inventory_count,0);
     assert.equal(result.qualified_unallocated_count,0);
     assert.equal(result.active_buyer_capacity,0);
     assert.equal(result.buyer_candidates_due,0);
+    assert.equal(result.buyer_reviews_pending_total,0);
     assert.ok(result.observed_at);
   });
 
@@ -102,9 +110,15 @@ try{
     await admin.query(`
       insert into outbound_replies(classification)
       values ('unclassified'),('classified');
-      insert into gtm_jobs(status) values ('failed'),('done');
-      insert into buyer_candidate_reviews(status)
-      values ('pending'),('approved');
+      insert into gtm_jobs(status,created_by) values
+        ('failed','runtime_worker'),
+        ('failed','manual_production_smoke'),
+        ('done','runtime_worker');
+      insert into buyer_candidate_reviews(status,evidence)
+      values
+        ('pending','{"outreach_ready":true}'::jsonb),
+        ('pending','{"outreach_ready":false}'::jsonb),
+        ('approved','{"outreach_ready":true}'::jsonb);
       insert into buyers(
         is_active,status,commercial_activation_state,daily_cap,calls_today
       ) values
@@ -117,7 +131,9 @@ try{
     )).rows[0].result;
     assert.equal(result.replies_waiting,1);
     assert.equal(result.failed_jobs,1);
+    assert.equal(result.diagnostic_failed_jobs,1);
     assert.equal(result.buyer_candidates_due,1);
+    assert.equal(result.buyer_reviews_pending_total,2);
     assert.equal(result.active_buyer_capacity,7);
   });
 

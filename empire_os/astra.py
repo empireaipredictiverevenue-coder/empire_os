@@ -170,7 +170,7 @@ def _decision_candidates(
                 ),
                 (),
             ))
-        else:
+        elif snapshot.source_health_ok:
             decisions.append(AstraDecision(
                 ASTRA_VERSION, "buyer_acquisition", "source_buyer_candidates",
                 "buyer_agent", 94, False, "rules",
@@ -196,12 +196,26 @@ def _decision_candidates(
         ))
 
     if not snapshot.source_health_ok:
+        source_priority = (
+            94
+            if (
+                snapshot.active_buyer_capacity <= 0
+                and snapshot.buyer_candidates_due <= 0
+                and snapshot.outbound_domain_verified
+            )
+            else 89
+        )
+        rationale = [
+            "canonical acquisition must fail closed when sources are unhealthy",
+        ]
+        if source_priority == 94:
+            rationale.append(
+                "buyer acquisition cannot proceed without a healthy real-data source"
+            )
         decisions.append(AstraDecision(
             ASTRA_VERSION, "source_health", "repair_real_data_sources",
-            "acquisition_agent", 89, False, "rules",
-            (
-                "canonical acquisition must fail closed when sources are unhealthy",
-            ),
+            "acquisition_agent", source_priority, False, "rules",
+            tuple(rationale),
             ("real_source_unavailable",),
         ))
 

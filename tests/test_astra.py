@@ -191,3 +191,21 @@ def test_operating_board_unexpected_execution_mode_is_governance_only():
     assert len(board.items) == 1
     assert board.primary.workstream == "governance"
     assert board.primary.side_effect_approval_required is True
+
+
+def test_astra_repairs_sources_before_sourcing_buyers_when_sources_unhealthy():
+    board = build_operating_board(AstraSnapshot(
+        active_buyer_capacity=0,
+        buyer_candidates_due=0,
+        outbound_domain_verified=True,
+        source_health_ok=False,
+        owned_inventory_count=8,
+        qualified_unallocated_count=1,
+    ))
+    assert board.primary.workstream == "source_health"
+    assert board.primary.recommended_job_type == "repair_real_data_sources"
+    assert board.primary.priority == 94
+    assert "real_source_unavailable" in board.primary.blockers
+    assert "source_buyer_candidates" not in {
+        item.recommended_job_type for item in board.items
+    }
