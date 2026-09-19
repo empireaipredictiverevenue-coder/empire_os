@@ -344,6 +344,8 @@ Fifth slice ✅ local/tested: SaaS quota readiness now checks freshness independ
 
 Sixth slice ✅ local/tested: API-access freshness review now requires membership, subscription and tenant-isolation evidence to remain within a bounded freshness window in addition to the existing admin-role, active-subscription and read-scope gates. Stale or future-dated evidence blocks issuance review; API-key issuance/revocation, secret generation and subscription mutation remain disabled.
 
+Seventh slice ✅ local/tested: append-only API-access review history now preserves tenant/user identity, requested/approved scopes, freshness blockers and provenance for audit/manual issuance review. Both eligible and blocked reviews can be retained, but no API key or secret material is generated and issuance, revocation, provisioning and subscription mutation remain disabled.
+
 Multi-tenant architecture, teams/RBAC, usage billing, USDT subscriptions, white label, custom domains, affiliate/agency/client dashboards, API keys, developer platform and marketplace/partner network.
 
 ### Phase 17 — Enterprise

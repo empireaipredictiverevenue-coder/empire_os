@@ -12,6 +12,7 @@ from empire_os.saas_api_access import (
     assess_api_access_readiness,
 )
 from empire_os.saas_api_access_freshness import assess_api_access_freshness
+from empire_os.saas_api_access_registry import ApiAccessReviewRecord
 from empire_os.saas_freshness import review_saas_quota_readiness
 from empire_os.saas_registry import SaasReadinessRecord
 from empire_os.saas_readiness import (
@@ -42,6 +43,11 @@ class ApiAccessFreshnessRequest(ApiAccessReadinessRequest):
     isolation_observed_at: str
     now_utc: str
     max_age_seconds: int = Field(default=21600, gt=0)
+
+
+class ApiAccessReviewRegisterRequest(ApiAccessFreshnessRequest):
+    review_key: str
+    evidence: dict = Field(default_factory=dict)
 
 
 class SaasQuotaReadinessRequest(BaseModel):
@@ -99,6 +105,7 @@ class TenantScopedSaasRepository(Protocol):
 def create_saas_router(
     repository: TenantScopedSaasRepository | None = None,
     registry=None,
+    api_access_registry=None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/saas",
@@ -113,6 +120,7 @@ def create_saas_router(
             "tenant_scoped": True,
             "repository_available": repository is not None,
             "registry_available": registry is not None,
+            "api_access_registry_available": api_access_registry is not None,
             "tenant_id": (
                 repository.tenant_id
                 if repository is not None
@@ -247,6 +255,100 @@ def create_saas_router(
             "secret_material_generated": False,
             "subscription_mutation": False,
             "freshness": freshness.as_dict(),
+        }
+
+    @router.post("/api-access/reviews/register")
+    def register_api_access_review(req: ApiAccessReviewRegisterRequest):
+        if api_access_registry is None or not hasattr(
+            api_access_registry,
+            "record_api_access_review",
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail="saas_api_access_registry_not_activated",
+            )
+        try:
+            membership = TenantMembership(
+                tenant_id=req.tenant_id,
+                user_id=req.user_id,
+                role=req.role,
+                status=req.membership_status,
+            )
+            readiness = assess_api_access_readiness(
+                ApiAccessEvidence(
+                    membership=membership,
+                    active_subscription=req.active_subscription,
+                    tenant_isolation_verified=req.tenant_isolation_verified,
+                    requested_scopes=tuple(req.requested_scopes),
+                    evidence_refs=tuple(req.evidence_refs),
+                )
+            )
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            freshness = assess_api_access_freshness(
+                readiness=readiness,
+                membership_observed_at=req.membership_observed_at,
+                subscription_observed_at=req.subscription_observed_at,
+                isolation_observed_at=req.isolation_observed_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+            item = ApiAccessReviewRecord(
+                review_key=req.review_key,
+                freshness=freshness,
+                evidence=dict(req.evidence),
+            )
+            item.validate()
+            row = api_access_registry.record_api_access_review(item)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "approval_required": True,
+            "execution_authority": "none",
+            "api_key_issuance": False,
+            "api_key_revocation": False,
+            "secret_material_generated": False,
+            "subscription_mutation": False,
+            "provisioning_execution": False,
+            "status": str(row.get("status") or "recorded"),
+            "review_record": item.as_dict(),
+            "result": dict(row),
+        }
+
+    @router.get("/api-access/reviews")
+    def list_api_access_reviews(
+        limit: int = Query(default=100, ge=1, le=500),
+    ):
+        if api_access_registry is None or not hasattr(
+            api_access_registry,
+            "list_api_access_reviews",
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail="saas_api_access_registry_not_activated",
+            )
+        rows = list(api_access_registry.list_api_access_reviews(limit=limit))
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "recommendation_only": True,
+            "approval_required": True,
+            "execution_authority": "none",
+            "api_key_issuance": False,
+            "api_key_revocation": False,
+            "secret_material_generated": False,
+            "subscription_mutation": False,
+            "provisioning_execution": False,
+            "count": len(rows),
+            "items": [dict(row) for row in rows],
         }
 
     @router.post("/scale-readiness/preview")
