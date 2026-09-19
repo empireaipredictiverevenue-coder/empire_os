@@ -12,7 +12,8 @@ class SaasRegistryTransportError(RuntimeError):
 
 
 RPC_NAME = "record_saas_readiness"
-ROLE = "empire_saas_registry_writer"
+WRITER_ROLE = "empire_saas_registry_writer"
+READER_ROLE = "empire_saas_registry_reader"
 SQL = (
     "select public.record_saas_readiness("
     "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb)"
@@ -76,7 +77,7 @@ class PostgresSaasRegistryRpc:
         try:
             with self._connect(self.dsn) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute("SET LOCAL ROLE " + ROLE)
+                    cursor.execute("SET LOCAL ROLE " + WRITER_ROLE)
                     cursor.execute(SQL, tuple(values))
                     row = cursor.fetchone()
         except Exception as exc:
@@ -90,9 +91,86 @@ class PostgresSaasRegistryRpc:
         return row[0]
 
 
+READ_SQL = """
+SELECT
+  id,
+  readiness_key,
+  tenant_id,
+  active_members,
+  observed_monthly_usage,
+  observed_usage_limit,
+  active_subscription,
+  tenant_isolation_verified,
+  white_label_requested,
+  white_label_configured,
+  evidence_refs,
+  evidence,
+  ready_for_review,
+  execution_authority,
+  provisioning_execution,
+  billing_execution,
+  api_key_issuance,
+  subscription_mutation,
+  created_at
+FROM public.saas_readiness_registry
+ORDER BY created_at DESC,id DESC
+LIMIT %s
+"""
+
+
+class PostgresSaasRegistryReader:
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        connect_factory: Callable | None = None,
+    ) -> None:
+        self.dsn = str(dsn or "").strip()
+        if not self.dsn:
+            raise SaasRegistryTransportError(
+                "dedicated SaaS registry read DSN required"
+            )
+        if connect_factory is None:
+            try:
+                import psycopg
+            except ImportError as exc:
+                raise SaasRegistryTransportError(
+                    "psycopg is required for SaaS registry read"
+                ) from exc
+            connect_factory = psycopg.connect
+        self._connect = connect_factory
+
+    def __call__(self, *, limit: int) -> list[dict[str, Any]]:
+        bounded = max(1, min(int(limit), 500))
+        try:
+            with self._connect(self.dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL ROLE " + READER_ROLE)
+                    cursor.execute(READ_SQL, (bounded,))
+                    columns = [
+                        description.name
+                        for description in cursor.description
+                    ]
+                    rows = cursor.fetchall()
+        except Exception as exc:
+            raise SaasRegistryTransportError(
+                "SaaS registry read failed"
+            ) from exc
+        return [
+            dict(zip(columns, row, strict=True))
+            for row in rows
+        ]
+
+
 class RpcSaasRegistryRepository:
-    def __init__(self, rpc: Callable[[str, dict[str, Any]], Any]):
+    def __init__(
+        self,
+        rpc: Callable[[str, dict[str, Any]], Any],
+        *,
+        reader: Callable[..., list[dict[str, Any]]] | None = None,
+    ):
         self.rpc = rpc
+        self.reader = reader
 
     def record(self, item: SaasReadinessRecord):
         item.validate()
@@ -120,3 +198,15 @@ class RpcSaasRegistryRepository:
                 "SaaS registry RPC returned invalid payload"
             )
         return result
+
+    def list_readiness(self, *, limit: int):
+        if self.reader is None:
+            raise SaasRegistryTransportError(
+                "SaaS registry reader not activated"
+            )
+        rows = self.reader(limit=limit)
+        if not isinstance(rows, list):
+            raise SaasRegistryTransportError(
+                "SaaS registry reader returned invalid payload"
+            )
+        return rows
