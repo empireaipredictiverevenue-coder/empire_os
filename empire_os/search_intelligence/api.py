@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from .commander import SearchCommanderAgent
+from .competitor_gap import analyse_competitor_gap
 from .health import search_health
 from .metadata import generate_metadata
 from .models import SearchOpportunity, SearchPage
@@ -19,6 +20,7 @@ from .search_console import (
     SearchConsoleAdapter,
     configured_search_console_adapter,
 )
+from .serp import SerpResultEvidence, SerpSnapshot
 
 
 class AnalyseRequest(BaseModel):
@@ -39,6 +41,32 @@ class SchemaPreviewRequest(BaseModel):
 class MetadataPreviewRequest(BaseModel):
     page: dict[str, Any]
     quality_factors: dict[str, float | None] = Field(default_factory=dict)
+
+
+class SerpResultRequest(BaseModel):
+    title: str
+    url: str
+    snippet: str = ""
+    position: int = Field(ge=1)
+    engine: str
+    relevance_score: float | None = None
+    provenance: list[str] = Field(default_factory=list)
+
+
+class SerpSnapshotRequest(BaseModel):
+    query: str
+    observed_at: str
+    engine: str
+    quality_gate: str | None = None
+    cache: bool | None = None
+    available: bool
+    results: list[SerpResultRequest] = Field(default_factory=list)
+    error: str | None = None
+
+
+class CompetitorGapPreviewRequest(BaseModel):
+    snapshot: SerpSnapshotRequest
+    empire_domains: list[str] = Field(min_length=1)
 
 
 def _repository_unavailable() -> None:
@@ -130,6 +158,41 @@ def create_search_router(
     @router.get("/revenue")
     def revenue(limit: int = Query(default=100, ge=1, le=500)):
         return _collection("revenue", limit)
+
+    @router.post("/competitor-gap/preview")
+    def competitor_gap_preview(req: CompetitorGapPreviewRequest):
+        snapshot = SerpSnapshot(
+            query=req.snapshot.query,
+            observed_at=req.snapshot.observed_at,
+            engine=req.snapshot.engine,
+            quality_gate=req.snapshot.quality_gate,
+            cache=req.snapshot.cache,
+            available=req.snapshot.available,
+            results=tuple(
+                SerpResultEvidence(
+                    title=item.title,
+                    url=item.url,
+                    snippet=item.snippet,
+                    position=item.position,
+                    engine=item.engine,
+                    relevance_score=item.relevance_score,
+                    provenance=tuple(item.provenance),
+                )
+                for item in req.snapshot.results
+            ),
+            error=req.snapshot.error,
+        )
+        analysis = analyse_competitor_gap(
+            snapshot,
+            empire_domains=req.empire_domains,
+        )
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_allowed": False,
+            "analysis": analysis.as_dict(),
+            "opportunity_inputs": analysis.opportunity_inputs(),
+        }
 
     @router.post("/analyse")
     def analyse(req: AnalyseRequest):

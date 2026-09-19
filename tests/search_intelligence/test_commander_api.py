@@ -160,3 +160,64 @@ def test_collection_limit_is_contract_bounded_by_fastapi():
     client = _repository_client(repository)
     assert client.get("/v1/search/pages?limit=0").status_code == 422
     assert client.get("/v1/search/pages?limit=501").status_code == 422
+
+
+def test_competitor_gap_preview_is_observe_only_and_evidence_backed():
+    response = _client().post(
+        "/v1/search/competitor-gap/preview",
+        json={
+            "snapshot": {
+                "query": "predictive revenue software",
+                "observed_at": "2026-09-19T15:00:00+00:00",
+                "engine": "duckduckgo_html",
+                "quality_gate": "lexical_v1",
+                "cache": False,
+                "available": True,
+                "results": [
+                    {
+                        "title": "Competitor",
+                        "url": "https://competitor.example/",
+                        "position": 1,
+                        "engine": "duckduckgo_html",
+                        "provenance": ["search_fabric"],
+                    },
+                    {
+                        "title": "Empire",
+                        "url": "https://empire-ai.co.uk/",
+                        "position": 2,
+                        "engine": "duckduckgo_html",
+                        "provenance": ["search_fabric"],
+                    },
+                ],
+            },
+            "empire_domains": ["empire-ai.co.uk"],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "OBSERVE"
+    assert body["recommendation_only"] is True
+    assert body["execution_allowed"] is False
+    assert body["analysis"]["empire_best_position"] == 2
+    assert body["opportunity_inputs"] == {
+        "competitor_presence": 0.5,
+        "current_empire_coverage": 0.5,
+        "content_gap": 0.5,
+    }
+
+
+def test_competitor_gap_preview_rejects_missing_empire_domain():
+    response = _client().post(
+        "/v1/search/competitor-gap/preview",
+        json={
+            "snapshot": {
+                "query": "test",
+                "observed_at": "2026-09-19T15:00:00+00:00",
+                "engine": "none",
+                "available": False,
+                "results": [],
+            },
+            "empire_domains": [],
+        },
+    )
+    assert response.status_code == 422

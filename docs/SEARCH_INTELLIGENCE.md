@@ -191,6 +191,7 @@ Foundation routes:
 - `POST /v1/search/page/validate`
 - `POST /v1/search/schema/preview`
 - `POST /v1/search/metadata/preview`
+- `POST /v1/search/competitor-gap/preview`
 - `GET /v1/search/search-console/status`
 
 Preview/analyse endpoints are pure recommendation functions.
@@ -239,7 +240,7 @@ The frontend is a product surface, not the source of truth. Search rules, attrib
 3. Real SERP snapshot adapter ✅ local/tested: `SearchFabricSerpAdapter` converts only observed Search Fabric results into timestamped provenance-backed snapshots, preserves engine/quality/cache evidence, rejects missing ranking positions instead of inventing them, and reports retrieval failure as unavailable rather than fake success. Runtime network use remains governed by Search Fabric provider health/credentials.
 4. Internal-link graph, cannibalisation and content-decay engines ✅ local/tested; deterministic analyzers are covered by focused tests, and the Command Centre now exposes repository-backed decay/cannibalisation technical views without mutation authority.
 5. Sitemap/robots/indexation governance engine ✅ local/tested: approved/indexable canonical records can be planned into sitemap groups, while `publish_allowed=false`, `submit_allowed=false` and lifecycle `execution_allowed=false` preserve OBSERVE authority. Repository-driven runtime publication remains separately gated.
-6. Evidence-backed competitor gap engine.
+6. Evidence-backed competitor gap engine ✅ local/tested: observed SERP snapshots produce Empire coverage, competitor-result presence, content gap, best observed Empire position and competitor domains without inventing keyword volume, traffic, authority or market share. `POST /v1/search/competitor-gap/preview` is OBSERVE-only and projects only observed gap factors into opportunity inputs.
 7. Real analytics/session bridge when a canonical first-party analytics model exists.
 8. Search Command Centre frontend ✅ foundation local/tested: `apps/search-command-centre/` is a Next.js 16 + TypeScript + Tailwind server-rendered dashboard consuming the governed `search-v1` API through server-only `EMPIRE_SEARCH_API_BASE_URL`. Gated/unavailable metrics remain explicit rather than fabricated. Production deployment/API binding remains gated.
 9. Controlled approval/execution layer only after OBSERVE behavior and economics are proven.
