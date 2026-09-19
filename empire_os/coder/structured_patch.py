@@ -248,10 +248,17 @@ class StructuredPatchRefiner:
         objective: str,
         context: ContextPack,
         route: ModelRoute,
-        max_output_chars: int = 4_000,
+        max_output_chars: int = 3_200,
     ) -> StructuredPatchCandidate:
         candidates: list[str] = []
-        schema = (
+        strategy_schema = (
+            '{"operation":"replace_python_symbol|replace_exact|create_file",'
+            '"target_path":"relative/path",'
+            '"symbol":"name-or-null",'
+            '"approach":"concise implementation approach",'
+            '"expected_tests":["tests/..."]}'
+        )
+        final_schema = (
             '{"operation":"replace_python_symbol|replace_exact|create_file",'
             '"target_path":"relative/path",'
             '"symbol":"name-or-null",'
@@ -260,23 +267,29 @@ class StructuredPatchRefiner:
             '"rationale":"why",'
             '"expected_tests":["tests/..."]}'
         )
+
         for index in range(2):
             response = self.provider.complete(ModelRequest(
                 task_id=task_id,
                 instruction=(
-                    "Produce an independent structured patch proposal for the "
-                    "objective using supplied repository evidence only. "
-                    "Do not apply it. Return STRICT JSON only using this shape: "
-                    + schema
+                    "Produce an independent PATCH STRATEGY for the objective "
+                    "using supplied repository evidence only. Do not emit the "
+                    "full replacement code yet and do not apply anything. "
+                    "Return STRICT JSON only using this compact shape: "
+                    + strategy_schema
                     + f"\nThis is candidate {index + 1}.\nOBJECTIVE:\n"
                     + objective
                 ),
                 context=context,
                 route=route,
-                max_output_chars=max_output_chars,
+                max_output_chars=min(max_output_chars, 1_200),
             ))
             if response.error:
                 raise StructuredPatchError(response.error)
+            if not response.text.strip():
+                raise StructuredPatchError(
+                    "empty structured patch strategy"
+                )
             candidates.append(response.text)
 
         block = "\n\n".join(
@@ -286,27 +299,32 @@ class StructuredPatchRefiner:
         critique = self.provider.complete(ModelRequest(
             task_id=task_id,
             instruction=(
-                "Compare both structured patch candidates against the actual "
-                "repository evidence. Identify stale assumptions, wrong target "
-                "paths/symbols, over-broad edits, missing tests and safety "
-                "issues. Do not simply choose candidate one. Return critique "
+                "Compare both patch strategies against the actual repository "
+                "evidence. Identify stale assumptions, wrong target paths or "
+                "symbols, over-broad edits, missing tests and safety issues. "
+                "Do not simply choose candidate one. Return concise critique "
                 "only.\n\n" + block
             ),
             context=context,
             route=route,
-            max_output_chars=1600,
+            max_output_chars=1_000,
         ))
         if critique.error:
             raise StructuredPatchError(critique.error)
+        if not critique.text.strip():
+            raise StructuredPatchError(
+                "empty structured patch critique"
+            )
 
         synthesis = self.provider.complete(ModelRequest(
             task_id=task_id,
             instruction=(
-                "Synthesize a NEW strict-JSON patch proposal from the strongest "
-                "evidence-backed parts of both candidates and critique. "
-                "Do not apply the patch. Return JSON only using exactly this "
-                "shape: "
-                + schema
+                "Synthesize a NEW complete strict-JSON patch proposal from "
+                "the strongest evidence-backed parts of both compact strategies "
+                "and critique. This is the only stage that should include the "
+                "full replacement code. Do not apply the patch. Return JSON "
+                "only using exactly this shape: "
+                + final_schema
                 + "\n\n"
                 + block
                 + "\n\nCRITIQUE:\n"
@@ -314,7 +332,7 @@ class StructuredPatchRefiner:
             ),
             context=context,
             route=route,
-            max_output_chars=max_output_chars,
+            max_output_chars=min(max_output_chars, 3_200),
         ))
         if synthesis.error:
             raise StructuredPatchError(synthesis.error)
