@@ -216,6 +216,8 @@ Trend Radar, market/demand/business/buyer/revenue/profit forecasts, churn, LTV, 
 
 Foundation slice ✅ local/tested: `predictive_cloud_v3` now supports bounded explainable directional forecasts from canonical observed time series only, with a seven-observation minimum gate, explicit trend slope/R²/evidence confidence, and `insufficient_history` instead of guessed direction. Staged forecast/signal tables are read-only to the current service role; no autonomous commercial execution or production migration is activated.
 
+Second slice ✅ local/tested: an idempotent forecast registry now records only available forecasts that satisfy the seven-observation evidence gate, with model name/version, forecast key and provenance. Insufficient-history previews cannot be registered. The fail-closed registry/read API remains OBSERVE-only with no commercial execution authority.
+
 ### Phase 11 — Experiment + Causal Engine
 Controlled experiments, counterfactuals, holdouts, creative/offer/pricing/page tests, incrementality and causal attribution.
 

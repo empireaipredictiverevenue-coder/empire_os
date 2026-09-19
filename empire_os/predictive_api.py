@@ -1,10 +1,13 @@
-"""Evidence-only Predictive Cloud V3 forecast preview API."""
+"""Evidence-only Predictive Cloud V3 forecast preview and registry API."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from typing import Any, Protocol
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from empire_os.predictive_materializer import materialize_daily_actuals
+from empire_os.predictive_registry import ForecastRegistryRecord
 
 
 class ObservedActualRequest(BaseModel):
@@ -19,23 +22,32 @@ class ForecastPreviewRequest(BaseModel):
     points: list[ObservedActualRequest]
 
 
-def create_predictive_router() -> APIRouter:
+class ForecastRegisterRequest(BaseModel):
+    forecast_key: str
+    model_name: str
+    model_version: str
+    dimension_key: str = "global"
+    preview: ForecastPreviewRequest
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class PredictiveRegistryRepository(Protocol):
+    def record(self, item: ForecastRegistryRecord):
+        ...
+
+    def list_forecasts(self, *, limit: int):
+        ...
+
+
+def create_predictive_router(
+    repository: PredictiveRegistryRepository | None = None,
+) -> APIRouter:
     router = APIRouter(
         prefix="/v1/predictive",
         tags=["predictive-cloud"],
     )
 
-    @router.get("/health")
-    def health():
-        return {
-            "mode": "OBSERVE",
-            "execution_authority": "none",
-            "write_authority": "none",
-            "synthetic_data_allowed": False,
-        }
-
-    @router.post("/forecast/preview")
-    def forecast_preview(req: ForecastPreviewRequest):
+    def materialize(req: ForecastPreviewRequest):
         rows = [
             {
                 "snapshot_date": point.observed_date,
@@ -45,7 +57,7 @@ def create_predictive_router() -> APIRouter:
             for point in req.points
         ]
         try:
-            result = materialize_daily_actuals(
+            return materialize_daily_actuals(
                 metric=req.metric,
                 rows=rows,
                 value_field="actual_value",
@@ -55,12 +67,82 @@ def create_predictive_router() -> APIRouter:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @router.get("/health")
+    def health():
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "write_authority": (
+                "forecast_registry_only"
+                if repository is not None
+                else "none"
+            ),
+            "synthetic_data_allowed": False,
+            "registry_available": repository is not None,
+            "commercial_execution": False,
+        }
+
+    @router.post("/forecast/preview")
+    def forecast_preview(req: ForecastPreviewRequest):
+        result = materialize(req)
         return {
             "mode": "OBSERVE",
             "execution_authority": "none",
             "write_authority": "none",
             "synthetic_data_allowed": False,
             "materialization": result.as_dict(),
+        }
+
+    @router.post("/forecast/register")
+    def forecast_register(req: ForecastRegisterRequest):
+        if repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="predictive_registry_not_activated",
+            )
+        result = materialize(req.preview)
+        item = ForecastRegistryRecord(
+            forecast_key=req.forecast_key,
+            model_name=req.model_name,
+            model_version=req.model_version,
+            dimension_key=req.dimension_key,
+            forecast=result.forecast,
+            evidence=dict(req.evidence),
+        )
+        try:
+            item.validate()
+            stored = repository.record(item)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        status = str(stored.get("status") or "").strip()
+        if status not in {"recorded", "existing"}:
+            raise HTTPException(
+                status_code=502,
+                detail="predictive_registry_invalid_repository_result",
+            )
+        return {
+            "mode": "OBSERVE",
+            "status": status,
+            "forecast_id": stored.get("forecast_id"),
+            "execution_authority": "none",
+            "commercial_execution": False,
+            "forecast": result.forecast.as_dict(),
+        }
+
+    @router.get("/forecasts")
+    def forecasts(limit: int = Query(default=100, ge=1, le=500)):
+        if repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="predictive_registry_not_activated",
+            )
+        rows = list(repository.list_forecasts(limit=limit))
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "count": len(rows),
+            "items": [dict(row) for row in rows],
         }
 
     return router
