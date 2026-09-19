@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from empire_os.advertising_brain import normalise_ad_observation
+from empire_os.advertising_drift import review_advertising_drift
 from empire_os.advertising_freshness import review_advertising_evidence
 from empire_os.advertising_ingest import build_canonical_ad_observation
 from empire_os.advertising_review import review_campaign_economics
@@ -41,6 +42,14 @@ class AdvertisingEvidenceReviewRequest(BaseModel):
     now_utc: str
     max_age_seconds: int = Field(default=21600, gt=0)
     observations: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AdvertisingDriftReviewRequest(BaseModel):
+    campaign_id: str
+    now_utc: str
+    max_age_seconds: int = Field(default=21600, gt=0)
+    baseline_observations: list[dict[str, Any]] = Field(default_factory=list)
+    current_observations: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AdvertisingObservationIngestRequest(BaseModel):
@@ -200,6 +209,45 @@ def create_advertising_router(
             "pause_mutation": False,
             "retarget_execution": False,
             "review": result.as_dict(),
+        }
+
+    @router.post("/campaigns/drift/preview")
+    def campaign_drift_preview(req: AdvertisingDriftReviewRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            baseline = tuple(
+                normalise_ad_observation(row)
+                for row in req.baseline_observations
+            )
+            current = tuple(
+                normalise_ad_observation(row)
+                for row in req.current_observations
+            )
+            result = review_advertising_drift(
+                baseline=baseline,
+                current=current,
+                campaign_id=req.campaign_id,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "campaign_creation": False,
+            "budget_mutation": False,
+            "pause_mutation": False,
+            "retarget_execution": False,
+            "drift": result.as_dict(),
         }
 
     @router.post("/observations/ingest")

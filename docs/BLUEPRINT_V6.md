@@ -249,6 +249,8 @@ Third slice ✅ local/tested: campaign economics review now aggregates observed 
 
 Fourth slice ✅ local/tested: advertising evidence review now checks observation freshness and produces creative-level economics only from explicitly identified creatives. Creative comparison is available only when at least two creatives have complete revenue/profit attribution; stale/future observations, missing creative identity and incomplete attribution remain explicit blockers. No campaign creation, budget, pause or retarget mutation is introduced.
 
+Fifth slice ✅ local/tested: creative economics drift review compares fresh baseline and current observation windows for the same canonical creative identities, deriving observed ROAS/profit-ROAS deltas only when attribution is complete. Missing creative matches, stale evidence or incomplete attribution blocks comparison; no campaign creation, budget, pause or retarget mutation is introduced.
+
 ### Phase 10 — Predictive Cloud V3
 Trend Radar, market/demand/business/buyer/revenue/profit forecasts, churn, LTV, capacity, conversion, Horizon forecasts, Revenue GPS and connected Business/Buyer/Signal/Revenue graphs.
 
