@@ -12,7 +12,8 @@ class DemandRegistryTransportError(RuntimeError):
 
 
 RPC_NAME = "record_demand_plan_registry"
-ROLE = "empire_demand_registry_writer"
+WRITER_ROLE = "empire_demand_registry_writer"
+READER_ROLE = "empire_demand_registry_reader"
 SQL = (
     "select public.record_demand_plan_registry("
     "%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s::jsonb)"
@@ -75,7 +76,7 @@ class PostgresDemandRegistryRpc:
         try:
             with self._connect(self.dsn) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute("SET LOCAL ROLE " + ROLE)
+                    cursor.execute("SET LOCAL ROLE " + WRITER_ROLE)
                     cursor.execute(SQL, tuple(values))
                     row = cursor.fetchone()
         except Exception as exc:
@@ -89,9 +90,85 @@ class PostgresDemandRegistryRpc:
         return row[0]
 
 
+READ_SQL = """
+SELECT
+  id,
+  plan_id,
+  channel,
+  objective,
+  audience,
+  evidence_refs,
+  success_metric,
+  evidence_score,
+  readiness_reason,
+  missing_evidence,
+  evidence,
+  approval_required,
+  execution_authority,
+  publishing_enabled,
+  outbound_enabled,
+  ad_spend_enabled,
+  provider_activation_enabled,
+  created_at
+FROM public.demand_plan_registry
+ORDER BY created_at DESC,id DESC
+LIMIT %s
+"""
+
+
+class PostgresDemandRegistryReader:
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        connect_factory: Callable | None = None,
+    ) -> None:
+        self.dsn = str(dsn or "").strip()
+        if not self.dsn:
+            raise DemandRegistryTransportError(
+                "dedicated demand registry read DSN required"
+            )
+        if connect_factory is None:
+            try:
+                import psycopg
+            except ImportError as exc:
+                raise DemandRegistryTransportError(
+                    "psycopg is required for demand registry read"
+                ) from exc
+            connect_factory = psycopg.connect
+        self._connect = connect_factory
+
+    def __call__(self, *, limit: int) -> list[dict[str, Any]]:
+        bounded = max(1, min(int(limit), 500))
+        try:
+            with self._connect(self.dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL ROLE " + READER_ROLE)
+                    cursor.execute(READ_SQL, (bounded,))
+                    columns = [
+                        description.name
+                        for description in cursor.description
+                    ]
+                    rows = cursor.fetchall()
+        except Exception as exc:
+            raise DemandRegistryTransportError(
+                "demand registry read failed"
+            ) from exc
+        return [
+            dict(zip(columns, row, strict=True))
+            for row in rows
+        ]
+
+
 class RpcDemandRegistryRepository:
-    def __init__(self, rpc: Callable[[str, dict[str, Any]], Any]):
+    def __init__(
+        self,
+        rpc: Callable[[str, dict[str, Any]], Any],
+        *,
+        reader: Callable[..., list[dict[str, Any]]] | None = None,
+    ):
         self.rpc = rpc
+        self.reader = reader
 
     def record(self, item: DemandRegistryRecord):
         item.validate()
@@ -117,3 +194,15 @@ class RpcDemandRegistryRepository:
                 "demand registry RPC returned invalid payload"
             )
         return result
+
+    def list_plans(self, *, limit: int):
+        if self.reader is None:
+            raise DemandRegistryTransportError(
+                "demand registry reader not activated"
+            )
+        rows = self.reader(limit=limit)
+        if not isinstance(rows, list):
+            raise DemandRegistryTransportError(
+                "demand registry reader returned invalid payload"
+            )
+        return rows
