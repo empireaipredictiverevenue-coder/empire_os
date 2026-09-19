@@ -199,6 +199,8 @@ Second slice ✅ local/tested: authenticated agent identity now supports a non-e
 
 Third slice ✅ local/tested: deterministic A2A negotiation transition previews now enforce human approval and terminal-state rules. `approved_for_manual_execution` never grants payment, allocation or task-execution authority; all negotiation lifecycle outputs remain OBSERVE-only.
 
+Fourth slice ✅ local/tested: evidence-only manual-handoff review now requires an approved-for-manual-execution negotiation plus signed-agent identity provenance, negotiation evidence, explicit human-approval evidence, counterparty acknowledgement and a manual-handoff reference. Passing the review only makes the packet ready for operator review; payment, allocation, task execution and autonomous handoff remain hard-disabled.
+
 ### Phase 7 — Conversation OS
 
 Second slice ✅ local/tested: provider ingestion now records deterministic payload hashes, requires timezone-aware event timestamps and treats exact replay as idempotent while rejecting altered payloads under the same provider-event ID. Persistence remains append-only and provider sends/calls/bookings stay disabled.

@@ -10,6 +10,10 @@ from empire_os.a2a_commerce_intent import (
     CommercialIntent,
     normalize_intent_record,
 )
+from empire_os.a2a_handoff import (
+    A2AManualHandoffEvidence,
+    review_manual_handoff,
+)
 from empire_os.a2a_negotiation import preview_negotiation_transition
 from empire_os.a2a_identity import (
     AgentIdentityClaim,
@@ -43,6 +47,20 @@ class NegotiationTransitionRequest(BaseModel):
     current_state: str
     requested_state: str
     human_approval_present: bool = False
+
+
+class ManualHandoffReviewRequest(BaseModel):
+    negotiation_id: str
+    agent_id: str
+    negotiation_state: str
+    signed_identity_evidence_ref: str | None = None
+    negotiation_evidence_ref: str | None = None
+    human_approval_present: bool = False
+    human_approval_evidence_ref: str | None = None
+    counterparty_acknowledged: bool = False
+    counterparty_evidence_ref: str | None = None
+    manual_handoff_ref: str | None = None
+
 
 class CommercialIntentRequest(BaseModel):
     identity: IdentityClaimRequest
@@ -103,6 +121,44 @@ def create_a2a_commerce_router(
             "allocation_authority": False,
             "task_execution": False,
             "transition": result.as_dict(),
+        }
+
+    @router.post("/negotiation/handoff/preview")
+    def negotiation_handoff_preview(req: ManualHandoffReviewRequest):
+        try:
+            review = review_manual_handoff(
+                A2AManualHandoffEvidence(
+                    negotiation_id=req.negotiation_id,
+                    agent_id=req.agent_id,
+                    negotiation_state=req.negotiation_state,
+                    signed_identity_evidence_ref=(
+                        req.signed_identity_evidence_ref
+                    ),
+                    negotiation_evidence_ref=req.negotiation_evidence_ref,
+                    human_approval_present=req.human_approval_present,
+                    human_approval_evidence_ref=(
+                        req.human_approval_evidence_ref
+                    ),
+                    counterparty_acknowledged=(
+                        req.counterparty_acknowledged
+                    ),
+                    counterparty_evidence_ref=(
+                        req.counterparty_evidence_ref
+                    ),
+                    manual_handoff_ref=req.manual_handoff_ref,
+                )
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "human_approval_required": True,
+            "execution_authority": "none",
+            "payment_authority": False,
+            "allocation_authority": False,
+            "task_execution": False,
+            "autonomous_handoff_execution": False,
+            "handoff": review.as_dict(),
         }
 
     @router.post("/intents")
