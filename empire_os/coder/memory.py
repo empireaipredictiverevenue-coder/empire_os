@@ -147,6 +147,98 @@ class ContextMemory:
         self._write(task, snapshot)
         return snapshot
 
+    def model_view(
+        self,
+        task_id: str,
+        *,
+        max_events: int = 8,
+    ) -> dict[str, Any]:
+        """Return a lean projection for model context.
+
+        Durable recovery memory remains richer on disk. The model gets only
+        the state needed to continue the current engineering task.
+        """
+        snapshot = self.load(task_id)
+        if snapshot is None:
+            raise ValueError(f"context memory not found: {task_id}")
+
+        task = dict(snapshot.get("task") or {})
+        lean_task = {
+            "task_id": task.get("task_id"),
+            "objective": task.get("objective"),
+            "status": task.get("status"),
+            "phase": task.get("phase"),
+            "plan": list(task.get("plan") or [])[:12],
+            "completed_steps": list(
+                task.get("completed_steps") or []
+            )[-8:],
+            "unresolved_issues": list(
+                task.get("unresolved_issues") or []
+            )[-8:],
+            "discovered_files": list(
+                task.get("discovered_files") or []
+            )[-12:],
+            "decisions": list(task.get("decisions") or [])[-8:],
+            "tests_required": list(
+                task.get("tests_required") or []
+            )[-12:],
+            "pending_approval": list(
+                task.get("pending_approval") or []
+            )[-8:],
+        }
+
+        latest_proposal = snapshot.get("latest_proposal")
+        if latest_proposal:
+            latest_proposal = {
+                "provider": latest_proposal.get("provider"),
+                "model": latest_proposal.get("model"),
+                "stage": latest_proposal.get("stage"),
+                "revision_count": latest_proposal.get(
+                    "revision_count"
+                ),
+                "actionable": latest_proposal.get("actionable"),
+                "refined": str(
+                    latest_proposal.get("refined") or ""
+                )[:800],
+            }
+
+        latest_command = snapshot.get("latest_command_proposal")
+        if latest_command:
+            latest_command = {
+                "candidate_count": latest_command.get(
+                    "candidate_count"
+                ),
+                "argv": list(latest_command.get("argv") or [])[:16],
+                "decision": latest_command.get("decision"),
+                "eligible": latest_command.get("eligible"),
+            }
+
+        git_state = dict(snapshot.get("git_state") or {})
+        lean_git = {
+            "branch": git_state.get("branch"),
+            "head": git_state.get("head"),
+            "dirty": git_state.get("dirty"),
+            "status": str(git_state.get("status") or "")[-1000:],
+        }
+
+        return {
+            "version": snapshot.get("version"),
+            "trigger": snapshot.get("trigger"),
+            "task": lean_task,
+            "recent_events": list(
+                snapshot.get("recent_events") or []
+            )[-max(1, min(int(max_events), 12)):],
+            "latest_proposal": latest_proposal,
+            "latest_command_proposal": latest_command,
+            "latest_structured_patch_proposal": snapshot.get(
+                "latest_structured_patch_proposal"
+            ),
+            "git_state": lean_git,
+            "recovery_instructions": snapshot.get(
+                "recovery_instructions"
+            ),
+        }
+
     def load(self, task_id: str) -> dict[str, Any] | None:
         path = self._path(task_id)
         if not path.exists():
