@@ -5,6 +5,10 @@ from datetime import datetime
 from typing import Any, Mapping, Protocol, Sequence
 
 from empire_os.autonomous_revenue_os import compose_revenue_decision_packet
+from empire_os.revenue_os_feedback import (
+    RevenueOsOutcomeEvidence,
+    review_revenue_os_outcome,
+)
 from empire_os.revenue_os_freshness import assess_revenue_os_freshness
 from empire_os.revenue_os_readiness import assess_revenue_os_readiness
 from empire_os.revenue_os_registry import RevenueOsRegistryRecord
@@ -23,6 +27,16 @@ class RevenueOsFreshnessRequest(BaseModel):
     capital_observed_at: str | None = None
     demand_observed_at: str | None = None
     enterprise_observed_at: str | None = None
+
+
+class RevenueOsFeedbackRequest(BaseModel):
+    packet_key: str
+    outcome_observed: bool = False
+    revenue_recognized: bool = False
+    recognized_revenue_cents: int | None = Field(default=None, ge=0)
+    observed_cost_cents: int | None = Field(default=None, ge=0)
+    observed_at: str
+    evidence_refs: list[str] = Field(min_length=1)
 
 
 class RevenueOsRegisterRequest(BaseModel):
@@ -97,6 +111,36 @@ def create_revenue_os_router(
             "allocation_execution": False,
             "deployment_execution": False,
             "freshness": result.as_dict(),
+        }
+
+    @router.post("/feedback/preview")
+    def feedback_preview(req: RevenueOsFeedbackRequest):
+        try:
+            evidence = RevenueOsOutcomeEvidence(
+                packet_key=req.packet_key,
+                outcome_observed=req.outcome_observed,
+                revenue_recognized=req.revenue_recognized,
+                recognized_revenue_cents=req.recognized_revenue_cents,
+                observed_cost_cents=req.observed_cost_cents,
+                observed_at=req.observed_at,
+                evidence_refs=tuple(req.evidence_refs),
+            )
+            feedback = review_revenue_os_outcome(evidence)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "side_effects": "none",
+            "execution_authority": "none",
+            "model_weight_mutation": False,
+            "capital_reallocation": False,
+            "spend_execution": False,
+            "outreach_execution": False,
+            "payment_execution": False,
+            "allocation_execution": False,
+            "deployment_execution": False,
+            "feedback": feedback.as_dict(),
         }
 
     @router.get("/board")

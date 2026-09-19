@@ -330,6 +330,8 @@ Third slice ✅ local/tested: governed Revenue OS packet registry now persists c
 
 Fourth slice ✅ local/tested: component-level freshness review now gates Astra, Predictive, Capital, Demand and Enterprise evidence by explicit observed timestamps. Missing, stale or future-dated evidence blocks operator review; no execution path is introduced.
 
+Fifth slice ✅ local/tested: OBSERVE-only Revenue OS learning feedback links a decision packet to later commercial outcome, recognized-revenue and observed-cost evidence. Gross profit is derived only when recognized revenue and cost are both present; missing evidence remains explicit and no model-weight mutation, capital reallocation, spend, outreach, payment, allocation or deployment authority is introduced.
+
 ### Governed Control-Plane API Layer — Phases 4–18
 Second-pass API layer ✅ local/tested and mounted in the hub. Health/read/preview surfaces now exist for Astra, A2A identity, Conversation OS, Revenue CRM, Advertising Brain, Predictive Cloud, Experiment/Causal analysis, Demand Genesis, Revenue Exchange, Digital Twin, Capital Review, SaaS tenancy, Enterprise readiness and Revenue OS. Repository/provider-backed surfaces mount unbound and fail closed until their canonical reader or verifier is explicitly activated; pure analysis/simulation previews remain non-mutating. All routes expose OBSERVE/SIMULATION status and explicit zero execution authority.
 
