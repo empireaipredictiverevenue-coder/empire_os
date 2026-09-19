@@ -143,38 +143,8 @@ def test_list_leads_returns_crm_dictionary_contract(monkeypatch):
     assert response.json()["leads"][0]["id"] == 7
 
 
-def test_status_route_uses_existing_pipeline_api(monkeypatch):
-    from empire_os import crm, hub
-
-    monkeypatch.setattr(hub, "backend", object())
-    calls = []
-
-    def fake_stage(backend, lead_id, stage_name, actor):
-        calls.append(("stage", lead_id, stage_name, actor))
-        return {"ok": True, "stage": stage_name}
-
-    def fake_activity(
-        backend,
-        lead_id,
-        act_type,
-        summary,
-        detail="",
-        actor="user",
-    ):
-        calls.append(
-            (
-                "activity",
-                lead_id,
-                act_type,
-                summary,
-                detail,
-                actor,
-            )
-        )
-        return {"ok": True, "activity_id": 1}
-
-    monkeypatch.setattr(crm, "set_pipeline_stage", fake_stage)
-    monkeypatch.setattr(crm, "add_activity", fake_activity)
+def test_status_route_is_retired():
+    from empire_os import hub
 
     async def request():
         transport = httpx.ASGITransport(app=hub.app)
@@ -184,29 +154,18 @@ def test_status_route_uses_existing_pipeline_api(monkeypatch):
         ) as client:
             return await client.patch(
                 "/v1/leads/7/status",
-                params={
-                    "status": "qualified",
-                    "notes": "reviewed",
-                },
+                params={"status": "qualified", "notes": "reviewed"},
             )
 
     response = run(request())
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "ok": True,
-        "lead_id": 7,
-        "status": "qualified",
-    }
-    assert calls[0] == ("stage", 7, "qualified", "api")
-    assert calls[1][0] == "activity"
-    assert calls[1][4] == "reviewed"
+    assert response.status_code == 410
+    assert response.json()["detail"] == (
+        "legacy_lead_status_retired_use_revenue_crm_and_governed_state_flow"
+    )
 
 
-def test_status_route_rejects_non_integer_legacy_id(monkeypatch):
+def test_status_route_non_integer_id_is_also_retired():
     from empire_os import hub
-
-    monkeypatch.setattr(hub, "backend", object())
 
     async def request():
         transport = httpx.ASGITransport(app=hub.app)
@@ -220,4 +179,4 @@ def test_status_route_rejects_non_integer_legacy_id(monkeypatch):
             )
 
     response = run(request())
-    assert response.status_code == 400
+    assert response.status_code == 410

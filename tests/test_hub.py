@@ -40,16 +40,17 @@ class TestLeadPipeline:
                 "source": "test",
             },
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["status"] in ("accepted", "rejected")
+        assert resp.status_code == 410
+        assert resp.json()["detail"] == (
+            "legacy_pipeline_incoming_retired_use_canonical_lead_intake"
+        )
 
     def test_incoming_lead_missing_data(self, client):
         resp = client.post(
             "/v1/pipeline/incoming",
-            json={"niche": "roofing"},  # no phone, no details
+            json={"niche": "roofing"},
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 410
 
 
 class TestFunnel:

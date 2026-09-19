@@ -526,61 +526,32 @@ def health_check():
 
 @app.post("/v1/pipeline/incoming")
 async def incoming_lead(lead: LeadPayload, background_tasks: BackgroundTasks):
-    """Accept an incoming lead, score it, and register in funnel."""
-    if not lead.phone and not lead.details:
-        raise HTTPException(status_code=400, detail="Missing lead data")
-
-    # Score
-    score = calculate_observed_score(lead.niche, lead.details, lead.phone, lead.zip_code)
-
-    # Evaluate and register
-    scored = scout.evaluate(
-        niche=lead.niche,
-        details=lead.details,
-        phone=lead.phone,
-        zip_code=lead.zip_code,
-        name=lead.name,
-        address=lead.address,
-        source=lead.source,
-        prospect_id=lead.lead_id,
+    """Retired legacy neural-scout funnel mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_pipeline_incoming_retired_use_canonical_lead_intake",
     )
 
-    if scored is None:
-        return {
-            "status": "rejected",
-            "score": score,
-            "message": "Lead below minimum score threshold",
-        }
-
-    eid = scout.register_lead(scored)
-    return {
-        "status": "accepted",
-        "prospect_id": scored.prospect_id,
-        "score": score,
-        "event_id": eid,
-        "message": "Lead queued into the engine",
-    }
 
 
 @app.post("/v1/traffic/discover")
-def discover_prospect(prospect: DiscoveredProspect):
-    """Manually register a discovered prospect."""
-    if not backend:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-    eid = discover_one(backend, prospect)
-    return {"status": "ok", "event_id": eid}
+def discover_prospect(prospect: dict):
+    """Retired legacy traffic discovery mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_traffic_discover_retired_use_canonical_source_mesh",
+    )
+
 
 
 @app.post("/v1/traffic/match")
-def match_prospect(payload: MatchPayload):
-    """Mark a prospect as matched."""
-    if not backend:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-    try:
-        eid = mark_matched(backend, payload.prospect_id, notes=payload.notes)
-        return {"status": "ok", "event_id": eid}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+def match_prospect(payload: dict):
+    """Retired legacy traffic-match mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_traffic_match_retired_use_canonical_identity_and_allocation",
+    )
+
 
 
 @app.get("/v1/traffic/status")
@@ -1032,42 +1003,12 @@ _BUY_LEADS_TEMPLATE = "/root/empire_os/templates/buy-leads.html"
 
 @app.post("/v1/buyers/apply", response_model=BuyerApplyResponse)
 async def buyer_apply(req: BuyerApplyRequest):
-    """Buyer self-serve signup -> auto-rate + auto-seat into lanes.
+    """Retired legacy Solana/USDC buyer auto-onboarding path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_buyer_apply_retired_use_governed_bsc_buyer_onboarding_flow",
+    )
 
-    Async wrapper: runs the blocking auto_onboard.onboard() in a thread with a
-    strict 3s timeout + silent fallback so the endpoint never hangs.
-    """
-    tier = req.tier.lower()
-    if tier not in ("bronze", "silver", "gold", "platinum"):
-        tier = "silver"
-    try:
-        import empire_os.auto_onboard as ao
-        res = await asyncio.wait_for(
-            asyncio.to_thread(
-                ao.onboard, req.name.strip(), req.niche.strip().lower(), tier,
-                webhook_url=req.webhook_url, delivery_email=req.email.strip(),
-                min_deposit=req.min_deposit, source=req.source,
-            ),
-            timeout=12.0,
-        )
-        if not res.get("ok"):
-            raise HTTPException(502, f"onboard failed: {res.get('error', 'unknown')}")
-        vault = os.environ.get("SOLANA_VAULT_WALLET", "")
-        return BuyerApplyResponse(
-            ok=True, buyer=req.name, niche=req.niche, tier=tier,
-            seat_price_usd=res.get("seat_price"),
-            funded=res.get("funded"),
-            tenant_id=res.get("tenant_id"),
-            subscription_id=res.get("subscription_id"),
-            payment={"asset": "USDC", "network": "Solana", "vault_wallet": vault,
-                     "note": "Fund this wallet to activate collection. Leads bill per delivery."},
-        )
-    except asyncio.TimeoutError:
-        raise HTTPException(504, "onboard timed out — try again")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"buyer apply error: {str(e)[:160]}")
 
 
 @app.get("/buy-leads", response_class=HTMLResponse)
@@ -1228,47 +1169,12 @@ def list_leads(
 
 @app.patch("/v1/leads/{lead_id}/status")
 def update_lead_status(lead_id: str, status: str = "", notes: str = ""):
-    """Compatibility mutation for legacy CRM pipeline state only."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    if not status:
-        raise HTTPException(400, "status is required")
-    try:
-        numeric_id = int(lead_id)
-    except (TypeError, ValueError) as exc:
-        raise HTTPException(
-            400,
-            "legacy CRM lead_id must be an integer",
-        ) from exc
+    """Retired legacy SQLite CRM status mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lead_status_retired_use_revenue_crm_and_governed_state_flow",
+    )
 
-    from empire_os.crm import add_activity, set_pipeline_stage
-
-    try:
-        result = set_pipeline_stage(
-            backend,
-            numeric_id,
-            status,
-            actor="api",
-        )
-        if notes.strip():
-            add_activity(
-                backend,
-                numeric_id,
-                "note",
-                "Lead status update note",
-                notes.strip(),
-                actor="api",
-            )
-    except ValueError as exc:
-        message = str(exc)
-        code = 404 if "not found" in message else 400
-        raise HTTPException(code, message) from exc
-
-    return {
-        "ok": True,
-        "lead_id": numeric_id,
-        "status": result["stage"],
-    }
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -1765,32 +1671,12 @@ def finance_replay(req: dict):
 
 @app.post("/v1/swarm/worker-config")
 def swarm_worker_config(req: dict):
-    """Register or update a worker handler.
-
-    Body:
-      worker_id      str   unique identifier (e.g. "outreach-agent", "lead-deliverer")
-      niche          str   target niche OR "*" wildcard
-      metro          str   target metro (or "*")
-      action         str   what the worker wants to do (consume, fanout, etc.)
-      weight         int   1-10 priority ranking (higher = preferred)
-
-    Persistence: every config is appended to /root/feedback/swarm_registry.jsonl.
-    """
-    worker_id = req.get("worker_id", "").strip()
-    if not worker_id:
-        raise HTTPException(400, "worker_id required")
-    _swarm_persist_handler(
-        worker_id=worker_id,
-        niche=req.get("niche", "*"),
-        metro=req.get("metro", "*"),
-        action=req.get("action", "consume"),
-        weight=int(req.get("weight", 5)),
+    """Retired legacy file-backed worker-config mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_swarm_worker_config_retired_use_governed_execution_bus",
     )
-    _swarm_audit("worker_registered",
-                worker_id=worker_id,
-                niche=req.get("niche", "*"),
-                metro=req.get("metro", "*"))
-    return {"ok": True, "worker_id": worker_id}
+
 
 
 @app.get("/v1/swarm/worker-config")
@@ -1923,16 +1809,13 @@ def _hm_backend():
     return _HM_BACKEND
 
 @app.post("/v1/homeowner/jobs")
-def homeowner_create_job(name: str, zip: str, job_type: str,
-                          phone: str = "", email: str = "", description: str = ""):
-    """Submit a new homeowner job (status=discovered)."""
-    from empire_os.homeowner_matching import ensure_schema, submit_job
-    b = _hm_backend()
-    ensure_schema(b)
-    job = submit_job(b, name=name, phone=phone, email=email,
-                     zip=zip, job_type=job_type, description=description)
+def homeowner_create_job_retired():
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_job_create_retired_use_canonical_marketplace_flow",
+    )
 
-    return {"ok": True, "job": job.to_dict()}
 
 @app.get("/v1/homeowner/jobs")
 def homeowner_list_jobs(status: str = None, limit: int = 50):
@@ -1957,79 +1840,44 @@ def homeowner_get_job(job_id: int):
         raise HTTPException(status_code=404, detail=str(e))
 
 @app.post("/v1/homeowner/jobs/{job_id}/match")
-def homeowner_find_matches(job_id: int):
-    """Find carrier-roster contractors and match them to a job."""
-    from empire_os.homeowner_matching import find_matches, JobNotFoundError
-    b = _hm_backend()
-    try:
-        matches = find_matches(b, job_id)
+def homeowner_match_retired(job_id: int):
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_match_retired_use_governed_matching_flow",
+    )
 
-        return {"ok": True, "matches": [m.to_dict() for m in matches], "count": len(matches)}
-    except JobNotFoundError as e:
-
-        raise HTTPException(status_code=404, detail=str(e))
 
 @app.patch("/v1/homeowner/jobs/{job_id}/status")
-def homeowner_update_job_status(job_id: int, status: str, opt_in: bool = None):
-    """Update job status (e.g. bid_sent, work_completed, settled)."""
-    from empire_os.homeowner_matching import update_job_status, JobNotFoundError, get_job
-    from empire_os.homeowner_pipeline import transition_job
-    b = _hm_backend()
-    try:
-        prev = get_job(b, job_id)
-        job = update_job_status(b, job_id, status=status, opt_in=opt_in)
-        # Record pipeline event
-        try:
-            transition_job(b, str(job_id), prev.status, status,
-                          actor="hub")
-        except Exception:
-            pass
-        return {"ok": True, "job": job.to_dict()}
-    except JobNotFoundError as e:
+def homeowner_status_retired(job_id: int):
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_status_retired_use_governed_marketplace_flow",
+    )
 
-        raise HTTPException(status_code=404, detail=str(e))
 
 @app.patch("/v1/homeowner/jobs/matches/{match_id}/status")
-def homeowner_update_match_status(match_id: int, status: str):
-    """Update a match's status (e.g. bid_sent, bid_accepted, rejected)."""
-    from empire_os.homeowner_matching import update_match_status, get_match, get_job
-    from empire_os.homeowner_pipeline import transition_job
-    b = _hm_backend()
-    match = update_match_status(b, match_id, status=status)
+def homeowner_match_status_retired(match_id: int):
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_match_status_retired_use_governed_marketplace_flow",
+    )
 
-    # Also update parent job status when match advances
-    try:
-        job = get_job(b, match.job_id)
-        new_job_status = None
-        if status == "bid_sent" and job.status == "matched_to_contractor":
-            new_job_status = "bid_sent"
-        elif status == "bid_accepted" and job.status in ("bid_sent", "matched_to_contractor"):
-            new_job_status = "bid_accepted"
-
-        if new_job_status:
-            from empire_os.homeowner_matching import update_job_status
-            update_job_status(b, match.job_id, status=new_job_status)
-            transition_job(b, str(match.job_id), job.status, new_job_status,
-                          actor="matching_engine")
-    except Exception:
-        pass
-
-    return {"ok": True, "match": match.to_dict()}
 
 # ═══════════════════════════════════════════════════════════════════
 # Blueprint v5 — Carrier Application Portal Auto-Filler (#3)
 # ═══════════════════════════════════════════════════════════════════
 
 @app.post("/v1/carrier-applications")
-def carrier_app_create(company_name: str, license_no: str, carrier: str):
-    """Register intent to apply with a carrier."""
-    from empire_os.carrier_applications import ensure_schema, create_application
-    b = _hm_backend()
-    ensure_schema(b)
-    app = create_application(b, company_name=company_name,
-                              license_no=license_no, carrier=carrier)
+def carrier_application_create_retired():
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_carrier_application_create_retired_use_governed_partner_flow",
+    )
 
-    return {"ok": True, "application": app.to_dict()}
 
 @app.get("/v1/carrier-applications")
 def carrier_app_list(carrier: str = None, status: str = None, limit: int = 100):
@@ -2054,50 +1902,35 @@ def carrier_app_get(app_id: int):
         raise HTTPException(status_code=404, detail=str(e))
 
 @app.patch("/v1/carrier-applications/{app_id}")
-def carrier_app_update(app_id: int, status: str = None, notes: str = None):
-    """Update application status and/or notes."""
-    from empire_os.carrier_applications import update_application, ApplicationNotFoundError
-    b = _hm_backend()
-    try:
-        app = update_application(b, app_id, status=status, notes=notes)
+def carrier_application_update_retired(app_id: int):
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_carrier_application_update_retired_use_governed_partner_flow",
+    )
 
-        return {"ok": True, "application": app.to_dict()}
-    except ApplicationNotFoundError as e:
-
-        raise HTTPException(status_code=404, detail=str(e))
 
 @app.post("/v1/carrier-applications/{app_id}/auto-fill")
-def carrier_app_autofill(app_id: int):
-    """Generate a carrier portal fill plan (stub — no headless browser yet)."""
-    from empire_os.carrier_applications import auto_fill_application, ApplicationNotFoundError
-    b = _hm_backend()
-    try:
-        plan = auto_fill_application(b, app_id)
+def carrier_application_autofill_retired(app_id: int):
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_carrier_application_autofill_retired_use_governed_partner_flow",
+    )
 
-        return {"ok": True, **plan}
-    except ApplicationNotFoundError as e:
-
-        raise HTTPException(status_code=404, detail=str(e))
 
 # ═══════════════════════════════════════════════════════════════════
 # Blueprint v5 — Pipeline Extension (homeowner_job → settled) (#4)
 # ═══════════════════════════════════════════════════════════════════
 
 @app.post("/v1/homeowner/pipeline/transition")
-def homeowner_pipeline_transition(job_id: str, from_status: str,
-                                   to_status: str, actor: str = "hub",
-                                   notes: str = ""):
-    """Transition a homeowner job along the pipeline (homeowner_job→settled)."""
-    from empire_os.homeowner_pipeline import transition_job
-    b = _hm_backend()
-    try:
-        event_id = transition_job(b, job_id=job_id, from_status=from_status,
-                                   to_status=to_status, actor=actor, notes=notes)
+def homeowner_pipeline_transition_retired():
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_pipeline_transition_retired_use_governed_marketplace_flow",
+    )
 
-        return {"ok": True, "event_id": event_id}
-    except ValueError as e:
-
-        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/v1/homeowner/pipeline/timeline/{job_id}")
 def homeowner_pipeline_timeline(job_id: str):
@@ -4301,20 +4134,13 @@ class UpdateCarrierAppRequest(BaseModel):
 
 
 @app.post("/v1/carrier-applications")
-def create_carrier_application(req: CreateCarrierAppRequest):
-    """Register intent to apply with a carrier."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        app = create_carrier_app(
-            backend,
-            company_name=req.company_name,
-            license_no=req.license_no,
-            carrier=req.carrier,
-        )
-        return {"ok": True, "application": app.to_dict()}
-    except Exception as e:
-        raise HTTPException(400, detail=str(e)[:300])
+def carrier_application_create_retired():
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_carrier_application_create_retired_use_governed_partner_flow",
+    )
+
 
 
 @app.get("/v1/carrier-applications")
@@ -4334,32 +4160,23 @@ def list_carrier_applications(
 
 
 @app.patch("/v1/carrier-applications/{app_id}")
-def update_carrier_application(app_id: int, req: UpdateCarrierAppRequest):
-    """Update a carrier application's status and/or notes."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        app = update_carrier_app(
-            backend,
-            app_id=app_id,
-            status=req.status,
-            notes=req.notes,
-        )
-        return {"ok": True, "application": app.to_dict()}
-    except ValueError as e:
-        raise HTTPException(400, detail=str(e)[:300])
+def carrier_application_update_retired(app_id: int):
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_carrier_application_update_retired_use_governed_partner_flow",
+    )
+
 
 
 @app.post("/v1/carrier-applications/{app_id}/auto-fill")
-def trigger_auto_fill(app_id: int):
-    """Generate a fill plan for a carrier application (stub — no headless browser yet)."""
-    if not backend:
-        raise HTTPException(503, detail="Engine not initialized")
-    try:
-        result = auto_fill_carrier_app(backend, app_id)
-        return result
-    except ValueError as e:
-        raise HTTPException(400, detail=str(e)[:300])
+def carrier_application_autofill_retired(app_id: int):
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_carrier_application_autofill_retired_use_governed_partner_flow",
+    )
+
 
 
 # ── Homeowner Matching (Blueprint v5 #2) ─────────────────────────────
@@ -4384,23 +4201,13 @@ class UpdateMatchStatusRequest(BaseModel):
 
 
 @app.post("/v1/homeowner/jobs")
-def homeowner_submit_job(req: SubmitJobRequest):
-    """Submit a new homeowner job (starts at 'discovered')."""
-    if not backend:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-    try:
-        job = hm_submit_job(
-            backend,
-            name=req.name,
-            phone=req.phone,
-            email=req.email,
-            zip=req.zip,
-            job_type=req.job_type,
-            description=req.description,
-        )
-        return {"ok": True, "job": job.to_dict()}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)[:300])
+def homeowner_create_job_retired():
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_job_create_retired_use_canonical_marketplace_flow",
+    )
+
 
 
 @app.get("/v1/homeowner/jobs/{job_id}")
@@ -4451,22 +4258,13 @@ def homeowner_trigger_matches(job_id: int):
 
 
 @app.post("/v1/homeowner/jobs/{job_id}/status")
-def homeowner_update_job_status(job_id: int, req: UpdateJobStatusRequest):
-    """Update a job's status (e.g. 'bid_sent', 'bid_accepted', 'settled')."""
-    if not backend:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-    try:
-        job = hm_update_job_status(
-            backend,
-            job_id=job_id,
-            status=req.status,
-            opt_in=req.opt_in,
-        )
-        return {"ok": True, "job": job.to_dict()}
-    except (JobNotFoundError, InvalidJobStatusError) as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)[:300])
+def homeowner_status_post_retired(job_id: int):
+    """Retired legacy state mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_homeowner_status_retired_use_governed_marketplace_flow",
+    )
+
 
 
 # ── Homeowner Pipeline Extension (Blueprint v5 #4) ──────────────────
