@@ -65,3 +65,36 @@ def test_specialist_roles_separate_patch_and_review_authority():
     assert ROLES["security"].can_verify is True
     assert ROLES["reviewer"].can_patch is False
     assert ROLES["architect"].can_patch is False
+
+
+def test_symbol_patch_preserves_class_method_indentation(tmp_path):
+    root = make_repo(tmp_path)
+    target = root / "empire_os/methods.py"
+    target.write_text(
+        "class Engine:\n"
+        "    def value(self):\n"
+        "        return 1\n",
+        encoding="utf-8",
+    )
+    engine = AstPatchEngine(
+        PatchEngine(root, runtime_root=root / "runtime")
+    )
+    engine.replace_python_symbol(
+        "task_method",
+        "empire_os/methods.py",
+        "value",
+        "def value(self):\n    return 2",
+    )
+    updated = target.read_text(encoding="utf-8")
+    assert "    def value(self):" in updated
+    assert "        return 2" in updated
+
+    import ast
+    tree = ast.parse(updated)
+    class_node = tree.body[0]
+    assert isinstance(class_node, ast.ClassDef)
+    assert any(
+        isinstance(node, ast.FunctionDef)
+        and node.name == "value"
+        for node in class_node.body
+    )

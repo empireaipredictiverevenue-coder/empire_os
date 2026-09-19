@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -56,9 +57,17 @@ class AstPatchEngine:
         start = symbol.start_line - 1
         end = symbol.end_line
         old = "".join(lines[start:end])
-        replacement_text = replacement.rstrip() + "\n"
-        if ast.parse(replacement_text) is None:
-            raise PatchError("replacement did not parse")
+        indent = old[: len(old) - len(old.lstrip(" \t"))]
+        normalized = textwrap.dedent(replacement).strip("\n")
+        if not normalized.strip():
+            raise PatchError("replacement is empty")
+        try:
+            ast.parse(normalized + "\n")
+        except SyntaxError as exc:
+            raise PatchError("replacement did not parse") from exc
+        replacement_text = (
+            textwrap.indent(normalized, indent).rstrip() + "\n"
+        )
         return self.patch_engine.replace_exact(
             task_id,
             path,
