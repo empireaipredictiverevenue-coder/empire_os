@@ -6,15 +6,31 @@ from typing import Any, Mapping, Protocol, Sequence
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from empire_os.saas_api_access import (
+    ApiAccessEvidence,
+    assess_api_access_readiness,
+)
 from empire_os.saas_registry import SaasReadinessRecord
 from empire_os.saas_readiness import (
     SaasScaleSnapshot,
     assess_saas_scale_readiness,
 )
+from empire_os.saas_scale import TenantMembership
 
 
 
 
+
+
+class ApiAccessReadinessRequest(BaseModel):
+    tenant_id: str
+    user_id: str
+    role: str
+    membership_status: str = "active"
+    active_subscription: bool
+    tenant_isolation_verified: bool
+    requested_scopes: list[str] = Field(min_length=1)
+    evidence_refs: list[str] = Field(min_length=1)
 
 
 class SaasReadinessRegisterRequest(BaseModel):
@@ -93,6 +109,38 @@ def create_saas_router(
             )
         return repository
 
+
+    @router.post("/api-access/readiness/preview")
+    def api_access_readiness(req: ApiAccessReadinessRequest):
+        try:
+            membership = TenantMembership(
+                tenant_id=req.tenant_id,
+                user_id=req.user_id,
+                role=req.role,
+                status=req.membership_status,
+            )
+            result = assess_api_access_readiness(
+                ApiAccessEvidence(
+                    membership=membership,
+                    active_subscription=req.active_subscription,
+                    tenant_isolation_verified=(
+                        req.tenant_isolation_verified
+                    ),
+                    requested_scopes=tuple(req.requested_scopes),
+                    evidence_refs=tuple(req.evidence_refs),
+                )
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "api_key_issuance": False,
+            "api_key_revocation": False,
+            "secret_material_generated": False,
+            "readiness": result.as_dict(),
+        }
 
     @router.post("/scale-readiness/preview")
     def scale_readiness(req: SaasScaleReadinessRequest):

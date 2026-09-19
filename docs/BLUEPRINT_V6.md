@@ -296,6 +296,8 @@ Second slice ✅ local/tested: SaaS/network-scale readiness now reviews observed
 
 Third slice ✅ local/tested: tenant-scoped readiness registry persists only review-ready scale evidence with idempotent history. Tenant provisioning, API-key issuance, billing and subscription mutation remain disabled.
 
+Fourth slice ✅ local/tested: developer/API-access readiness now requires active membership, owner/admin role, active subscription, verified tenant isolation and allowlisted read scopes. Mutating scopes are rejected; no API-key secret material is generated and issuance/revocation stay disabled.
+
 Multi-tenant architecture, teams/RBAC, usage billing, USDT subscriptions, white label, custom domains, affiliate/agency/client dashboards, API keys, developer platform and marketplace/partner network.
 
 ### Phase 17 — Enterprise
