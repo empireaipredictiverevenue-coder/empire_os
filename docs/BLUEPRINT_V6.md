@@ -188,6 +188,8 @@ A2A Agent Card/protocol, authenticated agent discovery, agent buyers/suppliers, 
 
 Foundation slice ✅ local/tested: `/a2a/v1/discovery` now publishes machine-readable separation between public read-only capabilities and future authenticated commercial capabilities. Quote/negotiation/task capabilities are discovery-only with authentication + human approval required; execution, payment and allocation remain unexposed.
 
+Second slice ✅ local/tested: authenticated agent identity now supports a non-executing `commerce.intent` scope in addition to discovery. A staged append-only `a2a_commercial_intents` contract + dedicated NOLOGIN RPC role records quote/negotiation/task requests as `pending_approval`; the fail-closed `/v1/a2a-commerce/intents` API remains unbound by default. No approval, execution, payment or allocation RPC exists in this slice.
+
 ### Phase 7 — Conversation OS
 Vonage, ElevenLabs, streaming voice, barge-in, tone mirroring, summaries/transcripts, AI qualification/closing, human escalation, booking, objections, DISC/coaching, dynamic offers and unified conversation history across email/voice/A2A/CRM.
 

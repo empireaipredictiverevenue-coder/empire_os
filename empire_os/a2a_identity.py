@@ -27,8 +27,10 @@ class AgentIdentityClaim:
         ):
             if not str(value or "").strip():
                 raise ValueError(f"{name} required")
-        if self.requested_scope != "discovery":
-            raise ValueError("only discovery scope is supported")
+        if self.requested_scope not in {"discovery", "commerce.intent"}:
+            raise ValueError(
+                "only discovery and commerce.intent scopes are supported"
+            )
 
     def signing_payload(self) -> bytes:
         self.validate()
@@ -86,10 +88,16 @@ def verify_agent_identity(
             reason="signature_invalid",
         )
 
+    granted_scope = claim.requested_scope
+    reason = (
+        "authenticated_discovery_only"
+        if granted_scope == "discovery"
+        else "authenticated_commerce_intent_only"
+    )
     return AgentIdentityDecision(
         authenticated=True,
         agent_id=claim.agent_id,
         key_id=claim.key_id,
-        granted_scope="discovery",
-        reason="authenticated_discovery_only",
+        granted_scope=granted_scope,
+        reason=reason,
     )

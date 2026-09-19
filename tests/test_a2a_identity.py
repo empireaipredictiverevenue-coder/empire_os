@@ -75,8 +75,27 @@ def test_verifier_exception_fails_closed():
     assert decision.reason == "signature_invalid"
 
 
-def test_commercial_scope_is_not_supported():
-    with pytest.raises(ValueError, match="only discovery scope"):
+def test_commerce_intent_scope_authenticates_without_execution_authority():
+    decision = verify_agent_identity(
+        claim("commerce.intent"),
+        verifier=lambda key_id, payload, signature: (
+            key_id == "key-1"
+            and signature == "sig-1"
+            and b"commerce.intent" in payload
+        ),
+        trusted_key_ids={"key-1"},
+    )
+    assert decision.authenticated is True
+    assert decision.granted_scope == "commerce.intent"
+    assert decision.reason == "authenticated_commerce_intent_only"
+    assert decision.execution_authority == "none"
+
+
+def test_commercial_execution_scope_is_not_supported():
+    with pytest.raises(
+        ValueError,
+        match="only discovery and commerce.intent scopes",
+    ):
         verify_agent_identity(
             claim("commerce.execute"),
             verifier=lambda *args: True,

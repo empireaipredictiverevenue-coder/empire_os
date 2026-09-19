@@ -38,7 +38,7 @@ def create_a2a_identity_router(
         configured = verifier is not None and bool(trusted)
         return {
             "mode": "OBSERVE",
-            "scope": "discovery",
+            "scopes": ["discovery", "commerce.intent"],
             "execution_authority": "none",
             "commerce_execution": False,
             "payment_execution": False,
@@ -73,7 +73,7 @@ def create_a2a_identity_router(
 
         return {
             "mode": "OBSERVE",
-            "scope": "discovery",
+            "scope": decision.granted_scope,
             "execution_authority": "none",
             "commerce_execution": False,
             "payment_execution": False,
