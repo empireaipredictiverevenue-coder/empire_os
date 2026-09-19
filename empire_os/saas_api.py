@@ -1,6 +1,7 @@
 """Tenant-scoped read-only SaaS usage/subscription API."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Mapping, Protocol, Sequence
 
 from fastapi import APIRouter, HTTPException, Query
@@ -10,6 +11,7 @@ from empire_os.saas_api_access import (
     ApiAccessEvidence,
     assess_api_access_readiness,
 )
+from empire_os.saas_freshness import review_saas_quota_readiness
 from empire_os.saas_registry import SaasReadinessRecord
 from empire_os.saas_readiness import (
     SaasScaleSnapshot,
@@ -31,6 +33,19 @@ class ApiAccessReadinessRequest(BaseModel):
     tenant_isolation_verified: bool
     requested_scopes: list[str] = Field(min_length=1)
     evidence_refs: list[str] = Field(min_length=1)
+
+
+class SaasQuotaReadinessRequest(BaseModel):
+    tenant_id: str
+    observed_monthly_usage: int = Field(ge=0)
+    observed_usage_limit: int | None = Field(default=None, ge=0)
+    active_subscription: bool
+    tenant_isolation_verified: bool
+    usage_observed_at: str
+    subscription_observed_at: str
+    isolation_observed_at: str
+    now_utc: str
+    max_age_seconds: int = Field(default=21600, gt=0)
 
 
 class SaasReadinessRegisterRequest(BaseModel):
@@ -109,6 +124,42 @@ def create_saas_router(
             )
         return repository
 
+
+    @router.post("/quota-readiness/preview")
+    def quota_readiness(req: SaasQuotaReadinessRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            result = review_saas_quota_readiness(
+                tenant_id=req.tenant_id,
+                observed_monthly_usage=req.observed_monthly_usage,
+                observed_usage_limit=req.observed_usage_limit,
+                active_subscription=req.active_subscription,
+                tenant_isolation_verified=req.tenant_isolation_verified,
+                usage_observed_at=req.usage_observed_at,
+                subscription_observed_at=req.subscription_observed_at,
+                isolation_observed_at=req.isolation_observed_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "provisioning_execution": False,
+            "billing_execution": False,
+            "subscription_mutation": False,
+            "api_key_issuance": False,
+            "review": result.as_dict(),
+        }
 
     @router.post("/api-access/readiness/preview")
     def api_access_readiness(req: ApiAccessReadinessRequest):
