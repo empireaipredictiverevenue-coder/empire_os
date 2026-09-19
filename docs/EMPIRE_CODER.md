@@ -176,11 +176,11 @@ Long model work is placed in `runtime/coder/jobs` rather than executed inside th
 - PLAN — best-of-N implementation planning, proposal only;
 - NEXT_COMMAND — best-of-N command synthesis and policy classification, never execution.
 
-`empire-coder-worker.service` and timer are staged but not installed/enabled by repository automation. The staged worker service is filesystem-restricted and network-restricted to localhost so it can reach local Ollama without receiving general outbound network access. Its oneshot start timeout is explicitly 30 minutes so bounded CPU-local 30B planning jobs are not killed by the shorter systemd default timeout.
+`empire-coder-worker.service` and `empire-coder-worker.timer` are installed on the EmpireOS host. The timer is enabled and invokes one bounded worker pass per minute. The worker remains filesystem-restricted and network-restricted to localhost so it can reach local Ollama without receiving general outbound network access. Its oneshot start timeout is explicitly 30 minutes so bounded CPU-local 30B planning jobs are not killed by the shorter systemd default timeout.
 
 ## Runtime Packaging
 
-empire-ollama.service is staged only and is not installed/enabled automatically. It binds Ollama to localhost, loads one model at a time, allows one parallel generation and runs as ubuntu with restrictive systemd protections.
+`empire-ollama.service` is installed and enabled for reboot persistence. The installer deliberately leaves an already-healthy localhost Ollama process undisturbed; after reboot the systemd unit owns startup. It binds Ollama to localhost, loads one model at a time, allows one parallel generation and runs as ubuntu with restrictive systemd protections.
 
 `scripts/install_empire_coder_services.sh` is the explicit root activation helper. `--check` performs non-mutating unit validation. Root installation verifies all units again, installs them under `/etc/systemd/system`, enables Ollama for reboot persistence, enables/starts the Coder worker timer, preserves an already-healthy localhost Ollama process, and refuses to launch a duplicate worker. It does not enable the internal Coder API or provision production credentials.
 

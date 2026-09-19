@@ -132,10 +132,10 @@ Foundation status — local/tested, production activation gated:
 - Independent verifier with security, diff and test checks.
 - Controlled self-build scope that cannot silently widen authority.
 - Staged canonical coder_* Supabase schema with a dedicated least-privilege engineering-state role.
-- Staged localhost-only Ollama systemd packaging; not installed/enabled automatically.
+- Localhost-only Ollama systemd packaging is installed and enabled for reboot persistence on the EmpireOS host; an already-healthy pre-existing Ollama process remains undisturbed until reboot.
 - Disabled-by-default, internal-token-gated `/v1/coder/*` API for task state and proposal-job queueing only; no remote execution/patch/deploy endpoint.
 - Resumable local job queue with stale-job recovery and proposal-only PLAN / NEXT_COMMAND worker.
-- Staged Coder worker service/timer with localhost-only network access and a 30-minute bounded oneshot start timeout for CPU-local 30B jobs; not installed/enabled automatically.
+- Coder worker service/timer is installed and enabled; the timer runs one proposal-only worker pass per minute with localhost-only network access and a 30-minute bounded oneshot start timeout for CPU-local 30B jobs.
 
 Candidate engineering changes stop at human approval. Commit/push/merge/deploy, production DB changes, service control, outbound, payment/funds and production credentials remain gated.
 
