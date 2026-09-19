@@ -236,12 +236,16 @@ Foundation slice ✅ local/tested: deterministic holdout/treatment assignment pl
 
 Second slice ✅ local/tested: observed experiment analysis now gates causal-review eligibility on sample sufficiency plus verified assignment integrity, exposure integrity and a closed outcome window. Failed integrity remains observed lift only; no rollout, traffic or pricing mutation is exposed.
 
+Third slice ✅ local/tested: append-only experiment registry records evidence-backed hypothesis/metric/variant definitions plus assignment/exposure integrity and outcome-window state. Registry writes are idempotent and OBSERVE-only; live traffic, rollout and pricing mutation remain unavailable.
+
 ### Phase 12 — Demand Genesis
 Create demand through content, ads, offers, voice, AEO/GEO, communities, partnerships and agent distribution rather than only harvesting existing demand.
 
 Foundation slice ✅ local/tested: governed demand-plan and evidence records are staged across content/AEO/GEO/community/partnership/agent-distribution/ads/voice channels. Plans require evidence, explicit success metrics and approval, while execution authority is hard-locked to `none`; no publishing, outbound, ad spend, provider activation or production migration is enabled.
 
 Second slice ✅ local/tested: demand readiness analysis now requires observed demand signals, audience, conversion and cost evidence before a plan can be operator-review ready. Missing evidence remains explicit and publishing, outbound, ad-spend and provider activation stay disabled.
+
+Third slice ✅ local/tested: governed demand-plan registry persists only review-ready evidence-backed plans with idempotent read-only history. Publishing, outbound, ad-spend and provider activation remain hard-disabled.
 
 ### Phase 13 — Revenue Exchange
 Inventory marketplace, real-time pricing, exclusives, territories, human/agent buyers, supply-demand pricing, capacity-aware allocation and Revenue Lanes.
@@ -259,6 +263,8 @@ Foundation slice ✅ local/tested: deterministic market scenarios now require an
 
 Second slice ✅ local/tested: Digital Twin scenario comparison now quantifies simulated revenue delta versus the observed baseline while preserving `simulation_only=true`, `actual_revenue=false` and zero execution authority.
 
+Third slice ✅ local/tested: append-only scenario/result registry persists immutable observed-baseline provenance plus simulated results with idempotent history. Capital, campaign and pricing execution remain hard-disabled.
+
 ### Phase 15 — Capital Allocator
 Astra evaluates expected return, risk, cost, cash, confidence and time-to-revenue to decide where the next unit of capital should go.
 
@@ -266,12 +272,16 @@ Foundation slice ✅ local/tested: recommendation-only capital assessments now d
 
 Second slice ✅ local/tested: operator capital-review policy now blocks recommendations below confidence/risk-adjusted thresholds or above downside limits. Review eligibility never moves funds or mutates budgets.
 
+Third slice ✅ local/tested: append-only capital review registry records candidate economics, policy thresholds, blockers and evidence for operator review. Funds movement and budget mutation remain impossible from this surface.
+
 ### Phase 16 — SaaS / Network Scale
 Canonical multi-tenant teams, RBAC, usage metering, subscriptions and network-scale tenancy controls.
 
 Foundation slice ✅ local/tested: staged `saas_tenants`, `saas_memberships`, `saas_usage_observations` and subscription-state reads establish canonical tenant identity, RBAC and usage evidence. Existing billing/subscription mutation paths are not expanded; no billing execution, tenant migration or production credential change is activated.
 
 Second slice ✅ local/tested: SaaS/network-scale readiness now reviews observed utilization, active subscription state, tenant-isolation evidence and optional white-label readiness. Output is approval-only with provisioning and billing execution hard-false.
+
+Third slice ✅ local/tested: tenant-scoped readiness registry persists only review-ready scale evidence with idempotent history. Tenant provisioning, API-key issuance, billing and subscription mutation remain disabled.
 
 Multi-tenant architecture, teams/RBAC, usage billing, USDT subscriptions, white label, custom domains, affiliate/agency/client dashboards, API keys, developer platform and marketplace/partner network.
 
@@ -282,12 +292,16 @@ Foundation slice ✅ local/tested: tenant-scoped enterprise control evidence and
 
 Second slice ✅ local/tested: Enterprise readiness aggregation now blocks review on any control/SLO failure or unknown and requires both control evidence and SLO observations. Execution authority remains `none`.
 
+Third slice ✅ local/tested: append-only enterprise readiness registry stores observed control/SLO evidence snapshots and derived blockers without any infrastructure, identity, backup, SLO-target or compliance mutation authority.
+
 ### Phase 18 — Full Autonomous Revenue OS
 Astra detects → predicts economics → selects market → creates acquisition/content/ads → finds buyers → runs conversations → closes → verifies payment → delivers → measures actual profit → learns → reallocates.
 
 Foundation slice ✅ local/tested: OBSERVE-only `RevenueDecisionPacket` integration composes Astra workstream recommendations, Predictive Cloud direction, capital recommendation references, demand-plan references, enterprise blockers and explicit evidence refs. Missing signals remain unknown; packets are hard-locked to `side_effects=none` and `execution_authority=none`, so no autonomous spend, outreach, payment, allocation or deployment is enabled.
 
 Second slice ✅ local/tested: Revenue OS readiness now gates operator review on complete Astra workstream/job, forecast direction, capital candidate, demand plan and zero enterprise blockers. Packets remain OBSERVE-only with no side effects.
+
+Third slice ✅ local/tested: governed Revenue OS packet registry now persists composed packets together with readiness state and evidence while hard-locking spend, outreach, payment, allocation and deployment execution to false.
 
 ### Governed Control-Plane API Layer — Phases 4–18
 Second-pass API layer ✅ local/tested and mounted in the hub. Health/read/preview surfaces now exist for Astra, A2A identity, Conversation OS, Revenue CRM, Advertising Brain, Predictive Cloud, Experiment/Causal analysis, Demand Genesis, Revenue Exchange, Digital Twin, Capital Review, SaaS tenancy, Enterprise readiness and Revenue OS. Repository/provider-backed surfaces mount unbound and fail closed until their canonical reader or verifier is explicitly activated; pure analysis/simulation previews remain non-mutating. All routes expose OBSERVE/SIMULATION status and explicit zero execution authority.
