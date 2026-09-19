@@ -2518,44 +2518,23 @@ def serve_signup():
     return HTMLResponse(p.read_text(encoding="utf-8"))
 
 
-@app.post("/v1/buyers/enterprise")
-# Outbox table bootstrap — created lazily by sender
+# Outbox table bootstrap — legacy mutation endpoints retired
 @app.post("/v1/outbox/enqueue")
 def outbox_enqueue(req: dict):
-    """Add an outbound email to the persistent queue.
+    """Retired legacy SQLite outbound queue mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_outbox_enqueue_retired_use_governed_resend_outbound_flow",
+    )
 
-    Body: { to_email, subject, body, lane, tier, lead_id, source }
-    """
-    import sqlite3 as _sq3
-    cnx = _sq3.connect("/root/empire_os/empire_os.db")
-    try:
-        cnx.execute(
-            "CREATE TABLE IF NOT EXISTS si_outbox ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "to_email TEXT, subject TEXT, body TEXT,"
-            "lane TEXT, tier TEXT, lead_id TEXT, source TEXT,"
-            "status TEXT DEFAULT 'pending',"
-            "created_at TEXT DEFAULT (datetime('now')),"
-            "sent_at TEXT, resend_id TEXT)"
-        )
-        cnx.commit()
-        cur = cnx.execute(
-            "INSERT INTO si_outbox "
-            "(to_email, subject, body, lane, tier, lead_id, source) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (req.get("to_email", ""),
-             req.get("subject", ""),
-             req.get("body", "")[:8000],
-             req.get("lane", ""),
-             req.get("tier", ""),
-             req.get("lead_id", ""),
-             req.get("source", "outreach_now"))
-        )
-        cnx.commit()
-        out_id = cur.lastrowid
-        return {"ok": True, "id": out_id, "status": "pending"}
-    finally:
-        cnx.close()
+
+@app.post("/v1/buyers/enterprise")
+def buyers_enterprise_retired(req: dict):
+    """Retired legacy enterprise buyer intake/outbound path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_buyer_enterprise_retired_use_governed_buyer_onboarding_flow",
+    )
 
 
 @app.get("/v1/outbox/pending")
@@ -2619,22 +2598,11 @@ def outbox_pending(n: int = 10):
 
 @app.post("/v1/outbox/{out_id}/mark")
 def outbox_mark(out_id: int, req: dict):
-    """Mark a queued email as sent/failed with the Resend id."""
-    import sqlite3 as _sq3
-    cnx = _sq3.connect("/root/empire_os/empire_os.db")
-    try:
-        cnx.execute(
-            "UPDATE si_outbox SET status = ?, sent_at = ?, "
-            "resend_id = ? WHERE id = ?",
-            (req.get("status", "sent"),
-             datetime.now(timezone.utc).isoformat(),
-             req.get("resend_id", ""),
-             out_id))
-        cnx.commit()
-        return {"ok": True, "id": out_id,
-                "status": req.get("status", "sent")}
-    finally:
-        cnx.close()
+    """Retired legacy SQLite outbound status mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_outbox_mark_retired_use_canonical_outbound_event_flow",
+    )
 
 
 @app.get("/v1/outbox/recent")
@@ -2655,60 +2623,11 @@ def outbox_recent(n: int = 50):
 
 @app.post("/v1/innovator/ship")
 def innovator_ship(req: dict):
-    """Council-approved proposal lands here. Performs the ship_action:
-      - create_lane: inserts row into lanes + returns lane_id
-      - create_source: returns stub (manual wiring needed for new sources)
-      - create_endpoint: returns stub (Hub already serving it manually)
-    """
-    action = req.get("ship_action") or {}
-    kind = action.get("kind")
-    args = action.get("args", {})
-    pid  = req.get("id", "prop_unknown")
-    name = req.get("name", "untitled")
-    out = {"ok": True, "proposal_id": pid, "kind": kind, "shipped_at": datetime.now(timezone.utc).isoformat()}
-
-    if kind == "create_lane":
-        try:
-            import sqlite3 as _sq3
-            niche   = args.get("niche", "global")
-            metro   = args.get("metro", "GLOBAL")
-            rate_c  = int(args.get("rate_per_call_cents", 1500))
-            rate_s  = int(args.get("rate_per_seat_cents", 150000))
-            rank    = args.get("ranking_method", "default")
-            scrapes = bool(args.get("scrapes", False))
-            lane_id = "lane_innovator_" + niche + "_" + metro
-            cnx = _sq3.connect("/root/empire_os/empire_os.db")
-            try:
-                cnx.execute(
-                    "INSERT OR REPLACE INTO lanes "
-                    "(id, category, category_label, sub_niche, sub_label, "
-                    "metro, metro_label, seat_price, created_at, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (lane_id, "innovator", "Innovator-Shipped",
-                     niche, niche.title(),
-                     metro, metro.upper(),
-                     rate_s / 100.0,
-                     datetime.now(timezone.utc).isoformat(),
-                     datetime.now(timezone.utc).isoformat()))
-                cnx.commit()
-                out["lane_id"] = lane_id
-                out["lane_key"] = f"{niche}:{metro}"
-            finally:
-                cnx.close()
-            return out
-        except Exception as e:
-            raise HTTPException(500, f"create_lane failed: {e}")
-
-    if kind == "create_source":
-        out["note"] = "source registry update queued - re-run crawler_agent"
-        return out
-
-    if kind == "create_endpoint":
-        out["note"] = "endpoint contract noted - implementation belongs in next sprint"
-        return out
-
-    out["note"] = "unknown ship_action kind"
-    return out
+    """Retired legacy self-modifying lane/source ship path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_innovator_ship_retired_use_governed_coder_and_product_flow",
+    )
 
 
 def buyer_enterprise_intake(req: dict):
@@ -2823,79 +2742,11 @@ Contract template: https://empire-ai.co.uk/contract-{tier}.pdf
 
 @app.post("/v1/buyers/signup-seat")
 def buyer_signup_seat(req: dict):
-    """Per-seat subscription signup — new pricing model (preferred).
-
-    Body:
-      agency_name    str  business name
-      email          str  contact email
-      phone          str  phone
-      wallet         str  Solana address (for invoice delivery)
-      tier           str  bronze | silver | gold
-      lanes          list [{"niche":"hvac","metro":"NYC"}, ...]
-                      max lanes = tier's seat count
-
-    Returns:
-      tenant_id, subscription_id, amount_usdc, vault_wallet, memo
-    """
-    name = req.get("agency_name", "").strip() or req.get("name", "").strip()
-    email = req.get("email", "").strip()
-    phone = req.get("phone", "").strip()
-    wallet = req.get("wallet", "").strip()
-    tier = req.get("tier", "silver").strip().lower()
-    lanes = req.get("lanes") or []
-
-    if not all([name, email, wallet, tier, lanes]):
-        raise HTTPException(400, "agency_name, email, wallet, tier, lanes required")
-
-    env_path = Path("/root/empire_os/.env")
-    env = {}
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            if "=" in line and not line.startswith("#"):
-                k, v = line.split("=", 1)
-                env[k.strip()] = v.strip()
-    vault = env.get("SOLANA_VAULT_WALLET", "")
-    usdc_mint = env.get("USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
-    if not vault:
-        raise HTTPException(500, "vault not configured")
-
-    try:
-        from empire_os.marketplace import (
-            create_buyer, buy_seat_subscription, LANE_SEAT_PRICING,
-        )
-        tenant_id = create_buyer(
-            name=name, email=email, wallet=wallet, method="self_serve_seat"
-        )
-        result = buy_seat_subscription(
-            tenant_id=tenant_id, tier=tier, lanes=lanes,
-        )
-        if not isinstance(result, dict) or "error" in result:
-            raise Exception(f"buy_seat_subscription: {result}")
-
-        amount_usdc = result.get("amount_usdc", 0)
-        sub_id = result.get("subscription_id")
-
-        return {
-            "ok": True,
-            "model": "per_seat_subscription",
-            "tenant_id": tenant_id,
-            "subscription_id": sub_id,
-            "tier": tier,
-            "seats": result.get("seats"),
-            "lane_count": result.get("lane_count"),
-            "lanes": result.get("lanes"),
-            "monthly_cents": result.get("monthly_cents"),
-            "amount_usdc": amount_usdc,
-            "vault_wallet": vault,
-            "usdc_mint": usdc_mint,
-            "memo": f"SEAT_{sub_id.replace('sub_', '')}",
-            "status": "pending",
-            "tier_config": LANE_SEAT_PRICING.get(tier),
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"seat signup failed: {str(e)[:300]}")
+    """Retired legacy Solana seat signup path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_buyer_signup_seat_retired_use_governed_bsc_buyer_activation_flow",
+    )
 
 
 @app.get("/v1/buyers/seat-tiers")
@@ -2912,78 +2763,11 @@ def seat_tiers_endpoint():
 
 @app.post("/v1/buyers/signup")
 def buyer_signup(req: dict):
-    """Self-serve buyer signup:
-    1. create_buyer() in marketplace
-    2. set_buyer_webhook() if webhook+api_key provided
-    3. buy_lane_access() for primary metro+niche
-    4. return invoice + USDC payment memo for the buyer to pay
-    """
-    name = req.get("agency_name", "").strip() or req.get("name", "").strip()
-    email = req.get("email", "").strip()
-    phone = req.get("phone", "").strip()
-    wallet = req.get("wallet", "").strip()
-    metro = req.get("metro", "").strip().upper()
-    niche = req.get("niche", "").strip()
-    plan = req.get("plan", "gold").strip()
-
-    if not all([name, email, wallet, metro, niche]):
-        raise HTTPException(400, "agency_name, email, wallet, metro, niche required")
-
-    # Read env for vault + USDC mint
-    env_path = Path("/root/empire_os/.env")
-    env = {}
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            if "=" in line and not line.startswith("#"):
-                k, v = line.split("=", 1)
-                env[k.strip()] = v.strip()
-
-    vault = env.get("SOLANA_VAULT_WALLET", "")
-    usdc_mint = env.get("USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
-
-    if not vault:
-        raise HTTPException(500, "vault not configured")
-
-    try:
-        from empire_os.marketplace import (
-            create_buyer, set_buyer_webhook, buy_lane_access,
-        )
-        # 1) Create buyer tenant
-        tenant_id = create_buyer(
-            name=name, email=email, wallet=wallet, method="self_serve"
-        )
-
-        # 2) Buy lane access (creates invoice + subscription)
-        tier = plan if plan in ("bronze", "silver", "gold") else "gold"
-        result = buy_lane_access(
-            tenant_id=tenant_id, niche=niche, metro=metro, tier=tier,
-        )
-
-        if not isinstance(result, dict) or "error" in result:
-            raise Exception(f"buy_lane_access: {result}")
-
-        sub_id = result.get("subscription_id")
-        invoice_id = result.get("invoice_id")
-        price_cents = result.get("price_per_lead_cents")
-
-        return {
-            "ok": True,
-            "tenant_id": tenant_id,
-            "subscription_id": sub_id,
-            "invoice_id": invoice_id,
-            "amount_usdc": (price_cents or 0) / 100 if price_cents else None,
-            "amount_cents": price_cents,
-            "vault_wallet": vault,
-            "memo": f"INV_{invoice_id.replace('inv_', '')}" if invoice_id else "",
-            "usdc_mint": usdc_mint,
-            "plan": plan,
-            "metro": metro,
-            "niche": niche,
-        }
-    except ImportError:
-        raise HTTPException(500, "marketplace module missing")
-    except Exception as e:
-        raise HTTPException(500, f"signup failed: {str(e)[:200]}")
+    """Retired legacy Solana buyer signup path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_buyer_signup_retired_use_governed_bsc_buyer_activation_flow",
+    )
 
 
 @app.get("/aeo/{niche}/{metro}")
@@ -3398,11 +3182,11 @@ def prompts_get(slug: str = ""):
 
 @app.post("/v1/agi/sales/tick")
 def agi_sales_tick():
-    """Run one AGI Sales observe-reason-act cycle."""
-    global agi_sales
-    if not agi_sales:
-        raise HTTPException(503, "agi-sales not initialized")
-    return agi_sales.tick()
+    """Retired legacy AGI sales mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_agi_sales_tick_retired_use_revenue_crm_and_conversation_os",
+    )
 
 
 @app.get("/v1/agi/sales/deals")
@@ -4278,17 +4062,11 @@ class SignupRequest(BaseModel):
 
 @app.post("/v1/tenants/signup")
 def tenant_signup(req: SignupRequest):
-    """Create a new tenant account."""
-    if not tenant_store:
-        raise HTTPException(503, "Tenant store not initialized")
-    if tenant_store.get_tenant_by_email(req.email):
-        raise HTTPException(409, f"email already registered: {req.email}")
-    if req.plan not in PLANS:
-        raise HTTPException(400, f"unknown plan: {req.plan}")
-    tenant = tenant_store.create_tenant(req.name, req.email, plan=req.plan)
-    # Owner seat
-    tenant_store.add_seat(tenant.tenant_id, f"owner@{req.email}", role="owner")
-    return {"tenant_id": tenant.tenant_id, "plan": tenant.plan, "email": tenant.email}
+    """Retired legacy SQLite tenant signup path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_tenant_signup_retired_use_canonical_saas_tenant_flow",
+    )
 
 
 @app.get("/v1/tenants/{tenant_id}")
@@ -4320,49 +4098,11 @@ class SubscribeRequest(BaseModel):
 
 @app.post("/v1/billing/subscribe")
 def billing_subscribe(req: SubscribeRequest):
-    """Start a subscription via PayPal or Crypto."""
-    if not billing_engine or not tenant_store:
-        raise HTTPException(503, "billing not initialized")
-    tenant = tenant_store.get_tenant(req.tenant_id)
-    if not tenant:
-        raise HTTPException(404, "tenant not found")
-
-    # Create the subscription record (pending)
-    sub = tenant_store.create_subscription(
-        tenant_id=req.tenant_id,
-        plan=req.plan,
-        billing_cycle=req.billing_cycle,
-        seats=req.seats,
-        payment_method=req.payment_method,
+    """Retired legacy billing subscription execution path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_billing_subscribe_retired_use_governed_usdt_bsc_subscription_flow",
     )
-    # Initiate payment
-    result = billing_engine.start_subscription(
-        req.tenant_id, req.plan, req.billing_cycle,
-        req.seats, req.payment_method,
-    )
-    # Record payment_ref on the subscription
-    if "subscription_id" in result:  # PayPal
-        tenant_store.activate_subscription(sub.subscription_id,
-                                          payment_ref=result["subscription_id"])
-    elif "payment_request_id" in result:  # Crypto
-        # Use a compound ref: tenant_id:payment_request_id
-        ref = f"{req.tenant_id}:{result['payment_request_id']}"
-        tenant_store.activate_subscription(sub.subscription_id,
-                                          payment_ref=ref)
-
-    # Create the invoice
-    inv = tenant_store.create_invoice(
-        tenant_id=req.tenant_id,
-        amount_cents=result.get("amount_cents", 0),
-        method=req.payment_method,
-        subscription_id=sub.subscription_id,
-        description=f"Empire OS {req.plan} ({req.billing_cycle})",
-    )
-    return {
-        "subscription_id": sub.subscription_id,
-        "invoice_id": inv.invoice_id,
-        "payment": result,
-    }
 
 
 class CryptoVerifyRequest(BaseModel):
@@ -4373,52 +4113,22 @@ class CryptoVerifyRequest(BaseModel):
 
 @app.post("/v1/billing/crypto/verify")
 def crypto_verify(req: CryptoVerifyRequest):
-    """Verify a crypto payment on-chain and activate the subscription."""
-    if not billing_engine or not tenant_store:
-        raise HTTPException(503, "billing not initialized")
-    result = billing_engine.verify_crypto_and_activate(
-        tenant_store, req.subscription_id, req.subscription_id,
-        req.tx_signature, req.sender_wallet,
+    """Retired legacy crypto subscription verification path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_crypto_verify_retired_use_verified_bsc_usdt_commercial_flow",
     )
-    return result
 
 
 # --- Payouts (Crypto USDC for TokenPocket etc.) ---
 
 @app.post("/v1/payouts/process-all")
 def payouts_process_all():
-    """Build a payout batch with one USDC transfer per pending payout.
-
-    Returns deeplinks for TokenPocket / Phantom / Solflare.
-    Operator signs each transfer, then submits the tx signature back
-    via POST /v1/payouts/verify/{payout_id}.
-    """
-    if not payout_engine or not payout_batch_store:
-        raise HTTPException(503, "payout engine not initialized")
-    pending = [r for r in payout_engine.store.list_all()
-               if r.get("status") == "pending"]
-    if not pending:
-        return {"batch_id": None, "message": "no pending payouts",
-                "total_cents": 0,
-                "debug": {"store_path": str(payout_engine.store.path),
-                          "records": len(payout_engine.store.records)}}
-    crypto_cfg = billing_engine.crypto
-    if not crypto_cfg.configured():
-        return {
-            "error": "crypto_not_configured",
-            "message": "set VAULT_WALLET_ADDRESS to enable USDC payouts",
-            "pending_count": len(pending),
-            "pending_total_cents": sum(p["amount_cents"] for p in pending),
-        }
-    batch = build_payout_batch(pending, crypto_cfg, payout_batch_store)
-    return {
-        "batch_id": batch.batch_id,
-        "payment_request_count": len(batch.payment_requests),
-        "total_amount_cents": batch.total_amount_cents,
-        "total_amount_usdc": batch.total_amount_cents / 100,
-        "vault_wallet": crypto_cfg.vault_wallet,
-        "payment_requests": batch.payment_requests,
-    }
+    """Retired legacy Solana payout batch path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_payout_processing_retired_use_governed_bsc_treasury_flow",
+    )
 
 
 class BatchTxRequest(BaseModel):
@@ -4428,96 +4138,11 @@ class BatchTxRequest(BaseModel):
 
 @app.post("/v1/payouts/batch-tx")
 def payouts_batch_tx(req: BatchTxRequest = None):
-    """Build Solana transactions for all pending payouts.
-    
-    Splits payouts into batches of ~4 per tx so Phantom can handle the size.
-    Returns an array of unsigned transactions (base64) — sign each one sequentially.
-    If `sender_wallet` is omitted, uses VAULT_WALLET_ADDRESS (env var).
-    """
-    if not payout_engine or not billing_engine:
-        raise HTTPException(503, "payout engine not initialized")
-    crypto_cfg = billing_engine.crypto
-    if not crypto_cfg.configured():
-        raise HTTPException(503, "set VAULT_WALLET_ADDRESS first")
-
-    sender = (req.sender_wallet if req and req.sender_wallet
-              else crypto_cfg.vault_wallet)
-    pending = [r for r in payout_engine.store.list_all()
-               if r.get("status") == "pending"]
-    if not pending:
-        return {
-            "batch_id": None,
-            "message": "no pending payouts",
-            "debug": {
-                "store_path": str(payout_engine.store.path),
-                "store_records": len(payout_engine.store.records),
-                "records_by_status": {
-                    s: sum(1 for r in payout_engine.store.records
-                           if r.get("status") == s)
-                    for s in set(r.get("status", "?")
-                                  for r in payout_engine.store.records)
-                },
-            },
-        }
-
-    import base64
-    from empire_os.batched_payout import build_batched_payout_tx
-
-    # Build all payouts (operator receives all — demo mode)
-    operator_wallet = sender
-    all_payouts = []
-    for p in pending:
-        all_payouts.append({
-            "payout_id": p["payout_id"],
-            "destination": operator_wallet,
-            "amount_cents": p["amount_cents"],
-        })
-
-    # Fetch one blockhash for all batches (avoid RPC rate limit)
-    import urllib.request, json as _json
-    try:
-        _pl = _json.dumps({"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash","params":[{"commitment":"confirmed"}]}).encode()
-        _req = urllib.request.Request(crypto_cfg.rpc_url, data=_pl, headers={"Content-Type":"application/json"})
-        with urllib.request.urlopen(_req, timeout=15) as _resp:
-            bh = _json.loads(_resp.read().decode())["result"]["value"]["blockhash"]
-    except Exception:
-        bh = None
-
-    # Split into sub-batches of MAX_PER_TX for Phantom's size limit
-    MAX_PER_TX = 4
-    batch_id = payout_batch_store.batches[-1]["batch_id"] if payout_batch_store.batches else ""
-    txs = []
-    total_ix = 0
-    total_cents = 0
-    for i in range(0, len(all_payouts), MAX_PER_TX):
-        chunk = all_payouts[i:i + MAX_PER_TX]
-        result = build_batched_payout_tx(
-            payouts=chunk,
-            sender_wallet=sender,
-            mint=crypto_cfg.usdc_mint,
-            batch_id=batch_id,
-        )
-        tx_bytes = base64.b64decode(result.transaction_base64) if result.transaction_base64 else b""
-        txs.append({
-            "index": len(txs),
-            "payout_ids": [p["payout_id"] for p in chunk],
-            "count": len(chunk),
-            "amount_usdc": result.total_amount_usdc,
-            "amount_cents": result.total_amount_cents,
-            "transaction_base64": result.transaction_base64 or "",
-            "tx_bytes": len(tx_bytes),
-        })
-        total_ix += len(chunk)
-        total_cents += result.total_amount_cents
-
-    return {
-        "batch_id": batch_id,
-        "total_payouts": len(all_payouts),
-        "total_amount_usdc": round(total_cents / 100, 2),
-        "total_amount_cents": total_cents,
-        "batch_count": len(txs),
-        "transactions": txs,
-    }
+    """Retired legacy Solana payout transaction builder."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_payout_batch_tx_retired_use_governed_bsc_treasury_flow",
+    )
 
 
 class PayoutVerifyRequest(BaseModel):
@@ -4528,33 +4153,11 @@ class PayoutVerifyRequest(BaseModel):
 
 @app.post("/v1/payouts/verify")
 def payouts_verify(req: PayoutVerifyRequest):
-    """Verify a payout's crypto tx on-chain and mark paid."""
-    if not payout_engine:
-        raise HTTPException(503, "payout engine not initialized")
-    crypto_cfg = billing_engine.crypto
-    if not crypto_cfg.configured():
-        raise HTTPException(503, "crypto not configured")
-    # Look up the payout record to get the expected amount + memo
-    record = next(
-        (r for r in payout_engine.store.list_all()
-         if r["payout_id"] == req.payout_id), None
+    """Retired legacy Solana payout verification path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_payout_verify_retired_use_governed_bsc_treasury_flow",
     )
-    if not record:
-        raise HTTPException(404, "payout not found")
-    expected_memo = f"empire-payout:{req.payout_id}"
-    result = verify_crypto_payment(
-        crypto_cfg, req.tx_signature,
-        record["amount_cents"], expected_memo, req.sender_wallet,
-    )
-    if result.get("verified"):
-        payout_engine.store.update(
-            req.payout_id,
-            status="paid",
-            reference=req.tx_signature,
-            paid_at=datetime.now(timezone.utc).isoformat(),
-        )
-        return {"ok": True, "payout_id": req.payout_id, "verification": result}
-    return {"ok": False, "payout_id": req.payout_id, "verification": result}
 
 
 # --- Waterfall (Data Provider Orchestrator) ---
@@ -4753,114 +4356,20 @@ class PayoutSubmitRequest(BaseModel):
 
 @app.post("/v1/payouts/submit")
 def payouts_submit(req: PayoutSubmitRequest):
-    """Submit a signed transaction via the hub's server-side RPC.
-
-    The wallet page signs the transaction locally (Phantom handles this),
-    then sends the signed tx back here. The hub broadcasts it server-side
-    using its own RPC endpoint — no client-side RPC calls needed.
-    """
-    if not payout_engine or not billing_engine:
-        raise HTTPException(503, "payout engine not initialized")
-    crypto_cfg = billing_engine.crypto
-    if not crypto_cfg.configured():
-        raise HTTPException(503, "crypto not configured")
-
-    import base64, urllib.request as _ur, struct
-    enc = (req.encoding or "base64").lower()
-    try:
-        if enc == "base58":
-            # Forward base58 as-is — Phantom may serialize to base58.
-            tx_for_rpc = req.signed_tx_base64
-            print(f"[submit] base58 mode, len={len(req.signed_tx_base64)}", flush=True)
-        else:
-            # Decode our own base64 to bytes, then re-encode WITHOUT PADDING.
-            # Solana RPC's base58 parser trips on `=` (padding) at the end
-            # when it auto-detects encoding — strip it to keep the RPC happy.
-            raw = base64.b64decode(req.signed_tx_base64, validate=True)
-            tx_for_rpc = base64.b64encode(raw).decode().rstrip("=")
-            print(f"[submit] base64 mode, raw_len={len(raw)}, encoded_len={len(tx_for_rpc)}", flush=True)
-    except Exception as e:
-        raise HTTPException(400, f"invalid encoding: {e}")
-
-    rpc_url = crypto_cfg.rpc_url
-    payload = json.dumps({
-        "jsonrpc": "2.0", "id": 1,
-        "method": "sendTransaction",
-        "params": [
-            tx_for_rpc,
-            {"skipPreflight": True, "maxRetries": 5, "preflightCommitment": "confirmed"},
-        ],
-    }).encode()
-    try:
-        _r = _ur.Request(rpc_url, data=payload,
-                         headers={"Content-Type": "application/json"})
-        with _ur.urlopen(_r, timeout=60) as resp:
-            data = json.loads(resp.read().decode())
-            if "error" in data:
-                return {"ok": False, "error": data["error"], "batch_index": req.batch_index}
-            sig = data.get("result")
-            return {"ok": True, "signature": sig, "batch_index": req.batch_index,
-                    "encoding": enc}
-    except Exception as e:
-        raise HTTPException(502, f"RPC submit failed: {e}")
+    """Retired legacy Solana payout submission path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_payout_submit_retired_use_governed_bsc_treasury_flow",
+    )
 
 
 @app.post("/v1/payouts/verify-batch")
 def payouts_verify_batch(req: PayoutVerifyBatchRequest):
-    """Verify a submitted batched tx on-chain and mark all pending payouts paid.
-
-    Polls up to 60 seconds for the tx to confirm — Solana mainnet-beta typically
-    confirms in 12-20s but the first call after submit may see "not found".
-    """
-    if not payout_engine or not billing_engine:
-        raise HTTPException(503, "payout engine not initialized")
-    crypto_cfg = billing_engine.crypto
-    if not crypto_cfg.configured():
-        raise HTTPException(503, "crypto not configured")
-
-    from empire_os.billing import verify_crypto_payment
-    pending = [r for r in payout_engine.store.list_all()
-               if r.get("status") == "pending"]
-    if not pending:
-        return {"ok": False, "message": "no pending payouts to verify"}
-
-    sample = pending[0]
-    expected_memo = f"empire-payout:{sample['payout_id']}"
-
-    # Poll the RPC up to 60 seconds for confirmation
-    import time as _t
-    deadline = _t.time() + 60
-    result = None
-    attempts = 0
-    while _t.time() < deadline:
-        attempts += 1
-        result = verify_crypto_payment(
-            crypto_cfg, req.tx_signature,
-            sample["amount_cents"], expected_memo, crypto_cfg.vault_wallet,
-        )
-        if result.get("verified"):
-            break
-        # tx_not_found is normal right after submit; keep polling
-        if result.get("error") not in ("tx_not_found", "tx_not_confirmed", None):
-            break
-        _t.sleep(3)
-
-    if result and result.get("verified"):
-        for p in pending:
-            payout_engine.store.update(
-                p["payout_id"],
-                status="paid",
-                reference=req.tx_signature,
-                paid_at=datetime.now(timezone.utc).isoformat(),
-            )
-        return {
-            "ok": True,
-            "message": f"All {len(pending)} payouts marked paid (after {attempts} attempts)",
-            "tx_signature": req.tx_signature,
-            "verification": result,
-        }
-    return {"ok": False, "message": f"Transaction not verified after {attempts} attempts",
-            "verification": result}
+    """Retired legacy Solana payout batch verification path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_payout_verify_batch_retired_use_governed_bsc_treasury_flow",
+    )
 
 
 # ── Lane / Lead Supply System ────────────────────────────────────────
@@ -4947,42 +4456,20 @@ class AssignSeatRequest(BaseModel):
 
 @app.post("/v1/lanes/{lane_id}/seat")
 def assign_seat(lane_id: str, req: AssignSeatRequest):
-    """Assign a law firm to a lane seat."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    cur = backend.execute("SELECT * FROM lanes WHERE id=?", (lane_id,))
-    if not cur.fetchone():
-        raise HTTPException(404, f"lane {lane_id} not found")
-
-    # Deactivate any existing seat for this lane
-    backend.execute(
-        "UPDATE lane_seats SET active=0 WHERE lane_id=? AND active=1",
-        (lane_id,),
+    """Retired legacy SQLite lane seat mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lane_seat_retired_use_governed_buyer_allocation_flow",
     )
-
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).isoformat()
-    backend.execute(
-        "INSERT INTO lane_seats (lane_id, firm_name, firm_slug, tier, price_monthly, "
-        "active, started_at) VALUES (?, ?, ?, ?, ?, 1, ?)",
-        (lane_id, req.firm_name, req.firm_slug, req.tier, req.price_monthly, now),
-    )
-    backend.execute("UPDATE lanes SET occupied_by=?, price_monthly=? WHERE id=?",
-                    (req.firm_slug, req.price_monthly, lane_id))
-    backend.commit()
-    return {"ok": True, "lane_id": lane_id, "firm": req.firm_slug}
 
 
 @app.post("/v1/lanes/{lane_id}/release")
 def release_seat(lane_id: str):
-    """Release a lane seat."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    backend.execute("UPDATE lane_seats SET active=0 WHERE lane_id=? AND active=1",
-                    (lane_id,))
-    backend.execute("UPDATE lanes SET occupied_by=NULL WHERE id=?", (lane_id,))
-    backend.commit()
-    return {"ok": True, "lane_id": lane_id, "status": "released"}
+    """Retired legacy SQLite lane release mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lane_release_retired_use_governed_buyer_allocation_flow",
+    )
 
 
 @app.get("/v1/lanes/leads/pending")
@@ -5055,37 +4542,11 @@ class RouteLeadRequest(BaseModel):
 
 @app.post("/v1/lanes/route")
 def route_prospect(req: RouteLeadRequest):
-    """Route a prospect to the correct lane and qualify them."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-
-    # Step 1: Route to lane
-    routing = route_lead(
-        backend,
-        prospect_id=req.prospect_id,
-        details=req.details,
-        zip_code=req.zip_code or "",
-        state=req.state or "",
+    """Retired legacy SQLite lead routing mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lane_route_retired_use_canonical_allocation_planner",
     )
-
-    # Step 2: Qualify with Omega OS scoring
-    qualification = qualify_prospect(
-        backend,
-        prospect_id=req.prospect_id,
-        tort_key=routing.get("best_niche"),
-        details=req.details,
-        source=req.source,
-        name=req.name,
-        phone=req.phone,
-        zip_code=req.zip_code,
-        screening=req.screening,
-    )
-
-    return {
-        "prospect_id": req.prospect_id,
-        "routing": routing,
-        "qualification": qualification,
-    }
 
 
 class QualifyBatchRequest(BaseModel):
@@ -5094,29 +4555,11 @@ class QualifyBatchRequest(BaseModel):
 
 @app.post("/v1/lanes/route-batch")
 def route_batch(req: QualifyBatchRequest):
-    """Route and qualify multiple prospects at once."""
-    if not backend:
-        raise HTTPException(503, "backend not initialized")
-    results = []
-    for lead in req.leads:
-        routing = route_lead(
-            backend, prospect_id=lead.prospect_id,
-            details=lead.details or "", zip_code=lead.zip_code or "",
-            state=lead.state or "",
-        )
-        qual = qualify_prospect(
-            backend, prospect_id=lead.prospect_id,
-            tort_key=routing.get("best_niche"),
-            details=lead.details, source=lead.source,
-            name=lead.name, phone=lead.phone,
-            zip_code=lead.zip_code, screening=lead.screening,
-        )
-        results.append({
-            "prospect_id": lead.prospect_id,
-            "routing": routing,
-            "qualification": qual,
-        })
-    return {"results": results, "count": len(results)}
+    """Retired legacy SQLite batch routing mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_lane_route_batch_retired_use_canonical_allocation_planner",
+    )
 
 
 @app.get("/v1/lanes/score/{prospect_id}")
@@ -5169,99 +4612,29 @@ PPC_DB = "/root/empire_os/empire_os.db"
 
 @app.post("/v1/ppc/log_charge")
 async def ppc_log_charge(request: Request):
-    """Ppc-router (and other containers) POST charge records here so
-    the hub hosts the canonical ledger. Idempotent on charge_id."""
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(400, "invalid JSON body")
-    cid = body.get("charge_id")
-    if not cid:
-        raise HTTPException(400, "charge_id required")
-    import sqlite3 as _sq
-    cnx = _sq.connect(PPC_DB)
-    cnx.execute(
-        "INSERT OR IGNORE INTO si_charges "
-        "(charge_id, buyer_id, processor, customer_ref, payment_ref,"
-        " head, reason, amount_cents, currency, status, "
-        " processor_response, attempt_count, created_at, paid_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
-        (cid, body.get("buyer_id", ""), body.get("processor", ""),
-         body.get("customer_ref", ""), body.get("payment_ref", ""),
-         body.get("head", 0), body.get("reason", "")[:200],
-         int(body.get("amount_cents", 0)),
-         body.get("currency", "USD"),
-         body.get("status", "failed"),
-         json.dumps(body)[:500],
-         body.get("created_at") or
-         datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-         body.get("paid_at")))
-    cnx.commit()
-    cnx.close()
-    return {"ok": True, "charge_id": cid}
+    """Retired legacy SQLite PPC charge ledger mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_ppc_log_charge_retired_use_canonical_advertising_observation_flow",
+    )
 
 
 @app.post("/v1/ppc/log_invoice")
 async def ppc_log_invoice(request: Request):
-    """Ppc-router POSTs invoices here for canonical ledger."""
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(400, "invalid JSON body")
-    iid = body.get("invoice_id")
-    if not iid:
-        raise HTTPException(400, "invoice_id required")
-    import sqlite3 as _sq
-    cnx = _sq.connect(PPC_DB)
-    cnx.execute(
-        "INSERT OR IGNORE INTO si_ppc_invoices "
-        "(invoice_id, charge_id, buyer_id, head, lead_id, call_id,"
-        " amount_cents, amount_usdc, status, metadata, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (iid, body.get("charge_id", ""),
-         body.get("buyer_id", ""), str(body.get("head", "")),
-         body.get("lead_id", ""), body.get("call_id", ""),
-         int(body.get("amount_cents", 0)),
-         body.get("amount_usdc", 0),
-         body.get("status", "open"),
-         body.get("metadata", "")[:500],
-         body.get("ts") or __import__("datetime").datetime.now(
-             __import__("datetime").timezone.utc).isoformat()))
-    cnx.commit()
-    cnx.close()
-    return {"ok": True, "invoice_id": iid}
+    """Retired legacy SQLite PPC invoice ledger mutation path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_ppc_log_invoice_retired_use_canonical_advertising_observation_flow",
+    )
 
 
 @app.post("/v1/ppc/charge")
 async def ppc_charge(request: Request):
-    """Centralized charge endpoint. ppc_router and other agents POST
-    here with {buyer_id, head, reason, amount_cents}. Hub resolves
-    the buyer's wallet from canonical si_buyer_payment_methods,
-    generates a payment-memo, and persists the charge in si_charges
-    + si_ppc_invoices on the host (canonical source of truth).
-
-    Returns ChargeResult shape.
-    """
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(400, "invalid JSON body")
-    required = ("buyer_id", "head", "reason", "amount_cents")
-    if not all(k in body for k in required):
-        raise HTTPException(400, f"requires {required}")
-    buyer_id = body["buyer_id"]
-    head = int(body["head"])
-    amount_cents = int(body["amount_cents"])
-    reason = body["reason"][:200]
-    call_id = body.get("call_id", "")
-    lead_id = body.get("lead_id", "")
-    # Delegate to charge.charge() which knows all the processors
-    from empire_os.charge import charge as _do_charge
-    res = _do_charge(
-        buyer_id=buyer_id, head=head, reason=reason,
-        amount_cents=amount_cents, currency="USD",
-        call_id=call_id, lead_id=lead_id)
-    return res
+    """Retired legacy direct charging path."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_ppc_charge_retired_use_governed_commercial_payment_flow",
+    )
 
 
 @app.get("/v1/ppc/buyer_pms")

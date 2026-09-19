@@ -74,3 +74,128 @@ def test_legacy_agi_marketing_tick_is_retired():
     assert response.json()["detail"] == (
         "legacy_agi_marketing_tick_retired_use_governed_search_and_demand_flow"
     )
+
+
+def test_legacy_agi_sales_tick_is_retired():
+    response = client.post("/v1/agi/sales/tick")
+    assert response.status_code == 410
+
+
+def test_legacy_tenant_signup_is_retired():
+    response = client.post(
+        "/v1/tenants/signup",
+        json={"name": "Acme", "email": "owner@example.com", "plan": "free"},
+    )
+    assert response.status_code == 410
+
+
+def test_legacy_billing_subscribe_is_retired():
+    response = client.post(
+        "/v1/billing/subscribe",
+        json={
+            "tenant_id": "tenant-1",
+            "plan": "pro",
+            "billing_cycle": "monthly",
+            "seats": 1,
+            "payment_method": "crypto_usdc",
+        },
+    )
+    assert response.status_code == 410
+
+
+def test_legacy_crypto_subscription_verify_is_retired():
+    response = client.post(
+        "/v1/billing/crypto/verify",
+        json={
+            "subscription_id": "sub-1",
+            "tx_signature": "sig",
+            "sender_wallet": "wallet",
+        },
+    )
+    assert response.status_code == 410
+
+
+def test_legacy_payout_execution_routes_are_retired():
+    cases = [
+        ("/v1/payouts/process-all", {}),
+        ("/v1/payouts/batch-tx", {}),
+        ("/v1/payouts/verify", {
+            "payout_id": "payout-1",
+            "tx_signature": "sig",
+            "sender_wallet": "wallet",
+        }),
+        ("/v1/payouts/submit", {
+            "signed_tx_base64": "Zm9v",
+            "batch_index": 0,
+        }),
+        ("/v1/payouts/verify-batch", {
+            "tx_signature": "sig",
+        }),
+    ]
+    for path, payload in cases:
+        response = client.post(path, json=payload)
+        assert response.status_code == 410, path
+
+
+def test_legacy_lane_mutation_routes_are_retired():
+    seat = client.post(
+        "/v1/lanes/lane-1/seat",
+        json={
+            "firm_name": "Firm",
+            "firm_slug": "firm",
+            "tier": "raw",
+            "price_monthly": 100,
+        },
+    )
+    release = client.post("/v1/lanes/lane-1/release")
+    route = client.post(
+        "/v1/lanes/route",
+        json={"prospect_id": "prospect-1"},
+    )
+    route_batch = client.post(
+        "/v1/lanes/route-batch",
+        json={"leads": [{"prospect_id": "prospect-1"}]},
+    )
+    assert seat.status_code == 410
+    assert release.status_code == 410
+    assert route.status_code == 410
+    assert route_batch.status_code == 410
+
+
+def test_legacy_ppc_mutation_routes_are_retired():
+    assert client.post(
+        "/v1/ppc/log_charge",
+        json={"charge_id": "charge-1"},
+    ).status_code == 410
+    assert client.post(
+        "/v1/ppc/log_invoice",
+        json={"invoice_id": "invoice-1"},
+    ).status_code == 410
+    assert client.post(
+        "/v1/ppc/charge",
+        json={
+            "buyer_id": "buyer-1",
+            "head": 1,
+            "reason": "test",
+            "amount_cents": 100,
+        },
+    ).status_code == 410
+
+
+def test_legacy_buyer_signup_routes_are_retired():
+    assert client.post("/v1/buyers/signup-seat", json={}).status_code == 410
+    assert client.post("/v1/buyers/signup", json={}).status_code == 410
+    assert client.post("/v1/buyers/enterprise", json={}).status_code == 410
+
+
+def test_legacy_outbox_mutations_are_retired():
+    assert client.post("/v1/outbox/enqueue", json={}).status_code == 410
+    assert client.post("/v1/outbox/1/mark", json={}).status_code == 410
+
+
+def test_legacy_innovator_ship_is_retired():
+    response = client.post(
+        "/v1/innovator/ship",
+        json={"ship_action": {"kind": "create_lane", "args": {}}},
+    )
+    assert response.status_code == 410
