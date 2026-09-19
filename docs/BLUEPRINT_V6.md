@@ -253,6 +253,8 @@ Second slice ✅ local/tested: observed experiment analysis now gates causal-rev
 
 Third slice ✅ local/tested: append-only experiment registry records evidence-backed hypothesis/metric/variant definitions plus assignment/exposure integrity and outcome-window state. Registry writes are idempotent and OBSERVE-only; live traffic, rollout and pricing mutation remain unavailable.
 
+Fourth slice ✅ local/tested: causal-review conclusion packets/history now require sufficient observed arm samples, verified assignment integrity, verified exposure integrity and a closed outcome window. The conclusion records observed lift direction/size while explicitly marking statistical significance unavailable; the staged append-only registry recomputes lift from observed means and cannot enable traffic, rollout or pricing mutation.
+
 ### Phase 12 — Demand Genesis
 Create demand through content, ads, offers, voice, AEO/GEO, communities, partnerships and agent distribution rather than only harvesting existing demand.
 

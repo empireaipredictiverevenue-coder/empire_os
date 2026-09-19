@@ -5,6 +5,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from empire_os.experiment_analysis import analyze_observed_experiment
+from empire_os.experiment_conclusion import (
+    ExperimentConclusionRecord,
+    build_causal_conclusion,
+)
 from empire_os.experiment_registry import ExperimentRegistryRecord
 
 
@@ -31,6 +35,11 @@ class ExperimentAnalysisRequest(BaseModel):
     exposure_integrity_verified: bool = False
     outcome_window_closed: bool = False
     minimum_per_arm: int = Field(default=5, ge=1, le=100000)
+
+
+class ExperimentConclusionRequest(ExperimentAnalysisRequest):
+    conclusion_key: str
+    evidence: dict = Field(default_factory=dict)
 
 
 def create_experiment_router(registry=None) -> APIRouter:
@@ -80,10 +89,93 @@ def create_experiment_router(registry=None) -> APIRouter:
             "analysis": result.as_dict(),
         }
 
+    def build_conclusion(req: ExperimentConclusionRequest):
+        analysis = analyze_observed_experiment(
+            experiment_key=req.experiment_key,
+            metric=req.metric,
+            control_values=req.control_values,
+            treatment_values=req.treatment_values,
+            evidence_refs=tuple(req.evidence_refs),
+            assignment_integrity_verified=(
+                req.assignment_integrity_verified
+            ),
+            exposure_integrity_verified=(
+                req.exposure_integrity_verified
+            ),
+            outcome_window_closed=req.outcome_window_closed,
+            minimum_per_arm=req.minimum_per_arm,
+        )
+        return analysis, build_causal_conclusion(
+            conclusion_key=req.conclusion_key,
+            analysis=analysis,
+        )
+
+    @router.post("/conclusions/preview")
+    def conclusion_preview(req: ExperimentConclusionRequest):
+        try:
+            analysis, conclusion = build_conclusion(req)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "traffic_mutation": False,
+            "rollout_enabled": False,
+            "pricing_mutation": False,
+            "analysis": analysis.as_dict(),
+            "conclusion": conclusion.as_dict(),
+        }
+
+    @router.post("/conclusions/register")
+    def register_conclusion(req: ExperimentConclusionRequest):
+        if registry is None or not hasattr(registry, "record_conclusion"):
+            raise HTTPException(
+                status_code=503,
+                detail="experiment_conclusion_registry_not_activated",
+            )
+        try:
+            _analysis, conclusion = build_conclusion(req)
+            item = ExperimentConclusionRecord(
+                conclusion=conclusion,
+                evidence=dict(req.evidence),
+            )
+            item.validate()
+            row = registry.record_conclusion(item)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "traffic_mutation": False,
+            "rollout_enabled": False,
+            "pricing_mutation": False,
+            "status": str(row.get("status") or "recorded"),
+            "conclusion_record": item.as_dict(),
+            "result": dict(row),
+        }
+
+    @router.get("/conclusions")
+    def list_conclusions(limit: int = 100):
+        if registry is None or not hasattr(registry, "list_conclusions"):
+            raise HTTPException(
+                status_code=503,
+                detail="experiment_conclusion_registry_not_activated",
+            )
+        rows = list(registry.list_conclusions(limit=max(1, min(limit, 500))))
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "traffic_mutation": False,
+            "rollout_enabled": False,
+            "pricing_mutation": False,
+            "count": len(rows),
+            "items": [dict(row) for row in rows],
+        }
 
     @router.post("/registry")
     def register_experiment(req: ExperimentRegistryRequest):
-        if registry is None:
+        if registry is None or not hasattr(registry, "record"):
             raise HTTPException(
                 status_code=503,
                 detail="experiment_registry_not_activated",
