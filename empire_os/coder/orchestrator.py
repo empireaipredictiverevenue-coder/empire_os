@@ -211,10 +211,11 @@ class EmpireCoder:
         *,
         trigger: str,
     ) -> ContextPack:
-        snapshot = self._sync_context(task_id, trigger)
+        self._sync_context(task_id, trigger)
+        model_state = self.memory.model_view(task_id)
         return ContextPack(
             objective=context.objective,
-            task_state=snapshot,
+            task_state=model_state,
             documents=context.documents,
             symbols=context.symbols,
             token_budget_chars=context.token_budget_chars,
