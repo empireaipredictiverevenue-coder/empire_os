@@ -83,11 +83,12 @@ Code may be prepared and tested for those operations, but live side effects rema
 - Phase 3B market qualification materializer: complete
 - Phase 3C canonical acquisition + live buyer capacity gate: complete
 - Phase 3D buyer matching + capacity allocation: complete
-- Phase 3E governed outbound: complete/frozen
-- Phase 3F outcome feedback + Lead Intelligence: current
-- Phase 4 Astra operating layer: next, OBSERVE-only until separately approved
+- Phase 3E governed outbound: implementation complete/frozen; live revenue proof gates carried forward
+- Phase 3F outcome feedback + Lead Intelligence: implementation complete/frozen; production proof gates carried forward
+- Phase 4 Astra operating layer: current, OBSERVE-only
+- Phase 5 Organic Growth / Search Intelligence: parallel foundation
 
-Do not broaden a Phase 3F task into Phase 4+ unless explicitly requested.
+Do not broaden a Phase 4 task into consequential production authority. Phase 3 real-revenue proof remains a narrow production/commercial gate and must not block Phase 4/5 engineering.
 
 ## Phase 3C completion criteria
 

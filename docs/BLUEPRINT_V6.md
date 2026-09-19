@@ -72,13 +72,15 @@ Satellite Sniper, Storm Tracker, Warehouse Sniper, Market Scanner, Reddit/commun
 ### Phase 2 — Commercial Control Plane ✅
 Commercial products, buyer records/capacity, commercial events, fulfilment, idempotency, approval gates, buyer evidence, atomic allocation, activation gate, locked GTM RPCs.
 
-### Phase 3 — First Revenue ← CURRENT
+### Phase 3 — First Revenue — IMPLEMENTATION FROZEN / PRODUCTION PROOF GATES CARRIED FORWARD
 3A Qualification ✅
 3B Market materialization ✅ mostly
 3C Canonical acquisition ✅
 3D Buyer matching/allocation ✅
 3E Governed outbound ✅ implementation complete; production runtime/webhook activation gated
-3F Outcome feedback ← NOW (implementation complete locally; production activation gated)
+3F Outcome feedback ✅ implementation complete locally; production activation/revenue-proof gates carried forward
+
+Phase 3 no longer blocks later engineering. Its remaining finish line is one genuine governed buyer → agreement → verified payment → delivery → outcome → recognized revenue loop. That proof remains mandatory before expanding consequential commercial authority, but Phase 4/5 may continue in OBSERVE/local-safe modes.
 
 Phase 3E deliverables:
 - Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers. Canonical buyer discovery includes business-web evidence, structured Person extraction, decision-maker authority ranking, current-role reconciliation, personhood-quality guards, domain-integrity checks, offer-fit routing, provenance-aware decision-maker-bound contact evidence, hard-bounded batch site review, separate review-ready/outreach-ready contact gates, recent exact public-record/press-release contact provenance, and governed candidate review. The first real outreach-ready buyer has now progressed through production intent creation and human approval; no send has occurred yet.
@@ -140,7 +142,7 @@ Foundation status — local/tested, production activation gated:
 
 Candidate engineering changes stop at human approval. Commit/push/merge/deploy, production DB changes, service control, outbound, payment/funds and production credentials remain gated.
 
-### Phase 4 — Astra Operating Layer
+### Phase 4 — Astra Operating Layer ← CURRENT
 Astra becomes the top coordinator for business priorities, agent routing, bottleneck detection, expected-value decisions, resource allocation, cost control and approval policies. Premium AI is used only when expected value justifies the cost.
 
 Phase 4 observer/calibration implementation status — ✅ local/tested, production activation gated:
@@ -153,7 +155,7 @@ Phase 4 observer/calibration implementation status — ✅ local/tested, product
 7. Runtime Packaging ✅ staged — env template plus `empire-astra-observer.service` / timer exist but are not installed or enabled.
 8. Documentation ✅ — `docs/PHASE4_ASTRA_OBSERVER.md`.
 
-Phase 4 authority remains OBSERVE. The canonical Supabase migration, observer credential provisioning and service activation remain production gates. The CURRENT roadmap marker stays on Phase 3F until a genuine buyer → verified payment → outcome → feedback loop is proven end to end.
+Phase 4 authority remains OBSERVE. The canonical Supabase migration, observer credential provisioning and service activation remain production gates. A genuine buyer → verified payment → outcome → feedback loop is still required before Astra receives consequential commercial authority, but it no longer blocks Phase 4 engineering.
 
 ### Phase 5 — Organic Growth Engine
 SEO, AEO, GEO, keyword intelligence, topic clusters, programmatic pages, AI Cards, citation/mention monitoring, authority/backlink graph, competitor citation gaps, public publishing, first-party tracking and content→revenue attribution.
@@ -245,9 +247,9 @@ Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deploym
 5. Recognize the first independently verified paid outcome as actual revenue and gross profit.
 6. Feed the canonical Phase 3F outcome projection into Astra/Omega/revenue intelligence calibration.
 7. Supabase-backed AI Closer production state-machine gate ✅ local/tested; activate its canonical migrations, separated runtime credentials and OBSERVE worker only under production gates.
-8. Move the CURRENT marker to Phase 4 Astra Operating Layer once first-revenue feedback is proven end to end.
+8. Phase 4 Astra Operating Layer is CURRENT in OBSERVE/local-safe engineering mode; carry the first-revenue feedback loop as a production authority gate rather than an engineering blocker.
 9. Continue Phase 5 organic intelligence and Phase 6 Agent Web/A2A capability execution in parallel where they do not bypass gates. Build the Search Intelligence foundation first; stabilize its API contract, then build the Search Command Centre frontend.
-10. Expand Astra operating authority only after proven controls and economics.
+10. Expand Astra operating authority only after the genuine buyer → verified payment → outcome → feedback loop proves controls and economics.
 
 11. BSC USDT smart-contract escrow: local contract + verifier + database rail ✅;
     canonical Supabase migration ✅; external audit, production identities and mainnet contract deployment pending.
