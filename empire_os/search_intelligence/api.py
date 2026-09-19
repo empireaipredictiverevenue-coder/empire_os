@@ -15,6 +15,10 @@ from .quality import ContentQualityEvaluator
 from .repository import SearchRepository, bounded_limit, collection_payload
 from .postgres_repository import configured_search_repository_from_env
 from .schema import generate_schema_preview
+from .search_console import (
+    SearchConsoleAdapter,
+    configured_search_console_adapter,
+)
 
 
 class AnalyseRequest(BaseModel):
@@ -46,10 +50,16 @@ def _repository_unavailable() -> None:
 
 def create_search_router(
     repository: SearchRepository | None = None,
+    search_console_adapter: SearchConsoleAdapter | None = None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/search",
         tags=["search-intelligence"],
+    )
+    search_console = (
+        search_console_adapter
+        if search_console_adapter is not None
+        else configured_search_console_adapter()
     )
 
     @router.get("/health")
@@ -59,6 +69,10 @@ def create_search_router(
             "repository_available": repository is not None,
             "api_contract_version": "search-v1",
         }
+
+    @router.get("/search-console/status")
+    def search_console_status():
+        return search_console.status().as_dict()
 
     @router.get("/summary")
     def summary():
