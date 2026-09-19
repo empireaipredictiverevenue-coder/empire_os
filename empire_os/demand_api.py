@@ -6,6 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from empire_os.demand_comparison import compare_demand_plan_outcomes
 from empire_os.demand_freshness import review_demand_outcome_evidence
 from empire_os.demand_genesis import DemandPlan
 from empire_os.demand_outcome import (
@@ -49,6 +50,11 @@ class DemandOutcomeEvidenceReviewRequest(DemandOutcomeRequest):
     plan_registered_at: str
     now_utc: str
     max_age_seconds: int = Field(default=604800, gt=0)
+
+
+class DemandComparisonRequest(BaseModel):
+    left: DemandOutcomeEvidenceReviewRequest
+    right: DemandOutcomeEvidenceReviewRequest
 
 
 class DemandEvidenceRequest(BaseModel):
@@ -148,6 +154,51 @@ def create_demand_router(registry=None) -> APIRouter:
             "ad_spend_enabled": False,
             "provider_activation_enabled": False,
             "review": review.as_dict(),
+        }
+
+    @router.post("/outcome/comparison/preview")
+    def outcome_comparison_preview(req: DemandComparisonRequest):
+        def build(item: DemandOutcomeEvidenceReviewRequest):
+            normalized = (
+                item.now_utc[:-1] + "+00:00"
+                if item.now_utc.endswith("Z")
+                else item.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            evidence = DemandOutcomeEvidence(
+                plan_id=item.plan_id,
+                success_metric=item.success_metric,
+                baseline_value=item.baseline_value,
+                observed_value=item.observed_value,
+                observed_cost_cents=item.observed_cost_cents,
+                observed_at=item.observed_at,
+                evidence_refs=tuple(item.evidence_refs),
+            )
+            return review_demand_outcome_evidence(
+                evidence,
+                plan_registered_at=item.plan_registered_at,
+                now=now,
+                max_age_seconds=item.max_age_seconds,
+            )
+        try:
+            comparison = compare_demand_plan_outcomes(
+                build(req.left),
+                build(req.right),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "publishing_enabled": False,
+            "outbound_enabled": False,
+            "ad_spend_enabled": False,
+            "provider_activation_enabled": False,
+            "automatic_plan_selection": False,
+            "comparison": comparison.as_dict(),
         }
 
     @router.post("/readiness/preview")
