@@ -195,6 +195,8 @@ Vonage, ElevenLabs, streaming voice, barge-in, tone mirroring, summaries/transcr
 
 Foundation slice ✅ local/tested: canonical `empire_conversations` + append-only `empire_conversation_events` are staged as the shared channel-neutral history layer across email/SMS/voice/A2A, linked to existing prospects, entities, buyers, opportunities and closer cases. No provider ingestion writer, Vonage call, ElevenLabs streaming, outbound, booking or production migration is activated.
 
+Second slice ✅ local/tested: provider-event ingestion now has a dedicated append-only NOLOGIN RPC role and fail-closed `/v1/conversations/events/ingest` boundary. Existing canonical conversation IDs are required; provider/external IDs are consistency-checked and provider event IDs are idempotent. The default hub binding remains unconfigured, and no provider activation, send, call, voice streaming or booking authority is introduced.
+
 ### Phase 8 — Revenue CRM
 Prospect/buyer graph, conversations, pipeline, deal probability, next action, follow-ups, preferences, territory/capacity, offers/contracts/payments, retention, expansion and customer success.
 
