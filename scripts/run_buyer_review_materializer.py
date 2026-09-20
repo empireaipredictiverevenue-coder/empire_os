@@ -35,7 +35,16 @@ def main() -> int:
     args = parser.parse_args()
 
     state = _state()
-    offset = max(0, int(state.get("next_offset") or 0))
+    scan_fresh = bool(state.get("scan_fresh_next", True))
+    backlog_offset = max(
+        int(args.scan_limit),
+        int(
+            state.get("backlog_offset")
+            or state.get("next_offset")
+            or args.scan_limit
+        ),
+    )
+    offset = 0 if scan_fresh else backlog_offset
     result = run_buyer_review_materializer(
         scan_limit=args.scan_limit,
         proposal_limit=args.proposal_limit,
@@ -49,13 +58,19 @@ def main() -> int:
     payload["ok"] = not payload["errors"]
     _write(LATEST, payload)
 
-    next_offset = offset + max(1, int(args.scan_limit))
-    if next_offset > max(0, int(args.max_offset)):
-        next_offset = 0
+    next_scan_fresh = not scan_fresh
+    next_backlog = backlog_offset
+    if not scan_fresh:
+        next_backlog += max(1, int(args.scan_limit))
+        if next_backlog > max(0, int(args.max_offset)):
+            next_backlog = max(1, int(args.scan_limit))
+    next_offset = 0 if next_scan_fresh else next_backlog
     _write(
         STATE,
         {
             "next_offset": next_offset,
+            "backlog_offset": next_backlog,
+            "scan_fresh_next": next_scan_fresh,
             "last_offset": offset,
             "last_ok": payload["ok"],
             "last_proposed": payload["proposed"],
