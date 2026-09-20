@@ -484,3 +484,116 @@ Current Remote Desktop Commander runs as `ubuntu` and cannot read `/root/.hermes
 Hermes session request dumps under `/home/ubuntu/.hermes/sessions/` preserve substantial historical EmpireOS repository context and were used to recover the runtime lineage above.
 
 The root snapshot should be treated as read-only evidence if copied for audit. Do not execute or restore it wholesale.
+
+
+## French Cortex / North Mini Provenance — Verified
+
+A direct audit of the private G-Brain repository
+`empireaipredictiverevenue-coder/g-brain` and EmpireOS Git history confirms:
+
+### French "Juge d'Evaluation" material
+
+The phrases:
+- `$121+/heure -> YOUR WALLET`
+- `JUGE D'EVALUATION` sending `$5.50/eval`
+- `$87,000+/month`
+- `100% taux d'approbation`
+
+do **not** exist as an implemented North Mini source file.
+
+They survive only in:
+- `g-brain/system/FABRICATION_LOG.md`
+- `SAVEPOINT_2026-07-19.md`
+
+The fabrication log identifies them as French-language LLM session output from
+session `20260718_120153_04d254`, not deployed code.
+
+Do not recover those amounts or claims as production economics.
+
+### What North Mini actually wrote
+
+G-Brain contains four explicit North Mini artifacts:
+
+- `build/growth_plan_northmini.md`
+- `build/management_northmini.md`
+- `build/product_design_northmini.md`
+- `research/agi_intel_northmini.md`
+
+and North Mini also appended projections to:
+- `revenue/projections.md`
+
+The current historical `north_mini_agent.py` confirms a 30-minute rotating loop:
+
+1. read live revenue/funnel state
+2. produce one of:
+   - growth plan
+   - product design
+   - management decision
+   - AGI market intelligence
+   - revenue projection
+3. write only safe artifacts to G-Brain / feedback
+4. expose outputs for Hermes to read
+5. never mutate live commercial state directly
+
+### North Mini's real revenue-loop insight
+
+The repeated North Mini diagnosis was:
+
+`lead -> offer -> pay_url -> paid charge -> subscription/seat -> revenue`
+
+The dominant leak it repeatedly surfaced was:
+- payment link not delivered
+- open charge not converted to paid
+- leads stuck in received state
+- no downstream paid conversion
+
+This is conceptually valuable and should be translated into the modern canonical loop:
+
+real acquisition
+-> qualification v2
+-> Omega 2
+-> buyer fit
+-> governed offer/outreach
+-> commercial terms
+-> fulfilment order
+-> BSC USDT payment evidence
+-> fulfilment
+-> recognized revenue
+-> realized GP
+-> learning
+
+### Real evaluation product that replaced the French fiction
+
+G-Brain:
+`system/eval_product_state.md`
+
+records the real replacement:
+
+- free Omega grading
+- A/B/C/D grade
+- outcome/conversion billing
+- optional per-score billing
+- duplicate-charge protection
+- minimum settlement floor
+- credit-pack concept
+- buyer-specific ledger
+- external payment evidence required before settlement truth
+
+Historical Solana/USDC settlement is obsolete.
+The product concept should be rebuilt on canonical Supabase + BSC USDT + Revenue Truth.
+
+### Important distinction
+
+North Mini did have one separate truth-quality failure:
+its cached state signature became stale and it repeated the same old funnel numbers.
+That incident was repaired by binding its state read to the live database.
+
+Therefore the modern recovery rule is:
+
+North Mini/Cortex strategy
+-> fresh canonical observations
+-> explicit evidence provenance
+-> no invented economics
+-> no direct commercial mutation
+-> compare prediction with realized GP
+-> learn
