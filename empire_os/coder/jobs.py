@@ -37,6 +37,7 @@ class CoderJob:
     kind: JobKind
     payload: dict[str, Any] = field(default_factory=dict)
     status: JobStatus = JobStatus.PENDING
+    priority: int = 50
     attempts: int = 0
     result: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
@@ -103,12 +104,14 @@ class LocalJobQueue:
         task_id: str,
         kind: JobKind,
         payload: dict[str, Any] | None = None,
+        priority: int = 50,
     ) -> CoderJob:
         job = CoderJob(
             id=f"coder_job_{uuid4().hex}",
             task_id=self._safe_id(task_id),
             kind=JobKind(kind),
             payload=dict(payload or {}),
+            priority=max(0, min(int(priority), 100)),
         )
         with self._locked():
             self._write(self.pending / f"{job.id}.json", job)
@@ -123,11 +126,21 @@ class LocalJobQueue:
         now = datetime.now(timezone.utc)
         lease_for = max(60, int(lease_seconds))
         with self._locked():
-            for source in sorted(self.pending.glob("*.json")):
+            candidates: list[tuple[int, str, Path, CoderJob]] = []
+            for source in self.pending.glob("*.json"):
                 candidate = self._load_path(source)
                 retry_after = self._parse_ts(candidate.retry_after)
                 if retry_after is not None and retry_after > now:
                     continue
+                candidates.append(
+                    (
+                        -max(0, min(int(candidate.priority), 100)),
+                        str(candidate.created_at or ""),
+                        source,
+                        candidate,
+                    )
+                )
+            for _, _, source, candidate in sorted(candidates):
                 destination = self.running / source.name
                 try:
                     source.replace(destination)
