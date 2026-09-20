@@ -40,6 +40,14 @@ SAFE_JOBS = {
         "--limit",
         "50",
     ],
+    "commercial_terms_materializer": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/run_commercial_terms_materializer.py"),
+        "--scan-limit",
+        "25",
+        "--proposal-limit",
+        "5",
+    ],
     "source_health_refresh": [
         str(ROOT / "scripts/run_source_health_observer_cron.sh"),
     ],
@@ -85,6 +93,7 @@ def choose_jobs(
             jobs.append("gtm_pipeline")
         if stages.get("commercial_terms") is not True:
             jobs.append("closer_reply_handoff")
+            jobs.append("commercial_terms_materializer")
         jobs.append("commercial_loop_refresh")
     return list(dict.fromkeys(jobs))
 
