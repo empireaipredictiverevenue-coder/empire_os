@@ -8,6 +8,7 @@ funds or writes revenue.
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 import urllib.parse
@@ -174,33 +175,51 @@ def run_buyer_review_materializer(
     scan_limit: int = 25,
     proposal_limit: int = 5,
     scan_offset: int = 0,
+    probe_workers: int = 6,
 ) -> BuyerReviewMaterializerResult:
     rows, skipped_existing = fetch_candidate_rows(
         request,
         scan_limit=scan_limit,
         scan_offset=scan_offset,
     )
-    cap = max(1, min(int(proposal_limit), 10))
+    cap = max(1, min(int(proposal_limit), 20))
+    workers = max(1, min(int(probe_workers), 12))
 
     eligible = probed = review_ready = proposed = skipped_ineligible = 0
     errors: list[str] = []
+    work: list[tuple[Any, dict[str, Any]]] = []
 
     for row in rows:
-        if proposed >= cap:
-            break
-
         candidate = _eligible_candidate(row)
         if candidate is None:
             skipped_ineligible += 1
             continue
         eligible += 1
+        probe_row = candidate.to_dict()
+        probe_row["id"] = probe_row.pop("prospect_id")
+        work.append((candidate, probe_row))
 
+    def do_probe(item):
+        candidate, probe_row = item
         try:
-            probe_row = candidate.to_dict()
-            probe_row["id"] = probe_row.pop("prospect_id")
-            result = probe(probe_row)
-            probed += 1
+            return candidate, probe(probe_row), None
+        except Exception as exc:
+            return candidate, None, exc
 
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(do_probe, item) for item in work]
+        for future in as_completed(futures):
+            candidate, result, exc = future.result()
+            probed += 1
+            if exc is not None:
+                errors.append(
+                    f"{candidate.prospect_id}:"
+                    f"{type(exc).__name__}:{str(exc)[:180]}"
+                )
+                continue
+            if not isinstance(result, Mapping):
+                skipped_ineligible += 1
+                continue
             if (
                 result.get("review_ready") is not True
                 or result.get("outreach_ready") is not True
@@ -222,6 +241,10 @@ def run_buyer_review_materializer(
                 skipped_ineligible += 1
                 continue
 
+            review_ready += 1
+            if proposed >= cap:
+                continue
+
             contact_plan = {
                 "review_ready": True,
                 "outreach_ready": True,
@@ -237,23 +260,24 @@ def run_buyer_review_materializer(
                     f"{str(result.get('preferred_email') or '').lower()}:v1"
                 ),
             )
-            review_ready += 1
-            response = request(
-                "POST",
-                "/rest/v1/rpc/propose_buyer_candidate_review",
-                payload=plan["params"],
-            )
-            if isinstance(response, Mapping) and response.get("review_id"):
-                proposed += 1
-            else:
-                errors.append(
-                    f"{candidate.prospect_id}:proposal_returned_no_review"
+            try:
+                response = request(
+                    "POST",
+                    "/rest/v1/rpc/propose_buyer_candidate_review",
+                    payload=plan["params"],
                 )
-        except Exception as exc:
-            errors.append(
-                f"{candidate.prospect_id}:"
-                f"{type(exc).__name__}:{str(exc)[:180]}"
-            )
+                if isinstance(response, Mapping) and response.get("review_id"):
+                    proposed += 1
+                else:
+                    errors.append(
+                        f"{candidate.prospect_id}:proposal_returned_no_review"
+                    )
+            except Exception as proposal_exc:
+                errors.append(
+                    f"{candidate.prospect_id}:"
+                    f"{type(proposal_exc).__name__}:"
+                    f"{str(proposal_exc)[:180]}"
+                )
 
     return BuyerReviewMaterializerResult(
         scanned=len(rows),

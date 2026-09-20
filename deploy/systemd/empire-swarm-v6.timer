@@ -3,7 +3,7 @@ Description=Run governed EmpireOS Swarm V6 every thirty minutes
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=30min
+OnUnitActiveSec=15min
 AccuracySec=2min
 Persistent=true
 Unit=empire-swarm-v6.service

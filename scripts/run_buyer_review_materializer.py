@@ -28,9 +28,10 @@ def _write(path: Path, payload: dict) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scan-limit", type=int, default=8)
-    parser.add_argument("--proposal-limit", type=int, default=3)
-    parser.add_argument("--max-offset", type=int, default=120)
+    parser.add_argument("--scan-limit", type=int, default=40)
+    parser.add_argument("--proposal-limit", type=int, default=10)
+    parser.add_argument("--max-offset", type=int, default=500)
+    parser.add_argument("--probe-workers", type=int, default=8)
     args = parser.parse_args()
 
     state = _state()
@@ -39,6 +40,7 @@ def main() -> int:
         scan_limit=args.scan_limit,
         proposal_limit=args.proposal_limit,
         scan_offset=offset,
+        probe_workers=args.probe_workers,
     )
     payload = result.as_dict()
     payload["scan_offset"] = offset
