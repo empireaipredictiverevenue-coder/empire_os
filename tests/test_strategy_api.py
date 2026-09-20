@@ -453,3 +453,57 @@ def test_typed_decision_shadow_api_never_controls_live_route():
     body = response.json()
     assert body["candidate_controlled_live_routing"] is False
     assert body["execution_performed"] is False
+
+
+def test_category_strategy_api_never_claims_leadership():
+    response = client().post(
+        "/v1/strategy/category/review",
+        json={"data": {
+            "category_key": "predictive-revenue",
+            "category_name": "Predictive Revenue Operating System",
+            "narrative": "See revenue earlier and learn from realized GP.",
+            "evidence_refs": ["strategy:category"],
+            "proof_refs": ["proof:1"],
+            "category_clarity": .8,
+            "problem_urgency": .8,
+            "differentiation": .8,
+            "proof_strength": .8,
+            "search_presence": .8,
+            "ai_citation_presence": .8,
+            "content_authority": .8,
+            "partner_amplification": .8,
+            "customer_language_alignment": .8,
+            "commercial_conversion_evidence": .8,
+        }},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["leadership_claimed"] is False
+    assert body["publishing_enabled"] is False
+
+
+def test_partnership_strategy_api_never_outreaches_or_contracts():
+    response = client().post(
+        "/v1/strategy/partnership/review",
+        json={"data": {
+            "partner_key": "agency-1",
+            "partner_type": "agency",
+            "strategic_thesis": "Extend distribution.",
+            "evidence_refs": ["partner:1"],
+            "strategic_fit": .8,
+            "distribution_reach": .8,
+            "data_synergy": .7,
+            "product_synergy": .8,
+            "commercial_economics": .8,
+            "brand_trust": .8,
+            "learning_value": .8,
+            "switching_cost_value": .6,
+            "execution_feasibility": .8,
+            "exclusivity_risk": .2,
+            "dependency_risk": .2,
+        }},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["outreach_enabled"] is False
+    assert body["contracting_enabled"] is False

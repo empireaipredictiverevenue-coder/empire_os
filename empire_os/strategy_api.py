@@ -52,6 +52,16 @@ from empire_os.typed_decision_eval import (
     evaluate_provider_outputs,
     summarize_shadow_records,
 )
+from empire_os.category_strategy import (
+    category_gap_plan,
+    compare_category_snapshots,
+    review_category_position,
+)
+from empire_os.strategic_partnerships import (
+    build_partnership_portfolio,
+    partnership_gap_map,
+    review_partner_candidate,
+)
 
 
 class DataRequest(BaseModel):
@@ -125,6 +135,14 @@ class EvalReportsRequest(BaseModel):
 
 class ShadowRowsRequest(BaseModel):
     rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CategoryRowsRequest(BaseModel):
+    categories: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class PartnerRowsRequest(BaseModel):
+    partners: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -380,6 +398,48 @@ def create_strategy_router() -> APIRouter:
     def typed_decision_shadow_summary(req: ShadowRowsRequest):
         try:
             return summarize_shadow_records(req.rows)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/category/review")
+    def category_review(req: DataRequest):
+        try:
+            return review_category_position(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/category/gaps/preview")
+    def category_gaps(req: DataRequest):
+        try:
+            return category_gap_plan(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/category/portfolio/preview")
+    def category_portfolio(req: CategoryRowsRequest):
+        try:
+            return compare_category_snapshots(req.categories)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/partnership/review")
+    def partnership_review(req: DataRequest):
+        try:
+            return review_partner_candidate(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/partnership/portfolio/preview")
+    def partnership_portfolio(req: PartnerRowsRequest):
+        try:
+            return build_partnership_portfolio(req.partners)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/partnership/gaps/preview")
+    def partnership_gaps(req: PartnerRowsRequest):
+        try:
+            return partnership_gap_map(req.partners)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
