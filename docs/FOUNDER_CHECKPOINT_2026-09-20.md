@@ -180,3 +180,6 @@ Added provider-neutral observed rank-history analysis with strict provenance, tr
 
 ## Search Product local visibility
 Added provider-neutral Local Search & Maps Grid Intelligence. It measures only observed grid points, top-3/top-10 coverage, weak zones and unknown cells; missing map ranks are never synthesized.
+
+## Search Product client reports
+Added deterministic client report previews for each Search Product. Reports organize only supplied/observed evidence, mark missing deliverables unavailable, expose evidence coverage, and never fabricate rankings, traffic, authority, pricing or revenue.

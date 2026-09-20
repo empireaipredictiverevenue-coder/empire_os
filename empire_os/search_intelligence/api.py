@@ -26,6 +26,7 @@ from .models import SearchOpportunity, SearchPage
 from .performance import lighthouse_parser_status, parse_lighthouse_report
 from .quality import ContentQualityEvaluator
 from .rank_history import RankObservation, analyse_rank_history
+from .reports import build_search_product_report
 from .products import (
     get_search_product,
     product_catalog,
@@ -85,6 +86,12 @@ class BacklinkGraphPreviewRequest(BaseModel):
     observations: list[BacklinkObservationRequest] = Field(
         default_factory=list
     )
+
+
+class SearchProductReportRequest(BaseModel):
+    site: str
+    generated_at: str
+    evidence: dict[str, Any] = Field(default_factory=dict)
 
 
 class LocalGridObservationRequest(BaseModel):
@@ -429,6 +436,23 @@ def create_search_router(
             return parse_lighthouse_report(req.report)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/products/{product_key}/report/preview")
+    def product_report_preview(
+        product_key: str,
+        req: SearchProductReportRequest,
+    ):
+        try:
+            return build_search_product_report(
+                product_key=product_key,
+                site=req.site,
+                generated_at=req.generated_at,
+                evidence=req.evidence,
+            )
+        except ValueError as exc:
+            detail = str(exc)
+            status = 404 if detail == "search product not found" else 422
+            raise HTTPException(status_code=status, detail=detail) from exc
 
     @router.post("/crawl/preview")
     def crawl_preview(req: CrawlPreviewRequest):
