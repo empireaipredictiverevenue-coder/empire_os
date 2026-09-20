@@ -2,7 +2,10 @@ import json
 import pytest
 
 from empire_os.outbound_provider import OutboundProviderError
-from empire_os.outbound_role_transport import PostgresOutboundRpc
+from empire_os.outbound_role_transport import (
+    PostgresOutboundRpc,
+    SupabaseOutboundRpc,
+)
 
 
 class FakeCursor:
@@ -87,3 +90,54 @@ def test_approver_role_is_separate_and_parameter_shape_is_strict():
         PostgresOutboundRpc("postgresql://secret", "service_role", connect_factory=factory)
     with pytest.raises(OutboundProviderError, match="DSN"):
         PostgresOutboundRpc("", "empire_outbound_sender", connect_factory=factory)
+
+
+def test_supabase_sender_transport_keeps_same_rpc_allowlist():
+    calls = []
+
+    def request(method, path, payload=None, **kwargs):
+        calls.append((method, path, payload, kwargs))
+        return {"decision": "authorized_send", "actual_revenue": False}
+
+    rpc = SupabaseOutboundRpc(
+        "empire_outbound_sender",
+        request_factory=request,
+    )
+    result = rpc(
+        "claim_outbound_send",
+        {
+            "p_intent_id": "00000000-0000-0000-0000-000000000001",
+            "p_actor": "empire_gtm_agent_v1",
+        },
+    )
+
+    assert result["decision"] == "authorized_send"
+    assert calls == [
+        (
+            "POST",
+            "/rest/v1/rpc/claim_outbound_send",
+            {
+                "p_intent_id": "00000000-0000-0000-0000-000000000001",
+                "p_actor": "empire_gtm_agent_v1",
+            },
+            {},
+        )
+    ]
+    with pytest.raises(OutboundProviderError, match="not allowed"):
+        rpc("approve_outbound_intent", {})
+
+
+def test_supabase_reply_transport_is_not_a_sender():
+    rpc = SupabaseOutboundRpc(
+        "empire_reply_ingest",
+        request_factory=lambda *args, **kwargs: {"ok": True},
+    )
+
+    with pytest.raises(OutboundProviderError, match="not allowed"):
+        rpc(
+            "claim_outbound_send",
+            {
+                "p_intent_id": "00000000-0000-0000-0000-000000000001",
+                "p_actor": "reply",
+            },
+        )

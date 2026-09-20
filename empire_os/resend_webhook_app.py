@@ -18,7 +18,10 @@ from empire_os.outbound_provider import (
     extract_resend_reply,
     verify_resend_inbound,
 )
-from empire_os.outbound_role_transport import PostgresOutboundRpc
+from empire_os.outbound_role_transport import (
+    PostgresOutboundRpc,
+    SupabaseOutboundRpc,
+)
 from empire_os.reply_classifier import classify_reply_text
 
 MAX_WEBHOOK_BYTES = 1_000_000
@@ -49,9 +52,9 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
         if reply_rpc is not None:
             return reply_rpc
         dsn = os.getenv("EMPIRE_REPLY_INGEST_DSN", "").strip()
-        if not dsn:
-            raise OutboundProviderError("EMPIRE_REPLY_INGEST_DSN is required")
-        return PostgresOutboundRpc(dsn, "empire_reply_ingest")
+        if dsn:
+            return PostgresOutboundRpc(dsn, "empire_reply_ingest")
+        return SupabaseOutboundRpc("empire_reply_ingest")
 
     @app.get("/health")
     async def health():

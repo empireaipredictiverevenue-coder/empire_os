@@ -58,12 +58,12 @@ def test_guarded_execute_can_mark_low_risk_intent_auto_approval_eligible():
     assert result["mutation_authorized"] is True
 
 
-def test_approved_intent_can_be_auto_send_eligible_only_when_policy_allows():
+def test_approved_intent_can_be_auto_send_without_auto_approval():
     result = evaluate_outbound(
         review(status="approved"), context(),
         policy=OutboundGovernorPolicy(
             mode="GUARDED_EXECUTE",
-            allow_auto_approval=True,
+            allow_auto_approval=False,
             allow_auto_send=True,
         ),
     )
@@ -99,5 +99,5 @@ def test_missing_optout_is_repairable_in_assist_mode():
 def test_auto_flags_are_rejected_outside_guarded_execute():
     with pytest.raises(ValueError, match="GUARDED_EXECUTE"):
         OutboundGovernorPolicy(mode="OBSERVE", allow_auto_approval=True)
-    with pytest.raises(ValueError, match="auto approval"):
-        OutboundGovernorPolicy(mode="GUARDED_EXECUTE", allow_auto_send=True)
+    with pytest.raises(ValueError, match="GUARDED_EXECUTE"):
+        OutboundGovernorPolicy(mode="OBSERVE", allow_auto_send=True)

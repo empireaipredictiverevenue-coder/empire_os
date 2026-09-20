@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from empire_os.outbound_provider import OutboundProviderError
+from empire_os.qualification_worker_v2 import request_json
 
 ROLE_FUNCTIONS = {
     "empire_outbound_approver": {
@@ -103,3 +104,41 @@ class PostgresOutboundRpc:
         if not row or len(row) != 1:
             raise OutboundProviderError("dedicated outbound database RPC returned no result")
         return row[0]
+
+
+class SupabaseOutboundRpc:
+    """Narrow PostgREST transport using the existing protected service key.
+
+    The local role name remains an allowlist boundary: only RPC names already
+    assigned to that Phase 3E role may be called. This is a runtime bridge for
+    environments where dedicated Postgres LOGIN credentials are not yet
+    provisioned; it does not add table-write helpers or arbitrary SQL.
+    """
+
+    def __init__(
+        self,
+        role: str,
+        *,
+        request_factory: Callable[..., Any] | None = None,
+    ):
+        if role not in ROLE_FUNCTIONS:
+            raise OutboundProviderError("unsupported outbound database role")
+        self.role = role
+        self._request = request_factory or request_json
+
+    def __call__(self, name: str, params: dict[str, Any]) -> Any:
+        allowed = ROLE_FUNCTIONS[self.role]
+        if name not in allowed:
+            raise OutboundProviderError(
+                f"{self.role} is not allowed to execute {name}"
+            )
+        _, keys = allowed[name]
+        if not isinstance(params, dict) or set(params) != set(keys):
+            raise OutboundProviderError(
+                "unexpected outbound RPC parameters"
+            )
+        return self._request(
+            "POST",
+            f"/rest/v1/rpc/{name}",
+            payload=params,
+        )

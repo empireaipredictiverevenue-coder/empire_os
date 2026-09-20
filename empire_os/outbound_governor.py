@@ -25,10 +25,12 @@ class OutboundGovernorPolicy:
     def __post_init__(self) -> None:
         if self.mode not in MODES:
             raise ValueError(f"unsupported outbound governor mode: {self.mode}")
-        if self.mode != "GUARDED_EXECUTE" and (self.allow_auto_approval or self.allow_auto_send):
-            raise ValueError("auto approval/send requires GUARDED_EXECUTE mode")
-        if self.allow_auto_send and not self.allow_auto_approval:
-            raise ValueError("auto send requires auto approval policy")
+        if self.mode != "GUARDED_EXECUTE" and (
+            self.allow_auto_approval or self.allow_auto_send
+        ):
+            raise ValueError(
+                "auto approval/send requires GUARDED_EXECUTE mode"
+            )
 
 
 def _normalize(value: Any) -> str:

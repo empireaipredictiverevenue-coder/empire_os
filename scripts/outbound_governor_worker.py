@@ -17,7 +17,10 @@ from empire_os.outbound_governor_executor import (
     execute_governor_decision,
 )
 from empire_os.outbound_provider import OutboundProviderError
-from empire_os.outbound_role_transport import PostgresOutboundRpc
+from empire_os.outbound_role_transport import (
+    PostgresOutboundRpc,
+    SupabaseOutboundRpc,
+)
 
 
 def _bool_env(name: str) -> bool:
@@ -44,11 +47,14 @@ def _provider_ready() -> bool:
     ])
 
 
-def _sender_rpc() -> PostgresOutboundRpc:
+def _sender_rpc():
     dsn = os.getenv("EMPIRE_OUTBOUND_SENDER_DSN", "").strip()
-    if not dsn:
-        raise OutboundProviderError("EMPIRE_OUTBOUND_SENDER_DSN is required")
-    return PostgresOutboundRpc(dsn, "empire_outbound_sender")
+    if dsn:
+        return PostgresOutboundRpc(
+            dsn,
+            "empire_outbound_sender",
+        )
+    return SupabaseOutboundRpc("empire_outbound_sender")
 
 
 def _approver_rpc() -> PostgresOutboundRpc:

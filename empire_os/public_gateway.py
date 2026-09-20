@@ -9,7 +9,8 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import Body, FastAPI, Query
+import httpx
+from fastapi import Body, FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -21,6 +22,10 @@ GATEWAY_VERSION = "agent-web-v1.1"
 PUBLIC_BASE_URL = os.getenv("EMPIRE_PUBLIC_BASE_URL", "https://empire-ai.co.uk").rstrip("/")
 AEO_ROOT = Path(os.getenv("EMPIRE_PUBLIC_AEO_ROOT", "/srv/empire_os/runtime/aeo"))
 AEO_ROOT.mkdir(parents=True, exist_ok=True)
+RESEND_INBOUND_URL = os.getenv(
+    "EMPIRE_RESEND_INBOUND_URL",
+    "http://127.0.0.1:8097/webhooks/resend-inbound",
+).strip()
 
 app = FastAPI(title="Empire AI Public Gateway", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/aeo", StaticFiles(directory=str(AEO_ROOT), html=True), name="aeo")
@@ -48,6 +53,47 @@ def health():
         "execution": "read-only-public-surface",
         "astra": "governed",
     }
+
+
+
+
+@app.post("/webhooks/resend-inbound")
+async def resend_inbound_proxy(request: Request):
+    raw = await request.body()
+    if len(raw) > 1_000_000:
+        return JSONResponse({"ok": False}, status_code=413)
+
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() in {
+            "content-type",
+            "svix-id",
+            "svix-timestamp",
+            "svix-signature",
+        }
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                RESEND_INBOUND_URL,
+                content=raw,
+                headers=headers,
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"ok": False, "error": "resend_inbound_unavailable"},
+            status_code=503,
+        )
+
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
 
 
 @app.get("/agent-web/capabilities")
