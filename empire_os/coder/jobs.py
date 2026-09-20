@@ -16,6 +16,7 @@ from .policy import resolve_runtime_root, resolve_workspace
 
 class JobKind(str, Enum):
     PLAN = "PLAN"
+    IMPLEMENT = "IMPLEMENT"
     NEXT_COMMAND = "NEXT_COMMAND"
 
 
@@ -174,6 +175,15 @@ class LocalJobQueue:
     ) -> CoderJob:
         current = self.running / f"{self._safe_id(job.id)}.json"
         if not current.exists():
+            name = f"{self._safe_id(job.id)}.json"
+            for directory in (
+                self.completed,
+                self.failed,
+                self.pending,
+            ):
+                existing = directory / name
+                if existing.exists():
+                    return self._load_path(existing)
             raise JobQueueError("job is not currently running")
         job.status = status
         job.result = result

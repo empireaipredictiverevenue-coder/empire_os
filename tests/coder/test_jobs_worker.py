@@ -91,6 +91,42 @@ class FakeCoder:
             eligible=True,
         )
 
+    def propose_structured_patch(self, task_id, objective, context):
+        self.calls.append(("structured_patch", task_id, objective))
+        return SimpleNamespace(
+            eligible=True,
+            validation=SimpleNamespace(
+                reasons=(),
+                warnings=(),
+            ),
+            proposal=SimpleNamespace(
+                target_path="empire_os/example.py",
+                operation=SimpleNamespace(value="create_file"),
+                expected_tests=("tests/test_example.py",),
+            ),
+        )
+
+    def apply_structured_patch(self, task_id, candidate):
+        self.calls.append(("apply_structured_patch", task_id))
+        return {"path": candidate.proposal.target_path}
+
+    def impacted_tests(self, changed_files):
+        self.calls.append(("impacted_tests", tuple(changed_files)))
+        return ("tests/test_example.py",)
+
+    def verify(self, task_id, *, changed_files, commands):
+        self.calls.append(
+            ("verify", task_id, tuple(changed_files), tuple(commands))
+        )
+        return SimpleNamespace(
+            as_dict=lambda: {
+                "verdict": "PASS",
+                "checks": [],
+                "reasons": [],
+                "warnings": [],
+            }
+        )
+
 
 def test_worker_processes_plan_without_patch_or_command_execution(tmp_path):
     root = workspace(tmp_path)
@@ -135,3 +171,62 @@ def test_worker_next_command_returns_proposal_but_does_not_execute(tmp_path):
     assert result.result["eligible"] is True
     assert result.result["executed"] is False
     assert result.result["argv"] == ["git", "diff", "--check"]
+
+
+def test_worker_implement_applies_one_validated_patch_and_verifies(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = FakeCoder()
+    worker = CoderTaskWorker(coder, queue)
+    job = queue.enqueue(
+        task_id="coder_task_5",
+        kind=JobKind.IMPLEMENT,
+        payload={
+            "terms": ["buyer_allocation"],
+            "budget_chars": 12000,
+        },
+    )
+
+    result = worker.run_once()
+
+    assert result.id == job.id
+    assert result.status is JobStatus.COMPLETED
+    assert result.result["applied"] is True
+    assert result.result["target_path"] == "empire_os/example.py"
+    assert result.result["candidate_commit_required"] is True
+    assert result.result["production_mutation"] is False
+    context_call = next(
+        call for call in coder.calls
+        if call[0] == "build_context"
+    )
+    assert context_call[2]["budget_chars"] == 8000
+    assert any(
+        call[0] == "apply_structured_patch"
+        for call in coder.calls
+    )
+    verify_call = next(
+        call for call in coder.calls
+        if call[0] == "verify"
+    )
+    assert verify_call[3] == (
+        ("pytest", "-q", "tests/test_example.py"),
+    )
+
+
+def test_finish_returns_recovered_pending_job_instead_of_raising(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    job = queue.enqueue(
+        task_id="coder_task_6",
+        kind=JobKind.IMPLEMENT,
+    )
+    claimed = queue.claim_next()
+    running_path = queue.running / f"{claimed.id}.json"
+    old = time.time() - 7200
+    os.utime(running_path, (old, old))
+    queue.recover_stale(stale_seconds=60, max_attempts=3)
+
+    recovered = queue.fail(claimed, "late worker failure")
+
+    assert recovered.status is JobStatus.PENDING
+    assert queue.get(job.id).status is JobStatus.PENDING

@@ -1,4 +1,4 @@
-"""Resumable plan/proposal worker for Empire Coder."""
+"""Resumable plan, implementation and verification worker for Empire Coder."""
 from __future__ import annotations
 
 from typing import Any
@@ -40,7 +40,7 @@ class CoderTaskWorker:
         terms = tuple(job.payload.get("terms") or ())
         symbols = tuple(job.payload.get("symbols") or ())
         budget = int(job.payload.get("budget_chars") or 12000)
-        budget_cap = 4500 if job.kind is JobKind.PLAN else 5000
+        budget_cap = 4500 if job.kind is JobKind.PLAN else 8000
         context = self.coder.build_context(
             task.id,
             terms=terms,
@@ -69,6 +69,70 @@ class CoderTaskWorker:
                 "revision_count": proposal.revision_count,
                 "actionable_patch": False,
                 "proposal_persisted": True,
+            }
+
+        if job.kind is JobKind.IMPLEMENT:
+            candidate = self.coder.propose_structured_patch(
+                task.id,
+                (
+                    "Implement the smallest safe DEVELOPMENT patch for the "
+                    "task objective using only supplied repository evidence. "
+                    "Do not touch protected paths, deployment, services, "
+                    "production databases, outbound systems, credentials, "
+                    "or funds. Prefer one narrow code change with focused "
+                    "tests. The patch must remain inside the repository and "
+                    "must be verifiable before any commit."
+                ),
+                context,
+            )
+            if not candidate.eligible:
+                return {
+                    "kind": job.kind.value,
+                    "eligible": False,
+                    "applied": False,
+                    "validation_reasons": list(
+                        candidate.validation.reasons
+                    ),
+                    "validation_warnings": list(
+                        candidate.validation.warnings
+                    ),
+                }
+
+            patch_result = self.coder.apply_structured_patch(
+                task.id,
+                candidate,
+            )
+            changed_files = (candidate.proposal.target_path,)
+            expected_tests = tuple(
+                dict.fromkeys(candidate.proposal.expected_tests)
+            )
+            impacted_tests = tuple(
+                self.coder.impacted_tests(changed_files)
+            )
+            tests = tuple(
+                dict.fromkeys(expected_tests + impacted_tests)
+            )
+            commands = (
+                (("pytest", "-q", *tests),)
+                if tests
+                else ()
+            )
+            verification = self.coder.verify(
+                task.id,
+                changed_files=changed_files,
+                commands=commands,
+            )
+            return {
+                "kind": job.kind.value,
+                "eligible": True,
+                "applied": True,
+                "target_path": candidate.proposal.target_path,
+                "operation": candidate.proposal.operation.value,
+                "patch_result": patch_result,
+                "tests": list(tests),
+                "verification": verification.as_dict(),
+                "candidate_commit_required": True,
+                "production_mutation": False,
             }
 
         if job.kind is JobKind.NEXT_COMMAND:
