@@ -108,24 +108,38 @@ def fetch_unlinked_allocatable_prospects(
     limit = max(1, min(int(limit), 25))
     qparams = urllib.parse.urlencode(
         {
-            "select": "prospect_id,scored_at",
+            "select": "prospect_id,scored_at,result_payload",
             "scoring_engine": f"eq.{SCORING_ENGINE}",
             "scoring_version": f"eq.{SCORING_VERSION}",
             "status": "eq.scored",
             "tier": "in.(hot,warm)",
             "entity_id": "is.null",
             "order": "scored_at.desc",
-            "limit": limit,
+            "limit": limit * 5,
         }
     )
     qualifications = request_json(
         "GET", f"/rest/v1/prospect_qualifications?{qparams}"
     ) or []
-    ids = [
-        str(row.get("prospect_id") or "")
-        for row in qualifications
-        if isinstance(row, dict) and row.get("prospect_id")
-    ]
+    ids: list[str] = []
+    for row in qualifications:
+        if not isinstance(row, dict) or not row.get("prospect_id"):
+            continue
+        result_payload = row.get("result_payload")
+        identity_state = (
+            result_payload.get("identity_resolution")
+            if isinstance(result_payload, dict)
+            else None
+        )
+        if (
+            isinstance(identity_state, dict)
+            and identity_state.get("attempted") is True
+        ):
+            continue
+        ids.append(str(row["prospect_id"]))
+        if len(ids) >= limit:
+            break
+
     if not ids:
         return []
 
@@ -398,6 +412,20 @@ def qualify_prospect(prospect: dict[str, Any]) -> dict[str, Any]:
         enrichment=enrichment,
         entity_id=entity_id,
     )
+    payload["result_payload"] = {
+        **payload["result_payload"],
+        "identity_resolution": {
+            "attempted": True,
+            "resolved": bool(entity_id),
+            "entity_id": entity_id,
+            "method": (
+                "canonical_link_or_singleton_evidence"
+                if entity_id
+                else "singleton_evidence_unresolved"
+            ),
+            "attempted_at": _now(),
+        },
+    }
     row = upsert_qualification(payload)
     emit_event(
         prospect_id=prospect_id,

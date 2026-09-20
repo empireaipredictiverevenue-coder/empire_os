@@ -206,3 +206,35 @@ def test_payload_binds_entity_when_identity_is_known(monkeypatch):
         entity_id=entity_id,
     )
     assert payload["entity_id"] == entity_id
+
+
+def test_identity_catchup_skips_rows_already_attempted(monkeypatch):
+    pending_id = str(uuid4())
+    attempted_id = str(uuid4())
+
+    def fake_request(method, path, payload=None, prefer=None):
+        if "prospect_qualifications" in path:
+            return [
+                {
+                    "prospect_id": attempted_id,
+                    "result_payload": {
+                        "identity_resolution": {"attempted": True}
+                    },
+                },
+                {
+                    "prospect_id": pending_id,
+                    "result_payload": {},
+                },
+            ]
+        if "/rest/v1/prospects?" in path:
+            return [
+                {
+                    **_prospect(),
+                    "id": pending_id,
+                }
+            ]
+        raise AssertionError(path)
+
+    monkeypatch.setattr(worker, "request_json", fake_request)
+    rows = worker.fetch_unlinked_allocatable_prospects(limit=5)
+    assert [row["id"] for row in rows] == [pending_id]
