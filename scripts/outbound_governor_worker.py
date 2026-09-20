@@ -20,6 +20,7 @@ from empire_os.outbound_provider import OutboundProviderError
 from empire_os.outbound_role_transport import (
     PostgresOutboundRpc,
     SupabaseOutboundRpc,
+    SupabaseStandingAuthorityApproverRpc,
 )
 
 
@@ -57,11 +58,12 @@ def _sender_rpc():
     return SupabaseOutboundRpc("empire_outbound_sender")
 
 
-def _approver_rpc() -> PostgresOutboundRpc:
+def _approver_rpc():
     dsn = os.getenv("EMPIRE_OUTBOUND_APPROVER_DSN", "").strip()
-    if not dsn:
-        raise OutboundProviderError("EMPIRE_OUTBOUND_APPROVER_DSN is required")
-    return PostgresOutboundRpc(dsn, "empire_outbound_approver")
+    if dsn:
+        return PostgresOutboundRpc(dsn, "empire_outbound_approver")
+    cap = int(os.getenv("EMPIRE_GTM_DAILY_EXTERNAL_CAP", "10"))
+    return SupabaseStandingAuthorityApproverRpc(daily_cap=cap)
 
 
 def _evaluate(

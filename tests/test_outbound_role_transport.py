@@ -5,6 +5,7 @@ from empire_os.outbound_provider import OutboundProviderError
 from empire_os.outbound_role_transport import (
     PostgresOutboundRpc,
     SupabaseOutboundRpc,
+    SupabaseStandingAuthorityApproverRpc,
 )
 
 
@@ -141,3 +142,65 @@ def test_supabase_reply_transport_is_not_a_sender():
                 "p_actor": "reply",
             },
         )
+
+
+def test_standing_authority_approver_uses_only_bounded_rpc():
+    calls = []
+
+    def request(method, path, payload=None, **kwargs):
+        calls.append((method, path, payload, kwargs))
+        return {"decision": "approved", "standing_authority": True}
+
+    rpc = SupabaseStandingAuthorityApproverRpc(
+        daily_cap=7,
+        request_factory=request,
+    )
+    result = rpc(
+        "approve_outbound_intent",
+        {
+            "p_intent_id": "00000000-0000-0000-0000-000000000001",
+            "p_approved_by": "outbound_governor",
+            "p_note": "bounded",
+        },
+    )
+    assert result["standing_authority"] is True
+    assert calls == [(
+        "POST",
+        "/rest/v1/rpc/auto_approve_outbound_intent",
+        {
+            "p_intent_id": "00000000-0000-0000-0000-000000000001",
+            "p_daily_cap": 7,
+        },
+        {},
+    )]
+    with pytest.raises(OutboundProviderError, match="only supports outbound approval"):
+        rpc(
+            "cancel_outbound_intent",
+            {
+                "p_intent_id": "00000000-0000-0000-0000-000000000001",
+                "p_approved_by": "x",
+                "p_note": "x",
+            },
+        )
+
+
+def test_standing_authority_approver_caps_daily_limit():
+    seen = {}
+
+    def request(_method, _path, payload=None, **_kwargs):
+        seen.update(payload or {})
+        return {"decision": "approved"}
+
+    rpc = SupabaseStandingAuthorityApproverRpc(
+        daily_cap=999,
+        request_factory=request,
+    )
+    rpc(
+        "approve_outbound_intent",
+        {
+            "p_intent_id": "00000000-0000-0000-0000-000000000001",
+            "p_approved_by": "outbound_governor",
+            "p_note": "bounded",
+        },
+    )
+    assert seen["p_daily_cap"] == 50

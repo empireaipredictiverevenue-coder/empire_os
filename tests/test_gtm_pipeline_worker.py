@@ -1,0 +1,94 @@
+from datetime import datetime, timezone
+
+from empire_os.gtm_pipeline_worker import (
+    POSTAL_ADDRESS,
+    build_outbound_payload,
+    run_gtm_pipeline,
+)
+
+
+NOW = datetime(2026, 9, 20, 16, 0, tzinfo=timezone.utc)
+
+
+def review(review_id="00000000-0000-0000-0000-000000000001"):
+    return {
+        "id": review_id,
+        "contact_name": "Clay Winter",
+        "contact_email": "clay@example.com",
+        "offer_key": "managed_service",
+        "evidence": {
+            "business_name": "Kihle Roofing",
+            "niche": "roofing",
+            "metro": "Wichita",
+            "review_ready": True,
+            "outreach_ready": True,
+        },
+    }
+
+
+def test_build_outbound_payload_is_compliant_and_evidence_safe():
+    payload = build_outbound_payload(review(), now=NOW)
+    assert payload["p_subject"] == "Clay — roofing opportunities in Wichita"
+    assert POSTAL_ADDRESS in payload["p_body_text"]
+    assert "opt out" in payload["p_body_text"].lower()
+    assert "Kihle Roofing" in payload["p_body_text"]
+    assert "revenue" not in payload["p_metadata"]
+    assert payload["p_proposed_by"] == "empire_gtm_agent_v1"
+    assert payload["p_expires_at"].startswith("2026-09-23T16:00:00")
+
+
+def test_pipeline_auto_reviews_then_proposes_only_ready_reviews():
+    calls = []
+
+    def request(method, path, payload=None, **_kwargs):
+        calls.append((method, path, payload))
+        if method == "GET" and path.startswith("/rest/v1/buyer_candidate_reviews?"):
+            return [{"id": "00000000-0000-0000-0000-000000000010"}]
+        if path.endswith("auto_review_buyer_candidate"):
+            return {
+                "decision": "approved",
+                "status": "approved",
+                "review_id": payload["p_review_id"],
+            }
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return [review("00000000-0000-0000-0000-000000000010")]
+        if path.endswith("propose_reviewed_outbound_intent"):
+            return {
+                "decision": "proposed",
+                "intent_id": "00000000-0000-0000-0000-000000000020",
+            }
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(
+        request,
+        limit=10,
+        daily_cap=10,
+        now=NOW,
+    )
+    assert result.pending_seen == 1
+    assert result.candidate_auto_approved == 1
+    assert result.intents_proposed == 1
+    assert result.proposal_errors == ()
+    proposal = calls[-1][2]
+    assert proposal["p_review_id"] == (
+        "00000000-0000-0000-0000-000000000010"
+    )
+    assert POSTAL_ADDRESS in proposal["p_body_text"]
+
+
+def test_pipeline_skips_ineligible_review_without_fabricating_evidence():
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith("/rest/v1/buyer_candidate_reviews?"):
+            return [{"id": "00000000-0000-0000-0000-000000000010"}]
+        if path.endswith("auto_review_buyer_candidate"):
+            raise RuntimeError("verified decision-maker contact evidence required")
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+    assert result.pending_seen == 1
+    assert result.candidate_auto_approved == 0
+    assert result.candidate_skipped == 1
+    assert result.intents_proposed == 0
+    assert result.proposal_errors == ()

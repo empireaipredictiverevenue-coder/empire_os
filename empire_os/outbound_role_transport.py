@@ -142,3 +142,40 @@ class SupabaseOutboundRpc:
             f"/rest/v1/rpc/{name}",
             payload=params,
         )
+
+
+class SupabaseStandingAuthorityApproverRpc:
+    """Service-role bridge to the database-enforced standing-authority gate.
+
+    It intentionally exposes only automatic intent approval. The database RPC
+    rechecks evidence, suppression, content compliance, offer scope, freshness,
+    and the daily cap before delegating to approve_outbound_intent.
+    """
+
+    def __init__(
+        self,
+        *,
+        daily_cap: int = 10,
+        request_factory: Callable[..., Any] | None = None,
+    ) -> None:
+        self.daily_cap = max(1, min(int(daily_cap), 50))
+        self._request = request_factory or request_json
+
+    def __call__(self, name: str, params: dict[str, Any]) -> Any:
+        if name != "approve_outbound_intent":
+            raise OutboundProviderError(
+                "standing-authority bridge only supports outbound approval"
+            )
+        expected = {"p_intent_id", "p_approved_by", "p_note"}
+        if not isinstance(params, dict) or set(params) != expected:
+            raise OutboundProviderError(
+                "unexpected standing-authority approval parameters"
+            )
+        return self._request(
+            "POST",
+            "/rest/v1/rpc/auto_approve_outbound_intent",
+            payload={
+                "p_intent_id": params["p_intent_id"],
+                "p_daily_cap": self.daily_cap,
+            },
+        )
