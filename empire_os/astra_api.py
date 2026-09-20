@@ -9,6 +9,7 @@ from empire_os.astra_activation import (
     AstraActivationEvidence,
     assess_astra_activation_readiness,
 )
+from empire_os.astra_intelligence_routing import review_intelligence_route
 
 
 
@@ -37,6 +38,13 @@ class AstraSnapshotRequest(BaseModel):
     buyer_candidates_due: int = Field(default=0, ge=0)
     outbound_domain_verified: bool = False
     source_health_ok: bool = True
+
+
+class AstraIntelligenceRouteRequest(BaseModel):
+    snapshot: AstraSnapshotRequest
+    task_kind: str
+    expected_value_cents: int = Field(default=0, ge=0)
+    premium_cost_cents: int = Field(default=0, ge=0)
 
 
 class AstraBoardPreviewRequest(BaseModel):
@@ -93,6 +101,34 @@ def create_astra_router() -> APIRouter:
             "execution_authority": "none",
             "commercial_mutation": False,
             "readiness": result.as_dict(),
+        }
+
+    @router.post("/intelligence-route/preview")
+    def intelligence_route_preview(req: AstraIntelligenceRouteRequest):
+        mode = req.snapshot.execution_mode.strip().lower()
+        if mode != "observe":
+            raise HTTPException(
+                status_code=422,
+                detail="astra preview supports OBSERVE only",
+            )
+        try:
+            review = review_intelligence_route(
+                AstraSnapshot(**req.snapshot.model_dump()),
+                task_kind=req.task_kind,
+                expected_value_cents=req.expected_value_cents,
+                premium_cost_cents=req.premium_cost_cents,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "side_effects": "none",
+            "execution_authority": "none",
+            "provider_activation": False,
+            "premium_spend_execution": False,
+            "budget_mutation": False,
+            "model_promotion": False,
+            "review": review.as_dict(),
         }
 
     @router.post("/board/preview")
