@@ -1,0 +1,267 @@
+# Legacy Commercial Intelligence Recovery Index — 2026-09-20
+
+Purpose: preserve exact Git-history locations for the high-value commercial/intelligence systems recovered from earlier EmpireOS generations.
+
+## Omega / Cortex / North Mini
+
+### Current canonical files still present
+- `empire_os/north_mini_agent.py`
+- `empire_os/agents/souls/north_mini_SOUL.md`
+- `empire_os/agents/souls/north_mini_SKILLS.md`
+- `empire_os/omega_os.py`
+- `empire_os/intelligence/omega.py` — canonical Omega 2 deterministic baseline
+- `empire_os/lead_scoring_v2.py`
+- `empire_os/revenue_os_learning.py`
+- `empire_os/outcome_feedback.py`
+- `empire_os/quant_brain.py`
+- `empire_os/payment_governance.py`
+
+North Mini current code:
+- reads real state
+- never invents metrics
+- rotates growth/product/management/AGI-intel/projection work
+- historically ran on a timed cycle
+
+### Cortex-era recovery commit
+Commit:
+`aea6ea72a95c7c29bda64daaf446928a99440219`
+
+Subject:
+`feat(cortex): cortex_blueprint_pack SKU 299 catalog+pricing+listener delivery+campaign; DNS fallback; storm verified mapservices`
+
+Important recovered paths from that commit:
+- `empire_os/hourly_retainer.py`
+- `campaigns/campaign_b_enterprise.md`
+- `campaigns/campaign_b_enterprise_direct_real.md`
+- `campaigns/marketing_plan_b_enterprise.md`
+- `PLAN_INTEGRATION_SCALE.md`
+- `empire_os/agents/cortex_engine.py`
+- `empire_os/agents/souls/cortex_SOUL.md`
+- `empire_os/cortex_ai_assistant.py`
+- `empire_os/cortex_api.py`
+- `empire_os/agents/systemd/north_mini_agent.service`
+
+## $150/hour Intelligence Retainer
+
+Recovered from:
+`aea6ea72a95c7c29bda64daaf446928a99440219:empire_os/hourly_retainer.py`
+
+Literal product:
+- SKU: `intel_hourly`
+- name: Hourly Intelligence Retainer
+- price: **$150/hour**
+- minimum engagement: 5 hours
+- example block: 10 hours = $1,500
+- settlement: USDT on BSC
+- delivery concept: Cortex + Predictive + Neural Scout intelligence
+
+Historical deliverables:
+1. market/competitor/opportunity report
+2. Cortex niche analysis
+3. consultation/review
+4. lead-acquisition / market-entry recommendations
+
+Important:
+- historical implementation used legacy SQLite/local invoicing
+- some field names still referenced old USDC-era schema labels
+- rebuild against canonical Supabase + BSC/USDT payment governance + fulfilment + Revenue Truth
+- do not restore raw implementation unchanged
+
+## Evaluation Product
+
+Latest recovered path:
+`a96ec26523df9e155d9dd9c2972bcdc53d207ed9:empire_os/agents/evaluation_product.py`
+
+Earlier development commits:
+- `0bc1afe1ccb67597be7cc1ec40b293b28079f800` — free audit lead-magnet feeds eval ledger
+- `e7c3a721c781f72d9cbd66b11528ce08797cde36` — buyer claim endpoint for pre-graded prospects
+- `3455df268bf7e0ce9281e68ee2925f9a7e686277` — evaluation pricing update
+- `b29496a1df7382417371c0f3dae60cc5dad35516` — fee-aware credit-pack model
+
+Historical design:
+- Omega grading free
+- grade A/B/C/D
+- outcome mode: bill only when acceptable graded lead converts
+- per-score mode available
+- minimum settlement floor
+- credit packs amortize chain/payment fees
+
+Important:
+This is a **separate product from the $150/hour Intelligence Retainer**.
+
+Modern target:
+Omega 2 + verified outcomes + Quant calibration + canonical usage meter + BSC/USDT billing.
+
+## Enterprise Campaign Family
+
+Recovered current-history source:
+`63953f70f6764b1a94e68d7729d39bc79f6ba422:empire_os/enterprise_campaigns.py`
+
+Commit subject:
+`feat: enterprise campaign family (north-mini blueprint, REAL data via northmini_realstate guard)...`
+
+Historical campaigns:
+1. 7-day received-lead conversion campaign
+2. enterprise PPC hero SKU
+3. recurring weekly lead generation
+4. lead reactivation
+
+Historical rule:
+- real-state audience sizes
+- no fabricated "$100M"-style claims
+- campaigns initially draft/idempotent
+
+Enterprise marketing assets recovered from Cortex commit:
+- `campaigns/marketing_plan_b_enterprise.md`
+- `campaigns/campaign_b_enterprise.md`
+- `campaigns/campaign_b_enterprise_direct_real.md`
+
+Historical direct campaign included:
+- legal prospects
+- home-service lane ownership
+- white-label Omega
+- BSC USDT
+- explicit "No placeholder buyers. No simulated contracts."
+
+All contacts/audience counts must be freshly reverified before reuse.
+
+## Whale Acquisition
+
+### Whale Finder
+Commit:
+`f8e5d23f830b67f5066c220eac1b0827e28026e4`
+
+Path:
+`empire_os/agents/whale_finder.py`
+
+Historical function:
+- score CEOs/founders/revenue leaders/enterprise prospects
+- signals from role/title, vertical, headcount, custom domains
+- tiers included T5 Whale and T4 Enterprise
+- free public-source scouting
+
+### Whale Harvester
+Commit:
+`5e6e508b1a6dde7ec5e47290058782ccd4752123`
+
+Path:
+`empire_os/agents/whale_harvester.py`
+
+Historical function:
+- free HN/public founder signals
+- recurring 6-hour harvest
+- founder/company/budget/growth indicators
+
+Do not restore old placeholder email conventions or SQLite persistence.
+Rebuild on:
+real source -> canonical prospect -> evidence -> entity/person resolution -> buyer/enterprise fit -> governed contact.
+
+### Whale Application Workflow
+Commit:
+`42c0f6cc9b85a3c319e3c5a7ba3215d72c707dff`
+
+Path:
+`scripts/whale_application_workflow.json`
+
+Useful concepts:
+- high-ticket application
+- due diligence
+- decision-maker fields
+- dedicated success
+- custom AI tuning
+- API access
+- performance reporting
+
+Reject/replace:
+- stale pricing
+- unverified conversion promises
+- Solana multi-chain settlement
+- restrictive/exclusivity terms unless independently justified
+
+## Billion-Scale Blueprint
+
+Commit:
+`42c0f6cc9b85a3c319e3c5a7ba3215d72c707dff`
+
+Path:
+`BILLION_SCALE_PLAN_v2.md`
+
+This blueprint is unusually useful because it explicitly corrected earlier fantasy revenue:
+- distinguished real vs junk subscriptions
+- called out phantom pipeline
+- called out inactive Omega learning engine
+- called out absent product tables
+- stated Revenue Truth weaknesses
+- mapped multiple revenue lines
+
+Historical revenue lines:
+A. Lead Marketplace
+B. SMB SaaS product catalog
+C. Omega AI Learning Engine/API
+D. Legal/Mass Tort products
+E. Evaluation Product
+plus enterprise/white-label scaling
+
+Important:
+Historical numeric forecasts are scenarios, not current evidence.
+Use the architecture and sequencing; recompute all economics from current real data.
+
+## Full Integration + Scale Plan
+
+Latest recovered:
+`a96ec26523df9e155d9dd9c2972bcdc53d207ed9:PLAN_INTEGRATION_SCALE.md`
+
+Important historical observation:
+It explicitly listed these as orphaned revenue modules:
+- Neural Scout
+- Hourly Retainer
+- Evaluation Product
+- A2A Marketplace / Closer
+- Audit/revenue leak tooling
+- Satellite products
+- Permit product
+- AEO surfaces
+- MCP bridge
+
+It also explicitly said:
+`hourly_retainer.py -> /v1/retainer/start (USDT/hr, streamed)`
+
+This confirms the intended hourly-payment product integration.
+
+## Current Reconstruction Target
+
+Do not restore the old stack as separate duplicated systems.
+
+Canonical target:
+
+real sources
+-> acquisition
+-> enrichment
+-> Lead Scoring v2
+-> Omega 2
+-> Whale/Enterprise fit
+-> Cortex decision layer (Omega + Quant + AGI + strategy)
+-> product/offer selection
+-> governed outreach / inbound
+-> commercial terms
+-> fulfilment
+-> BSC USDT payment
+-> Revenue Truth
+-> outcome feedback
+-> AI learning / calibration
+-> strategy evolution
+
+Commercial products recovered:
+- qualified leads/calls
+- enterprise/white-label
+- whale/high-touch service
+- $150/hr Intelligence Retainer
+- Omega Evaluation Product
+- SaaS/API
+- market/search/permit intelligence
+
+## Provenance note
+
+North Mini definitely authored/drove the **enterprise campaign blueprint** in historical source comments.
+
+The $150/hour retainer landed in the same Cortex-era commit and integrated Cortex/Predictive/Neural Scout, but Git metadata attributes the commit to `Empire AI`, not directly to North Mini. Preserve the historical association, but do not state that Git independently proves North Mini authored the file.
