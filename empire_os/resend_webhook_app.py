@@ -118,6 +118,7 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                 "p_received_at": reply["received_at"],
                 "p_metadata": {
                     "provider": "resend", "untrusted_content": True,
+                    "body_unavailable": bool(reply.get("body_unavailable")),
                     "in_reply_to": reply["in_reply_to"],
                     "references": reply["references"],
                 },

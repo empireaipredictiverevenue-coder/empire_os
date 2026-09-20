@@ -210,3 +210,34 @@ def test_extract_provider_event_rejects_missing_intent_tag():
             "type": "email.delivered",
             "data": {"email_id": "em_123", "to": ["buyer@example.com"]},
         })
+
+def test_extract_reply_records_signed_metadata_when_body_fetch_is_unavailable():
+    intent_id = "00000000-0000-0000-0000-000000000001"
+    event = {
+        "type": "email.received",
+        "data": {
+            "email_id": "em_receive_only",
+            "from": "buyer@example.com",
+            "to": [
+                f"reply+{intent_id}@mail.empire-ai.co.uk"
+            ],
+            "subject": "opt out",
+            "created_at": "2026-09-20T19:19:27Z",
+        },
+    }
+
+    def unavailable(_):
+        raise RuntimeError("API key is send-only")
+
+    reply = extract_resend_reply(
+        event,
+        fetch_email=unavailable,
+        reply_to="reply@mail.empire-ai.co.uk",
+    )
+
+    assert reply["intent_id"] == intent_id
+    assert reply["from_contact"] == "buyer@example.com"
+    assert reply["subject"] == "opt out"
+    assert reply["body_unavailable"] is True
+    assert reply["body_text"]
+    assert reply["executable"] is False

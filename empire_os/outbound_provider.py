@@ -165,34 +165,81 @@ def extract_resend_reply(event: dict[str, Any], *, fetch_email: Callable[[str], 
     if event.get("type") != "email.received":
         return None
     data = event.get("data") or {}
+    if not isinstance(data, dict):
+        raise OutboundProviderError("verified inbound event missing data")
     email_id = str(data.get("email_id") or "").strip()
     if not email_id:
         raise OutboundProviderError("verified inbound event missing email_id")
+
+    event_recipients = (
+        data.get("received_for")
+        or data.get("to")
+        or []
+    )
+    intent_id = (
+        resolve_intent_from_recipients(
+            event_recipients,
+            reply_to=reply_to,
+        )
+        if reply_to
+        else ""
+    )
+    event_sender = _email(data.get("from"))
+    event_subject = str(data.get("subject") or "")
+
     try:
         fetched = fetch_email(email_id)
-    except Exception as exc:
-        raise OutboundProviderError("failed to fetch inbound email") from exc
+    except Exception:
+        # A send-only Resend key cannot fetch received-email bodies. The
+        # signed webhook still proves that a reply arrived and provides the
+        # governed reply alias, sender, subject and provider email id. Record
+        # that event instead of silently losing it; downstream automation can
+        # only auto-classify explicit deterministic patterns such as opt-out.
+        return {
+            "provider": "resend",
+            "provider_message_id": email_id,
+            "intent_id": intent_id,
+            "from_contact": event_sender,
+            "subject": event_subject,
+            "body_text": "[provider body unavailable]",
+            "received_at": str(data.get("created_at") or ""),
+            "in_reply_to": "",
+            "references": "",
+            "body_unavailable": True,
+            "untrusted_content": True,
+            "executable": False,
+        }
+
     if isinstance(fetched, dict) and isinstance(fetched.get("data"), dict):
         fetched = fetched["data"]
     if not isinstance(fetched, dict):
         raise OutboundProviderError("inbound email response must be an object")
-    sender = _email(fetched.get("from") or data.get("from"))
+    sender = _email(fetched.get("from") or event_sender)
     text = str(fetched.get("text") or "").strip()
     if not text:
         raise OutboundProviderError("plain-text inbound body required")
     headers = fetched.get("headers") if isinstance(fetched.get("headers"), dict) else {}
-    recipients = fetched.get("received_for") or fetched.get("to") or data.get("to") or []
-    intent_id = resolve_intent_from_recipients(recipients, reply_to=reply_to) if reply_to else ""
+    recipients = (
+        fetched.get("received_for")
+        or fetched.get("to")
+        or event_recipients
+    )
+    if reply_to:
+        intent_id = resolve_intent_from_recipients(
+            recipients,
+            reply_to=reply_to,
+        )
     return {
         "provider": "resend",
         "provider_message_id": email_id,
         "intent_id": intent_id,
         "from_contact": sender,
-        "subject": str(fetched.get("subject") or data.get("subject") or ""),
+        "subject": str(fetched.get("subject") or event_subject),
         "body_text": text,
         "received_at": str(data.get("created_at") or fetched.get("created_at") or ""),
         "in_reply_to": str(headers.get("in-reply-to") or headers.get("In-Reply-To") or ""),
         "references": str(headers.get("references") or headers.get("References") or ""),
+        "body_unavailable": False,
         "untrusted_content": True,
         "executable": False,
     }
