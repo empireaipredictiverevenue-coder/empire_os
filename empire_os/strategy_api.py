@@ -46,6 +46,12 @@ from empire_os.jev_strategy import (
     compare_decision_providers,
     review_jev_use_case,
 )
+from empire_os.typed_decision_eval import (
+    build_shadow_decision,
+    compare_eval_reports,
+    evaluate_provider_outputs,
+    summarize_shadow_records,
+)
 
 
 class DataRequest(BaseModel):
@@ -106,6 +112,19 @@ class BenchmarkRowsRequest(BaseModel):
 
 class JevUseCasesRequest(BaseModel):
     use_cases: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class EvalRowsRequest(BaseModel):
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    minimum_samples: int = 20
+
+
+class EvalReportsRequest(BaseModel):
+    reports: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ShadowRowsRequest(BaseModel):
+    rows: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -330,6 +349,37 @@ def create_strategy_router() -> APIRouter:
     def jev_provider_compare(req: BenchmarkRowsRequest):
         try:
             return compare_decision_providers(req.rows)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/eval/preview")
+    def typed_decision_eval(req: EvalRowsRequest):
+        try:
+            return evaluate_provider_outputs(
+                req.rows,
+                minimum_samples=req.minimum_samples,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/eval/compare/preview")
+    def typed_decision_eval_compare(req: EvalReportsRequest):
+        try:
+            return compare_eval_reports(req.reports)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/shadow/review")
+    def typed_decision_shadow(req: DataRequest):
+        try:
+            return build_shadow_decision(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/shadow/summary/preview")
+    def typed_decision_shadow_summary(req: ShadowRowsRequest):
+        try:
+            return summarize_shadow_records(req.rows)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

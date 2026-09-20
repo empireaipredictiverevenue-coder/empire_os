@@ -403,3 +403,53 @@ def test_scenario_stress_test_never_executes_response():
     assert body["execution_enabled"] is False
     assert body["forecast"] is False
     assert body["execution_authority"] == "none"
+
+
+def test_typed_decision_eval_api_is_offline_only():
+    rows = []
+    for i in range(25):
+        truth = "positive" if i % 2 == 0 else "negative"
+        rows.append({
+            "case_id": f"c-{i}",
+            "task_key": "reply_classification",
+            "provider_key": "jev",
+            "model_key": "system-one",
+            "ground_truth": truth,
+            "predicted": truth,
+            "confidence": .9,
+            "latency_ms": 120,
+            "input_tokens": 40,
+            "cost_cents": .001,
+            "source_ref": f"eval:{i}",
+        })
+    response = client().post(
+        "/v1/strategy/typed-decision/eval/preview",
+        json={"rows": rows, "minimum_samples": 20},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["accuracy"] == 1.0
+    assert body["provider_activation"] is False
+    assert body["production_routing"] is False
+
+
+def test_typed_decision_shadow_api_never_controls_live_route():
+    response = client().post(
+        "/v1/strategy/typed-decision/shadow/review",
+        json={"data": {
+            "shadow_id": "s1",
+            "task_key": "reply_classification",
+            "case_ref": "case:1",
+            "incumbent_provider": "rules",
+            "incumbent_decision": "negative",
+            "candidate_provider": "jev",
+            "candidate_decision": "positive",
+            "candidate_confidence": .74,
+            "decision_schema_ref": "schema:reply:v1",
+        }},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["candidate_controlled_live_routing"] is False
+    assert body["execution_performed"] is False
