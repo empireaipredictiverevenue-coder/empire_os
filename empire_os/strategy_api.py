@@ -76,6 +76,11 @@ from empire_os.typed_decision_shadow_collector import (
     collect_shadow_candidates,
     shadow_collection_summary,
 )
+from empire_os.typed_decision_readiness import (
+    build_readiness_board,
+    next_evidence_actions,
+    review_task_readiness,
+)
 
 
 class DataRequest(BaseModel):
@@ -188,6 +193,10 @@ class ShadowCollectRequest(BaseModel):
 
 class ShadowSummaryRequest(BaseModel):
     batches: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ReadinessBoardRequest(BaseModel):
+    tasks: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -555,5 +564,20 @@ def create_strategy_router() -> APIRouter:
     @router.post("/typed-decision/shadow-candidates/summary/preview")
     def typed_decision_shadow_collect_summary(req: ShadowSummaryRequest):
         return shadow_collection_summary(req.batches)
+
+    @router.post("/typed-decision/readiness/review")
+    def typed_decision_readiness_review(req: DataRequest):
+        return review_task_readiness(req.data)
+
+    @router.post("/typed-decision/readiness/board/preview")
+    def typed_decision_readiness_board(req: ReadinessBoardRequest):
+        try:
+            board = build_readiness_board(req.tasks)
+            return {
+                "board": board,
+                "next_evidence_actions": next_evidence_actions(board),
+            }
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return router

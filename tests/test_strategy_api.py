@@ -588,3 +588,26 @@ def test_shadow_candidate_collection_is_review_only():
     assert body["batch"]["production_routing"] is False
     assert body["label_review_queue"]["auto_label_applied"] is False
     assert body["label_review_queue"]["queue"][0]["review_state"] == "pending"
+
+
+def test_typed_decision_readiness_board_is_advisory_only():
+    response = client().post(
+        "/v1/strategy/typed-decision/readiness/board/preview",
+        json={"tasks": [{
+            "task_key": "reply_classification",
+            "real_labeled_case_count": 10,
+            "provider_output_count": 10,
+            "shadow_record_count": 10,
+            "independent_review_count": 0,
+            "calibration_observed": False,
+            "fallback_tested": False,
+            "drift_monitor_defined": False,
+            "schema_failure_measured": False,
+            "synthetic_cases_present": False,
+        }]},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["board"]["provider_selected"] is False
+    assert body["board"]["production_routing_enabled"] is False
+    assert body["next_evidence_actions"]["automatic_execution"] is False
