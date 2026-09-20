@@ -376,9 +376,12 @@ def observations_from_cycle(
         ),
         "qualification_v2": CommercialLoopObservation(
             "qualification_v2",
-            qualified > 0,
+            qualified > 0 or scores > 0,
             evidence_ref="canonical:prospect_qualifications:v2",
-            detail=f"{qualified} qualification(s) written in current cycle",
+            detail=(
+                f"{qualified} qualification(s) written in current cycle; "
+                f"{scores} downstream Omega observation(s)"
+            ),
         ),
         "omega_projection": CommercialLoopObservation(
             "omega_projection",

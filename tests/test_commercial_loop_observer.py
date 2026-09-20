@@ -193,3 +193,17 @@ def test_snapshot_is_local_observe_artifact(tmp_path):
     assert saved["execution_authority"] == "none"
     assert saved["highest_priority_blocker"] == "real_acquisition"
     assert saved["allocation_execution"] is False
+
+
+def test_existing_omega_proves_prior_v2_qualification_when_cycle_writes_zero():
+    observations = observations_from_cycle(
+        acquisition_accepted=10,
+        qualification={"qualified": 0},
+        omega={"candidates_seen": 5},
+        buyer_readiness={
+            "buyers_with_verified_terms": 0,
+            "activated_buyers_with_capacity": 0,
+        },
+    )
+
+    assert observations["qualification_v2"].observed is True
