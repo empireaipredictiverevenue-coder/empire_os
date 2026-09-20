@@ -29,6 +29,9 @@ outbound-email = [
 search-console = [
     "google-auth>=2.0,<3",
 ]
+ops-mcp = [
+    "mcp>=2,<3",
+]
 
 [tool.setuptools.packages.find]
 include = ["empire_os*"]
