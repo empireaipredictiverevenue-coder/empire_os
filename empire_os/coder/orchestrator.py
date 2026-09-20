@@ -187,9 +187,22 @@ class EmpireCoder:
                 600,
             ),
         )
+        context_length = max(
+            4096,
+            min(
+                int(
+                    os.getenv(
+                        "EMPIRE_CODER_OLLAMA_CONTEXT_LENGTH",
+                        "16384",
+                    )
+                ),
+                65536,
+            ),
+        )
         ollama = OllamaProvider(
             num_threads=8,
             timeout_seconds=timeout_seconds,
+            context_length=context_length,
         )
         local_models: tuple[str, ...] = ()
         if ollama.health():
