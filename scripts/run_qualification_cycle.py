@@ -9,6 +9,7 @@ from empire_os.qualification_worker_v2 import (
     run_cycle,
     run_identity_catchup,
 )
+from empire_os.omega_worker import run_omega_cycle
 
 
 def main() -> int:
@@ -40,11 +41,17 @@ def main() -> int:
             "errors": [],
         }
     )
+    omega = run_omega_cycle(args.limit)
     result = {
-        "schema_version": "qualification_service_cycle.v1",
+        "schema_version": "qualification_service_cycle.v2",
         "qualification": qualification,
         "identity_catchup": catchup,
-        "ok": bool(qualification["ok"] and catchup["ok"]),
+        "omega_projection": omega,
+        "ok": bool(
+            qualification["ok"]
+            and catchup["ok"]
+            and omega["ok"]
+        ),
     }
     print(json.dumps(result, indent=2, default=str))
     return 0 if result["ok"] else 1

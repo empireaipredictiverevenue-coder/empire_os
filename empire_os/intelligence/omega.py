@@ -28,8 +28,8 @@ class OmegaPrediction:
     conversion_probability: float = 0.0
     payment_probability: float = 0.0
 
-    expected_revenue: float = 0.0
-    expected_gross_profit: float = 0.0
+    expected_revenue: float | None = None
+    expected_gross_profit: float | None = None
     time_to_conversion_days: float | None = None
 
     opportunity_score: float = 0.0
@@ -196,22 +196,76 @@ def _legacy_tier(score: float) -> str:
     return "bronze"
 
 
-def _expected_revenue(lead: Mapping[str, Any], conversion: float) -> float:
-    """Estimate revenue from explicit lead value when available.
-
-    Falls back to a deliberately conservative baseline rather than assuming
-    the historical niche pricing is authoritative.
-    """
-    for field in ("expected_revenue", "sold_price", "price_usd"):
+def _positive_value(
+    lead: Mapping[str, Any],
+    *fields: str,
+) -> float | None:
+    for field in fields:
         try:
             value = float(lead.get(field))
         except (TypeError, ValueError):
             continue
-
         if value > 0:
-            return round(value * conversion, 2)
+            return value
+    return None
 
-    return round(5.0 * conversion, 2)
+
+def _expected_revenue(
+    lead: Mapping[str, Any],
+    conversion: float,
+) -> float | None:
+    """Forecast revenue only from explicit commercial value evidence."""
+    value = _positive_value(
+        lead,
+        "expected_revenue",
+        "sold_price",
+        "price_usd",
+    )
+    if value is None:
+        return None
+    return round(value * conversion, 2)
+
+
+def _expected_gross_profit(
+    lead: Mapping[str, Any],
+    conversion: float,
+    expected_revenue: float | None,
+) -> float | None:
+    """Forecast GP only when explicit value/cost evidence exists."""
+    explicit_gp = _positive_value(
+        lead,
+        "expected_gross_profit",
+        "expected_gp",
+        "gross_profit_usd",
+    )
+    if explicit_gp is not None:
+        return round(explicit_gp * conversion, 2)
+
+    if expected_revenue is None:
+        return None
+
+    cost = _positive_value(
+        lead,
+        "expected_cost",
+        "cost_usd",
+        "acquisition_cost",
+    )
+    if cost is None:
+        return None
+
+    revenue_value = _positive_value(
+        lead,
+        "expected_revenue",
+        "sold_price",
+        "price_usd",
+    )
+    if revenue_value is None:
+        return None
+
+    gross_profit_value = revenue_value - cost
+    if gross_profit_value <= 0:
+        return 0.0
+    return round(gross_profit_value * conversion, 2)
 
 
 def analyze(lead: Mapping[str, Any]) -> OmegaPrediction:
@@ -230,7 +284,11 @@ def analyze(lead: Mapping[str, Any]) -> OmegaPrediction:
     payment = _clamp(conversion * 0.75)
 
     expected_revenue = _expected_revenue(lead, conversion)
-    expected_gross_profit = round(expected_revenue * 0.70, 2)
+    expected_gross_profit = _expected_gross_profit(
+        lead,
+        conversion,
+        expected_revenue,
+    )
 
     legacy_score = _legacy_score(quality, buyer_fit, engagement)
     legacy_tier = _legacy_tier(legacy_score)
@@ -294,7 +352,7 @@ def analyze_many(leads: list[Mapping[str, Any]]) -> list[OmegaPrediction]:
     return sorted(
         predictions,
         key=lambda result: (
-            result.expected_gross_profit * result.confidence,
+            (result.expected_gross_profit or 0.0) * result.confidence,
             result.opportunity_score,
         ),
         reverse=True,

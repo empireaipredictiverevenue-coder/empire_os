@@ -56,7 +56,31 @@ def test_explicit_revenue_value_changes_expected_revenue():
         "expected_revenue": 100.0,
     })
 
-    assert result.expected_revenue > 5.0
+    assert result.expected_revenue is not None
+    assert result.expected_revenue > 0.0
+    assert result.expected_gross_profit is None
+
+
+def test_unknown_commercial_value_stays_unknown():
+    result = analyze({
+        "business_name": "Unknown Value Roofing",
+        "niche": "roofing",
+    })
+
+    assert result.expected_revenue is None
+    assert result.expected_gross_profit is None
+
+
+def test_gp_requires_explicit_cost_or_gp_evidence():
+    result = analyze({
+        "business_name": "Costed Roofing",
+        "niche": "roofing",
+        "expected_revenue": 100.0,
+        "expected_cost": 40.0,
+    })
+
+    assert result.expected_revenue is not None
+    assert result.expected_gross_profit is not None
     assert result.expected_gross_profit > 0.0
 
 
@@ -91,13 +115,15 @@ def test_analyze_many_ranks_by_commercial_value():
             "state": "TX",
             "niche": "roofing",
             "expected_revenue": 500.0,
+            "expected_cost": 100.0,
         },
     ]
 
     results = analyze_many(leads)
 
     assert len(results) == 2
-    assert results[0].expected_gross_profit >= results[1].expected_gross_profit
+    assert results[0].expected_gross_profit is not None
+    assert results[1].expected_gross_profit is None
 
 
 def test_legacy_omega_score_does_not_change_omega_2_prediction():
