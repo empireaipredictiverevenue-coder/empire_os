@@ -341,6 +341,8 @@ Fifth slice ✅ local/tested: reconciled market-drift review now checks current/
 
 Sixth slice ✅ local/tested: allocation-readiness review now requires a fresh current snapshot, exact canonical reconciliation, positive qualified inventory, positive verified buyer capacity and at least one verified price before an operator allocation review is considered ready. Allocation, pricing, exclusivity and settlement authority remain `none`; no matching or funds movement is introduced.
 
+Seventh slice ✅ local/tested: proposal-only inventory-to-buyer match review now requires qualified inventory evidence, buyer-specific remaining capacity, a price inside the verified market set, territory eligibility and explicit exclusivity clearance. Passing the review creates no allocation, pricing, exclusivity or settlement authority and remains review-only.
+
 ### Phase 14 — Digital Twin
 Simulate markets, campaigns, pricing, buyers, inventory, sales capacity, ad spend and offers before deploying real capital.
 

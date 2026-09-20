@@ -11,6 +11,10 @@ from empire_os.revenue_exchange import normalise_exchange_snapshot
 from empire_os.revenue_exchange_allocation_readiness import (
     assess_exchange_allocation_readiness,
 )
+from empire_os.revenue_exchange_allocation_proposal import (
+    ExchangeAllocationProposalEvidence,
+    review_exchange_allocation_proposal,
+)
 from empire_os.revenue_exchange_analysis import assess_exchange_market
 from empire_os.revenue_exchange_freshness import review_exchange_drift
 from empire_os.revenue_exchange_ingest import build_exchange_observation
@@ -55,6 +59,21 @@ class ExchangeDriftReviewRequest(BaseModel):
 class ExchangeAllocationReadinessRequest(ExchangeReconciliationRequest):
     now_utc: str
     max_age_seconds: int = Field(default=21600, gt=0)
+
+
+class ExchangeAllocationProposalRequest(ExchangeAllocationReadinessRequest):
+    inventory_id: str
+    buyer_id: str
+    inventory_qualified: bool = False
+    inventory_evidence_ref: str | None = None
+    buyer_capacity_remaining: int | None = Field(default=None, ge=0)
+    buyer_capacity_evidence_ref: str | None = None
+    proposed_price_cents: int = Field(gt=0)
+    verified_price_evidence_ref: str | None = None
+    territory_eligible: bool | None = None
+    territory_evidence_ref: str | None = None
+    exclusivity_clear: bool | None = None
+    exclusivity_evidence_ref: str | None = None
 
 
 class ExchangeObservationIngestRequest(BaseModel):
@@ -221,6 +240,69 @@ def create_revenue_exchange_router(
             "pricing_authority": "none",
             "exclusivity_authority": "none",
             "readiness": readiness.as_dict(),
+        }
+
+    @router.post("/allocation/proposal/preview")
+    def allocation_proposal_preview(req: ExchangeAllocationProposalRequest):
+        try:
+            snapshot = normalise_exchange_snapshot(req.row)
+            reconciliation = reconcile_exchange_snapshot(
+                snapshot,
+                ExchangeEvidenceSnapshot(
+                    inventory_count=req.inventory_count,
+                    buyer_capacity=req.buyer_capacity,
+                    verified_prices_cents=(
+                        tuple(req.verified_prices_cents)
+                        if req.verified_prices_cents is not None
+                        else None
+                    ),
+                    evidence_refs=tuple(req.evidence_refs),
+                ),
+            )
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            readiness = assess_exchange_allocation_readiness(
+                snapshot=snapshot,
+                reconciliation=reconciliation,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+            proposal = review_exchange_allocation_proposal(
+                snapshot=snapshot,
+                readiness=readiness,
+                evidence=ExchangeAllocationProposalEvidence(
+                    inventory_id=req.inventory_id,
+                    buyer_id=req.buyer_id,
+                    niche=snapshot.niche,
+                    metro=snapshot.metro,
+                    inventory_qualified=req.inventory_qualified,
+                    inventory_evidence_ref=req.inventory_evidence_ref,
+                    buyer_capacity_remaining=req.buyer_capacity_remaining,
+                    buyer_capacity_evidence_ref=req.buyer_capacity_evidence_ref,
+                    proposed_price_cents=req.proposed_price_cents,
+                    verified_price_evidence_ref=req.verified_price_evidence_ref,
+                    territory_eligible=req.territory_eligible,
+                    territory_evidence_ref=req.territory_evidence_ref,
+                    exclusivity_clear=req.exclusivity_clear,
+                    exclusivity_evidence_ref=req.exclusivity_evidence_ref,
+                ),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "allocation_authority": "none",
+            "settlement_authority": "none",
+            "pricing_authority": "none",
+            "exclusivity_authority": "none",
+            "funds_movement": False,
+            "proposal": proposal.as_dict(),
         }
 
     @router.post("/observations/ingest")
