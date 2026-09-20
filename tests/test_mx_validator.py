@@ -91,3 +91,30 @@ class TestExtractors:
     def test_extract_from_empty(self):
         assert extract_emails_from_text("") == []
         assert extract_phones_from_text("") == []
+
+def test_mx_lookup_returns_host_strings_in_preference_order(monkeypatch):
+    class Exchange:
+        def __init__(self, value):
+            self.value = value
+
+        def to_text(self):
+            return self.value
+
+    class Record:
+        def __init__(self, host, preference):
+            self.exchange = Exchange(host)
+            self.preference = preference
+
+    monkeypatch.setattr(
+        "dns.resolver.resolve",
+        lambda domain, record_type: [
+            Record("mx2.example.com.", 20),
+            Record("mx1.example.com.", 10),
+        ],
+    )
+
+    hosts = MxValidator(do_smtp_probe=False)._mx_lookup(
+        "example.com"
+    )
+
+    assert hosts == ["mx1.example.com", "mx2.example.com"]

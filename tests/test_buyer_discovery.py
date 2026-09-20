@@ -833,3 +833,51 @@ def test_buyer_readiness_dossier_is_allocation_ready_only_after_activation():
     assert dossier["next_required"] is None
     assert dossier["buyer_activation_ready"] is True
     assert dossier["allocation_ready"] is True
+
+
+def test_prior_smtp_verified_generated_contact_survives_lightweight_recheck():
+    from types import SimpleNamespace
+    from empire_os.buyer_discovery import (
+        merge_generated_contact_evidence,
+        verify_contact_plan,
+    )
+
+    enriched = {
+        "decision_maker": {
+            "name": "Jane Smith",
+            "title": "CEO",
+            "decision_score": 1.0,
+        },
+        "contact_candidates": [],
+    }
+    merged = merge_generated_contact_evidence(
+        enriched,
+        [{
+            "email": "jane.smith@acme.test",
+            "verification_state": "smtp_valid",
+            "smtp_accepts": True,
+            "has_mx": True,
+            "confidence": 0.95,
+        }],
+    )
+
+    class LightweightValidator:
+        def validate(self, email):
+            return SimpleNamespace(
+                email=email,
+                is_valid=True,
+                confidence=0.75,
+                is_role_address=False,
+                is_disposable=False,
+                has_mx=True,
+                smtp_accepts=False,
+            )
+
+    plan = verify_contact_plan(
+        merged,
+        validator=LightweightValidator(),
+    )
+
+    assert plan["outreach_ready"] is True
+    assert plan["verified_contacts"][0]["smtp_accepts"] is True
+    assert plan["preferred_email"] == "jane.smith@acme.test"

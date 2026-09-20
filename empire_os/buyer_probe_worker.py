@@ -4,7 +4,15 @@ from __future__ import annotations
 import json
 import sys
 
-from empire_os.buyer_discovery import build_candidate, enrich_candidate, verify_contact_plan
+from empire_os.buyer_discovery import (
+    build_candidate,
+    enrich_candidate,
+    merge_public_web_contact_evidence,
+    verify_contact_plan,
+)
+from empire_os.hunter.domain_intelligence import analyze_domain
+from empire_os.hunter.models import VerificationState
+from empire_os.hunter.verification_mesh import VerificationMesh
 from empire_os.mx_validator import MxValidator
 from empire_os.search_fabric.site_probe import probe_site
 
@@ -23,7 +31,41 @@ def run(row: dict, *, max_pages: int = 2, request_timeout: float = 3.0,
         time_budget_seconds=time_budget_seconds,
     )
     enriched = enrich_candidate(candidate, evidence)
-    contact = verify_contact_plan(enriched, validator=MxValidator(do_smtp_probe=False))
+
+    hunter = analyze_domain(
+        candidate.website,
+        mesh=VerificationMesh(
+            mx_validator=MxValidator(do_smtp_probe=False)
+        ),
+        probe=lambda *args, **kwargs: evidence,
+        max_pages=max_pages,
+        request_timeout=request_timeout,
+        time_budget_seconds=time_budget_seconds,
+    )
+    hunter_first_party = [
+        {
+            "name": item.person_name,
+            "email": item.email,
+            "source_url": item.source_url or candidate.website,
+            "source_kind": "official_site",
+            "role_corroborated": True,
+            "direct_publication": True,
+        }
+        for item in hunter.confirmed_contacts
+        if item.state is VerificationState.CONFIRMED
+        and item.person_name
+    ]
+    if hunter_first_party:
+        enriched = merge_public_web_contact_evidence(
+            enriched,
+            hunter_first_party,
+        )
+
+    contact = verify_contact_plan(
+        enriched,
+        validator=MxValidator(do_smtp_probe=False),
+    )
+
     return {
         "prospect_id": candidate.prospect_id,
         "business_name": candidate.business_name,
@@ -36,6 +78,15 @@ def run(row: dict, *, max_pages: int = 2, request_timeout: float = 3.0,
         "review_ready": bool(contact.get("review_ready")),
         "outreach_ready": bool(contact.get("outreach_ready")),
         "preferred_email": contact.get("preferred_email"),
+        "hunter_domain_pattern": hunter.pattern.as_dict(),
+        "hunter_confirmed_contacts": [
+            item.as_dict() for item in hunter.confirmed_contacts
+        ],
+        "hunter_probable_contacts": [
+            item.as_dict()
+            for item in hunter.contacts
+            if item.state is VerificationState.PROBABLE
+        ],
         "mode": "OBSERVE",
         "write_authorized": False,
     }

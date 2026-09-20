@@ -135,10 +135,17 @@ class MxValidator:
         try:
             import dns.resolver  # type: ignore
             answers = dns.resolver.resolve(domain, "MX")
-            return sorted(
-                [(r.exchange.to_text().rstrip("."), r.preference) for r in answers],
-                key=lambda x: x[1],
-            )[0:1]  # just the primary
+            ordered = sorted(
+                [
+                    (
+                        r.exchange.to_text().rstrip("."),
+                        int(r.preference),
+                    )
+                    for r in answers
+                ],
+                key=lambda item: item[1],
+            )
+            return [host for host, _ in ordered]
         except ImportError:
             # Fall back to socket-based check if dnspython not available
             return self._fallback_mx(domain)

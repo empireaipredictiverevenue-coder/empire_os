@@ -684,6 +684,10 @@ def merge_generated_contact_evidence(enriched: Mapping[str, Any], validated: Ite
             "email": email,
             "source": "generated_pattern_smtp_verified",
             "bound_to_decision_maker": True,
+            "verification_state": "smtp_valid",
+            "smtp_accepts": True,
+            "has_mx": bool(item.get("has_mx", True)),
+            "confidence": float(item.get("confidence", 0.95) or 0.95),
         })
     dedup = {}
     for item in contacts:
@@ -716,14 +720,28 @@ def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[
             result = validator.validate(email)
         except Exception:
             continue
+        prior_smtp = bool(
+            contact.get("smtp_accepts") is True
+            and contact.get("verification_state") == "smtp_valid"
+        )
         verified.append({
             "email": _text(getattr(result, "email", email)).lower(),
-            "is_valid": bool(getattr(result, "is_valid", False)),
-            "confidence": float(getattr(result, "confidence", 0.0) or 0.0),
+            "is_valid": bool(
+                getattr(result, "is_valid", False) or prior_smtp
+            ),
+            "confidence": max(
+                float(getattr(result, "confidence", 0.0) or 0.0),
+                float(contact.get("confidence", 0.0) or 0.0),
+            ),
             "is_role_address": bool(getattr(result, "is_role_address", False)),
             "is_disposable": bool(getattr(result, "is_disposable", False)),
-            "has_mx": bool(getattr(result, "has_mx", False)),
-            "smtp_accepts": bool(getattr(result, "smtp_accepts", False)),
+            "has_mx": bool(
+                getattr(result, "has_mx", False)
+                or contact.get("has_mx") is True
+            ),
+            "smtp_accepts": bool(
+                getattr(result, "smtp_accepts", False) or prior_smtp
+            ),
             "source": contact.get("source") or "unknown",
             "bound_to_decision_maker": bool(contact.get("bound_to_decision_maker")),
         })
