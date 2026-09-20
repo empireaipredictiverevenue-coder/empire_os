@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from .attribution import preview_search_revenue_attribution
+from .attribution_review import review_search_attribution
 from .ai_visibility import AiCitationObservation, analyse_ai_visibility
 from .backlinks import BacklinkObservation, analyse_backlink_graph
 from .citation_gap import analyse_citation_gap
@@ -118,6 +119,22 @@ class SerpSnapshotRequest(BaseModel):
 class CompetitorGapPreviewRequest(BaseModel):
     snapshot: SerpSnapshotRequest
     empire_domains: list[str] = Field(min_length=1)
+
+
+class RevenueAttributionReviewRequest(BaseModel):
+    site_id: str
+    page_id: str | None = None
+    query: str | None = None
+    external_session_id: str | None = None
+    prospect_id: str | None = None
+    opportunity_id: str | None = None
+    attribution_kind: str = "observed_search_touch"
+    commercial_event: dict[str, Any]
+    search_touch_observed_at: str
+    touch_evidence_ref: str
+    observed_cost_cents: int | None = Field(default=None, ge=0)
+    cost_evidence_ref: str | None = None
+    max_attribution_lag_seconds: int = Field(default=2592000, gt=0)
 
 
 class RevenueAttributionPreviewRequest(BaseModel):
@@ -371,6 +388,41 @@ def create_search_router(
             "recommendation_only": True,
             "execution_allowed": False,
             "preview": preview.as_dict(),
+        }
+
+    @router.post("/revenue/review/preview")
+    def revenue_attribution_review_preview(
+        req: RevenueAttributionReviewRequest,
+    ):
+        try:
+            review = review_search_attribution(
+                site_id=req.site_id,
+                page_id=req.page_id,
+                query=req.query,
+                external_session_id=req.external_session_id,
+                prospect_id=req.prospect_id,
+                opportunity_id=req.opportunity_id,
+                attribution_kind=req.attribution_kind,
+                commercial_event=req.commercial_event,
+                search_touch_observed_at=req.search_touch_observed_at,
+                touch_evidence_ref=req.touch_evidence_ref,
+                observed_cost_cents=req.observed_cost_cents,
+                cost_evidence_ref=req.cost_evidence_ref,
+                max_attribution_lag_seconds=(
+                    req.max_attribution_lag_seconds
+                ),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_allowed": False,
+            "publishing_execution": False,
+            "indexation_execution": False,
+            "revenue_mutation": False,
+            "accounting_mutation": False,
+            "review": review.as_dict(),
         }
 
     @router.post("/competitor-gap/preview")
