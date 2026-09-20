@@ -16,6 +16,7 @@ def test_choose_jobs_drives_internal_launch_pipeline():
         "gtm_pipeline",
         "closer_reply_handoff",
         "commercial_terms_materializer",
+        "conversion_intelligence_refresh",
         "commercial_loop_refresh",
     ]
 
@@ -35,6 +36,7 @@ def test_choose_jobs_adds_source_repair_but_no_duplicate_jobs():
         "buyer_review_materializer",
         "closer_reply_handoff",
         "commercial_terms_materializer",
+        "conversion_intelligence_refresh",
         "commercial_loop_refresh",
     ]
 

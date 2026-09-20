@@ -198,12 +198,35 @@ def _acquisition(raw: dict[str, Any] | None, path: Path) -> dict[str, Any]:
     }
 
 
+
+
+def _conversion(raw: dict[str, Any] | None, path: Path) -> dict[str, Any]:
+    if raw is None:
+        return {"available": False, "observed_at": _mtime_iso(path)}
+    stages = raw.get("stages")
+    unknown = raw.get("unknown_stages")
+    return {
+        "available": True,
+        "observed_at": raw.get("observed_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "source": raw.get("source"),
+        "min_sample_size": raw.get("min_sample_size"),
+        "primary_bottleneck": raw.get("primary_bottleneck"),
+        "primary_bottleneck_rate": raw.get("primary_bottleneck_rate"),
+        "experiment_candidate": raw.get("experiment_candidate"),
+        "unknown_stages": unknown if isinstance(unknown, list) else [],
+        "stages": stages if isinstance(stages, list) else [],
+        "counts": raw.get("counts") if isinstance(raw.get("counts"), dict) else {},
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
 def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     loop_path = runtime / "commercial_loop" / "latest.json"
     astra_path = runtime / "astra" / "latest.json"
     acquisition_path = runtime / "acquisition" / "latest.json"
     source_path = runtime / "source_health" / "latest.json"
+    conversion_path = runtime / "conversion" / "latest.json"
 
     return {
         "mode": "OBSERVE",
@@ -217,5 +240,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             acquisition_path,
         ),
         "source_health": _source_health(_read_json(source_path), source_path),
+        "conversion": _conversion(
+            _read_json(conversion_path),
+            conversion_path,
+        ),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }

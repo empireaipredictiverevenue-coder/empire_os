@@ -80,6 +80,27 @@ Search foundation ✅
         },
     )
     write_json(
+        root / "runtime/conversion/latest.json",
+        {
+            "observed_at": "2026-09-20T19:30:00+00:00",
+            "mode": "OBSERVE",
+            "source": "canonical_supabase",
+            "min_sample_size": 20,
+            "primary_bottleneck": None,
+            "primary_bottleneck_rate": None,
+            "experiment_candidate": None,
+            "unknown_stages": ["visitor_to_lead"],
+            "stages": [],
+            "counts": {
+                "delivered_outreach_to_reply": {
+                    "entered": 5,
+                    "converted": 0,
+                }
+            },
+            "execution_authority": "none",
+        },
+    )
+    write_json(
         root / "runtime/source_health/latest.json",
         {
             "source": "overpass",
@@ -110,6 +131,11 @@ def test_projection_separates_last_run_from_current_source_health(tmp_path):
         "buyer_candidate_approved"
     )
     assert result["astra"]["observed"]["owned_inventory_count"] == 12189
+    assert result["conversion"]["available"] is True
+    assert result["conversion"]["counts"]["delivered_outreach_to_reply"] == {
+        "entered": 5,
+        "converted": 0,
+    }
 
 
 def test_phase_projection_marks_frozen_current_and_parallel(tmp_path):

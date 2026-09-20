@@ -51,6 +51,12 @@ SAFE_JOBS = {
     "source_health_refresh": [
         str(ROOT / "scripts/run_source_health_observer_cron.sh"),
     ],
+    "conversion_intelligence_refresh": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/run_conversion_intelligence.py"),
+        "--min-sample-size",
+        "20",
+    ],
     "commercial_loop_refresh": [
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/refresh_commercial_loop.py"),
@@ -94,6 +100,7 @@ def choose_jobs(
         if stages.get("commercial_terms") is not True:
             jobs.append("closer_reply_handoff")
             jobs.append("commercial_terms_materializer")
+        jobs.append("conversion_intelligence_refresh")
         jobs.append("commercial_loop_refresh")
     return list(dict.fromkeys(jobs))
 
