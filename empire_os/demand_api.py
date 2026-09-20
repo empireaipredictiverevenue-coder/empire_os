@@ -6,6 +6,10 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from empire_os.demand_commercial_impact import (
+    DemandCommercialImpactEvidence,
+    review_demand_commercial_impact,
+)
 from empire_os.demand_comparison import compare_demand_plan_outcomes
 from empire_os.demand_freshness import review_demand_outcome_evidence
 from empire_os.demand_genesis import DemandPlan
@@ -50,6 +54,14 @@ class DemandOutcomeEvidenceReviewRequest(DemandOutcomeRequest):
     plan_registered_at: str
     now_utc: str
     max_age_seconds: int = Field(default=604800, gt=0)
+
+
+class DemandCommercialImpactRequest(DemandOutcomeEvidenceReviewRequest):
+    commercial_attribution_ref: str | None = None
+    recognized_revenue_ref: str | None = None
+    recognized_revenue_cents: int | None = Field(default=None, ge=0)
+    realized_gp_ref: str | None = None
+    realized_gp_cents: int | None = Field(default=None, ge=0)
 
 
 class DemandComparisonRequest(BaseModel):
@@ -154,6 +166,57 @@ def create_demand_router(registry=None) -> APIRouter:
             "ad_spend_enabled": False,
             "provider_activation_enabled": False,
             "review": review.as_dict(),
+        }
+
+    @router.post("/outcome/commercial-impact/preview")
+    def outcome_commercial_impact_preview(req: DemandCommercialImpactRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            outcome = review_demand_outcome_evidence(
+                DemandOutcomeEvidence(
+                    plan_id=req.plan_id,
+                    success_metric=req.success_metric,
+                    baseline_value=req.baseline_value,
+                    observed_value=req.observed_value,
+                    observed_cost_cents=req.observed_cost_cents,
+                    observed_at=req.observed_at,
+                    evidence_refs=tuple(req.evidence_refs),
+                ),
+                plan_registered_at=req.plan_registered_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+            impact = review_demand_commercial_impact(
+                outcome=outcome,
+                evidence=DemandCommercialImpactEvidence(
+                    plan_id=req.plan_id,
+                    commercial_attribution_ref=req.commercial_attribution_ref,
+                    recognized_revenue_ref=req.recognized_revenue_ref,
+                    recognized_revenue_cents=req.recognized_revenue_cents,
+                    realized_gp_ref=req.realized_gp_ref,
+                    realized_gp_cents=req.realized_gp_cents,
+                ),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "publishing_enabled": False,
+            "outbound_enabled": False,
+            "ad_spend_enabled": False,
+            "provider_activation_enabled": False,
+            "revenue_mutation": False,
+            "accounting_mutation": False,
+            "impact": impact.as_dict(),
         }
 
     @router.post("/outcome/comparison/preview")

@@ -322,6 +322,8 @@ Fourth slice ✅ local/tested: observed demand outcome feedback now compares the
 
 Fifth slice ✅ local/tested: demand outcome evidence review now checks outcome freshness and plan→outcome chronology before exposing observed cost per positive incremental success-metric unit. Missing cost, stale/future outcomes, outcome-before-plan evidence and flat/negative incremental outcomes remain explicit/unknown rather than receiving synthetic efficiency. Publishing, outbound, ad spend and provider activation remain disabled.
 
+Sixth slice ✅ local/tested: demand commercial-impact review now requires an explicit plan→commercial attribution reference plus recognized-revenue and realized-GP evidence before commercial impact is review-ready. Success-metric lift alone can never become revenue; zero-cost demand keeps return ratios unknown rather than dividing or inventing values. Publishing, outbound, ad spend, provider activation, revenue mutation and accounting mutation remain disabled.
+
 Sixth slice ✅ local/tested: evidence-only Demand plan comparison now compares two fresh realized plans only when they share the same success metric and both expose complete observed cost-efficiency. It reports observed incremental-outcome and cost-efficiency deltas without selecting a winner or enabling publishing, outbound, ad spend or provider activation.
 
 ### Phase 13 — Revenue Exchange
