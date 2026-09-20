@@ -396,6 +396,8 @@ Seventh slice ✅ local/tested: append-only API-access review history now preser
 
 Multi-tenant architecture, teams/RBAC, usage billing, USDT subscriptions, white label, custom domains, affiliate/agency/client dashboards, API keys, developer platform and marketplace/partner network.
 
+Eighth slice ✅ local/tested: tenant usage can now produce an evidence-only USDT overage-charge preview when usage/subscription/isolation evidence is fresh and commercial terms plus overage pricing are explicitly verified. Over-limit usage is billable evidence rather than a provisioning failure, while invoice creation, payment requests, funds movement, billing execution, subscription mutation and recognized revenue remain disabled.
+
 ### Phase 17 — Enterprise
 Auditability, permissions/data isolation, SLA/compliance/security monitoring, backup/DR, multi-region, Kubernetes, Kafka, ClickHouse/Grafana, queues, model registry and retraining when justified by real load.
 

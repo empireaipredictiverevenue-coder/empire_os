@@ -14,6 +14,10 @@ from empire_os.saas_api_access import (
 from empire_os.saas_api_access_freshness import assess_api_access_freshness
 from empire_os.saas_api_access_registry import ApiAccessReviewRecord
 from empire_os.saas_freshness import review_saas_quota_readiness
+from empire_os.saas_usage_billing import (
+    SaasUsageBillingTerms,
+    review_saas_usage_billing,
+)
 from empire_os.saas_registry import SaasReadinessRecord
 from empire_os.saas_readiness import (
     SaasScaleSnapshot,
@@ -61,6 +65,13 @@ class SaasQuotaReadinessRequest(BaseModel):
     isolation_observed_at: str
     now_utc: str
     max_age_seconds: int = Field(default=21600, gt=0)
+
+
+class SaasUsageBillingRequest(SaasQuotaReadinessRequest):
+    commercial_terms_verified: bool = False
+    commercial_terms_ref: str | None = None
+    overage_price_usdt_micros_per_unit: int | None = Field(default=None, ge=0)
+    pricing_evidence_ref: str | None = None
 
 
 class SaasReadinessRegisterRequest(BaseModel):
@@ -176,6 +187,55 @@ def create_saas_router(
             "subscription_mutation": False,
             "api_key_issuance": False,
             "review": result.as_dict(),
+        }
+
+    @router.post("/usage-billing/preview")
+    def usage_billing_preview(req: SaasUsageBillingRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            quota_review = review_saas_quota_readiness(
+                tenant_id=req.tenant_id,
+                observed_monthly_usage=req.observed_monthly_usage,
+                observed_usage_limit=req.observed_usage_limit,
+                active_subscription=req.active_subscription,
+                tenant_isolation_verified=req.tenant_isolation_verified,
+                usage_observed_at=req.usage_observed_at,
+                subscription_observed_at=req.subscription_observed_at,
+                isolation_observed_at=req.isolation_observed_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+            review = review_saas_usage_billing(
+                quota_review=quota_review,
+                terms=SaasUsageBillingTerms(
+                    tenant_id=req.tenant_id,
+                    commercial_terms_verified=req.commercial_terms_verified,
+                    commercial_terms_ref=req.commercial_terms_ref,
+                    overage_price_usdt_micros_per_unit=(
+                        req.overage_price_usdt_micros_per_unit
+                    ),
+                    pricing_evidence_ref=req.pricing_evidence_ref,
+                ),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "invoice_creation": False,
+            "payment_request_creation": False,
+            "funds_movement": False,
+            "billing_execution": False,
+            "subscription_mutation": False,
+            "recognized_revenue": False,
+            "review": review.as_dict(),
         }
 
     @router.post("/api-access/readiness/preview")
