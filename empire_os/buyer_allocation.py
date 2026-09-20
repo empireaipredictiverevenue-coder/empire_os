@@ -407,7 +407,7 @@ def fetch_latest_qualification(
         "/rest/v1/prospect_qualifications",
         {
             "select": (
-                "prospect_id,entity_id,score,tier,status,scoring_engine,scoring_version,"
+                "id,prospect_id,entity_id,score,tier,status,scoring_engine,scoring_version,"
                 "evidence_confidence,observed_dimensions,unknown_dimensions,scored_at"
             ),
             "prospect_id": f"eq.{prospect_id}",

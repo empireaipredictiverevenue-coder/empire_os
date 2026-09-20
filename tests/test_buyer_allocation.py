@@ -161,6 +161,7 @@ def test_fetch_latest_qualification_prefers_v2_with_v1_fallback():
     assert row["scoring_version"] == "v2"
     assert row["score"] == 86.3
     assert calls[0]["scoring_version"] == "in.(v2,v1)"
+    assert "id,prospect_id" in calls[0]["select"]
     assert calls[0]["limit"] == "2"
 
 
