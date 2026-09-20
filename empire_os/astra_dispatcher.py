@@ -43,6 +43,10 @@ SAFE_JOBS = {
     "source_health_refresh": [
         str(ROOT / "scripts/run_source_health_observer_cron.sh"),
     ],
+    "commercial_loop_refresh": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/refresh_commercial_loop.py"),
+    ],
 }
 
 
@@ -81,6 +85,7 @@ def choose_jobs(
             jobs.append("gtm_pipeline")
         if stages.get("commercial_terms") is not True:
             jobs.append("closer_reply_handoff")
+        jobs.append("commercial_loop_refresh")
     return list(dict.fromkeys(jobs))
 
 
