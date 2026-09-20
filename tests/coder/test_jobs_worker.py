@@ -255,7 +255,13 @@ def test_worker_verify_runs_deterministic_tests_without_model_context(tmp_path):
     assert not any(call[0] == "build_context" for call in coder.calls)
     verify_call = next(call for call in coder.calls if call[0] == "verify")
     assert verify_call[2] == ("empire_os/example.py",)
-    assert verify_call[3] == (("pytest", "-q", "tests/test_example.py"),)
+    command = verify_call[3][0]
+    assert command[1:] == (
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_example.py",
+    )
 
 
 def test_worker_verify_rejects_non_test_paths(tmp_path):

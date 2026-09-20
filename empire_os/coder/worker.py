@@ -1,6 +1,7 @@
 """Resumable plan, implementation and verification worker for Empire Coder."""
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 from .jobs import CoderJob, JobKind, LocalJobQueue
@@ -57,7 +58,7 @@ class CoderTaskWorker:
             ):
                 raise ValueError("VERIFY tests must be repository test files")
             commands = (
-                (("pytest", "-q", *tests),)
+                ((sys.executable, "-m", "pytest", "-q", *tests),)
                 if tests
                 else ()
             )
