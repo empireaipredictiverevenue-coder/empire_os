@@ -75,3 +75,15 @@ Parallel coder work must map to Priority 1-3 and may not create a new roadmap br
 Solar & Energy and HVAC & Climate Services are now first-class Intelligence Nodes under Priority 2.
 They are not separate roadmap branches; they reuse the shared acquisition, property, weather,
 registry, Search Fabric and canonical Intelligence Fabric foundations.
+
+## Predictive market + Deal Room expansion
+Roadmap now includes:
+- 30/90 day and 6/12/18/24 month evidence-backed forecasts;
+- trend velocity/acceleration, structural breaks and market-regime detection;
+- current-vs-future industry operating-model intelligence;
+- forecast-vs-actual calibration through Omega/Astra;
+- one Deal Room backbone for human and A2A commerce;
+- Documenso adapter for agreement envelopes, embedded signing and verified lifecycle webhooks;
+- A2A v1.0 conformance review and commercial task/artifact alignment.
+
+Binding agreement send/sign/acceptance remains a founder/commercial gate.

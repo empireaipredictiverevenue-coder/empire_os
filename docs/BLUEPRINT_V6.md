@@ -112,6 +112,40 @@ Vonage/live calling, broad authority expansion, public content auto-publishing, 
 ### Parallel-work rule
 Parallel coders may work only on isolated slices that advance Priority 1-3. They must not create a new roadmap branch, duplicate an existing subsystem, expand external authority, or turn prototype/dry-run data into production truth.
 
+## Cross-Node Predictive Market Intelligence — ACTIVE DESIGN
+Empire must forecast markets, not only detect current opportunity.
+
+Required horizons:
+- near-term: 30/90 days for operational demand and trigger timing;
+- strategic: 6, 12, 18 and 24 months for market demand, buyer capacity, competitive intensity, pricing pressure, channel change and product opportunity.
+
+Required outputs:
+- baseline / upside / downside forecast ranges with confidence and evidence;
+- trend velocity, acceleration/deceleration and structural-break detection;
+- market-regime classification: expansion, saturation, consolidation, disruption, regulatory shift, channel shift or unknown;
+- industry operating-model intelligence: how the niche is sold, bought, fulfilled and marketed today;
+- future operating-model hypotheses: what is likely to become automated, agentic, embedded, marketplace-driven or data/API-driven;
+- leading-indicator graph showing which observable signals precede demand, buyer spend, capacity, churn, pricing or conversion changes;
+- forecast-vs-actual calibration so Omega/Astra learn from realized outcomes rather than preserving stale forecasts.
+
+Forecasts are never actual revenue. Unknown inputs remain unknown; scenario output remains separate from probabilistic forecast output.
+
+## Empire Deal Room & Signature Layer — ACTIVE DESIGN
+One governed commercial backbone will support human clients and future A2A counterparties:
+
+DISCOVERY -> QUOTE -> NEGOTIATION -> APPROVED TERMS -> AGREEMENT -> SIGNATURE -> BUYER ACTIVATION -> PAYMENT -> FULFILMENT -> REVENUE TRUTH.
+
+Design:
+- versioned commercial term sheets and agreement templates;
+- evidence-linked offer, price, scope, territory, capacity and expiry;
+- Documenso adapter for envelope creation, recipient routing, embedded signing and signed-status webhooks;
+- signed agreement stored as evidence, never inferred from negotiation state;
+- webhook verification/idempotency and exact counterparty binding;
+- A2A negotiations may prepare a deal package but cannot sign on behalf of a human/company or create binding commitment without the configured approval authority;
+- signed agreement alone does not equal payment or recognized revenue.
+
+Provider activation, sending a binding agreement, or accepting binding terms remains a genuine founder/commercial authority gate.
+
 ## Phase Roadmap
 
 ### Phase 0 — Foundation ✅
