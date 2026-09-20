@@ -13,6 +13,12 @@ from empire_os.omega_worker import run_omega_cycle
 from empire_os.omega_buyer_readiness import (
     run_omega_buyer_readiness_cycle,
 )
+from empire_os.commercial_loop_observer import (
+    assess_commercial_loop,
+    observations_from_cycle,
+    read_latest_acquisition_accepted,
+    write_commercial_loop_snapshot,
+)
 
 
 def main() -> int:
@@ -46,12 +52,22 @@ def main() -> int:
     )
     omega = run_omega_cycle(args.limit)
     buyer_readiness = run_omega_buyer_readiness_cycle(args.limit)
+    commercial_loop = assess_commercial_loop(
+        observations_from_cycle(
+            acquisition_accepted=read_latest_acquisition_accepted(),
+            qualification=qualification,
+            omega=omega,
+            buyer_readiness=buyer_readiness,
+        )
+    )
+    write_commercial_loop_snapshot(commercial_loop)
     result = {
-        "schema_version": "qualification_service_cycle.v3",
+        "schema_version": "qualification_service_cycle.v4",
         "qualification": qualification,
         "identity_catchup": catchup,
         "omega_projection": omega,
         "buyer_readiness": buyer_readiness,
+        "commercial_loop": commercial_loop.as_dict(),
         "ok": bool(
             qualification["ok"]
             and catchup["ok"]
