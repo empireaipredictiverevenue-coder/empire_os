@@ -10,6 +10,10 @@ from pydantic import BaseModel, Field
 from empire_os.advertising_brain import normalise_ad_observation
 from empire_os.advertising_drift import review_advertising_drift
 from empire_os.advertising_freshness import review_advertising_evidence
+from empire_os.advertising_landing_feedback import (
+    LandingPageOutcomeEvidence,
+    review_landing_page_feedback,
+)
 from empire_os.advertising_ingest import build_canonical_ad_observation
 from empire_os.advertising_review import review_campaign_economics
 
@@ -50,6 +54,15 @@ class AdvertisingDriftReviewRequest(BaseModel):
     max_age_seconds: int = Field(default=21600, gt=0)
     baseline_observations: list[dict[str, Any]] = Field(default_factory=list)
     current_observations: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AdvertisingLandingFeedbackRequest(BaseModel):
+    campaign_id: str
+    landing_page_id: str
+    landing_evidence_ref: str | None = None
+    landing_sessions: int | None = Field(default=None, ge=0)
+    landing_qualified_actions: int | None = Field(default=None, ge=0)
+    observations: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AdvertisingObservationIngestRequest(BaseModel):
@@ -248,6 +261,41 @@ def create_advertising_router(
             "pause_mutation": False,
             "retarget_execution": False,
             "drift": result.as_dict(),
+        }
+
+    @router.post("/campaigns/landing-feedback/preview")
+    def landing_feedback_preview(req: AdvertisingLandingFeedbackRequest):
+        try:
+            observations = tuple(
+                normalise_ad_observation(row)
+                for row in req.observations
+            )
+            campaign = review_campaign_economics(
+                observations,
+                campaign_id=req.campaign_id,
+            )
+            feedback = review_landing_page_feedback(
+                campaign=campaign,
+                landing=LandingPageOutcomeEvidence(
+                    campaign_id=req.campaign_id,
+                    landing_page_id=req.landing_page_id,
+                    evidence_ref=req.landing_evidence_ref,
+                    sessions=req.landing_sessions,
+                    qualified_actions=req.landing_qualified_actions,
+                ),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "campaign_creation": False,
+            "budget_mutation": False,
+            "pause_mutation": False,
+            "retarget_execution": False,
+            "landing_page_mutation": False,
+            "publishing_execution": False,
+            "feedback": feedback.as_dict(),
         }
 
     @router.post("/observations/ingest")
