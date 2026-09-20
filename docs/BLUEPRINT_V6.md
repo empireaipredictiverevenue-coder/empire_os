@@ -178,7 +178,7 @@ Product rules:
 - open-source components may be reused only through license-aware adapters/patterns;
 - paid third-party SEO providers remain optional adapters, not canonical dependencies.
 
-Open-source intake currently includes OpenSEO, SEOnaut, SerpBear, Unlighthouse, Google Lighthouse, SiteOne Crawler, All-In-One Free SEO Tool and GPT Researcher; Firecrawl AGPL core is service-boundary only.
+Open-source intake currently includes OpenSEO, SEOnaut, SerpBear, Unlighthouse, Google Lighthouse, SiteOne Crawler, All-In-One Free SEO Tool and GPT Researcher. Empire Web Intelligence Crawler remains canonical. Firecrawl AGPL core is reference-only and is not adopted as a runtime or service dependency.
 
 ## Trust, Reputation & Proof Layer — ACTIVE DESIGN
 Empire is new, so trust must be earned from verifiable evidence rather than claimed through vanity badges.

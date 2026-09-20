@@ -91,12 +91,29 @@ Use:
 Best destination: Search Opportunity research briefs / citation-worthy original research.
 Not a ranking measurement source.
 
-## Tier C — service-only / licensing caution
+## Reference-only / not adopted
 
 ### Firecrawl — AGPL-3.0 core
 Repo: firecrawl/firecrawl
-Use only through an isolated service/API boundary or MIT-licensed SDK components after review.
-Do not copy AGPL core into Empire's proprietary server runtime.
+Status: REJECT_FROM_RUNTIME / REFERENCE_ONLY.
+Empire already owns its crawler/search evidence stack and does not need Firecrawl as a runtime dependency or service dependency.
+We may compare public product behaviour and ideas, but do not import, embed, fork or operationally depend on the AGPL core.
+
+## Empire Web Intelligence Crawler — CANONICAL
+Empire's crawler stack is the canonical collection/evidence layer:
+- site_crawler.py for bounded first-party contact crawling;
+- Search Fabric site_probe for HTML/schema/people/contact/service-area evidence;
+- sitemap/common-path discovery and bounded page walking;
+- first-party person/title recovery;
+- structured-data extraction;
+- email/phone quality guards;
+- canonical URL cleanup and evidence provenance;
+- multi-engine Search Fabric fusion;
+- direct-business/directory/article classification;
+- geo/entity/consensus/confidence scoring;
+- acquisition routing into canonical Supabase and Intelligence Fabric.
+
+Search Product work should enhance this stack rather than introduce a second crawler source of truth.
 
 ## Empire-native capabilities we keep
 - canonical tenant-scoped Search repository;
