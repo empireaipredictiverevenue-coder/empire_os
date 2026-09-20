@@ -86,7 +86,7 @@ def test_local_planner_ladder_routes_by_complexity():
     assert router.route(
         "Implement a new endpoint and tests",
         role="planner",
-    ).model == "qwen2.5-coder:14b"
+    ).model == "qwen2.5-coder:7b"
 
     assert router.route(
         "Review the current implementation plan",
@@ -96,7 +96,7 @@ def test_local_planner_ladder_routes_by_complexity():
     assert router.route(
         "Plan a security database migration architecture",
         role="planner",
-    ).model == "qwen3-coder:30b"
+    ).model == "qwen2.5-coder:7b"
 
 
 def test_router_does_not_escalate_on_negated_safety_guards():

@@ -69,9 +69,12 @@ class ModelRouter:
         role: str = "writer",
         exclude: Iterable[tuple[str, str]] = (),
     ) -> ModelRoute:
-        need = self.complexity(objective)
+        objective_need = self.complexity(objective)
         excluded = set(exclude)
         role_name = str(role or "writer").strip().lower()
+        # PLAN output is advisory, short, and non-actionable. Prefer the
+        # smallest capable local planner to keep queue throughput high.
+        need = 1 if role_name == "planner" else objective_need
         candidates = sorted(
             (
                 profile
