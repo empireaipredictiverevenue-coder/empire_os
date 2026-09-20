@@ -43,6 +43,7 @@ Built/active foundations:
 
 Still incomplete:
 - Revenue Pulse canonical V3.
+- Search Growth Product Suite: product contracts/API started; crawler, rank-history, Lighthouse/CWV, local SEO, reporting and product UI adapters remain.
 - Forecast/Trend/Regime engine 30d/90d/6m/12m/18m/24m.
 - Founder Console Intelligence Node read surfaces.
 - Intelligence Data Product contracts/APIs.

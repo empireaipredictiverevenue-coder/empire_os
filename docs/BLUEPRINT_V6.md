@@ -158,6 +158,28 @@ Canonical V3 must now unify:
 
 The old standalone Supabase project, legacy SQLite delivery path and forecast-as-revenue behaviour remain retired. Revenue Pulse must consume current canonical Supabase truth and preserve OBSERVE/governed authority.
 
+### Search Growth Product Suite — ACTIVE BUILD
+Empire Search Intelligence is now being productized into sellable SEO/AEO/GEO products rather than remaining only an internal engine.
+
+Initial product contracts:
+- Technical Search Audit;
+- Search Opportunity Map;
+- Content Decay & Cannibalisation Monitor;
+- Authority & Backlink Intelligence;
+- AEO / GEO AI Visibility;
+- Competitor Search Gap;
+- Search Growth Command.
+
+Product rules:
+- canonical Search Intelligence remains the source of truth;
+- unknown metrics stay unknown;
+- no invented keyword volume, rankings, authority, citations, traffic or revenue;
+- products expose readiness before production Search DB / GSC activation;
+- open-source components may be reused only through license-aware adapters/patterns;
+- paid third-party SEO providers remain optional adapters, not canonical dependencies.
+
+Open-source intake currently includes OpenSEO, SEOnaut, SerpBear, Unlighthouse, Google Lighthouse, SiteOne Crawler, All-In-One Free SEO Tool and GPT Researcher; Firecrawl AGPL core is service-boundary only.
+
 ## Trust, Reputation & Proof Layer — ACTIVE DESIGN
 Empire is new, so trust must be earned from verifiable evidence rather than claimed through vanity badges.
 

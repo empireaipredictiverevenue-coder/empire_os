@@ -19,6 +19,11 @@ from .health import search_health
 from .metadata import generate_metadata
 from .models import SearchOpportunity, SearchPage
 from .quality import ContentQualityEvaluator
+from .products import (
+    get_search_product,
+    product_catalog,
+    product_portfolio_readiness,
+)
 from .repository import SearchRepository, bounded_limit, collection_payload
 from .postgres_repository import configured_search_repository_from_env
 from .schema import generate_schema_preview
@@ -234,6 +239,68 @@ def create_search_router(
             method(limit=bounded),
             limit=bounded,
         )
+
+
+    def _product_capabilities() -> dict[str, bool | None]:
+        repo = repository is not None
+        console_status = search_console.status()
+        return {
+            "pages": repo,
+            "indexation": repo,
+            "opportunities": repo,
+            "decay": repo,
+            "cannibalisation": repo,
+            "internal_links": repo,
+            "ai_visibility": repo,
+            "backlinks": repo,
+            "revenue": repo,
+            "search_console": bool(console_status.available),
+            "serp": True,
+            "competitor_gap": True,
+            "citation_gap": True,
+        }
+
+    @router.get("/products")
+    def products():
+        return {
+            "schema_version": "empire.search.products.v1",
+            "mode": "OBSERVE",
+            "commercial_terms_required": True,
+            "pricing_observed": False,
+            "execution_allowed": False,
+            "count": len(product_catalog()),
+            "items": product_catalog(),
+        }
+
+    @router.get("/products/readiness")
+    def products_readiness():
+        capabilities = _product_capabilities()
+        return {
+            "schema_version": "empire.search.product-readiness.v1",
+            "mode": "OBSERVE",
+            "execution_allowed": False,
+            "capabilities": capabilities,
+            "items": product_portfolio_readiness(capabilities),
+        }
+
+    @router.get("/products/{product_key}")
+    def product_detail(product_key: str):
+        product = get_search_product(product_key)
+        if product is None:
+            raise HTTPException(status_code=404, detail="search_product_not_found")
+        capabilities = _product_capabilities()
+        readiness = next(
+            row
+            for row in product_portfolio_readiness(capabilities)
+            if row["product_key"] == product.key
+        )
+        return {
+            "schema_version": "empire.search.product.v1",
+            "mode": "OBSERVE",
+            "execution_allowed": False,
+            "product": product.as_dict(),
+            "readiness": readiness,
+        }
 
     @router.get("/pages")
     def pages(limit: int = Query(default=100, ge=1, le=500)):
