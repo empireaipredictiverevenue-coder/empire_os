@@ -1,6 +1,7 @@
 """Empire Coder governed engineering orchestrator."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Iterable
 
@@ -174,7 +175,22 @@ class EmpireCoder:
         requested_profiles = tuple(model_profiles)
         self.providers = ProviderRegistry()
         self.providers.register(DisabledProvider())
-        ollama = OllamaProvider(num_threads=8)
+        timeout_seconds = max(
+            30,
+            min(
+                int(
+                    os.getenv(
+                        "EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS",
+                        "120",
+                    )
+                ),
+                600,
+            ),
+        )
+        ollama = OllamaProvider(
+            num_threads=8,
+            timeout_seconds=timeout_seconds,
+        )
         local_models: tuple[str, ...] = ()
         if ollama.health():
             local_models = ollama.models()

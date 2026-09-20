@@ -110,3 +110,27 @@ def test_orchestrator_persists_refined_next_command_in_memory(tmp_path):
         "--check",
     ]
     assert memory["latest_command_proposal"]["eligible"] is True
+
+
+def test_orchestrator_uses_bounded_ollama_timeout_from_env(tmp_path, monkeypatch):
+    import empire_os.coder.orchestrator as orchestrator
+
+    captured = {}
+
+    class FakeOllamaProvider:
+        name = "ollama"
+
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def health(self):
+            return False
+
+    root = make_repo(tmp_path)
+    monkeypatch.setenv("EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS", "45")
+    monkeypatch.setattr(orchestrator, "OllamaProvider", FakeOllamaProvider)
+
+    orchestrator.EmpireCoder(root)
+
+    assert captured["timeout_seconds"] == 45
+    assert captured["num_threads"] == 8
