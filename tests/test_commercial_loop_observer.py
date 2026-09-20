@@ -207,3 +207,24 @@ def test_existing_omega_proves_prior_v2_qualification_when_cycle_writes_zero():
     )
 
     assert observations["qualification_v2"].observed is True
+
+
+def test_unsubscribe_reply_is_not_a_buyer_conversation():
+    def reader(path, params):
+        if path.endswith("outbound_replies"):
+            return [{
+                "id": "reply-unsub",
+                "classification": "unsubscribe",
+                "received_at": "2026-09-20T19:19:30Z",
+            }]
+        return []
+
+    canonical = fetch_canonical_commercial_observations(
+        reader,
+        now=NOW,
+    )
+
+    conversation = canonical["buyer_conversation"]
+    assert conversation.observed is False
+    assert "0 commercial buyer reply" in conversation.detail
+    assert "1 total reply" in conversation.detail

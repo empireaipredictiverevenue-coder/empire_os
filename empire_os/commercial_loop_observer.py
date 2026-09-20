@@ -203,9 +203,14 @@ def fetch_canonical_commercial_observations(
         {
             "select": "id,classification,received_at",
             "order": "received_at.desc",
-            "limit": "1",
+            "limit": "25",
         },
     )
+    commercial_replies = [
+        row for row in replies
+        if str(row.get("classification") or "").strip().lower()
+        in {"positive", "question", "objection"}
+    ]
     orders = _reader_rows(
         reader,
         "/rest/v1/fulfilment_orders",
@@ -306,9 +311,12 @@ def fetch_canonical_commercial_observations(
         ),
         "buyer_conversation": CommercialLoopObservation(
             "buyer_conversation",
-            bool(replies),
-            evidence_ref="canonical:outbound_replies",
-            detail=f"{len(replies)} buyer reply observation(s)",
+            bool(commercial_replies),
+            evidence_ref="canonical:outbound_replies:commercial",
+            detail=(
+                f"{len(commercial_replies)} commercial buyer reply(s); "
+                f"{len(replies)} total reply(s)"
+            ),
         ),
         "inventory_allocation": CommercialLoopObservation(
             "inventory_allocation",
