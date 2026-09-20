@@ -73,8 +73,10 @@ def fetch_candidate_rows(
     request: Request = request_json,
     *,
     scan_limit: int = 25,
+    scan_offset: int = 0,
 ) -> tuple[list[dict[str, Any]], int]:
     bounded = max(1, min(int(scan_limit), 100))
+    offset = max(0, int(scan_offset))
     prospects = _get(
         request,
         "/rest/v1/prospects",
@@ -84,8 +86,12 @@ def fetch_candidate_rows(
                 "status,notes,contact_name,contact_title,contact_source,"
                 "contacted_status,created_at"
             ),
+            "contact_name": "not.is.null",
+            "contact_title": "not.is.null",
+            "website": "not.is.null",
             "order": "buy_signal_score.desc.nullslast,created_at.desc",
             "limit": bounded,
+            "offset": offset,
         },
     )
 
@@ -149,8 +155,6 @@ def _eligible_candidate(row: Mapping[str, Any]):
         entity_id=row.get("entity_id") or None,
         entity_linked=bool(row.get("entity_id")),
     )
-    if not candidate.entity_id:
-        return None
     if not candidate.website:
         return None
     if candidate.offer_key != "managed_service":
@@ -166,10 +170,12 @@ def run_buyer_review_materializer(
     probe: Probe = run_buyer_probe,
     scan_limit: int = 25,
     proposal_limit: int = 5,
+    scan_offset: int = 0,
 ) -> BuyerReviewMaterializerResult:
     rows, skipped_existing = fetch_candidate_rows(
         request,
         scan_limit=scan_limit,
+        scan_offset=scan_offset,
     )
     cap = max(1, min(int(proposal_limit), 10))
 

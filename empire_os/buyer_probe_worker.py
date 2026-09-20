@@ -8,6 +8,7 @@ from empire_os.buyer_discovery import (
     build_candidate,
     enrich_candidate,
     merge_public_web_contact_evidence,
+    rank_site_people,
     verify_contact_plan,
 )
 from empire_os.hunter.domain_intelligence import analyze_domain
@@ -17,8 +18,8 @@ from empire_os.mx_validator import MxValidator
 from empire_os.search_fabric.site_probe import probe_site
 
 
-def run(row: dict, *, max_pages: int = 2, request_timeout: float = 3.0,
-        time_budget_seconds: float = 6.0) -> dict:
+def run(row: dict, *, max_pages: int = 5, request_timeout: float = 4.0,
+        time_budget_seconds: float = 15.0) -> dict:
     candidate = build_candidate(
         row,
         entity_id=row.get("entity_id") or None,
@@ -32,6 +33,43 @@ def run(row: dict, *, max_pages: int = 2, request_timeout: float = 3.0,
         page_priority="people",
     )
     enriched = enrich_candidate(candidate, evidence)
+
+    # Prefer current first-party structured person+email evidence when the
+    # canonical contact does not yield a bound email. This lets stale contact
+    # names self-heal without weakening identity or source requirements.
+    bound_now = any(
+        item.get("bound_to_decision_maker") is True
+        for item in (enriched.get("contact_candidates") or [])
+        if isinstance(item, dict)
+    )
+    if not bound_now:
+        official_people = [
+            item for item in rank_site_people(evidence.get("people") or [])
+            if item.get("email")
+            and float(item.get("decision_score") or 0.0) >= 0.70
+        ]
+        if official_people:
+            person = official_people[0]
+            enriched = dict(enriched)
+            enriched["decision_maker"] = {
+                **person,
+                "source": "website_structured_data",
+            }
+            enriched["decision_reconciliation"] = {
+                "status": "official_site_current",
+                "review_required": False,
+                "decision_maker": enriched["decision_maker"],
+            }
+            enriched["contact_candidates"] = [
+                {
+                    "email": str(person.get("email") or "").strip().lower(),
+                    "source": "person_structured_data",
+                    "bound_to_decision_maker": True,
+                }
+            ]
+            enriched["contact_email_candidates"] = [
+                str(person.get("email") or "").strip().lower()
+            ]
 
     decision = enriched.get("decision_maker")
     known_people = (

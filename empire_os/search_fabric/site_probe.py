@@ -337,6 +337,23 @@ def probe_site(
     homepage = _fetch(session, url, timeout=request_timeout)
 
     if homepage is None:
+        fallback_url = (
+            "https://" + url[len("http://"):]
+            if url.startswith("http://")
+            else (
+                "http://" + url[len("https://"):]
+                if url.startswith("https://")
+                else ""
+            )
+        )
+        if fallback_url:
+            homepage = _fetch(
+                session,
+                fallback_url,
+                timeout=request_timeout,
+            )
+
+    if homepage is None:
         return {
             "ok": False,
             "requested_url": url,

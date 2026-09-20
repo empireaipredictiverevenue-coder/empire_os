@@ -198,3 +198,21 @@ def test_non_managed_service_candidate_is_skipped_before_probe():
     assert result.proposed == 0
     assert result.skipped_ineligible == 1
     assert called == []
+
+
+def test_unlinked_but_verified_candidate_can_still_enter_review():
+    class UnlinkedRequest(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if method == "GET" and path.startswith("/rest/v1/prospect_entity_links?"):
+                return []
+            return super().__call__(method, path, payload=payload, **kwargs)
+
+    request = UnlinkedRequest()
+    result = run_buyer_review_materializer(
+        request,
+        probe=strong_probe,
+        scan_limit=5,
+        proposal_limit=1,
+    )
+    assert result.proposed == 1
+    assert request.posts[0][1]["p_entity_id"] is None
