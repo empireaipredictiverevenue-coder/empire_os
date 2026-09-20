@@ -25,6 +25,7 @@ from empire_os.qualification_worker_v2 import request_json
 
 Request = Callable[..., Any]
 Probe = Callable[[dict[str, Any]], dict[str, Any]]
+Defer = Callable[[Mapping[str, Any]], bool]
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,7 @@ class BuyerReviewMaterializerResult:
     proposed: int
     skipped_existing: int
     skipped_ineligible: int
+    deferred_enrichment: int
     rejection_counts: tuple[tuple[str, int], ...]
     errors: tuple[str, ...]
 
@@ -48,6 +50,7 @@ class BuyerReviewMaterializerResult:
             "proposed": self.proposed,
             "skipped_existing": self.skipped_existing,
             "skipped_ineligible": self.skipped_ineligible,
+            "deferred_enrichment": self.deferred_enrichment,
             "rejection_counts": dict(self.rejection_counts),
             "errors": list(self.errors),
             "actual_revenue": False,
@@ -90,7 +93,11 @@ def fetch_candidate_rows(
                 "status,notes,contact_name,contact_title,contact_source,"
                 "contacted_status,created_at"
             ),
-            "order": "buy_signal_score.desc.nullslast,created_at.desc",
+            "order": (
+                "created_at.desc"
+                if offset == 0
+                else "buy_signal_score.desc.nullslast,created_at.desc"
+            ),
             "limit": bounded,
             "offset": offset,
         },
@@ -172,6 +179,7 @@ def run_buyer_review_materializer(
     request: Request = request_json,
     *,
     probe: Probe = run_buyer_probe,
+    defer: Defer | None = None,
     scan_limit: int = 25,
     proposal_limit: int = 5,
     scan_offset: int = 0,
@@ -186,6 +194,7 @@ def run_buyer_review_materializer(
     workers = max(1, min(int(probe_workers), 24))
 
     eligible = probed = review_ready = proposed = skipped_ineligible = 0
+    deferred_enrichment = 0
     rejection_counts: Counter[str] = Counter()
     errors: list[str] = []
     work: list[tuple[Any, dict[str, Any]]] = []
@@ -206,6 +215,27 @@ def run_buyer_review_materializer(
             return candidate, probe(probe_row), None
         except Exception as exc:
             return candidate, None, exc
+
+    def queue_deferred(candidate, reason: str) -> None:
+        nonlocal deferred_enrichment
+        if defer is None:
+            return
+        payload = {
+            "prospect_id": candidate.prospect_id,
+            "business_name": candidate.business_name,
+            "website": candidate.website,
+            "phone": getattr(candidate, "phone", None),
+            "entity_id": getattr(candidate, "entity_id", None),
+            "reason": reason,
+        }
+        try:
+            if defer(payload):
+                deferred_enrichment += 1
+        except Exception as exc:
+            errors.append(
+                f"{candidate.prospect_id}:defer:"
+                f"{type(exc).__name__}:{str(exc)[:160]}"
+            )
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(do_probe, item) for item in work]
@@ -232,13 +262,16 @@ def run_buyer_review_materializer(
                     if result.get("review_ready") is True
                     else rejection_reason(dict(result))
                 )
-                rejection_counts[reason or "contact_not_ready"] += 1
+                reason = reason or "contact_not_ready"
+                rejection_counts[reason] += 1
+                queue_deferred(candidate, reason)
                 skipped_ineligible += 1
                 continue
 
             decision = result.get("decision_maker")
             if not isinstance(decision, Mapping):
                 rejection_counts["decision_maker_missing"] += 1
+                queue_deferred(candidate, "decision_maker_missing")
                 skipped_ineligible += 1
                 continue
             try:
@@ -249,6 +282,7 @@ def run_buyer_review_materializer(
                 decision_score = 0.0
             if decision_score < 0.70:
                 rejection_counts["decision_score_below_floor"] += 1
+                queue_deferred(candidate, "decision_score_below_floor")
                 skipped_ineligible += 1
                 continue
 
@@ -298,6 +332,7 @@ def run_buyer_review_materializer(
         proposed=proposed,
         skipped_existing=skipped_existing,
         skipped_ineligible=skipped_ineligible,
+        deferred_enrichment=deferred_enrichment,
         rejection_counts=tuple(sorted(rejection_counts.items())),
         errors=tuple(errors),
     )

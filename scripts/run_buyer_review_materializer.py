@@ -5,6 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
+from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
 from empire_os.buyer_review_materializer import run_buyer_review_materializer
 
 STATE = Path("/srv/empire_os/runtime/buyer_review_materializer/state.json")
@@ -45,7 +46,9 @@ def main() -> int:
         ),
     )
     offset = 0 if scan_fresh else backlog_offset
+    deferred_queue = BuyerDeferredEnrichmentQueue()
     result = run_buyer_review_materializer(
+        defer=deferred_queue.enqueue,
         scan_limit=args.scan_limit,
         proposal_limit=args.proposal_limit,
         scan_offset=offset,

@@ -179,8 +179,6 @@ class LocalJobQueue:
         delay_seconds: int = 30,
         max_attempts: int = 3,
     ) -> CoderJob:
-        if job.attempts >= max(1, int(max_attempts)):
-            return self.fail(job, error)
         current = self.running / f"{self._safe_id(job.id)}.json"
         with self._locked():
             if not current.exists():
@@ -191,8 +189,11 @@ class LocalJobQueue:
             now = datetime.now(timezone.utc)
             active.status = JobStatus.PENDING
             active.error = str(error)[:4000]
+            retry_delay = max(1, int(delay_seconds))
+            if active.attempts >= max(1, int(max_attempts)):
+                retry_delay = max(retry_delay, 600)
             active.retry_after = (
-                now + timedelta(seconds=max(1, int(delay_seconds)))
+                now + timedelta(seconds=retry_delay)
             ).isoformat()
             active.lease_id = None
             active.worker_id = None
@@ -257,23 +258,21 @@ class LocalJobQueue:
                 stale = stale_by_mtime or stale_by_lease
                 if not stale:
                     continue
-                if job.attempts >= max(1, int(max_attempts)):
-                    job.status = JobStatus.FAILED
-                    job.error = "stale_job_attempt_limit_reached"
-                    job.lease_id = None
-                    job.worker_id = None
-                    job.heartbeat_at = None
-                    job.lease_expires_at = None
-                    job.updated_at = utc_now()
-                    self._write(path, job)
-                    path.replace(self.failed / path.name)
-                    continue
                 job.status = JobStatus.PENDING
                 job.lease_id = None
                 job.worker_id = None
                 job.heartbeat_at = None
                 job.lease_expires_at = None
-                job.retry_after = None
+                job.error = (
+                    "stale_worker_retry_deferred"
+                    if job.attempts >= max(1, int(max_attempts))
+                    else job.error
+                )
+                job.retry_after = (
+                    (now + timedelta(minutes=10)).isoformat()
+                    if job.attempts >= max(1, int(max_attempts))
+                    else None
+                )
                 job.updated_at = utc_now()
                 destination = self.pending / path.name
                 self._write(path, job)
