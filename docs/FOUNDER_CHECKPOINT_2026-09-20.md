@@ -199,3 +199,8 @@ Founder Objectives and Revenue Pulse are mounted on the private Founder read API
 Legacy market-sweep execution exists in hub.py but is intentionally retired with HTTP 410 and points to the governed Source Mesh.
 Modern reusable components already exist: real scanner modules, Source Mesh/acquisition architecture, Market Intent Intelligence Node, Commander market-sweep reporting, and Market Scanner product architecture.
 What remains is a canonical OBSERVE-first Market Sweep orchestrator/read-model that composes those modern components without reviving legacy SQLite/remote-scanner execution.
+
+## Asset holding / market sweep closeout
+Added a non-destructive Asset Holding & Salvage policy and an isolated incubator path for useful work that is wanted but not yet production-ready.
+Legacy Market Sweep work exists (retired /v1/sweep/run, Commander sweep reporting, scanners, Market Scanner/Source Mesh blueprint), but the canonical modern sweep orchestrator remains a rebuild-later item over Source Mesh + Intelligence Fabric.
+Legacy okf_tracker.py is classified SALVAGE_CANDIDATE / REBUILD_LATER; the replacement Founder Objectives layer is evidence-backed and OBSERVE-only.
