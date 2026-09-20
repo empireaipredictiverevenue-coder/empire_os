@@ -11,6 +11,7 @@ from empire_os.enterprise_controls import ControlEvidence, SloObservation
 from empire_os.enterprise_drift import review_enterprise_drift
 from empire_os.enterprise_freshness import review_enterprise_evidence
 from empire_os.enterprise_review import review_enterprise_readiness
+from empire_os.enterprise_remediation import review_enterprise_remediation
 from empire_os.enterprise_registry import EnterpriseReadinessRecord
 
 
@@ -121,6 +122,51 @@ def create_enterprise_router(
             "backup_mutation": False,
             "slo_target_mutation": False,
             "compliance_mutation": False,
+            "review": review.as_dict(),
+        }
+
+    @router.post("/remediation/preview")
+    def remediation_preview(req: EnterpriseFreshnessRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            controls = tuple(
+                ControlEvidence(**row.model_dump()) for row in req.controls
+            )
+            slos = tuple(
+                SloObservation(**row.model_dump()) for row in req.slos
+            )
+            freshness = review_enterprise_evidence(
+                controls=controls,
+                slos=slos,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+            review = review_enterprise_remediation(
+                controls=controls,
+                slos=slos,
+                freshness=freshness,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "side_effects": "none",
+            "execution_authority": "none",
+            "control_mutation": False,
+            "infrastructure_mutation": False,
+            "identity_mutation": False,
+            "backup_mutation": False,
+            "slo_target_mutation": False,
+            "compliance_mutation": False,
+            "deployment_execution": False,
             "review": review.as_dict(),
         }
 

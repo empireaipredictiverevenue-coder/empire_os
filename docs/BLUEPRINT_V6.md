@@ -411,6 +411,8 @@ Fourth slice ✅ local/tested: preview-only enterprise evidence review now check
 
 Fifth slice ✅ local/tested: Enterprise drift review compares prior and current control/SLO evidence only when both snapshots are fresh, chronologically valid and structurally comparable. Control state direction and SLO margin trend are derived from observed evidence; missing matches, unknown SLO values and stale/future evidence remain explicit blockers. No infrastructure, identity, backup, SLO-target, compliance or control mutation authority is introduced.
 
+Sixth slice ✅ local/tested: Enterprise remediation triage now converts fresh failed/unknown controls and SLO breaches into an operator review queue while preserving stale/future evidence blockers. Triage cannot mutate controls, infrastructure, identities, backups, SLO targets, compliance state or deployments.
+
 ### Phase 18 — Full Autonomous Revenue OS
 Astra detects → predicts economics → selects market → creates acquisition/content/ads → finds buyers → runs conversations → closes → verifies payment → delivers → measures actual profit → learns → reallocates.
 
