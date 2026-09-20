@@ -531,3 +531,38 @@ def test_strategy_control_tower_is_read_only():
     assert body["control_tower"]["execution_authority"] == "none"
     assert body["control_tower"]["market_entry_execution"] is False
     assert body["brief"]["execution_performed"] is False
+
+
+def test_typed_decision_dataset_api_marks_fixture_unfit_for_promotion():
+    rows = [{
+        "case_id": "r1",
+        "task_key": "reply_classification",
+        "inputs": {"body_text": "Please unsubscribe me."},
+        "ground_truth": "unsubscribe",
+        "label_source": "deterministic_regression_fixture",
+        "source_ref": "fixture:r1",
+        "synthetic_test_fixture": True,
+    }]
+    freeze = client().post(
+        "/v1/strategy/typed-decision/dataset/freeze/preview",
+        json={"dataset_id": "reply-fixture", "version": "v1", "rows": rows},
+    )
+    assert freeze.status_code == 200
+    manifest = freeze.json()
+    assert manifest["synthetic_test_fixture_count"] == 1
+    assert manifest["eligible_for_production_promotion_evidence"] is False
+
+    verify = client().post(
+        "/v1/strategy/typed-decision/dataset/verify",
+        json={"data": manifest},
+    )
+    assert verify.status_code == 200
+    assert verify.json()["valid"] is True
+
+    ready = client().post(
+        "/v1/strategy/typed-decision/dataset/readiness/preview",
+        json={"manifest": manifest, "minimum_per_label": 1},
+    )
+    assert ready.status_code == 200
+    assert ready.json()["ready_for_provider_promotion_eval"] is False
+    assert "synthetic_test_fixtures_present" in ready.json()["blockers"]

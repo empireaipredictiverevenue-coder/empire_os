@@ -66,6 +66,11 @@ from empire_os.strategy_control_tower import (
     build_strategy_brief,
     build_strategy_control_tower,
 )
+from empire_os.typed_decision_dataset import (
+    dataset_readiness,
+    freeze_dataset,
+    verify_frozen_dataset,
+)
 
 
 class DataRequest(BaseModel):
@@ -158,6 +163,17 @@ class StrategyControlTowerRequest(BaseModel):
     partnership_portfolio: dict[str, Any] = Field(default_factory=dict)
     scenario_set: dict[str, Any] = Field(default_factory=dict)
     max_brief_items: int = 7
+
+
+class DatasetFreezeRequest(BaseModel):
+    dataset_id: str
+    version: str
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DatasetReadinessRequest(BaseModel):
+    manifest: dict[str, Any] = Field(default_factory=dict)
+    minimum_per_label: int = 20
 
 
 def create_strategy_router() -> APIRouter:
@@ -477,6 +493,34 @@ def create_strategy_router() -> APIRouter:
                     max_items=req.max_brief_items,
                 ),
             }
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/dataset/freeze/preview")
+    def typed_decision_dataset_freeze(req: DatasetFreezeRequest):
+        try:
+            return freeze_dataset(
+                req.rows,
+                dataset_id=req.dataset_id,
+                version=req.version,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/dataset/verify")
+    def typed_decision_dataset_verify(req: DataRequest):
+        try:
+            return verify_frozen_dataset(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/dataset/readiness/preview")
+    def typed_decision_dataset_readiness(req: DatasetReadinessRequest):
+        try:
+            return dataset_readiness(
+                req.manifest,
+                minimum_per_label=req.minimum_per_label,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
