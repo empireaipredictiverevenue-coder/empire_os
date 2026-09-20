@@ -1,7 +1,9 @@
 """Resumable plan, implementation and verification worker for Empire Coder."""
 from __future__ import annotations
 
+import os
 import sys
+import threading
 from typing import Any
 
 from .jobs import CoderJob, JobKind, LocalJobQueue
@@ -14,26 +16,85 @@ class CoderTaskWorker:
         coder: EmpireCoder,
         queue: LocalJobQueue,
         *,
-        stale_seconds: int = 1800,
+        stale_seconds: int = 240,
+        lease_seconds: int = 240,
+        heartbeat_seconds: int = 30,
+        max_attempts: int = 3,
     ) -> None:
         self.coder = coder
         self.queue = queue
         self.stale_seconds = max(60, int(stale_seconds))
+        self.lease_seconds = max(60, int(lease_seconds))
+        self.heartbeat_seconds = max(10, int(heartbeat_seconds))
+        self.max_attempts = max(1, int(max_attempts))
+
+    @staticmethod
+    def _transient_error(exc: Exception) -> bool:
+        text = f"{exc.__class__.__name__}:{exc}".lower()
+        return any(
+            token in text
+            for token in (
+                "timeout",
+                "temporarily unavailable",
+                "connection reset",
+                "connection refused",
+                "ollama_request_failed",
+                "service unavailable",
+            )
+        )
+
+    def _heartbeat_loop(
+        self,
+        job: CoderJob,
+        stop: threading.Event,
+    ) -> None:
+        while not stop.wait(self.heartbeat_seconds):
+            try:
+                self.queue.heartbeat(
+                    job,
+                    lease_seconds=self.lease_seconds,
+                )
+            except Exception:
+                return
 
     def run_once(self) -> CoderJob | None:
         self.queue.recover_stale(
             stale_seconds=self.stale_seconds,
+            max_attempts=self.max_attempts,
         )
-        job = self.queue.claim_next()
+        job = self.queue.claim_next(
+            worker_id=f"pid:{os.getpid()}",
+            lease_seconds=self.lease_seconds,
+        )
         if job is None:
             return None
+
+        stop = threading.Event()
+        heartbeat = threading.Thread(
+            target=self._heartbeat_loop,
+            args=(job, stop),
+            daemon=True,
+            name=f"coder-heartbeat-{job.id[-8:]}",
+        )
+        heartbeat.start()
         try:
             result = self._process(job)
         except Exception as exc:
-            return self.queue.fail(
-                job,
-                f"{exc.__class__.__name__}:{exc}",
-            )
+            stop.set()
+            heartbeat.join(timeout=2)
+            error = f"{exc.__class__.__name__}:{exc}"
+            if self._transient_error(exc):
+                delay = min(300, 30 * (2 ** max(0, job.attempts - 1)))
+                return self.queue.retry(
+                    job,
+                    error,
+                    delay_seconds=delay,
+                    max_attempts=self.max_attempts,
+                )
+            return self.queue.fail(job, error)
+
+        stop.set()
+        heartbeat.join(timeout=2)
         return self.queue.complete(job, result)
 
     def _process(self, job: CoderJob) -> dict[str, Any]:

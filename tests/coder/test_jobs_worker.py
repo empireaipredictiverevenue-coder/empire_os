@@ -282,3 +282,43 @@ def test_worker_verify_rejects_non_test_paths(tmp_path):
 
     assert result.status is JobStatus.FAILED
     assert "repository test files" in (result.error or "")
+
+def test_claim_sets_lease_and_heartbeat(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    job = queue.enqueue(task_id="coder_task_lease", kind=JobKind.PLAN)
+    claimed = queue.claim_next(worker_id="worker:test", lease_seconds=120)
+    assert claimed.id == job.id
+    assert claimed.lease_id
+    assert claimed.worker_id == "worker:test"
+    assert claimed.heartbeat_at
+    assert claimed.lease_expires_at
+    refreshed = queue.heartbeat(claimed, lease_seconds=180)
+    assert refreshed.lease_id == claimed.lease_id
+    assert refreshed.status is JobStatus.RUNNING
+
+
+class TimeoutCoder(FakeCoder):
+    def planner_model_draft(self, task_id, instruction, context, **kwargs):
+        raise RuntimeError("ollama_request_failed:TimeoutError")
+
+
+def test_worker_retries_transient_model_failure(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = TimeoutCoder()
+    worker = CoderTaskWorker(
+        coder,
+        queue,
+        stale_seconds=60,
+        lease_seconds=60,
+        heartbeat_seconds=10,
+        max_attempts=3,
+    )
+    job = queue.enqueue(task_id="coder_task_retry", kind=JobKind.PLAN)
+    result = worker.run_once()
+    assert result.id == job.id
+    assert result.status is JobStatus.PENDING
+    assert result.attempts == 1
+    assert result.retry_after
+    assert "ollama_request_failed" in (result.error or "")

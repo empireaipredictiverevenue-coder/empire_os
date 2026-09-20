@@ -42,7 +42,31 @@ def parser() -> argparse.ArgumentParser:
         type=int,
         default=_env_int(
             "EMPIRE_CODER_JOB_STALE_SECONDS",
-            1800,
+            240,
+        ),
+    )
+    p.add_argument(
+        "--lease-seconds",
+        type=int,
+        default=_env_int(
+            "EMPIRE_CODER_JOB_LEASE_SECONDS",
+            240,
+        ),
+    )
+    p.add_argument(
+        "--heartbeat-seconds",
+        type=int,
+        default=_env_int(
+            "EMPIRE_CODER_JOB_HEARTBEAT_SECONDS",
+            30,
+        ),
+    )
+    p.add_argument(
+        "--max-attempts",
+        type=int,
+        default=_env_int(
+            "EMPIRE_CODER_JOB_MAX_ATTEMPTS",
+            3,
         ),
     )
     p.add_argument(
@@ -68,6 +92,9 @@ def main(argv=None) -> int:
         coder,
         queue,
         stale_seconds=args.stale_seconds,
+        lease_seconds=args.lease_seconds,
+        heartbeat_seconds=args.heartbeat_seconds,
+        max_attempts=args.max_attempts,
     ).run_once()
 
     if job is None:
@@ -83,7 +110,10 @@ def main(argv=None) -> int:
         indent=2,
         sort_keys=True,
     ))
-    return 0 if job.status is JobStatus.COMPLETED else 2
+    return 0 if job.status in {
+        JobStatus.COMPLETED,
+        JobStatus.PENDING,
+    } else 2
 
 
 if __name__ == "__main__":
