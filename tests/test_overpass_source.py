@@ -160,3 +160,20 @@ def test_healthy_zero_overpass_response_is_not_an_outage(monkeypatch):
     )
 
     assert overpass._request_overpass("query") == {"elements": []}
+
+
+def test_fetch_retries_smaller_radius_after_source_failure(monkeypatch):
+    calls = []
+
+    def request(query):
+        calls.append(query)
+        if len(calls) < 3:
+            raise RuntimeError("overloaded")
+        return {"elements": []}
+
+    monkeypatch.setattr(overpass, "_request_overpass", request)
+    result = overpass._fetch(41.878113, -87.629799, radius=25000, limit=5)
+    assert result == []
+    assert "around:25000" in calls[0]
+    assert "around:12000" in calls[1]
+    assert "around:6000" in calls[2]

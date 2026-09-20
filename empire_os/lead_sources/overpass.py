@@ -48,6 +48,7 @@ OVERPASS_ENDPOINTS = (
 )
 
 RADIUS_M = 25000
+FALLBACK_RADII_M = (12000, 6000)
 MAX_RESULTS = 200
 QUERY_TIMEOUT_SECONDS = 25
 NETWORK_TIMEOUT_SECONDS = 35
@@ -264,9 +265,26 @@ def _fetch(
     radius: int = RADIUS_M,
     limit: int = MAX_RESULTS,
 ) -> list[LeadCandidate]:
-    data = _request_overpass(
-        _query(lat, lon, radius)
+    radii = [radius]
+    radii.extend(
+        value for value in FALLBACK_RADII_M
+        if value < radius and value not in radii
     )
+    last_error: Exception | None = None
+    data = None
+    for query_radius in radii:
+        try:
+            data = _request_overpass(
+                _query(lat, lon, query_radius)
+            )
+            break
+        except RuntimeError as exc:
+            last_error = exc
+
+    if data is None:
+        raise RuntimeError(
+            "Overpass failed at all bounded radii"
+        ) from last_error
 
     results = []
 

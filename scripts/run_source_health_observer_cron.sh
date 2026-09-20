@@ -13,19 +13,24 @@ readarray -t acquisition_state < <(
   /srv/empire_os/.venv/bin/python - <<'PY'
 import json
 from pathlib import Path
-path = Path('/srv/empire_os/runtime/acquisition/latest.json')
+
+latest_path = Path('/srv/empire_os/runtime/acquisition/latest.json')
+success_path = Path('/srv/empire_os/runtime/acquisition/last_success.json')
 try:
-    data = json.loads(path.read_text(encoding='utf-8'))
+    latest = json.loads(latest_path.read_text(encoding='utf-8'))
 except Exception:
-    data = {}
-tail = str(data.get('stdout_tail') or '')
+    latest = {}
+try:
+    success = json.loads(success_path.read_text(encoding='utf-8'))
+except Exception:
+    success = {}
+
 authorized = bool(
-    data.get('real_data_only') is True
-    and data.get('ok') is True
-    and '"msg": "prospect_acquired"' in tail
+    success.get('canonical_writes') is True
+    and success.get('real_data_only') is True
 )
 print('true' if authorized else 'false')
-print(str(data.get('metro') or 'Austin, TX'))
+print(str(latest.get('metro') or success.get('metro') or 'Austin, TX'))
 PY
 )
 

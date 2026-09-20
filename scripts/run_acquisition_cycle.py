@@ -20,6 +20,7 @@ ROOT = Path("/srv/empire_os")
 RUNTIME = ROOT / "runtime" / "acquisition"
 STATE = RUNTIME / "state.json"
 LATEST = RUNTIME / "latest.json"
+LAST_SUCCESS = RUNTIME / "last_success.json"
 LOCK = RUNTIME / "cycle.lock"
 
 
@@ -89,13 +90,19 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
             encoding="utf-8",
         )
 
-        if result["ok"]:
-            STATE.write_text(
+        if (
+            result["ok"]
+            and '"msg": "prospect_acquired"' in (completed.stdout or "")
+        ):
+            LAST_SUCCESS.write_text(
                 json.dumps(
                     {
-                        "next_index": (index + 1) % len(metros),
-                        "last_metro": metro,
-                        "updated_at": _now(),
+                        "schema_version": "acquisition_success.v1",
+                        "observed_at": _now(),
+                        "source": "overpass",
+                        "metro": metro,
+                        "canonical_writes": True,
+                        "real_data_only": True,
                     },
                     indent=2,
                     sort_keys=True,
@@ -103,6 +110,24 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
                 + "\n",
                 encoding="utf-8",
             )
+
+        # Always rotate after a bounded attempt. A dense/temporarily overloaded
+        # metro must not pin acquisition indefinitely. Failure remains visible
+        # in latest.json while the next scheduled run tries another real metro.
+        STATE.write_text(
+            json.dumps(
+                {
+                    "next_index": (index + 1) % len(metros),
+                    "last_metro": metro,
+                    "last_ok": result["ok"],
+                    "updated_at": _now(),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
         return result
 
