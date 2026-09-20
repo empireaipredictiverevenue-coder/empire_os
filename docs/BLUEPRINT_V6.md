@@ -247,6 +247,8 @@ Fourth slice ✅ local/tested: evidence-only qualification review now accepts qu
 
 Fifth slice ✅ local/tested: qualification freshness review now checks every explicit inbound qualification signal timestamp against a bounded freshness window. Stale, future-dated or missing explicit qualification evidence blocks operator review, while plain transcript text still cannot create inferred qualification. Send, call, voice-streaming and booking authority stay disabled.
 
+Sixth slice ✅ local/tested: human-escalation readiness now requires fresh explicit inbound qualification evidence plus an existing canonical closer-case link. Passing the review only makes the conversation eligible for human closer review; call execution, voice streaming, booking, sends and closer-state mutation remain disabled.
+
 ### Phase 8 — Revenue CRM
 
 Second slice ✅ local/tested: next-action recommendations now require canonical conversation/closer/fulfilment/buyer evidence refs, preserve unknown capacity as unknown, and can cite verified buyer capacity without mutating CRM state or sending follow-up.
