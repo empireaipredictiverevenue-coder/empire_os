@@ -112,7 +112,10 @@ def fetch_candidate_rows(
                 "limit": 1,
             },
         )
-        if reviews:
+        if any(
+            str(item.get("status") or "") in {"pending", "approved"}
+            for item in reviews
+        ):
             skipped_existing += 1
             continue
 
