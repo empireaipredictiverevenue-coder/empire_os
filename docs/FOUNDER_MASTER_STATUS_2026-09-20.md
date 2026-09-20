@@ -96,7 +96,48 @@ Canonical saved documents include:
 - RD_DEPARTMENT_BLUEPRINT.md
 - STRATEGY_DEPARTMENT_BLUEPRINT.md
 - SEARCH_INTELLIGENCE.md
+- LEGACY_ASSET_SALVAGE_AUDIT_2026-09-20.md
+- GTMSWARM_V4_SALVAGE_2026-09-20.md
 - Phase 3E/3F and Phase 4 activation docs
+
+### Explicit salvage-source inventory
+The named salvage material sent by the Founder is represented in the saved reconciliation docs:
+- `Steps to Deploy and Run Neural Scout (1).zip`
+  -> reconciled in `LEGACY_ASSET_SALVAGE_AUDIT_2026-09-20.md`.
+- `How to Generate Roofing Leads with Professional Outreach.zip`
+  -> reconciled in `LEGACY_ASSET_SALVAGE_AUDIT_2026-09-20.md`.
+- `EMPIRE AI - MULTI-NICHE OPEN-SOURCE GTM SWARM, FULFILLMENT & VIDEO PIPELINE BLUEPRINT`
+  -> reconciled in `GTMSWARM_V4_SALVAGE_2026-09-20.md`.
+- `EMPIRE AI: THE ULTIMATE 100K/MONTH AI AGENCY & REVENUE ENGINE (v4.0 ARCHITECTURAL EDITION)`
+  -> reconciled in `GTMSWARM_V4_SALVAGE_2026-09-20.md`.
+
+Raw archives are intentionally not committed into production Git because they contain obsolete architecture, mock/synthetic material and secret-like configuration patterns. Recovered components, decisions and deferred items remain tracked through the salvage audits, Blueprint and Closure Ledger.
+
+### From-the-start historical project lineage
+The following early Empire projects/repos are preserved as historical lineage and mapped into the modern architecture rather than treated as separate authorities:
+- `Empire-Ai`
+- `empire-revenue-pulse`
+- `empire-revenue-pulsev2`
+- `warehouse-sniper`
+- `empire-scanner`
+- `api`
+- `Empire-USA-Strike`
+- `empire-architect`
+- `Empire--AI-The-Predictive-Cloud`
+- `self-improving-landing-page`
+- historical `pay-per-call-empire` / marketplace work
+- early Neural Scout / Satellite Sniper / Warehouse Sniper / Market Scanner work
+- early Sovereign Vault / Ghost Protocol / Truth Portal / Ghost Ledger / Hall of Fame / Sniper Leaderboard / Live Strike Zone / Partner Network surfaces
+- early Concierge / CRM / AI Closer / call-system work
+- early ad-builder / media-buyer / RL optimization work
+- early Predictive Cloud / forecasting / churn / LTV / growth-AI work
+- early multi-tenant / white-label / affiliate / subscription / usage-billing work
+- early Search Fabric / SERP / zero-key search / Apollo-style company search / Hunter-style contact discovery work
+- early Omega / Cortex / Synthetic Brain / SI Brain / strategy evolution / North Mini work
+- early evaluation-product / hourly-intelligence / PPL / PPS / PPC / hybrid metering concepts
+- early investor deck / technical architecture / onboarding / legal-compliance / enterprise-readiness deliverables
+
+These are not assumed complete merely because the concept or old code existed. Their surviving value is reconciled through the Closure Ledger, Blueprint, salvage audits and current canonical modules.
 
 The Closure Ledger additionally preserves:
 - TAM / Business Entity Graph / Buyer Intelligence.
