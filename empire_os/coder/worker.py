@@ -37,6 +37,44 @@ class CoderTaskWorker:
 
     def _process(self, job: CoderJob) -> dict[str, Any]:
         task = self.coder.load_task(job.task_id)
+
+        if job.kind is JobKind.VERIFY:
+            changed_files = tuple(
+                str(value).strip()
+                for value in (job.payload.get("changed_files") or ())
+                if str(value).strip()
+            )
+            tests = tuple(
+                str(value).strip()
+                for value in (job.payload.get("tests") or ())
+                if str(value).strip()
+            )
+            if not changed_files:
+                raise ValueError("VERIFY requires changed_files")
+            if any(
+                not test.startswith("tests/") or not test.endswith(".py")
+                for test in tests
+            ):
+                raise ValueError("VERIFY tests must be repository test files")
+            commands = (
+                (("pytest", "-q", *tests),)
+                if tests
+                else ()
+            )
+            verification = self.coder.verify(
+                task.id,
+                changed_files=changed_files,
+                commands=commands,
+            )
+            return {
+                "kind": job.kind.value,
+                "changed_files": list(changed_files),
+                "tests": list(tests),
+                "verification": verification.as_dict(),
+                "model_inference": False,
+                "production_mutation": False,
+            }
+
         terms = tuple(job.payload.get("terms") or ())
         symbols = tuple(job.payload.get("symbols") or ())
         budget = int(job.payload.get("budget_chars") or 12000)

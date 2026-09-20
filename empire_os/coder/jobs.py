@@ -17,6 +17,7 @@ from .policy import resolve_runtime_root, resolve_workspace
 class JobKind(str, Enum):
     PLAN = "PLAN"
     IMPLEMENT = "IMPLEMENT"
+    VERIFY = "VERIFY"
     NEXT_COMMAND = "NEXT_COMMAND"
 
 

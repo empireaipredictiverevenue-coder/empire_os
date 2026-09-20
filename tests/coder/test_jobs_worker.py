@@ -230,3 +230,49 @@ def test_finish_returns_recovered_pending_job_instead_of_raising(tmp_path):
 
     assert recovered.status is JobStatus.PENDING
     assert queue.get(job.id).status is JobStatus.PENDING
+
+
+def test_worker_verify_runs_deterministic_tests_without_model_context(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = FakeCoder()
+    worker = CoderTaskWorker(coder, queue)
+    job = queue.enqueue(
+        task_id="coder_task_verify",
+        kind=JobKind.VERIFY,
+        payload={
+            "changed_files": ["empire_os/example.py"],
+            "tests": ["tests/test_example.py"],
+        },
+    )
+
+    result = worker.run_once()
+
+    assert result.status is JobStatus.COMPLETED
+    assert result.result["kind"] == "VERIFY"
+    assert result.result["model_inference"] is False
+    assert result.result["production_mutation"] is False
+    assert not any(call[0] == "build_context" for call in coder.calls)
+    verify_call = next(call for call in coder.calls if call[0] == "verify")
+    assert verify_call[2] == ("empire_os/example.py",)
+    assert verify_call[3] == (("pytest", "-q", "tests/test_example.py"),)
+
+
+def test_worker_verify_rejects_non_test_paths(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = FakeCoder()
+    worker = CoderTaskWorker(coder, queue)
+    job = queue.enqueue(
+        task_id="coder_task_verify_bad",
+        kind=JobKind.VERIFY,
+        payload={
+            "changed_files": ["empire_os/example.py"],
+            "tests": ["scripts/deploy.py"],
+        },
+    )
+
+    result = worker.run_once()
+
+    assert result.status is JobStatus.FAILED
+    assert "repository test files" in (result.error or "")
