@@ -30,6 +30,19 @@ Canonical references:
 - docs/history/VULTR_BILLION_SCALE_ANALYSIS_RECOVERED_2026-09-20.txt
 
 
+## Current Launch Checkpoint — 2026-09-20
+
+- Genuine buyer emails with provider-confirmed delivery: **3** — Kihle Roofing, Archway Roofing and Prodigy Restoration.
+- Genuine replies/conversations: **0**.
+- Accepted commercial terms: **0**.
+- Verified buyer capacity / fulfilment orders: **0**.
+- Verified BSC USDT payments: **0**.
+- Recognized revenue / realized GP: **0**.
+- Astra now performs bounded internal launch orchestration every cycle; consequential commercial authority remains gated.
+- Founder Console private read model/services are live; specialist dashboards remain drill-down surfaces.
+- Empire Coder now has a dependable deterministic VERIFY lane; Hermes-generated patch jobs remain opportunistic rather than authoritative.
+- Immediate launch path: widen verified buyer volume + wait for real replies → closer → commercial terms → capacity/order → BSC payment → fulfilment → Revenue Truth → learning.
+
 ## A. Revenue-Critical Closure Set
 
 | Thread | Current truth | Closure requirement |
@@ -40,10 +53,10 @@ Canonical references:
 | Qualification v2 | Live timer; evidence confidence and unknown dimensions preserved | Continue identity catch-up and first-party evidence lift; no low-confidence promotion |
 | Omega 2 | Live canonical `omega_opportunity` projection now proven | Connect Omega score to read-only buyer readiness, then later allocation under commercial gates; never treat projection as revenue |
 | Buyer matching / allocation | Strict activation, terms, capacity and delivery gates exist | Add Omega-aware readiness; execute only for commercially activated buyers with verified evidence |
-| Buyer discovery | Real company/decision-maker evidence stack exists | Turn verified buyer candidates into commercially activated buyer capacity; no pseudo-buyers |
+| Buyer discovery | Real company/decision-maker evidence stack exists; first-party team/about/contact probing widened; Kihle, Archway and Prodigy have reached provider-confirmed delivery | Keep widening verified buyer volume and move genuine replies into commercially activated buyer capacity; no pseudo-buyers |
 | Amstill / Frank Stilley lane | Candidate + outbound intent previously approved; provider/server wiring was blocked by missing sender env | Re-check canonical readiness/provider key via governed sender path; do not recreate approval gates already passed |
-| Governed outbound | Resend adapter, approval, compliance and lifecycle capture are implemented/local-tested | Complete runtime/provider/migration activation and real send/delivery/reply evidence |
-| AI Closer | Supabase-backed closer state machine exists local/tested; legacy SQLite closer retired | Activate canonical migrations/credentials/OBSERVE worker, then advance only from real buyer replies |
+| Governed outbound | Resend adapter, approval, compliance and lifecycle capture are live; three genuine buyer emails have provider-confirmed delivery | Continue bounded buyer volume, reply capture and governed follow-up; delivery is not revenue |
+| AI Closer | Supabase-backed closer state machine and reply handoff are live behind bounded orchestration; legacy SQLite closer retired | Advance only from genuine buyer replies; no fabricated conversation or acceptance |
 | Commercial terms | Canonical evidence gates exist | Capture real terms, price/capacity/delivery proof; no invented price |
 | Fulfilment orders | Canonical control-plane tables + atomic allocation exist | Create genuine order only after buyer activation and terms; preserve idempotency |
 | BSC USDT direct payment | Canonical rail and independent evidence verifier exist | Issue/verify real request only for genuine order; payment request is not revenue |
@@ -70,12 +83,12 @@ Canonical references:
 
 | Thread | Current truth | Closure requirement |
 |---|---|---|
-| Empire Coder | Native governed coder exists; `IMPLEMENT` job mode added 2026-09-20; 14B normal writer, 30B hard-task writer, 7B planner | Keep implementation/test/verify flow; candidate changes stop before commit/deploy unless separately approved; eliminate stale PLAN backlog |
+| Empire Coder | Native governed coder exists; Hermes provider bridge + deterministic `VERIFY` jobs are live. Buyer/outbound/closer/acquisition/BSC verification batches now complete independently; model-generated `IMPLEMENT` remains timeout-prone | Keep Coder continuously occupied with deterministic VERIFY and narrow implementation work; use model-generated patches only when they complete and pass verification |
 | Coder timeout/race | 600s Ollama stall reduced; queue finish race fixed | Monitor live IMPLEMENT proofs and further reduce model dependence where deterministic code can do the job |
-| Hermes agent | CLI installed; current user provider auth logged out; no active Hermes worker | Use as bounded parallel reviewer/research/orchestration lane once provider/session path is healthy; do not confuse with `hermes_gateway.py` notification router |
+| Hermes agent | CLI/provider bridge is available to Empire Coder and routes to Nemotron; structured-patch calls can still time out | Use Hermes for bounded planning/review/implementation where reliable; deterministic verifier remains authoritative |
 | Empire Ops MCP | Native MCP active on server | Finish privileged allowlisted helper + authenticated exposure; then retire Remote Desktop Commander bootstrap dependency |
 | Remote Desktop Commander | Still available but fragile and blocks privileged bootstrap | Remove from normal production operations once Ops MCP proves service/env control |
-| Astra | Production OBSERVE active | Keep machine coordination in OBSERVE until genuine revenue feedback proves authority expansion |
+| Astra | Observer remains active; bounded internal `GUARDED_EXECUTE` dispatcher now runs allowlisted launch-preparation jobs (source health, buyer review materialization, GTM handoff, closer reply handoff) | Keep consequential authority gated: no governor bypass, binding terms acceptance, fund movement, payment confirmation, revenue recognition, pricing/allocation/model-weight mutation or self-expansion |
 | AGI / System-Two / Verifier / Policy | Architecture and many foundations exist | Integrate around evidence packets and outcome learning; do not claim human-level AGI/ASI or broaden authority silently |
 
 ## D. Intelligence Fabric / TAM / Market Intelligence

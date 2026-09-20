@@ -91,14 +91,14 @@ Commercial products, buyer records/capacity, commercial events, fulfilment, idem
 3B Market materialization ✅ mostly
 3C Canonical acquisition ✅
 3D Buyer matching/allocation ✅
-3E Governed outbound ✅ implementation complete; production runtime/webhook activation gated
-3F Outcome feedback ✅ implementation complete locally; production activation/revenue-proof gates carried forward
+3E Governed outbound ✅ implementation complete; production Resend/runtime/webhook path active with real delivery evidence
+3F Outcome feedback ✅ implementation complete; production revenue/outcome proof gates carried forward
 
-Phase 3 no longer blocks later engineering. Its remaining finish line is one genuine governed buyer → agreement → verified payment → delivery → outcome → recognized revenue loop. That proof remains mandatory before expanding consequential commercial authority, but Phase 4/5 may continue in OBSERVE/local-safe modes.
+Phase 3 no longer blocks later engineering. Its remaining finish line is one genuine governed buyer → agreement → verified payment → delivery → outcome → recognized revenue loop. As of 2026-09-20, three genuine governed buyer outreaches (Kihle Roofing, Archway Roofing and Prodigy Restoration) have reached provider-confirmed delivery. No genuine reply, commercial terms, verified buyer capacity, BSC USDT payment, fulfilment, recognized revenue or realized GP has yet been observed. That proof remains mandatory before expanding consequential commercial authority.
 First-revenue proof readiness ✅ local/tested: `/v1/first-revenue/readiness/preview` now evaluates the exact evidence chain for verified buyer identity + terms + human approval + approved outbound intent + send/delivery + agreement + verified USDT/BSC payment + fulfilment + outcome + recognized revenue. It is preview-only and never sends, charges, fulfils or recognizes revenue itself.
 
 Phase 3E deliverables:
-- Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers. Canonical buyer discovery includes business-web evidence, structured Person extraction, decision-maker authority ranking, current-role reconciliation, personhood-quality guards, domain-integrity checks, offer-fit routing, provenance-aware decision-maker-bound contact evidence, hard-bounded batch site review, separate review-ready/outreach-ready contact gates, recent exact public-record/press-release contact provenance, and governed candidate review. The first real outreach-ready buyer has now progressed through production intent creation and human approval; no send has occurred yet.
+- Buyer discovery from real businesses, not placeholder/public-data pseudo-buyers. Canonical buyer discovery includes business-web evidence, structured Person extraction, decision-maker authority ranking, current-role reconciliation, personhood-quality guards, domain-integrity checks, offer-fit routing, provenance-aware decision-maker-bound contact evidence, hard-bounded batch site review, separate review-ready/outreach-ready contact gates, recent exact public-record/press-release contact provenance, and governed candidate review. First-party people-page probing now includes bounded common team/about/contact paths. Three genuine buyer intents have progressed through governed approval, Resend send and provider-confirmed delivery: Kihle Roofing, Archway Roofing and Prodigy Restoration.
 - Buyer-discovery website evidence now shares the first-party rule with Lead Scoring/Search Fabric: directory/social platform URLs contribute no website score, cannot seed generated work-email patterns, and are never probed as company sites. Accepted `identity_or_direct` acquisition evidence can provide a provenance-preserving first-party website fallback without mutating the canonical prospect row, and canonical first-party evidence wins when present. Public decision-maker evidence is separately fail-closed: official-site role evidence may stand alone, otherwise two independent business-correlated sources must agree on the same person/authority; this never creates contact/outreach authority by itself. An OBSERVE-only buyer-readiness dossier now combines company, decision-maker/contact and existing commercial-activation gates into ordered blockers. All Star Roofing currently reaches corroborated Terry Paris/Owner but remains blocked on a verified person-bound contact, then buyer-record creation. ✅ local/tested
 - Governed Resend outbound with approval, idempotency, opt-out and postal-footer compliance. Canonical DB layer + fail-closed Resend provider adapter + dedicated sender transport are live/tested. Outbound Governor policy engine now automates evidence/compliance decisions across OBSERVE, ASSIST and explicitly enabled GUARDED_EXECUTE modes while preserving role-separated approval/send boundaries.
 - Outreach Intelligence v1 ✅ local/tested: OBSERVE-only account packets now combine fresh evidence-backed triggers, buyer/corridor context, Predictive Revenue economics, verified channel paths, buying-committee evidence, warm-intro options, sequence fatigue/cooldown, proof packs, deliverability review, message constraints, reply routing and attribution. Predictions cannot be represented as actual revenue; no send/SMS/call/booking/CRM/buyer-activation authority is introduced.
@@ -158,28 +158,40 @@ Foundation status — local/tested, production activation gated:
 
 Candidate engineering changes stop at human approval. Commit/push/merge/deploy, production DB changes, service control, outbound, payment/funds and production credentials remain gated.
 
+### Current Launch Checkpoint — 2026-09-20
+- Real delivered buyer outreach: **3** — Kihle Roofing, Archway Roofing, Prodigy Restoration.
+- Genuine buyer replies/conversations observed: **0**.
+- Commercial terms accepted: **0**.
+- Verified buyer capacity / fulfilment orders: **0**.
+- Verified BSC USDT payments: **0**.
+- Recognized revenue / realized GP: **0**.
+- Astra: observer + bounded internal `GUARDED_EXECUTE` dispatcher live.
+- Founder Console: private read-only services live on loopback; specialist Search Command Centre remains a drill-down surface.
+- Empire Coder: Hermes provider available; deterministic VERIFY jobs are live and passing on buyer/outbound/closer/acquisition/BSC slices. Model-generated IMPLEMENT patches remain unreliable because Hermes structured-patch calls can time out, so deterministic verification is the dependable Coder lane today.
+- Launch focus: widen verified buyer volume while waiting for replies, then move real replies through closer → terms → capacity/order → BSC payment → fulfilment → Revenue Truth → learning.
+
 ### Phase 4 — Astra Operating Layer ← CURRENT
 Astra becomes the top coordinator for business priorities, agent routing, bottleneck detection, expected-value decisions, resource allocation, cost control and approval policies. Premium AI is used only when expected value justifies the cost.
 
 Agentic Intelligence Control Plane V1 ✅ local/tested foundation: Empire now separates grounding, perception, temporal world model, memory, goals, planning, model routing, specialists, deliberation, independent verification, simulation, external policy, typed execution, runtime safety, learning, self-improvement, evaluation, agent identity and cognitive audit. The system does not claim proven human-level AGI/ASI; legacy `agi_*` naming grants no authority. Cognitive packets persist evidence/decision summaries rather than private chain-of-thought and cannot execute while OBSERVE.
 
-Phase 4 observer/calibration implementation status — ✅ production OBSERVE active:
+Phase 4 observer/calibration implementation status — ✅ production observer active + bounded internal GUARDED_EXECUTE dispatcher active:
 1. Astra Observer DB Role ✅ — restricted read-only `empire_astra_observer` is live in canonical Supabase; direct DB login remains unused in production.
 2. Astra Role Transport ✅ production — live HTTPS token-authenticated RPC transport permits only feedback and operational-evidence reads; raw observer token stays on EmpireOS and Supabase stores only its SHA-256 hash.
 3. Outcome Calibration Engine ✅ — real Phase 3F conversion/revenue/cost/gross-profit/satisfaction/repeat-purchase calibration with explicit readiness thresholds.
 4. Astra Observer Worker ✅ — bounded feedback read, OBSERVE-only runtime, atomic local snapshot, no fabricated operational counts.
 5. Astra Decision Integration ✅ — verified negative-margin outcomes can elevate a review recommendation without changing prices, budgets, model weights or commercial state.
-6. Astra Operating Board V1 ✅ — deterministic ranked executive work queue across observed workstreams, preserving approval boundaries and intelligence routing while `decide()` remains backward-compatible through the board's primary item. OBSERVE-only; no execution authority.
+6. Astra Operating Board V1 ✅ — deterministic ranked executive work queue across observed workstreams, preserving approval boundaries and intelligence routing while `decide()` remains backward-compatible through the board's primary item. The decision core remains evidence-first; a separate bounded dispatcher may execute only allowlisted internal launch jobs.
 7. Phase 4 Test Suite ✅ — Python, isolated PostgreSQL role/permission, fail-closed CLI and systemd verification are green.
 8. Runtime Packaging ✅ production — owner-only env/token files are active; five-minute cron scheduling with `flock` is live. Systemd service/timer packaging remains staged for a future root-managed install.
 9. Documentation ✅ — `docs/PHASE4_ASTRA_OBSERVER.md`.
 10. Activation Readiness Gate ✅ local/tested — preview-only readiness distinguishes OBSERVE deployment prerequisites from consequential-authority prerequisites; the latter cannot pass until the genuine first-revenue loop is verified.
 11. Secret-safe Activation Preflight ✅ production — owner-only env permissions, OBSERVE mode, HTTPS token transport, policy bindings and persistent scheduler all verify with zero blockers; no secrets are emitted.
-12. Production OBSERVE Activation ✅ — explicit approval granted 2026-09-19; Phase 3F/4 canonical migrations are live, token-authenticated read RPCs are verified, the live observer cycle succeeds against fresh canonical evidence, and `runtime/astra/latest.json` reports `side_effects=none`.
+12. Production Observer Activation ✅ — explicit approval granted 2026-09-19; Phase 3F/4 canonical migrations are live, token-authenticated read RPCs are verified, and the live observer cycle succeeds against fresh canonical evidence. On 2026-09-20 a separate allowlisted `GUARDED_EXECUTE` dispatcher was activated for internal launch preparation only: source-health refresh, buyer-review materialization, GTM pipeline handoff and closer-reply handoff.
 13. Operational Evidence Hardening ✅ production — known smoke/diagnostic GTM failures are audit-visible but excluded from the live failure priority; `buyer_candidates_due` now counts only explicitly `outreach_ready=true` pending reviews; unhealthy real-data sources block buyer sourcing instead of producing a false sourcing recommendation. Live evidence currently shows 0 real failed jobs, 2 diagnostic failures, 0 outreach-ready buyer candidates, 1 pending buyer review, and 0 commercially activated buyer capacity.
 14. Intelligence Cost Routing Review ✅ local/tested — Astra now exposes an OBSERVE-only explanation of rules/local/premium routing with explicit premium budget headroom, expected-value multiple and the 5x premium ROI hurdle. Deterministic/language tasks stay bounded to rules/local; premium routing still requires observed actual revenue, explicit budget, known premium cost and sufficient expected value. The review cannot activate a provider, spend budget, mutate policy or promote a model.
 
-Phase 4 authority remains OBSERVE. A genuine buyer → verified payment → delivery/outcome → recognized revenue → feedback loop is still required before Astra receives consequential commercial authority. Outreach, spend, payments, pricing, allocation, model-weight changes and other mutations remain disabled.
+Phase 4 consequential authority remains gated. Astra now has bounded `GUARDED_EXECUTE` authority for explicitly allowlisted internal launch-preparation jobs, but it may not bypass the outbound governor, accept binding commercial terms, move funds, confirm payment, recognize revenue, mutate pricing/allocation/model weights, expand its own authority or make destructive infrastructure changes. A genuine buyer → verified payment → delivery/outcome → recognized revenue → feedback loop is still required before any broader authority expansion.
 
 ### Cross-Phase Company Operating System — Marketing / R&D / Chief of Staff
 
