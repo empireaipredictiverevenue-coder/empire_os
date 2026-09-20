@@ -70,3 +70,8 @@ Active priorities only:
 
 Everything else is parked unless it directly unblocks one of those three.
 Parallel coder work must map to Priority 1-3 and may not create a new roadmap branch.
+
+## Node expansion
+Solar & Energy and HVAC & Climate Services are now first-class Intelligence Nodes under Priority 2.
+They are not separate roadmap branches; they reuse the shared acquisition, property, weather,
+registry, Search Fabric and canonical Intelligence Fabric foundations.

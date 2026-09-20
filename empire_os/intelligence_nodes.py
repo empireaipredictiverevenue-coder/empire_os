@@ -40,6 +40,42 @@ NODES = (
         ),
     ),
     IntelligenceNode(
+        key="solar_energy",
+        name="Solar & Energy Intelligence Node",
+        market="solar_installers_energy_services_and_property_owners",
+        sensors=(
+            "overpass", "biz_search", "permits", "nws_alerts",
+            "registry", "site_probe", "property_signals",
+        ),
+        products=(
+            "solar_installer_directory", "solar_territory_intelligence",
+            "property_solar_opportunity_map", "permit_trigger_alerts",
+            "commercial_solar_opportunity_feed",
+        ),
+        opportunity_types=(
+            "new_install", "retrofit", "property_fit", "installer_capacity",
+            "storm_replacement", "territory_expansion",
+        ),
+    ),
+    IntelligenceNode(
+        key="hvac_climate",
+        name="HVAC & Climate Services Intelligence Node",
+        market="hvac_contractors_building_services_and_property_operators",
+        sensors=(
+            "overpass", "biz_search", "permits", "nws_alerts",
+            "registry", "site_probe", "property_signals",
+        ),
+        products=(
+            "hvac_contractor_directory", "hvac_territory_intelligence",
+            "replacement_demand_signals", "weather_load_alerts",
+            "building_upgrade_opportunity_feed",
+        ),
+        opportunity_types=(
+            "replacement_cycle", "weather_demand", "new_system",
+            "property_upgrade", "contractor_capacity", "territory_expansion",
+        ),
+    ),
+    IntelligenceNode(
         key="property",
         name="Property Opportunity Node",
         market="property_and_facilities",
