@@ -165,3 +165,7 @@ Placeholder personalization is no longer allowed into a proposed outbound intent
 - Above Ground Roofing was deliberately not re-ingested because legacy duplicates already exist.
 - Revenue Pulse restoration is active and queued to Empire Coder as a canonical V3 read-model against current Supabase/revenue truth.
 - Old Revenue Pulse standalone Supabase, legacy SQLite delivery and forecast-as-revenue behavior remain retired.
+
+## Search Product native crawler
+Empire Web Intelligence Crawler is canonical; Firecrawl remains reference-only and is not adopted as runtime/service dependency.
+Search Product now exposes an OBSERVE-only native crawl preview that converts Search Fabric site_probe evidence into bounded technical findings (titles, descriptions, canonicals, structured data, duplicate titles, crawl budget) without publishing/indexing/mutation authority.

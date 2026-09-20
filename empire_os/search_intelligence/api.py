@@ -15,6 +15,7 @@ from .backlinks import BacklinkObservation, analyse_backlink_graph
 from .citation_gap import analyse_citation_gap
 from .commander import SearchCommanderAgent
 from .competitor_gap import analyse_competitor_gap
+from .crawler_product import crawl_search_site
 from .health import search_health
 from .metadata import generate_metadata
 from .models import SearchOpportunity, SearchPage
@@ -78,6 +79,13 @@ class BacklinkGraphPreviewRequest(BaseModel):
     observations: list[BacklinkObservationRequest] = Field(
         default_factory=list
     )
+
+
+class CrawlPreviewRequest(BaseModel):
+    url: str
+    max_pages: int = Field(default=6, ge=1, le=12)
+    request_timeout_seconds: float = Field(default=8.0, ge=1.0, le=30.0)
+    time_budget_seconds: float = Field(default=30.0, ge=1.0, le=120.0)
 
 
 class AnalyseRequest(BaseModel):
@@ -245,6 +253,7 @@ def create_search_router(
         repo = repository is not None
         console_status = search_console.status()
         return {
+            "native_crawler": True,
             "pages": repo,
             "indexation": repo,
             "opportunities": repo,
@@ -301,6 +310,18 @@ def create_search_router(
             "product": product.as_dict(),
             "readiness": readiness,
         }
+
+    @router.post("/crawl/preview")
+    def crawl_preview(req: CrawlPreviewRequest):
+        try:
+            return crawl_search_site(
+                req.url,
+                max_pages=req.max_pages,
+                request_timeout=req.request_timeout_seconds,
+                time_budget_seconds=req.time_budget_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @router.get("/pages")
     def pages(limit: int = Query(default=100, ge=1, le=500)):

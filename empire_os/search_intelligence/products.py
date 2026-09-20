@@ -47,7 +47,11 @@ SEARCH_PRODUCTS: tuple[SearchProduct, ...] = (
             "prioritized_fix_backlog",
         ),
         required_capabilities=("pages", "indexation"),
-        optional_capabilities=("internal_links", "search_console"),
+        optional_capabilities=(
+            "native_crawler",
+            "internal_links",
+            "search_console",
+        ),
     ),
     SearchProduct(
         key="search_opportunity_map",
