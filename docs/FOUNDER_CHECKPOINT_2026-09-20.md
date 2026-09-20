@@ -138,3 +138,10 @@ property/operating signals and Search Fabric into sponsor graphs, roll-up maps, 
 founder-exit signals, portfolio-growth opportunities and consolidation intelligence.
 Premium public industry pages now include Private Equity alongside Property, Solar, HVAC, Roofing
 and Legal/Mass Tort.
+
+## Buyer identity recovery hardening
+Added official public-license identity seeds for evidence-first buyer recovery.
+Initial production source: Texas State Board of Plumbing Examiners Responsible Master Plumber daily CSV.
+License records provide a named professional/company association only; they do not establish buyer authority.
+Empire still requires first-party site evidence for a commercial decision role before promotion.
+Live testing caught and fixed a PATRIOT/RIOT fuzzy-match false positive before promotion.
