@@ -66,6 +66,50 @@ def _phase_projection(blueprint: Path) -> list[dict[str, Any]]:
     return phases
 
 
+def _commercial_operating_state(
+    raw: dict[str, Any],
+    stages: list[dict[str, Any]],
+) -> dict[str, Any]:
+    blocker = str(raw.get("highest_priority_blocker") or "").strip() or None
+    observed = {
+        str(row.get("stage") or ""): row.get("observed")
+        for row in stages
+        if isinstance(row, dict)
+    }
+
+    if raw.get("loop_complete") is True:
+        return {
+            "class": "COMPLETE",
+            "next_event": None,
+            "founder_action_required": False,
+        }
+
+    if blocker == "buyer_conversation" and observed.get("outbound_sent") is True:
+        return {
+            "class": "WAITING_EXTERNAL",
+            "next_event": "genuine_buyer_reply",
+            "founder_action_required": False,
+        }
+
+    founder_gates = {
+        "commercial_terms": "binding_commercial_terms",
+        "bsc_payment_request": "payment_request_authority",
+        "recognized_revenue": "revenue_recognition",
+    }
+    if blocker in founder_gates:
+        return {
+            "class": "FOUNDER_GATE",
+            "next_event": founder_gates[blocker],
+            "founder_action_required": True,
+        }
+
+    return {
+        "class": "SYSTEM_WORK",
+        "next_event": blocker,
+        "founder_action_required": False,
+    }
+
+
 def _commercial_loop(raw: dict[str, Any] | None, path: Path) -> dict[str, Any]:
     if raw is None:
         return {
@@ -77,6 +121,7 @@ def _commercial_loop(raw: dict[str, Any] | None, path: Path) -> dict[str, Any]:
             "stages": [],
         }
     stages = raw.get("stages")
+    clean_stages = stages if isinstance(stages, list) else []
     return {
         "available": True,
         "observed_at": _mtime_iso(path),
@@ -84,7 +129,8 @@ def _commercial_loop(raw: dict[str, Any] | None, path: Path) -> dict[str, Any]:
         "loop_complete": raw.get("loop_complete") is True,
         "blocker_state": raw.get("blocker_state"),
         "highest_priority_blocker": raw.get("highest_priority_blocker"),
-        "stages": stages if isinstance(stages, list) else [],
+        "operating_state": _commercial_operating_state(raw, clean_stages),
+        "stages": clean_stages,
     }
 
 

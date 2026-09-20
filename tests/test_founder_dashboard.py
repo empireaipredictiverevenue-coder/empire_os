@@ -132,3 +132,28 @@ def test_api_is_read_only_projection(tmp_path):
     assert body["execution_authority"] == "none"
     assert body["commercial_loop"]["available"] is True
     assert body["astra"]["available"] is True
+
+
+def test_conversation_blocker_is_presented_as_external_wait(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/commercial_loop/latest.json",
+        {
+            "mode": "OBSERVE",
+            "loop_complete": False,
+            "blocker_state": "blocked",
+            "highest_priority_blocker": "buyer_conversation",
+            "stages": [
+                {"stage": "buyer_candidate_approved", "observed": True},
+                {"stage": "outbound_authorized", "observed": True},
+                {"stage": "outbound_sent", "observed": True},
+                {"stage": "buyer_conversation", "observed": False},
+                {"stage": "commercial_terms", "observed": False},
+            ],
+        },
+    )
+    result = build_founder_dashboard(root)
+    state = result["commercial_loop"]["operating_state"]
+    assert state["class"] == "WAITING_EXTERNAL"
+    assert state["next_event"] == "genuine_buyer_reply"
+    assert state["founder_action_required"] is False
