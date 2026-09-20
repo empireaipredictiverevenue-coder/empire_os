@@ -322,7 +322,7 @@ Strategy Operating System V6 ✅ local/tested: the /v1/strategy/* surface expose
 ### Phase 5 — Organic Growth Engine — FOUNDATION COMPLETE / PRODUCTION RECOVERY + ACTIVATION
 SEO, AEO, GEO, keyword intelligence, topic clusters, programmatic pages, AI Cards, citation/mention monitoring, authority/backlink graph, competitor citation gaps, public publishing, first-party tracking and content→revenue attribution.
 
-Phase 5 foundation work was completed locally/tested in earlier phases. Current work is not a rebuild. The old Vultr shutdown removed the disk-backed deployed AEO/sitemap surface that had lived under /srv/aeo, while the code, 210 generated legacy AEO pages, Search Intelligence modules, Search Command Centre and sitemap/robots governance logic survived in Git/repo assets.
+Phase 5 foundation work was completed locally/tested in earlier phases. Current work is not a rebuild. The old Vultr shutdown removed the disk-backed deployed AEO/sitemap surface that had lived under /srv/aeo. The repo currently preserves a 210-page Git/tarball batch, while historical code references a larger 308-page AEO estate and earlier runtime archaeology found other deployed/indexed snapshots. The full Vultr-era deployed page count is not recoverable from current Git alone and remains unknown until historical census completes. Search Intelligence modules, Search Command Centre and sitemap/robots governance logic survived in Git/repo assets.
 
 Current Phase 5 work is therefore recovery/convergence:
 - recover and quality-review legacy AEO assets as candidate content;

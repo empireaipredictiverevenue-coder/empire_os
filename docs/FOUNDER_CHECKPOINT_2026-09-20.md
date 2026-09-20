@@ -124,3 +124,9 @@ New work must reconnect/recover those assets under the canonical Search Intellig
 Current Supabase inspection reported 115 legacy/public tables with RLS disabled.
 Do not blindly enable RLS: missing policies could break production access.
 A dedicated coder lane is performing a read-only dependency/policy audit and staged remediation proposal.
+
+## AEO historical count correction
+Do not treat 210 as the historical total.
+210 = surviving Git/tarball metro-page batch.
+Historical code also records 308 AEO pages in use; prior runtime archaeology found other deployed/indexed snapshots.
+The full old Vultr /srv/aeo estate count is currently unknown. Founder recalls 3,000+ pages; preserve that as an unverified historical lead until archival/runtime evidence confirms or disproves it.
