@@ -132,3 +132,31 @@ def test_run_sets_requested_metro(monkeypatch):
     assert len(results) == 1
     assert results[0].metro == "Austin, TX"
     assert results[0].niche == "electrical"
+
+
+
+def test_all_endpoint_failure_is_explicit_source_error(monkeypatch):
+    import urllib.error
+    import pytest
+
+    def fail(*args, **kwargs):
+        raise urllib.error.URLError("temporary outage")
+
+    monkeypatch.setattr(overpass.urllib.request, "urlopen", fail)
+
+    with pytest.raises(RuntimeError, match="all Overpass endpoints failed"):
+        overpass._request_overpass("[out:json];node(0,0,0,0);out;")
+
+
+def test_healthy_zero_overpass_response_is_not_an_outage(monkeypatch):
+    class Response:
+        def read(self):
+            return b'{"elements": []}'
+
+    monkeypatch.setattr(
+        overpass.urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: Response(),
+    )
+
+    assert overpass._request_overpass("query") == {"elements": []}

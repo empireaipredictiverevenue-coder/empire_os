@@ -105,12 +105,12 @@ def _request_overpass(query: str) -> dict:
             last_error = exc
 
     if last_error:
-        print(
-            "[overpass] all endpoints failed: "
+        raise RuntimeError(
+            "all Overpass endpoints failed: "
             f"{type(last_error).__name__}: {last_error}"
         )
 
-    return {}
+    raise RuntimeError("all Overpass endpoints returned invalid payloads")
 
 
 def _contact_value(tags: dict, *keys: str) -> str:
@@ -298,18 +298,23 @@ def run(
     else:
         targets = METRO_COORDS
 
+    failures = 0
+
     for metro_name, (lat, lon) in targets.items():
         try:
             for candidate in _fetch(lat, lon):
                 candidate.metro = metro_name
                 yield candidate
-
         except Exception as exc:
+            failures += 1
             print(
                 f"[overpass] metro {metro_name} failed: {exc}"
             )
 
         time.sleep(1.0)
+
+    if failures == len(targets):
+        raise RuntimeError("all requested Overpass metro queries failed")
 
 
 def register_source(reg):

@@ -314,6 +314,8 @@ def main():
         sources_ok=sources_ok,
         sources_err=sources_err,
     )
+    if errored_total > 0 and accepted_total == 0:
+        return 1
     return 0
 
 

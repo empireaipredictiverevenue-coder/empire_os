@@ -241,3 +241,66 @@ def test_run_source_safe_rejects_signal_before_ingest(monkeypatch):
 
     assert (found, accepted, errors) == (1, 0, 0)
     assert calls == []
+
+
+
+def test_main_returns_nonzero_when_only_source_errors_and_accepts_nothing(
+    monkeypatch,
+):
+    import sys
+    import empire_os.crawler_runner as crawler
+    import empire_os.lead_sources as lead_sources
+
+    src = SimpleNamespace(
+        name="overpass",
+        tier="real",
+        requires=[],
+        run_fn=lambda metro=None: iter(()),
+    )
+    monkeypatch.setitem(lead_sources._REGISTRY, "overpass", src)
+    monkeypatch.setattr(crawler, "_import_sources", lambda: None)
+    monkeypatch.setattr(
+        crawler,
+        "run_source_safe",
+        lambda *args, **kwargs: (0, 0, 1),
+    )
+    monkeypatch.setattr(crawler, "log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(crawler.signal, "signal", lambda *args, **kwargs: None)
+    monkeypatch.setattr(crawler.signal, "alarm", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["crawler_runner", "--source", "overpass", "--max-candidates", "1"],
+    )
+
+    assert crawler.main() == 1
+
+
+def test_main_keeps_healthy_zero_result_as_success(monkeypatch):
+    import sys
+    import empire_os.crawler_runner as crawler
+    import empire_os.lead_sources as lead_sources
+
+    src = SimpleNamespace(
+        name="overpass",
+        tier="real",
+        requires=[],
+        run_fn=lambda metro=None: iter(()),
+    )
+    monkeypatch.setitem(lead_sources._REGISTRY, "overpass", src)
+    monkeypatch.setattr(crawler, "_import_sources", lambda: None)
+    monkeypatch.setattr(
+        crawler,
+        "run_source_safe",
+        lambda *args, **kwargs: (0, 0, 0),
+    )
+    monkeypatch.setattr(crawler, "log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(crawler.signal, "signal", lambda *args, **kwargs: None)
+    monkeypatch.setattr(crawler.signal, "alarm", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["crawler_runner", "--source", "overpass", "--max-candidates", "1"],
+    )
+
+    assert crawler.main() == 0

@@ -129,6 +129,15 @@ def fetch_canonical_commercial_observations(
         raise ValueError("now must include timezone")
     current = now.astimezone(timezone.utc)
 
+    acquisitions = _reader_rows(
+        reader,
+        "/rest/v1/prospect_acquisitions",
+        {
+            "select": "prospect_id,source,created_at",
+            "order": "created_at.desc",
+            "limit": "1",
+        },
+    )
     reviews = _reader_rows(
         reader,
         "/rest/v1/buyer_candidate_reviews",
@@ -267,6 +276,16 @@ def fetch_canonical_commercial_observations(
     ]
 
     return {
+        "real_acquisition": CommercialLoopObservation(
+            "real_acquisition",
+            bool(acquisitions),
+            evidence_ref="canonical:prospect_acquisitions",
+            detail=(
+                "canonical real acquisition evidence exists"
+                if acquisitions
+                else "no canonical real acquisition evidence observed"
+            ),
+        ),
         "buyer_candidate_approved": CommercialLoopObservation(
             "buyer_candidate_approved",
             bool(approved_reviews),
@@ -405,7 +424,20 @@ def observations_from_cycle(
             ),
         ),
     }
-    observations.update(canonical_observations or {})
+    canonical = canonical_observations or {}
+    canonical_real = canonical.get("real_acquisition")
+    observations.update(
+        {
+            key: value
+            for key, value in canonical.items()
+            if key != "real_acquisition"
+        }
+    )
+    runtime_real = observations["real_acquisition"]
+    if canonical_real is not None and canonical_real.observed is True:
+        observations["real_acquisition"] = canonical_real
+    elif runtime_real.observed is not True and canonical_real is not None:
+        observations["real_acquisition"] = canonical_real
     return observations
 
 
