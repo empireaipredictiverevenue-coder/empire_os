@@ -10,6 +10,9 @@ from empire_os.qualification_worker_v2 import (
     run_identity_catchup,
 )
 from empire_os.omega_worker import run_omega_cycle
+from empire_os.omega_buyer_readiness import (
+    run_omega_buyer_readiness_cycle,
+)
 
 
 def main() -> int:
@@ -42,15 +45,18 @@ def main() -> int:
         }
     )
     omega = run_omega_cycle(args.limit)
+    buyer_readiness = run_omega_buyer_readiness_cycle(args.limit)
     result = {
-        "schema_version": "qualification_service_cycle.v2",
+        "schema_version": "qualification_service_cycle.v3",
         "qualification": qualification,
         "identity_catchup": catchup,
         "omega_projection": omega,
+        "buyer_readiness": buyer_readiness,
         "ok": bool(
             qualification["ok"]
             and catchup["ok"]
             and omega["ok"]
+            and buyer_readiness["ok"]
         ),
     }
     print(json.dumps(result, indent=2, default=str))
