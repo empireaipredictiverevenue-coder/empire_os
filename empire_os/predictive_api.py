@@ -1,11 +1,16 @@
 """Evidence-only Predictive Cloud V3 forecast preview and registry API."""
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Protocol
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from empire_os.predictive_calibration import (
+    ForecastActualEvidence,
+    review_forecast_calibration,
+)
 from empire_os.predictive_materializer import materialize_daily_actuals
 from empire_os.predictive_registry import ForecastRegistryRecord
 
@@ -20,6 +25,13 @@ class ForecastPreviewRequest(BaseModel):
     metric: str
     horizon_days: int = Field(ge=1, le=365)
     points: list[ObservedActualRequest]
+
+
+class ForecastCalibrationRequest(BaseModel):
+    preview: ForecastPreviewRequest
+    actual_observed_date: str
+    actual_value: float = Field(ge=0)
+    actual_source: str
 
 
 class ForecastRegisterRequest(BaseModel):
@@ -91,6 +103,35 @@ def create_predictive_router(
             "write_authority": "none",
             "synthetic_data_allowed": False,
             "materialization": result.as_dict(),
+        }
+
+    @router.post("/forecast/calibration/preview")
+    def forecast_calibration_preview(req: ForecastCalibrationRequest):
+        result = materialize(req.preview)
+        try:
+            actual = ForecastActualEvidence(
+                metric=req.preview.metric,
+                observed_date=date.fromisoformat(req.actual_observed_date),
+                actual_value=req.actual_value,
+                source=req.actual_source,
+            )
+            review = review_forecast_calibration(
+                materialization=result,
+                actual=actual,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "write_authority": "none",
+            "synthetic_data_allowed": False,
+            "forecast_mutation": False,
+            "model_weight_mutation": False,
+            "commercial_execution": False,
+            "accounting_mutation": False,
+            "creates_actual_revenue": False,
+            "calibration": review.as_dict(),
         }
 
     @router.post("/forecast/register")

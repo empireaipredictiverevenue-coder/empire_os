@@ -294,6 +294,8 @@ Foundation slice ✅ local/tested: `predictive_cloud_v3` now supports bounded ex
 
 Second slice ✅ local/tested: an idempotent forecast registry now records only available forecasts that satisfy the seven-observation evidence gate, with model name/version, forecast key and provenance. Insufficient-history previews cannot be registered. The fail-closed registry/read API remains OBSERVE-only with no commercial execution authority.
 
+Third slice ✅ local/tested: forecast realization calibration now compares an available evidence-backed forecast with a later canonical actual on the exact forecast target date, reporting signed/absolute/relative error and under-predicted/over-predicted/on-target bias. Insufficient-history forecasts and off-target-date actuals cannot calibrate; forecast/model/accounting/commercial mutation remain disabled.
+
 ### Phase 11 — Experiment + Causal Engine
 Controlled experiments, counterfactuals, holdouts, creative/offer/pricing/page tests, incrementality and causal attribution.
 
