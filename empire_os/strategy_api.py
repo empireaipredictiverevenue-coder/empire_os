@@ -34,6 +34,12 @@ from empire_os.ai_strategy_portfolio import (
     compare_ai_options,
     review_ai_portfolio_item,
 )
+from empire_os.strategic_scenarios import (
+    build_scenario_set,
+    review_scenario,
+    scenario_gaps,
+    stress_test_strategy,
+)
 
 
 class DataRequest(BaseModel):
@@ -77,6 +83,15 @@ class AiPortfolioRequest(BaseModel):
 class AiOptionComparisonRequest(BaseModel):
     capability_key: str
     options: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ScenarioSetRequest(BaseModel):
+    scenarios: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class StressTestRequest(BaseModel):
+    baseline: dict[str, Any] = Field(default_factory=dict)
+    scenarios: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -242,6 +257,37 @@ def create_strategy_router() -> APIRouter:
                 capability_key=req.capability_key,
                 options=req.options,
             )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/scenarios/review")
+    def scenario_review(req: DataRequest):
+        try:
+            return review_scenario(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/scenarios/set/preview")
+    def scenario_set(req: ScenarioSetRequest):
+        try:
+            return build_scenario_set(req.scenarios)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/scenarios/stress-test/preview")
+    def scenario_stress(req: StressTestRequest):
+        try:
+            return stress_test_strategy(
+                baseline=req.baseline,
+                scenarios=req.scenarios,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/scenarios/gaps/preview")
+    def scenario_gap_review(req: ScenarioSetRequest):
+        try:
+            return scenario_gaps(req.scenarios)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

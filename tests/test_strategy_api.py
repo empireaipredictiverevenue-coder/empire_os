@@ -289,3 +289,67 @@ def test_ai_option_comparison_is_observed_evidence_only():
     assert body["options"][0]["available"] is True
     assert body["provider_activation"] is False
     assert body["model_promotion"] is False
+
+
+def test_scenario_review_is_not_forecast_or_actual():
+    response = client().post(
+        "/v1/strategy/scenarios/review",
+        json={"data": {
+            "scenario_id": "search-shift",
+            "scenario_type": "search_ai_behavior",
+            "title": "AI answer engines reduce classic organic clicks",
+            "hypothesis": "More discovery moves into answer engines.",
+            "time_horizon_days": 180,
+            "estimated_probability": .5,
+            "confidence": .6,
+            "impacts": {
+                "search_visibility": -.25,
+                "ai_visibility": .2,
+                "time_to_revenue": .1,
+            },
+            "response_options": [{
+                "option_id": "geo-strengthen",
+                "summary": "Increase citation-worthy research and answer assets.",
+                "reversible": True,
+                "evidence_refs": ["strategy:geo"],
+            }],
+            "evidence_refs": ["scenario:search-shift"],
+        }},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["scenario_only"] is True
+    assert body["forecast"] is False
+    assert body["actual_outcome"] is False
+    assert body["execution_authority"] == "none"
+
+
+def test_scenario_stress_test_never_executes_response():
+    response = client().post(
+        "/v1/strategy/scenarios/stress-test/preview",
+        json={
+            "baseline": {
+                "model_cost": .3,
+                "time_to_revenue": .4,
+            },
+            "scenarios": [{
+                "scenario_id": "provider-shock",
+                "scenario_type": "model_cost",
+                "title": "Model provider cost shock",
+                "hypothesis": "Premium reasoning cost rises materially.",
+                "estimated_probability": 1.0,
+                "confidence": .7,
+                "impacts": {
+                    "model_cost": .8,
+                    "time_to_revenue": .2,
+                },
+                "evidence_refs": ["scenario:model-cost"],
+            }],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stress_results"][0]["scenario_id"] == "provider-shock"
+    assert body["execution_enabled"] is False
+    assert body["forecast"] is False
+    assert body["execution_authority"] == "none"

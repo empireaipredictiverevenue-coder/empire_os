@@ -349,7 +349,50 @@ Strategy defines choices.
 Chief of Staff ensures those choices become priorities, decisions, owners and
 operating cadence.
 
-## 13. Strategy Cadence
+## 13. Strategic Scenario Planning
+
+Strategy maintains a governed scenario set across:
+- market demand shocks
+- buyer-capacity changes
+- competitor moves
+- search/AI discovery shifts
+- model-provider cost shocks
+- data-source outages
+- regulatory friction
+- infrastructure constraints
+- pricing changes
+- partner/distribution shifts
+
+Every scenario must declare:
+- scenario ID/type
+- title
+- hypothesis
+- time horizon
+- estimated probability when evidence supports one
+- confidence
+- directional impacts
+- evidence refs
+- reversible response options
+
+Scenarios are not forecasts.
+
+The system keeps these labels explicit:
+- scenario_only=true
+- forecast=false
+- actual_outcome=false
+
+Probability-weighted expected impacts are only calculated when the scenario set
+contains a complete, coherent probability distribution. Missing probabilities
+remain unknown.
+
+Stress tests rank adverse scenarios against normalized strategic baselines but
+cannot trigger a response, commit budget, change providers, enter markets,
+publish content or alter authority.
+
+Scenario coverage should include the major external and internal risks relevant
+to the current company priorities.
+
+## 14. Strategy Cadence
 
 Weekly:
 - competitor/market changes
@@ -374,7 +417,7 @@ Quarterly:
 - enter/test/watch/avoid decisions
 - kill/scale bets
 
-## 14. Strategy Metrics
+## 15. Strategy Metrics
 
 - realized GP by market/corridor
 - market-entry success
@@ -389,7 +432,7 @@ Quarterly:
 - prediction/calibration improvement
 - R&D transfer-to-commercial impact
 
-## 15. Department Rule
+## 16. Department Rule
 
 Strategy is not "make a roadmap."
 
