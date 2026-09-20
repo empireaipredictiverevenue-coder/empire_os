@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
+from empire_os.qualification_worker_v2 import request_json
+
 
 class CloserTransportError(RuntimeError):
     pass
@@ -115,3 +117,42 @@ class PostgresCloserRpc:
                 "dedicated closer database RPC returned no result"
             )
         return row[0]
+
+
+class SupabaseCloserRpc:
+    """Narrow PostgREST bridge for closer roles already granted to service_role.
+
+    This keeps the same per-role RPC allowlist and exposes no arbitrary SQL or
+    table-write helper. Consequential closer state transitions remain excluded
+    because service_role has no execute grant on advance_closer_case.
+    """
+
+    def __init__(
+        self,
+        role: str,
+        *,
+        request_factory: Callable[..., Any] | None = None,
+    ) -> None:
+        self.role = str(role or "").strip()
+        if self.role not in ROLE_FUNCTIONS:
+            raise CloserTransportError("unsupported closer database role")
+        if self.role == "empire_closer_approver":
+            raise CloserTransportError(
+                "closer approver requires dedicated governed transport"
+            )
+        self._request = request_factory or request_json
+
+    def __call__(self, name: str, params: dict[str, Any]) -> Any:
+        allowed = ROLE_FUNCTIONS[self.role]
+        if name not in allowed:
+            raise CloserTransportError(
+                f"{self.role} is not allowed to execute {name}"
+            )
+        _, keys = allowed[name]
+        if not isinstance(params, dict) or set(params) != set(keys):
+            raise CloserTransportError("unexpected closer RPC parameters")
+        return self._request(
+            "POST",
+            f"/rest/v1/rpc/{name}",
+            payload=params,
+        )

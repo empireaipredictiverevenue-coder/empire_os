@@ -5,6 +5,7 @@ import pytest
 from empire_os.closer_role_transport import (
     CloserTransportError,
     PostgresCloserRpc,
+    SupabaseCloserRpc,
 )
 
 
@@ -117,4 +118,37 @@ def test_approver_can_only_advance_and_shapes_are_strict():
             "",
             "empire_closer_observer",
             connect_factory=factory,
+        )
+
+
+def test_supabase_planner_bridge_keeps_role_allowlist():
+    calls = []
+
+    def request(method, path, *, payload=None, **_kwargs):
+        calls.append((method, path, payload))
+        return {"decision": "opened", "case_id": "c1"}
+
+    rpc = SupabaseCloserRpc(
+        "empire_closer_planner",
+        request_factory=request,
+    )
+    result = rpc(
+        "open_closer_case",
+        {"p_reply_id": "00000000-0000-0000-0000-000000000001"},
+    )
+    assert result["case_id"] == "c1"
+    assert calls == [(
+        "POST",
+        "/rest/v1/rpc/open_closer_case",
+        {"p_reply_id": "00000000-0000-0000-0000-000000000001"},
+    )]
+    with pytest.raises(CloserTransportError, match="not allowed"):
+        rpc("advance_closer_case", {})
+
+
+def test_supabase_bridge_never_exposes_closer_approver():
+    with pytest.raises(CloserTransportError, match="dedicated governed"):
+        SupabaseCloserRpc(
+            "empire_closer_approver",
+            request_factory=lambda *_args, **_kwargs: None,
         )
