@@ -296,8 +296,10 @@ class KnowledgeGarden:
     def sync_manifest(
         self,
         destination: str | Path = "runtime/coder/knowledge/active.json",
+        *,
+        report: GardenReport | None = None,
     ) -> dict[str, Any]:
-        report = self.scan()
+        report = report or self.scan()
         target = Path(destination)
         if not target.is_absolute():
             target = self.workspace / target

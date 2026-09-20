@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Iterable
 
@@ -160,6 +161,7 @@ class EmpireCoder:
             runtime_root=self.runtime_root,
         )
         self._knowledge_report = None
+        self._knowledge_report_at = 0.0
         self.context = ContextBuilder(self.repo)
         self.runner = SafeCommandRunner(
             self.workspace, runtime_root=self.runtime_root
@@ -256,12 +258,16 @@ class EmpireCoder:
         self.worktrees = WorktreeController(self.workspace)
 
     def refresh_knowledge(self) -> dict:
-        report = self.knowledge.scan()
-        self._knowledge_report = report
+        now = time.monotonic()
+        report = self._knowledge_report
+        if report is None or now - self._knowledge_report_at > 60.0:
+            report = self.knowledge.scan()
+            self._knowledge_report = report
+            self._knowledge_report_at = now
         active_paths = self.knowledge.active_paths(report)
         self.context.set_active_knowledge_paths(active_paths)
         self.skills.set_active_knowledge_paths(active_paths)
-        manifest = self.knowledge.sync_manifest()
+        manifest = self.knowledge.sync_manifest(report=report)
         return {
             "scanned": report.scanned,
             "active": report.active,
