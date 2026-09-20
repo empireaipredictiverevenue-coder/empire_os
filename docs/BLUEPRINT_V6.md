@@ -175,6 +175,8 @@ Swarm V6 is the bounded parallel execution/verification layer beneath Astra. It 
 
 ### Multi-Niche GTM Swarm Extension ✅ LOCAL/TESTED
 Historical GTM-swarm and agency-revenue blueprints have been reconciled into the current architecture rather than restored wholesale. Native `empire_os/gtm_swarm_v6.py` now provides per-niche ICP/metro/channel/threshold configuration, intent-driven micro lead-magnet selection, evidence-backed score gating, governed outbound handoff and engagement rescoring. `empire_os/gtm_offer_strategy.py` adds evidence-first niche tiering, technical-demo/pre-nurture planning and high-ticket offer framing without inventing price/ROI. LangGraph, Redis, PostHog, Lago/OpenMeter, Authentik/Keycloak and Playwright/FFmpeg remain optional adapters gated by measured need. Solana/USDC, firewall-bypass proxy tactics, synthetic benchmarks and legacy Swarm 3.0 remain retired. Reconciliation: `docs/GTMSWARM_V4_SALVAGE_2026-09-20.md`.
+AI Video Studio ✅ local/tested planning layer: Empire combines real product/data captures with optional generated motion/b-roll, narration, captions, chapters, CTA and niche-specific social cuts. Real capture/evidence remains the proof layer; generated scenes cannot become pricing, revenue or commercial-outcome evidence. Viewer progress and CTA telemetry feed Conversion Intelligence. Rendering adapters (Playwright/FFmpeg/local-or-governed video models) remain disabled until intentionally activated.
+
 
 ### Phase 4 — Astra Operating Layer ← CURRENT
 Astra becomes the top coordinator for business priorities, agent routing, bottleneck detection, expected-value decisions, resource allocation, cost control and approval policies. Premium AI is used only when expected value justifies the cost.

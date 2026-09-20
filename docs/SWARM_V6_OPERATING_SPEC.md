@@ -64,6 +64,7 @@ The Closer / Outreach lane also verifies the native multi-niche GTM extension:
 
 - `empire_os/gtm_swarm_v6.py` — niche/ICP/metro configuration, score thresholding, micro lead-magnet routing, engagement rescoring and governed outbound handoff.
 - `empire_os/gtm_offer_strategy.py` — niche-tier review, evidence-first technical demo/pre-nurture assets and high-ticket offer framing.
-- `empire_os/video_demo_plan.py` — governed evidence-backed screen-demo manifests; Playwright remains an optional recording adapter until intentionally activated.
+- `empire_os/video_demo_plan.py` — governed evidence-backed screen-demo manifests.
+- `empire_os/video_studio_v1.py` — hybrid AI video-studio planning: real product/data captures as the proof layer plus optional generated motion/b-roll, narration, captions, chapters, CTA, social cuts and viewer telemetry. Generated media never becomes commercial evidence.
 
 This extension does not introduce a second send engine. All execution still passes through the canonical GTM/outbound governor. LangGraph/Redis/PostHog can be added later as adapters only when measured need justifies them.

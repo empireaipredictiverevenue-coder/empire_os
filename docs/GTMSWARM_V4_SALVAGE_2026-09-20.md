@@ -83,9 +83,8 @@ volume justifies it.
 Potential enterprise SSO providers after tenant/customer demand justifies the
 operational burden.
 
-### Playwright + FFmpeg video recording
-Keep as a future adapter for repeatable product demos and walkthrough capture.
-The current server does not have Playwright installed. The governed recording-plan layer now exists at `empire_os/video_demo_plan.py`; install browser/runtime dependencies only when the demo pipeline becomes launch-critical.
+### AI video studio + browser recording
+The target is a hybrid AI video studio rather than a plain recorder: real Empire browser/data captures remain the proof layer, while optional AI video generation can add motion, transitions, narration, visual b-roll and social cuts. The governed layers now exist at `empire_os/video_demo_plan.py` and `empire_os/video_studio_v1.py`. Playwright/FFmpeg and a video-generation model remain adapters to activate deliberately when the production renderer is built. Viewer completion/CTA telemetry will feed Conversion Intelligence.
 
 ### Incus / bare-metal expansion
 Keep Incus and additional Vultr/Hetzner nodes as scale options. Do not migrate
