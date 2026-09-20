@@ -1,14 +1,19 @@
 """Isolated public-site probe worker for Phase 3E buyer review."""
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from empire_os.buyer_discovery import (
     build_candidate,
     enrich_candidate,
+    generate_work_email_candidates,
+    merge_generated_contact_evidence,
     merge_public_web_contact_evidence,
     rank_site_people,
+    validate_email_candidates,
     verify_contact_plan,
 )
 from empire_os.hunter.domain_intelligence import analyze_domain
@@ -17,6 +22,77 @@ from empire_os.hunter.verification_mesh import VerificationMesh
 from empire_os.mx_validator import MxValidator
 from empire_os.search_fabric.site_probe import probe_site
 
+
+
+def _smtp_verified_generated_contacts(
+    enriched: dict,
+    website: str,
+    *,
+    smtp_timeout: int = 2,
+) -> tuple[list[dict], dict]:
+    decision = enriched.get("decision_maker")
+    if not isinstance(decision, dict):
+        return [], {"attempted": False, "reason": "missing_decision_maker"}
+    name = str(decision.get("name") or "").strip()
+    try:
+        score = float(decision.get("decision_score") or 0.0)
+    except (TypeError, ValueError):
+        score = 0.0
+    if not name or score < 0.70:
+        return [], {"attempted": False, "reason": "decision_score_below_floor"}
+
+    candidates = generate_work_email_candidates(name, website)
+    if not candidates:
+        return [], {"attempted": False, "reason": "no_generated_candidates"}
+    domain = candidates[0].rsplit("@", 1)[-1]
+    token = hashlib.sha256((name + "|" + domain).encode()).hexdigest()[:14]
+    sentinel = f"empire-probe-{token}@{domain}"
+
+    catch_validator = MxValidator(
+        smtp_timeout=smtp_timeout,
+        do_smtp_probe=True,
+    )
+    catch = catch_validator.validate(sentinel)
+    if catch.smtp_accepts:
+        return [], {
+            "attempted": True,
+            "catch_all": True,
+            "sentinel": sentinel,
+            "candidates": len(candidates),
+        }
+
+    def check(email: str) -> list[dict]:
+        validator = MxValidator(
+            smtp_timeout=smtp_timeout,
+            do_smtp_probe=True,
+        )
+        return validate_email_candidates(
+            [email],
+            validator,
+            require_smtp=True,
+        )
+
+    valid: list[dict] = []
+    with ThreadPoolExecutor(max_workers=min(4, len(candidates))) as pool:
+        futures = {pool.submit(check, email): email for email in candidates}
+        for future in as_completed(futures):
+            try:
+                valid.extend(future.result())
+            except Exception:
+                continue
+
+    valid.sort(
+        key=lambda item: candidates.index(item["email"])
+        if item.get("email") in candidates
+        else 999
+    )
+    return valid, {
+        "attempted": True,
+        "catch_all": False,
+        "sentinel": sentinel,
+        "candidates": len(candidates),
+        "smtp_valid": len(valid),
+    }
 
 def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
         time_budget_seconds: float = 22.0) -> dict:
@@ -108,6 +184,26 @@ def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
             hunter_first_party,
         )
 
+    generated_validated = []
+    generated_probe = {"attempted": False, "reason": "not_needed"}
+    has_bound = any(
+        isinstance(item, dict)
+        and item.get("bound_to_decision_maker") is True
+        for item in (enriched.get("contact_candidates") or [])
+    )
+    if not has_bound:
+        generated_validated, generated_probe = (
+            _smtp_verified_generated_contacts(
+                enriched,
+                candidate.website,
+            )
+        )
+        if generated_validated:
+            enriched = merge_generated_contact_evidence(
+                enriched,
+                generated_validated,
+            )
+
     contact = verify_contact_plan(
         enriched,
         validator=MxValidator(do_smtp_probe=False),
@@ -134,6 +230,8 @@ def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
             for item in hunter.contacts
             if item.state is VerificationState.PROBABLE
         ],
+        "generated_smtp_contacts": generated_validated,
+        "generated_smtp_probe": generated_probe,
         "mode": "OBSERVE",
         "write_authorized": False,
     }
