@@ -62,6 +62,10 @@ from empire_os.strategic_partnerships import (
     partnership_gap_map,
     review_partner_candidate,
 )
+from empire_os.strategy_control_tower import (
+    build_strategy_brief,
+    build_strategy_control_tower,
+)
 
 
 class DataRequest(BaseModel):
@@ -143,6 +147,17 @@ class CategoryRowsRequest(BaseModel):
 
 class PartnerRowsRequest(BaseModel):
     partners: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class StrategyControlTowerRequest(BaseModel):
+    market_portfolio: dict[str, Any] = Field(default_factory=dict)
+    category_portfolio: dict[str, Any] = Field(default_factory=dict)
+    keyword_portfolio: dict[str, Any] = Field(default_factory=dict)
+    competitive_landscape: dict[str, Any] = Field(default_factory=dict)
+    ai_portfolio: dict[str, Any] = Field(default_factory=dict)
+    partnership_portfolio: dict[str, Any] = Field(default_factory=dict)
+    scenario_set: dict[str, Any] = Field(default_factory=dict)
+    max_brief_items: int = 7
 
 
 def create_strategy_router() -> APIRouter:
@@ -440,6 +455,28 @@ def create_strategy_router() -> APIRouter:
     def partnership_gaps(req: PartnerRowsRequest):
         try:
             return partnership_gap_map(req.partners)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/control-tower/preview")
+    def strategy_control_tower(req: StrategyControlTowerRequest):
+        try:
+            tower = build_strategy_control_tower(
+                market_portfolio=req.market_portfolio,
+                category_portfolio=req.category_portfolio,
+                keyword_portfolio=req.keyword_portfolio,
+                competitive_landscape=req.competitive_landscape,
+                ai_portfolio=req.ai_portfolio,
+                partnership_portfolio=req.partnership_portfolio,
+                scenario_set=req.scenario_set,
+            )
+            return {
+                "control_tower": tower,
+                "brief": build_strategy_brief(
+                    tower,
+                    max_items=req.max_brief_items,
+                ),
+            }
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

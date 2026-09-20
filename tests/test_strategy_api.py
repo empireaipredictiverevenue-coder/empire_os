@@ -507,3 +507,27 @@ def test_partnership_strategy_api_never_outreaches_or_contracts():
     body = response.json()
     assert body["outreach_enabled"] is False
     assert body["contracting_enabled"] is False
+
+
+def test_strategy_control_tower_is_read_only():
+    response = client().post(
+        "/v1/strategy/control-tower/preview",
+        json={
+            "market_portfolio": {"markets": [{"identity": {"corridor_key": "roofing:manchester"}}]},
+            "category_portfolio": {"categories": [{"category_key": "predictive-revenue"}]},
+            "keyword_portfolio": {"keywords": [{"record": {"keyword": "predictive revenue"}}]},
+            "competitive_landscape": {
+                "search_presence": {"available": True},
+                "ai_citation_presence": {"available": True},
+            },
+            "ai_portfolio": {"capabilities": [{"capability_key": "entity-resolution"}]},
+            "partnership_portfolio": {"partners": [{"partner_key": "agency-1"}]},
+            "scenario_set": {"scenarios": [{"scenario_id": "search-shift"}]},
+            "max_brief_items": 5,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["control_tower"]["execution_authority"] == "none"
+    assert body["control_tower"]["market_entry_execution"] is False
+    assert body["brief"]["execution_performed"] is False
