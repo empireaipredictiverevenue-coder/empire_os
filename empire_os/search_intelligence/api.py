@@ -17,6 +17,10 @@ from .commander import SearchCommanderAgent
 from .competitor_gap import analyse_competitor_gap
 from .crawler_product import crawl_search_site
 from .health import search_health
+from .local_visibility import (
+    LocalGridObservation,
+    analyse_local_grid,
+)
 from .metadata import generate_metadata
 from .models import SearchOpportunity, SearchPage
 from .performance import lighthouse_parser_status, parse_lighthouse_report
@@ -79,6 +83,24 @@ class BacklinkObservationRequest(BaseModel):
 class BacklinkGraphPreviewRequest(BaseModel):
     empire_domains: list[str] = Field(min_length=1)
     observations: list[BacklinkObservationRequest] = Field(
+        default_factory=list
+    )
+
+
+class LocalGridObservationRequest(BaseModel):
+    query: str
+    latitude: float
+    longitude: float
+    observed_at: str
+    engine: str
+    provenance: list[str] = Field(min_length=1)
+    position: int | None = Field(default=None, ge=1)
+
+
+class LocalGridPreviewRequest(BaseModel):
+    query: str
+    engine: str | None = None
+    observations: list[LocalGridObservationRequest] = Field(
         default_factory=list
     )
 
@@ -280,6 +302,7 @@ def create_search_router(
             "lighthouse_parser": True,
             "lighthouse_runner": False,
             "rank_history": True,
+            "local_grid": True,
             "pages": repo,
             "indexation": repo,
             "opportunities": repo,
@@ -335,6 +358,35 @@ def create_search_router(
             "execution_allowed": False,
             "product": product.as_dict(),
             "readiness": readiness,
+        }
+
+    @router.post("/local-grid/preview")
+    def local_grid_preview(req: LocalGridPreviewRequest):
+        try:
+            observations = tuple(
+                LocalGridObservation(
+                    query=item.query,
+                    latitude=item.latitude,
+                    longitude=item.longitude,
+                    observed_at=item.observed_at,
+                    engine=item.engine,
+                    provenance=tuple(item.provenance),
+                    position=item.position,
+                )
+                for item in req.observations
+            )
+            analysis = analyse_local_grid(
+                observations,
+                query=req.query,
+                engine=req.engine,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "schema_version": "empire.search.local-grid.v1",
+            "mode": "OBSERVE",
+            "execution_allowed": False,
+            "analysis": analysis,
         }
 
     @router.post("/rank-history/preview")

@@ -177,3 +177,6 @@ Browser/Lighthouse runner execution remains unactivated.
 
 ## Search Product rank history
 Added provider-neutral observed rank-history analysis with strict provenance, trend/change/best/worst position summaries and zero synthetic time-series points. Missing rank observations remain unavailable rather than interpolated.
+
+## Search Product local visibility
+Added provider-neutral Local Search & Maps Grid Intelligence. It measures only observed grid points, top-3/top-10 coverage, weak zones and unknown cells; missing map ranks are never synthesized.

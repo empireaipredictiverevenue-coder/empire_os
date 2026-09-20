@@ -77,6 +77,36 @@ SEARCH_PRODUCTS: tuple[SearchProduct, ...] = (
         ),
     ),
     SearchProduct(
+        key="local_search_grid",
+        name="Local Search & Maps Grid Intelligence",
+        category="local_seo",
+        outcome=(
+            "Measure observed local-search visibility across a geographic grid "
+            "without inventing missing map ranks."
+        ),
+        buyer_types=(
+            "local_business",
+            "multi_location",
+            "agency",
+            "franchise",
+            "enterprise",
+        ),
+        deliverables=(
+            "maps_grid_visibility",
+            "top3_coverage",
+            "top10_coverage",
+            "weak_zone_map",
+            "unknown_cell_inventory",
+            "local_visibility_brief",
+        ),
+        required_capabilities=("local_grid",),
+        optional_capabilities=(
+            "search_console",
+            "rank_history",
+            "competitor_gap",
+        ),
+    ),
+    SearchProduct(
         key="content_protection",
         name="Content Decay & Cannibalisation Monitor",
         category="content_intelligence",
