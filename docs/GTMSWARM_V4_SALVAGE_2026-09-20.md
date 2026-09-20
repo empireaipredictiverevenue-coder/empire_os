@@ -140,3 +140,19 @@ REAL SIGNAL
 - Revenue Exchange schema: activated in canonical Supabase.
 - Commercial evidence registry: activated in canonical Supabase.
 - LangGraph / Redis / PostHog / Playwright: intentionally not installed.
+
+## Video / YouTube / Social Automation — deferred rebuild
+
+Historical EmpireOS code confirms the earlier stack included OpenMontage/OpenCut-oriented video editing plus YouTube/social syndication concepts. Those paths are now legacy references, not canonical runtime.
+
+The rebuild target after first-revenue proof is:
+
+REAL EMPIRE WORKFLOW → PRIVATE SYSTEM RECORDING → EDIT/COMPOSITE → LONG-FORM DEMO → SHORTS/SOCIAL CUTS → GOVERNED PUBLISH QUEUE → VIEW/CTA/REPLY TELEMETRY → CONVERSION INTELLIGENCE → ASTRA LEARNING.
+
+Recovered design references include the legacy `video_editing_agent.py`, `social_syndication.py`, `social_youtube.py`, `youtube_uploader.py` history and the social-video clipify prompt. We will re-evaluate the open-source renderer/editor stack rather than restoring OpenMontage blindly.
+
+Current canonical foundations are `empire_os/system_demo_recorder.py`, `empire_os/video_demo_plan.py` and `empire_os/video_studio_v1.py`. Browser/render/publishing adapters remain disabled until intentionally selected and configured.
+
+### GPU rendering architecture
+
+Video rendering/generation will run on a separate GPU worker rather than the core EmpireOS control-plane host. EmpireOS owns manifests, evidence, queueing, governance and telemetry; the GPU node owns browser capture/render/generation jobs and returns immutable artifacts/metadata. GPU failure must not block GTM, payments, CRM, Astra or Revenue Truth. Initial implementation should use a single worker with bounded concurrency and a provider-agnostic adapter so local/bare-metal or rented GPU capacity can be swapped later.
