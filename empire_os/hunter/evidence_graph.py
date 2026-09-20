@@ -181,10 +181,16 @@ def build_evidence_plan(
                     else None
                 ),
                 entity_id=eid,
-                contact_type="email",
+                contact_type="work_email",
                 value=item.email,
                 normalized_value=item.email.lower(),
-                verification_state=item.state.value,
+                verification_state=(
+                    "verified"
+                    if item.state is VerificationState.CONFIRMED
+                    else "invalid"
+                    if item.state is VerificationState.REJECTED
+                    else "observed"
+                ),
                 confidence=float(item.confidence),
                 first_seen_at=when_iso,
                 last_seen_at=when_iso,
@@ -223,7 +229,7 @@ def build_evidence_plan(
     return HunterEvidencePlan(
         entity_id=eid,
         source_key=f"empire_hunter:first_party:{domain}",
-        source_type="first_party_web",
+        source_type="company_web",
         source_display_name=f"Empire Hunter — {domain}",
         source_authority_score=0.95,
         people=tuple(people_by_name.values()),

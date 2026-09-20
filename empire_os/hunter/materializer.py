@@ -10,11 +10,29 @@ from empire_os.qualification_worker_v2 import request_json
 
 RequestFn = Callable[..., Any]
 STATE_RANK = {
-    "unknown": 0,
-    "probable": 1,
-    "confirmed": 2,
-    "rejected": 3,
+    "observed": 0,
+    "verified": 1,
+    "invalid": 2,
+    "suppressed": 3,
 }
+
+STATE_ALIASES = {
+    "unknown": "observed",
+    "probable": "observed",
+    "confirmed": "verified",
+    "rejected": "invalid",
+    "observed": "observed",
+    "verified": "verified",
+    "invalid": "invalid",
+    "suppressed": "suppressed",
+}
+
+
+def _canonical_state(value: Any) -> str:
+    return STATE_ALIASES.get(
+        str(value or "").strip().lower(),
+        "observed",
+    )
 
 
 class HunterMaterializerError(RuntimeError):
@@ -268,23 +286,29 @@ class SupabaseHunterMaterializer:
             )
         if existing:
             current = existing[0]
-            old_state = str(
-                current.get("verification_state") or "unknown"
+            old_state = _canonical_state(
+                current.get("verification_state")
             )
-            new_state = row.verification_state
+            new_state = _canonical_state(
+                row.verification_state
+            )
             state = (
                 new_state
-                if new_state == "rejected"
+                if new_state in {"invalid", "suppressed"}
                 or STATE_RANK.get(new_state, 0)
                 >= STATE_RANK.get(old_state, 0)
                 else old_state
             )
-            confidence = max(
-                float(current.get("confidence") or 0.0),
-                float(row.confidence),
+            confidence = (
+                min(float(row.confidence), 0.10)
+                if state in {"invalid", "suppressed"}
+                else max(
+                    float(current.get("confidence") or 0.0),
+                    float(row.confidence),
+                )
             )
             verified_at = current.get("verified_at")
-            if state == "confirmed" and not verified_at:
+            if state == "verified" and not verified_at:
                 verified_at = observed_at
             updated = self._patch(
                 "/rest/v1/intelligence_contact_points",

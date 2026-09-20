@@ -212,5 +212,5 @@ def test_confirmed_contact_is_not_downgraded_by_probable_refresh():
         call for call in calls
         if call[0] == "PATCH"
     )
-    assert patch[2]["verification_state"] == "confirmed"
+    assert patch[2]["verification_state"] == "verified"
     assert patch[2]["confidence"] == 0.96

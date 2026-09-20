@@ -90,6 +90,7 @@ from empire_os.astra_api import create_astra_router
 from empire_os.consent_api import create_consent_router
 from empire_os.first_revenue_api import create_first_revenue_router
 from empire_os.outreach_api import create_outreach_router
+from empire_os.hunter.api import create_hunter_router
 from empire_os.data_plane_api import create_data_plane_router
 from empire_os.agi_control_api import create_agi_control_router
 from empire_os.quant_brain_api import create_quant_brain_router
@@ -498,6 +499,7 @@ app.include_router(create_astra_router())
 app.include_router(create_consent_router())
 app.include_router(create_first_revenue_router())
 app.include_router(create_outreach_router())
+app.include_router(create_hunter_router())
 app.include_router(create_data_plane_router())
 app.include_router(create_agi_control_router())
 app.include_router(create_quant_brain_router())

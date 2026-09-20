@@ -10,6 +10,12 @@ from empire_os.hunter.pattern_brain import (
     learn_domain_pattern,
 )
 from empire_os.hunter.verification_mesh import VerificationMesh
+from empire_os.hunter.outcome_learning import (
+    HunterOutcomeObservation,
+    calibrate_contact,
+    calibrate_pattern_outcomes,
+)
+from empire_os.hunter.outcome_worker import HunterOutcomeWorker
 
 __all__ = [
     "ContactEvidence",
@@ -22,4 +28,8 @@ __all__ = [
     "generate_candidate",
     "infer_pattern",
     "learn_domain_pattern",
+    "HunterOutcomeObservation",
+    "HunterOutcomeWorker",
+    "calibrate_contact",
+    "calibrate_pattern_outcomes",
 ]

@@ -84,9 +84,9 @@ def test_evidence_plan_maps_to_existing_intelligence_fabric_shape():
         row for row in plan.contacts
         if row.normalized_value == "john.doe@acme.com"
     )
-    assert confirmed.verification_state == "confirmed"
+    assert confirmed.verification_state == "verified"
     assert confirmed.verified_at is not None
-    assert probable.verification_state == "probable"
+    assert probable.verification_state == "observed"
     assert probable.verified_at is None
 
 

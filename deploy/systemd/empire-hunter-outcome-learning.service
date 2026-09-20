@@ -1,0 +1,17 @@
+[Unit]
+Description=Empire Hunter verified outcome learner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=/etc/empire_os.env
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_hunter_outcome_learning.py --limit 200 --write
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=120
