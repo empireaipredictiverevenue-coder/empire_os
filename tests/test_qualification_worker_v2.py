@@ -94,3 +94,115 @@ def test_cycle_continues_after_one_prospect_failure(monkeypatch):
     assert result["real_data_only"] is True
     assert result["outreach_enabled"] is False
     assert result["payment_enabled"] is False
+
+
+def test_existing_identity_link_is_reused_without_writes(monkeypatch):
+    entity_id = str(uuid4())
+    monkeypatch.setattr(
+        worker,
+        "fetch_active_identity_link",
+        lambda prospect_id: {
+            "prospect_id": prospect_id,
+            "entity_id": entity_id,
+            "active": True,
+        },
+    )
+
+    def fail_request(*args, **kwargs):
+        raise AssertionError("no write should occur")
+
+    monkeypatch.setattr(worker, "request_json", fail_request)
+    resolved = worker.resolve_identity(_prospect(), None, {})
+    assert resolved == entity_id
+
+
+def test_strict_singleton_identity_is_promoted_idempotently(monkeypatch):
+    prospect = _prospect()
+    entity_id = str(uuid4())
+    links = []
+    writes = []
+
+    monkeypatch.setattr(
+        worker,
+        "build_singleton_identity_plan",
+        lambda **kwargs: {
+            "entity_id_candidate": entity_id,
+            "canonical_name_candidate": prospect["business_name"],
+            "canonical_niche_candidate": prospect["niche"],
+            "canonical_metro_candidate": prospect["metro"],
+            "canonical_phone_candidate": prospect["phone"],
+            "canonical_website_candidate": "https://realroofing.example",
+            "association_confidence": 1.0,
+            "resolution_state": "evidence_resolved_candidate",
+            "confidence_basis": "strict test evidence",
+            "evidence_assertions": ["exact_name", "exact_phone"],
+            "source": {"acquisition_source": "overpass_osm"},
+        },
+    )
+
+    def fake_fetch(prospect_id):
+        if links:
+            return {
+                "prospect_id": prospect_id,
+                "entity_id": entity_id,
+                "active": True,
+            }
+        return None
+
+    monkeypatch.setattr(worker, "fetch_active_identity_link", fake_fetch)
+
+    def fake_request(method, path, payload=None, prefer=None):
+        writes.append((method, path, payload, prefer))
+        if "prospect_entity_links" in path and method == "POST":
+            links.append(payload)
+        return None
+
+    monkeypatch.setattr(worker, "request_json", fake_request)
+    resolved = worker.resolve_identity(
+        prospect,
+        {"source": "overpass_osm"},
+        {"fields": {}, "evidence": []},
+    )
+
+    assert resolved == entity_id
+    assert len(writes) == 2
+    assert "business_entities" in writes[0][1]
+    assert writes[0][2]["id"] == entity_id
+    assert "prospect_entity_links" in writes[1][1]
+    assert writes[1][2]["prospect_id"] == prospect["id"]
+    assert writes[1][2]["entity_id"] == entity_id
+
+
+def test_identity_plan_rejection_stays_unresolved(monkeypatch):
+    monkeypatch.setattr(
+        worker,
+        "fetch_active_identity_link",
+        lambda prospect_id: None,
+    )
+
+    def reject(**kwargs):
+        raise worker.SingletonIdentityPlanError("phone mismatch")
+
+    monkeypatch.setattr(worker, "build_singleton_identity_plan", reject)
+    resolved = worker.resolve_identity(
+        _prospect(),
+        {"source": "overpass_osm"},
+        {"fields": {}, "evidence": []},
+    )
+    assert resolved is None
+
+
+def test_payload_binds_entity_when_identity_is_known(monkeypatch):
+    entity_id = str(uuid4())
+    enrichment = {
+        "fields": {},
+        "enrichment_score": 0.0,
+        "sources": [],
+        "evidence": [],
+    }
+    payload = worker.build_evidence_backed_payload(
+        _prospect(),
+        enrichment=enrichment,
+        entity_id=entity_id,
+    )
+    assert payload["entity_id"] == entity_id
