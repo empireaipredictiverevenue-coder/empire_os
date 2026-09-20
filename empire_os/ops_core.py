@@ -22,6 +22,8 @@ ALLOWED_UNITS = frozenset({
     "empire-desktop-commander.service",
     "empire-acquisition.service",
     "empire-acquisition.timer",
+    "empire-qualification.service",
+    "empire-qualification.timer",
     "empire-public-gateway.service",
 })
 
