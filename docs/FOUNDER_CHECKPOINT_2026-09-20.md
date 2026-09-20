@@ -145,3 +145,8 @@ Initial production source: Texas State Board of Plumbing Examiners Responsible M
 License records provide a named professional/company association only; they do not establish buyer authority.
 Empire still requires first-party site evidence for a commercial decision role before promotion.
 Live testing caught and fixed a PATRIOT/RIOT fuzzy-match false positive before promotion.
+
+## Empire Coder conveyor hardening
+Coder worker was alive but old high-priority Ollama PLAN jobs were repeatedly timing out and starving new roadmap jobs.
+Worker now quarantines pending jobs that have exhausted retry limits and fails a transient model job once max attempts are reached instead of retrying forever.
+Local coder runtime is being constrained to a smaller context/shorter timeout; external business execution is unaffected.

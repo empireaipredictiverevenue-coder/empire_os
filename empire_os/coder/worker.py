@@ -62,6 +62,9 @@ class CoderTaskWorker:
             stale_seconds=self.stale_seconds,
             max_attempts=self.max_attempts,
         )
+        self.queue.quarantine_exhausted(
+            max_attempts=self.max_attempts,
+        )
         job = self.queue.claim_next(
             worker_id=f"pid:{os.getpid()}",
             lease_seconds=self.lease_seconds,
@@ -84,6 +87,11 @@ class CoderTaskWorker:
             heartbeat.join(timeout=2)
             error = f"{exc.__class__.__name__}:{exc}"
             if self._transient_error(exc):
+                if job.attempts >= self.max_attempts:
+                    return self.queue.fail(
+                        job,
+                        f"{error}:max_attempts_exhausted",
+                    )
                 delay = min(300, 30 * (2 ** max(0, job.attempts - 1)))
                 return self.queue.retry(
                     job,

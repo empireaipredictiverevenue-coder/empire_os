@@ -117,6 +117,38 @@ class LocalJobQueue:
             self._write(self.pending / f"{job.id}.json", job)
         return job
 
+    def quarantine_exhausted(
+        self,
+        *,
+        max_attempts: int = 3,
+    ) -> list[str]:
+        """Move pending jobs that already exhausted retries out of the hot queue."""
+        exhausted: list[str] = []
+        threshold = max(1, int(max_attempts))
+        with self._locked():
+            for path in sorted(self.pending.glob("*.json")):
+                job = self._load_path(path)
+                if int(job.attempts or 0) < threshold:
+                    continue
+                if not str(job.error or "").strip():
+                    continue
+                job.status = JobStatus.FAILED
+                if "max_attempts_exhausted" not in str(job.error):
+                    job.error = (
+                        f"{str(job.error)[:3900]}:max_attempts_exhausted"
+                    )
+                job.retry_after = None
+                job.lease_id = None
+                job.worker_id = None
+                job.heartbeat_at = None
+                job.lease_expires_at = None
+                job.updated_at = utc_now()
+                self._write(path, job)
+                destination = self.failed / path.name
+                path.replace(destination)
+                exhausted.append(job.id)
+        return exhausted
+
     def claim_next(
         self,
         *,
