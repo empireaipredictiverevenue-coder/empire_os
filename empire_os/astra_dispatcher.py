@@ -28,6 +28,18 @@ SAFE_JOBS = {
         "--proposal-limit",
         "3",
     ],
+    "gtm_pipeline": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/run_gtm_pipeline_worker.py"),
+        "--limit",
+        "10",
+    ],
+    "closer_reply_handoff": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/run_closer_reply_worker.py"),
+        "--limit",
+        "50",
+    ],
     "source_health_refresh": [
         str(ROOT / "scripts/run_source_health_observer_cron.sh"),
     ],
@@ -65,7 +77,11 @@ def choose_jobs(
         }
         if stages.get("recognized_revenue") is not True:
             jobs.append("buyer_review_materializer")
-    return jobs
+        if stages.get("buyer_conversation") is not True:
+            jobs.append("gtm_pipeline")
+        if stages.get("commercial_terms") is not True:
+            jobs.append("closer_reply_handoff")
+    return list(dict.fromkeys(jobs))
 
 
 def dispatch(
@@ -117,7 +133,7 @@ def dispatch(
         "selected_jobs": selected,
         "executions": executed,
         "prohibited": [
-            "direct_outbound_send",
+            "raw_provider_send_bypassing_outbound_governor",
             "commercial_terms_acceptance",
             "fund_movement",
             "payment_confirmation",
