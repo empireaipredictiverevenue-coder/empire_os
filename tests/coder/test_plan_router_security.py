@@ -125,6 +125,20 @@ def test_security_scrubs_secret_and_flags_dangerous_code():
     assert any(f.kind == "dangerous_code" for f in findings)
 
 
+def test_security_does_not_flag_public_token_variable_assignment():
+    findings = scan_text(
+        'token = os.getenv("BSC_USDT_TOKEN_CONTRACT", BSC_USDT_CONTRACT).strip()'
+    )
+    assert not any(f.kind == "secret_material" for f in findings)
+
+
+def test_security_still_flags_literal_secret_assignments():
+    findings = scan_text(
+        'SERVICE_TOKEN = "abcdefghijklmnopqrstuvwx123456"'
+    )
+    assert any(f.kind == "secret_material" for f in findings)
+
+
 def test_self_build_scope_cannot_escape_coder():
     assert validate_self_build_scope(["empire_os/coder/repo.py", "tests/coder/test_repo.py"])
     with pytest.raises(SelfBuildScopeError):

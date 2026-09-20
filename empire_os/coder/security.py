@@ -11,7 +11,17 @@ from .policy import PROTECTED_NAMES, resolve_workspace
 
 _SECRET_PATTERNS = (
     re.compile(r"sk-[A-Za-z0-9_-]{20,}"),
-    re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*['\"]?[^\s'\"]{12,}"),
+    # Require an actual literal secret value. Generic variables such as
+    # ``token = os.getenv(...)`` or public token-contract constants are not
+    # secret material and must not fail deterministic verification.
+    re.compile(
+        r"(?i)(api[_-]?key|secret|password|(?:access|auth|bearer|service)[_-]?token)"
+        r"\s*[:=]\s*['\"][^'\"\r\n]{12,}['\"]"
+    ),
+    re.compile(
+        r"(?im)^\s*(?:[A-Z0-9_]*(?:SECRET|PASSWORD|API[_-]?KEY|ACCESS[_-]?TOKEN))"
+        r"\s*=\s*[A-Za-z0-9_./+=:-]{16,}\s*$"
+    ),
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     re.compile(r"(?i)mnemonic\s*[:=]"),
 )
