@@ -15,6 +15,7 @@ from typing import Any, Mapping
 
 class GTMAuthorityLane(str, Enum):
     AUTO = "AUTO"
+    APPROVED_ACTION = "APPROVED_ACTION"
     STANDING_AUTHORITY = "STANDING_AUTHORITY"
     FOUNDER_GATE = "FOUNDER_GATE"
 
@@ -161,84 +162,138 @@ def review_gtm_action(
             blockers=("founder_gate_required",),
         )
 
-    blockers: list[str] = []
+    authority_blockers: list[str] = []
+    readiness_blockers: list[str] = []
     authority = standing_authority
-    if authority is None:
-        blockers.append("standing_authority_missing")
+    specific_approval = ctx.get("specific_approval_present") is True
+    specific_approval_ref = str(
+        ctx.get("specific_approval_ref") or ""
+    ).strip()
+
+    if specific_approval:
+        if not specific_approval_ref:
+            authority_blockers.append("specific_approval_ref_missing")
+        result_lane = GTMAuthorityLane.APPROVED_ACTION
     else:
-        if not authority.enabled:
-            blockers.append("standing_authority_disabled")
-        if not str(authority.authority_id or "").strip():
-            blockers.append("authority_id_missing")
-        if not str(authority.approved_by or "").strip():
-            blockers.append("approved_by_missing")
+        result_lane = GTMAuthorityLane.STANDING_AUTHORITY
+        if authority is None:
+            authority_blockers.append("standing_authority_missing")
+        else:
+            if not authority.enabled:
+                authority_blockers.append("standing_authority_disabled")
+            if not str(authority.authority_id or "").strip():
+                authority_blockers.append("authority_id_missing")
+            if not str(authority.approved_by or "").strip():
+                authority_blockers.append("approved_by_missing")
 
-        current = now.astimezone(timezone.utc)
-        approved_at = _parse_ts(
-            authority.approved_at,
-            label="approved_at",
-        )
-        expires_at = _parse_ts(
-            authority.expires_at,
-            label="expires_at",
-        )
-        if approved_at > current:
-            blockers.append("standing_authority_not_yet_active")
-        if expires_at <= current:
-            blockers.append("standing_authority_expired")
+            current = now.astimezone(timezone.utc)
+            approved_at = _parse_ts(
+                authority.approved_at,
+                label="approved_at",
+            )
+            expires_at = _parse_ts(
+                authority.expires_at,
+                label="expires_at",
+            )
+            if approved_at > current:
+                authority_blockers.append(
+                    "standing_authority_not_yet_active"
+                )
+            if expires_at <= current:
+                authority_blockers.append(
+                    "standing_authority_expired"
+                )
 
-        allowed = set(authority.capabilities)
-        if key not in allowed:
-            blockers.append("capability_not_in_standing_authority")
+            allowed = set(authority.capabilities)
+            if key not in allowed:
+                authority_blockers.append(
+                    "capability_not_in_standing_authority"
+                )
 
-        cap = int(authority.daily_external_action_cap or 0)
-        if cap <= 0:
-            blockers.append("external_action_cap_missing")
-        elif external_actions_used_today >= cap:
-            blockers.append("external_action_cap_reached")
+            cap = int(authority.daily_external_action_cap or 0)
+            if cap <= 0:
+                authority_blockers.append(
+                    "external_action_cap_missing"
+                )
+            elif external_actions_used_today >= cap:
+                authority_blockers.append(
+                    "external_action_cap_reached"
+                )
 
-        channel = str(ctx.get("channel") or "").strip().lower()
-        if channel:
-            channels = {
-                str(value).strip().lower()
-                for value in authority.channels
-                if str(value).strip()
-            }
-            if channels and channel not in channels:
-                blockers.append("channel_outside_standing_authority")
+            channel = str(
+                ctx.get("channel") or ""
+            ).strip().lower()
+            if channel:
+                channels = {
+                    str(value).strip().lower()
+                    for value in authority.channels
+                    if str(value).strip()
+                }
+                if channels and channel not in channels:
+                    authority_blockers.append(
+                        "channel_outside_standing_authority"
+                    )
 
-        offer_key = str(ctx.get("offer_key") or "").strip()
-        if offer_key:
-            offers = {
-                str(value).strip()
-                for value in authority.offer_keys
-                if str(value).strip()
-            }
-            if offers and offer_key not in offers:
-                blockers.append("offer_outside_standing_authority")
+            offer_key = str(
+                ctx.get("offer_key") or ""
+            ).strip()
+            if offer_key:
+                offers = {
+                    str(value).strip()
+                    for value in authority.offer_keys
+                    if str(value).strip()
+                }
+                if offers and offer_key not in offers:
+                    authority_blockers.append(
+                        "offer_outside_standing_authority"
+                    )
 
-        # Standing authority is never enough by itself for an external action.
-        # The action must already have passed evidence/compliance/governance
-        # checks in the underlying subsystem.
-        if ctx.get("evidence_ready") is not True:
-            blockers.append("evidence_not_ready")
-        if ctx.get("compliance_ready") is not True:
-            blockers.append("compliance_not_ready")
-        if ctx.get("governor_ready") is not True:
-            blockers.append("governor_not_ready")
+    # Approval/authority never overrides readiness. Missing evidence,
+    # compliance, or governor readiness is a system blocker, not a reason
+    # to repeatedly ask the founder for approval.
+    if ctx.get("evidence_ready") is not True:
+        readiness_blockers.append("evidence_not_ready")
+    if ctx.get("compliance_ready") is not True:
+        readiness_blockers.append("compliance_not_ready")
+    if ctx.get("governor_ready") is not True:
+        readiness_blockers.append("governor_not_ready")
 
-    ordered = tuple(dict.fromkeys(blockers))
-    permitted = not ordered
+    blockers = tuple(
+        dict.fromkeys(authority_blockers + readiness_blockers)
+    )
+    permitted = not blockers
+
+    founder_authority_blockers = {
+        "standing_authority_missing",
+        "standing_authority_disabled",
+        "standing_authority_expired",
+        "authority_id_missing",
+        "approved_by_missing",
+        "specific_approval_ref_missing",
+        "external_action_cap_missing",
+        "capability_not_in_standing_authority",
+        "channel_outside_standing_authority",
+        "offer_outside_standing_authority",
+    }
+    requires_founder_approval = any(
+        blocker in founder_authority_blockers
+        for blocker in authority_blockers
+    )
+
+    authority_id = None
+    if permitted and specific_approval:
+        authority_id = specific_approval_ref
+    elif permitted and authority is not None:
+        authority_id = authority.authority_id
+
     return GTMActionReview(
         action=key,
-        lane=lane,
+        lane=result_lane,
         permitted=permitted,
-        requires_founder_approval=not permitted,
-        standing_authority_used=permitted,
-        authority_id=(
-            authority.authority_id
-            if authority is not None and permitted
-            else None
+        requires_founder_approval=requires_founder_approval,
+        standing_authority_used=(
+            permitted and not specific_approval
         ),
-        blockers=ordered,
+        authority_id=authority_id,
+        blockers=blockers,
     )

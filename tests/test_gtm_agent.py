@@ -118,3 +118,27 @@ def test_complete_loop_has_no_next_action():
 
     assert decision.next_action is None
     assert decision.action_review is None
+
+
+def test_current_specific_outbound_approval_does_not_reask_founder():
+    decision = decide_next_gtm_action(
+        {
+            "highest_priority_blocker": "outbound_sent",
+            "loop_complete": False,
+        },
+        now=NOW,
+        action_context={
+            "specific_approval_present": True,
+            "specific_approval_ref": "outbound_intent:a530c17a",
+            "channel": "email",
+            "offer_key": "managed_service",
+            "evidence_ready": True,
+            "compliance_ready": True,
+            "governor_ready": True,
+        },
+    )
+
+    assert decision.next_action == "outreach.send"
+    assert decision.action_review.permitted is True
+    assert decision.action_review.requires_founder_approval is False
+    assert decision.action_review.authority_id == "outbound_intent:a530c17a"

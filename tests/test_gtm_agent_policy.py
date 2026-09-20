@@ -166,3 +166,65 @@ def test_hard_gates_never_gain_authority_from_standing_grant(action):
     assert result.permitted is False
     assert result.requires_founder_approval is True
     assert result.blockers == ("founder_gate_required",)
+
+
+def test_specific_approved_intent_satisfies_authority_without_reapproval():
+    result = review_gtm_action(
+        "outreach.send",
+        now=NOW,
+        context={
+            "specific_approval_present": True,
+            "specific_approval_ref": "outbound_intent:a530c17a",
+            "channel": "email",
+            "offer_key": "managed_service",
+            "evidence_ready": True,
+            "compliance_ready": True,
+            "governor_ready": True,
+        },
+    )
+
+    assert result.lane is GTMAuthorityLane.APPROVED_ACTION
+    assert result.permitted is True
+    assert result.requires_founder_approval is False
+    assert result.standing_authority_used is False
+    assert result.authority_id == "outbound_intent:a530c17a"
+
+
+def test_readiness_blocker_is_not_misreported_as_founder_approval():
+    result = review_gtm_action(
+        "outreach.send",
+        now=NOW,
+        context={
+            "specific_approval_present": True,
+            "specific_approval_ref": "outbound_intent:a530c17a",
+            "channel": "email",
+            "offer_key": "managed_service",
+            "evidence_ready": False,
+            "compliance_ready": True,
+            "governor_ready": True,
+        },
+    )
+
+    assert result.permitted is False
+    assert result.requires_founder_approval is False
+    assert result.blockers == ("evidence_not_ready",)
+
+
+def test_daily_cap_waits_instead_of_asking_founder_again():
+    result = review_gtm_action(
+        "voice.call",
+        now=NOW,
+        standing_authority=grant(),
+        context={
+            "channel": "voice",
+            "offer_key": "managed_service",
+            "evidence_ready": True,
+            "compliance_ready": True,
+            "governor_ready": True,
+        },
+        external_actions_used_today=25,
+    )
+
+    assert result.permitted is False
+    assert result.requires_founder_approval is False
+    assert result.blockers == ("external_action_cap_reached",)
