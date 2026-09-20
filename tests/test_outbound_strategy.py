@@ -5,7 +5,7 @@ def test_verified_person_email_is_primary_and_company_phone_stays_separate():
     plan = build_contact_channel_plan(
         {"outreach_ready": True, "preferred_email": "frank@example.com"},
         channel_evidence=[
-            {"channel": "voice", "value": "+12815551212", "verified": True,
+            {"channel": "voice", "value": "+12814441212", "verified": True,
              "person_bound": False, "source": "official_business_phone"},
         ],
     )
@@ -40,3 +40,32 @@ def test_unverified_paths_are_never_promoted():
     )
     assert plan["primary"] is None
     assert len(plan["blocked"]) == 2
+
+
+def test_555_style_phone_is_blocked_even_when_marked_verified():
+    plan = build_contact_channel_plan(
+        {"outreach_ready": False},
+        channel_evidence=[
+            {
+                "channel": "voice",
+                "value": "+15125550123",
+                "verified": True,
+                "person_bound": True,
+                "source": "legacy_contact",
+            },
+            {
+                "channel": "sms",
+                "value": "+15551234567",
+                "verified": True,
+                "person_bound": True,
+                "source": "legacy_contact",
+            },
+        ],
+    )
+
+    assert plan["primary"] is None
+    assert len(plan["blocked"]) == 2
+    assert all(
+        item["reason"] == "valid_e164_required"
+        for item in plan["blocked"]
+    )

@@ -9,6 +9,8 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
+from empire_os.phone_quality import is_commercially_usable_phone
+
 from .decoder import decode_document
 
 
@@ -94,28 +96,8 @@ def _valid_email(value: str) -> bool:
 
 
 def _valid_phone(value: str) -> bool:
-    """Reject obvious fictional/template NANP phone numbers."""
-    digits = re.sub(r"\D", "", value or "")
-
-    if len(digits) == 11 and digits.startswith("1"):
-        digits = digits[1:]
-
-    if len(digits) != 10:
-        return False
-
-    # 555 is not a valid NANP area code and commonly appears in templates.
-    if digits[:3] == "555":
-        return False
-
-    if digits in {
-        "0000000000",
-        "1111111111",
-        "1234567890",
-        "0123456789",
-    }:
-        return False
-
-    return True
+    """Reject obvious fictional/template phone numbers."""
+    return is_commercially_usable_phone(value)
 
 
 def _host(url: str) -> str:

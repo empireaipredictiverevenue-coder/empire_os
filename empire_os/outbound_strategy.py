@@ -4,8 +4,9 @@ Pure planning only: no writes, sends, scraping, or account actions.
 """
 from __future__ import annotations
 
-import re
 from typing import Any, Iterable, Mapping
+
+from empire_os.phone_quality import normalized_e164
 
 
 def _text(value: Any) -> str:
@@ -13,8 +14,7 @@ def _text(value: Any) -> str:
 
 
 def _e164(value: Any) -> str:
-    text = re.sub(r"[^0-9+]", "", _text(value))
-    return text if re.fullmatch(r"\+[1-9][0-9]{7,14}", text) else ""
+    return normalized_e164(value)
 
 
 def build_contact_channel_plan(

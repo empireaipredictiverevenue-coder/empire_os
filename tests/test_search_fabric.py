@@ -237,6 +237,11 @@ class TestContactEvidenceHygiene:
             "+1 555-123-4567"
         ) is False
 
+    def test_555_exchange_phone_is_rejected(self):
+        assert _valid_phone(
+            "+1 512-555-0123"
+        ) is False
+
 
 class TestEnrichmentFailClosed:
     def test_probe_failure_cannot_score_candidate(self):
