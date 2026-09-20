@@ -37,7 +37,64 @@ Request = Callable[..., Any]
 
 def _first_name(value: Any) -> str:
     clean = str(value or "").strip()
-    return clean.split()[0] if clean else "there"
+    return clean.split()[0] if clean else ""
+
+
+def _required_context(evidence: Mapping[str, Any]) -> tuple[str, str, str]:
+    business = str(evidence.get("business_name") or "").strip()
+    niche = str(evidence.get("niche") or "").strip()
+    metro = str(evidence.get("metro") or "").strip()
+    missing = [
+        key
+        for key, value in (
+            ("business_name", business),
+            ("niche", niche),
+            ("metro", metro),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError(
+            "outbound personalization evidence missing: "
+            + ",".join(missing)
+        )
+    return business, niche, metro
+
+
+def _hydrate_review_evidence(
+    request: Request,
+    review: Mapping[str, Any],
+) -> dict[str, Any]:
+    evidence = review.get("evidence")
+    merged = dict(evidence) if isinstance(evidence, Mapping) else {}
+    if all(
+        str(merged.get(key) or "").strip()
+        for key in ("business_name", "niche", "metro")
+    ):
+        return {**dict(review), "evidence": merged}
+
+    prospect_id = str(review.get("prospect_id") or "").strip()
+    if not prospect_id:
+        return {**dict(review), "evidence": merged}
+
+    query = urlencode({
+        "select": "business_name,niche,metro",
+        "id": f"eq.{prospect_id}",
+        "limit": "1",
+    })
+    rows = request(
+        "GET",
+        f"/rest/v1/prospects?{query}",
+    ) or []
+    if not isinstance(rows, list) or not rows:
+        return {**dict(review), "evidence": merged}
+    prospect = rows[0] if isinstance(rows[0], Mapping) else {}
+    for key in ("business_name", "niche", "metro"):
+        if not str(merged.get(key) or "").strip():
+            value = str(prospect.get(key) or "").strip()
+            if value:
+                merged[key] = value
+    return {**dict(review), "evidence": merged}
 
 
 def build_outbound_payload(
@@ -50,9 +107,9 @@ def build_outbound_payload(
     evidence = review.get("evidence")
     evidence = evidence if isinstance(evidence, Mapping) else {}
     first = _first_name(review.get("contact_name"))
-    business = str(evidence.get("business_name") or "your team").strip()
-    niche = str(evidence.get("niche") or "local market").strip()
-    metro = str(evidence.get("metro") or "your market").strip()
+    if not first:
+        raise ValueError("outbound contact name required")
+    business, niche, metro = _required_context(evidence)
 
     subject = f"{first} — {niche} opportunities in {metro}"
     body = (
@@ -146,7 +203,8 @@ def run_gtm_pipeline(
     errors: list[str] = []
     for review in ready[:bounded]:
         try:
-            payload = build_outbound_payload(review, now=current)
+            hydrated = _hydrate_review_evidence(request, review)
+            payload = build_outbound_payload(hydrated, now=current)
             result = request(
                 "POST",
                 "/rest/v1/rpc/propose_reviewed_outbound_intent",

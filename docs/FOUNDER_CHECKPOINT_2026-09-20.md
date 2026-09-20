@@ -150,3 +150,10 @@ Live testing caught and fixed a PATRIOT/RIOT fuzzy-match false positive before p
 Coder worker was alive but old high-priority Ollama PLAN jobs were repeatedly timing out and starving new roadmap jobs.
 Worker now quarantines pending jobs that have exhausted retry limits and fails a transient model job once max attempts are reached instead of retrying forever.
 Local coder runtime is being constrained to a smaller context/shorter timeout; external business execution is unaffected.
+
+## GTM personalization truth fix
+Live outbound audit found malformed fallback copy in several delivered emails:
+"your team surfaced in our your market local market analysis".
+GTM now hydrates missing business_name/niche/metro from the canonical prospect row
+and fails closed if company, niche, metro or contact name remain unresolved.
+Placeholder personalization is no longer allowed into a proposed outbound intent.
