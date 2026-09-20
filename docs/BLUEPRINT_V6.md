@@ -112,6 +112,52 @@ Vonage/live calling, broad authority expansion, public content auto-publishing, 
 ### Parallel-work rule
 Parallel coders may work only on isolated slices that advance Priority 1-3. They must not create a new roadmap branch, duplicate an existing subsystem, expand external authority, or turn prototype/dry-run data into production truth.
 
+## Founder Revenue Strike — 30 / 60 / 90 Day Execution
+
+### Next 30 days — prove revenue
+- Prioritize trigger-backed accounts over broad cold volume.
+- Use the canonical Storm Leads Multiplier for Roofing, Restoration, HVAC and adjacent emergency-service markets.
+- Require real company, niche, market and evidence context before outbound.
+- Improve decision-maker/contact recovery and attach an Opportunity Brief where real evidence exists.
+- Activate the premium public site, Trust Center and governed sitemap recovery.
+- Keep Founder Console focused on the current blocker: buyer conversation.
+- No placeholder personalization, synthetic proof, or forecast-as-revenue.
+
+Exit: one genuine commercial conversation -> agreed terms -> verified payment -> fulfilment -> recognized revenue -> outcome evidence.
+
+### Days 31-60 — productize intelligence
+- Ship sellable Node products: territory intelligence, trigger alerts, market maps, opportunity feeds and buyer intelligence.
+- Launch premium Property, Private Capital, Solar, HVAC, Roofing and Legal/Mass Tort intelligence surfaces.
+- Activate 30/90-day plus 6/12/18/24-month forecast and market-regime read models.
+- Reconnect Search/AEO/GEO to the canonical Search Intelligence layer.
+- Prepare Deal Room agreement/signature lifecycle and forecast-vs-actual learning.
+
+### Days 61-90 — compound distribution
+- Scale only niches, metros and offers with verified conversation/payment/GP evidence.
+- Publish/index quality-approved intelligence pages and node-derived reports.
+- Grow GEO/AI citation visibility and first-party search-to-revenue attribution.
+- Turn genuine customer outcomes into proof packs/case studies.
+- Expand Private Capital sponsor/portfolio/add-on intelligence and cross-node opportunity graphs.
+- Keep Jev in shadow/evaluation until labelled evidence clears readiness thresholds.
+
+### Revenue Strike rule
+New work must improve one of: buyer conversations, close/payment/fulfilment probability, sellable intelligence, trust/distribution, or Founder decision quality.
+
+### Revenue Pulse — RESTORATION ACTIVE
+Revenue Pulse is a core operating layer, not a standalone legacy dashboard. The original Command Tower mission was storm/weather trigger -> property/commercial target -> evidence intelligence -> partner/closer payload -> revenue HUD.
+
+Canonical V3 must now unify:
+- storm opportunity pulse and Storm Leads Multiplier;
+- revenue and pipeline velocity;
+- trigger -> qualified buyer -> conversation -> terms -> payment -> fulfilment conversion;
+- recognized revenue and realized GP only from verified truth;
+- Node-level commercial pulse;
+- forecast-vs-actual and regime-change visibility;
+- current highest-priority revenue blocker;
+- Founder Console readout and Astra learning.
+
+The old standalone Supabase project, legacy SQLite delivery path and forecast-as-revenue behaviour remain retired. Revenue Pulse must consume current canonical Supabase truth and preserve OBSERVE/governed authority.
+
 ## Trust, Reputation & Proof Layer — ACTIVE DESIGN
 Empire is new, so trust must be earned from verifiable evidence rather than claimed through vanity badges.
 

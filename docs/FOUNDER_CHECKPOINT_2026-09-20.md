@@ -157,3 +157,11 @@ Live outbound audit found malformed fallback copy in several delivered emails:
 GTM now hydrates missing business_name/niche/metro from the canonical prospect row
 and fails closed if company, niche, metro or contact name remain unresolved.
 Placeholder personalization is no longer allowed into a proposed outbound intent.
+
+## Storm Revenue Strike + Revenue Pulse
+- Canonical Storm Revenue Multiplier added; historical 3x disaster premium preserved as a bounded maximum modeled multiplier.
+- Fresh North Texas severe-thunderstorm/hail/wind trigger produces 2.454x modeled opportunity multiplier / +36.35 priority boost for matched roofing.
+- Eight first-party DFW roofing/restoration prospects were canonically ingested with storm evidence; no outbound sent.
+- Above Ground Roofing was deliberately not re-ingested because legacy duplicates already exist.
+- Revenue Pulse restoration is active and queued to Empire Coder as a canonical V3 read-model against current Supabase/revenue truth.
+- Old Revenue Pulse standalone Supabase, legacy SQLite delivery and forecast-as-revenue behavior remain retired.
