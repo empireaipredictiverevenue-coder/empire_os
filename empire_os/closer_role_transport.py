@@ -32,13 +32,14 @@ ROLE_FUNCTIONS = {
             ("p_case_id", "p_actor"),
         ),
         "get_closer_reply_context": (
-            "select public.get_closer_reply_context(%s)",
-            ("p_case_id",),
+            "select public.get_closer_reply_context(%s,%s)",
+            ("p_case_id", "p_reply_id"),
         ),
         "propose_closer_reply_intent": (
-            "select public.propose_closer_reply_intent(%s,%s,%s,%s,%s,%s)",
+            "select public.propose_closer_reply_intent(%s,%s,%s,%s,%s,%s,%s)",
             (
                 "p_case_id",
+                "p_reply_id",
                 "p_subject",
                 "p_body_text",
                 "p_idempotency_key",

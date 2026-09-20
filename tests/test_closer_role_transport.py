@@ -80,9 +80,11 @@ def test_planner_can_open_and_record_but_not_approve():
     })
     rpc("get_closer_reply_context", {
         "p_case_id": "00000000-0000-0000-0000-000000000002",
+        "p_reply_id": "00000000-0000-0000-0000-000000000001",
     })
     rpc("propose_closer_reply_intent", {
         "p_case_id": "00000000-0000-0000-0000-000000000002",
+        "p_reply_id": "00000000-0000-0000-0000-000000000001",
         "p_subject": "Re: hello",
         "p_body_text": "Thanks",
         "p_idempotency_key": "closer:test:1",

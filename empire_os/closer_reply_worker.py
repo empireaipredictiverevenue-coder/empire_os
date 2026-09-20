@@ -21,6 +21,7 @@ class CloserReplyWorkerResult:
     recommendations_recorded: int
     buyers_provisioned: int
     reply_intents_proposed: int
+    existing_cases_reused: int
     skipped_existing: int
     errors: tuple[str, ...]
 
@@ -31,6 +32,7 @@ class CloserReplyWorkerResult:
             "recommendations_recorded": self.recommendations_recorded,
             "buyers_provisioned": self.buyers_provisioned,
             "reply_intents_proposed": self.reply_intents_proposed,
+            "existing_cases_reused": self.existing_cases_reused,
             "skipped_existing": self.skipped_existing,
             "errors": list(self.errors),
             "actual_revenue": False,
@@ -60,7 +62,7 @@ def run_closer_reply_worker(
     if not isinstance(rows, list):
         raise ValueError("closer work projection must be a list")
 
-    opened = recorded = provisioned = replies_proposed = existing = 0
+    opened = recorded = provisioned = replies_proposed = reused = skipped = 0
     errors: list[str] = []
 
     for row in rows:
@@ -71,20 +73,19 @@ def run_closer_reply_worker(
         case_id = str(row.get("case_id") or "").strip() or None
         if not reply_id or classification not in COMMERCIAL_CLASSES:
             continue
-        if case_id:
-            existing += 1
-            continue
-
         try:
-            opened_result = rpc(
-                "open_closer_case",
-                {"p_reply_id": reply_id},
-            )
-            case_id = str((opened_result or {}).get("case_id") or "").strip()
-            if not case_id:
-                raise ValueError("open_closer_case returned no case_id")
-            if str((opened_result or {}).get("decision") or "") == "opened":
-                opened += 1
+            if case_id:
+                reused += 1
+            else:
+                opened_result = rpc(
+                    "open_closer_case",
+                    {"p_reply_id": reply_id},
+                )
+                case_id = str((opened_result or {}).get("case_id") or "").strip()
+                if not case_id:
+                    raise ValueError("open_closer_case returned no case_id")
+                if str((opened_result or {}).get("decision") or "") == "opened":
+                    opened += 1
 
             buyer_result = rpc(
                 "provision_buyer_from_closer_case",
@@ -98,7 +99,7 @@ def run_closer_reply_worker(
 
             context = rpc(
                 "get_closer_reply_context",
-                {"p_case_id": case_id},
+                {"p_case_id": case_id, "p_reply_id": reply_id},
             ) or {}
             draft = build_closer_reply(context)
 
@@ -123,6 +124,7 @@ def run_closer_reply_worker(
                 "propose_closer_reply_intent",
                 {
                     "p_case_id": case_id,
+                    "p_reply_id": reply_id,
                     "p_subject": draft["subject"],
                     "p_body_text": draft["body_text"],
                     "p_idempotency_key": (
@@ -147,6 +149,7 @@ def run_closer_reply_worker(
         recommendations_recorded=recorded,
         buyers_provisioned=provisioned,
         reply_intents_proposed=replies_proposed,
-        skipped_existing=existing,
+        existing_cases_reused=reused,
+        skipped_existing=skipped,
         errors=tuple(errors),
     )
