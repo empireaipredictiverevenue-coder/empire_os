@@ -893,6 +893,10 @@ def build_candidate_review_plan(candidate: BuyerCandidate, contact_plan: Mapping
     decision_source = _text(decision.get("source") or candidate.contact_source)
     evidence = {
         **candidate.evidence,
+        "business_name": candidate.business_name,
+        "niche": candidate.niche,
+        "metro": candidate.metro,
+        "website": candidate.website,
         "decision_role": decision.get("decision_role") or candidate.decision_role,
         "decision_source": decision_source or None,
         "contact_source": contact_source or None,
