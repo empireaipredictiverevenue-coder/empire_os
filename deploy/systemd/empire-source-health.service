@@ -1,0 +1,15 @@
+[Unit]
+Description=EmpireOS real acquisition source health observer
+After=network-online.target empire-acquisition.timer
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/scripts/run_source_health_observer_cron.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=120
