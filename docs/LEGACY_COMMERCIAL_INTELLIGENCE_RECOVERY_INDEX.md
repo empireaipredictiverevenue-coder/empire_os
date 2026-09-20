@@ -265,3 +265,222 @@ Commercial products recovered:
 North Mini definitely authored/drove the **enterprise campaign blueprint** in historical source comments.
 
 The $150/hour retainer landed in the same Cortex-era commit and integrated Cortex/Predictive/Neural Scout, but Git metadata attributes the commit to `Empire AI`, not directly to North Mini. Preserve the historical association, but do not state that Git independently proves North Mini authored the file.
+
+
+## Recovered Runtime Revenue Pipeline Lineage
+
+Hermes session history plus Git history confirms the earlier revenue system was a connected runtime chain, not one isolated module.
+
+### Intelligence Loop / Buyer Waterfall
+
+Historical lineage:
+- `c03c881:empire_os/intelligence_loop.py`
+- `6d455f1` — buyer endpoint + delivery fixes
+
+Historical responsibilities:
+- load pending leads
+- load active buyers
+- AI enrichment
+- intelligent buyer matching
+- waterfall delivery
+- lead status updates
+- recurring intelligence tick
+
+Reject unchanged:
+- legacy SQLite
+- synthetic-intelligence fallback
+- direct delivery side effects
+- obsolete buyer tables
+
+Recover into current:
+- canonical Supabase qualification -> Omega 2 -> buyer allocation
+- preserve waterfall/ranking concept only behind evidence confidence, verified buyer terms/capacity and fulfilment-order controls
+
+### OpenMeter / Usage Metering
+
+Historical source:
+- `c03c881:empire_os/openmeter_client.py`
+
+Real metering concepts:
+- 90-second pay-per-call sprint
+- native CPC
+- PPL / pay-per-lead
+- PPS / pay-per-appointment
+- hybrid upfront
+- hybrid backend revenue share
+- replayable failed meter events
+
+This is likely the strongest surviving implementation evidence for the old usage/value-metering system.
+
+Modern target:
+verified commercial term
+-> observed billable event
+-> canonical usage event
+-> priced entitlement/charge
+-> BSC USDT payment evidence
+-> fulfilment/outcome
+-> Revenue Truth
+
+Do not restore the local JSONL fallback as commercial truth. Failed delivery may be queued as operational evidence, but billing/revenue remains canonical and verified.
+
+### Hourly Intelligence Retainer
+
+Historical source:
+- `aea6ea7:empire_os/hourly_retainer.py`
+
+Confirmed implementation:
+- `intel_hourly`
+- $150/hour
+- multi-hour retainer offers
+- BSC USDT payment language
+- intelligence deliverables based on Cortex + Predictive + Neural Scout
+
+Useful concept:
+hour blocks are a commercial entitlement/usage unit.
+
+Modern implementation should use canonical commercial terms + usage meter + fulfilment orders rather than legacy `si_subscription` / `si_invoice` SQLite writes.
+
+### Evaluation Product / Value Meter
+
+Historical source lineage:
+- `1e8d2f8:empire_os/agents/evaluation_product.py`
+- later versions through `a96ec26`
+
+Confirmed product mechanics:
+- lead evaluation through Omega
+- A/B/C/D grading
+- per-score billing mode
+- outcome/conversion billing mode
+- credit packs
+- duplicate-charge protection
+- settlement obligations
+
+Historical Solana/USDC settlement must not be restored.
+
+Modern target:
+Omega 2 evidence-backed scoring
+-> evaluation record
+-> billable usage/value event
+-> canonical commercial terms
+-> BSC USDT payment
+-> observed outcome
+-> calibration/learning
+
+### Business Loop Watchdog
+
+Historical source:
+- `aea6ea7:empire_os/agents/loop_closure_watchdog.py`
+
+Strong reusable concept:
+monitor business-stage freshness, not merely process uptime.
+
+Historical stages included:
+outreach -> application -> payment link -> settlement -> active subscription -> delivery -> charge -> collection.
+
+Modern target stages:
+real acquisition
+-> qualification
+-> Omega 2
+-> buyer match
+-> governed outreach
+-> conversation
+-> commercial terms
+-> fulfilment order
+-> BSC USDT payment
+-> fulfilment
+-> recognized revenue / realized GP
+-> learning
+
+Do not restore its old automatic service restarts, model rewrites, SQLite queries or Solana-specific checks unchanged. Rebuild as observe-first canonical stage health.
+
+### Strategy Rank / Revenue Arbitrage
+
+Historical sources:
+- `aea6ea7:empire_os/agents/strategy_rank.py`
+- `aea6ea7:empire_os/agents/strategy_rent.py`
+
+Useful concepts:
+- rank acquisition channels by observed demand and margin
+- only allocate when buyer price exceeds observed acquisition cost
+- track gross spread / margin per delivered unit
+- feed results back into strategy selection
+
+Modern target:
+predicted GP
+-> governed allocation
+-> observed cost
+-> recognized revenue
+-> realized GP
+-> prediction error
+-> strategy learning
+
+No hard-coded acquisition-cost proxies should be treated as real economics.
+
+### Relationship Engine
+
+Current historical root file:
+- `relationship_engine.py`
+- origin commit `3a7979a`
+
+Useful concepts:
+- company/buyer/referral/vertical relationship graph
+- contact/domain/entity quality checks
+- graph degree / relationship strength
+- interaction-quality scoring
+
+Reject unchanged:
+- Incus shell calls
+- `si_buyer_outreach` as identity truth
+- JSON files as canonical relationship state
+
+Modern target:
+canonical entities + people + buyers + opportunities + outcomes -> relationship/committee graph used by buyer fit and next-best-action.
+
+### Predictive Revenue Forecast
+
+Original transparent forecast:
+- `47d375a:empire_os/predictive_revenue.py`
+
+Useful principles:
+- auditable assumptions
+- separate pipeline from confirmed collections
+- explicit forecast horizon
+- confidence/uncertainty surfaced
+
+Reject:
+- 5% pre-data conversion floor
+- touch-rate-as-payment proxy
+- fixed seat-price assumptions
+- any forecast interpreted as revenue
+
+Modern target is already stricter:
+Omega 2 / Quant forecasts may remain unknown when commercial value is unknown and must be compared with later recognized revenue and realized GP.
+
+### Legacy A2A Buyer Marketplace
+
+Historical source:
+- `c03c881:empire_os/a2a_buyer_marketplace.py`
+
+Useful concepts:
+- buyer/lead fit scoring
+- bounded per-buyer capacity
+- duplicate assignment protection
+- buyer waterfall
+- delivery result capture
+
+Modern target:
+`buyer_allocation.py` + canonical buyer capacity + commercial terms + fulfilment orders.
+
+Do not resurrect direct HTTP delivery as allocation truth.
+
+## Hermes Snapshot Provenance
+
+Historical data-loss audit explicitly records the old Hermes skill snapshot at:
+
+`/root/.hermes/skills/empire-os-v3-snapshot/`
+
+Current Remote Desktop Commander runs as `ubuntu` and cannot read `/root/.hermes`, so the snapshot has not yet been independently enumerated in this session.
+
+Hermes session request dumps under `/home/ubuntu/.hermes/sessions/` preserve substantial historical EmpireOS repository context and were used to recover the runtime lineage above.
+
+The root snapshot should be treated as read-only evidence if copied for audit. Do not execute or restore it wholesale.
