@@ -44,6 +44,22 @@ class FakeRpc:
                 "metro": "Austin",
                 "contact_name": "Jane Smith",
             }
+        if name == "record_buyer_capacity_intake":
+            complete = bool(
+                params.get("p_territory")
+                and params.get("p_daily_cap")
+                and params.get("p_delivery_route")
+            )
+            return {
+                "decision": "recorded",
+                "state": "complete" if complete else "partial",
+            }
+        if name == "prepare_fulfilment_order_from_capacity":
+            return {
+                "decision": "prepared",
+                "fulfilment_order_id": "00000000-0000-0000-0000-000000000006",
+                "state": "qualified",
+            }
         if name == "record_closer_recommendation":
             return {
                 "decision": "recorded",
@@ -72,6 +88,8 @@ def test_opens_case_and_records_deterministic_recommendation():
     assert result.buyers_provisioned == 1
     assert result.reply_intents_proposed == 1
     assert result.existing_cases_reused == 0
+    assert result.capacity_intakes_recorded == 0
+    assert result.fulfilment_orders_prepared == 0
     assert result.errors == ()
     assert [name for name, _ in rpc.calls] == [
         "list_closer_work",
@@ -103,6 +121,8 @@ def test_existing_case_is_reused_for_later_reply():
     assert result.recommendations_recorded == 1
     assert result.buyers_provisioned == 0
     assert result.reply_intents_proposed == 1
+    assert result.capacity_intakes_recorded == 0
+    assert result.fulfilment_orders_prepared == 0
     assert result.skipped_existing == 0
     assert [name for name, _ in rpc.calls] == [
         "list_closer_work",
@@ -129,4 +149,53 @@ def test_noncommercial_reply_is_ignored():
     assert result.buyers_provisioned == 0
     assert result.reply_intents_proposed == 0
     assert result.existing_cases_reused == 0
+    assert result.capacity_intakes_recorded == 0
+    assert result.fulfilment_orders_prepared == 0
     assert result.errors == ()
+
+
+def test_complete_capacity_reply_prepares_nonbinding_order_shell():
+    class CapacityRpc(FakeRpc):
+        def __call__(self, name, params):
+            if name == "get_closer_reply_context":
+                self.calls.append((name, params))
+                return {
+                    "case_id": params["p_case_id"],
+                    "classification": "positive",
+                    "reply_body_text": (
+                        "We cover Austin and Round Rock. "
+                        "We can handle 10 leads per day. "
+                        "Webhook is preferred: https://acme.test/leads"
+                    ),
+                    "root_subject": "Roofing opportunities",
+                    "business_name": "Acme Roofing",
+                    "niche": "roofing",
+                    "metro": "Austin",
+                    "contact_name": "Jane Smith",
+                }
+            return super().__call__(name, params)
+
+    rpc = CapacityRpc([
+        {
+            "reply_id": "00000000-0000-0000-0000-000000000021",
+            "classification": "positive",
+            "confidence": 0.95,
+            "case_id": "00000000-0000-0000-0000-000000000010",
+            "case_origin": "threaded",
+        }
+    ])
+    result = run_closer_reply_worker(rpc)
+    assert result.existing_cases_reused == 1
+    assert result.capacity_intakes_recorded == 1
+    assert result.fulfilment_orders_prepared == 1
+    assert result.reply_intents_proposed == 1
+    names = [name for name, _ in rpc.calls]
+    assert "record_buyer_capacity_intake" in names
+    assert "prepare_fulfilment_order_from_capacity" in names
+    capacity = next(
+        params for name, params in rpc.calls
+        if name == "record_buyer_capacity_intake"
+    )
+    assert capacity["p_territory"] == "Austin and Round Rock"
+    assert capacity["p_daily_cap"] == 10
+    assert capacity["p_delivery_route"] == "webhook"

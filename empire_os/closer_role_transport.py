@@ -47,6 +47,23 @@ ROLE_FUNCTIONS = {
                 "p_expires_at",
             ),
         ),
+        "record_buyer_capacity_intake": (
+            "select public.record_buyer_capacity_intake(%s,%s,%s,%s,%s,%s,%s,%s)",
+            (
+                "p_case_id",
+                "p_reply_id",
+                "p_territory",
+                "p_daily_cap",
+                "p_delivery_route",
+                "p_delivery_reference",
+                "p_evidence",
+                "p_actor",
+            ),
+        ),
+        "prepare_fulfilment_order_from_capacity": (
+            "select public.prepare_fulfilment_order_from_capacity(%s,%s)",
+            ("p_case_id", "p_actor"),
+        ),
         "record_closer_recommendation": (
             "select public.record_closer_recommendation(%s,%s,%s,%s::jsonb,%s,%s)",
             (

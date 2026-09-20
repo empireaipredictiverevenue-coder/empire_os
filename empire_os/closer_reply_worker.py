@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 
 from empire_os.closer_reply_draft import build_closer_reply
+from empire_os.buyer_capacity_intake import parse_buyer_capacity_reply
 
 COMMERCIAL_CLASSES = {
     "positive": "qualify",
@@ -22,6 +23,8 @@ class CloserReplyWorkerResult:
     buyers_provisioned: int
     reply_intents_proposed: int
     existing_cases_reused: int
+    capacity_intakes_recorded: int
+    fulfilment_orders_prepared: int
     skipped_existing: int
     errors: tuple[str, ...]
 
@@ -33,6 +36,8 @@ class CloserReplyWorkerResult:
             "buyers_provisioned": self.buyers_provisioned,
             "reply_intents_proposed": self.reply_intents_proposed,
             "existing_cases_reused": self.existing_cases_reused,
+            "capacity_intakes_recorded": self.capacity_intakes_recorded,
+            "fulfilment_orders_prepared": self.fulfilment_orders_prepared,
             "skipped_existing": self.skipped_existing,
             "errors": list(self.errors),
             "actual_revenue": False,
@@ -63,6 +68,7 @@ def run_closer_reply_worker(
         raise ValueError("closer work projection must be a list")
 
     opened = recorded = provisioned = replies_proposed = reused = skipped = 0
+    capacity_recorded = orders_prepared = 0
     errors: list[str] = []
 
     for row in rows:
@@ -101,6 +107,41 @@ def run_closer_reply_worker(
                 "get_closer_reply_context",
                 {"p_case_id": case_id, "p_reply_id": reply_id},
             ) or {}
+
+            capacity = parse_buyer_capacity_reply(
+                str(context.get("reply_body_text") or "")
+            )
+            if capacity["has_explicit_capacity_evidence"]:
+                capacity_result = rpc(
+                    "record_buyer_capacity_intake",
+                    {
+                        "p_case_id": case_id,
+                        "p_reply_id": reply_id,
+                        "p_territory": capacity["territory"],
+                        "p_daily_cap": capacity["daily_cap"],
+                        "p_delivery_route": capacity["delivery_route"],
+                        "p_delivery_reference": capacity["delivery_reference"],
+                        "p_evidence": capacity["evidence"],
+                        "p_actor": "empire_closer_planner",
+                    },
+                ) or {}
+                if str(capacity_result.get("decision") or "") == "recorded":
+                    capacity_recorded += 1
+                if str(capacity_result.get("state") or "") == "complete":
+                    order_result = rpc(
+                        "prepare_fulfilment_order_from_capacity",
+                        {
+                            "p_case_id": case_id,
+                            "p_actor": "empire_closer_planner",
+                        },
+                    ) or {}
+                    if str(order_result.get("decision") or "") == "prepared":
+                        orders_prepared += 1
+                    context = {
+                        **context,
+                        "capacity_intake_state": "complete",
+                    }
+
             draft = build_closer_reply(context)
 
             rpc(
@@ -150,6 +191,8 @@ def run_closer_reply_worker(
         buyers_provisioned=provisioned,
         reply_intents_proposed=replies_proposed,
         existing_cases_reused=reused,
+        capacity_intakes_recorded=capacity_recorded,
+        fulfilment_orders_prepared=orders_prepared,
         skipped_existing=skipped,
         errors=tuple(errors),
     )

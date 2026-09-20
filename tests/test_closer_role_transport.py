@@ -91,6 +91,20 @@ def test_planner_can_open_and_record_but_not_approve():
         "p_proposed_by": "empire_closer_planner",
         "p_expires_at": "2026-09-21T12:00:00+00:00",
     })
+    rpc("record_buyer_capacity_intake", {
+        "p_case_id": "00000000-0000-0000-0000-000000000002",
+        "p_reply_id": "00000000-0000-0000-0000-000000000001",
+        "p_territory": "Austin",
+        "p_daily_cap": 10,
+        "p_delivery_route": "webhook",
+        "p_delivery_reference": "https://acme.test/leads",
+        "p_evidence": {"parser": "buyer_capacity_intake_v1"},
+        "p_actor": "empire_closer_planner",
+    })
+    rpc("prepare_fulfilment_order_from_capacity", {
+        "p_case_id": "00000000-0000-0000-0000-000000000002",
+        "p_actor": "empire_closer_planner",
+    })
     rpc("record_closer_recommendation", {
         "p_case_id": "00000000-0000-0000-0000-000000000002",
         "p_type": "qualify",
