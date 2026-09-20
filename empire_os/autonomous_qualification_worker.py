@@ -12,26 +12,17 @@ from typing import Any
 
 from empire_os.lead_scoring import compute_lead_score
 from empire_os.prospect_enrichment import enrich_prospect_for_scoring
+from empire_os.runtime_env import load_runtime_env
 
 
 ENV_PATH = "/etc/empire_os.env"
 
 
 def load_env() -> dict[str, str]:
-    env: dict[str, str] = {}
-
-    with open(ENV_PATH, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if (
-                line
-                and not line.startswith("#")
-                and "=" in line
-            ):
-                key, value = line.split("=", 1)
-                env[key] = value
-
-    return env
+    return load_runtime_env(
+        ENV_PATH,
+        required=("SUPABASE_URL", "SUPABASE_SERVICE_KEY"),
+    )
 
 
 ENV = load_env()

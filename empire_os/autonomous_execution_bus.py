@@ -55,6 +55,7 @@ from empire_os.niche_taxonomy import (
     niche_family,
     normalise,
 )
+from empire_os.runtime_env import load_runtime_env
 
 
 ENV_PATH = os.environ.get(
@@ -129,21 +130,10 @@ class BusError(RuntimeError):
 
 
 def load_env() -> dict[str, str]:
-    env: dict[str, str] = {}
-
-    with open(ENV_PATH, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-
-            if (
-                line
-                and not line.startswith("#")
-                and "=" in line
-            ):
-                key, value = line.split("=", 1)
-                env[key] = value
-
-    return env
+    return load_runtime_env(
+        ENV_PATH,
+        required=("SUPABASE_URL", "SUPABASE_SERVICE_KEY"),
+    )
 
 
 ENV = load_env()
