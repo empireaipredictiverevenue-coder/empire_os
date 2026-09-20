@@ -26,6 +26,12 @@ INTERESTING_LINK_TERMS = (
     "location",
     "locations",
     "team",
+    "leadership",
+    "staff",
+    "people",
+    "management",
+    "founder",
+    "owner",
     "company",
     "service-area",
     "servicearea",
@@ -37,6 +43,10 @@ COMMON_PEOPLE_PATHS = (
     "/our-team/",
     "/team/",
     "/leadership/",
+    "/staff/",
+    "/people/",
+    "/management/",
+    "/company/team/",
     "/about-us/",
     "/about/",
     "/contact-us/",
@@ -398,7 +408,8 @@ def probe_site(
             )
         )
 
-    queue = list(dict.fromkeys(queue))[:max_pages]
+    queue = list(dict.fromkeys(queue))
+    queued = set(queue)
 
     names: List[str] = []
     emails: List[str] = []
@@ -413,6 +424,8 @@ def probe_site(
     best_description = homepage.description
 
     for index, page_url in enumerate(queue):
+        if index >= max_pages:
+            break
         if index == 0:
             document = homepage
         else:
@@ -430,6 +443,23 @@ def probe_site(
 
             if document is None:
                 continue
+
+        if page_priority == "people" and document.format == "html":
+            discovered = _internal_candidates(
+                document.text,
+                document.url,
+                priority="people",
+            )
+            inject = []
+            for candidate_url in discovered:
+                if (
+                    candidate_url not in queued
+                    and _same_site(candidate_url, origin)
+                ):
+                    queued.add(candidate_url)
+                    inject.append(candidate_url)
+            if inject:
+                queue[index + 1:index + 1] = inject
 
         schema = _schema_evidence(
             document.structured_data

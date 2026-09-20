@@ -39,6 +39,58 @@ EMAIL_RE = re.compile(
     r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
 )
 
+
+
+OBFUSCATED_EMAIL_RE = re.compile(
+    r"\b([A-Za-z0-9._%+-]+)\s*"
+    r"(?:\[|\(|\{)?\s*at\s*(?:\]|\)|\})?\s*"
+    r"([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*)\s*"
+    r"(?:\[|\(|\{)?\s*dot\s*(?:\]|\)|\})?\s*"
+    r"([A-Za-z]{2,}(?:\.[A-Za-z]{2,})*)\b",
+    re.I,
+)
+
+CFEMAIL_RE = re.compile(
+    r'data-cfemail=["\']([0-9a-fA-F]{6,})["\']',
+    re.I,
+)
+
+
+def _decode_cfemail(value: str) -> str:
+    try:
+        data = bytes.fromhex(value)
+    except ValueError:
+        return ""
+    if len(data) < 2:
+        return ""
+    key = data[0]
+    try:
+        return bytes(byte ^ key for byte in data[1:]).decode(
+            "utf-8", errors="ignore"
+        )
+    except Exception:
+        return ""
+
+
+def extract_emails(page: str) -> List[str]:
+    """Extract normal and common first-party-obfuscated email addresses."""
+    raw = html.unescape(page or "")
+    values = list(EMAIL_RE.findall(raw))
+
+    visible = clean_text(raw)
+    for match in OBFUSCATED_EMAIL_RE.finditer(visible):
+        local, domain, suffix = match.groups()
+        values.append(f"{local}@{domain}.{suffix}")
+
+    for encoded in CFEMAIL_RE.findall(raw):
+        decoded = _decode_cfemail(encoded).strip()
+        if EMAIL_RE.fullmatch(decoded):
+            values.append(decoded)
+
+    return sorted(
+        set(value.strip().lower() for value in values if value.strip())
+    )
+
 PHONE_RE = re.compile(
     r"(?<!\d)(?:\+?1[\s.\-]?)?"
     r"(?:\(?\d{3}\)?[\s.\-]?)"
@@ -362,7 +414,7 @@ def extract_html_metadata(
         "title": title,
         "description": description,
         "canonical_url": canonical,
-        "emails": sorted(set(EMAIL_RE.findall(page))),
+        "emails": extract_emails(page),
         "phones": sorted(set(PHONE_RE.findall(visible))),
         "socials": list(dict.fromkeys(socials)),
         "structured_data": extract_json_ld(page),

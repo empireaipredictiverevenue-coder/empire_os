@@ -146,3 +146,63 @@ def test_people_priority_adds_common_first_party_paths():
         "https://acme.test/",
         priority="default",
     ) == []
+
+
+def test_people_priority_follows_profile_link_from_team_page(monkeypatch):
+    import empire_os.search_fabric.site_probe as sp
+
+    docs = {
+        "https://acme.test/": type("Doc", (), {
+            "url": "https://acme.test/",
+            "canonical_url": "https://acme.test/",
+            "format": "html",
+            "text": '<a href="/team/">Team</a>',
+            "title": "Acme",
+            "description": "",
+            "structured_data": [],
+            "emails": [],
+            "phones": [],
+            "socials": [],
+        })(),
+        "https://acme.test/team/": type("Doc", (), {
+            "url": "https://acme.test/team/",
+            "canonical_url": "https://acme.test/team/",
+            "format": "html",
+            "text": '<a href="/team/jane-smith/">Jane Smith, CEO</a>',
+            "title": "Team",
+            "description": "",
+            "structured_data": [],
+            "emails": [],
+            "phones": [],
+            "socials": [],
+        })(),
+        "https://acme.test/team/jane-smith/": type("Doc", (), {
+            "url": "https://acme.test/team/jane-smith/",
+            "canonical_url": "https://acme.test/team/jane-smith/",
+            "format": "html",
+            "text": "Jane Smith CEO jane@acme.test",
+            "title": "Jane Smith",
+            "description": "",
+            "structured_data": [],
+            "emails": ["jane@acme.test"],
+            "phones": [],
+            "socials": [],
+        })(),
+    }
+
+    def fake_fetch(session, url, *, timeout=15.0):
+        return docs.get(url)
+
+    monkeypatch.setattr(sp, "_fetch", fake_fetch)
+    monkeypatch.setattr(sp.time, "sleep", lambda _: None)
+    result = sp.probe_site(
+        "https://acme.test/",
+        max_pages=4,
+        request_timeout=1,
+        time_budget_seconds=4,
+        page_priority="people",
+    )
+
+    urls = [row["url"] for row in result["pages_checked"]]
+    assert "https://acme.test/team/jane-smith/" in urls
+    assert "jane@acme.test" in result["emails"]

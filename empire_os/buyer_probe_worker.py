@@ -18,8 +18,8 @@ from empire_os.mx_validator import MxValidator
 from empire_os.search_fabric.site_probe import probe_site
 
 
-def run(row: dict, *, max_pages: int = 5, request_timeout: float = 4.0,
-        time_budget_seconds: float = 15.0) -> dict:
+def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
+        time_budget_seconds: float = 22.0) -> dict:
     candidate = build_candidate(
         row,
         entity_id=row.get("entity_id") or None,
