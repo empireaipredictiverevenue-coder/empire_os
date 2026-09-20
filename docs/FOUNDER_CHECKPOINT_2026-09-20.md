@@ -110,3 +110,17 @@ Trust build direction:
 - review HSTS/Permissions-Policy safely before activation;
 - publish clear company identity, contact, privacy/security and commercial-process proof;
 - add only genuine signed-deal, payment, delivery, outcome, reference and case-study evidence as it is observed.
+
+## Search / AEO / GEO recovery status
+Phase 5 foundation was already completed locally/tested in earlier phases.
+Current work is recovery/convergence, not a rebuild.
+The old Vultr shutdown removed the disk-backed /srv/aeo deployment and sitemap artifacts.
+The repo still contains 210 generated legacy AEO pages across 42 niches plus the governed
+Search Intelligence engine, Search Command Centre, GEO/AI citation analysis, sitemap/robots
+planning, backlink/citation-gap, indexation, cannibalisation and content-decay modules.
+New work must reconnect/recover those assets under the canonical Search Intelligence layer.
+
+## Supabase security audit
+Current Supabase inspection reported 115 legacy/public tables with RLS disabled.
+Do not blindly enable RLS: missing policies could break production access.
+A dedicated coder lane is performing a read-only dependency/policy audit and staged remediation proposal.

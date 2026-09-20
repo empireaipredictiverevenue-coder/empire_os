@@ -319,11 +319,22 @@ AI Strategy ✅ canonical design: Empire manages AI as a capability portfolio ac
 
 Strategy Operating System V6 ✅ local/tested: the /v1/strategy/* surface exposes OBSERVE-only market-thesis review, strategic-bet review, Market Domination, Competitive Intelligence, Keyword Universe, AI Capability Portfolio and Strategic Scenario Planning. Market Domination separately scores attractiveness, defensibility, expected economics and verified realized economics; classifies corridor progress as DISCOVER → VALIDATE → ESTABLISH → PROVE → DEEPEN → EXPAND; and can rank adjacent corridors only for review. Competitive Intelligence preserves observed facts separately from hypotheses and calculates observed search-presence share and AI-citation share without converting either into market share. Keyword Universe maps evidence-backed queries to ICP, product, funnel stage, asset, CTA/free-tool path and revenue attribution, exposes coverage gaps and draft-only asset backlog, and leaves missing search metrics unscored. AI Capability Portfolio tracks BUILD/BUY/HYBRID/WATCH decisions, evaluations, observed quality/cost/latency/privacy/switching factors and provider-concentration risk without activating providers or promoting models. Strategic Scenario Planning covers market, buyer, competitor, search/AI, model-cost, data-source, regulatory, infrastructure, pricing and partner-distribution shocks; keeps scenario != forecast != actual; and stress-tests response options without executing them. Strategy never infers market share, monopoly or control from internal scores and cannot enter markets, allocate territories, publish/index content, send outreach, commit capital, activate providers, promote models or expand authority.
 
-### Phase 5 — Organic Growth Engine
+### Phase 5 — Organic Growth Engine — FOUNDATION COMPLETE / PRODUCTION RECOVERY + ACTIVATION
 SEO, AEO, GEO, keyword intelligence, topic clusters, programmatic pages, AI Cards, citation/mention monitoring, authority/backlink graph, competitor citation gaps, public publishing, first-party tracking and content→revenue attribution.
 
-#### Empire Search Intelligence Engine — PARALLEL FOUNDATION
-The proprietary Search Intelligence foundation is being built early in parallel with Phase 3F/4 because it is safe, reversible growth infrastructure and increases product value without bypassing revenue or autonomy gates.
+Phase 5 foundation work was completed locally/tested in earlier phases. Current work is not a rebuild. The old Vultr shutdown removed the disk-backed deployed AEO/sitemap surface that had lived under /srv/aeo, while the code, 210 generated legacy AEO pages, Search Intelligence modules, Search Command Centre and sitemap/robots governance logic survived in Git/repo assets.
+
+Current Phase 5 work is therefore recovery/convergence:
+- recover and quality-review legacy AEO assets as candidate content;
+- reconnect sitemap/robots/public discovery to the current EmpireOS gateway/runtime;
+- activate the staged canonical Search Intelligence repository/schema when approved;
+- bind the Search Command Centre to the live governed API;
+- restore Search Console/indexation observation;
+- make GEO/AI citation visibility first-class alongside SEO/AEO;
+- publish/index only evidence-backed, quality-approved pages.
+
+#### Empire Search Intelligence Engine — FOUNDATION COMPLETE
+The proprietary Search Intelligence foundation was built early in parallel with Phase 3F/4 because it is safe, reversible growth infrastructure and increases product value without bypassing revenue or autonomy gates.
 
 Foundation scope:
 - canonical Search Page + Search Opportunity models;
