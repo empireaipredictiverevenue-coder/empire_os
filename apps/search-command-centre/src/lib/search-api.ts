@@ -116,6 +116,15 @@ export async function getInternalLinkData() {
   return { health, pages, links };
 }
 
+export async function getAuthorityData() {
+  const [health, backlinks, aiVisibility] = await Promise.all([
+    request<Health>("/v1/search/health"),
+    request<CollectionEnvelope>("/v1/search/backlinks?limit=200"),
+    request<CollectionEnvelope>("/v1/search/ai-visibility?limit=200"),
+  ]);
+  return { health, backlinks, aiVisibility };
+}
+
 export async function getDashboardData() {
   const [health, summary, searchConsole, pages, opportunities, alerts, revenue] =
     await Promise.all([

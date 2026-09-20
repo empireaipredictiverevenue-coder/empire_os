@@ -1,4 +1,4 @@
-from empire_os.search_fabric.site_probe import _schema_evidence, _visible_people_from_html
+from empire_os.search_fabric.site_probe import _schema_evidence, _sitemap_people_candidates, _visible_people_from_html
 
 
 def test_schema_people_are_separate_from_business_names():
@@ -282,3 +282,31 @@ def test_visible_people_extracts_role_name_phrase():
         and p["title"].lower() == "president"
         for p in people
     )
+
+
+def test_sitemap_people_candidates_find_hidden_team_pages(monkeypatch):
+    import time
+    import empire_os.search_fabric.site_probe as sp
+
+    class Doc:
+        def __init__(self, text):
+            self.text = text
+
+    def fake_fetch(session, url, timeout):
+        if url.endswith("/sitemap.xml"):
+            return Doc(
+                "<urlset>"
+                "<url><loc>https://acme.test/services</loc></url>"
+                "<url><loc>https://acme.test/about/leadership</loc></url>"
+                "</urlset>"
+            )
+        return None
+
+    monkeypatch.setattr(sp, "_fetch", fake_fetch)
+    rows = _sitemap_people_candidates(
+        object(),
+        "https://acme.test/",
+        timeout=2.0,
+        deadline=time.monotonic() + 5,
+    )
+    assert rows == ["https://acme.test/about/leadership"]

@@ -260,6 +260,12 @@ export default async function Home() {
                   Internal-link graph →
                 </Link>
                 <Link
+                  href="/authority"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300 hover:text-emerald-200"
+                >
+                  Authority & citations →
+                </Link>
+                <Link
                   href="/revenue"
                   className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300 hover:text-emerald-200"
                 >

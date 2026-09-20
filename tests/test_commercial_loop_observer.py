@@ -91,7 +91,14 @@ def test_canonical_reader_surfaces_authorized_but_unsent_outbound():
                     "id": "review-1",
                     "status": "approved",
                     "reviewed_at": "2026-09-20T12:00:00Z",
-                    "evidence": {"outreach_ready": True},
+                    "evidence": {
+                            "outreach_ready": True,
+                            "verified_contacts": [{
+                                "email": "buyer@example.com",
+                                "is_valid": True,
+                                "bound_to_decision_maker": True,
+                            }],
+                        },
                 }
             ]
         if path.endswith("outbound_intents"):
@@ -136,7 +143,14 @@ def test_expired_approved_intent_is_not_current_authority():
                     "id": "review-1",
                     "status": "approved",
                     "reviewed_at": "2026-09-20T11:00:00Z",
-                    "evidence": {"outreach_ready": True},
+                    "evidence": {
+                            "outreach_ready": True,
+                            "verified_contacts": [{
+                                "email": "buyer@example.com",
+                                "is_valid": True,
+                                "bound_to_decision_maker": True,
+                            }],
+                        },
                 }
             ]
         if path.endswith("outbound_intents"):
@@ -207,6 +221,71 @@ def test_existing_omega_proves_prior_v2_qualification_when_cycle_writes_zero():
     )
 
     assert observations["qualification_v2"].observed is True
+
+
+def test_failed_historical_send_does_not_count_as_current_outbound():
+    def reader(path, params):
+        if path.endswith("buyer_candidate_reviews"):
+            return [{
+                "id": "review-1",
+                "status": "approved",
+                "reviewed_at": "2026-09-20T12:00:00Z",
+                "evidence": {
+                            "outreach_ready": True,
+                            "verified_contacts": [{
+                                "email": "buyer@example.com",
+                                "is_valid": True,
+                                "bound_to_decision_maker": True,
+                            }],
+                        },
+            }]
+        if path.endswith("outbound_intents"):
+            return []
+        if path.endswith("outbound_replies"):
+            return []
+        return []
+
+    canonical = fetch_canonical_commercial_observations(
+        reader,
+        now=NOW,
+    )
+
+    assert canonical["buyer_candidate_approved"].observed is True
+    assert canonical["outbound_authorized"].observed is False
+    assert canonical["outbound_sent"].observed is False
+
+
+def test_bounced_hunter_contact_invalidates_approved_review():
+    def reader(path, params):
+        if path.endswith("buyer_candidate_reviews"):
+            return [{
+                "id": "review-1",
+                "status": "approved",
+                "reviewed_at": "2026-09-20T12:00:00Z",
+                "evidence": {
+                    "outreach_ready": True,
+                    "verified_contacts": [{
+                        "email": "dead@example.com",
+                        "is_valid": True,
+                        "bound_to_decision_maker": True,
+                    }],
+                },
+            }]
+        if path.endswith("intelligence_outcomes"):
+            return [{
+                "id": "outcome-1",
+                "outcome_type": "contact_bounced",
+                "outcome_value": {"email": "dead@example.com"},
+                "occurred_at": "2026-09-20T12:10:00Z",
+            }]
+        return []
+
+    canonical = fetch_canonical_commercial_observations(
+        reader,
+        now=NOW,
+    )
+
+    assert canonical["buyer_candidate_approved"].observed is False
 
 
 def test_unsubscribe_reply_is_not_a_buyer_conversation():

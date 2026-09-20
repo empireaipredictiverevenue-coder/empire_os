@@ -96,10 +96,12 @@ def infer_niche(text: str) -> str:
 def _import_sources():
     from empire_os.lead_sources import (
         permits, chicago_311, court_listener, reddit_json,
-        nyc_hpd, storm_alerts, overpass,
+        nyc_hpd, storm_alerts, overpass, business_search,
     )
-    for mod in (permits, chicago_311, court_listener, reddit_json,
-                nyc_hpd, storm_alerts, overpass):
+    for mod in (
+        permits, chicago_311, court_listener, reddit_json,
+        nyc_hpd, storm_alerts, overpass, business_search,
+    ):
         if hasattr(mod, "register_source"):
             mod.register_source(register)
 

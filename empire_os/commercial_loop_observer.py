@@ -148,13 +148,50 @@ def fetch_canonical_commercial_observations(
             "limit": "25",
         },
     )
-    approved_reviews = [
-        row for row in reviews
-        if (
-            isinstance(row.get("evidence"), dict)
-            and row["evidence"].get("outreach_ready") is True
-        )
-    ]
+    hunter_contact_outcomes = _reader_rows(
+        reader,
+        "/rest/v1/intelligence_outcomes",
+        {
+            "select": "id,outcome_type,outcome_value,occurred_at",
+            "source_system": "eq.empire_hunter",
+            "outcome_type": "in.(contact_bounced,contact_complained,contact_suppressed)",
+            "order": "occurred_at.desc",
+            "limit": "100",
+        },
+    )
+    degraded_emails = {
+        str(value.get("email") or "").strip().lower()
+        for row in hunter_contact_outcomes
+        for value in [row.get("outcome_value")]
+        if isinstance(value, dict)
+        and str(value.get("email") or "").strip()
+    }
+
+    approved_reviews = []
+    for row in reviews:
+        evidence = row.get("evidence")
+        if not isinstance(evidence, dict):
+            continue
+        if evidence.get("outreach_ready") is not True:
+            continue
+        contacts = evidence.get("verified_contacts")
+        if not isinstance(contacts, list) or not contacts:
+            continue
+        viable = False
+        for contact in contacts:
+            if not isinstance(contact, dict):
+                continue
+            email = str(contact.get("email") or "").strip().lower()
+            if (
+                email
+                and contact.get("bound_to_decision_maker") is True
+                and contact.get("is_valid") is True
+                and email not in degraded_emails
+            ):
+                viable = True
+                break
+        if viable:
+            approved_reviews.append(row)
 
     intents = _reader_rows(
         reader,
@@ -187,16 +224,11 @@ def fetch_canonical_commercial_observations(
         if expires_at.tzinfo and expires_at.astimezone(timezone.utc) > current:
             authorized.append(row)
 
-    sent_events = _reader_rows(
-        reader,
-        "/rest/v1/outbound_events",
-        {
-            "select": "id,event_type,occurred_at",
-            "event_type": "in.(sent,delivered,reply_received)",
-            "order": "occurred_at.desc",
-            "limit": "1",
-        },
-    )
+    active_sent = [
+        row for row in authorized
+        if str(row.get("status") or "").lower()
+        in {"sent", "delivered", "replied"}
+    ]
     replies = _reader_rows(
         reader,
         "/rest/v1/outbound_replies",
@@ -305,9 +337,9 @@ def fetch_canonical_commercial_observations(
         ),
         "outbound_sent": CommercialLoopObservation(
             "outbound_sent",
-            bool(sent_events),
-            evidence_ref="canonical:outbound_events:sent",
-            detail=f"{len(sent_events)} recent verified send/delivery event(s)",
+            bool(active_sent),
+            evidence_ref="canonical:outbound_intents:current_sent_state",
+            detail=f"{len(active_sent)} currently sent/delivered/replied intent(s)",
         ),
         "buyer_conversation": CommercialLoopObservation(
             "buyer_conversation",

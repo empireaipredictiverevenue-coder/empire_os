@@ -28,6 +28,7 @@ AUTO_ACTIONS = frozenset({
     "qualification.run",
     "omega.score",
     "buyer.discovery",
+    "hunter.enrich",
     "buyer.readiness.observe",
     "gtm.plan",
     "gtm.publish_internal_jobs",

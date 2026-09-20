@@ -16,6 +16,7 @@ class EnrichmentPriority:
     omega_confidence: float | None
     buyer_demand_strength: float | None
     buyer_demand_confidence: float | None
+    contact_ready: bool
     modeled_expected_gp_cents: int | None
     enrichment_cost_cents: int | None
     economics_is_forecast: bool
@@ -157,6 +158,7 @@ def prioritize_enrichment(
             if demand_conf is not None
             else None
         ),
+        contact_ready=bool(contact_ready),
         modeled_expected_gp_cents=gp,
         enrichment_cost_cents=cost,
         economics_is_forecast=economics_is_forecast,

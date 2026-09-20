@@ -142,3 +142,26 @@ def test_current_specific_outbound_approval_does_not_reask_founder():
     assert decision.action_review.permitted is True
     assert decision.action_review.requires_founder_approval is False
     assert decision.action_review.authority_id == "outbound_intent:a530c17a"
+
+
+def test_buyer_discovery_blocker_delegates_to_hunter_priority():
+    decision = decide_next_gtm_action(
+        {
+            "highest_priority_blocker": "buyer_candidate_approved",
+            "loop_complete": False,
+        },
+        now=NOW,
+        action_context={
+            "hunter_priority": {
+                "entity_id": "entity-1",
+                "contact_ready": False,
+                "priority_score": 56.42,
+                "depth": "shallow",
+            }
+        },
+    )
+
+    assert decision.next_action == "hunter.enrich"
+    assert decision.action_review.permitted is True
+    assert decision.action_review.requires_founder_approval is False
+    assert "Hunter target entity-1" in decision.rationale

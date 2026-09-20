@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import json
 import os
+from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.astra import AstraSnapshot
@@ -125,6 +128,35 @@ def build_astra_evidence(
     )
 
 
+def source_health_from_file(
+    path: str | Path,
+    *,
+    now: datetime | None = None,
+    max_age_seconds: int = 1800,
+) -> bool:
+    if max_age_seconds <= 0:
+        raise ValueError("source health max_age_seconds must be positive")
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        raise ValueError("source health now must include timezone")
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        observed = datetime.fromisoformat(
+            str(payload["observed_at"]).replace("Z", "+00:00")
+        )
+        if observed.tzinfo is None:
+            return False
+        age = (
+            current.astimezone(timezone.utc)
+            - observed.astimezone(timezone.utc)
+        ).total_seconds()
+        if age < -60 or age > max_age_seconds:
+            return False
+        return bool(payload.get("end_to_end_healthy"))
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return False
+
+
 def astra_policy_bindings_from_env(
     environ: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
@@ -138,4 +170,20 @@ def astra_policy_bindings_from_env(
     for field, key in names.items():
         if key in env and str(env[key]).strip() != "":
             bindings[field] = env[key]
+
+    health_file = str(
+        env.get("EMPIRE_ASTRA_SOURCE_HEALTH_FILE", "")
+    ).strip()
+    if health_file:
+        raw_max_age = str(
+            env.get("EMPIRE_ASTRA_SOURCE_HEALTH_MAX_AGE_SECONDS", "1800")
+        ).strip()
+        try:
+            max_age = int(raw_max_age)
+        except ValueError:
+            max_age = 1800
+        bindings["source_health_ok"] = source_health_from_file(
+            health_file,
+            max_age_seconds=max_age,
+        )
     return bindings

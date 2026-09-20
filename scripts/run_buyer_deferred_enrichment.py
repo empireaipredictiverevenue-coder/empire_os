@@ -5,6 +5,7 @@ import argparse
 import json
 import urllib.parse
 from typing import Any
+from urllib.parse import urlparse
 
 from empire_os.buyer_call_plan import materialize_call_plans
 from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
@@ -15,6 +16,7 @@ from empire_os.buyer_discovery import (
 )
 from empire_os.buyer_probe_worker import rejection_reason, run as run_buyer_probe
 from empire_os.qualification_worker_v2 import request_json
+from empire_os.identity_recovery import recover_identity
 
 
 def _get(path: str, params: dict[str, Any]) -> list[dict[str, Any]]:
@@ -72,6 +74,70 @@ def _prospect_row(prospect_id: str) -> dict[str, Any] | None:
     return row
 
 
+def _same_host(left: str, right: str) -> bool:
+    def host(value: str) -> str:
+        raw = urlparse(str(value or "").strip()).netloc.lower()
+        return raw[4:] if raw.startswith("www.") else raw
+    return bool(host(left)) and host(left) == host(right)
+
+
+def _persist_recovered_identity(
+    row: dict[str, Any],
+    candidate,
+    result: dict[str, Any],
+) -> bool:
+    """Persist only first-party, high-confidence identity evidence.
+
+    Identity recovery is not contact verification and does not make a buyer
+    outreach-ready. Existing canonical identities are never overwritten.
+    """
+    if str(row.get("contact_name") or "").strip():
+        return False
+    decision = result.get("decision_maker")
+    if not isinstance(decision, dict):
+        return False
+
+    name = str(decision.get("name") or "").strip()
+    title = str(decision.get("title") or "").strip()
+    evidence_url = str(
+        decision.get("url")
+        or decision.get("source_url")
+        or ""
+    ).strip()
+    try:
+        score = float(decision.get("decision_score") or 0.0)
+    except (TypeError, ValueError):
+        score = 0.0
+
+    if not name or not title or score < 0.70:
+        return False
+    source = str(decision.get("source") or "").strip()
+    first_party_evidence = (
+        bool(evidence_url)
+        and _same_host(evidence_url, candidate.website)
+    )
+    authoritative_registry = (
+        source.startswith("empire_registry:")
+        and score >= 0.90
+        and bool(evidence_url)
+    )
+    if not (first_party_evidence or authoritative_registry):
+        return False
+
+    params = urllib.parse.urlencode({"id": f"eq.{candidate.prospect_id}"})
+    request_json(
+        "PATCH",
+        f"/rest/v1/prospects?{params}",
+        payload={
+            "contact_name": name,
+            "contact_title": title,
+            "contact_source": source or "first_party_identity_recovery",
+        },
+        prefer="return=minimal",
+    )
+    return True
+
+
 def _propose_review(candidate, result: dict[str, Any]) -> bool:
     decision = result.get("decision_maker")
     if not isinstance(decision, dict):
@@ -115,7 +181,7 @@ def _propose_review(candidate, result: dict[str, Any]) -> bool:
 def run_cycle(*, limit: int = 5) -> dict[str, Any]:
     queue = BuyerDeferredEnrichmentQueue()
     due = queue.due(limit=limit)
-    processed = proposed = call_ready = deferred_again = 0
+    processed = proposed = call_ready = deferred_again = identities_recovered = 0
     errors: list[str] = []
     results: list[dict[str, Any]] = []
 
@@ -181,6 +247,42 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                 time_budget_seconds=45.0,
             )
 
+            recovery = None
+            if not result.get("decision_maker"):
+                recovery = recover_identity(
+                    business_name=candidate.business_name,
+                    website=candidate.website,
+                    metro=candidate.metro,
+                )
+                recovered = recovery.get("identity")
+                if isinstance(recovered, dict):
+                    probe_row["contact_name"] = recovered.get("name")
+                    probe_row["contact_title"] = recovered.get("title")
+                    probe_row["contact_source"] = recovered.get("source")
+                    result = run_buyer_probe(
+                        probe_row,
+                        max_pages=15,
+                        request_timeout=5.0,
+                        time_budget_seconds=45.0,
+                    )
+                    if not result.get("decision_maker"):
+                        result = dict(result)
+                        result["decision_maker"] = {
+                            "name": recovered.get("name"),
+                            "title": recovered.get("title"),
+                            "url": recovered.get("source_url"),
+                            "source": recovered.get("source"),
+                            "decision_score": recovered.get("confidence"),
+                        }
+
+            identity_recovered = _persist_recovered_identity(
+                row,
+                candidate,
+                result,
+            )
+            if identity_recovered:
+                identities_recovered += 1
+
             if _propose_review(candidate, result):
                 queue.resolve(
                     prospect_id,
@@ -192,6 +294,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                     "prospect_id": prospect_id,
                     "outcome": "buyer_review_proposed",
                     "preferred_email": result.get("preferred_email"),
+                    "identity_recovered": identity_recovered,
                 })
                 continue
 
@@ -217,6 +320,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                 "outcome": "deferred",
                 "reason": reason,
                 "call_ready": marked_call,
+                "identity_recovered": identity_recovered,
             })
         except Exception as exc:
             retry_minutes = min(360, 30 * (2 ** min(attempts - 1, 3)))
@@ -236,6 +340,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
         "mode": "INTERNAL_ENRICHMENT",
         "processed": processed,
         "buyer_reviews_proposed": proposed,
+        "identities_recovered": identities_recovered,
         "deferred_again": deferred_again,
         "call_ready_added": call_ready,
         "errors": errors,

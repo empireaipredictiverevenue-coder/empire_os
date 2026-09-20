@@ -89,6 +89,20 @@ def decide_next_gtm_action(
         )
 
     action = BLOCKER_ACTIONS.get(blocker)
+    ctx = dict(action_context or {})
+    hunter_priority = ctx.get("hunter_priority")
+    target_entity_id = None
+    if (
+        blocker == "buyer_candidate_approved"
+        and isinstance(hunter_priority, Mapping)
+        and hunter_priority.get("contact_ready") is not True
+        and str(hunter_priority.get("entity_id") or "").strip()
+    ):
+        action = "hunter.enrich"
+        target_entity_id = str(
+            hunter_priority.get("entity_id")
+        ).strip()
+
     if action is None:
         return GTMAgentDecision(
             agent_id=GTM_AGENT_ID,
@@ -102,7 +116,7 @@ def decide_next_gtm_action(
         action,
         now=now,
         standing_authority=standing_authority,
-        context=action_context,
+        context=ctx,
         external_actions_used_today=external_actions_used_today,
     )
 
@@ -110,6 +124,11 @@ def decide_next_gtm_action(
         rationale = (
             f"{blocker} is the first incomplete commercial stage; "
             f"{action} is authorized in {review.lane.value}"
+            + (
+                f" for Hunter target {target_entity_id}"
+                if target_entity_id
+                else ""
+            )
         )
     else:
         rationale = (

@@ -127,14 +127,15 @@ def plan_evidence_enrichment(
         actions.append(
             EvidenceAction(
                 key="decision_maker_evidence",
-                capability="future_identity_people_adapter",
+                capability="empire_identity_recovery",
                 target_fields=("contact_name",),
                 max_completeness_gain=contact_gain,
-                available_now=False,
+                available_now=True,
                 bounded=True,
                 rationale=(
-                    "A named decision maker needs direct public or licensed "
-                    "evidence; the current site probe does not infer people."
+                    "Empire Search Fabric, first-party people probing, Hunter "
+                    "verification and public-registry evidence can recover a "
+                    "named decision maker without inventing identity."
                 ),
             )
         )
@@ -149,14 +150,15 @@ def plan_evidence_enrichment(
         actions.append(
             EvidenceAction(
                 key="registry_evidence",
-                capability="future_public_registry_adapter",
+                capability="empire_registry_scraper",
                 target_fields=registry_fields,
                 max_completeness_gain=registry_gain,
-                available_now=False,
+                available_now=True,
                 bounded=True,
                 rationale=(
-                    "Registry/licensing evidence may close structured address "
-                    "or licence gaps; no generic verified adapter is active yet."
+                    "Empire Registry Scraper and existing public-record "
+                    "scanners can recover authoritative registry/licensing "
+                    "evidence when a supported source returns it."
                 ),
             )
         )

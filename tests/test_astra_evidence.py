@@ -1,6 +1,13 @@
+import json
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
-from empire_os.astra_evidence import build_astra_evidence
+from empire_os.astra_evidence import (
+    astra_policy_bindings_from_env,
+    build_astra_evidence,
+    source_health_from_file,
+)
 
 
 def operational_row():
@@ -68,3 +75,46 @@ def test_invalid_boolean_binding_fails_closed():
             operational_row=operational_row(),
             bindings=bindings,
         )
+
+
+def test_source_health_file_requires_fresh_end_to_end_health(tmp_path):
+    now = datetime(2026, 9, 19, 23, 0, tzinfo=timezone.utc)
+    path = tmp_path / "source-health.json"
+    path.write_text(json.dumps({
+        "observed_at": (now - timedelta(minutes=5)).isoformat(),
+        "endpoint_healthy": True,
+        "end_to_end_healthy": True,
+    }))
+    assert source_health_from_file(
+        path,
+        now=now,
+        max_age_seconds=1800,
+    ) is True
+
+    path.write_text(json.dumps({
+        "observed_at": (now - timedelta(hours=2)).isoformat(),
+        "endpoint_healthy": True,
+        "end_to_end_healthy": True,
+    }))
+    assert source_health_from_file(
+        path,
+        now=now,
+        max_age_seconds=1800,
+    ) is False
+
+
+def test_policy_binding_uses_health_file_fail_closed(tmp_path):
+    path = tmp_path / "source-health.json"
+    path.write_text(json.dumps({
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "endpoint_healthy": True,
+        "end_to_end_healthy": False,
+    }))
+    bindings = astra_policy_bindings_from_env({
+        "EMPIRE_ASTRA_PREMIUM_AI_BUDGET_CENTS": "0",
+        "EMPIRE_ASTRA_OUTBOUND_DOMAIN_VERIFIED": "true",
+        "EMPIRE_ASTRA_SOURCE_HEALTH_OK": "true",
+        "EMPIRE_ASTRA_SOURCE_HEALTH_FILE": str(path),
+        "EMPIRE_ASTRA_SOURCE_HEALTH_MAX_AGE_SECONDS": "1800",
+    })
+    assert bindings["source_health_ok"] is False

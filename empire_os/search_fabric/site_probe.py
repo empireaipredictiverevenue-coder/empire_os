@@ -493,6 +493,92 @@ def _common_candidates(origin: str, *, priority: str = "default") -> List[str]:
     return [urljoin(origin, path) for path in COMMON_PEOPLE_PATHS]
 
 
+_SITEMAP_PEOPLE_TERMS = (
+    "team",
+    "leadership",
+    "staff",
+    "people",
+    "management",
+    "founder",
+    "owner",
+    "about",
+    "who-we-are",
+    "our-story",
+    "company",
+)
+
+
+def _sitemap_people_candidates(
+    session: requests.Session,
+    origin: str,
+    *,
+    timeout: float,
+    deadline: float,
+    max_urls: int = 12,
+) -> List[str]:
+    """Discover hidden first-party people pages from bounded sitemap reads."""
+    root = f"{urlparse(origin).scheme}://{urlparse(origin).netloc}"
+    sitemap_urls = [
+        urljoin(root + "/", "sitemap.xml"),
+        urljoin(root + "/", "sitemap_index.xml"),
+    ]
+    discovered: List[str] = []
+    nested: List[str] = []
+
+    def locs(text: str) -> List[str]:
+        return [
+            html_lib.unescape(value.strip())
+            for value in re.findall(
+                r"<loc>\s*(.*?)\s*</loc>",
+                text or "",
+                flags=re.I | re.S,
+            )
+            if value.strip()
+        ]
+
+    for sitemap_url in sitemap_urls:
+        if time.monotonic() >= deadline:
+            break
+        doc = _fetch(session, sitemap_url, timeout=min(timeout, 4.0))
+        if doc is None:
+            continue
+        for value in locs(doc.text):
+            if not _same_site(value, origin):
+                continue
+            lower = value.lower()
+            if lower.endswith(".xml"):
+                if any(
+                    token in lower
+                    for token in ("page", "team", "people", "staff", "author")
+                ):
+                    nested.append(value)
+                continue
+            if any(term in lower for term in _SITEMAP_PEOPLE_TERMS):
+                discovered.append(value.split("#", 1)[0])
+        if discovered:
+            break
+
+    for nested_url in list(dict.fromkeys(nested))[:2]:
+        if time.monotonic() >= deadline:
+            break
+        doc = _fetch(session, nested_url, timeout=min(timeout, 4.0))
+        if doc is None:
+            continue
+        for value in locs(doc.text):
+            if (
+                _same_site(value, origin)
+                and any(
+                    term in value.lower()
+                    for term in _SITEMAP_PEOPLE_TERMS
+                )
+            ):
+                discovered.append(value.split("#", 1)[0])
+                if len(discovered) >= max_urls:
+                    break
+
+    return list(dict.fromkeys(discovered))[:max_urls]
+
+
 def _fetch_with_urllib(url: str, *, timeout: float):
     request = UrlRequest(
         url,
@@ -632,13 +718,25 @@ def probe_site(
     queue = [homepage.url]
 
     if homepage.format == "html":
-        queue.extend(
-            _internal_candidates(
-                homepage.text,
-                homepage.url,
-                priority=page_priority,
-            )
+        internal = _internal_candidates(
+            homepage.text,
+            homepage.url,
+            priority=page_priority,
         )
+        if page_priority == "people" and max_pages >= 12:
+            queue.extend(internal[:6])
+            queue.extend(
+                _sitemap_people_candidates(
+                    session,
+                    origin,
+                    timeout=request_timeout,
+                    deadline=deadline,
+                    max_urls=12,
+                )
+            )
+            queue.extend(internal[6:])
+        else:
+            queue.extend(internal)
         queue.extend(
             _common_candidates(
                 homepage.url,

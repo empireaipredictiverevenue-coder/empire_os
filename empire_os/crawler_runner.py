@@ -37,6 +37,7 @@ from empire_os.prospect_ingest import (
     materialize_prospect,
     prepare_candidate,
 )
+from empire_os.signal_inbox import enqueue_signal
 
 LOG_PATH = Path(
     os.environ.get(
@@ -145,6 +146,23 @@ def run_source_safe(src, metro, dry_run, max_candidates=None):
 
             quality = assess_candidate(cand)
             if not quality.accepted:
+                if quality.source_role == "signal":
+                    signal = enqueue_signal(cand, quality=quality)
+                    accepted += 1
+                    log(
+                        "SIGNAL",
+                        "signal_queued",
+                        source=cand.source,
+                        niche=cand.niche,
+                        metro=cand.metro,
+                        name=cand.name[:40],
+                        signal_id=signal.get("signal_id"),
+                        decision=signal.get("decision"),
+                        quality_confidence=quality.confidence,
+                        entity_kind=quality.entity_kind,
+                        source_role=quality.source_role,
+                    )
+                    continue
                 log(
                     "SKIP",
                     "candidate_quality_rejected",
