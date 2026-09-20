@@ -126,3 +126,23 @@ def test_people_priority_visits_team_before_locations():
     assert urls[0] == "https://acme.test/about-us/meet-the-team/"
     assert urls[1] == "https://acme.test/about-us/"
     assert urls[2] == "https://acme.test/contact/"
+
+
+def test_people_priority_adds_common_first_party_paths():
+    import empire_os.search_fabric.site_probe as sp
+
+    urls = sp._common_candidates(
+        "https://acme.test/",
+        priority="people",
+    )
+
+    assert urls[:4] == [
+        "https://acme.test/about-us/meet-the-team/",
+        "https://acme.test/meet-the-team/",
+        "https://acme.test/our-team/",
+        "https://acme.test/team/",
+    ]
+    assert sp._common_candidates(
+        "https://acme.test/",
+        priority="default",
+    ) == []

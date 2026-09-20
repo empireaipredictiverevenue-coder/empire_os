@@ -31,6 +31,18 @@ INTERESTING_LINK_TERMS = (
     "servicearea",
 )
 
+COMMON_PEOPLE_PATHS = (
+    "/about-us/meet-the-team/",
+    "/meet-the-team/",
+    "/our-team/",
+    "/team/",
+    "/leadership/",
+    "/about-us/",
+    "/about/",
+    "/contact-us/",
+    "/contact/",
+)
+
 MAX_RESPONSE_BYTES = 2_000_000
 
 
@@ -270,6 +282,12 @@ def _internal_candidates(
     )
 
 
+def _common_candidates(origin: str, *, priority: str = "default") -> List[str]:
+    if priority != "people":
+        return []
+    return [urljoin(origin, path) for path in COMMON_PEOPLE_PATHS]
+
+
 def _fetch(session: requests.Session, url: str, *, timeout: float = 15.0):
     try:
         response = session.get(
@@ -369,6 +387,12 @@ def probe_site(
         queue.extend(
             _internal_candidates(
                 homepage.text,
+                homepage.url,
+                priority=page_priority,
+            )
+        )
+        queue.extend(
+            _common_candidates(
                 homepage.url,
                 priority=page_priority,
             )
