@@ -287,6 +287,28 @@ def test_candidate_review_and_reviewed_outbound_plans_are_separate():
     assert review["params"]["p_offer_key"] == "high_ticket"
     assert review["params"]["p_evidence"]["review_ready"] is True
     assert review["params"]["p_evidence"]["outreach_ready"] is True
+    assert review["params"]["p_evidence"]["contact_source"] is None
+
+    sourced_contact = {
+        **contact,
+        "decision_maker": {
+            **contact["decision_maker"],
+            "source": "website_structured_data",
+        },
+        "verified_contacts": [{
+            "email": "jane@acme.test",
+            "is_valid": True,
+            "source": "person_structured_data",
+        }],
+    }
+    sourced = build_candidate_review_plan(
+        candidate, sourced_contact, idempotency_key="buyer:0001:sourced"
+    )
+    assert sourced["params"]["p_evidence"]["contact_source"] == "official_site"
+    assert sourced["params"]["p_evidence"]["decision_source"] == "website_structured_data"
+    preferred = sourced["params"]["p_evidence"]["verified_contacts"][0]
+    assert preferred["source"] == "official_site"
+    assert preferred["source_detail"] == "person_structured_data"
     assert review["write_authorized"] is False
 
     body = "Hi Jane. Relevant revenue idea. Reply to opt out. 10 Example Street, London."

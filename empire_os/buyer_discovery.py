@@ -868,11 +868,35 @@ def build_candidate_review_plan(candidate: BuyerCandidate, contact_plan: Mapping
         raise ValueError("verified decision maker required")
     if len(idem) < 8:
         raise ValueError("candidate review idempotency key required")
+    source_aliases = {
+        "person_structured_data": "official_site",
+        "public_government_record": "public_record",
+        "company_press_release": "press_release",
+    }
+    verified_contacts = []
+    for raw_contact in contact_plan.get("verified_contacts") or []:
+        item = dict(raw_contact)
+        original_source = _text(item.get("source"))
+        normalized_source = source_aliases.get(
+            original_source,
+            original_source,
+        )
+        if original_source and normalized_source != original_source:
+            item["source_detail"] = original_source
+            item["source"] = normalized_source
+        verified_contacts.append(item)
+    preferred_contact = next(
+        (item for item in verified_contacts if _text(item.get("email")).lower() == email),
+        {},
+    )
+    contact_source = _text(preferred_contact.get("source"))
+    decision_source = _text(decision.get("source") or candidate.contact_source)
     evidence = {
         **candidate.evidence,
         "decision_role": decision.get("decision_role") or candidate.decision_role,
-        "contact_source": decision.get("source") or candidate.contact_source,
-        "verified_contacts": contact_plan.get("verified_contacts") or [],
+        "decision_source": decision_source or None,
+        "contact_source": contact_source or None,
+        "verified_contacts": verified_contacts,
         "review_ready": bool(contact_plan.get("review_ready")),
         "outreach_ready": bool(contact_plan.get("outreach_ready")),
         "source": "buyer_discovery_v2",
