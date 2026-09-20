@@ -11,6 +11,7 @@ from .benchmark import BenchmarkHarness
 from .command_proposal import CommandProposal, CommandRefiner
 from .context import ContextBuilder, ContextPack
 from .dependencies import DependencyIndex
+from .hermes_provider import HermesProvider
 from .knowledge_garden import KnowledgeGarden
 from .memory import ContextMemory
 from .model_review import DistinctModelReviewer, ModelReview
@@ -209,8 +210,44 @@ class EmpireCoder:
             local_models = ollama.models()
             if local_models:
                 self.providers.register(ollama)
-            if not requested_profiles:
-                requested_profiles = local_ollama_profiles(local_models)
+
+        if not requested_profiles:
+            default_profiles: list[ModelProfile] = []
+            hermes_enabled = os.getenv(
+                "EMPIRE_CODER_HERMES_ENABLED",
+                "false",
+            ).strip().lower() in {"1", "true", "yes", "on"}
+            if hermes_enabled:
+                hermes = HermesProvider(
+                    self.workspace,
+                    timeout_seconds=max(
+                        30,
+                        min(
+                            int(
+                                os.getenv(
+                                    "EMPIRE_CODER_HERMES_TIMEOUT_SECONDS",
+                                    "180",
+                                )
+                            ),
+                            600,
+                        ),
+                    ),
+                )
+                if hermes.health():
+                    self.providers.register(hermes)
+                    default_profiles.append(ModelProfile(
+                        "hermes",
+                        os.getenv(
+                            "EMPIRE_CODER_HERMES_MODEL",
+                            "nvidia/nemotron-3.5-lightning:free",
+                        ).strip() or "hermes-configured-model",
+                        capability=3,
+                        cost_tier=0,
+                        local=False,
+                        roles=("writer", "planner", "verifier"),
+                    ))
+            default_profiles.extend(local_ollama_profiles(local_models))
+            requested_profiles = tuple(default_profiles)
         self.router = ModelRouter(requested_profiles)
         self.skills = SkillLoader(self.workspace)
         self.audit = AuditTrail(self.runtime_root)
