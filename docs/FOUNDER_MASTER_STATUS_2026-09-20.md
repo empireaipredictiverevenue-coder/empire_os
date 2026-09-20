@@ -42,7 +42,8 @@ Built/active foundations:
 - Canonical buyer/contact/identity/revenue truth infrastructure.
 
 Still incomplete:
-- Revenue Pulse canonical V3.
+- Revenue Pulse canonical V3: core/read API/reader/snapshot builder now built and tested; recurring production execution still needs service/timer wiring under the existing root-managed environment file.
+- Canonical Market Sweep orchestrator/read-model: legacy sweep runner exists but is retired; modern Source Mesh/Market Scanner/Market Intent pieces exist and need one governed sweep layer over them.
 - Search Growth Product Suite: product contracts/API started; Empire Web Intelligence Crawler is canonical; rank-history, Lighthouse/CWV, local SEO, reporting and product UI adapters remain.
 - Forecast/Trend/Regime engine 30d/90d/6m/12m/18m/24m.
 - Founder Console Intelligence Node read surfaces.

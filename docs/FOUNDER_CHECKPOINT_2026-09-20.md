@@ -188,3 +188,14 @@ Added deterministic client report previews for each Search Product. Reports orga
 Empire's self-hosted Search Fabric SERP engine remains canonical and is now restored as a first-class commercial Search Product.
 Revenue models preserved from the prior plan: API usage, prepaid credits, subscription, agency/reseller wholesale, white-label licensing and enterprise data/API contracts.
 Added /v1/search/serp/snapshot backed by SearchFabricSerpAdapter with provenance-preserving observed positions and fail-closed upstream handling.
+
+## Founder Objectives / legacy OKF recovery
+Recovered the useful strategy from legacy okf_tracker.py into an evidence-backed Founder Objectives layer.
+Current Blueprint objectives are authoritative/confirmed; recovered legacy 2026-Q3 targets remain reference-only with target_confirmed=false.
+No hardcoded progress, old SQLite, Incus, Solana/USDC or proxy metrics were carried forward.
+Founder Objectives and Revenue Pulse are mounted on the private Founder read API.
+
+## Market sweeps status
+Legacy market-sweep execution exists in hub.py but is intentionally retired with HTTP 410 and points to the governed Source Mesh.
+Modern reusable components already exist: real scanner modules, Source Mesh/acquisition architecture, Market Intent Intelligence Node, Commander market-sweep reporting, and Market Scanner product architecture.
+What remains is a canonical OBSERVE-first Market Sweep orchestrator/read-model that composes those modern components without reviving legacy SQLite/remote-scanner execution.
