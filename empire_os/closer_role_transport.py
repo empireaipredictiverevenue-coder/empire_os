@@ -31,6 +31,21 @@ ROLE_FUNCTIONS = {
             "select public.provision_buyer_from_closer_case(%s,%s)",
             ("p_case_id", "p_actor"),
         ),
+        "get_closer_reply_context": (
+            "select public.get_closer_reply_context(%s)",
+            ("p_case_id",),
+        ),
+        "propose_closer_reply_intent": (
+            "select public.propose_closer_reply_intent(%s,%s,%s,%s,%s,%s)",
+            (
+                "p_case_id",
+                "p_subject",
+                "p_body_text",
+                "p_idempotency_key",
+                "p_proposed_by",
+                "p_expires_at",
+            ),
+        ),
         "record_closer_recommendation": (
             "select public.record_closer_recommendation(%s,%s,%s,%s::jsonb,%s,%s)",
             (

@@ -21,10 +21,26 @@ class FakeRpc:
                 "decision": "provisioned",
                 "buyer_id": "00000000-0000-0000-0000-000000000004",
             }
+        if name == "get_closer_reply_context":
+            return {
+                "case_id": params["p_case_id"],
+                "classification": "positive",
+                "reply_body_text": "Yes, interested",
+                "root_subject": "Roofing opportunities",
+                "business_name": "Acme Roofing",
+                "niche": "roofing",
+                "metro": "Austin",
+                "contact_name": "Jane Smith",
+            }
         if name == "record_closer_recommendation":
             return {
                 "decision": "recorded",
                 "recommendation_id": "00000000-0000-0000-0000-000000000003",
+            }
+        if name == "propose_closer_reply_intent":
+            return {
+                "decision": "proposed",
+                "intent_id": "00000000-0000-0000-0000-000000000005",
             }
         raise AssertionError(name)
 
@@ -42,17 +58,20 @@ def test_opens_case_and_records_deterministic_recommendation():
     assert result.cases_opened == 1
     assert result.recommendations_recorded == 1
     assert result.buyers_provisioned == 1
+    assert result.reply_intents_proposed == 1
     assert result.errors == ()
     assert [name for name, _ in rpc.calls] == [
         "list_closer_work",
         "open_closer_case",
         "provision_buyer_from_closer_case",
+        "get_closer_reply_context",
         "record_closer_recommendation",
+        "propose_closer_reply_intent",
     ]
-    recommendation = rpc.calls[-1][1]
+    recommendation = rpc.calls[-2][1]
     assert recommendation["p_type"] == "qualify"
     assert recommendation["p_confidence"] == 0.9
-    assert recommendation["p_message"] is None
+    assert "how many qualified opportunities per day" in recommendation["p_message"]
 
 
 def test_existing_case_is_not_duplicated():
@@ -68,6 +87,7 @@ def test_existing_case_is_not_duplicated():
     assert result.cases_opened == 0
     assert result.recommendations_recorded == 0
     assert result.buyers_provisioned == 0
+    assert result.reply_intents_proposed == 0
     assert result.skipped_existing == 1
     assert [name for name, _ in rpc.calls] == ["list_closer_work"]
 
@@ -85,4 +105,5 @@ def test_noncommercial_reply_is_ignored():
     assert result.cases_opened == 0
     assert result.recommendations_recorded == 0
     assert result.buyers_provisioned == 0
+    assert result.reply_intents_proposed == 0
     assert result.errors == ()

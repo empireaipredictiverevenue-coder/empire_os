@@ -236,3 +236,29 @@ def test_standing_authority_approver_caps_daily_limit():
         },
     )
     assert seen["p_daily_cap"] == 50
+
+
+def test_standing_authority_routes_closer_reply_to_closer_gate():
+    calls = []
+
+    def request(method, path, payload=None, **kwargs):
+        calls.append((method, path, payload, kwargs))
+        if method == "GET":
+            return [{"metadata": {"sequence_kind": "closer_reply"}}]
+        return {"decision": "approved", "sequence_kind": "closer_reply"}
+
+    rpc = SupabaseStandingAuthorityApproverRpc(
+        daily_cap=5,
+        request_factory=request,
+    )
+    result = rpc(
+        "approve_outbound_intent",
+        {
+            "p_intent_id": "00000000-0000-0000-0000-000000000077",
+            "p_approved_by": "outbound_governor",
+            "p_note": "bounded",
+        },
+    )
+    assert result["sequence_kind"] == "closer_reply"
+    assert calls[1][1] == "/rest/v1/rpc/auto_approve_closer_reply_intent"
+    assert calls[1][2]["p_daily_cap"] == 5

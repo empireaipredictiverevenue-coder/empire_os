@@ -178,12 +178,17 @@ class SupabaseStandingAuthorityApproverRpc:
             f"?select=metadata&id=eq.{intent_id}&limit=1",
         ) or []
         metadata = (rows[0].get("metadata") or {}) if rows else {}
-        rpc_name = (
-            "auto_approve_outbound_followup"
+        sequence_kind = (
+            metadata.get("sequence_kind")
             if isinstance(metadata, dict)
-            and metadata.get("sequence_kind") == "followup"
-            else "auto_approve_outbound_intent"
+            else None
         )
+        if sequence_kind == "followup":
+            rpc_name = "auto_approve_outbound_followup"
+        elif sequence_kind == "closer_reply":
+            rpc_name = "auto_approve_closer_reply_intent"
+        else:
+            rpc_name = "auto_approve_outbound_intent"
         return self._request(
             "POST",
             f"/rest/v1/rpc/{rpc_name}",

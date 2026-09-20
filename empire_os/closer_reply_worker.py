@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
+
+from empire_os.closer_reply_draft import build_closer_reply
 
 COMMERCIAL_CLASSES = {
     "positive": "qualify",
@@ -17,6 +20,7 @@ class CloserReplyWorkerResult:
     cases_opened: int
     recommendations_recorded: int
     buyers_provisioned: int
+    reply_intents_proposed: int
     skipped_existing: int
     errors: tuple[str, ...]
 
@@ -26,6 +30,7 @@ class CloserReplyWorkerResult:
             "cases_opened": self.cases_opened,
             "recommendations_recorded": self.recommendations_recorded,
             "buyers_provisioned": self.buyers_provisioned,
+            "reply_intents_proposed": self.reply_intents_proposed,
             "skipped_existing": self.skipped_existing,
             "errors": list(self.errors),
             "actual_revenue": False,
@@ -55,7 +60,7 @@ def run_closer_reply_worker(
     if not isinstance(rows, list):
         raise ValueError("closer work projection must be a list")
 
-    opened = recorded = provisioned = existing = 0
+    opened = recorded = provisioned = replies_proposed = existing = 0
     errors: list[str] = []
 
     for row in rows:
@@ -91,6 +96,12 @@ def run_closer_reply_worker(
             if str((buyer_result or {}).get("decision") or "") == "provisioned":
                 provisioned += 1
 
+            context = rpc(
+                "get_closer_reply_context",
+                {"p_case_id": case_id},
+            ) or {}
+            draft = build_closer_reply(context)
+
             rpc(
                 "record_closer_recommendation",
                 {
@@ -102,11 +113,29 @@ def run_closer_reply_worker(
                         "reply_id": reply_id,
                         "classification": classification,
                     },
-                    "p_message": None,
-                    "p_model_key": "deterministic_closer_router_v1",
+                    "p_message": draft["body_text"],
+                    "p_model_key": "deterministic_closer_router_v2",
                 },
             )
             recorded += 1
+
+            reply_result = rpc(
+                "propose_closer_reply_intent",
+                {
+                    "p_case_id": case_id,
+                    "p_subject": draft["subject"],
+                    "p_body_text": draft["body_text"],
+                    "p_idempotency_key": (
+                        f"closer-reply:{case_id}:{reply_id}:v1"
+                    ),
+                    "p_proposed_by": "empire_closer_planner",
+                    "p_expires_at": (
+                        datetime.now(timezone.utc) + timedelta(hours=18)
+                    ).isoformat(),
+                },
+            )
+            if str((reply_result or {}).get("intent_id") or "").strip():
+                replies_proposed += 1
         except Exception as exc:
             errors.append(
                 f"{reply_id}:{type(exc).__name__}:{str(exc)[:180]}"
@@ -117,6 +146,7 @@ def run_closer_reply_worker(
         cases_opened=opened,
         recommendations_recorded=recorded,
         buyers_provisioned=provisioned,
+        reply_intents_proposed=replies_proposed,
         skipped_existing=existing,
         errors=tuple(errors),
     )

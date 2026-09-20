@@ -78,6 +78,17 @@ def test_planner_can_open_and_record_but_not_approve():
         "p_case_id": "00000000-0000-0000-0000-000000000002",
         "p_actor": "empire_closer_planner",
     })
+    rpc("get_closer_reply_context", {
+        "p_case_id": "00000000-0000-0000-0000-000000000002",
+    })
+    rpc("propose_closer_reply_intent", {
+        "p_case_id": "00000000-0000-0000-0000-000000000002",
+        "p_subject": "Re: hello",
+        "p_body_text": "Thanks",
+        "p_idempotency_key": "closer:test:1",
+        "p_proposed_by": "empire_closer_planner",
+        "p_expires_at": "2026-09-21T12:00:00+00:00",
+    })
     rpc("record_closer_recommendation", {
         "p_case_id": "00000000-0000-0000-0000-000000000002",
         "p_type": "qualify",
