@@ -170,6 +170,9 @@ Candidate engineering changes stop at human approval. Commit/push/merge/deploy, 
 - Empire Coder: Hermes provider available; deterministic VERIFY jobs are live and passing on buyer/outbound/closer/acquisition/BSC slices. Model-generated IMPLEMENT patches remain unreliable because Hermes structured-patch calls can time out, so deterministic verification is the dependable Coder lane today.
 - Launch focus: widen verified buyer volume while waiting for replies, then move real replies through closer → terms → capacity/order → BSC payment → fulfilment → Revenue Truth → learning.
 
+### Swarm V6 — Governed Parallel Specialist Layer ✅ ACTIVE
+Swarm V6 is the bounded parallel execution/verification layer beneath Astra. It replaces the retired public/file-backed Swarm 3.0 model and runs six specialist lanes: Revenue/Payments, Closer/Outreach, Growth/Conversion, Search/Opportunity, Platform/SaaS and Integration/QA. The runtime continuously feeds deterministic Empire Coder VERIFY work when the queue is idle and writes `runtime/swarm_v6/latest.json`. Swarm V6 has no production mutation, outbound-send, terms-acceptance, fund-movement, payment-confirmation, fulfilment, revenue-recognition or authority-expansion rights. Astra remains commander; governed domain workers retain execution authority. Operating spec: `docs/SWARM_V6_OPERATING_SPEC.md`.
+
 ### Phase 4 — Astra Operating Layer ← CURRENT
 Astra becomes the top coordinator for business priorities, agent routing, bottleneck detection, expected-value decisions, resource allocation, cost control and approval policies. Premium AI is used only when expected value justifies the cost.
 
