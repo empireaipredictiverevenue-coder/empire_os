@@ -87,9 +87,6 @@ def fetch_candidate_rows(
                 "status,notes,contact_name,contact_title,contact_source,"
                 "contacted_status,created_at"
             ),
-            "contact_name": "not.is.null",
-            "contact_title": "not.is.null",
-            "website": "not.is.null",
             "order": "buy_signal_score.desc.nullslast,created_at.desc",
             "limit": bounded,
             "offset": offset,

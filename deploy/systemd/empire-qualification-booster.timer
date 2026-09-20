@@ -1,0 +1,12 @@
+[Unit]
+Description=Run high-throughput qualification every five minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=empire-qualification-booster.service
+
+[Install]
+WantedBy=timers.target

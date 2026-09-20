@@ -106,8 +106,8 @@ def test_mx_lookup_returns_host_strings_in_preference_order(monkeypatch):
             self.preference = preference
 
     monkeypatch.setattr(
-        "dns.resolver.resolve",
-        lambda domain, record_type: [
+        "dns.resolver.Resolver.resolve",
+        lambda self, domain, record_type: [
             Record("mx2.example.com.", 20),
             Record("mx1.example.com.", 10),
         ],

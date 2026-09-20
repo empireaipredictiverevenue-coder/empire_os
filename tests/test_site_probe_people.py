@@ -206,3 +206,32 @@ def test_people_priority_follows_profile_link_from_team_page(monkeypatch):
     urls = [row["url"] for row in result["pages_checked"]]
     assert "https://acme.test/team/jane-smith/" in urls
     assert "jane@acme.test" in result["emails"]
+
+def test_visible_people_recovers_named_ceo_without_schema():
+    import empire_os.search_fabric.site_probe as sp
+
+    people = sp._visible_people_from_html(
+        "<div><h2>Jane Smith</h2><p>Founder & CEO</p>"
+        "<a href='mailto:jane@acme.test'>Email</a></div>",
+        page_url="https://acme.test/team/jane",
+        page_title="Jane Smith",
+        emails=["jane@acme.test"],
+    )
+
+    assert people
+    assert people[0]["name"] == "Jane Smith"
+    assert people[0]["title"].lower() in {"founder", "ceo"}
+    assert people[0]["email"] == "jane@acme.test"
+
+
+def test_visible_people_rejects_generic_team_heading():
+    import empire_os.search_fabric.site_probe as sp
+
+    people = sp._visible_people_from_html(
+        "<div><h2>Meet The Team</h2><p>CEO</p></div>",
+        page_url="https://acme.test/team",
+        page_title="Meet The Team",
+        emails=[],
+    )
+
+    assert people == []

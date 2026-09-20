@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html as html_lib
 import re
 import time
 from typing import Any, Dict, Iterable, List
@@ -69,6 +70,153 @@ _PLACEHOLDER_EMAIL_DOMAINS = {
     "example.net",
     "example.org",
 }
+
+_PEOPLE_TITLE_RE = re.compile(
+    r"\b(?:co-founder|founder|owner|chief executive officer|ceo|"
+    r"managing director|president|principal|chief revenue officer|cro|"
+    r"chief commercial officer|cco|vice president(?: of)? sales|vp sales|"
+    r"sales director|head of sales|head of growth|growth director|"
+    r"commercial director|business development director|general manager)\b",
+    re.I,
+)
+
+_NON_PERSON_WORDS = {
+    "about", "contact", "company", "leadership", "management", "meet",
+    "our", "staff", "team", "the", "people", "services", "service",
+    "founder", "owner", "president", "principal", "director", "manager",
+    "chief", "executive", "officer", "ceo", "cro", "cco",
+}
+
+
+def _looks_like_visible_person_name(value: str) -> bool:
+    text = re.sub(r"\s+", " ", str(value or "")).strip(" ,|:/–—-")
+    words = text.split()
+    if not 2 <= len(words) <= 4:
+        return False
+    lowered = {word.lower().strip(".'’\"-") for word in words}
+    if lowered & _NON_PERSON_WORDS:
+        return False
+    for word in words:
+        clean = word.strip(".'’\"-")
+        if not clean:
+            return False
+        if len(clean) == 1:
+            if not clean.isupper():
+                return False
+            continue
+        if not clean[0].isupper():
+            return False
+        letters = clean.replace("'", "").replace("’", "").replace("-", "")
+        if not letters.isalpha():
+            return False
+    return True
+
+
+def _matching_person_email(name: str, emails: Iterable[str]) -> str:
+    parts = [
+        re.sub(r"[^a-z]", "", token.lower())
+        for token in str(name or "").replace("-", " ").split()
+    ]
+    parts = [part for part in parts if part]
+    if len(parts) < 2:
+        return ""
+    first, last = parts[0], parts[-1]
+    expected = {
+        first,
+        f"{first}.{last}",
+        f"{first}{last}",
+        f"{first[0]}{last}",
+        f"{first[0]}.{last}",
+    }
+    for email in emails or []:
+        value = str(email or "").strip().lower()
+        if "@" not in value:
+            continue
+        if value.split("@", 1)[0] in expected:
+            return value
+    return ""
+
+
+def _visible_people_from_html(
+    page: str,
+    *,
+    page_url: str,
+    page_title: str = "",
+    emails: Iterable[str] = (),
+) -> List[Dict[str, str]]:
+    """Recover named decision-makers from first-party visible page text."""
+    raw = re.sub(
+        r"<(?:script|style)\b[^>]*>.*?</(?:script|style)>",
+        " ",
+        page or "",
+        flags=re.I | re.S,
+    )
+    raw = re.sub(
+        r"<\s*(?:br|/p|/div|/li|/h[1-6]|/section|/article|/tr|/td)\b[^>]*>",
+        "\n",
+        raw,
+        flags=re.I,
+    )
+    raw = re.sub(r"<[^>]+>", " ", raw)
+    raw = html_lib.unescape(raw)
+    blocks = [
+        re.sub(r"\s+", " ", line).strip()
+        for line in raw.splitlines()
+        if re.sub(r"\s+", " ", line).strip()
+    ]
+
+    people: List[Dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(name: str, title: str) -> None:
+        clean_name = re.sub(r"\s+", " ", name).strip(" ,|:/–—-")
+        clean_title = re.sub(r"\s+", " ", title).strip(" ,|:/–—-")
+        if not _looks_like_visible_person_name(clean_name) or not clean_title:
+            return
+        key = (clean_name.casefold(), clean_title.casefold())
+        if key in seen:
+            return
+        seen.add(key)
+        people.append({
+            "name": clean_name,
+            "title": clean_title,
+            "email": _matching_person_email(clean_name, emails),
+            "url": page_url,
+        })
+
+    for block in blocks:
+        if len(block) > 220:
+            continue
+        match = _PEOPLE_TITLE_RE.search(block)
+        if not match:
+            continue
+
+        before = block[:match.start()].strip(" ,|:/–—-")
+        words = before.split()
+        for width in (2, 3, 4):
+            if len(words) >= width:
+                candidate = " ".join(words[-width:])
+                if _looks_like_visible_person_name(candidate):
+                    add(candidate, match.group(0))
+                    break
+
+        after = block[match.end():].strip(" ,|:/–—-")
+        words = after.split()
+        for width in (2, 3, 4):
+            if len(words) >= width:
+                candidate = " ".join(words[:width])
+                if _looks_like_visible_person_name(candidate):
+                    add(candidate, match.group(0))
+                    break
+
+    title_name = re.sub(r"\s+[|–—-].*$", "", str(page_title or "")).strip()
+    if _looks_like_visible_person_name(title_name):
+        visible = " ".join(blocks)[:6000]
+        match = _PEOPLE_TITLE_RE.search(visible)
+        if match:
+            add(title_name, match.group(0))
+
+    return people
 
 
 def _valid_email(value: str) -> bool:
@@ -464,6 +612,16 @@ def probe_site(
         schema = _schema_evidence(
             document.structured_data
         )
+        visible_people = (
+            _visible_people_from_html(
+                document.text,
+                page_url=document.url,
+                page_title=document.title,
+                emails=document.emails,
+            )
+            if document.format == "html"
+            else []
+        )
 
         names.extend(schema["business_names"])
         emails.extend(document.emails)
@@ -474,6 +632,7 @@ def probe_site(
         socials.extend(document.socials)
         schema_types.extend(schema["schema_types"])
         people.extend(schema["people"])
+        people.extend(visible_people)
 
         page_emails = [
             value

@@ -134,7 +134,10 @@ class MxValidator:
         """Return MX hosts for the domain (empty list on failure)."""
         try:
             import dns.resolver  # type: ignore
-            answers = dns.resolver.resolve(domain, "MX")
+            resolver = dns.resolver.Resolver(configure=True)
+            resolver.timeout = max(0.5, min(float(self.smtp_timeout), 3.0))
+            resolver.lifetime = max(0.5, min(float(self.smtp_timeout), 3.0))
+            answers = resolver.resolve(domain, "MX")
             ordered = sorted(
                 [
                     (
