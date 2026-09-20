@@ -3,11 +3,22 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 
 from empire_os.swarm_v6 import run_swarm_cycle
 
 
+def _apply_background_priority(target_nice: int = 10) -> None:
+    try:
+        current = os.nice(0)
+        if current < target_nice:
+            os.nice(target_nice - current)
+    except OSError:
+        pass
+
+
 def main() -> int:
+    _apply_background_priority()
     parser = argparse.ArgumentParser()
     parser.add_argument("--max-workers", type=int, default=3)
     parser.add_argument(

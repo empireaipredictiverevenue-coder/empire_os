@@ -5,6 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+Nice=10
+CPUWeight=25
+IOWeight=25
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=/srv/empire_os

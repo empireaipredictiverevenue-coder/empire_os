@@ -5,6 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+Nice=10
+CPUWeight=25
+IOWeight=25
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_swarm_v6.py --max-workers 3

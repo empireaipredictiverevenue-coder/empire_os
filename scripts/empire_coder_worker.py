@@ -78,7 +78,17 @@ def parser() -> argparse.ArgumentParser:
     return p
 
 
+def _apply_background_priority(target_nice: int = 10) -> None:
+    try:
+        current = os.nice(0)
+        if current < target_nice:
+            os.nice(target_nice - current)
+    except OSError:
+        pass
+
+
 def main(argv=None) -> int:
+    _apply_background_priority()
     args = parser().parse_args(argv)
     coder = EmpireCoder(
         Path(args.workspace),

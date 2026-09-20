@@ -5,6 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+Nice=12
+CPUWeight=20
+IOWeight=20
 User=ubuntu
 Group=ubuntu
 Environment=HOME=/home/ubuntu
