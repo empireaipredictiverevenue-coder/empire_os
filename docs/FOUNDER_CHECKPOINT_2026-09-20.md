@@ -87,3 +87,26 @@ Roadmap now includes:
 - A2A v1.0 conformance review and commercial task/artifact alignment.
 
 Binding agreement send/sign/acceptance remains a founder/commercial gate.
+
+## Trust / reputation baseline
+Trust & Reputation is now a cross-cutting Priority 1-3 capability.
+
+Observed public baseline:
+- HTTPS live behind Cloudflare.
+- CSP present.
+- X-Content-Type-Options nosniff present.
+- X-Frame-Options DENY present.
+- Referrer-Policy strict-origin-when-cross-origin present.
+- SPF exists and includes multiple current/historical sender providers.
+- DMARC exists but is monitoring-only (p=none).
+- HSTS not currently advertised.
+- Permissions-Policy not currently advertised.
+
+Trust build direction:
+- internal evidence-backed Trust Readiness Score only;
+- public Trust Center shows evidence, not a self-awarded score;
+- validate SPF lookup budget and retire obsolete senders before DMARC enforcement;
+- move DMARC from monitor -> staged enforcement only after sender verification;
+- review HSTS/Permissions-Policy safely before activation;
+- publish clear company identity, contact, privacy/security and commercial-process proof;
+- add only genuine signed-deal, payment, delivery, outcome, reference and case-study evidence as it is observed.

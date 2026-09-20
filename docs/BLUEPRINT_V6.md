@@ -112,6 +112,31 @@ Vonage/live calling, broad authority expansion, public content auto-publishing, 
 ### Parallel-work rule
 Parallel coders may work only on isolated slices that advance Priority 1-3. They must not create a new roadmap branch, duplicate an existing subsystem, expand external authority, or turn prototype/dry-run data into production truth.
 
+## Trust, Reputation & Proof Layer — ACTIVE DESIGN
+Empire is new, so trust must be earned from verifiable evidence rather than claimed through vanity badges.
+
+Trust architecture:
+- internal Trust Readiness Score for operator guidance only;
+- public Trust Center exposes verified claims and source evidence, not a self-awarded numeric rating;
+- company/founder identity transparency and clear contact paths;
+- domain/email authentication evidence;
+- security/privacy posture and data-handling explanations;
+- clear commercial terms, signed-agreement integrity and exact counterparty binding;
+- independently verified payment, fulfilment and outcome evidence;
+- genuine customer references, reviews and case studies only after observed outcomes;
+- complaint/opt-out/incident-response history and remediation;
+- uptime/service-health and audit/history evidence where available.
+
+Operating rules:
+- unknown trust evidence remains unknown;
+- failed controls cannot be hidden by unrelated positive signals;
+- testimonials, case studies, customer counts, savings, ROI and ratings must never be fabricated;
+- trust evidence should be timestamped, provenance-backed and refreshable;
+- public proof packs should link claims to evidence without exposing private buyer data;
+- Documenso-signed agreements, verified BSC payment evidence and delivery/outcome records become high-value trust signals when genuinely observed.
+
+Trust is cross-cutting across Priority 1-3: it should improve reply/conversion performance, increase the value of Intelligence products and become visible in Founder Console.
+
 ## Cross-Node Predictive Market Intelligence — ACTIVE DESIGN
 Empire must forecast markets, not only detect current opportunity.
 
