@@ -120,4 +120,24 @@ NODES = (
             "inspection", "citation", "remediation_need", "compliance_change",
         ),
     ),
+    IntelligenceNode(
+        key="legal_mass_tort",
+        name="Legal & Mass Tort Intelligence Node",
+        market="plaintiff_law_firms_and_legal_marketing",
+        sensors=(
+            "firm_finder", "ca_bar", "tx_bar", "courtlistener",
+            "reddit_mass_tort", "search_fabric", "adgen_scanner",
+            "legal_aeo_pages",
+        ),
+        products=(
+            "law_firm_directory", "mass_tort_market_map",
+            "firm_buyer_intelligence", "case_demand_signals",
+            "competitor_campaign_intelligence",
+            "campaign_audience_feed",
+        ),
+        opportunity_types=(
+            "firm_buyer", "active_mass_tort", "new_campaign",
+            "case_demand", "competitive_gap", "intake_capacity",
+        ),
+    ),
 )
