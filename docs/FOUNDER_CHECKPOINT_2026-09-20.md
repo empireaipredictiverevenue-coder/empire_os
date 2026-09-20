@@ -59,3 +59,14 @@ Move fast. Do not stop for reversible engineering decisions.
 Do not duplicate existing systems. Preserve concurrent work.
 Only stop at genuine founder gates: destructive/irreversible changes, fund movement,
 legally binding acceptance, irreversible accounting/revenue recognition, or authority expansion.
+
+## Roadmap execution order updated
+Blueprint v6 now contains a Founder Execution Lock dated 2026-09-20.
+
+Active priorities only:
+1. Prove the genuine commercial revenue loop.
+2. Productize the Intelligence Fabric / Intelligence Nodes.
+3. Build Founder Console operating visibility.
+
+Everything else is parked unless it directly unblocks one of those three.
+Parallel coder work must map to Priority 1-3 and may not create a new roadmap branch.

@@ -75,6 +75,43 @@ Competitive design target — business-web search plus closed-loop intelligence:
 - exceed discovery-only platforms with temporal signal sequences, buying-committee reconstruction, multi-offer fit, expected deal value, next-best-action, payment/revenue truth, outcome-conditioned memory and causal learning
 - learn from Empire-specific wins/losses/fulfilment/churn/revenue so ranking optimizes for probability of profitable Empire outcomes, not generic ICP similarity alone
 
+## Founder Execution Lock — 2026-09-20
+This section is the current operating order. It overrides local enthusiasm for side projects without deleting valid roadmap work.
+
+### Priority 1 — Prove the commercial loop
+Goal: complete one genuine buyer -> reply/conversation -> terms -> verified capacity/order -> USDT/BSC payment -> fulfilment -> recognized revenue -> outcome feedback loop.
+Current work:
+- keep real acquisition, qualification, buyer review materialization and governed email running;
+- improve decision-maker/contact recovery;
+- move genuine replies through the canonical closer/terms/payment path;
+- preserve the existing outbound cap and approval boundaries unless the founder explicitly expands authority.
+Exit condition: one fully verified commercial loop with recognized revenue and outcome evidence.
+
+### Priority 2 — Build the Intelligence Fabric into sellable products
+Goal: turn Empire's sensors, historical assets and external datasets into proprietary intelligence products rather than a lead-scraping identity.
+Current work:
+- Intelligence Nodes: Home Services, Property, Market Intent, Corporate Change, Government Spend, Healthcare Growth, Compliance/Risk, Legal & Mass Tort;
+- canonical entity/evidence reconciliation and temporal provenance;
+- recover the existing Legal/Mass Tort firm dataset into canonical truth without promoting dry-run candidates blindly;
+- define read-only product contracts for market maps, directories, opportunity feeds, trigger alerts, territory intelligence and buyer intelligence.
+Exit condition: each priority node has canonical inputs, provenance, a stable product contract and a read-only API/export surface.
+
+### Priority 3 — Founder Console / operating visibility
+Goal: make the business operable from one truth surface rather than from logs, shells and scattered dashboards.
+Current work:
+- node/source health;
+- commercial funnel from acquisition through recognized revenue;
+- unresolved enrichment and buyer-readiness queues;
+- agent/coder/swarm health;
+- sellable data-product inventory and opportunity counts.
+Exit condition: founder can see what is working, what is blocked, what is producing opportunities and what requires a genuine founder decision.
+
+### Explicitly parked until the above moves
+Vonage/live calling, broad authority expansion, public content auto-publishing, GPU video infrastructure, A2A commercial execution, new payment rails, speculative model/provider expansion and unrelated product experiments remain backlog work unless they directly unblock Priority 1-3.
+
+### Parallel-work rule
+Parallel coders may work only on isolated slices that advance Priority 1-3. They must not create a new roadmap branch, duplicate an existing subsystem, expand external authority, or turn prototype/dry-run data into production truth.
+
 ## Phase Roadmap
 
 ### Phase 0 — Foundation ✅
