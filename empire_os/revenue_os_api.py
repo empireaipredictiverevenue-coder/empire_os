@@ -11,6 +11,9 @@ from empire_os.revenue_os_feedback import (
 )
 from empire_os.revenue_os_freshness import assess_revenue_os_freshness
 from empire_os.revenue_os_learning import assess_revenue_os_learning
+from empire_os.revenue_os_model_review import (
+    build_revenue_os_model_review_feedback,
+)
 from empire_os.revenue_os_feedback_registry import RevenueOsLearningRecord
 from empire_os.revenue_os_readiness import assess_revenue_os_readiness
 from empire_os.revenue_os_registry import RevenueOsRegistryRecord
@@ -198,6 +201,49 @@ def create_revenue_os_router(
             "allocation_execution": False,
             "deployment_execution": False,
             "readiness": readiness.as_dict(),
+        }
+
+    @router.post("/feedback/model-review/preview")
+    def model_review_feedback_preview(req: RevenueOsLearningRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            readiness = assess_revenue_os_learning(
+                evidence=RevenueOsOutcomeEvidence(
+                    packet_key=req.packet_key,
+                    outcome_observed=req.outcome_observed,
+                    revenue_recognized=req.revenue_recognized,
+                    recognized_revenue_cents=req.recognized_revenue_cents,
+                    observed_cost_cents=req.observed_cost_cents,
+                    observed_at=req.observed_at,
+                    evidence_refs=tuple(req.evidence_refs),
+                ),
+                packet_created_at=req.packet_created_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+            feedback = build_revenue_os_model_review_feedback(readiness)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "side_effects": "none",
+            "execution_authority": "none",
+            "model_weight_mutation": False,
+            "capital_reallocation": False,
+            "spend_execution": False,
+            "outreach_execution": False,
+            "payment_execution": False,
+            "allocation_execution": False,
+            "deployment_execution": False,
+            "feedback": feedback.as_dict(),
         }
 
     @router.post("/feedback/register")

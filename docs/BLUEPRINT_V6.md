@@ -430,6 +430,8 @@ Sixth slice ✅ local/tested: Revenue OS learning-readiness now requires outcome
 
 Seventh slice ✅ local/tested: append-only learning-feedback registry contracts now preserve packet-linked outcome readiness, realized gross profit, blockers and provenance for audit/history. Both learning-ready and blocked outcomes can be retained, but only learning-ready records are marked eligible for later model review; model weights, capital, spend, outreach, payment, allocation and deployment remain non-mutable.
 
+Eighth slice ✅ local/tested: learning-ready Revenue OS evidence now produces a typed model-review feedback packet that classifies realized profitability from actual recognized revenue and observed cost only. Positive, negative, breakeven and unknown realized-GP states are descriptive only; model weights, capital, spend, outreach, payment, allocation and deployment remain non-mutable.
+
 ### Governed Control-Plane API Layer — Phases 4–18
 Second-pass API layer ✅ local/tested and mounted in the hub. Health/read/preview surfaces now exist for Astra, A2A identity, Conversation OS, Revenue CRM, Advertising Brain, Predictive Cloud, Experiment/Causal analysis, Demand Genesis, Revenue Exchange, Digital Twin, Capital Review, SaaS tenancy, Enterprise readiness and Revenue OS. Repository/provider-backed surfaces mount unbound and fail closed until their canonical reader or verifier is explicitly activated; pure analysis/simulation previews remain non-mutating. All routes expose OBSERVE/SIMULATION status and explicit zero execution authority.
 
