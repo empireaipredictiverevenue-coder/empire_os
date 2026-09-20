@@ -149,6 +149,8 @@ def test_standing_authority_approver_uses_only_bounded_rpc():
 
     def request(method, path, payload=None, **kwargs):
         calls.append((method, path, payload, kwargs))
+        if method == "GET":
+            return [{"metadata": {}}]
         return {"decision": "approved", "standing_authority": True}
 
     rpc = SupabaseStandingAuthorityApproverRpc(
@@ -164,7 +166,9 @@ def test_standing_authority_approver_uses_only_bounded_rpc():
         },
     )
     assert result["standing_authority"] is True
-    assert calls == [(
+    assert calls[0][0] == "GET"
+    assert calls[0][1].startswith("/rest/v1/outbound_intents?select=metadata")
+    assert calls[1] == (
         "POST",
         "/rest/v1/rpc/auto_approve_outbound_intent",
         {
@@ -172,7 +176,7 @@ def test_standing_authority_approver_uses_only_bounded_rpc():
             "p_daily_cap": 7,
         },
         {},
-    )]
+    )
     with pytest.raises(OutboundProviderError, match="only supports outbound approval"):
         rpc(
             "cancel_outbound_intent",
@@ -184,10 +188,38 @@ def test_standing_authority_approver_uses_only_bounded_rpc():
         )
 
 
+def test_standing_authority_routes_followup_to_followup_gate():
+    calls = []
+
+    def request(method, path, payload=None, **kwargs):
+        calls.append((method, path, payload, kwargs))
+        if method == "GET":
+            return [{"metadata": {"sequence_kind": "followup"}}]
+        return {"decision": "approved", "sequence_kind": "followup"}
+
+    rpc = SupabaseStandingAuthorityApproverRpc(
+        daily_cap=4,
+        request_factory=request,
+    )
+    result = rpc(
+        "approve_outbound_intent",
+        {
+            "p_intent_id": "00000000-0000-0000-0000-000000000002",
+            "p_approved_by": "outbound_governor",
+            "p_note": "bounded",
+        },
+    )
+    assert result["sequence_kind"] == "followup"
+    assert calls[1][1] == "/rest/v1/rpc/auto_approve_outbound_followup"
+    assert calls[1][2]["p_daily_cap"] == 4
+
+
 def test_standing_authority_approver_caps_daily_limit():
     seen = {}
 
-    def request(_method, _path, payload=None, **_kwargs):
+    def request(method, _path, payload=None, **_kwargs):
+        if method == "GET":
+            return [{"metadata": {}}]
         seen.update(payload or {})
         return {"decision": "approved"}
 

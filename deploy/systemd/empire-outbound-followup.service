@@ -1,0 +1,16 @@
+[Unit]
+Description=EmpireOS governed no-reply follow-up proposals
+After=network-online.target empire-resend-inbound.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=/srv/empire_os/runtime/secrets/outbound.env
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_outbound_followup_worker.py --limit 25
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=90

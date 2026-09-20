@@ -171,11 +171,24 @@ class SupabaseStandingAuthorityApproverRpc:
             raise OutboundProviderError(
                 "unexpected standing-authority approval parameters"
             )
+        intent_id = params["p_intent_id"]
+        rows = self._request(
+            "GET",
+            "/rest/v1/outbound_intents"
+            f"?select=metadata&id=eq.{intent_id}&limit=1",
+        ) or []
+        metadata = (rows[0].get("metadata") or {}) if rows else {}
+        rpc_name = (
+            "auto_approve_outbound_followup"
+            if isinstance(metadata, dict)
+            and metadata.get("sequence_kind") == "followup"
+            else "auto_approve_outbound_intent"
+        )
         return self._request(
             "POST",
-            "/rest/v1/rpc/auto_approve_outbound_intent",
+            f"/rest/v1/rpc/{rpc_name}",
             payload={
-                "p_intent_id": params["p_intent_id"],
+                "p_intent_id": intent_id,
                 "p_daily_cap": self.daily_cap,
             },
         )

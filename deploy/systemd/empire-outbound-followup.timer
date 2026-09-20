@@ -1,0 +1,11 @@
+[Unit]
+Description=Check due EmpireOS follow-ups on weekday business hours
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 14..21:00:00 UTC
+AccuracySec=5min
+Persistent=true
+Unit=empire-outbound-followup.service
+
+[Install]
+WantedBy=timers.target
