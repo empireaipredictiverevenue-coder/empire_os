@@ -358,6 +358,8 @@ Fifth slice ✅ local/tested: append-only realization registry/history persists 
 
 Sixth slice ✅ local/tested: Digital Twin calibration readiness now requires a realized outcome to occur after the observed baseline, remain within a bounded freshness window and expose recognized-revenue comparison before simulation error can be used for model-review feedback. Stale/future/pre-baseline outcomes or missing recognized revenue block calibration readiness; simulation cannot mutate model weights or execute capital, campaign or pricing actions.
 
+Seventh slice ✅ local/tested: calibrated Digital Twin realization error now produces a model-review feedback packet that classifies served-unit and recognized-revenue bias as under-predicted, over-predicted, on-target or unknown. Feedback is eligible only after calibration readiness passes and cannot mutate model weights or execute capital, campaign or pricing actions.
+
 ### Phase 15 — Capital Allocator
 Astra evaluates expected return, risk, cost, cash, confidence and time-to-revenue to decide where the next unit of capital should go.
 
