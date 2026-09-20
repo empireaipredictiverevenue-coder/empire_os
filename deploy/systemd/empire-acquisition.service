@@ -2,6 +2,7 @@
 Description=EmpireOS Real Prospect Acquisition Cycle
 After=network-online.target
 Wants=network-online.target
+OnSuccess=empire-qualification.service
 
 [Service]
 Type=oneshot
