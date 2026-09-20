@@ -71,6 +71,11 @@ from empire_os.typed_decision_dataset import (
     freeze_dataset,
     verify_frozen_dataset,
 )
+from empire_os.typed_decision_shadow_collector import (
+    build_label_review_queue,
+    collect_shadow_candidates,
+    shadow_collection_summary,
+)
 
 
 class DataRequest(BaseModel):
@@ -174,6 +179,15 @@ class DatasetFreezeRequest(BaseModel):
 class DatasetReadinessRequest(BaseModel):
     manifest: dict[str, Any] = Field(default_factory=dict)
     minimum_per_label: int = 20
+
+
+class ShadowCollectRequest(BaseModel):
+    task_key: str
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ShadowSummaryRequest(BaseModel):
+    batches: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -523,5 +537,23 @@ def create_strategy_router() -> APIRouter:
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/shadow-candidates/collect/preview")
+    def typed_decision_shadow_collect(req: ShadowCollectRequest):
+        try:
+            batch = collect_shadow_candidates(
+                req.rows,
+                task_key=req.task_key,
+            )
+            return {
+                "batch": batch,
+                "label_review_queue": build_label_review_queue(batch),
+            }
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/shadow-candidates/summary/preview")
+    def typed_decision_shadow_collect_summary(req: ShadowSummaryRequest):
+        return shadow_collection_summary(req.batches)
 
     return router

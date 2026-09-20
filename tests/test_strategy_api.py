@@ -566,3 +566,25 @@ def test_typed_decision_dataset_api_marks_fixture_unfit_for_promotion():
     assert ready.status_code == 200
     assert ready.json()["ready_for_provider_promotion_eval"] is False
     assert "synthetic_test_fixtures_present" in ready.json()["blockers"]
+
+
+def test_shadow_candidate_collection_is_review_only():
+    response = client().post(
+        "/v1/strategy/typed-decision/shadow-candidates/collect/preview",
+        json={
+            "task_key": "reply_classification",
+            "rows": [{
+                "reply_id": "r1",
+                "provider_message_id": "m1",
+                "subject": "Re: proposal",
+                "body_text": "Interested, tell me more.",
+                "received_at": "2026-09-20T10:00:00Z",
+            }],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["batch"]["provider_called"] is False
+    assert body["batch"]["production_routing"] is False
+    assert body["label_review_queue"]["auto_label_applied"] is False
+    assert body["label_review_queue"]["queue"][0]["review_state"] == "pending"
