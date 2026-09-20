@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from empire_os.hunter.models import ContactEvidence, DomainPattern, VerificationState
 from empire_os.hunter.pattern_brain import (
+    PATTERNS,
     generate_candidate,
     learn_domain_pattern,
     normalize_domain,
@@ -54,9 +55,116 @@ class DomainIntelligenceReport:
 ProbeFn = Callable[..., dict[str, Any]]
 
 
+def _email_domain(email: str) -> str:
+    raw = str(email or "").strip().lower()
+    return raw.rsplit("@", 1)[1] if "@" in raw else ""
+
+
+def _first_name(value: str) -> str:
+    parts = [
+        "".join(ch for ch in token.lower() if ch.isalpha())
+        for token in str(value or "").replace("-", " ").split()
+    ]
+    return next((item for item in parts if item), "")
+
+
+def _normalize_visible(value: str) -> str:
+    return " ".join(
+        "".join(
+            ch.lower() if ch.isalnum() else " "
+            for ch in str(value or "")
+        ).split()
+    )
+
+
+def _known_person_page_observations(
+    evidence: dict[str, Any],
+    mesh: VerificationMesh,
+    domain: str,
+    known_people: tuple[dict[str, Any], ...],
+) -> list[ContactEvidence]:
+    rows: list[ContactEvidence] = []
+    seen: set[str] = set()
+
+    for person in known_people:
+        name = str(person.get("name") or "").strip()
+        title = str(person.get("title") or "").strip()
+        if not name:
+            continue
+        normalized_name = _normalize_visible(name)
+        normalized_title = _normalize_visible(title)
+        candidates = {
+            candidate
+            for pattern in PATTERNS
+            if (
+                candidate := generate_candidate(
+                    name,
+                    domain,
+                    pattern,
+                )
+            )
+        }
+        if not candidates:
+            continue
+
+        for page in evidence.get("pages_checked") or []:
+            if not isinstance(page, dict):
+                continue
+            page_url = str(
+                page.get("canonical_url")
+                or page.get("url")
+                or ""
+            ).strip()
+            if normalize_domain(page_url) != domain:
+                continue
+            visible = _normalize_visible(
+                page.get("visible_text") or ""
+            )
+            if (
+                not visible
+                or normalized_name not in visible
+            ):
+                continue
+            if normalized_title:
+                start = visible.find(normalized_name)
+                window = visible[
+                    max(0, start - 120):
+                    start + len(normalized_name) + 220
+                ]
+                if normalized_title not in window:
+                    continue
+
+            page_emails = {
+                str(value or "").strip().lower()
+                for value in page.get("emails") or []
+                if str(value or "").strip()
+            }
+            matches = sorted(candidates & page_emails)
+            if len(matches) != 1:
+                continue
+            email = matches[0]
+            if email in seen:
+                continue
+            seen.add(email)
+            rows.append(
+                mesh.verify(
+                    email,
+                    source="first_party_page_correlation",
+                    source_url=page_url or None,
+                    person_name=name,
+                    person_title=title or None,
+                    person_bound=True,
+                    first_party=True,
+                )
+            )
+
+    return rows
+
+
 def _person_observations(
     evidence: dict[str, Any],
     mesh: VerificationMesh,
+    domain: str,
 ) -> list[ContactEvidence]:
     rows: list[ContactEvidence] = []
     source_url = str(
@@ -72,7 +180,11 @@ def _person_observations(
         name = str(person.get("name") or "").strip()
         title = str(person.get("title") or "").strip() or None
         email = str(person.get("email") or "").strip()
-        if not name or not email:
+        if (
+            not name
+            or not email
+            or _email_domain(email) != domain
+        ):
             continue
         rows.append(
             mesh.verify(
@@ -93,6 +205,7 @@ def _generic_site_observations(
     evidence: dict[str, Any],
     mesh: VerificationMesh,
     existing: set[str],
+    domain: str,
 ) -> list[ContactEvidence]:
     rows: list[ContactEvidence] = []
     source_url = str(
@@ -102,10 +215,45 @@ def _generic_site_observations(
         or ""
     ).strip() or None
 
+    people_by_first: dict[str, list[dict[str, Any]]] = {}
+    for person in evidence.get("people") or []:
+        if not isinstance(person, dict):
+            continue
+        first = _first_name(person.get("name") or "")
+        if first:
+            people_by_first.setdefault(first, []).append(person)
+
     for email in evidence.get("emails") or []:
         normalized = str(email or "").strip().lower()
-        if not normalized or normalized in existing:
+        if (
+            not normalized
+            or normalized in existing
+            or _email_domain(normalized) != domain
+        ):
             continue
+        local = normalized.split("@", 1)[0]
+        matches = people_by_first.get(local, [])
+        if len(matches) == 1:
+            person = matches[0]
+            rows.append(
+                mesh.verify(
+                    normalized,
+                    source="first_party_name_correlation",
+                    source_url=str(
+                        person.get("url") or ""
+                    ).strip() or source_url,
+                    person_name=str(
+                        person.get("name") or ""
+                    ).strip() or None,
+                    person_title=str(
+                        person.get("title") or ""
+                    ).strip() or None,
+                    person_bound=True,
+                    first_party=True,
+                )
+            )
+            continue
+
         rows.append(
             mesh.verify(
                 normalized,
@@ -123,6 +271,7 @@ def analyze_domain(
     *,
     mesh: VerificationMesh | None = None,
     probe: ProbeFn = probe_site,
+    known_people: tuple[dict[str, Any], ...] = (),
     max_pages: int = 5,
     request_timeout: float = 5.0,
     time_budget_seconds: float = 25.0,
@@ -133,6 +282,7 @@ def analyze_domain(
         max_pages=max_pages,
         request_timeout=request_timeout,
         time_budget_seconds=time_budget_seconds,
+        page_priority="people",
     )
     if not isinstance(evidence, dict) or evidence.get("ok") is not True:
         return DomainIntelligenceReport(
@@ -154,13 +304,26 @@ def analyze_domain(
     domain = normalize_domain(
         str(evidence.get("domain") or website)
     )
-    contacts = _person_observations(evidence, verifier)
+    contacts = _person_observations(
+        evidence,
+        verifier,
+        domain,
+    )
+    contacts.extend(
+        _known_person_page_observations(
+            evidence,
+            verifier,
+            domain,
+            known_people,
+        )
+    )
     existing = {item.email for item in contacts}
     contacts.extend(
         _generic_site_observations(
             evidence,
             verifier,
             existing,
+            domain,
         )
     )
 

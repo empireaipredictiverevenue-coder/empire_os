@@ -11,7 +11,7 @@ import requests
 
 from empire_os.phone_quality import is_commercially_usable_phone
 
-from .decoder import decode_document
+from .decoder import clean_text, decode_document
 
 
 USER_AGENT = (
@@ -202,8 +202,13 @@ def _schema_evidence(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def _internal_candidates(html: str, origin: str) -> List[str]:
-    candidates: List[str] = []
+def _internal_candidates(
+    html: str,
+    origin: str,
+    *,
+    priority: str = "default",
+) -> List[str]:
+    candidates: List[tuple[int, str]] = []
 
     for match in re.finditer(
         r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
@@ -227,9 +232,42 @@ def _internal_candidates(html: str, origin: str) -> List[str]:
             url.startswith(("http://", "https://"))
             and _same_site(url, origin)
         ):
-            candidates.append(url.split("#", 1)[0])
+            rank = 10
+            if priority == "people":
+                if any(
+                    term in text
+                    for term in (
+                        "meet-the-team",
+                        "meet the team",
+                        "leadership",
+                        "our-team",
+                        "our team",
+                        "team",
+                        "staff",
+                        "people",
+                        "management",
+                    )
+                ):
+                    rank = 0
+                elif "about" in text:
+                    rank = 1
+                elif "contact" in text:
+                    rank = 2
+                elif "location" in text:
+                    rank = 4
+                else:
+                    rank = 3
+            candidates.append(
+                (rank, url.split("#", 1)[0])
+            )
 
-    return list(dict.fromkeys(candidates))
+    ordered = sorted(
+        candidates,
+        key=lambda item: item[0],
+    )
+    return list(
+        dict.fromkeys(url for _, url in ordered)
+    )
 
 
 def _fetch(session: requests.Session, url: str, *, timeout: float = 15.0):
@@ -270,6 +308,7 @@ def probe_site(
     max_pages: int = 4,
     request_timeout: float = 8.0,
     time_budget_seconds: float = 24.0,
+    page_priority: str = "default",
 ) -> dict:
     """
     Inspect a public business site and return normalized evidence.
@@ -314,6 +353,7 @@ def probe_site(
             _internal_candidates(
                 homepage.text,
                 homepage.url,
+                priority=page_priority,
             )
         )
 
@@ -364,12 +404,24 @@ def probe_site(
         schema_types.extend(schema["schema_types"])
         people.extend(schema["people"])
 
+        page_emails = [
+            value
+            for value in dict.fromkeys(document.emails)
+            if _valid_email(value)
+        ]
+        visible_text = (
+            clean_text(document.text)[:12_000]
+            if document.format == "html"
+            else ""
+        )
         pages.append({
             "url": document.url,
             "canonical_url": document.canonical_url,
             "title": document.title,
             "format": document.format,
             "emails_found": len(document.emails),
+            "emails": page_emails[:50],
+            "visible_text": visible_text,
             "phones_found": len(document.phones),
             "schema_records": len(
                 document.structured_data

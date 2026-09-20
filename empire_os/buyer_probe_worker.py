@@ -29,15 +29,24 @@ def run(row: dict, *, max_pages: int = 2, request_timeout: float = 3.0,
         max_pages=max_pages,
         request_timeout=request_timeout,
         time_budget_seconds=time_budget_seconds,
+        page_priority="people",
     )
     enriched = enrich_candidate(candidate, evidence)
 
+    decision = enriched.get("decision_maker")
+    known_people = (
+        (dict(decision),)
+        if isinstance(decision, dict)
+        and decision.get("name")
+        else ()
+    )
     hunter = analyze_domain(
         candidate.website,
         mesh=VerificationMesh(
             mx_validator=MxValidator(do_smtp_probe=False)
         ),
         probe=lambda *args, **kwargs: evidence,
+        known_people=known_people,
         max_pages=max_pages,
         request_timeout=request_timeout,
         time_budget_seconds=time_budget_seconds,

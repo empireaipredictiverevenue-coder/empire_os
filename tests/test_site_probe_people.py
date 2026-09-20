@@ -69,3 +69,60 @@ def test_probe_stops_internal_fetches_when_budget_exhausted(monkeypatch):
     result = sp.probe_site("https://acme.test", max_pages=4, request_timeout=1, time_budget_seconds=1)
     assert len(calls) == 1
     assert result["budget_exhausted"] is True
+
+
+def test_probe_preserves_bounded_page_email_context(monkeypatch):
+    import empire_os.search_fabric.site_probe as sp
+
+    doc = type("Doc", (), {
+        "url": "https://acme.test/team",
+        "canonical_url": "https://acme.test/team",
+        "format": "html",
+        "text": (
+            "<html><body>Jane Smith Chief Executive Officer "
+            "jane@acme.test</body></html>"
+        ),
+        "title": "Meet the Team",
+        "description": "",
+        "structured_data": [],
+        "emails": ["jane@acme.test"],
+        "phones": [],
+        "socials": [],
+    })()
+
+    monkeypatch.setattr(
+        sp,
+        "_fetch",
+        lambda session, url, *, timeout=15.0: doc,
+    )
+    result = sp.probe_site(
+        "https://acme.test/team",
+        max_pages=1,
+        request_timeout=1,
+        time_budget_seconds=1,
+    )
+
+    page = result["pages_checked"][0]
+    assert page["emails"] == ["jane@acme.test"]
+    assert "Jane Smith Chief Executive Officer" in page["visible_text"]
+    assert len(page["visible_text"]) <= 12_000
+
+
+def test_people_priority_visits_team_before_locations():
+    import empire_os.search_fabric.site_probe as sp
+
+    html = """
+    <a href="/locations/austin/">Austin Location</a>
+    <a href="/contact/">Contact</a>
+    <a href="/about-us/">About Us</a>
+    <a href="/about-us/meet-the-team/">Meet the Team</a>
+    """
+    urls = sp._internal_candidates(
+        html,
+        "https://acme.test/",
+        priority="people",
+    )
+
+    assert urls[0] == "https://acme.test/about-us/meet-the-team/"
+    assert urls[1] == "https://acme.test/about-us/"
+    assert urls[2] == "https://acme.test/contact/"

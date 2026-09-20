@@ -144,3 +144,143 @@ def test_infer_pattern_rejects_wrong_domain():
         "Jane Smith",
         domain="acme.com",
     ) is None
+
+
+def test_unique_first_party_first_name_email_is_correlated():
+    evidence = {
+        "ok": True,
+        "requested_url": "https://acme.com",
+        "final_url": "https://acme.com/",
+        "canonical_url": "https://acme.com/",
+        "domain": "acme.com",
+        "business_names": ["Acme Roofing"],
+        "emails": ["jane@acme.com"],
+        "people": [
+            {
+                "name": "Jane Smith",
+                "title": "CEO",
+                "email": "",
+                "url": "https://acme.com/team",
+            }
+        ],
+        "pages_checked": [{"url": "https://acme.com/team"}],
+        "evidence_score": 0.9,
+    }
+
+    report = analyze_domain(
+        "https://acme.com",
+        mesh=VerificationMesh(mx_validator=FakeMx()),
+        probe=lambda *args, **kwargs: evidence,
+    )
+
+    assert report.outreach_ready is True
+    contact = report.confirmed_contacts[0]
+    assert contact.email == "jane@acme.com"
+    assert contact.person_name == "Jane Smith"
+    assert contact.source == "first_party_name_correlation"
+
+
+def test_ambiguous_first_name_email_stays_unbound():
+    evidence = {
+        "ok": True,
+        "requested_url": "https://acme.com",
+        "final_url": "https://acme.com/",
+        "canonical_url": "https://acme.com/",
+        "domain": "acme.com",
+        "business_names": ["Acme Roofing"],
+        "emails": ["jane@acme.com"],
+        "people": [
+            {"name": "Jane Smith", "title": "CEO", "email": "", "url": ""},
+            {"name": "Jane Jones", "title": "COO", "email": "", "url": ""},
+        ],
+        "pages_checked": [],
+        "evidence_score": 0.8,
+    }
+
+    report = analyze_domain(
+        "https://acme.com",
+        mesh=VerificationMesh(mx_validator=FakeMx()),
+        probe=lambda *args, **kwargs: evidence,
+    )
+
+    assert report.outreach_ready is False
+    email = next(
+        item for item in report.contacts
+        if item.email == "jane@acme.com"
+    )
+    assert email.person_bound is False
+    assert email.state is VerificationState.PROBABLE
+
+
+def test_known_person_can_be_bound_from_same_official_page_evidence():
+    evidence = {
+        "ok": True,
+        "requested_url": "https://acme.com",
+        "final_url": "https://acme.com/",
+        "canonical_url": "https://acme.com/",
+        "domain": "acme.com",
+        "business_names": ["Acme Roofing"],
+        "emails": ["jane@acme.com"],
+        "people": [],
+        "pages_checked": [{
+            "url": "https://acme.com/team",
+            "canonical_url": "https://acme.com/team",
+            "emails": ["jane@acme.com"],
+            "visible_text": (
+                "Meet our team Jane Smith Chief Executive Officer "
+                "Operations and company leadership"
+            ),
+        }],
+        "evidence_score": 0.9,
+    }
+
+    report = analyze_domain(
+        "https://acme.com",
+        mesh=VerificationMesh(mx_validator=FakeMx()),
+        probe=lambda *args, **kwargs: evidence,
+        known_people=({
+            "name": "Jane Smith",
+            "title": "Chief Executive Officer",
+        },),
+    )
+
+    assert report.outreach_ready is True
+    contact = report.confirmed_contacts[0]
+    assert contact.email == "jane@acme.com"
+    assert contact.person_name == "Jane Smith"
+    assert contact.source == "first_party_page_correlation"
+
+
+def test_known_person_page_binding_requires_title_proximity_when_known():
+    evidence = {
+        "ok": True,
+        "requested_url": "https://acme.com",
+        "final_url": "https://acme.com/",
+        "canonical_url": "https://acme.com/",
+        "domain": "acme.com",
+        "business_names": ["Acme Roofing"],
+        "emails": ["jane@acme.com"],
+        "people": [],
+        "pages_checked": [{
+            "url": "https://acme.com/team",
+            "canonical_url": "https://acme.com/team",
+            "emails": ["jane@acme.com"],
+            "visible_text": (
+                "Jane Smith Project Coordinator. "
+                "Far away text Chief Executive Officer"
+            ),
+        }],
+        "evidence_score": 0.9,
+    }
+
+    report = analyze_domain(
+        "https://acme.com",
+        mesh=VerificationMesh(mx_validator=FakeMx()),
+        probe=lambda *args, **kwargs: evidence,
+        known_people=({
+            "name": "Jane Smith",
+            "title": "Owner",
+        },),
+    )
+
+    assert report.outreach_ready is False
