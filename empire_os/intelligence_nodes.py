@@ -118,6 +118,25 @@ NODES = (
         ),
     ),
     IntelligenceNode(
+        key="private_capital",
+        name="Private Capital & Roll-Up Intelligence Node",
+        market="private_equity_independent_sponsors_and_portfolio_companies",
+        sensors=(
+            "sec_form_adv", "sec_edgar", "companies_house",
+            "sponsor_portfolio_pages", "m_and_a_announcements",
+            "public_registries", "property_signals", "search_fabric",
+        ),
+        products=(
+            "private_equity_sponsor_graph", "rollup_market_map",
+            "add_on_target_feed", "founder_exit_signal_feed",
+            "portfolio_growth_opportunity_map", "consolidation_index",
+        ),
+        opportunity_types=(
+            "platform_acquisition", "add_on_acquisition", "owner_exit",
+            "rollup_cluster", "portfolio_cross_sell", "carve_out",
+        ),
+    ),
+    IntelligenceNode(
         key="government",
         name="Government Spend Node",
         market="public_sector_and_suppliers",

@@ -90,7 +90,7 @@ Exit condition: one fully verified commercial loop with recognized revenue and o
 ### Priority 2 — Build the Intelligence Fabric into sellable products
 Goal: turn Empire's sensors, historical assets and external datasets into proprietary intelligence products rather than a lead-scraping identity.
 Current work:
-- Intelligence Nodes: Home Services, Solar & Energy, HVAC & Climate Services, Property, Market Intent, Corporate Change, Government Spend, Healthcare Growth, Compliance/Risk, Legal & Mass Tort;
+- Intelligence Nodes: Home Services, Solar & Energy, HVAC & Climate Services, Property, Market Intent, Corporate Change, Private Capital & Roll-Up, Government Spend, Healthcare Growth, Compliance/Risk, Legal & Mass Tort;
 - canonical entity/evidence reconciliation and temporal provenance;
 - recover the existing Legal/Mass Tort firm dataset into canonical truth without promoting dry-run candidates blindly;
 - define read-only product contracts for market maps, directories, opportunity feeds, trigger alerts, territory intelligence and buyer intelligence.

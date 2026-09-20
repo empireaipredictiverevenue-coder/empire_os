@@ -130,3 +130,11 @@ Do not treat 210 as the historical total.
 210 = surviving Git/tarball metro-page batch.
 Historical code also records 308 AEO pages in use; prior runtime archaeology found other deployed/indexed snapshots.
 The full old Vultr /srv/aeo estate count is currently unknown. Founder recalls 3,000+ pages; preserve that as an unverified historical lead until archival/runtime evidence confirms or disproves it.
+
+## Private capital / roll-up expansion
+Private Capital & Roll-Up is now a first-class Intelligence Node.
+It connects sponsor/adviser identity, portfolio companies, M&A announcements, public registries,
+property/operating signals and Search Fabric into sponsor graphs, roll-up maps, add-on target feeds,
+founder-exit signals, portfolio-growth opportunities and consolidation intelligence.
+Premium public industry pages now include Private Equity alongside Property, Solar, HVAC, Roofing
+and Legal/Mass Tort.
