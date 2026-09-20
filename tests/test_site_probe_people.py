@@ -1,4 +1,4 @@
-from empire_os.search_fabric.site_probe import _schema_evidence
+from empire_os.search_fabric.site_probe import _schema_evidence, _visible_people_from_html
 
 
 def test_schema_people_are_separate_from_business_names():
@@ -249,3 +249,36 @@ def test_visible_people_pairs_adjacent_team_card_blocks():
     assert people
     assert people[0]["name"] == "John Carter"
     assert people[0]["email"] == "john@acme.test"
+
+
+def test_visible_people_extracts_founded_by_phrase():
+    html = """
+    <html><body>
+      <p>Founded by Jane Smith in 2012, the company serves Houston.</p>
+    </body></html>
+    """
+    people = _visible_people_from_html(
+        html,
+        page_url="https://example.com/about",
+    )
+    assert any(
+        p["name"] == "Jane Smith" and p["title"].lower() == "owner"
+        for p in people
+    )
+
+
+def test_visible_people_extracts_role_name_phrase():
+    html = """
+    <html><body>
+      <p>Our President Michael Carter leads the roofing team.</p>
+    </body></html>
+    """
+    people = _visible_people_from_html(
+        html,
+        page_url="https://example.com/about",
+    )
+    assert any(
+        p["name"] == "Michael Carter"
+        and p["title"].lower() == "president"
+        for p in people
+    )

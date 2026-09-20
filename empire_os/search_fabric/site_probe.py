@@ -90,6 +90,19 @@ _PEOPLE_TITLE_RE = re.compile(
     re.I,
 )
 
+_OWNERSHIP_PHRASE_RE = re.compile(
+    r"\b(?i:founded|co-founded|owned(?:\s+and\s+operated)?|started|led|run)"
+    r"(?i:\s+by\s+)"
+    r"(?P<name>[A-Z][A-Za-z.'’\-]+(?:\s+[A-Z][A-Za-z.'’\-]+){1,3})\b"
+)
+
+_ROLE_NAME_PHRASE_RE = re.compile(
+    r"\b(?i:(?:our\s+)?)(?P<title>(?i:founder|co-founder|owner|president|"
+    r"principal|chief executive officer|ceo|managing director|general manager))"
+    r"(?i:\s*(?:is|:|,|-|–|—)?\s*)"
+    r"(?P<name>[A-Z][A-Za-z.'’\-]+(?:\s+[A-Z][A-Za-z.'’\-]+){1,3})\b"
+)
+
 _NON_PERSON_WORDS = {
     "about", "contact", "company", "leadership", "management", "meet",
     "our", "staff", "team", "the", "people", "services", "service",
@@ -193,6 +206,14 @@ def _visible_people_from_html(
             "email": _matching_person_email(clean_name, emails),
             "url": page_url,
         })
+
+    for block in blocks:
+        if len(block) > 360:
+            continue
+        for phrase in _OWNERSHIP_PHRASE_RE.finditer(block):
+            add(phrase.group("name"), "owner")
+        for phrase in _ROLE_NAME_PHRASE_RE.finditer(block):
+            add(phrase.group("name"), phrase.group("title"))
 
     for index, block in enumerate(blocks):
         if len(block) > 220:
