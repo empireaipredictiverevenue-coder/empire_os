@@ -232,7 +232,25 @@ Long term:
 - advanced optimization
 - new AI-native products
 
-## 12. Strategic Rule
+## 12. Jev / System One Candidate Layer
+
+TypeSafe AI's Jev is being treated as a candidate machine-native decision
+provider for bounded typed tasks such as classification, routing, scoring and
+secondary verification.
+
+Canonical Empire position:
+- Jev is a fast reflex layer, not the executive.
+- It does not replace Quant, System Two reasoning, independent verification,
+  policy or the execution bus.
+- It must pass Empire-specific benchmarks before any production routing.
+- task-level confidence thresholds and fallbacks are mandatory.
+- no financial, commercial, infrastructure or external side effect may rely on
+  Jev alone.
+- provider activation remains disabled until separately approved.
+
+See `JEV_EVALUATION_STRATEGY.md`.
+
+## 13. Strategic Rule
 
 Empire should never compete on "we use AI."
 

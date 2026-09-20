@@ -40,6 +40,12 @@ from empire_os.strategic_scenarios import (
     scenario_gaps,
     stress_test_strategy,
 )
+from empire_os.jev_strategy import (
+    CANDIDATE_TASKS as JEV_CANDIDATE_TASKS,
+    build_jev_eval_plan,
+    compare_decision_providers,
+    review_jev_use_case,
+)
 
 
 class DataRequest(BaseModel):
@@ -92,6 +98,14 @@ class ScenarioSetRequest(BaseModel):
 class StressTestRequest(BaseModel):
     baseline: dict[str, Any] = Field(default_factory=dict)
     scenarios: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class BenchmarkRowsRequest(BaseModel):
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class JevUseCasesRequest(BaseModel):
+    use_cases: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def create_strategy_router() -> APIRouter:
@@ -288,6 +302,34 @@ def create_strategy_router() -> APIRouter:
     def scenario_gap_review(req: ScenarioSetRequest):
         try:
             return scenario_gaps(req.scenarios)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/jev/task-catalog")
+    def jev_tasks():
+        return {
+            "schema_version": "jev_task_catalog.v1",
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "candidate_tasks": sorted(JEV_CANDIDATE_TASKS),
+            "provider_activation": False,
+        }
+
+    @router.post("/jev/use-case/review")
+    def jev_use_case(req: DataRequest):
+        return review_jev_use_case(req.data)
+
+    @router.post("/jev/eval-plan/preview")
+    def jev_eval_plan(req: JevUseCasesRequest):
+        try:
+            return build_jev_eval_plan(req.use_cases)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/jev/providers/compare/preview")
+    def jev_provider_compare(req: BenchmarkRowsRequest):
+        try:
+            return compare_decision_providers(req.rows)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

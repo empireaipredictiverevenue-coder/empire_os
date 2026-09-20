@@ -798,13 +798,17 @@ Raw signals
    AI capability portfolio, build/buy/open-source decisions, model economics,
    proprietary data advantage, evaluation and AI product strategy.
 
-11. `BLUEPRINT_V6.md`
+11. `JEV_EVALUATION_STRATEGY.md`
+   Evaluation-first System One / machine-native decision layer for fast typed
+   classification, routing, scoring and verification.
+
+12. `BLUEPRINT_V6.md`
    Engineering/phase implementation roadmap and production gates.
 
-12. `COMMERCIAL_BLUEPRINT.md`
+13. `COMMERCIAL_BLUEPRINT.md`
    Buyer/seats/territories/corridors/MRR detail.
 
-13. Phase/product docs
+14. Phase/product docs
    Implementation-specific detail.
 
 No future phase document should silently redefine the company model.

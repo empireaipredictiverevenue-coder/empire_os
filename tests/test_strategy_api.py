@@ -109,6 +109,56 @@ def test_market_domination_portfolio_never_allocates():
     assert response.json()["allocation_execution"] is False
 
 
+def test_jev_strategy_surfaces_are_evaluation_only():
+    catalog = client().get("/v1/strategy/jev/task-catalog")
+    assert catalog.status_code == 200
+    assert catalog.json()["provider_activation"] is False
+    assert "reply_classification" in catalog.json()["candidate_tasks"]
+
+    use_case_payload = {
+        "task_key": "reply_classification",
+        "risk_class": "medium",
+        "decision_schema_ref": "schema:reply:v1",
+        "baseline_ref": "baseline:reply:v1",
+        "evaluation_dataset_refs": ["eval:reply:v1"],
+        "deterministic_possible": False,
+        "open_ended_generation": False,
+        "requires_exact_math": False,
+        "consequential_authority": False,
+    }
+    use_case = client().post(
+        "/v1/strategy/jev/use-case/review",
+        json={"data": use_case_payload},
+    )
+    assert use_case.status_code == 200
+    assert use_case.json()["review_ready"] is True
+    assert use_case.json()["provider_activation"] is False
+
+    plan = client().post(
+        "/v1/strategy/jev/eval-plan/preview",
+        json={"use_cases": [use_case_payload]},
+    )
+    assert plan.status_code == 200
+    assert plan.json()["ready_for_offline_eval"] == ["reply_classification"]
+    assert plan.json()["credentials_required_now"] is False
+
+    compare = client().post(
+        "/v1/strategy/jev/providers/compare/preview",
+        json={"rows": [{
+            "provider_key": "jev",
+            "accuracy": .91,
+            "brier_score": .09,
+            "p95_latency_ms": 300,
+            "cost_per_million_input_tokens": .042,
+            "operational_failure_rate": .01,
+            "evidence_refs": ["private-eval:jev:v1"],
+        }]},
+    )
+    assert compare.status_code == 200
+    assert compare.json()["provider_activation"] is False
+    assert compare.json()["recommendation_only"] is True
+
+
 def test_competitive_search_presence_is_not_market_share():
     response = client().post(
         "/v1/strategy/competitive/search-presence/preview",
