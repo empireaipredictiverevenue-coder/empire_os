@@ -307,6 +307,8 @@ Fourth slice ✅ local/tested: causal-review conclusion packets/history now requ
 
 Fifth slice ✅ local/tested: causal-conclusion freshness review now requires the closed outcome window to occur after the experiment observation and remain within a bounded freshness window. Stale, future-dated or chronologically invalid conclusion evidence blocks current operator review without invalidating the historical observed lift packet; traffic, rollout and pricing mutation remain disabled.
 
+Sixth slice ✅ local/tested: experiment commercial-impact review now links only fresh causal-review conclusions to explicit commercial-outcome, recognized-revenue and realized-GP evidence. Outcome linkage can be reviewed while revenue/GP remain unknown, and statistical significance remains explicitly unavailable; no traffic, rollout, pricing, revenue or accounting mutation is introduced.
+
 ### Phase 12 — Demand Genesis
 Create demand through content, ads, offers, voice, AEO/GEO, communities, partnerships and agent distribution rather than only harvesting existing demand.
 

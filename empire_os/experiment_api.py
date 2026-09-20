@@ -6,6 +6,10 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from empire_os.experiment_business_impact import (
+    ExperimentBusinessImpactEvidence,
+    review_experiment_business_impact,
+)
 from empire_os.experiment_analysis import analyze_observed_experiment
 from empire_os.experiment_conclusion import (
     ExperimentConclusionRecord,
@@ -45,6 +49,17 @@ class ExperimentAnalysisRequest(BaseModel):
 class ExperimentConclusionRequest(ExperimentAnalysisRequest):
     conclusion_key: str
     evidence: dict = Field(default_factory=dict)
+
+
+class ExperimentBusinessImpactRequest(ExperimentConclusionRequest):
+    experiment_observed_at: str
+    outcome_window_closed_at: str
+    now_utc: str
+    max_age_seconds: int = Field(default=86400, gt=0)
+    commercial_outcome_ref: str | None = None
+    recognized_revenue_ref: str | None = None
+    realized_gp_ref: str | None = None
+    realized_gp_cents: int | None = None
 
 
 class ExperimentConclusionFreshnessRequest(ExperimentConclusionRequest):
@@ -168,6 +183,51 @@ def create_experiment_router(registry=None) -> APIRouter:
             "rollout_enabled": False,
             "pricing_mutation": False,
             "freshness": freshness.as_dict(),
+        }
+
+    @router.post("/conclusions/business-impact/preview")
+    def conclusion_business_impact_preview(
+        req: ExperimentBusinessImpactRequest,
+    ):
+        try:
+            _analysis, conclusion = build_conclusion(req)
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            freshness = assess_conclusion_freshness(
+                conclusion=conclusion,
+                experiment_observed_at=req.experiment_observed_at,
+                outcome_window_closed_at=req.outcome_window_closed_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+            impact = review_experiment_business_impact(
+                conclusion=conclusion,
+                freshness=freshness,
+                evidence=ExperimentBusinessImpactEvidence(
+                    conclusion_key=req.conclusion_key,
+                    commercial_outcome_ref=req.commercial_outcome_ref,
+                    recognized_revenue_ref=req.recognized_revenue_ref,
+                    realized_gp_ref=req.realized_gp_ref,
+                    realized_gp_cents=req.realized_gp_cents,
+                ),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "traffic_mutation": False,
+            "rollout_enabled": False,
+            "pricing_mutation": False,
+            "revenue_mutation": False,
+            "accounting_mutation": False,
+            "impact": impact.as_dict(),
         }
 
     @router.post("/conclusions/register")
