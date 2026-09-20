@@ -6,7 +6,9 @@ import html as html_lib
 import re
 import time
 from typing import Any, Dict, Iterable, List
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
+from urllib.request import Request as UrlRequest, urlopen
 
 import requests
 
@@ -43,11 +45,19 @@ COMMON_PEOPLE_PATHS = (
     "/meet-the-team/",
     "/our-team/",
     "/team/",
+    "/meet-our-team/",
+    "/meet-the-owner/",
+    "/about/our-team/",
+    "/about/team/",
     "/leadership/",
+    "/about/leadership/",
+    "/company/leadership/",
     "/staff/",
     "/people/",
     "/management/",
     "/company/team/",
+    "/who-we-are/",
+    "/our-story/",
     "/about-us/",
     "/about/",
     "/contact-us/",
@@ -184,29 +194,45 @@ def _visible_people_from_html(
             "url": page_url,
         })
 
-    for block in blocks:
+    for index, block in enumerate(blocks):
         if len(block) > 220:
             continue
         match = _PEOPLE_TITLE_RE.search(block)
-        if not match:
-            continue
+        if match:
+            before = block[:match.start()].strip(" ,|:/–—-")
+            words = before.split()
+            for width in (2, 3, 4):
+                if len(words) >= width:
+                    candidate = " ".join(words[-width:])
+                    if _looks_like_visible_person_name(candidate):
+                        add(candidate, match.group(0))
+                        break
 
-        before = block[:match.start()].strip(" ,|:/–—-")
-        words = before.split()
-        for width in (2, 3, 4):
-            if len(words) >= width:
-                candidate = " ".join(words[-width:])
-                if _looks_like_visible_person_name(candidate):
-                    add(candidate, match.group(0))
+            after = block[match.end():].strip(" ,|:/–—-")
+            words = after.split()
+            for width in (2, 3, 4):
+                if len(words) >= width:
+                    candidate = " ".join(words[:width])
+                    if _looks_like_visible_person_name(candidate):
+                        add(candidate, match.group(0))
+                        break
+
+            for neighbor_index in (index - 1, index - 2, index + 1, index + 2):
+                if not 0 <= neighbor_index < len(blocks):
+                    continue
+                neighbor = blocks[neighbor_index]
+                if len(neighbor) > 100:
+                    continue
+                if _looks_like_visible_person_name(neighbor):
+                    add(neighbor, match.group(0))
                     break
-
-        after = block[match.end():].strip(" ,|:/–—-")
-        words = after.split()
-        for width in (2, 3, 4):
-            if len(words) >= width:
-                candidate = " ".join(words[:width])
-                if _looks_like_visible_person_name(candidate):
-                    add(candidate, match.group(0))
+        elif _looks_like_visible_person_name(block):
+            for neighbor_index in (index + 1, index + 2):
+                if neighbor_index >= len(blocks):
+                    continue
+                title_match = _PEOPLE_TITLE_RE.search(blocks[neighbor_index])
+                if title_match:
+                    add(block, title_match.group(0))
                     break
 
     title_name = re.sub(r"\s+[|–—-].*$", "", str(page_title or "")).strip()
@@ -446,7 +472,48 @@ def _common_candidates(origin: str, *, priority: str = "default") -> List[str]:
     return [urljoin(origin, path) for path in COMMON_PEOPLE_PATHS]
 
 
+def _fetch_with_urllib(url: str, *, timeout: float):
+    request = UrlRequest(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept": (
+                "text/html,application/xhtml+xml,"
+                "application/xml;q=0.9,*/*;q=0.8"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+    )
+    try:
+        with urlopen(request, timeout=max(1.0, float(timeout))) as response:
+            status = getattr(response, "status", None) or response.getcode()
+            if int(status or 0) != 200:
+                return None
+            content_type = response.headers.get("Content-Type", "")
+            if not any(
+                kind in content_type.lower()
+                for kind in ("html", "json", "xml", "text")
+            ):
+                return None
+            data = response.read(MAX_RESPONSE_BYTES + 1)[:MAX_RESPONSE_BYTES]
+            charset = None
+            try:
+                charset = response.headers.get_content_charset()
+            except Exception:
+                charset = None
+            return decode_document(
+                url=str(response.geturl()),
+                data=data,
+                content_type=content_type,
+                content_encoding="",
+                charset=charset,
+            )
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError):
+        return None
+
+
 def _fetch(session: requests.Session, url: str, *, timeout: float = 15.0):
+    response = None
     try:
         response = session.get(
             url,
@@ -457,6 +524,8 @@ def _fetch(session: requests.Session, url: str, *, timeout: float = 15.0):
         return None
 
     if response.status_code != 200:
+        if response.status_code == 403:
+            return _fetch_with_urllib(url, timeout=timeout)
         return None
 
     content_type = response.headers.get("Content-Type", "")

@@ -235,3 +235,17 @@ def test_visible_people_rejects_generic_team_heading():
     )
 
     assert people == []
+
+def test_visible_people_pairs_adjacent_team_card_blocks():
+    import empire_os.search_fabric.site_probe as sp
+
+    people = sp._visible_people_from_html(
+        "<section><h3>John Carter</h3><p>Owner & President</p></section>",
+        page_url="https://acme.test/our-team/",
+        page_title="Our Team",
+        emails=["john@acme.test"],
+    )
+
+    assert people
+    assert people[0]["name"] == "John Carter"
+    assert people[0]["email"] == "john@acme.test"

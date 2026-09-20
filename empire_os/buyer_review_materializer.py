@@ -8,6 +8,7 @@ funds or writes revenue.
 """
 from __future__ import annotations
 
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
@@ -18,7 +19,7 @@ from empire_os.buyer_discovery import (
     build_candidate,
     build_candidate_review_plan,
 )
-from empire_os.buyer_probe_worker import run as run_buyer_probe
+from empire_os.buyer_probe_worker import rejection_reason, run as run_buyer_probe
 from empire_os.qualification_worker_v2 import request_json
 
 
@@ -35,6 +36,7 @@ class BuyerReviewMaterializerResult:
     proposed: int
     skipped_existing: int
     skipped_ineligible: int
+    rejection_counts: tuple[tuple[str, int], ...]
     errors: tuple[str, ...]
 
     def as_dict(self) -> dict[str, Any]:
@@ -46,6 +48,7 @@ class BuyerReviewMaterializerResult:
             "proposed": self.proposed,
             "skipped_existing": self.skipped_existing,
             "skipped_ineligible": self.skipped_ineligible,
+            "rejection_counts": dict(self.rejection_counts),
             "errors": list(self.errors),
             "actual_revenue": False,
             "outbound_sent": False,
@@ -180,9 +183,10 @@ def run_buyer_review_materializer(
         scan_offset=scan_offset,
     )
     cap = max(1, min(int(proposal_limit), 20))
-    workers = max(1, min(int(probe_workers), 12))
+    workers = max(1, min(int(probe_workers), 24))
 
     eligible = probed = review_ready = proposed = skipped_ineligible = 0
+    rejection_counts: Counter[str] = Counter()
     errors: list[str] = []
     work: list[tuple[Any, dict[str, Any]]] = []
 
@@ -209,23 +213,32 @@ def run_buyer_review_materializer(
             candidate, result, exc = future.result()
             probed += 1
             if exc is not None:
+                rejection_counts["probe_error"] += 1
                 errors.append(
                     f"{candidate.prospect_id}:"
                     f"{type(exc).__name__}:{str(exc)[:180]}"
                 )
                 continue
             if not isinstance(result, Mapping):
+                rejection_counts["invalid_probe_result"] += 1
                 skipped_ineligible += 1
                 continue
             if (
                 result.get("review_ready") is not True
                 or result.get("outreach_ready") is not True
             ):
+                reason = (
+                    "outreach_not_ready"
+                    if result.get("review_ready") is True
+                    else rejection_reason(dict(result))
+                )
+                rejection_counts[reason or "contact_not_ready"] += 1
                 skipped_ineligible += 1
                 continue
 
             decision = result.get("decision_maker")
             if not isinstance(decision, Mapping):
+                rejection_counts["decision_maker_missing"] += 1
                 skipped_ineligible += 1
                 continue
             try:
@@ -235,6 +248,7 @@ def run_buyer_review_materializer(
             except (TypeError, ValueError):
                 decision_score = 0.0
             if decision_score < 0.70:
+                rejection_counts["decision_score_below_floor"] += 1
                 skipped_ineligible += 1
                 continue
 
@@ -284,5 +298,6 @@ def run_buyer_review_materializer(
         proposed=proposed,
         skipped_existing=skipped_existing,
         skipped_ineligible=skipped_ineligible,
+        rejection_counts=tuple(sorted(rejection_counts.items())),
         errors=tuple(errors),
     )
