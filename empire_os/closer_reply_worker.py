@@ -16,6 +16,7 @@ class CloserReplyWorkerResult:
     rows_seen: int
     cases_opened: int
     recommendations_recorded: int
+    buyers_provisioned: int
     skipped_existing: int
     errors: tuple[str, ...]
 
@@ -24,6 +25,7 @@ class CloserReplyWorkerResult:
             "rows_seen": self.rows_seen,
             "cases_opened": self.cases_opened,
             "recommendations_recorded": self.recommendations_recorded,
+            "buyers_provisioned": self.buyers_provisioned,
             "skipped_existing": self.skipped_existing,
             "errors": list(self.errors),
             "actual_revenue": False,
@@ -53,7 +55,7 @@ def run_closer_reply_worker(
     if not isinstance(rows, list):
         raise ValueError("closer work projection must be a list")
 
-    opened = recorded = existing = 0
+    opened = recorded = provisioned = existing = 0
     errors: list[str] = []
 
     for row in rows:
@@ -78,6 +80,16 @@ def run_closer_reply_worker(
                 raise ValueError("open_closer_case returned no case_id")
             if str((opened_result or {}).get("decision") or "") == "opened":
                 opened += 1
+
+            buyer_result = rpc(
+                "provision_buyer_from_closer_case",
+                {
+                    "p_case_id": case_id,
+                    "p_actor": "empire_closer_planner",
+                },
+            )
+            if str((buyer_result or {}).get("decision") or "") == "provisioned":
+                provisioned += 1
 
             rpc(
                 "record_closer_recommendation",
@@ -104,6 +116,7 @@ def run_closer_reply_worker(
         rows_seen=len(rows),
         cases_opened=opened,
         recommendations_recorded=recorded,
+        buyers_provisioned=provisioned,
         skipped_existing=existing,
         errors=tuple(errors),
     )

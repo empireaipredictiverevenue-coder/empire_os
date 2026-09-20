@@ -16,6 +16,11 @@ class FakeRpc:
                 "case_id": "00000000-0000-0000-0000-000000000002",
                 "state": "engaged",
             }
+        if name == "provision_buyer_from_closer_case":
+            return {
+                "decision": "provisioned",
+                "buyer_id": "00000000-0000-0000-0000-000000000004",
+            }
         if name == "record_closer_recommendation":
             return {
                 "decision": "recorded",
@@ -36,10 +41,12 @@ def test_opens_case_and_records_deterministic_recommendation():
     result = run_closer_reply_worker(rpc, limit=25)
     assert result.cases_opened == 1
     assert result.recommendations_recorded == 1
+    assert result.buyers_provisioned == 1
     assert result.errors == ()
     assert [name for name, _ in rpc.calls] == [
         "list_closer_work",
         "open_closer_case",
+        "provision_buyer_from_closer_case",
         "record_closer_recommendation",
     ]
     recommendation = rpc.calls[-1][1]
@@ -60,6 +67,7 @@ def test_existing_case_is_not_duplicated():
     result = run_closer_reply_worker(rpc)
     assert result.cases_opened == 0
     assert result.recommendations_recorded == 0
+    assert result.buyers_provisioned == 0
     assert result.skipped_existing == 1
     assert [name for name, _ in rpc.calls] == ["list_closer_work"]
 
@@ -76,4 +84,5 @@ def test_noncommercial_reply_is_ignored():
     result = run_closer_reply_worker(rpc)
     assert result.cases_opened == 0
     assert result.recommendations_recorded == 0
+    assert result.buyers_provisioned == 0
     assert result.errors == ()

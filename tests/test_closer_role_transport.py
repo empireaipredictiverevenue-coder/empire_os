@@ -74,6 +74,10 @@ def test_planner_can_open_and_record_but_not_approve():
         connect_factory=factory,
     )
     rpc("open_closer_case", {"p_reply_id": "00000000-0000-0000-0000-000000000001"})
+    rpc("provision_buyer_from_closer_case", {
+        "p_case_id": "00000000-0000-0000-0000-000000000002",
+        "p_actor": "empire_closer_planner",
+    })
     rpc("record_closer_recommendation", {
         "p_case_id": "00000000-0000-0000-0000-000000000002",
         "p_type": "qualify",

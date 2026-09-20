@@ -27,6 +27,10 @@ ROLE_FUNCTIONS = {
             "select public.open_closer_case(%s)",
             ("p_reply_id",),
         ),
+        "provision_buyer_from_closer_case": (
+            "select public.provision_buyer_from_closer_case(%s,%s)",
+            ("p_case_id", "p_actor"),
+        ),
         "record_closer_recommendation": (
             "select public.record_closer_recommendation(%s,%s,%s,%s::jsonb,%s,%s)",
             (
