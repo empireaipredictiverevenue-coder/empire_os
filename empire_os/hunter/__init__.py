@@ -16,6 +16,16 @@ from empire_os.hunter.outcome_learning import (
     calibrate_pattern_outcomes,
 )
 from empire_os.hunter.outcome_worker import HunterOutcomeWorker
+from empire_os.hunter.prioritization import (
+    EnrichmentPriority,
+    prioritize_enrichment,
+    rank_enrichment_candidates,
+)
+from empire_os.hunter.signals import (
+    HunterSignal,
+    derive_temporal_signals,
+    outcome_signal,
+)
 
 __all__ = [
     "ContactEvidence",
@@ -32,4 +42,10 @@ __all__ = [
     "HunterOutcomeWorker",
     "calibrate_contact",
     "calibrate_pattern_outcomes",
+    "EnrichmentPriority",
+    "HunterSignal",
+    "prioritize_enrichment",
+    "rank_enrichment_candidates",
+    "derive_temporal_signals",
+    "outcome_signal",
 ]

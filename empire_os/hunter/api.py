@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from empire_os.hunter.domain_intelligence import analyze_domain
@@ -13,6 +13,8 @@ from empire_os.hunter.outcome_learning import (
     calibrate_pattern_outcomes,
 )
 from empire_os.hunter.pattern_brain import learn_domain_pattern
+from empire_os.hunter.prioritization import prioritize_enrichment
+from empire_os.hunter.signals import derive_temporal_signals
 from empire_os.hunter.verification_mesh import VerificationMesh
 
 
@@ -41,6 +43,27 @@ class ContactCalibrationRequest(BaseModel):
 class PatternCalibrationRequest(BaseModel):
     domain: str
     observations: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class EnrichmentPriorityRequest(BaseModel):
+    entity_id: str
+    evidence_confidence: float = Field(ge=0, le=1)
+    omega_score: float | None = Field(default=None, ge=0, le=100)
+    omega_confidence: float | None = Field(default=None, ge=0, le=1)
+    buyer_demand_strength: float | None = Field(default=None, ge=0, le=1)
+    buyer_demand_confidence: float | None = Field(default=None, ge=0, le=1)
+    contact_ready: bool = False
+    modeled_expected_gp_cents: int | None = Field(default=None, ge=0)
+    enrichment_cost_cents: int | None = Field(default=None, ge=0)
+    evidence_refs: list[str] = Field(min_length=1)
+
+
+class TemporalSignalsRequest(BaseModel):
+    entity_id: str
+    observed_at: str
+    previous: dict[str, Any] | None = None
+    current: dict[str, Any]
+    evidence_refs: list[str] = Field(min_length=1)
 
 
 class DomainAnalyseRequest(BaseModel):
@@ -142,6 +165,47 @@ def create_hunter_router() -> APIRouter:
             "calibration": result.as_dict(),
         }
 
+    @router.post("/prioritize/preview")
+    def prioritize_preview(req: EnrichmentPriorityRequest):
+        try:
+            result = prioritize_enrichment(
+                entity_id=req.entity_id,
+                evidence_confidence=req.evidence_confidence,
+                omega_score=req.omega_score,
+                omega_confidence=req.omega_confidence,
+                buyer_demand_strength=req.buyer_demand_strength,
+                buyer_demand_confidence=req.buyer_demand_confidence,
+                contact_ready=req.contact_ready,
+                modeled_expected_gp_cents=req.modeled_expected_gp_cents,
+                enrichment_cost_cents=req.enrichment_cost_cents,
+                evidence_refs=req.evidence_refs,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_allowed": False,
+            "priority": result.as_dict(),
+        }
+
+    @router.post("/signals/preview")
+    def signals_preview(req: TemporalSignalsRequest):
+        try:
+            signals = derive_temporal_signals(
+                entity_id=req.entity_id,
+                observed_at=req.observed_at,
+                previous=req.previous,
+                current=req.current,
+                evidence_refs=req.evidence_refs,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_allowed": False,
+            "signals": [signal.as_dict() for signal in signals],
+        }
+
     @router.post("/domain/analyse")
     def domain_analyse(req: DomainAnalyseRequest):
         try:
@@ -166,3 +230,12 @@ def create_hunter_router() -> APIRouter:
 
 
 router = create_hunter_router()
+
+app = FastAPI(
+    title="Empire Hunter",
+    version="1.0",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
+app.include_router(router)

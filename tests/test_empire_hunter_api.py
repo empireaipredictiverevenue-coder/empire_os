@@ -79,3 +79,54 @@ def test_contact_outcome_preview_rejects_verified_bounce():
     calibration = response.json()["calibration"]
     assert calibration["state"] == "rejected"
     assert calibration["posterior_confidence"] <= 0.10
+
+
+def test_prioritize_preview_never_uses_actual_revenue():
+    response = client().post(
+        "/v1/hunter/prioritize/preview",
+        json={
+            "entity_id": "entity-1",
+            "evidence_confidence": 0.9,
+            "omega_score": 88,
+            "omega_confidence": 0.8,
+            "buyer_demand_strength": 0.9,
+            "buyer_demand_confidence": 0.9,
+            "contact_ready": False,
+            "modeled_expected_gp_cents": 250000,
+            "enrichment_cost_cents": 3000,
+            "evidence_refs": ["omega:1", "buyer-demand:1"],
+        },
+    )
+
+    assert response.status_code == 200
+    priority = response.json()["priority"]
+    assert priority["depth"] == "deep"
+    assert priority["economics_is_forecast"] is True
+    assert priority["actual_revenue_used"] is False
+
+
+def test_signals_preview_requires_real_change():
+    response = client().post(
+        "/v1/hunter/signals/preview",
+        json={
+            "entity_id": "entity-1",
+            "observed_at": "2026-09-20T14:30:00Z",
+            "previous": {
+                "people": [{"name": "Old Owner", "title": "Owner"}],
+                "emails": ["old@example.com"],
+            },
+            "current": {
+                "people": [{"name": "New Owner", "title": "President"}],
+                "emails": ["new@example.com"],
+            },
+            "evidence_refs": ["site:before", "site:after"],
+        },
+    )
+
+    assert response.status_code == 200
+    types = {
+        item["signal_type"]
+        for item in response.json()["signals"]
+    }
+    assert "leadership_change" in types
+    assert "contact_surface_change" in types
