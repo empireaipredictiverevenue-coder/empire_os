@@ -19,6 +19,7 @@ from .crawler_product import crawl_search_site
 from .health import search_health
 from .metadata import generate_metadata
 from .models import SearchOpportunity, SearchPage
+from .performance import lighthouse_parser_status, parse_lighthouse_report
 from .quality import ContentQualityEvaluator
 from .products import (
     get_search_product,
@@ -79,6 +80,10 @@ class BacklinkGraphPreviewRequest(BaseModel):
     observations: list[BacklinkObservationRequest] = Field(
         default_factory=list
     )
+
+
+class LighthouseReportRequest(BaseModel):
+    report: dict[str, Any]
 
 
 class CrawlPreviewRequest(BaseModel):
@@ -254,6 +259,8 @@ def create_search_router(
         console_status = search_console.status()
         return {
             "native_crawler": True,
+            "lighthouse_parser": True,
+            "lighthouse_runner": False,
             "pages": repo,
             "indexation": repo,
             "opportunities": repo,
@@ -310,6 +317,17 @@ def create_search_router(
             "product": product.as_dict(),
             "readiness": readiness,
         }
+
+    @router.get("/performance/status")
+    def performance_status():
+        return lighthouse_parser_status()
+
+    @router.post("/performance/lighthouse/parse")
+    def performance_lighthouse_parse(req: LighthouseReportRequest):
+        try:
+            return parse_lighthouse_report(req.report)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @router.post("/crawl/preview")
     def crawl_preview(req: CrawlPreviewRequest):

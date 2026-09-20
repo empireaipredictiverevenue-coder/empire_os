@@ -169,3 +169,8 @@ Placeholder personalization is no longer allowed into a proposed outbound intent
 ## Search Product native crawler
 Empire Web Intelligence Crawler is canonical; Firecrawl remains reference-only and is not adopted as runtime/service dependency.
 Search Product now exposes an OBSERVE-only native crawl preview that converts Search Fabric site_probe evidence into bounded technical findings (titles, descriptions, canonicals, structured data, duplicate titles, crawl budget) without publishing/indexing/mutation authority.
+
+## Search Product performance evidence
+Added Lighthouse JSON evidence ingestion for lab performance, accessibility, best-practices and SEO scores plus LCP/FCP/CLS/TBT/Speed Index diagnostics and optimization opportunities.
+Field Core Web Vitals remain explicitly unavailable until a genuine field-data adapter is activated; lab evidence is never relabeled as real-user CWV.
+Browser/Lighthouse runner execution remains unactivated.

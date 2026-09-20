@@ -49,6 +49,8 @@ SEARCH_PRODUCTS: tuple[SearchProduct, ...] = (
         required_capabilities=("pages", "indexation"),
         optional_capabilities=(
             "native_crawler",
+            "lighthouse_parser",
+            "lighthouse_runner",
             "internal_links",
             "search_console",
         ),
