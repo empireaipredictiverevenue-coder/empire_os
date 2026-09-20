@@ -229,6 +229,8 @@ Fourth slice ✅ local/tested: evidence-only manual-handoff review now requires 
 
 Fifth slice ✅ local/tested: manual-handoff readiness now validates chronology and freshness across negotiation, human approval, counterparty acknowledgement and operator-handoff evidence. Missing, stale, future-dated or out-of-order evidence blocks readiness; payment, allocation, task execution and autonomous handoff remain hard-disabled.
 
+Sixth slice ✅ local/tested: evidence-only A2A commercial attribution now requires the explicit chain from governed intent/manual handoff through fulfilment order, BSC payment request, independently verified payment, commercial outcome and recognized-revenue evidence before revenue attribution is review-ready. Realized GP remains separately unknown until observed. The orphaned legacy Solana/USDC a2a_settle_bridge.py executable is hard-retired; no payment, allocation, revenue-recognition or accounting mutation authority is introduced.
+
 ### Phase 7 — Conversation OS
 
 Second slice ✅ local/tested: provider ingestion now records deterministic payload hashes, requires timezone-aware event timestamps and treats exact replay as idempotent while rejecting altered payloads under the same provider-event ID. Persistence remains append-only and provider sends/calls/bookings stay disabled.

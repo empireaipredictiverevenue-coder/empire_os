@@ -7,6 +7,10 @@ from typing import Any, Mapping, Protocol
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from empire_os.a2a_attribution import (
+    A2ACommercialAttributionEvidence,
+    review_a2a_commercial_attribution,
+)
 from empire_os.a2a_commerce_intent import (
     CommercialIntent,
     normalize_intent_record,
@@ -65,6 +69,19 @@ class ManualHandoffReviewRequest(BaseModel):
     counterparty_acknowledged: bool = False
     counterparty_evidence_ref: str | None = None
     manual_handoff_ref: str | None = None
+
+
+class CommercialAttributionRequest(BaseModel):
+    intent_id: str
+    negotiation_id: str
+    agent_id: str
+    manual_handoff_ref: str | None = None
+    fulfilment_order_ref: str | None = None
+    payment_request_ref: str | None = None
+    verified_payment_ref: str | None = None
+    commercial_outcome_ref: str | None = None
+    recognized_revenue_ref: str | None = None
+    realized_gp_cents: int | None = None
 
 
 class ManualHandoffReadinessRequest(ManualHandoffReviewRequest):
@@ -231,6 +248,35 @@ def create_a2a_commerce_router(
             "task_execution": False,
             "autonomous_handoff_execution": False,
             "readiness": readiness.as_dict(),
+        }
+
+    @router.post("/attribution/preview")
+    def commercial_attribution_preview(req: CommercialAttributionRequest):
+        try:
+            review = review_a2a_commercial_attribution(
+                A2ACommercialAttributionEvidence(
+                    intent_id=req.intent_id,
+                    negotiation_id=req.negotiation_id,
+                    agent_id=req.agent_id,
+                    manual_handoff_ref=req.manual_handoff_ref,
+                    fulfilment_order_ref=req.fulfilment_order_ref,
+                    payment_request_ref=req.payment_request_ref,
+                    verified_payment_ref=req.verified_payment_ref,
+                    commercial_outcome_ref=req.commercial_outcome_ref,
+                    recognized_revenue_ref=req.recognized_revenue_ref,
+                    realized_gp_cents=req.realized_gp_cents,
+                )
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "payment_authority": False,
+            "allocation_authority": False,
+            "revenue_mutation": False,
+            "accounting_mutation": False,
+            "attribution": review.as_dict(),
         }
 
     @router.post("/intents")
