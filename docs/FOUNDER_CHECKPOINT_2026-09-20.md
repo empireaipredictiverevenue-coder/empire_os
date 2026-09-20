@@ -174,3 +174,6 @@ Search Product now exposes an OBSERVE-only native crawl preview that converts Se
 Added Lighthouse JSON evidence ingestion for lab performance, accessibility, best-practices and SEO scores plus LCP/FCP/CLS/TBT/Speed Index diagnostics and optimization opportunities.
 Field Core Web Vitals remain explicitly unavailable until a genuine field-data adapter is activated; lab evidence is never relabeled as real-user CWV.
 Browser/Lighthouse runner execution remains unactivated.
+
+## Search Product rank history
+Added provider-neutral observed rank-history analysis with strict provenance, trend/change/best/worst position summaries and zero synthetic time-series points. Missing rank observations remain unavailable rather than interpolated.

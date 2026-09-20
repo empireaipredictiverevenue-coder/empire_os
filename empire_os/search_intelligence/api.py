@@ -21,6 +21,7 @@ from .metadata import generate_metadata
 from .models import SearchOpportunity, SearchPage
 from .performance import lighthouse_parser_status, parse_lighthouse_report
 from .quality import ContentQualityEvaluator
+from .rank_history import RankObservation, analyse_rank_history
 from .products import (
     get_search_product,
     product_catalog,
@@ -80,6 +81,23 @@ class BacklinkGraphPreviewRequest(BaseModel):
     observations: list[BacklinkObservationRequest] = Field(
         default_factory=list
     )
+
+
+class RankObservationRequest(BaseModel):
+    query: str
+    url: str
+    observed_at: str
+    position: int = Field(ge=1)
+    engine: str
+    source: str
+    provenance: list[str] = Field(min_length=1)
+
+
+class RankHistoryPreviewRequest(BaseModel):
+    query: str
+    url: str | None = None
+    engine: str | None = None
+    observations: list[RankObservationRequest] = Field(default_factory=list)
 
 
 class LighthouseReportRequest(BaseModel):
@@ -261,6 +279,7 @@ def create_search_router(
             "native_crawler": True,
             "lighthouse_parser": True,
             "lighthouse_runner": False,
+            "rank_history": True,
             "pages": repo,
             "indexation": repo,
             "opportunities": repo,
@@ -316,6 +335,36 @@ def create_search_router(
             "execution_allowed": False,
             "product": product.as_dict(),
             "readiness": readiness,
+        }
+
+    @router.post("/rank-history/preview")
+    def rank_history_preview(req: RankHistoryPreviewRequest):
+        try:
+            observations = tuple(
+                RankObservation(
+                    query=item.query,
+                    url=item.url,
+                    observed_at=item.observed_at,
+                    position=item.position,
+                    engine=item.engine,
+                    source=item.source,
+                    provenance=tuple(item.provenance),
+                )
+                for item in req.observations
+            )
+            analysis = analyse_rank_history(
+                observations,
+                query=req.query,
+                url=req.url,
+                engine=req.engine,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "schema_version": "empire.search.rank-history.v1",
+            "mode": "OBSERVE",
+            "execution_allowed": False,
+            "analysis": analysis,
         }
 
     @router.get("/performance/status")

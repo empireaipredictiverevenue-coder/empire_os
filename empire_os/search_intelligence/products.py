@@ -69,7 +69,12 @@ SEARCH_PRODUCTS: tuple[SearchProduct, ...] = (
             "opportunity_evidence",
         ),
         required_capabilities=("opportunities",),
-        optional_capabilities=("serp", "search_console", "competitor_gap"),
+        optional_capabilities=(
+            "rank_history",
+            "serp",
+            "search_console",
+            "competitor_gap",
+        ),
     ),
     SearchProduct(
         key="content_protection",
