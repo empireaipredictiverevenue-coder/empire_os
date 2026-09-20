@@ -375,6 +375,8 @@ Fifth slice ✅ local/tested: capital outcome calibration now checks freshness a
 
 Sixth slice ✅ local/tested: append-only capital calibration history now preserves candidate-linked expected-vs-realized return error, realized gross profit, blockers and provenance for audit/model review. Both available and blocked calibrations may be retained, but only evidence-complete calibrations are marked eligible for later model review; recommendation mutation, model-weight mutation, funds movement and budget mutation remain disabled.
 
+Seventh slice ✅ local/tested: capital calibration now produces an explicit model-review feedback packet that classifies realized return as under-estimated, over-estimated, on-target or unknown. Feedback remains recommendation-only and cannot mutate model weights, recommendations, budgets or funds.
+
 ### Phase 16 — SaaS / Network Scale
 Canonical multi-tenant teams, RBAC, usage metering, subscriptions and network-scale tenancy controls.
 

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from empire_os.capital_allocator import CapitalCandidate
 from empire_os.capital_calibration_registry import CapitalCalibrationRecord
 from empire_os.capital_freshness import review_capital_outcome_calibration
+from empire_os.capital_feedback import build_capital_model_review_feedback
 from empire_os.capital_outcome import (
     CapitalOutcomeEvidence,
     review_capital_outcome,
@@ -192,6 +193,45 @@ def create_capital_router(
             "budget_mutation": False,
             "recommendation_mutation": False,
             "calibration": calibration.as_dict(),
+        }
+
+    @router.post("/outcome/feedback/preview")
+    def outcome_feedback_preview(req: CapitalOutcomeCalibrationRequest):
+        try:
+            normalized = (
+                req.now_utc[:-1] + "+00:00"
+                if req.now_utc.endswith("Z")
+                else req.now_utc
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("now_utc must include timezone")
+            calibration = review_capital_outcome_calibration(
+                CapitalOutcomeEvidence(
+                    candidate_id=req.candidate_id,
+                    expected_return_cents=req.expected_return_cents,
+                    required_capital_cents=req.required_capital_cents,
+                    recognized_revenue_cents=req.recognized_revenue_cents,
+                    observed_cost_cents=req.observed_cost_cents,
+                    observed_at=req.observed_at,
+                    evidence_refs=tuple(req.evidence_refs),
+                ),
+                recommendation_recorded_at=req.recommendation_recorded_at,
+                now=now,
+                max_age_seconds=req.max_age_seconds,
+            )
+            feedback = build_capital_model_review_feedback(calibration)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_authority": "none",
+            "model_weight_mutation": False,
+            "recommendation_mutation": False,
+            "funds_movement": False,
+            "budget_mutation": False,
+            "feedback": feedback.as_dict(),
         }
 
     @router.post("/outcome/calibration/register")
