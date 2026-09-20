@@ -13,6 +13,23 @@ REAL DATA -> CRAWL -> QUALITY / IDENTITY -> CANONICAL SUPABASE -> ENRICH -> QUAL
 
 No synthetic production evidence. Unknown remains unknown. Forecast is not revenue.
 
+## Canonical Anti-Drift Strategy Lock — 2026-09-20
+
+Founder decisions now locked unless explicitly superseded:
+- Empire is a global business / global revenue infrastructure company with sequential evidence-first market entry.
+- Global Opportunity Graph + Opportunity Foundry + Market Entry OS create new business, market opportunity and growth.
+- Global Buyer Network, Pricing Intelligence, Distribution Intelligence, Productization Engine and Empire Economic Memory are compounding-moat systems.
+- Astra evolves toward evidence-backed opportunity portfolio coordination while consequential authority remains governed.
+- Founder Console is the top-level operating/truth cockpit; specialist dashboards are drill-downs.
+- Major backend capabilities should receive visible read surfaces soon after implementation.
+- Old Vultr strategy is recovered as historical input; concepts may be reused but old numbers/claims are not current evidence.
+
+Canonical references:
+- docs/GLOBAL_OPPORTUNITY_GROWTH_DOCTRINE.md
+- docs/FOUNDER_CONSOLE_OPERATING_SPEC.md
+- docs/history/VULTR_BILLION_SCALE_ANALYSIS_RECOVERED_2026-09-20.txt
+
+
 ## A. Revenue-Critical Closure Set
 
 | Thread | Current truth | Closure requirement |

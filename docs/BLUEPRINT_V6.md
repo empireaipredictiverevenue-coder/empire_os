@@ -10,6 +10,18 @@ Build a governed Predictive Revenue operating system that detects commercial sig
 ## Build Principle
 QUALITY → FIRST REVENUE → PROVE ECONOMICS → CAPTURE OUTCOMES → IMPROVE PREDICTIONS → AUTOMATE → SCALE.
 
+## Global Growth Strategic Lock
+Empire is a global Predictive Revenue operating system and revenue infrastructure company. Global architecture is mandatory; market entry remains sequential, jurisdiction-aware and evidence-first.
+
+Canonical strategy documents:
+- docs/GLOBAL_OPPORTUNITY_GROWTH_DOCTRINE.md — Global Opportunity Graph, Opportunity Foundry, Market Entry OS, Buyer/Distribution/Pricing Intelligence, Productization, Economic Memory, Astra portfolio growth and anti-drift rules.
+- docs/FOUNDER_CONSOLE_OPERATING_SPEC.md — Founder Console as the top-level truth/operating surface.
+- docs/history/VULTR_BILLION_SCALE_ANALYSIS_RECOVERED_2026-09-20.txt — recovered historical strategy evidence only; old numbers/forecasts are not current truth.
+
+Global growth loop:
+SIGNALS → OPPORTUNITY GRAPH → OPPORTUNITY FOUNDRY → MARKET ENTRY → EXPERIMENT → VALIDATION → DISTRIBUTION/GTM → BUYER NETWORK → PAYMENT/FULFILMENT → RECOGNIZED REVENUE → REALIZED GP → ECONOMIC MEMORY → ASTRA → NEXT OPPORTUNITY.
+
+
 ## Canonical Architecture Decisions
 - Truth/data plane: Supabase project `owbeinlfcfdtwcwrttjy` (Empire-AI Database). SQLite is legacy/cache only.
 - Operating coordinator: Astra. Deterministic/local first; premium AI only when economically justified.
