@@ -197,6 +197,8 @@ Phase 4 consequential authority remains gated. Astra now has bounded `GUARDED_EX
 
 Marketing Department Blueprint ✅ canonical design: category/positioning, Product Marketing, Growth/Demand, Search/SEO/AEO/GEO, Content, Brand/Creative, Lifecycle, Community/PR and Partner functions now share one revenue-attributed operating model. Marketing is measured by qualified demand, recognized revenue, realized gross profit, MRR/ARR contribution, retention/expansion and incrementality rather than content/impression volume alone.
 
+Conversion Intelligence / CRO Specialist ✅ canonical design + local/tested foundation: a dedicated evidence-only specialist owns conversion measurement across visitor→lead, lead→qualified, qualified→buyer review, review→delivered outreach, delivered→reply, reply→qualified conversation, conversation→terms, terms→acceptance, acceptance→payment, payment→fulfilment, fulfilment→positive outcome and outcome→repeat purchase. It consumes Search, Advertising, landing-page, Experiment, GTM/Closer, payment and Revenue Truth evidence; preserves UNKNOWN instead of zero; only ranks bottlenecks when minimum sample evidence exists; and proposes CRO experiments without auto-mutating traffic, pages, outreach, pricing, payment or revenue. The legacy `/root/conversion/experiments.jsonl` synthetic runner is non-canonical and must not drive production state.
+
 R&D Department Blueprint ✅ canonical design: research now runs as a governed portfolio across Predictive Revenue, Quant, AGI, Data/Intelligence, causal/experiment, multimodal/satellite/permit and product innovation. Lifecycle is IDEA → TRIAGE → RESEARCH → HYPOTHESIS → PROTOTYPE → EVALUATION → SHADOW → VALIDATED → TRANSFER_READY; prototype/research status cannot imply production or product readiness.
 
 Chief of Staff Operating System ✅ canonical design: founder attention, maximum-three priority stack, decision register, dependencies/blockers, operating cadence and cross-functional ownership are separated from Astra's machine-runtime coordination. Chief of Staff coordinates human/company priorities; Astra coordinates machine work.
@@ -324,6 +326,8 @@ Third slice ✅ local/tested: forecast realization calibration now compares an a
 
 ### Phase 11 — Experiment + Causal Engine
 Controlled experiments, counterfactuals, holdouts, creative/offer/pricing/page tests, incrementality and causal attribution.
+
+Conversion Intelligence bridge ✅ local/tested: canonical conversion boundaries now produce evidence-backed rates/drop-off only when numerator, denominator and provenance exist. The CRO specialist selects a primary bottleneck only above a configurable sample floor, maps it to the responsible surface (landing, qualification, buyer discovery, outbound, closer, terms, payment, fulfilment, retention), and emits proposal-only experiment candidates into the Experiment Engine. No automatic rollout or commercial mutation is granted.
 
 Foundation slice ✅ local/tested: deterministic holdout/treatment assignment planning and append-only experiment outcome observations are staged around the existing `gtm_experiments` model. Incrementality is computed only when each arm has sufficient observed samples; no live traffic mutation, automatic rollout, pricing change or production migration is activated.
 

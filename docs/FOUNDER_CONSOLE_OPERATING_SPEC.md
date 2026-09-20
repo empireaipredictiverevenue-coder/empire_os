@@ -52,7 +52,7 @@ Ranked workstreams, blockers, owners, intelligence route, expected value, premiu
 Show phases as finished engineering, production proof pending, current, parallel build, gated or retired, plus closure requirements from the Founder Closure Ledger.
 
 ### Growth Command
-Search/SEO/AEO/GEO, Advertising, Demand Genesis, landing/content performance, partnerships/distribution, experiments and attributed recognized revenue/GP.
+Search/SEO/AEO/GEO, Advertising, Demand Genesis, landing/content performance, partnerships/distribution, experiments, Conversion Intelligence/CRO and attributed recognized revenue/GP. Conversion shows every canonical boundary from visitor→lead through outcome→repeat purchase, evidence-backed rate/drop-off, sample size, UNKNOWN/stale states, primary bottleneck and next proposal-only experiment.
 
 ### Intelligence / Learning
 Omega, Predictive, forecast-vs-actual calibration, Revenue OS, Digital Twin, Capital, Economic Memory and model-review feedback.
@@ -84,7 +84,7 @@ Funds, binding terms, destructive infrastructure, accounting recognition, irreve
 
 Founder Console is the top-level cockpit.
 
-Search Command Centre, Revenue Command Centre, Market Intelligence, Buyer/CRM/Closer, Advertising/Demand/Experiments, Predictive/Capital and System Operations become drill-downs.
+Search Command Centre, Revenue Command Centre, Market Intelligence, Buyer/CRM/Closer, Advertising/Demand/Experiments, Conversion Intelligence/CRO, Predictive/Capital and System Operations become drill-downs.
 
 Avoid disconnected apps with conflicting metrics.
 
