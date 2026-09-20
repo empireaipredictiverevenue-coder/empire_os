@@ -265,6 +265,8 @@ Fourth slice ✅ local/tested: retention/expansion readiness now requires activa
 
 Fifth slice ✅ local/tested: retention/expansion freshness review now validates chronology across buyer activation, verified payment, fulfilment and observed outcome, and independently checks capacity freshness for expansion. Stale, future-dated, missing or out-of-order evidence blocks the relevant review while retention remains separable from expansion-only blockers. No follow-up, payment, CRM or offer mutation is introduced.
 
+Sixth slice ✅ local/tested: Customer Success review routing now converts only fresh evidence-backed retention/expansion readiness into a retention-review or expansion-review route. Expansion remains blocked when successful outcome or buyer capacity is unknown/unverified; no follow-up, payment, CRM or offer mutation is introduced.
+
 ### Phase 9 — Advertising Brain
 
 Second slice ✅ local/tested: canonical ad observations now carry deterministic payload provenance, timezone-aware observation timestamps, optional explicit canonical creative identity, and tamper-aware idempotency. Exact provider replays stay idempotent; changed metrics or creative identity under the same observation ID conflict. Campaign/budget/pause/retarget authority remains disabled.
