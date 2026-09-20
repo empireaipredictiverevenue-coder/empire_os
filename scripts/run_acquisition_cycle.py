@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Bounded real-source acquisition cycle.
+"""Bounded multi-source real acquisition cycle.
 
-Rotates one metro per run, runs only the real Overpass source, and relies on
-crawler_runner's quality/idempotency/canonical-ingest boundaries.
+Rotates broad local-business discovery with specialist signal sources while
+keeping every accepted candidate on the same canonical Supabase ingest path.
+
+No source writes legacy lead tables. No source sends outreach or moves funds.
 """
 from __future__ import annotations
 
@@ -14,6 +16,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from empire_os.acquisition_source_policy import choose_source
 from empire_os.lead_sources.overpass import METRO_COORDS
 
 ROOT = Path("/srv/empire_os")
@@ -23,17 +26,44 @@ LATEST = RUNTIME / "latest.json"
 LAST_SUCCESS = RUNTIME / "last_success.json"
 LOCK = RUNTIME / "cycle.lock"
 
+# Diversified acquisition portfolio. No single discovery engine may dominate
+# the commercial pipeline. Broad business discovery gets three slots; the
+# remaining slots are independent intent/event/public-record sources.
+SOURCE_ROTATION = (
+    "overpass",
+    "biz_search",
+    "reddit",
+    "nws_alerts",
+    "overpass",
+    "permits",
+    "chicago_311",
+    "nyc_hpd",
+    "courtlistener",
+    "overpass",
+)
+
+# These sources own their own geography/query rotation and should not inherit
+# an arbitrary Overpass metro.
+SOURCE_METRO = {
+    "reddit": None,
+    "permits": "NYC",
+    "chicago_311": "CHI",
+    "courtlistener": None,
+    "nyc_hpd": "NYC",
+    "nws_alerts": None,
+}
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _load_index(count: int) -> int:
+def _load_state() -> dict:
     try:
-        data = json.loads(STATE.read_text(encoding="utf-8"))
-        return int(data.get("next_index", 0)) % count
+        value = json.loads(STATE.read_text(encoding="utf-8"))
     except Exception:
-        return 0
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def run_cycle(*, max_candidates: int = 10) -> dict:
@@ -47,20 +77,37 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
 
     with LOCK.open("a+") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        index = _load_index(len(metros))
-        metro = metros[index]
+        state = _load_state()
+
+        choice = choose_source(
+            state,
+            log_path=ROOT / "runtime" / "feedback" / "crawler_runs.jsonl",
+        )
+        source = str(choice["source"])
+        family = str(choice["family"])
+
+        metro_index = int(
+            state.get("next_metro_index", state.get("next_index", 0))
+        ) % len(metros)
+        overpass_metro = metros[metro_index]
+        metro = (
+            overpass_metro
+            if source in {"overpass", "biz_search"}
+            else SOURCE_METRO.get(source)
+        )
 
         command = [
             sys.executable,
             "-m",
             "empire_os.crawler_runner",
             "--source",
-            "overpass",
-            "--metro",
-            metro,
+            source,
             "--max-candidates",
             str(max_candidates),
         ]
+        if metro:
+            command.extend(["--metro", metro])
+
         completed = subprocess.run(
             command,
             cwd=str(ROOT),
@@ -70,17 +117,31 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
             check=False,
         )
 
+        stdout = completed.stdout or ""
+        stderr = completed.stderr or ""
+        prospect_acquired = '"msg": "prospect_acquired"' in stdout
+        signal_queued = '"msg": "signal_queued"' in stdout
+        acquired = prospect_acquired or signal_queued
+
         result = {
-            "schema_version": "acquisition_cycle.v1",
+            "schema_version": "acquisition_cycle.v2",
             "started_at": _now(),
+            "source": source,
+            "source_family": family,
+            "source_policy": choice.get("policy"),
+            "source_recent_stats": choice.get("recent_stats") or {},
             "metro": metro,
+            "overpass_metro_cursor": overpass_metro,
             "max_candidates": max_candidates,
             "returncode": completed.returncode,
             "ok": completed.returncode == 0,
-            "stdout_tail": (completed.stdout or "")[-8000:],
-            "stderr_tail": (completed.stderr or "")[-4000:],
-            "source": "overpass",
+            "canonical_acquisition_observed": acquired,
+            "prospect_acquired": prospect_acquired,
+            "signal_queued": signal_queued,
+            "stdout_tail": stdout[-8000:],
+            "stderr_tail": stderr[-4000:],
             "real_data_only": True,
+            "canonical_store": "supabase",
             "outreach_enabled": False,
             "payment_enabled": False,
         }
@@ -90,16 +151,13 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
             encoding="utf-8",
         )
 
-        if (
-            result["ok"]
-            and '"msg": "prospect_acquired"' in (completed.stdout or "")
-        ):
+        if result["ok"] and acquired:
             LAST_SUCCESS.write_text(
                 json.dumps(
                     {
-                        "schema_version": "acquisition_success.v1",
+                        "schema_version": "acquisition_success.v2",
                         "observed_at": _now(),
-                        "source": "overpass",
+                        "source": source,
                         "metro": metro,
                         "canonical_writes": True,
                         "real_data_only": True,
@@ -111,13 +169,18 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
                 encoding="utf-8",
             )
 
-        # Always rotate after a bounded attempt. A dense/temporarily overloaded
-        # metro must not pin acquisition indefinitely. Failure remains visible
-        # in latest.json while the next scheduled run tries another real metro.
+        next_metro_index = metro_index
+        if source in {"overpass", "biz_search"}:
+            next_metro_index = (metro_index + 1) % len(metros)
+
         STATE.write_text(
             json.dumps(
                 {
-                    "next_index": (index + 1) % len(metros),
+                    "next_family_index": choice["next_family_index"],
+                    "next_metro_index": next_metro_index,
+                    # Retain compatibility for older tooling reading next_index.
+                    "next_index": next_metro_index,
+                    "last_source": source,
                     "last_metro": metro,
                     "last_ok": result["ok"],
                     "updated_at": _now(),
