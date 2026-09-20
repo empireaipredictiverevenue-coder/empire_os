@@ -14,6 +14,7 @@ import urllib.parse
 
 from empire_os.buyer_deferred_enrichment import CALL_READY_PATH
 from empire_os.qualification_worker_v2 import request_json
+from empire_os.vonage_call_transport import VonageCallConfig, VonageCallTransport
 
 
 Request = Callable[..., Any]
@@ -272,6 +273,12 @@ def build_call_work(
         )
     )
     selected = items[:bounded]
+    transport = VonageCallTransport(VonageCallConfig.from_env())
+    provider_readiness = transport.config.readiness()
+    previews = {
+        item.prospect_id: transport.preview(item.as_dict())
+        for item in selected
+    }
     return {
         "schema_version": "empire.call_manager.v1",
         "mode": "PREPARE_ONLY",
@@ -279,7 +286,14 @@ def build_call_work(
         "channel": "voice",
         "queue_total": len(items),
         "selected": len(selected),
-        "items": [item.as_dict() for item in selected],
+        "items": [
+            {
+                **item.as_dict(),
+                "provider_preview": previews[item.prospect_id],
+            }
+            for item in selected
+        ],
+        "provider_readiness": provider_readiness,
         "live_calls_placed": 0,
         "execution_allowed": False,
         "requires_live_call_authority": True,
