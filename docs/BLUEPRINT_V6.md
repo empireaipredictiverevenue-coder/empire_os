@@ -163,6 +163,7 @@ Empire Search Intelligence is now being productized into sellable SEO/AEO/GEO pr
 
 Initial product contracts:
 - Technical Search Audit;
+- SERP Intelligence API — monetised via API usage, prepaid credits, subscriptions, agency/reseller wholesale, white-label licensing and enterprise data/API contracts;
 - Search Opportunity Map;
 - Content Decay & Cannibalisation Monitor;
 - Authority & Backlink Intelligence;

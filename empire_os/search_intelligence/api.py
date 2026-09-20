@@ -39,7 +39,7 @@ from .search_console import (
     SearchConsoleAdapter,
     configured_search_console_adapter,
 )
-from .serp import SerpResultEvidence, SerpSnapshot
+from .serp import SearchFabricSerpAdapter, SerpResultEvidence, SerpSnapshot
 
 
 
@@ -158,6 +158,12 @@ class SchemaPreviewRequest(BaseModel):
 class MetadataPreviewRequest(BaseModel):
     page: dict[str, Any]
     quality_factors: dict[str, float | None] = Field(default_factory=dict)
+
+
+class SerpQueryRequest(BaseModel):
+    query: str
+    num: int = Field(default=10, ge=1, le=20)
+    engine: str | None = None
 
 
 class SerpResultRequest(BaseModel):
@@ -654,6 +660,27 @@ def create_search_router(
             "revenue_mutation": False,
             "accounting_mutation": False,
             "review": review.as_dict(),
+        }
+
+    @router.post("/serp/snapshot")
+    def serp_snapshot(req: SerpQueryRequest):
+        try:
+            snapshot = SearchFabricSerpAdapter().snapshot(
+                req.query,
+                num=req.num,
+                engine=req.engine,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"serp_snapshot_unavailable:{type(exc).__name__}",
+            ) from exc
+        return {
+            "schema_version": "empire.search.serp-snapshot.v1",
+            "mode": "OBSERVE",
+            "execution_allowed": False,
+            "commercial_product": "serp_intelligence_api",
+            "snapshot": snapshot.as_dict(),
         }
 
     @router.post("/competitor-gap/preview")

@@ -183,3 +183,8 @@ Added provider-neutral Local Search & Maps Grid Intelligence. It measures only o
 
 ## Search Product client reports
 Added deterministic client report previews for each Search Product. Reports organize only supplied/observed evidence, mark missing deliverables unavailable, expose evidence coverage, and never fabricate rankings, traffic, authority, pricing or revenue.
+
+## SERP Intelligence monetisation restored
+Empire's self-hosted Search Fabric SERP engine remains canonical and is now restored as a first-class commercial Search Product.
+Revenue models preserved from the prior plan: API usage, prepaid credits, subscription, agency/reseller wholesale, white-label licensing and enterprise data/API contracts.
+Added /v1/search/serp/snapshot backed by SearchFabricSerpAdapter with provenance-preserving observed positions and fail-closed upstream handling.

@@ -21,6 +21,7 @@ class SearchProduct:
     required_capabilities: tuple[str, ...]
     optional_capabilities: tuple[str, ...] = ()
     commercial_model: str = "terms_required"
+    revenue_models: tuple[str, ...] = ()
     execution_mode: str = "OBSERVE"
     publishing_authority: bool = False
     indexation_authority: bool = False
@@ -53,6 +54,46 @@ SEARCH_PRODUCTS: tuple[SearchProduct, ...] = (
             "lighthouse_runner",
             "internal_links",
             "search_console",
+        ),
+    ),
+    SearchProduct(
+        key="serp_intelligence_api",
+        name="SERP Intelligence API",
+        category="search_data_api",
+        outcome=(
+            "Provide provenance-preserving observed organic search results "
+            "through Empire's self-hosted multi-engine Search Fabric."
+        ),
+        buyer_types=(
+            "developer",
+            "agency",
+            "seo_platform",
+            "data_team",
+            "enterprise",
+            "white_label_partner",
+        ),
+        deliverables=(
+            "serp_snapshots",
+            "organic_result_positions",
+            "engine_provenance",
+            "result_relevance_evidence",
+            "rank_observation_feed",
+            "competitor_serp_inputs",
+        ),
+        required_capabilities=("serp",),
+        optional_capabilities=(
+            "rank_history",
+            "competitor_gap",
+            "search_console",
+        ),
+        commercial_model="usage_and_subscription",
+        revenue_models=(
+            "api_usage",
+            "prepaid_credits",
+            "subscription",
+            "agency_reseller_wholesale",
+            "white_label_license",
+            "enterprise_data_api_contract",
         ),
     ),
     SearchProduct(

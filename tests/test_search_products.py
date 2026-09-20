@@ -100,3 +100,18 @@ def test_search_product_api_is_available_without_canonical_repository():
 
     missing = client.get("/v1/search/products/not-real")
     assert missing.status_code == 404
+
+
+
+def test_serp_product_preserves_monetisation_models():
+    product = get_search_product("serp_intelligence_api")
+    assert product is not None
+    assert product.commercial_model == "usage_and_subscription"
+    assert {
+        "api_usage",
+        "prepaid_credits",
+        "subscription",
+        "agency_reseller_wholesale",
+        "white_label_license",
+        "enterprise_data_api_contract",
+    } <= set(product.revenue_models)
