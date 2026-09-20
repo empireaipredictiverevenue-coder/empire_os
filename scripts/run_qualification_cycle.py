@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import urllib.parse
+from datetime import datetime, timezone
 
 from empire_os.qualification_worker_v2 import (
+    request_json,
     run_cycle,
     run_identity_catchup,
 )
@@ -15,6 +18,7 @@ from empire_os.omega_buyer_readiness import (
 )
 from empire_os.commercial_loop_observer import (
     assess_commercial_loop,
+    fetch_canonical_commercial_observations,
     observations_from_cycle,
     read_latest_acquisition_accepted,
     write_commercial_loop_snapshot,
@@ -52,12 +56,22 @@ def main() -> int:
     )
     omega = run_omega_cycle(args.limit)
     buyer_readiness = run_omega_buyer_readiness_cycle(args.limit)
+
+    def canonical_reader(path: str, params: dict[str, str]):
+        query = urllib.parse.urlencode(params)
+        return request_json("GET", f"{path}?{query}")
+
+    canonical_observations = fetch_canonical_commercial_observations(
+        canonical_reader,
+        now=datetime.now(timezone.utc),
+    )
     commercial_loop = assess_commercial_loop(
         observations_from_cycle(
             acquisition_accepted=read_latest_acquisition_accepted(),
             qualification=qualification,
             omega=omega,
             buyer_readiness=buyer_readiness,
+            canonical_observations=canonical_observations,
         )
     )
     write_commercial_loop_snapshot(commercial_loop)

@@ -5,6 +5,7 @@ import urllib.parse
 from typing import Any, Mapping
 
 from empire_os.buyer_allocation import (
+    buyer_activation_decision,
     fetch_active_identity_link,
     fetch_buyer_rows,
     fetch_latest_qualification,
@@ -235,10 +236,29 @@ def run_omega_buyer_readiness_cycle(limit: int = 10) -> dict[str, Any]:
                 }
             )
 
+    commercially_activated = [
+        row for row in buyers
+        if buyer_activation_decision(row)[0]
+    ]
+    terms_verified = [
+        row for row in buyers
+        if row.get("commercial_terms_verified_at")
+        and str(row.get("commercial_terms_source") or "").strip()
+        and str(row.get("commercial_terms_reference") or "").strip()
+    ]
+    capacity_ready = [
+        row for row in commercially_activated
+        if int(row.get("daily_cap") or 0) > int(row.get("calls_today") or 0)
+    ]
+
     return {
-        "schema_version": "omega_buyer_readiness.v1",
+        "schema_version": "omega_buyer_readiness.v2",
         "ok": not errors,
         "scores_seen": len(scores),
+        "buyers_seen": len(buyers),
+        "buyers_with_verified_terms": len(terms_verified),
+        "commercially_activated_buyers": len(commercially_activated),
+        "activated_buyers_with_capacity": len(capacity_ready),
         "ready_count": sum(
             1 for item in results
             if item.get("buyer_capacity_ready") is True

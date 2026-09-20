@@ -9,18 +9,23 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 STAGE_ORDER = (
     "real_acquisition",
     "qualification_v2",
     "omega_projection",
-    "verified_buyer_capacity",
+    "buyer_candidate_approved",
+    "outbound_authorized",
+    "outbound_sent",
+    "buyer_conversation",
     "commercial_terms",
-    "governed_outbound",
-    "buyer_agreement",
+    "verified_buyer_capacity",
+    "inventory_allocation",
+    "bsc_payment_request",
     "bsc_usdt_payment",
     "fulfilment",
     "commercial_outcome",
@@ -99,12 +104,247 @@ def assess_commercial_loop(
     )
 
 
+
+Reader = Callable[[str, dict[str, str]], Any]
+
+
+def _reader_rows(
+    reader: Reader,
+    path: str,
+    params: dict[str, str],
+) -> list[dict[str, Any]]:
+    rows = reader(path, params)
+    if not isinstance(rows, list):
+        raise ValueError(f"canonical reader returned invalid rows for {path}")
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def fetch_canonical_commercial_observations(
+    reader: Reader,
+    *,
+    now: datetime,
+) -> dict[str, CommercialLoopObservation]:
+    """Read canonical downstream evidence without mutating commercial state."""
+    if now.tzinfo is None:
+        raise ValueError("now must include timezone")
+    current = now.astimezone(timezone.utc)
+
+    reviews = _reader_rows(
+        reader,
+        "/rest/v1/buyer_candidate_reviews",
+        {
+            "select": "id,status,reviewed_at,evidence",
+            "status": "eq.approved",
+            "order": "reviewed_at.desc",
+            "limit": "25",
+        },
+    )
+    approved_reviews = [
+        row for row in reviews
+        if (
+            isinstance(row.get("evidence"), dict)
+            and row["evidence"].get("outreach_ready") is True
+        )
+    ]
+
+    intents = _reader_rows(
+        reader,
+        "/rest/v1/outbound_intents",
+        {
+            "select": "id,status,approved_at,expires_at",
+            "status": "in.(approved,sent,delivered,replied)",
+            "order": "created_at.desc",
+            "limit": "25",
+        },
+    )
+    authorized: list[dict[str, Any]] = []
+    for row in intents:
+        status = str(row.get("status") or "").lower()
+        if status in {"sent", "delivered", "replied"}:
+            authorized.append(row)
+            continue
+        expires_raw = str(row.get("expires_at") or "").strip()
+        if not expires_raw or not row.get("approved_at"):
+            continue
+        normalized = (
+            expires_raw[:-1] + "+00:00"
+            if expires_raw.endswith("Z")
+            else expires_raw
+        )
+        try:
+            expires_at = datetime.fromisoformat(normalized)
+        except ValueError:
+            continue
+        if expires_at.tzinfo and expires_at.astimezone(timezone.utc) > current:
+            authorized.append(row)
+
+    sent_events = _reader_rows(
+        reader,
+        "/rest/v1/outbound_events",
+        {
+            "select": "id,event_type,occurred_at",
+            "event_type": "in.(sent,delivered,reply_received)",
+            "order": "occurred_at.desc",
+            "limit": "1",
+        },
+    )
+    replies = _reader_rows(
+        reader,
+        "/rest/v1/outbound_replies",
+        {
+            "select": "id,classification,received_at",
+            "order": "received_at.desc",
+            "limit": "1",
+        },
+    )
+    orders = _reader_rows(
+        reader,
+        "/rest/v1/fulfilment_orders",
+        {
+            "select": "id,state,updated_at",
+            "order": "updated_at.desc",
+            "limit": "25",
+        },
+    )
+    payment_requests = _reader_rows(
+        reader,
+        "/rest/v1/bsc_payment_requests",
+        {
+            "select": "id,status,approved_at,created_at",
+            "order": "created_at.desc",
+            "limit": "1",
+        },
+    )
+    payment_evidence = _reader_rows(
+        reader,
+        "/rest/v1/bsc_payment_evidence",
+        {
+            "select": "id,request_id,verified_at",
+            "order": "verified_at.desc",
+            "limit": "1",
+        },
+    )
+    outcomes = _reader_rows(
+        reader,
+        "/rest/v1/commercial_outcomes",
+        {
+            "select": "id,recorded_at",
+            "order": "recorded_at.desc",
+            "limit": "1",
+        },
+    )
+    revenue = _reader_rows(
+        reader,
+        "/rest/v1/commercial_events",
+        {
+            "select": "id,amount_cents,cost_cents,margin_cents,occurred_at",
+            "event_type": "eq.revenue_recognized",
+            "order": "occurred_at.desc",
+            "limit": "1",
+        },
+    )
+
+    allocated_orders = [
+        row for row in orders
+        if str(row.get("state") or "").lower()
+        not in {"", "raw", "qualified"}
+    ]
+    delivered_orders = [
+        row for row in orders
+        if str(row.get("state") or "").lower()
+        in {
+            "delivered",
+            "confirmed",
+            "invoiced",
+            "paid",
+            "settled",
+            "outcome_captured",
+        }
+    ]
+    realized_gp = [
+        row for row in revenue
+        if row.get("margin_cents") is not None
+    ]
+
+    return {
+        "buyer_candidate_approved": CommercialLoopObservation(
+            "buyer_candidate_approved",
+            bool(approved_reviews),
+            evidence_ref="canonical:buyer_candidate_reviews:approved",
+            detail=f"{len(approved_reviews)} approved outreach-ready buyer candidate(s)",
+        ),
+        "outbound_authorized": CommercialLoopObservation(
+            "outbound_authorized",
+            bool(authorized),
+            evidence_ref="canonical:outbound_intents:approved",
+            detail=f"{len(authorized)} currently authorized/sent outbound intent(s)",
+        ),
+        "outbound_sent": CommercialLoopObservation(
+            "outbound_sent",
+            bool(sent_events),
+            evidence_ref="canonical:outbound_events:sent",
+            detail=f"{len(sent_events)} recent verified send/delivery event(s)",
+        ),
+        "buyer_conversation": CommercialLoopObservation(
+            "buyer_conversation",
+            bool(replies),
+            evidence_ref="canonical:outbound_replies",
+            detail=f"{len(replies)} buyer reply observation(s)",
+        ),
+        "inventory_allocation": CommercialLoopObservation(
+            "inventory_allocation",
+            bool(allocated_orders),
+            evidence_ref="canonical:fulfilment_orders",
+            detail=f"{len(allocated_orders)} non-raw fulfilment order(s) observed",
+        ),
+        "bsc_payment_request": CommercialLoopObservation(
+            "bsc_payment_request",
+            bool(payment_requests),
+            evidence_ref="canonical:bsc_payment_requests",
+            detail=f"{len(payment_requests)} BSC payment request observation(s)",
+        ),
+        "bsc_usdt_payment": CommercialLoopObservation(
+            "bsc_usdt_payment",
+            bool(payment_evidence),
+            evidence_ref="canonical:bsc_payment_evidence",
+            detail=f"{len(payment_evidence)} verified BSC USDT payment evidence row(s)",
+        ),
+        "fulfilment": CommercialLoopObservation(
+            "fulfilment",
+            bool(delivered_orders),
+            evidence_ref="canonical:fulfilment_orders:delivery",
+            detail=f"{len(delivered_orders)} delivered/confirmed order observation(s)",
+        ),
+        "commercial_outcome": CommercialLoopObservation(
+            "commercial_outcome",
+            bool(outcomes),
+            evidence_ref="canonical:commercial_outcomes",
+            detail=f"{len(outcomes)} verified commercial outcome(s)",
+        ),
+        "recognized_revenue": CommercialLoopObservation(
+            "recognized_revenue",
+            bool(revenue),
+            evidence_ref="canonical:commercial_events:revenue_recognized",
+            detail=f"{len(revenue)} recognized revenue event observation(s)",
+        ),
+        "realized_gross_profit": CommercialLoopObservation(
+            "realized_gross_profit",
+            bool(realized_gp),
+            evidence_ref="canonical:commercial_events:margin_cents",
+            detail=f"{len(realized_gp)} revenue event(s) with realized GP evidence",
+        ),
+    }
+
+
 def observations_from_cycle(
     *,
     acquisition_accepted: int | None,
     qualification: dict[str, Any],
     omega: dict[str, Any],
     buyer_readiness: dict[str, Any],
+    canonical_observations: dict[
+        str, CommercialLoopObservation
+    ] | None = None,
 ) -> dict[str, CommercialLoopObservation]:
     qualified = int(qualification.get("qualified") or 0)
     scores = int(
@@ -112,9 +352,14 @@ def observations_from_cycle(
         or omega.get("candidates_seen")
         or 0
     )
-    ready = int(buyer_readiness.get("ready_count") or 0)
+    terms_verified = int(
+        buyer_readiness.get("buyers_with_verified_terms") or 0
+    )
+    activated_capacity = int(
+        buyer_readiness.get("activated_buyers_with_capacity") or 0
+    )
 
-    return {
+    observations = {
         "real_acquisition": CommercialLoopObservation(
             "real_acquisition",
             (
@@ -141,13 +386,24 @@ def observations_from_cycle(
             evidence_ref="canonical:intelligence_scores:omega_opportunity",
             detail=f"{scores} Omega candidate/score observation(s)",
         ),
+        "commercial_terms": CommercialLoopObservation(
+            "commercial_terms",
+            terms_verified > 0,
+            evidence_ref="canonical:buyers:commercial_terms",
+            detail=f"{terms_verified} buyer(s) with verified commercial terms",
+        ),
         "verified_buyer_capacity": CommercialLoopObservation(
             "verified_buyer_capacity",
-            ready > 0,
+            activated_capacity > 0,
             evidence_ref="canonical:buyers:commercial_activation",
-            detail=f"{ready} Omega prospect(s) with verified buyer capacity",
+            detail=(
+                f"{activated_capacity} commercially activated buyer(s) "
+                "with remaining verified capacity"
+            ),
         ),
     }
+    observations.update(canonical_observations or {})
+    return observations
 
 
 def read_latest_acquisition_accepted(
