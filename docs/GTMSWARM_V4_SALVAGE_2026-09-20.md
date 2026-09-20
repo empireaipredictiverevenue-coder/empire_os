@@ -85,9 +85,7 @@ operational burden.
 
 ### Playwright + FFmpeg video recording
 Keep as a future adapter for repeatable product demos and walkthrough capture.
-The current server does not have Playwright installed. First build a governed
-recording-plan layer; install browser/runtime dependencies only when the demo
-pipeline becomes launch-critical.
+The current server does not have Playwright installed. The governed recording-plan layer now exists at `empire_os/video_demo_plan.py`; install browser/runtime dependencies only when the demo pipeline becomes launch-critical.
 
 ### Incus / bare-metal expansion
 Keep Incus and additional Vultr/Hetzner nodes as scale options. Do not migrate

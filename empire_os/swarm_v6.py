@@ -72,12 +72,14 @@ LANES: tuple[SwarmLane, ...] = (
             "empire_os/conversion_runtime.py",
             "empire_os/advertising_landing_feedback.py",
             "empire_os/experiment_business_impact.py",
+            "empire_os/video_demo_plan.py",
         ),
         tests=(
             "tests/test_conversion_intelligence.py",
             "tests/test_conversion_runtime.py",
             "tests/test_advertising_landing_feedback.py",
             "tests/test_experiment_business_impact.py",
+            "tests/test_video_demo_plan.py",
         ),
     ),
     SwarmLane(
