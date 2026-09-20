@@ -8,9 +8,9 @@ Type=oneshot
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 EnvironmentFile=/srv/empire_os/runtime/secrets/outbound.env
-ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_review_materializer.py --scan-limit 100 --proposal-limit 20 --max-offset 2000 --probe-workers 20
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_review_materializer.py --scan-limit 60 --proposal-limit 20 --max-offset 2000 --probe-workers 20
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ReadWritePaths=/srv/empire_os/runtime
-TimeoutStartSec=240
+TimeoutStartSec=600

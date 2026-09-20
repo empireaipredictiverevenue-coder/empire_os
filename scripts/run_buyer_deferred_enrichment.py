@@ -6,6 +6,7 @@ import json
 import urllib.parse
 from typing import Any
 
+from empire_os.buyer_call_plan import materialize_call_plans
 from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
 from empire_os.buyer_discovery import (
     accepted_acquisition_website,
@@ -229,6 +230,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                 f"{prospect_id}:{type(exc).__name__}:{str(exc)[:240]}"
             )
 
+    call_plans = materialize_call_plans()
     return {
         "schema_version": "empire.buyer_deferred_enrichment.v1",
         "mode": "INTERNAL_ENRICHMENT",
@@ -238,6 +240,10 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
         "call_ready_added": call_ready,
         "errors": errors,
         "queue": queue.snapshot(),
+        "call_plans": {
+            "count": call_plans.get("count", 0),
+            "execution_allowed": False,
+        },
         "live_calls_placed": 0,
         "execution_allowed": False,
         "authority_expansion": False,
