@@ -52,12 +52,16 @@ LANES: tuple[SwarmLane, ...] = (
             "empire_os/closer_reply_draft.py",
             "empire_os/buyer_capacity_intake.py",
             "empire_os/outbound_role_transport.py",
+            "empire_os/gtm_swarm_v6.py",
+            "empire_os/gtm_offer_strategy.py",
         ),
         tests=(
             "tests/test_closer_reply_worker.py",
             "tests/test_closer_reply_draft.py",
             "tests/test_buyer_capacity_intake.py",
             "tests/test_outbound_role_transport.py",
+            "tests/test_gtm_swarm_v6.py",
+            "tests/test_gtm_offer_strategy.py",
         ),
     ),
     SwarmLane(

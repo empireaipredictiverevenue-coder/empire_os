@@ -57,3 +57,12 @@ The following are historical and must not be reactivated as production execution
 - synthetic-agent production fallback.
 
 Historical SOUL files may be used as design evidence only when reconciled with Blueprint v6 and current governance.
+
+## Multi-Niche GTM extension
+
+The Closer / Outreach lane also verifies the native multi-niche GTM extension:
+
+- `empire_os/gtm_swarm_v6.py` — niche/ICP/metro configuration, score thresholding, micro lead-magnet routing, engagement rescoring and governed outbound handoff.
+- `empire_os/gtm_offer_strategy.py` — niche-tier review, evidence-first technical demo/pre-nurture assets and high-ticket offer framing.
+
+This extension does not introduce a second send engine. All execution still passes through the canonical GTM/outbound governor. LangGraph/Redis/PostHog can be added later as adapters only when measured need justifies them.
