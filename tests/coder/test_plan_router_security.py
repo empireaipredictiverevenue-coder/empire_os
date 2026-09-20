@@ -91,6 +91,16 @@ def test_local_planner_ladder_routes_by_complexity():
     assert router.route(
         "Review the current implementation plan",
         role="writer",
+    ).model == "qwen2.5-coder:14b"
+
+    assert router.route(
+        "Implement a new endpoint and tests",
+        role="writer",
+    ).model == "qwen2.5-coder:14b"
+
+    assert router.route(
+        "Refactor payment database architecture",
+        role="writer",
     ).model == "qwen3-coder:30b"
 
     assert router.route(

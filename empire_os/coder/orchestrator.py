@@ -86,7 +86,7 @@ def local_ollama_profiles(
             capability=2,
             cost_tier=1,
             local=True,
-            roles=("planner",),
+            roles=("writer", "planner"),
         ))
     if LOCAL_WRITER_MODEL in available:
         profiles.append(ModelProfile(
