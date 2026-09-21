@@ -194,3 +194,31 @@ def market_by_metro(metro: str) -> GeoMarket | None:
          if market.metro.casefold() == needle),
         None,
     )
+
+
+LEGACY_US_METROS = (
+    "Houston, TX", "Dallas, TX", "Austin, TX", "San Antonio, TX",
+    "Phoenix, AZ", "Chicago, IL", "Atlanta, GA", "Miami, FL",
+    "Denver, CO", "Los Angeles, CA", "New York, NY", "Seattle, WA",
+    "Charlotte, NC", "Nashville, TN", "Tampa, FL", "Philadelphia, PA",
+    "Washington, DC", "Boston, MA", "Detroit, MI", "Minneapolis, MN",
+    "Portland, OR", "Las Vegas, NV", "Orlando, FL", "Jacksonville, FL",
+    "Raleigh, NC", "Columbus, OH", "Indianapolis, IN", "Kansas City, MO",
+    "St. Louis, MO", "Pittsburgh, PA", "Baltimore, MD", "Cincinnati, OH",
+    "Cleveland, OH", "Salt Lake City, UT", "San Diego, CA",
+    "Sacramento, CA", "San Jose, CA", "Oklahoma City, OK", "Tulsa, OK",
+    "New Orleans, LA", "Birmingham, AL", "Richmond, VA",
+    "Virginia Beach, VA", "Milwaukee, WI", "Louisville, KY",
+    "Memphis, TN", "Albuquerque, NM", "Tucson, AZ", "Fresno, CA",
+    "Omaha, NE",
+)
+
+
+def legacy_us_markets() -> tuple[GeoMarket, ...]:
+    rows = []
+    for metro in LEGACY_US_METROS:
+        market = market_by_metro(metro)
+        if market is None:
+            raise RuntimeError(f"legacy US market missing from registry: {metro}")
+        rows.append(market)
+    return tuple(rows)

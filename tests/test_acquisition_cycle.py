@@ -79,3 +79,26 @@ def test_cycle_can_be_scoped_to_one_country(tmp_path, monkeypatch):
 
     assert result["country_code"] == "GB"
     assert result["geo_country_scope"] == ["GB"]
+
+
+
+def test_legacy_soak_market_set_preserves_round_robin(tmp_path, monkeypatch):
+    monkeypatch.setattr(cycle, "RUNTIME", tmp_path)
+    monkeypatch.setattr(cycle, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(cycle, "LATEST", tmp_path / "latest.json")
+    monkeypatch.setattr(cycle, "LAST_SUCCESS", tmp_path / "last_success.json")
+    monkeypatch.setattr(cycle, "LOCK", tmp_path / "cycle.lock")
+    monkeypatch.setenv("EMPIRE_ACQUISITION_MARKET_SET", "legacy_us")
+    monkeypatch.setenv("EMPIRE_ACQUISITION_COUNTRIES", "US")
+
+    class Done:
+        returncode = 0
+        stdout = '{"msg": "prospect_acquired"}'
+        stderr = ""
+
+    with patch.object(cycle.subprocess, "run", return_value=Done()):
+        result = cycle.run_cycle(max_candidates=5)
+
+    assert result["metro"] == "Houston, TX"
+    assert result["geo_policy"] == "legacy_round_robin"
+    assert result["geo_market_set"] == "legacy_us"

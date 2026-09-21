@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from empire_os.acquisition_source_policy import choose_source
-from empire_os.geo_registry import acquisition_markets, market_coordinates
+from empire_os.geo_registry import acquisition_markets, legacy_us_markets, market_coordinates
 from empire_os.geo_scheduler import choose_market
 
 METRO_COORDS = market_coordinates()
@@ -80,8 +80,11 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
         for value in os.getenv("EMPIRE_ACQUISITION_COUNTRIES", "").split(",")
         if value.strip()
     )
-    markets = acquisition_markets(
-        countries=country_scope or None,
+    market_set = os.getenv("EMPIRE_ACQUISITION_MARKET_SET", "").strip()
+    markets = (
+        legacy_us_markets()
+        if market_set == "legacy_us"
+        else acquisition_markets(countries=country_scope or None)
     )
     if not markets:
         raise RuntimeError("no acquisition markets configured")
@@ -97,12 +100,28 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
         source = str(choice["source"])
         family = str(choice["family"])
 
-        geo = choose_market(
-            markets,
-            state=state,
-            source=source,
-            log_path=ROOT / "runtime" / "feedback" / "crawler_runs.jsonl",
-        )
+        if market_set == "legacy_us":
+            cursor = int(
+                state.get("next_metro_index", state.get("next_index", 0))
+                or 0
+            ) % len(markets)
+            selected = markets[cursor]
+            geo = {
+                "market": selected,
+                "market_index": cursor,
+                "next_market_index": (cursor + 1) % len(markets),
+                "geo_cycle_count": int(state.get("geo_cycle_count") or 0) + 1,
+                "policy": "legacy_round_robin",
+                "score": selected.base_priority,
+                "recent_stats": {"runs": 0.0, "accepted": 0.0, "errors": 0.0},
+            }
+        else:
+            geo = choose_market(
+                markets,
+                state=state,
+                source=source,
+                log_path=ROOT / "runtime" / "feedback" / "crawler_runs.jsonl",
+            )
         selected_market = geo["market"]
         metro_index = int(geo["market_index"])
         overpass_metro = selected_market.metro
@@ -151,6 +170,7 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
             "geo_market_id": selected_market.market_id,
             "country_code": selected_market.country_code,
             "geo_country_scope": list(country_scope),
+            "geo_market_set": market_set or "adaptive_global",
             "region_code": selected_market.region_code,
             "language_code": selected_market.language_code,
             "timezone": selected_market.timezone,
