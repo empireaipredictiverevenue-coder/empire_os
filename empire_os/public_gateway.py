@@ -5,8 +5,11 @@ allocation, outreach, buyer activation and closer mutation endpoints.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -35,16 +38,55 @@ app.mount("/aeo", StaticFiles(directory=str(AEO_ROOT), html=True), name="aeo")
 app.mount("/_next", StaticFiles(directory=str(SITE_OUT / "_next"), check_dir=False), name="next-static")
 
 
+_INLINE_SCRIPT_RE = re.compile(
+    r"<script(?P<attrs>[^>]*)>(?P<body>.*?)</script>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _inline_script_hashes(path: Path | None) -> tuple[str, ...]:
+    if path is None or not path.is_file():
+        return ()
+    try:
+        html = path.read_text(encoding="utf-8")
+    except OSError:
+        return ()
+
+    hashes: list[str] = []
+    for match in _INLINE_SCRIPT_RE.finditer(html):
+        attrs = match.group("attrs") or ""
+        if re.search(r"\bsrc\s*=", attrs, re.IGNORECASE):
+            continue
+        body = match.group("body")
+        digest = hashlib.sha256(body.encode("utf-8")).digest()
+        token = "'sha256-" + base64.b64encode(digest).decode("ascii") + "'"
+        if token not in hashes:
+            hashes.append(token)
+    return tuple(hashes)
+
+
+def _site_csp(route: str) -> str:
+    page = _site_html_path(route)
+    script_hashes = _inline_script_hashes(page)
+    script_src = "script-src 'self'"
+    if script_hashes:
+        script_src += " " + " ".join(script_hashes)
+    return (
+        "default-src 'self'; "
+        + script_src
+        + "; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; connect-src 'self'; "
+        "worker-src 'self' blob:; frame-ancestors 'none'"
+    )
+
+
 @app.middleware("http")
 async def security_headers(request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
-    )
+    response.headers["Content-Security-Policy"] = _site_csp(request.url.path)
     return response
 
 

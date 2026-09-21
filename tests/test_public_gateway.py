@@ -1,8 +1,10 @@
 from fastapi.testclient import TestClient
 
 from empire_os.public_gateway import (
+    _inline_script_hashes,
     _public_site_urls,
     _public_trust_manifest,
+    _site_csp,
     _site_html_path,
     _sitemap_xml,
     app,
@@ -105,3 +107,26 @@ def test_public_site_urls_are_added_to_sitemap(tmp_path):
     assert "/industries" in xml
     assert "/industries/property" in xml
     assert "/aeo/roofing/DFW/" in xml
+
+
+def test_inline_script_hashes_ignore_external_scripts(tmp_path):
+    page = tmp_path / "index.html"
+    page.write_text(
+        '<script>window.__BOOT__=1</script>'
+        '<script src="/_next/app.js"></script>'
+    )
+    hashes = _inline_script_hashes(page)
+    assert len(hashes) == 1
+    assert hashes[0].startswith("'sha256-")
+
+
+def test_csp_allows_only_hashed_inline_scripts(monkeypatch, tmp_path):
+    page = tmp_path / "index.html"
+    page.write_text('<script>window.__BOOT__=1</script>')
+    monkeypatch.setattr(
+        "empire_os.public_gateway._site_html_path",
+        lambda route: page,
+    )
+    csp = _site_csp("/")
+    assert "script-src 'self' 'sha256-" in csp
+    assert "'unsafe-inline'" not in csp.split("style-src", 1)[0]
