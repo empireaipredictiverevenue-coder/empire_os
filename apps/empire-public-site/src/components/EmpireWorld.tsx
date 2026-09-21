@@ -126,8 +126,8 @@ function SignalDust() {
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const particles = useMemo(
     () =>
-      Array.from({ length: 180 }, (_, index) => {
-        const z = 10 - (index / 180) * 68;
+      Array.from({ length: 110 }, (_, index) => {
+        const z = 10 - (index / 110) * 68;
         const radius = 2.5 + ((index * 17) % 45) / 10;
         const a = index * 2.417;
         return {
@@ -173,7 +173,7 @@ function SignalDust() {
 
 function Rail({
   points,
-  color = "#9dff4a",
+  color = "#4f8cff",
   speed = 0.07,
   offset = 0,
 }: {
@@ -224,27 +224,27 @@ function Gate() {
       <mesh position={[-3.3, 0, 0]}>
         <boxGeometry args={[0.5, 7.5, 1.3]} />
         <meshStandardMaterial
-          color="#050806"
+          color="#050b1c"
           metalness={0.92}
           roughness={0.18}
-          emissive="#102a08"
+          emissive="#0c1f4a"
           emissiveIntensity={0.25}
         />
       </mesh>
       <mesh position={[3.3, 0, 0]}>
         <boxGeometry args={[0.5, 7.5, 1.3]} />
         <meshStandardMaterial
-          color="#050806"
+          color="#050b1c"
           metalness={0.92}
           roughness={0.18}
-          emissive="#102a08"
+          emissive="#0c1f4a"
           emissiveIntensity={0.25}
         />
       </mesh>
       <mesh position={[0, 3.5, 0]}>
         <boxGeometry args={[7.1, 0.5, 1.3]} />
         <meshStandardMaterial
-          color="#050806"
+          color="#050b1c"
           metalness={0.92}
           roughness={0.18}
           emissive="#08252a"
@@ -254,7 +254,7 @@ function Gate() {
       <mesh position={[0, -3.5, 0]}>
         <boxGeometry args={[7.1, 0.16, 1.3]} />
         <meshBasicMaterial
-          color="#9dff4a"
+          color="#4f8cff"
           transparent
           opacity={0.34}
           toneMapped={false}
@@ -267,7 +267,7 @@ function Gate() {
 function SignalAtrium() {
   return (
     <group position={[0, 0, -3]}>
-      {Array.from({ length: 18 }, (_, index) => {
+      {Array.from({ length: 12 }, (_, index) => {
         const side = index % 2 ? 1 : -1;
         const row = Math.floor(index / 2);
         const z = -row * 0.92;
@@ -283,7 +283,7 @@ function SignalAtrium() {
           >
             <boxGeometry args={[0.38, height, 0.38]} />
             <meshStandardMaterial
-              color="#06100b"
+              color="#071127"
               metalness={0.78}
               roughness={0.24}
               emissive={index % 3 === 0 ? "#17380d" : "#06252a"}
@@ -344,7 +344,7 @@ function Reactor() {
   return (
     <group position={[0, 0, -14]}>
       <pointLight
-        color={charged ? "#d9ffc8" : "#9dff4a"}
+        color={charged ? "#dbeafe" : "#4f8cff"}
         intensity={charged ? 34 : 20}
         distance={14}
       />
@@ -365,10 +365,10 @@ function Reactor() {
             ]}
           >
             <torusGeometry
-              args={[radius, index === 0 ? 0.045 : 0.025, 12, 140]}
+              args={[radius, index === 0 ? 0.045 : 0.025, 10, 96]}
             />
             <meshBasicMaterial
-              color={index === 1 ? "#00d9ff" : "#9dff4a"}
+              color={index === 1 ? "#00d9ff" : "#4f8cff"}
               transparent
               opacity={(charged ? 0.74 : 0.5) - index * 0.11}
               toneMapped={false}
@@ -397,14 +397,14 @@ function Reactor() {
             roughness={0.14}
             clearcoat={1}
             clearcoatRoughness={0.06}
-            emissive={charged ? "#2c7a1d" : "#183a10"}
+            emissive={charged ? "#2563eb" : "#173b8f"}
             emissiveIntensity={charged ? 1.1 : 0.5}
           />
         </mesh>
         <mesh scale={1.03}>
           <icosahedronGeometry args={[1.18, 2]} />
           <meshBasicMaterial
-            color={charged ? "#ffffff" : "#b6ff88"}
+            color={charged ? "#ffffff" : "#7dd3fc"}
             wireframe
             transparent
             opacity={charged ? 0.36 : 0.18}
@@ -475,7 +475,7 @@ function OpportunityVault() {
   return (
     <group position={[0, 0, -27]}>
       <group ref={floating}>
-        {Array.from({ length: 14 }, (_, index) => {
+        {Array.from({ length: 10 }, (_, index) => {
           const side = index % 2 ? 1 : -1;
           const row = Math.floor(index / 2);
           return (
@@ -494,11 +494,11 @@ function OpportunityVault() {
             >
               <boxGeometry args={[1.28, 0.64, 0.12]} />
               <meshPhysicalMaterial
-                color="#06100d"
+                color="#071127"
                 metalness={0.84}
                 roughness={0.2}
                 clearcoat={0.7}
-                emissive={index % 3 === 0 ? "#16450d" : "#07303a"}
+                emissive={index % 3 === 0 ? "#1d4ed8" : "#07303a"}
                 emissiveIntensity={0.26}
               />
             </mesh>
@@ -521,7 +521,7 @@ function OpportunityVault() {
           <mesh>
             <boxGeometry args={[1.08, 4.8, 0.24]} />
             <meshPhysicalMaterial
-              color="#050906"
+              color="#050b1c"
               metalness={0.94}
               roughness={0.13}
               clearcoat={1}
@@ -534,7 +534,7 @@ function OpportunityVault() {
           <mesh>
             <boxGeometry args={[1.08, 4.8, 0.24]} />
             <meshPhysicalMaterial
-              color="#050906"
+              color="#050b1c"
               metalness={0.94}
               roughness={0.13}
               clearcoat={1}
@@ -549,11 +549,11 @@ function OpportunityVault() {
         position={[0, 0.3, -0.5]}
         height={6.4}
         radius={1.05}
-        color={open ? "#d7ffc5" : "#9dff4a"}
+        color={open ? "#bfdbfe" : "#4f8cff"}
       />
 
       <Rail
-        color="#d8ffc1"
+        color="#a5f3fc"
         speed={0.055}
         points={[
           [-4.5, 2.6, 2.5],
@@ -591,9 +591,9 @@ function ExecutionTunnel() {
             scale={scale}
           >
             <mesh rotation={[0, 0, index * 0.12]}>
-              <torusGeometry args={[2.8, 0.035, 8, 100]} />
+              <torusGeometry args={[2.8, 0.035, 8, 72]} />
               <meshBasicMaterial
-                color={index % 3 === 0 ? "#9dff4a" : "#00d9ff"}
+                color={index % 3 === 0 ? "#4f8cff" : "#00d9ff"}
                 transparent
                 opacity={0.1 + index * 0.005}
                 toneMapped={false}
@@ -603,7 +603,7 @@ function ExecutionTunnel() {
               <mesh key={side} position={[side * 3.25, 0, 0]}>
                 <boxGeometry args={[0.08, 4.8, 0.3]} />
                 <meshStandardMaterial
-                  color="#06100d"
+                  color="#071127"
                   emissive="#0f2910"
                   emissiveIntensity={0.18}
                   metalness={0.85}
@@ -669,7 +669,7 @@ function AgentStreams() {
         >
           <octahedronGeometry args={[0.12 + (index % 2) * 0.04, 0]} />
           <meshBasicMaterial
-            color={index % 2 ? "#00d9ff" : "#b6ff88"}
+            color={index % 2 ? "#00d9ff" : "#7dd3fc"}
             toneMapped={false}
           />
         </mesh>
@@ -681,7 +681,7 @@ function AgentStreams() {
 function ArchitecturalSpine() {
   return (
     <group>
-      {Array.from({ length: 34 }, (_, index) => {
+      {Array.from({ length: 24 }, (_, index) => {
         const z = 7 - index * 2.05;
         const width = 4.4 + (index % 5) * 0.18;
         return (
@@ -689,17 +689,17 @@ function ArchitecturalSpine() {
             <mesh position={[0, -3.15, 0]}>
               <boxGeometry args={[width * 2, 0.08, 1.5]} />
               <meshStandardMaterial
-                color="#040705"
+                color="#040a18"
                 metalness={0.82}
                 roughness={0.24}
-                emissive={index % 4 === 0 ? "#102808" : "#041014"}
+                emissive={index % 4 === 0 ? "#0d2a64" : "#041014"}
                 emissiveIntensity={0.18}
               />
             </mesh>
             <mesh position={[0, 3.25, 0]}>
               <boxGeometry args={[width * 2, 0.06, 1.1]} />
               <meshStandardMaterial
-                color="#040705"
+                color="#040a18"
                 metalness={0.9}
                 roughness={0.2}
                 emissive={index % 3 === 0 ? "#06252a" : "#0c1c08"}
@@ -713,10 +713,10 @@ function ArchitecturalSpine() {
               >
                 <boxGeometry args={[0.08, 6.4, 0.55]} />
                 <meshStandardMaterial
-                  color="#050806"
+                  color="#050b1c"
                   metalness={0.92}
                   roughness={0.18}
-                  emissive={index % 2 ? "#082329" : "#102507"}
+                  emissive={index % 2 ? "#082329" : "#102a66"}
                   emissiveIntensity={0.2}
                 />
               </mesh>
@@ -732,7 +732,7 @@ function LightShaft({
   position,
   height = 6,
   radius = 1.3,
-  color = "#9dff4a",
+  color = "#4f8cff",
 }: {
   position: V3;
   height?: number;
@@ -778,7 +778,7 @@ function FloatingShardField() {
 
   return (
     <group ref={group}>
-      {Array.from({ length: 22 }, (_, index) => {
+      {Array.from({ length: 14 }, (_, index) => {
         const z = 2 - index * 2.55;
         const side = index % 2 ? 1 : -1;
         return (
@@ -797,12 +797,12 @@ function FloatingShardField() {
           >
             <octahedronGeometry args={[0.18 + (index % 3) * 0.07, 0]} />
             <meshPhysicalMaterial
-              color="#07100b"
+              color="#08142c"
               metalness={0.95}
               roughness={0.1}
               clearcoat={1}
               clearcoatRoughness={0.04}
-              emissive={index % 3 === 0 ? "#0f3b0a" : "#062d35"}
+              emissive={index % 3 === 0 ? "#1e40af" : "#062d35"}
               emissiveIntensity={0.34}
             />
           </mesh>
@@ -853,7 +853,7 @@ function WorldChapter({
           (side === "right" ? "text-right" : "text-left")
         }
       >
-        <div className="text-[8px] font-black tracking-[0.24em] text-[#9dff4a]">
+        <div className="text-[8px] font-black tracking-[0.24em] text-[#4f8cff]">
           {chapter.index} · {chapter.eyebrow}
         </div>
         <div className="mt-3 text-[26px] font-[520] leading-[0.94] tracking-[-0.045em] md:text-[34px]">
@@ -904,7 +904,7 @@ function RevenueVault() {
   return (
     <group position={[0, 0, -58]}>
       <pointLight
-        color="#9dff4a"
+        color="#4f8cff"
         intensity={30}
         distance={13}
         position={[0, 0, 2]}
@@ -913,19 +913,19 @@ function RevenueVault() {
         <mesh ref={left} position={[-0.84, 0, 0]}>
           <boxGeometry args={[1.58, 5.8, 0.82]} />
           <meshPhysicalMaterial
-            color="#020403"
+            color="#020817"
             metalness={0.97}
             roughness={0.09}
             clearcoat={1}
             clearcoatRoughness={0.04}
-            emissive="#0d1e0a"
+            emissive="#0f2458"
             emissiveIntensity={0.22}
           />
         </mesh>
         <mesh ref={right} position={[0.84, 0, 0]}>
           <boxGeometry args={[1.58, 5.8, 0.82]} />
           <meshPhysicalMaterial
-            color="#020403"
+            color="#020817"
             metalness={0.97}
             roughness={0.09}
             clearcoat={1}
@@ -939,7 +939,7 @@ function RevenueVault() {
       <mesh position={[0, 0, 0.1]}>
         <boxGeometry args={[1.1, 4.5, 0.3]} />
         <meshBasicMaterial
-          color="#9dff4a"
+          color="#4f8cff"
           transparent
           opacity={0.12}
           toneMapped={false}
@@ -957,7 +957,7 @@ function RevenueVault() {
             args={[1.85 - (index % 4) * 0.19, 0.022]}
           />
           <meshBasicMaterial
-            color={index < 9 ? "#9dff4a" : "#00d9ff"}
+            color={index < 9 ? "#4f8cff" : "#00d9ff"}
             transparent
             opacity={0.24 + (11 - index) * 0.035}
             toneMapped={false}
@@ -1006,7 +1006,7 @@ function Hotspot({
       >
         <sphereGeometry args={[0.14, 16, 16]} />
         <meshBasicMaterial
-          color={hovered ? "#ffffff" : "#9dff4a"}
+          color={hovered ? "#ffffff" : "#4f8cff"}
           toneMapped={false}
         />
       </mesh>
@@ -1016,7 +1016,7 @@ function Hotspot({
       >
         <torusGeometry args={[0.32, 0.012, 8, 48]} />
         <meshBasicMaterial
-          color="#9dff4a"
+          color="#4f8cff"
           transparent
           opacity={hovered ? 0.85 : 0.32}
           toneMapped={false}
@@ -1032,7 +1032,7 @@ function Hotspot({
           className={
             "whitespace-nowrap rounded-full border px-3 py-1.5 text-[8px] font-black tracking-[0.16em] backdrop-blur-xl transition " +
             (hovered
-              ? "border-[#9dff4a]/50 bg-[#081008]/85 text-white"
+              ? "border-[#4f8cff]/50 bg-[#071329]/85 text-white"
               : "border-white/10 bg-black/45 text-white/40")
           }
         >
@@ -1046,12 +1046,12 @@ function Hotspot({
 function World() {
   return (
     <>
-      <fog attach="fog" args={["#020403", 8, 34]} />
+      <fog attach="fog" args={["#020817", 8, 34]} />
       <ambientLight intensity={0.2} />
       <directionalLight
         position={[5, 9, 7]}
         intensity={1.6}
-        color="#e8ffe0"
+        color="#dbeafe"
       />
       <pointLight
         position={[-4, 3, -20]}
@@ -1118,7 +1118,7 @@ function ScrollNarrative() {
       <div className="pointer-events-none w-screen">
         <section className="flex h-screen items-end px-5 pb-12 md:px-10 md:pb-16 lg:px-14">
           <div className="max-w-[720px]">
-            <div className="mb-5 text-[9px] font-black tracking-[0.26em] text-[#9dff4a]">
+            <div className="mb-5 text-[9px] font-black tracking-[0.26em] text-[#4f8cff]">
               ENTER EMPIRE
             </div>
             <h1 className="text-[clamp(3.8rem,8.2vw,8.8rem)] font-[520] leading-[0.82] tracking-[-0.07em] text-[#f5fff6]">
@@ -1144,7 +1144,7 @@ function ScrollNarrative() {
 
         <section className="flex h-screen items-center px-5 md:px-10 lg:px-14">
           <div className="max-w-[700px]">
-            <div className="mb-5 text-[9px] font-black tracking-[0.25em] text-[#9dff4a]">
+            <div className="mb-5 text-[9px] font-black tracking-[0.25em] text-[#4f8cff]">
               THE LOOP CLOSES
             </div>
             <h2 className="text-[clamp(3.2rem,6.5vw,7.2rem)] font-[520] leading-[0.86] tracking-[-0.065em] text-white">
@@ -1156,7 +1156,7 @@ function ScrollNarrative() {
             <div className="pointer-events-auto mt-8 flex flex-wrap gap-3">
               <a
                 href="mailto:founder@empire-ai.co.uk"
-                className="rounded-full bg-[#b6ff88] px-5 py-3 text-[9px] font-black tracking-[0.12em] text-black transition hover:-translate-y-0.5"
+                className="rounded-full bg-[#7dd3fc] px-5 py-3 text-[9px] font-black tracking-[0.12em] text-black transition hover:-translate-y-0.5"
               >
                 TALK TO EMPIRE
               </a>
@@ -1174,23 +1174,26 @@ function ScrollNarrative() {
   );
 }
 
-export default function EmpireWorld() {
+export default function EmpireWorld({ onReady }: { onReady?: () => void }) {
   return (
-    <div className="h-screen w-screen bg-[#020403]">
+    <div className="h-screen w-screen bg-[#020817]">
       <Canvas
+        onCreated={() => onReady?.()}
         camera={{
           position: [0, 0.35, 12],
           fov: 48,
           near: 0.08,
           far: 100,
         }}
-        dpr={[1, 1.45]}
+        dpr={[1, 1.25]}
         gl={{
-          antialias: true,
+          antialias: false,
+          alpha: false,
+          stencil: false,
           powerPreference: "high-performance",
         }}
       >
-        <color attach="background" args={["#020403"]} />
+        <color attach="background" args={["#020817"]} />
         <ScrollControls
           pages={7}
           damping={0.16}
