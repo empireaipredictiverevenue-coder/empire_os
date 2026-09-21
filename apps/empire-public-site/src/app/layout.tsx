@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   description:
     "Empire AI discovers global opportunity, predicts economics and turns verified commercial signals into revenue.",
   metadataBase: new URL("https://empire-ai.co.uk"),
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
   openGraph: {
     title: "Empire AI — Predictive Revenue",
     description:
