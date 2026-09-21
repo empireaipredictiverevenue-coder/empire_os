@@ -203,7 +203,7 @@ function SignalDust() {
     <instancedMesh ref={ref} args={[undefined, undefined, particles.length]}>
       <sphereGeometry args={[1, 6, 6]} />
       <meshBasicMaterial
-        color="#a9ff6d"
+        color="#60a5fa"
         transparent
         opacity={0.45}
         toneMapped={false}
@@ -1121,14 +1121,7 @@ function World({
       <LightShaft position={[2.1, 0.2, -14]} height={7} radius={1.4} color="#00d9ff" />
       <LightShaft position={[-2.25, 0.25, -27]} height={7} radius={1.5} />
       <LightShaft position={[2.35, 0.1, -41]} height={7} radius={1.35} color="#00d9ff" />
-      <LightShaft position={[-1.8, 0.15, -58]} height={8} radius={1.6} />
-
-      <WorldChapter position={[-3.45, 1.15, -3.0]} chapter={CHAPTERS[0]} />
-      <WorldChapter position={[3.35, 1.2, -14.2]} chapter={CHAPTERS[1]} side="right" />
-      <WorldChapter position={[-3.4, 1.0, -27.4]} chapter={CHAPTERS[2]} />
-      <WorldChapter position={[3.4, 1.0, -41.0]} chapter={CHAPTERS[3]} side="right" />
-      <WorldChapter position={[-3.1, 0.9, -58.0]} chapter={CHAPTERS[4]} />
-
+      <LightShaft position={[-1.8, 0.15, -58]} height={8} radius={1.6} />\n
       <Hotspot
         position={[2.8, 1.9, -1.5]}
         label="SIGNALS"
@@ -1161,60 +1154,10 @@ function World({
 function ScrollNarrative() {
   return (
     <Scroll html>
-      <div className="pointer-events-none w-screen">
-        <section className="flex h-screen items-end px-5 pb-12 md:px-10 md:pb-16 lg:px-14">
-          <div className="max-w-[720px]">
-            <div className="mb-5 text-[9px] font-black tracking-[0.26em] text-[#4f8cff]">
-              ENTER EMPIRE
-            </div>
-            <h1 className="text-[clamp(3.8rem,8.2vw,8.8rem)] font-[520] leading-[0.82] tracking-[-0.07em] text-[#f5fff6]">
-              Walk through
-              <span className="block text-white/25">
-                predictive revenue.
-              </span>
-            </h1>
-            <p className="mt-6 max-w-lg text-[14px] leading-7 text-white/42">
-              Scroll to move through the system. The world, objects and
-              chapters exist in the space around you.
-            </p>
-          </div>
-        </section>
-
-        {Array.from({ length: 5 }, (_, index) => (
-          <section
-            key={index}
-            aria-hidden="true"
-            className="h-screen"
-          />
+      <div className="pointer-events-none w-screen" aria-hidden="true">
+        {Array.from({ length: 7 }, (_, index) => (
+          <section key={index} className="h-screen" />
         ))}
-
-        <section className="flex h-screen items-center px-5 md:px-10 lg:px-14">
-          <div className="max-w-[700px]">
-            <div className="mb-5 text-[9px] font-black tracking-[0.25em] text-[#4f8cff]">
-              THE LOOP CLOSES
-            </div>
-            <h2 className="text-[clamp(3.2rem,6.5vw,7.2rem)] font-[520] leading-[0.86] tracking-[-0.065em] text-white">
-              Own the intelligence.
-              <span className="block text-white/24">
-                Own the outcome.
-              </span>
-            </h2>
-            <div className="pointer-events-auto mt-8 flex flex-wrap gap-3">
-              <a
-                href="mailto:founder@empire-ai.co.uk"
-                className="rounded-full bg-[#7dd3fc] px-5 py-3 text-[9px] font-black tracking-[0.12em] text-black transition hover:-translate-y-0.5"
-              >
-                TALK TO EMPIRE
-              </a>
-              <a
-                href="/trust"
-                className="rounded-full border border-white/10 bg-black/35 px-5 py-3 text-[9px] font-black tracking-[0.12em] text-white/60 backdrop-blur-xl transition hover:border-white/20 hover:text-white"
-              >
-                TRUST & EVIDENCE
-              </a>
-            </div>
-          </div>
-        </section>
       </div>
     </Scroll>
   );
