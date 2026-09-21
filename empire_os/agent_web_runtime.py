@@ -7,9 +7,15 @@ import os
 from pathlib import Path
 from typing import Any
 
+from empire_os.commercial_product_catalog import public_catalog_projection
+
 SNAPSHOT_PATH = Path(os.getenv(
     "EMPIRE_AGENT_WEB_SNAPSHOT",
     "/srv/empire_os/runtime/agent_web/canonical_snapshot.json",
+))
+CATALOG_SNAPSHOT_PATH = Path(os.getenv(
+    "EMPIRE_COMMERCIAL_CATALOG_LATEST",
+    "/srv/empire_os/runtime/commercial_catalog/latest.json",
 ))
 
 
