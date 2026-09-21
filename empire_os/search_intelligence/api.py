@@ -40,6 +40,11 @@ from .search_console import (
     configured_search_console_adapter,
 )
 from .serp import SearchFabricSerpAdapter, SerpResultEvidence, SerpSnapshot
+from empire_os.search_traffic_forecast import (
+    aggregate_search_console_daily,
+    forecast_search_traffic,
+)
+from empire_os.timesfm_shadow import configured_timesfm_provider
 
 
 
@@ -277,6 +282,82 @@ def create_search_router(
             "items": rows,
         }
 
+    @router.get("/search-console/daily")
+    def search_console_daily(
+        start_date: date,
+        end_date: date,
+        limit: int = Query(default=1000, ge=1, le=25000),
+    ):
+        status = search_console.status()
+        if not status.available:
+            raise HTTPException(status_code=503, detail=status.reason)
+        if end_date < start_date:
+            raise HTTPException(status_code=422, detail="invalid_date_range")
+        daily_method = getattr(search_console, "daily_observations", None)
+        if daily_method is None:
+            raise HTTPException(
+                status_code=503,
+                detail="daily_search_console_observations_unavailable",
+            )
+        rows = [
+            dict(row)
+            for row in daily_method(
+                start_date=start_date.isoformat(),
+                end_date=end_date.isoformat(),
+                limit=limit,
+            )
+        ]
+        return {
+            "available": True,
+            "source": "google_search_console",
+            "dimensions": ["date"],
+            "site_url": status.site_url,
+            "count": len(rows),
+            "limit": limit,
+            "items": rows,
+        }
+
+    @router.get("/forecast/traffic")
+    def search_traffic_forecast(
+        start_date: date,
+        end_date: date,
+        horizon_days: int = Query(default=30, ge=1, le=365),
+        limit: int = Query(default=1000, ge=1, le=25000),
+    ):
+        status = search_console.status()
+        if not status.available:
+            raise HTTPException(status_code=503, detail=status.reason)
+        if end_date < start_date:
+            raise HTTPException(status_code=422, detail="invalid_date_range")
+        daily_method = getattr(search_console, "daily_observations", None)
+        if daily_method is None:
+            raise HTTPException(
+                status_code=503,
+                detail="daily_search_console_observations_unavailable",
+            )
+        raw_rows = [
+            dict(row)
+            for row in daily_method(
+                start_date=start_date.isoformat(),
+                end_date=end_date.isoformat(),
+                limit=limit,
+            )
+        ]
+        observations = aggregate_search_console_daily(raw_rows)
+        forecast = forecast_search_traffic(
+            observations,
+            horizon_days=horizon_days,
+            timesfm_provider=configured_timesfm_provider(),
+        )
+        return {
+            "schema_version": "empire.search_traffic_forecast.v1",
+            "mode": "SHADOW_COMPARE",
+            "execution_authority": "none",
+            "search_console_site": status.site_url,
+            "observed_rows": len(observations),
+            "forecast": forecast.as_dict(),
+        }
+
     @router.get("/summary")
     def summary():
         base = {
@@ -329,6 +410,10 @@ def create_search_router(
             "serp": True,
             "competitor_gap": True,
             "citation_gap": True,
+            "traffic_forecast": True,
+            "timesfm_shadow": bool(
+                configured_timesfm_provider().status().get("available")
+            ),
         }
 
     @router.get("/products")

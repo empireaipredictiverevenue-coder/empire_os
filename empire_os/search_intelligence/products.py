@@ -226,6 +226,7 @@ SEARCH_PRODUCTS: tuple[SearchProduct, ...] = (
             "ai_visibility",
             "competitor_gaps",
             "search_to_revenue_attribution",
+            "click_impression_forecast",
             "weekly_priority_brief",
         ),
         required_capabilities=(
@@ -242,6 +243,8 @@ SEARCH_PRODUCTS: tuple[SearchProduct, ...] = (
             "ai_visibility",
             "competitor_gap",
             "revenue",
+            "traffic_forecast",
+            "timesfm_shadow",
         ),
     ),
 )

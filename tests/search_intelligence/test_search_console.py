@@ -187,6 +187,20 @@ class FakeReadySearchConsole:
             "position": 3.5,
         }]
 
+    def daily_observations(self, *, start_date, end_date, limit=1000):
+        from datetime import date, timedelta
+        start = date.fromisoformat(start_date)
+        return [
+            {
+                "keys": [(start + timedelta(days=i)).isoformat()],
+                "clicks": 10 + i,
+                "impressions": 100 + i * 10,
+                "ctr": (10 + i) / (100 + i * 10),
+                "position": 4.0,
+            }
+            for i in range(14)
+        ]
+
 
 def test_search_console_observations_endpoint_fails_closed_by_default():
     response = _client().get(
@@ -223,3 +237,68 @@ def test_search_console_observations_rejects_reverse_date_range():
     )
     assert response.status_code == 422
     assert response.json()["detail"] == "invalid_date_range"
+
+
+def test_real_adapter_maps_daily_search_analytics_rows(tmp_path):
+    credential = tmp_path / "gsc.json"
+    credential.write_text("{}")
+    calls = []
+
+    def post_json(url, headers, payload):
+        calls.append(dict(payload))
+        return {
+            "rows": [{
+                "keys": ["2026-09-01"],
+                "clicks": 3,
+                "impressions": 40,
+                "ctr": 0.075,
+                "position": 4.2,
+            }]
+        }
+
+    adapter = GoogleSearchConsoleAdapter(
+        "https://empire-ai.co.uk/",
+        credential,
+        token_provider=lambda path: "token",
+        post_json=post_json,
+    )
+    rows = adapter.daily_observations(
+        start_date="2026-09-01",
+        end_date="2026-09-19",
+        limit=50,
+    )
+    assert rows[0]["clicks"] == 3
+    assert calls[0]["dimensions"] == ["date"]
+
+
+def test_search_console_daily_endpoint_returns_date_rows():
+    app = FastAPI()
+    app.include_router(create_search_router(
+        search_console_adapter=FakeReadySearchConsole(),
+    ))
+    response = TestClient(app).get(
+        "/v1/search/search-console/daily"
+        "?start_date=2026-09-01&end_date=2026-09-14"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["dimensions"] == ["date"]
+    assert body["count"] == 14
+
+
+def test_search_traffic_forecast_endpoint_preserves_shadow_mode():
+    app = FastAPI()
+    app.include_router(create_search_router(
+        search_console_adapter=FakeReadySearchConsole(),
+    ))
+    response = TestClient(app).get(
+        "/v1/search/forecast/traffic"
+        "?start_date=2026-09-01&end_date=2026-09-14&horizon_days=7"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "SHADOW_COMPARE"
+    assert body["execution_authority"] == "none"
+    assert body["observed_rows"] == 14
+    assert body["forecast"]["baseline_impressions"]["available"] is True
+    assert body["forecast"]["timesfm_horizon_impressions"] is None
