@@ -15,9 +15,36 @@ SNAPSHOT_PATH = Path(os.getenv(
 
 def load_snapshot() -> dict[str, Any]:
     try:
-        return json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+        snapshot = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return {"generated_at": None, "counts": {}, "markets": [], "seo_keywords": []}
+        snapshot = {
+            "generated_at": None,
+            "counts": {},
+            "markets": [],
+            "seo_keywords": [],
+        }
+    if not isinstance(snapshot, dict):
+        snapshot = {
+            "generated_at": None,
+            "counts": {},
+            "markets": [],
+            "seo_keywords": [],
+        }
+    try:
+        catalog = json.loads(
+            CATALOG_SNAPSHOT_PATH.read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        catalog = {
+            "schema_version": "empire.commercial-product-catalog.v1",
+            "products": [],
+            "product_count": 0,
+            "binding_terms_ready_count": 0,
+        }
+    snapshot["commercial_catalog"] = (
+        catalog if isinstance(catalog, dict) else {"products": []}
+    )
+    return snapshot
 
 
 def _norm(value: Any) -> str:
@@ -103,11 +130,12 @@ def execute_public_capability(name: str, args: dict[str, Any]) -> dict[str, Any]
         }
 
     if name == "product.catalog":
+        public = public_catalog_projection(
+            snapshot.get("commercial_catalog") or {}
+        )
         return {
             "capability": name,
-            "status": "canonical_catalog_not_activated",
-            "products": [],
-            "note": "No active rows are currently present in canonical commercial_products.",
+            **public,
             "provenance": provenance,
         }
 
