@@ -24,6 +24,8 @@ VALID_STATUSES = {
     "planning",
     "planned",
     "implementation_ready",
+    "implementing",
+    "implementation_failed",
     "founder_gate",
     "plan_failed",
     "implemented",
@@ -107,6 +109,10 @@ class FounderDirective:
     coder_task_id: str | None = None
     coder_job_id: str | None = None
     plan_result: dict[str, Any] = field(default_factory=dict)
+    implementation_task_id: str | None = None
+    implementation_job_id: str | None = None
+    implementation_result: dict[str, Any] = field(default_factory=dict)
+    commit_sha: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -274,6 +280,9 @@ class FounderDirectiveStore:
                     "priority": row.priority,
                     "coder_task_id": row.coder_task_id,
                     "coder_job_id": row.coder_job_id,
+                    "implementation_task_id": row.implementation_task_id,
+                    "implementation_job_id": row.implementation_job_id,
+                    "commit_sha": row.commit_sha,
                 }
                 for row in sorted(
                     rows,
