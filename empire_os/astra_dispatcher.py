@@ -45,6 +45,12 @@ SAFE_JOBS = {
         "--limit",
         "50",
     ],
+    "commercial_evidence_auto_verifier": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/run_commercial_evidence_auto_verifier.py"),
+        "--limit",
+        "25",
+    ],
     "commercial_terms_materializer": [
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/run_commercial_terms_materializer.py"),
@@ -111,6 +117,7 @@ def choose_jobs(
             jobs.append("gtm_pipeline")
         if stages.get("commercial_terms") is not True:
             jobs.append("closer_reply_handoff")
+            jobs.append("commercial_evidence_auto_verifier")
             jobs.append("commercial_terms_materializer")
         jobs.append("conversion_intelligence_refresh")
         jobs.append("commercial_loop_refresh")
