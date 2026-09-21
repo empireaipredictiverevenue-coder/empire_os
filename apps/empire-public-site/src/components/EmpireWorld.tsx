@@ -316,19 +316,41 @@ function SignalAtrium() {
 
 function Reactor() {
   const rings = useRef<THREE.Group>(null);
-  useFrame((state) => {
-    if (!rings.current) return;
+  const core = useRef<THREE.Group>(null);
+  const [hovered, setHovered] = useState(false);
+  const [charged, setCharged] = useState(false);
+  useCursor(hovered);
+
+  useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
-    rings.current.rotation.x = t * 0.11;
-    rings.current.rotation.y = t * -0.19;
+    if (rings.current) {
+      const speed = charged ? 0.6 : hovered ? 0.34 : 0.18;
+      rings.current.rotation.x += delta * speed * 0.7;
+      rings.current.rotation.y -= delta * speed;
+    }
+    if (core.current) {
+      const target = charged ? 1.22 : hovered ? 1.1 : 1;
+      const lerp = 1 - Math.exp(-delta * 7);
+      core.current.scale.lerp(
+        new THREE.Vector3(target, target, target),
+        lerp,
+      );
+      core.current.rotation.y += delta * (charged ? 0.5 : 0.16);
+      core.current.rotation.x =
+        Math.sin(t * 0.45) * (charged ? 0.22 : 0.08);
+    }
   });
 
   return (
     <group position={[0, 0, -14]}>
-      <pointLight color="#9dff4a" intensity={20} distance={12} />
+      <pointLight
+        color={charged ? "#d9ffc8" : "#9dff4a"}
+        intensity={charged ? 34 : 20}
+        distance={14}
+      />
       <pointLight
         color="#00d9ff"
-        intensity={12}
+        intensity={hovered ? 19 : 12}
         distance={10}
         position={[2, -1.2, 0]}
       />
@@ -348,47 +370,106 @@ function Reactor() {
             <meshBasicMaterial
               color={index === 1 ? "#00d9ff" : "#9dff4a"}
               transparent
-              opacity={0.5 - index * 0.11}
+              opacity={(charged ? 0.74 : 0.5) - index * 0.11}
               toneMapped={false}
             />
           </mesh>
         ))}
       </group>
-      <mesh>
-        <icosahedronGeometry args={[1.18, 2]} />
-        <meshPhysicalMaterial
-          color="#08120d"
-          metalness={0.88}
-          roughness={0.14}
-          clearcoat={1}
-          clearcoatRoughness={0.06}
-          emissive="#183a10"
-          emissiveIntensity={0.5}
-        />
-      </mesh>
-      <mesh scale={1.03}>
-        <icosahedronGeometry args={[1.18, 2]} />
-        <meshBasicMaterial
-          color="#b6ff88"
-          wireframe
-          transparent
-          opacity={0.18}
-          toneMapped={false}
-        />
-      </mesh>
+
+      <group
+        ref={core}
+        onPointerEnter={(event) => {
+          event.stopPropagation();
+          setHovered(true);
+        }}
+        onPointerLeave={() => setHovered(false)}
+        onClick={(event) => {
+          event.stopPropagation();
+          setCharged((value) => !value);
+        }}
+      >
+        <mesh>
+          <icosahedronGeometry args={[1.18, 2]} />
+          <meshPhysicalMaterial
+            color={charged ? "#102114" : "#08120d"}
+            metalness={0.88}
+            roughness={0.14}
+            clearcoat={1}
+            clearcoatRoughness={0.06}
+            emissive={charged ? "#2c7a1d" : "#183a10"}
+            emissiveIntensity={charged ? 1.1 : 0.5}
+          />
+        </mesh>
+        <mesh scale={1.03}>
+          <icosahedronGeometry args={[1.18, 2]} />
+          <meshBasicMaterial
+            color={charged ? "#ffffff" : "#b6ff88"}
+            wireframe
+            transparent
+            opacity={charged ? 0.36 : 0.18}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
+
+      <Html
+        center
+        position={[0, -2.2, 0]}
+        distanceFactor={9}
+        style={{ pointerEvents: "none" }}
+      >
+        <div className="whitespace-nowrap text-[7px] font-black tracking-[0.18em] text-white/25">
+          {charged ? "REACTOR CHARGED" : "CLICK TO CHARGE"}
+        </div>
+      </Html>
     </group>
   );
 }
 
 function OpportunityVault() {
   const floating = useRef<THREE.Group>(null);
-  useFrame((state) => {
-    if (!floating.current) return;
-    const t = state.clock.elapsedTime;
-    floating.current.children.forEach((child, index) => {
-      child.rotation.y += 0.0007 * (index % 2 ? 1 : -1);
-      child.position.y += Math.sin(t * 0.45 + index) * 0.0008;
-    });
+  const leftDoor = useRef<THREE.Group>(null);
+  const rightDoor = useRef<THREE.Group>(null);
+  const [hovered, setHovered] = useState(false);
+  const [open, setOpen] = useState(false);
+  useCursor(hovered);
+
+  useFrame((state, delta) => {
+    if (floating.current) {
+      const t = state.clock.elapsedTime;
+      floating.current.children.forEach((child, index) => {
+        child.rotation.y += 0.0007 * (index % 2 ? 1 : -1);
+        child.position.y += Math.sin(t * 0.45 + index) * 0.0008;
+      });
+    }
+
+    const target = open ? 2.05 : 0.58;
+    const ease = 1 - Math.exp(-delta * 5.5);
+    if (leftDoor.current) {
+      leftDoor.current.position.x = THREE.MathUtils.lerp(
+        leftDoor.current.position.x,
+        -target,
+        ease,
+      );
+      leftDoor.current.rotation.y = THREE.MathUtils.lerp(
+        leftDoor.current.rotation.y,
+        open ? -0.24 : 0,
+        ease,
+      );
+    }
+    if (rightDoor.current) {
+      rightDoor.current.position.x = THREE.MathUtils.lerp(
+        rightDoor.current.position.x,
+        target,
+        ease,
+      );
+      rightDoor.current.rotation.y = THREE.MathUtils.lerp(
+        rightDoor.current.rotation.y,
+        open ? 0.24 : 0,
+        ease,
+      );
+    }
   });
 
   return (
@@ -401,7 +482,7 @@ function OpportunityVault() {
             <mesh
               key={index}
               position={[
-                side * (2.1 + (row % 3) * 0.55),
+                side * (2.35 + (row % 3) * 0.55),
                 (row - 3) * 0.73,
                 -row * 0.48,
               ]}
@@ -424,6 +505,53 @@ function OpportunityVault() {
           );
         })}
       </group>
+
+      <group
+        onPointerEnter={(event) => {
+          event.stopPropagation();
+          setHovered(true);
+        }}
+        onPointerLeave={() => setHovered(false)}
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((value) => !value);
+        }}
+      >
+        <group ref={leftDoor} position={[-0.58, 0, 0]}>
+          <mesh>
+            <boxGeometry args={[1.08, 4.8, 0.24]} />
+            <meshPhysicalMaterial
+              color="#050906"
+              metalness={0.94}
+              roughness={0.13}
+              clearcoat={1}
+              emissive="#12310c"
+              emissiveIntensity={hovered ? 0.7 : 0.32}
+            />
+          </mesh>
+        </group>
+        <group ref={rightDoor} position={[0.58, 0, 0]}>
+          <mesh>
+            <boxGeometry args={[1.08, 4.8, 0.24]} />
+            <meshPhysicalMaterial
+              color="#050906"
+              metalness={0.94}
+              roughness={0.13}
+              clearcoat={1}
+              emissive="#062f38"
+              emissiveIntensity={hovered ? 0.7 : 0.32}
+            />
+          </mesh>
+        </group>
+      </group>
+
+      <LightShaft
+        position={[0, 0.3, -0.5]}
+        height={6.4}
+        radius={1.05}
+        color={open ? "#d7ffc5" : "#9dff4a"}
+      />
+
       <Rail
         color="#d8ffc1"
         speed={0.055}
@@ -435,6 +563,17 @@ function OpportunityVault() {
           [1.1, -0.6, -2.5],
         ]}
       />
+
+      <Html
+        center
+        position={[0, -2.95, 0]}
+        distanceFactor={9}
+        style={{ pointerEvents: "none" }}
+      >
+        <div className="whitespace-nowrap text-[7px] font-black tracking-[0.18em] text-white/25">
+          {open ? "VAULT OPEN" : "CLICK TO OPEN"}
+        </div>
+      </Html>
     </group>
   );
 }
@@ -475,10 +614,69 @@ function ExecutionTunnel() {
           </group>
         );
       })}
+      <AgentStreams />
     </group>
   );
 }
 
+function AgentStreams() {
+  const refs = useRef<Array<THREE.Mesh | null>>([]);
+  const paths = useMemo(
+    () => [
+      new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-2.2, 1.1, -34),
+        new THREE.Vector3(-1.2, 0.2, -38),
+        new THREE.Vector3(1.4, -0.4, -43),
+        new THREE.Vector3(2.4, 0.8, -48),
+      ]),
+      new THREE.CatmullRomCurve3([
+        new THREE.Vector3(2.1, -1.3, -35),
+        new THREE.Vector3(0.8, -0.2, -39),
+        new THREE.Vector3(-1.8, 0.7, -44),
+        new THREE.Vector3(-2.2, -0.1, -48),
+      ]),
+      new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.2, 2.2, -35),
+        new THREE.Vector3(1.3, 1.0, -39),
+        new THREE.Vector3(-0.8, -0.9, -44),
+        new THREE.Vector3(0.3, 0.1, -49),
+      ]),
+    ],
+    [],
+  );
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    refs.current.forEach((mesh, index) => {
+      if (!mesh) return;
+      const curve = paths[index % paths.length];
+      const offset = (t * (0.055 + index * 0.01) + index * 0.27) % 1;
+      mesh.position.copy(curve.getPointAt(offset));
+      const next = curve.getPointAt((offset + 0.01) % 1);
+      mesh.lookAt(next);
+      mesh.rotation.z = Math.sin(t * 0.8 + index) * 0.15;
+    });
+  });
+
+  return (
+    <group>
+      {Array.from({ length: 6 }, (_, index) => (
+        <mesh
+          key={index}
+          ref={(node) => {
+            refs.current[index] = node;
+          }}
+        >
+          <octahedronGeometry args={[0.12 + (index % 2) * 0.04, 0]} />
+          <meshBasicMaterial
+            color={index % 2 ? "#00d9ff" : "#b6ff88"}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
 
 function ArchitecturalSpine() {
   return (
@@ -670,41 +868,90 @@ function WorldChapter({
 }
 
 function RevenueVault() {
-  const monolith = useRef<THREE.Mesh>(null);
-  useFrame((state) => {
-    if (!monolith.current) return;
-    monolith.current.rotation.y =
-      Math.sin(state.clock.elapsedTime * 0.18) * 0.08;
+  const scroll = useScroll();
+  const shell = useRef<THREE.Group>(null);
+  const left = useRef<THREE.Mesh>(null);
+  const right = useRef<THREE.Mesh>(null);
+
+  useFrame((state, delta) => {
+    const proximity = THREE.MathUtils.smoothstep(
+      scroll.offset,
+      0.79,
+      0.96,
+    );
+    const spread = proximity * 1.72;
+    const ease = 1 - Math.exp(-delta * 5);
+
+    if (shell.current) {
+      shell.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.18) * 0.045;
+    }
+    if (left.current) {
+      left.current.position.x = THREE.MathUtils.lerp(
+        left.current.position.x,
+        -0.84 - spread,
+        ease,
+      );
+    }
+    if (right.current) {
+      right.current.position.x = THREE.MathUtils.lerp(
+        right.current.position.x,
+        0.84 + spread,
+        ease,
+      );
+    }
   });
 
   return (
     <group position={[0, 0, -58]}>
       <pointLight
         color="#9dff4a"
-        intensity={26}
-        distance={12}
+        intensity={30}
+        distance={13}
         position={[0, 0, 2]}
       />
-      <mesh ref={monolith}>
-        <boxGeometry args={[3.3, 5.8, 0.82]} />
-        <meshPhysicalMaterial
-          color="#020403"
-          metalness={0.97}
-          roughness={0.09}
-          clearcoat={1}
-          clearcoatRoughness={0.04}
-          emissive="#0d1e0a"
-          emissiveIntensity={0.18}
+      <group ref={shell}>
+        <mesh ref={left} position={[-0.84, 0, 0]}>
+          <boxGeometry args={[1.58, 5.8, 0.82]} />
+          <meshPhysicalMaterial
+            color="#020403"
+            metalness={0.97}
+            roughness={0.09}
+            clearcoat={1}
+            clearcoatRoughness={0.04}
+            emissive="#0d1e0a"
+            emissiveIntensity={0.22}
+          />
+        </mesh>
+        <mesh ref={right} position={[0.84, 0, 0]}>
+          <boxGeometry args={[1.58, 5.8, 0.82]} />
+          <meshPhysicalMaterial
+            color="#020403"
+            metalness={0.97}
+            roughness={0.09}
+            clearcoat={1}
+            clearcoatRoughness={0.04}
+            emissive="#06242b"
+            emissiveIntensity={0.2}
+          />
+        </mesh>
+      </group>
+
+      <mesh position={[0, 0, 0.1]}>
+        <boxGeometry args={[1.1, 4.5, 0.3]} />
+        <meshBasicMaterial
+          color="#9dff4a"
+          transparent
+          opacity={0.12}
+          toneMapped={false}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </mesh>
-      <mesh position={[0, 0, 0.43]}>
-        <planeGeometry args={[2.45, 4.92]} />
-        <meshBasicMaterial color="#06100a" />
-      </mesh>
+
       {Array.from({ length: 12 }, (_, index) => (
         <mesh
           key={index}
-          position={[0, 2.08 - index * 0.37, 0.445]}
+          position={[0, 2.08 - index * 0.37, 0.48]}
         >
           <planeGeometry
             args={[1.85 - (index % 4) * 0.19, 0.022]}
