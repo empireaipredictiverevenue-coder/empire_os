@@ -28,7 +28,7 @@ def main() -> int:
         {
             "select": "id,prospect_id,recipient,subject,status,metadata",
             "channel": "eq.email",
-            "status": "eq.delivered",
+            "status": "in.(delivered,suppressed)",
             "order": "created_at.asc",
             "limit": 100,
         },
@@ -86,6 +86,8 @@ def main() -> int:
         key: payload[key]
         for key in (
             "delivered_first_touches",
+            "followup_eligible_delivered",
+            "suppressed_after_delivery",
             "due_now",
             "due_within_24h",
             "recoverable",

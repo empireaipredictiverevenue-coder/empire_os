@@ -104,3 +104,32 @@ def test_event_parser_keeps_latest_delivery():
     ]
     result = parse_delivered_events(rows)
     assert result["i1"].hour == 11
+
+
+def test_suppressed_after_delivery_reconciles_without_followup():
+    intents = [{
+        "id": "i1",
+        "prospect_id": "p1",
+        "recipient": "buyer@example.com",
+        "subject": "Legacy subject",
+        "status": "suppressed",
+        "metadata": {
+            "candidate_evidence": {
+                "business_name": "Atlanta Roofing",
+                "niche": "roofing",
+                "metro": "Atlanta",
+            }
+        },
+    }]
+    result = build_conversation_recovery(
+        intents,
+        {"i1": NOW - timedelta(hours=80)},
+        {"p1": {"business_name": "Atlanta Roofing", "niche": "roofing", "metro": "Atlanta"}},
+        now=NOW,
+    )
+    assert result["delivered_first_touches"] == 1
+    assert result["followup_eligible_delivered"] == 0
+    assert result["suppressed_after_delivery"] == 1
+    assert result["due_now"] == 0
+    assert result["recoverable"] == 0
+    assert result["items"][0]["recovery_reason"] == "suppressed_after_delivery"

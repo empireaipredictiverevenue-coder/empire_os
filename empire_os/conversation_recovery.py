@@ -97,7 +97,8 @@ def build_conversation_recovery(
     rows: list[RecoveryRow] = []
 
     for intent in intents:
-        if _text(intent.get("status")).lower() != "delivered":
+        status = _text(intent.get("status")).lower()
+        if status not in {"delivered", "suppressed"}:
             continue
         metadata = intent.get("metadata")
         metadata = metadata if isinstance(metadata, Mapping) else {}
@@ -136,22 +137,25 @@ def build_conversation_recovery(
 
         recoverable = False
         preview = None
-        reason = "missing_canonical_context" if placeholder else "ready_when_due"
-        if not placeholder:
-            try:
-                copy = build_followup_copy(
-                    {
-                        "root_subject": subject,
-                        "candidate_evidence": candidate,
-                    },
-                    step=1,
-                    now=current,
-                )
-                preview = copy.subject
-                recoverable = True
-                reason = "due_now" if due_now else "waiting_for_72h_cadence"
-            except ValueError as exc:
-                reason = f"copy_blocked:{str(exc)[:120]}"
+        if status == "suppressed":
+            reason = "suppressed_after_delivery"
+        else:
+            reason = "missing_canonical_context" if placeholder else "ready_when_due"
+            if not placeholder:
+                try:
+                    copy = build_followup_copy(
+                        {
+                            "root_subject": subject,
+                            "candidate_evidence": candidate,
+                        },
+                        step=1,
+                        now=current,
+                    )
+                    preview = copy.subject
+                    recoverable = True
+                    reason = "due_now" if due_now else "waiting_for_72h_cadence"
+                except ValueError as exc:
+                    reason = f"copy_blocked:{str(exc)[:120]}"
 
         rows.append(
             RecoveryRow(
@@ -180,8 +184,23 @@ def build_conversation_recovery(
         "followup_one_hours": FOLLOWUP_ONE_HOURS,
         "followup_two_hours": FOLLOWUP_TWO_HOURS,
         "delivered_first_touches": len(rows),
-        "due_now": sum(row.due_now for row in rows),
-        "due_within_24h": sum(row.due_within_24h for row in rows),
+        "followup_eligible_delivered": sum(
+            row.recovery_reason != "suppressed_after_delivery"
+            for row in rows
+        ),
+        "suppressed_after_delivery": sum(
+            row.recovery_reason == "suppressed_after_delivery"
+            for row in rows
+        ),
+        "due_now": sum(
+            row.due_now and row.recovery_reason != "suppressed_after_delivery"
+            for row in rows
+        ),
+        "due_within_24h": sum(
+            row.due_within_24h
+            and row.recovery_reason != "suppressed_after_delivery"
+            for row in rows
+        ),
         "recoverable": sum(row.recoverable for row in rows),
         "blocked_missing_context": sum(row.placeholder_evidence for row in rows),
         "legacy_generic_subjects": sum(row.legacy_generic_subject for row in rows),

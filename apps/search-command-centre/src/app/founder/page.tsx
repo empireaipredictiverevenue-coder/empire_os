@@ -374,6 +374,14 @@ export default async function FounderPage() {
                   value={int(daily?.conversation_recovery?.recoverable)}
                 />
                 <Evidence
+                  label="Follow-up eligible"
+                  value={int(daily?.conversation_recovery?.followup_eligible_delivered)}
+                />
+                <Evidence
+                  label="Suppressed after delivery"
+                  value={int(daily?.conversation_recovery?.suppressed_after_delivery)}
+                />
+                <Evidence
                   label="Follow-ups due"
                   value={int(daily?.conversation_recovery?.due_now)}
                 />

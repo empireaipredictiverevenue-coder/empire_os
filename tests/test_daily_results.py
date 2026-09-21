@@ -121,7 +121,9 @@ def test_daily_results_surfaces_conversation_recovery_gap(tmp_path):
         "current_window": {"delivered_outreach": 16},
     })
     dump(runtime / "conversation_recovery/latest.json", {
-        "delivered_first_touches": 15,
+        "delivered_first_touches": 16,
+        "followup_eligible_delivered": 15,
+        "suppressed_after_delivery": 1,
         "due_now": 0,
         "due_within_24h": 0,
         "recoverable": 15,
@@ -135,5 +137,7 @@ def test_daily_results_surfaces_conversation_recovery_gap(tmp_path):
     recovery = payload["conversation_recovery"]
     assert recovery["available"] is True
     assert recovery["recoverable"] == 15
-    assert recovery["pulse_delivery_gap"] == 1
+    assert recovery["followup_eligible_delivered"] == 15
+    assert recovery["suppressed_after_delivery"] == 1
+    assert recovery["pulse_delivery_gap"] == 0
     assert recovery["send_executed"] is False

@@ -227,6 +227,8 @@ def build_daily_results(
         "conversation_recovery": {
             "available": bool(conversation_recovery),
             "delivered_first_touches": conversation_recovery.get("delivered_first_touches"),
+            "followup_eligible_delivered": conversation_recovery.get("followup_eligible_delivered"),
+            "suppressed_after_delivery": conversation_recovery.get("suppressed_after_delivery"),
             "due_now": conversation_recovery.get("due_now"),
             "due_within_24h": conversation_recovery.get("due_within_24h"),
             "recoverable": conversation_recovery.get("recoverable"),

@@ -380,6 +380,8 @@ export type FounderDailyResults = {
   conversation_recovery?: {
     available?: boolean;
     delivered_first_touches?: number | null;
+    followup_eligible_delivered?: number | null;
+    suppressed_after_delivery?: number | null;
     due_now?: number | null;
     due_within_24h?: number | null;
     recoverable?: number | null;
