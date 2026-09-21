@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from empire_os.first_revenue_api import create_first_revenue_router
 from empire_os.founder_dashboard_api import create_founder_dashboard_router
 from empire_os.founder_daily_results_api import create_founder_daily_results_router
 from empire_os.founder_directives_api import create_founder_directives_router
@@ -24,6 +25,7 @@ app = FastAPI(
     openapi_url=None,
 )
 app.include_router(create_founder_dashboard_router())
+app.include_router(create_first_revenue_router())
 app.include_router(create_founder_daily_results_router())
 app.include_router(create_founder_directives_router())
 app.include_router(create_founder_intelligence_nodes_router())
