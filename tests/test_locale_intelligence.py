@@ -106,3 +106,24 @@ def test_contact_window_defers_weekends():
     assert result["eligible"] is False
     assert result["reason"] == "recipient_local_weekend"
     assert result["next_eligible_utc"].startswith("2026-09-21T07:00:00")
+
+
+
+def test_system_iso_and_tzdata_resolve_unprofiled_single_zone_country():
+    locale = resolve_locale({"country_code": "JP"})
+    assert locale.country_code == "JP"
+    assert locale.country_name == "Japan"
+    assert locale.timezone == "Asia/Tokyo"
+    assert locale.timezone_basis == "country_single_zone"
+    assert locale.timezone_candidates == ("Asia/Tokyo",)
+    # Language/currency are not guessed without a commercial profile or evidence.
+    assert locale.language_code is None
+    assert locale.outreach_language is None
+    assert locale.currency is None
+
+
+def test_multi_timezone_country_keeps_timezone_unresolved_without_region():
+    locale = resolve_locale({"country_code": "US"})
+    assert locale.country_code == "US"
+    assert locale.timezone is None
+    assert len(locale.timezone_candidates) > 1

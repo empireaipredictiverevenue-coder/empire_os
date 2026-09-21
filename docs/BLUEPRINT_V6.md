@@ -91,6 +91,7 @@ Exit condition: one fully verified commercial loop with recognized revenue and o
 Goal: turn Empire's sensors, historical assets and external datasets into proprietary intelligence products rather than a lead-scraping identity.
 
 New first-class intelligence layers:
+- Geo & Locale Intelligence: every acquired business/signal must carry a conservative locale identity covering country, region/state, metro/city, IANA timezone, timezone candidates, language basis, outreach language, currency, calling code, measurement/date/number conventions where known. Country/timezone uses ISO/tzdata evidence; language is never guessed in multilingual/ambiguous markets. Unknown stays UNKNOWN. Governed outbound must respect recipient-local weekday/business-hour windows.
 - Volumetric Intelligence: evidence-backed 3D/spatial understanding of properties, sites, assets, terrain and physical environments from sources such as satellite/drone imagery, LiDAR, depth maps, photogrammetry and digital-twin geometry.
 - Natural Physical Intelligence: evidence-backed reasoning over real-world physical state and consequence including storm damage, roof/material condition, thermal loss, HVAC load, flood exposure, structural load, solar exposure, motion and degradation.
 - These layers feed the shared Intelligence Fabric, Predictive Cloud, Digital Twin and Opportunity Foundry; they do not create commercial truth or execution authority.

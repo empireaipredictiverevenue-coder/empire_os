@@ -45,6 +45,53 @@ COUNTRIES: dict[str, CountryProfile] = {
     "PT": CountryProfile("PT", "Portugal", "pt-PT", "EUR", "+351", "metric", "DD/MM/YYYY", "pt-PT", "Europe/Lisbon"),
 }
 
+def _load_iso_country_names() -> dict[str, str]:
+    path = "/usr/share/zoneinfo/iso3166.tab"
+    result: dict[str, str] = {}
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                if not line or line.startswith("#") or "\t" not in line:
+                    continue
+                code, name = line.rstrip("\n").split("\t", 1)
+                if len(code) == 2 and name:
+                    result[code.upper()] = name.strip()
+    except OSError:
+        pass
+    return result
+
+
+def _load_country_timezones() -> dict[str, tuple[str, ...]]:
+    path = "/usr/share/zoneinfo/zone.tab"
+    rows: dict[str, list[str]] = {}
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) < 3:
+                    continue
+                code, zone = parts[0].upper(), parts[2].strip()
+                if len(code) != 2 or not zone:
+                    continue
+                rows.setdefault(code, []).append(zone)
+    except OSError:
+        return {}
+    return {
+        code: tuple(dict.fromkeys(zones))
+        for code, zones in rows.items()
+    }
+
+
+SYSTEM_COUNTRY_NAMES = _load_iso_country_names()
+SYSTEM_COUNTRY_TIMEZONES = _load_country_timezones()
+SYSTEM_COUNTRY_ALIASES = {
+    name.casefold(): code
+    for code, name in SYSTEM_COUNTRY_NAMES.items()
+}
+
+
 COUNTRY_ALIASES = {
     "usa": "US", "us": "US", "u.s.": "US", "united states": "US", "united states of america": "US",
     "uk": "GB", "u.k.": "GB", "great britain": "GB", "united kingdom": "GB", "england": "GB", "scotland": "GB", "wales": "GB", "northern ireland": "GB",
@@ -140,6 +187,7 @@ class LocaleIdentity:
     outreach_language: str | None
     timezone: str | None
     timezone_basis: str
+    timezone_candidates: tuple[str, ...]
     currency: str | None
     calling_code: str | None
     measurement_system: str | None
@@ -174,9 +222,12 @@ def _explicit_country(data: Mapping[str, Any], raw: Mapping[str, Any]) -> tuple[
         if not text:
             continue
         upper = text.upper()
-        if upper in COUNTRIES:
+        if upper in COUNTRIES or upper in SYSTEM_COUNTRY_NAMES:
             return upper, "explicit_country"
-        alias = COUNTRY_ALIASES.get(text.casefold())
+        alias = (
+            COUNTRY_ALIASES.get(text.casefold())
+            or SYSTEM_COUNTRY_ALIASES.get(text.casefold())
+        )
         if alias:
             return alias, "explicit_country"
     return None, ""
@@ -195,6 +246,9 @@ def _infer_country(state: str, metro: str, raw: Mapping[str, Any]) -> tuple[str 
     for alias, code in COUNTRY_ALIASES.items():
         if re.search(rf"(?<![a-z]){re.escape(alias)}(?![a-z])", haystack):
             return code, "geo_text"
+    clean_haystack = _norm(haystack)
+    if clean_haystack in SYSTEM_COUNTRY_ALIASES:
+        return SYSTEM_COUNTRY_ALIASES[clean_haystack], "geo_text"
 
     token = _region_token(state, metro)
     if token in US_STATE_CODES:
@@ -243,6 +297,10 @@ def _timezone_for(code: str | None, state: str, metro: str, explicit: Any = None
     profile = COUNTRIES.get(code)
     if profile and profile.default_timezone:
         return profile.default_timezone, "country_default"
+
+    candidates = SYSTEM_COUNTRY_TIMEZONES.get(code, ())
+    if len(candidates) == 1:
+        return candidates[0], "country_single_zone"
     return None, "unknown"
 
 
@@ -304,7 +362,11 @@ def resolve_locale(data: Mapping[str, Any] | Any) -> LocaleIdentity:
 
     return LocaleIdentity(
         country_code=code,
-        country_name=profile.name if profile else None,
+        country_name=(
+            profile.name
+            if profile
+            else SYSTEM_COUNTRY_NAMES.get(code or "")
+        ),
         region=state or None,
         city_or_metro=metro or None,
         language_code=language,
@@ -312,6 +374,7 @@ def resolve_locale(data: Mapping[str, Any] | Any) -> LocaleIdentity:
         outreach_language=outreach_language,
         timezone=tz,
         timezone_basis=tz_basis,
+        timezone_candidates=SYSTEM_COUNTRY_TIMEZONES.get(code or "", ()),
         currency=profile.currency if profile else None,
         calling_code=profile.calling_code if profile else None,
         measurement_system=profile.measurement_system if profile else None,
