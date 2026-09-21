@@ -1,5 +1,6 @@
 from empire_os import sb
 from scripts.buyer_discovery_preview import (
+    _load_env,
     filter_market_rows,
     load_rows,
 )
@@ -96,3 +97,26 @@ def test_load_rows_projects_only_accepted_acquisition_site(monkeypatch):
         call for call in calls if call[0] == "prospect_acquisitions"
     ]
     assert acquisition_calls[0][1] == "created_at.desc"
+
+
+def test_load_env_uses_canonical_runtime_loader(tmp_path, monkeypatch):
+    runtime_env = tmp_path / "empire.env"
+    runtime_env.write_text(
+        "SUPABASE_URL=https://canonical.supabase.co\n"
+        "SUPABASE_SERVICE_KEY=canonical-key\n"
+    )
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+
+    env = _load_env(runtime_env)
+
+    assert env["SUPABASE_URL"] == "https://canonical.supabase.co"
+    assert env["SUPABASE_SERVICE_KEY"] == "canonical-key"
+    assert "SUPABASE_URL" not in __import__("os").environ
+    assert "SUPABASE_SERVICE_KEY" not in __import__("os").environ
+
+
+def test_default_runtime_env_path_is_user_service_secret_source():
+    import scripts.buyer_discovery_preview as preview
+
+    assert preview.ENV_PATH.endswith("/runtime/secrets/outbound.env")

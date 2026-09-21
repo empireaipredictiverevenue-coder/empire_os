@@ -18,18 +18,33 @@ from empire_os.buyer_discovery import (
     select_candidates,
 )
 from empire_os.niche_taxonomy import metro_key, niche_family
+from empire_os.runtime_env import load_runtime_env
+
+ENV_PATH = os.environ.get(
+    "EMPIRE_BUYER_DISCOVERY_ENV_PATH",
+    "/srv/empire_os/runtime/secrets/outbound.env",
+)
 
 
-def _load_env():
-    path = Path("/srv/empire_os/.env")
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip())
+def _load_env(path: str | Path = ENV_PATH) -> dict[str, str]:
+    return load_runtime_env(
+        path,
+        required=("SUPABASE_URL", "SUPABASE_SERVICE_KEY"),
+    )
+
+
+def _supabase_client():
+    from empire_os import sb
+
+    if sb._configured():
+        return sb
+
+    env = _load_env()
+    sb.SUPABASE_URL = env["SUPABASE_URL"].rstrip("/")
+    sb.SUPABASE_KEY = env["SUPABASE_SERVICE_KEY"]
+    if not sb._configured():
+        raise RuntimeError("canonical Supabase configuration required")
+    return sb
 
 
 def _pages(
@@ -63,10 +78,7 @@ def _pages(
 
 
 def load_rows():
-    _load_env()
-    from empire_os import sb
-    if not sb._configured():
-        raise RuntimeError("canonical Supabase configuration required")
+    sb = _supabase_client()
     prospects = _pages(
         sb.select, "prospects",
         "id,business_name,niche,metro,phone,website,buy_signal_score,status,notes,contact_name,contact_title,contact_source,contacted_status",
