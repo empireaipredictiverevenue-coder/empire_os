@@ -479,6 +479,196 @@ function ExecutionTunnel() {
   );
 }
 
+
+function ArchitecturalSpine() {
+  return (
+    <group>
+      {Array.from({ length: 34 }, (_, index) => {
+        const z = 7 - index * 2.05;
+        const width = 4.4 + (index % 5) * 0.18;
+        return (
+          <group key={index} position={[0, 0, z]}>
+            <mesh position={[0, -3.15, 0]}>
+              <boxGeometry args={[width * 2, 0.08, 1.5]} />
+              <meshStandardMaterial
+                color="#040705"
+                metalness={0.82}
+                roughness={0.24}
+                emissive={index % 4 === 0 ? "#102808" : "#041014"}
+                emissiveIntensity={0.18}
+              />
+            </mesh>
+            <mesh position={[0, 3.25, 0]}>
+              <boxGeometry args={[width * 2, 0.06, 1.1]} />
+              <meshStandardMaterial
+                color="#040705"
+                metalness={0.9}
+                roughness={0.2}
+                emissive={index % 3 === 0 ? "#06252a" : "#0c1c08"}
+                emissiveIntensity={0.14}
+              />
+            </mesh>
+            {[-1, 1].map((side) => (
+              <mesh
+                key={side}
+                position={[side * width, 0, 0]}
+              >
+                <boxGeometry args={[0.08, 6.4, 0.55]} />
+                <meshStandardMaterial
+                  color="#050806"
+                  metalness={0.92}
+                  roughness={0.18}
+                  emissive={index % 2 ? "#082329" : "#102507"}
+                  emissiveIntensity={0.2}
+                />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function LightShaft({
+  position,
+  height = 6,
+  radius = 1.3,
+  color = "#9dff4a",
+}: {
+  position: V3;
+  height?: number;
+  radius?: number;
+  color?: string;
+}) {
+  return (
+    <group position={position}>
+      <mesh rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[radius, height, 24, 1, true]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.055}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      <pointLight
+        color={color}
+        intensity={5}
+        distance={height * 1.1}
+        position={[0, height * 0.28, 0]}
+      />
+    </group>
+  );
+}
+
+function FloatingShardField() {
+  const group = useRef<THREE.Group>(null);
+
+  useFrame((state) => {
+    if (!group.current) return;
+    const t = state.clock.elapsedTime;
+    group.current.children.forEach((child, index) => {
+      child.rotation.x = t * (0.08 + (index % 4) * 0.02);
+      child.rotation.y = t * (0.06 + (index % 5) * 0.015);
+      child.position.y += Math.sin(t * 0.35 + index) * 0.0007;
+    });
+  });
+
+  return (
+    <group ref={group}>
+      {Array.from({ length: 22 }, (_, index) => {
+        const z = 2 - index * 2.55;
+        const side = index % 2 ? 1 : -1;
+        return (
+          <mesh
+            key={index}
+            position={[
+              side * (3.1 + (index % 4) * 0.34),
+              ((index * 7) % 9) * 0.48 - 1.8,
+              z,
+            ]}
+            rotation={[
+              index * 0.17,
+              index * 0.23,
+              index * 0.09,
+            ]}
+          >
+            <octahedronGeometry args={[0.18 + (index % 3) * 0.07, 0]} />
+            <meshPhysicalMaterial
+              color="#07100b"
+              metalness={0.95}
+              roughness={0.1}
+              clearcoat={1}
+              clearcoatRoughness={0.04}
+              emissive={index % 3 === 0 ? "#0f3b0a" : "#062d35"}
+              emissiveIntensity={0.34}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function WorldChapter({
+  position,
+  chapter,
+  side = "left",
+}: {
+  position: V3;
+  chapter: (typeof CHAPTERS)[number];
+  side?: "left" | "right";
+}) {
+  const scroll = useScroll();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useFrame(() => {
+    if (!ref.current) return;
+    const distance = Math.abs(scroll.offset - chapter.at);
+    const opacity = THREE.MathUtils.clamp(
+      1 - distance / 0.12,
+      0,
+      1,
+    );
+    ref.current.style.opacity = String(opacity);
+    ref.current.style.transform =
+      "translate3d(0," + ((1 - opacity) * 14).toFixed(1) + "px,0)";
+  });
+
+  return (
+    <Html
+      transform
+      sprite
+      center
+      position={position}
+      distanceFactor={8.5}
+      style={{ pointerEvents: "none" }}
+    >
+      <div
+        ref={ref}
+        className={
+          "w-[320px] rounded-2xl border border-white/10 bg-black/55 p-5 text-white shadow-2xl backdrop-blur-2xl transition-opacity md:w-[390px] " +
+          (side === "right" ? "text-right" : "text-left")
+        }
+      >
+        <div className="text-[8px] font-black tracking-[0.24em] text-[#9dff4a]">
+          {chapter.index} · {chapter.eyebrow}
+        </div>
+        <div className="mt-3 text-[26px] font-[520] leading-[0.94] tracking-[-0.045em] md:text-[34px]">
+          {chapter.title}
+        </div>
+        <div className="mt-4 text-[10px] leading-5 text-white/42 md:text-[11px]">
+          {chapter.body}
+        </div>
+      </div>
+    </Html>
+  );
+}
+
 function RevenueVault() {
   const monolith = useRef<THREE.Mesh>(null);
   useFrame((state) => {
@@ -624,13 +814,27 @@ function World() {
       />
 
       <CameraFlight />
+      <ArchitecturalSpine />
       <SignalDust />
+      <FloatingShardField />
       <Gate />
       <SignalAtrium />
       <Reactor />
       <OpportunityVault />
       <ExecutionTunnel />
       <RevenueVault />
+
+      <LightShaft position={[-2.1, 0.4, -3]} height={7} radius={1.5} />
+      <LightShaft position={[2.1, 0.2, -14]} height={7} radius={1.4} color="#00d9ff" />
+      <LightShaft position={[-2.25, 0.25, -27]} height={7} radius={1.5} />
+      <LightShaft position={[2.35, 0.1, -41]} height={7} radius={1.35} color="#00d9ff" />
+      <LightShaft position={[-1.8, 0.15, -58]} height={8} radius={1.6} />
+
+      <WorldChapter position={[-3.45, 1.15, -3.0]} chapter={CHAPTERS[0]} />
+      <WorldChapter position={[3.35, 1.2, -14.2]} chapter={CHAPTERS[1]} side="right" />
+      <WorldChapter position={[-3.4, 1.0, -27.4]} chapter={CHAPTERS[2]} />
+      <WorldChapter position={[3.4, 1.0, -41.0]} chapter={CHAPTERS[3]} side="right" />
+      <WorldChapter position={[-3.1, 0.9, -58.0]} chapter={CHAPTERS[4]} />
 
       <Hotspot
         position={[2.8, 1.9, -1.5]}
@@ -666,61 +870,37 @@ function ScrollNarrative() {
     <Scroll html>
       <div className="pointer-events-none w-screen">
         <section className="flex h-screen items-end px-5 pb-12 md:px-10 md:pb-16 lg:px-14">
-          <div className="max-w-[800px]">
+          <div className="max-w-[720px]">
             <div className="mb-5 text-[9px] font-black tracking-[0.26em] text-[#9dff4a]">
               ENTER EMPIRE
             </div>
-            <h1 className="max-w-[900px] text-[clamp(3.8rem,8.2vw,9rem)] font-[520] leading-[0.82] tracking-[-0.07em] text-[#f5fff6]">
+            <h1 className="text-[clamp(3.8rem,8.2vw,8.8rem)] font-[520] leading-[0.82] tracking-[-0.07em] text-[#f5fff6]">
               Walk through
-              <span className="block text-white/28">
+              <span className="block text-white/25">
                 predictive revenue.
               </span>
             </h1>
-            <p className="mt-6 max-w-xl text-[14px] leading-7 text-white/45 sm:text-[16px]">
-              Scroll to travel. Move your pointer to look around. Hover the
-              glowing nodes to navigate the machine.
+            <p className="mt-6 max-w-lg text-[14px] leading-7 text-white/42">
+              Scroll to move through the system. The world, objects and
+              chapters exist in the space around you.
             </p>
           </div>
         </section>
 
-        {CHAPTERS.map((chapter, index) => (
+        {Array.from({ length: 5 }, (_, index) => (
           <section
-            key={chapter.id}
-            className={
-              "flex h-screen items-center px-5 md:px-10 lg:px-14 " +
-              (index % 2 ? "justify-end" : "justify-start")
-            }
-          >
-            <div
-              className={
-                "max-w-[510px] " +
-                (index % 2 ? "text-right" : "")
-              }
-            >
-              <div className="mb-4 text-[8px] font-black tracking-[0.24em] text-[#9dff4a]">
-                {chapter.index} · {chapter.eyebrow}
-              </div>
-              <h2 className="text-[clamp(2.5rem,5vw,5.2rem)] font-[520] leading-[0.9] tracking-[-0.055em] text-white">
-                {chapter.title}
-              </h2>
-              <p
-                className={
-                  "mt-6 max-w-[500px] text-[13px] leading-6 text-white/42 sm:text-[15px] " +
-                  (index % 2 ? "ml-auto" : "")
-                }
-              >
-                {chapter.body}
-              </p>
-            </div>
-          </section>
+            key={index}
+            aria-hidden="true"
+            className="h-screen"
+          />
         ))}
 
         <section className="flex h-screen items-center px-5 md:px-10 lg:px-14">
-          <div className="max-w-[760px]">
+          <div className="max-w-[700px]">
             <div className="mb-5 text-[9px] font-black tracking-[0.25em] text-[#9dff4a]">
               THE LOOP CLOSES
             </div>
-            <h2 className="text-[clamp(3.4rem,7vw,7.5rem)] font-[520] leading-[0.85] tracking-[-0.065em] text-white">
+            <h2 className="text-[clamp(3.2rem,6.5vw,7.2rem)] font-[520] leading-[0.86] tracking-[-0.065em] text-white">
               Own the intelligence.
               <span className="block text-white/24">
                 Own the outcome.
