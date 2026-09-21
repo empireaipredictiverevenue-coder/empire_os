@@ -128,3 +128,93 @@ def test_landscape_combines_profiles_and_visibility_without_execution():
     assert result["market_share_inferred"] is False
     assert result["market_entry_execution"] is False
     assert result["publishing_enabled"] is False
+
+
+def test_competitor_audience_evidence_requires_provenance():
+    from empire_os.competitive_intelligence import (
+        review_competitor_audience_evidence,
+    )
+
+    result = review_competitor_audience_evidence({
+        "competitor_key": "competitor-a",
+        "competitor_domain": "competitor.example",
+        "company_name": "Acme Roofing",
+        "company_domain": "acme.example",
+        "evidence_type": "customer_case_study",
+        "summary": "Named in a public competitor case study.",
+        "observed_at": "2026-09-21T20:00:00Z",
+    })
+
+    assert result["review_ready"] is False
+    assert "source_ref_required" in result["blockers"]
+    assert result["buyer_intent"] is False
+    assert result["execution_authority"] == "none"
+
+
+def test_competitor_audience_graph_stacks_company_evidence_without_intent():
+    from empire_os.competitive_intelligence import (
+        build_competitor_audience_graph,
+    )
+
+    evidence = [
+        {
+            "competitor_key": "competitor-a",
+            "competitor_domain": "competitor.example",
+            "company_name": "Acme Roofing",
+            "company_domain": "https://www.acme.example/",
+            "evidence_type": "customer_case_study",
+            "summary": "Named in a public case study.",
+            "source_ref": "web:competitor-a:case-study:acme",
+            "observed_at": "2026-09-21T20:00:00Z",
+            "confidence": 0.95,
+        },
+        {
+            "competitor_key": "competitor-b",
+            "competitor_domain": "competitor-b.example",
+            "company_name": "Acme Roofing",
+            "company_domain": "acme.example",
+            "evidence_type": "search_overlap",
+            "summary": "Observed in the same public commercial search set.",
+            "source_ref": "search:commercial-roofing:acme",
+            "observed_at": "2026-09-21T20:05:00Z",
+            "confidence": 0.8,
+        },
+    ]
+
+    result = build_competitor_audience_graph(evidence)
+
+    assert result["company_count"] == 1
+    assert result["evidence_count"] == 2
+    assert result["companies"][0]["evidence_count"] == 2
+    assert result["companies"][0]["competitors"] == [
+        "competitor-a",
+        "competitor-b",
+    ]
+    assert result["companies"][0]["research_candidate"] is True
+    assert result["companies"][0]["buyer_intent"] is False
+    assert result["companies"][0]["commercial_intent"] is False
+    assert result["companies"][0]["prospect_created"] is False
+    assert result["outreach_enabled"] is False
+    assert result["execution_authority"] == "none"
+
+
+def test_competitor_audience_graph_rejects_unsupported_relationship_claim():
+    from empire_os.competitive_intelligence import (
+        build_competitor_audience_graph,
+    )
+
+    result = build_competitor_audience_graph([{
+        "competitor_key": "competitor-a",
+        "competitor_domain": "competitor.example",
+        "company_name": "Acme Roofing",
+        "company_domain": "acme.example",
+        "evidence_type": "definitely_ready_to_buy",
+        "summary": "Unsupported intent claim.",
+        "source_ref": "web:example",
+        "observed_at": "2026-09-21T20:00:00Z",
+    }])
+
+    assert result["company_count"] == 0
+    assert result["rejected_evidence_count"] == 1
+    assert result["buyer_intent_inferred"] is False
+    assert result["commercial_intent_inferred"] is False

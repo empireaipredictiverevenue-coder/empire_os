@@ -358,3 +358,173 @@ def build_competitive_landscape(
         "publishing_enabled": False,
         "outreach_enabled": False,
     }
+
+
+# ---------------------------------------------------------------------------
+# Competitor Audience Graph
+# ---------------------------------------------------------------------------
+
+COMPETITOR_AUDIENCE_EVIDENCE_TYPES = frozenset({
+    "customer_case_study",
+    "testimonial_company",
+    "partner_ecosystem",
+    "public_review_company",
+    "search_overlap",
+    "comparison_mention",
+    "event_participant",
+    "public_competitor_activity",
+})
+
+
+def _normalise_audience_domain(value: Any) -> str:
+    value = str(value or "").strip().lower()
+    value = value.removeprefix("https://").removeprefix("http://")
+    value = value.split("/", 1)[0]
+    return value.removeprefix("www.")
+
+
+def review_competitor_audience_evidence(
+    raw: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate public company-level competitor-audience evidence.
+
+    This establishes an observed relationship/evidence item only. It never
+    establishes buyer intent, commercial intent, prospect status or execution
+    authority.
+    """
+    competitor_key = str(raw.get("competitor_key") or "").strip()
+    competitor_domain = _normalise_audience_domain(
+        raw.get("competitor_domain")
+    )
+    company_name = str(raw.get("company_name") or "").strip()
+    company_domain = _normalise_audience_domain(raw.get("company_domain"))
+    evidence_type = str(raw.get("evidence_type") or "").strip()
+    summary = str(raw.get("summary") or "").strip()
+    source_ref = str(raw.get("source_ref") or "").strip()
+    observed_at = str(raw.get("observed_at") or "").strip()
+
+    blockers: list[str] = []
+
+    if not competitor_key:
+        blockers.append("competitor_key_required")
+    if not competitor_domain:
+        blockers.append("competitor_domain_required")
+    if not company_name and not company_domain:
+        blockers.append("company_identity_required")
+    if evidence_type not in COMPETITOR_AUDIENCE_EVIDENCE_TYPES:
+        blockers.append("unsupported_evidence_type")
+    if not summary:
+        blockers.append("summary_required")
+    if not source_ref:
+        blockers.append("source_ref_required")
+    if not observed_at:
+        blockers.append("observed_at_required")
+
+    confidence = raw.get("confidence")
+    if confidence is not None:
+        try:
+            confidence = float(confidence)
+        except (TypeError, ValueError):
+            blockers.append("confidence_invalid")
+            confidence = None
+        else:
+            if not 0.0 <= confidence <= 1.0:
+                blockers.append("confidence_invalid")
+
+    return {
+        "schema_version": "competitor_audience_evidence.v1",
+        "competitor_key": competitor_key,
+        "competitor_domain": competitor_domain,
+        "company_name": company_name,
+        "company_domain": company_domain,
+        "evidence_type": evidence_type,
+        "summary": summary,
+        "source_ref": source_ref,
+        "observed_at": observed_at,
+        "confidence": confidence,
+        "review_ready": not blockers,
+        "blockers": blockers,
+        "relationship_observed": not blockers,
+        "buyer_intent": False,
+        "commercial_intent": False,
+        "prospect_created": False,
+        "outreach_enabled": False,
+        "execution_authority": "none",
+    }
+
+
+def build_competitor_audience_graph(
+    evidence: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Build a deduplicated company-level graph from public evidence.
+
+    Companies are research candidates only. Canonical prospect promotion must
+    occur through EmpireOS identity-resolution and commercial governance.
+    """
+    reviewed = [
+        review_competitor_audience_evidence(row)
+        for row in evidence
+    ]
+
+    companies: dict[str, dict[str, Any]] = {}
+
+    for row in reviewed:
+        if not row["review_ready"]:
+            continue
+
+        identity = (
+            f"domain:{row['company_domain']}"
+            if row["company_domain"]
+            else f"name:{row['company_name'].casefold()}"
+        )
+
+        company = companies.setdefault(identity, {
+            "company_name": row["company_name"],
+            "company_domain": row["company_domain"],
+            "research_candidate": True,
+            "buyer_intent": False,
+            "commercial_intent": False,
+            "prospect_created": False,
+            "execution_authority": "none",
+            "competitors": set(),
+            "evidence": [],
+        })
+
+        company["competitors"].add(row["competitor_key"])
+        company["evidence"].append({
+            "competitor_key": row["competitor_key"],
+            "competitor_domain": row["competitor_domain"],
+            "evidence_type": row["evidence_type"],
+            "summary": row["summary"],
+            "source_ref": row["source_ref"],
+            "observed_at": row["observed_at"],
+            "confidence": row["confidence"],
+        })
+
+    graph_companies = []
+    for identity, company in sorted(companies.items()):
+        graph_companies.append({
+            **company,
+            "identity_key": identity,
+            "competitors": sorted(company["competitors"]),
+            "evidence_count": len(company["evidence"]),
+        })
+
+    rejected = [row for row in reviewed if not row["review_ready"]]
+
+    return {
+        "schema_version": "competitor_audience_graph.v1",
+        "mode": "OBSERVE",
+        "execution_authority": "none",
+        "company_count": len(graph_companies),
+        "evidence_count": sum(
+            company["evidence_count"] for company in graph_companies
+        ),
+        "rejected_evidence_count": len(rejected),
+        "companies": graph_companies,
+        "rejected_evidence": rejected,
+        "buyer_intent_inferred": False,
+        "commercial_intent_inferred": False,
+        "prospect_creation_enabled": False,
+        "outreach_enabled": False,
+    }
