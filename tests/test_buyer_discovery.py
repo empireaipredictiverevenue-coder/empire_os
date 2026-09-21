@@ -907,3 +907,10 @@ def test_prior_smtp_verified_generated_contact_survives_lightweight_recheck():
     assert plan["outreach_ready"] is True
     assert plan["verified_contacts"][0]["smtp_accepts"] is True
     assert plan["preferred_email"] == "jane.smith@acme.test"
+
+
+def test_placeholder_referral_program_is_not_a_person_name():
+    from empire_os.buyer_discovery import looks_like_person_name
+
+    assert looks_like_person_name("Your Referral Program") is False
+    assert looks_like_person_name("Kathy Thomas") is True

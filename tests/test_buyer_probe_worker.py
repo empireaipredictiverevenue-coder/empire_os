@@ -306,3 +306,23 @@ def test_first_party_non_buyer_contact_cannot_replace_decision_maker():
         }],
     )
     assert result["decision_maker"]["name"] == "Chad Thomas"
+
+
+def test_placeholder_person_cannot_be_promoted_from_first_party_contact():
+    import empire_os.buyer_probe_worker as worker
+
+    enriched = {
+        "decision_maker": None,
+        "contact_candidates": [],
+    }
+    result = worker._promote_confirmed_first_party_buyer(
+        enriched,
+        [{
+            "name": "Your Referral Program",
+            "title": "Founder",
+            "email": "your@email.com",
+            "source_url": "https://acme.test",
+            "source_kind": "official_site",
+        }],
+    )
+    assert result["decision_maker"] is None

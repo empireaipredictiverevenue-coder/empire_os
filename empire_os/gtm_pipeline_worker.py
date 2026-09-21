@@ -7,6 +7,7 @@ from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 
 from empire_os.conversation_value import build_first_touch_copy
+from empire_os.buyer_discovery import looks_like_person_name
 
 POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
 
@@ -18,6 +19,8 @@ class GTMPipelineResult:
     candidate_skipped: int
     reviews_ready_for_outbound: int
     intents_proposed: int
+    outreach_deferred: int
+    deferred_reasons: tuple[str, ...]
     proposal_errors: tuple[str, ...]
 
     def as_dict(self) -> dict[str, Any]:
@@ -27,6 +30,8 @@ class GTMPipelineResult:
             "candidate_skipped": self.candidate_skipped,
             "reviews_ready_for_outbound": self.reviews_ready_for_outbound,
             "intents_proposed": self.intents_proposed,
+            "outreach_deferred": self.outreach_deferred,
+            "deferred_reasons": list(self.deferred_reasons),
             "proposal_errors": list(self.proposal_errors),
             "actual_revenue": False,
             "payment_mutation": False,
@@ -113,7 +118,10 @@ def build_outbound_payload(
         raise ValueError("now must include timezone")
     evidence = review.get("evidence")
     evidence = evidence if isinstance(evidence, Mapping) else {}
-    first = _first_name(review.get("contact_name"))
+    raw_contact_name = str(review.get("contact_name") or "").strip()
+    if not looks_like_person_name(raw_contact_name):
+        raise ValueError("verified person contact required")
+    first = _first_name(raw_contact_name)
     if not first:
         raise ValueError("outbound contact name required")
     business, niche, metro = _required_context(evidence)
@@ -204,6 +212,8 @@ def run_gtm_pipeline(
         raise ValueError("approved review projection must be a list")
 
     proposed = 0
+    deferred = 0
+    deferred_reasons: list[str] = []
     errors: list[str] = []
     for review in ready[:bounded]:
         try:
@@ -220,6 +230,20 @@ def run_gtm_pipeline(
                 errors.append(
                     f"{payload['p_review_id']}:proposal_returned_no_intent"
                 )
+        except ValueError as exc:
+            review_id = str((review or {}).get("id") or "unknown")
+            message = str(exc)
+            if (
+                "specific outreach evidence required" in message
+                or "verified person contact required" in message
+                or "outbound personalization evidence missing" in message
+            ):
+                deferred += 1
+                deferred_reasons.append(f"{review_id}:{message[:180]}")
+            else:
+                errors.append(
+                    f"{review_id}:{type(exc).__name__}:{message[:180]}"
+                )
         except Exception as exc:
             review_id = str((review or {}).get("id") or "unknown")
             errors.append(
@@ -232,5 +256,7 @@ def run_gtm_pipeline(
         candidate_skipped=skipped,
         reviews_ready_for_outbound=len(ready),
         intents_proposed=proposed,
+        outreach_deferred=deferred,
+        deferred_reasons=tuple(deferred_reasons),
         proposal_errors=tuple(errors),
     )

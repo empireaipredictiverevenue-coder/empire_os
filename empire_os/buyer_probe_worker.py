@@ -10,6 +10,7 @@ from empire_os.buyer_discovery import (
     build_candidate,
     classify_decision_role,
     enrich_candidate,
+    looks_like_person_name,
     generate_work_email_candidates,
     merge_generated_contact_evidence,
     merge_public_web_contact_evidence,
@@ -120,6 +121,8 @@ def _promote_confirmed_first_party_buyer(
         source_url = str(item.get("source_url") or "").strip()
         if not (name and title and email and source_url):
             continue
+        if not looks_like_person_name(name):
+            continue
         role, score = classify_decision_role(title)
         if role not in {"economic_buyer", "functional_buyer"} or score < 0.7:
             continue
@@ -188,6 +191,7 @@ def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
         official_people = [
             item for item in rank_site_people(evidence.get("people") or [])
             if item.get("email")
+            and looks_like_person_name(item.get("name"))
             and float(item.get("decision_score") or 0.0) >= 0.70
         ]
         if official_people:

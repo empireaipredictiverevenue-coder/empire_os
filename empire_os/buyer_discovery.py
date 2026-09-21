@@ -38,7 +38,7 @@ NON_PERSON_NAME_TERMS = {
     "lorem", "ipsum", "himself", "herself", "itself", "who", "what", "when",
     "where", "why", "how", "was", "were", "is", "are", "does", "did", "not",
     "after", "before", "through", "each", "very", "exceptional", "needed", "came",
-    "ship", "club", "engineer",
+    "ship", "club", "engineer", "your", "referral", "program", "email",
 }
 
 

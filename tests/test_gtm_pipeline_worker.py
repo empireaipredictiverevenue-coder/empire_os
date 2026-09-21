@@ -205,7 +205,56 @@ def test_pipeline_skips_when_canonical_context_cannot_be_resolved():
     result = run_gtm_pipeline(request, now=NOW)
 
     assert result.intents_proposed == 0
-    assert len(result.proposal_errors) == 1
+    assert result.outreach_deferred == 1
+    assert result.proposal_errors == ()
     assert "outbound personalization evidence missing" in (
-        result.proposal_errors[0]
+        result.deferred_reasons[0]
     )
+
+
+def test_placeholder_contact_is_deferred_not_proposed():
+    calls = []
+    bad = review("00000000-0000-0000-0000-000000000050")
+    bad["contact_name"] = "Your Referral Program"
+    bad["contact_email"] = "your@email.com"
+
+    def request(method, path, payload=None, **_kwargs):
+        calls.append((method, path, payload))
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            return []
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return [bad]
+        if path.endswith("propose_reviewed_outbound_intent"):
+            raise AssertionError("placeholder contact must never be proposed")
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+    assert result.intents_proposed == 0
+    assert result.outreach_deferred == 1
+    assert result.proposal_errors == ()
+    assert "verified person contact required" in result.deferred_reasons[0]
+
+
+def test_missing_specific_proof_is_deferred_not_service_error():
+    no_proof = review("00000000-0000-0000-0000-000000000051")
+    no_proof["evidence"].pop("rating", None)
+    no_proof["evidence"].pop("review_count", None)
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            return []
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return [no_proof]
+        if path.endswith("propose_reviewed_outbound_intent"):
+            raise AssertionError("evidence-poor contact must not be proposed")
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+    assert result.intents_proposed == 0
+    assert result.outreach_deferred == 1
+    assert result.proposal_errors == ()
+    assert "specific outreach evidence required" in result.deferred_reasons[0]
