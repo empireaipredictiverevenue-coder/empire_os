@@ -245,7 +245,23 @@ Satellite imagery must never invent damage or business identity.
 - corridor/territory opportunity creation
 - MRR alerts/API/data product
 
-### 4.7 Market Scanner / Source Mesh
+### 4.7 Oil & Gas / Energy Infrastructure Intelligence — INCUBATE / RESEARCH
+- reuse permit/licence, Property, Industrial, Satellite/Volumetric, Corporate
+  Change and Market Intelligence rather than creating a parallel platform;
+- operator / owner / asset / infrastructure identity;
+- drilling / well / environmental / land / planning activity where lawful and
+  supported by real sources;
+- service-company / supplier / contractor ecosystems;
+- maintenance / expansion / corporate-change trigger intelligence;
+- basin / territory / infrastructure maps;
+- private-capital energy roll-up intelligence;
+- alerts / API / data-export concepts.
+
+This node is research/incubation only until source rights, canonical identity,
+buyer demand, fulfilment, compliance and economics are validated. It has no
+commercial execution authority by virtue of appearing in this blueprint.
+
+### 4.8 Market Scanner / Source Mesh
 - multi-source discovery
 - market imbalance
 - demand/supply
@@ -808,7 +824,14 @@ Raw signals
 13. `COMMERCIAL_BLUEPRINT.md`
    Buyer/seats/territories/corridors/MRR detail.
 
-14. Phase/product docs
+14. `COMMERCIAL_RECOVERY_AND_REVENUE_MAP.md`
+   Canonical recovery/commercialization index for salvaged, half-built and
+   newly incubated product families. It preserves Permit, Property, Private
+   Capital, Storm, Satellite, Warehouse, recovered commercial products,
+   marketing/GTM plans and new research nodes without promoting them into
+   production truth or approved pricing.
+
+15. Phase/product docs
    Implementation-specific detail.
 
 No future phase document should silently redefine the company model.
