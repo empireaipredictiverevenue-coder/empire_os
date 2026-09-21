@@ -410,6 +410,29 @@ export type FounderDailyResults = {
     proposal_created?: boolean | null;
     pulse_delivery_gap?: number | null;
   };
+  founder_directives?: {
+    available?: boolean;
+    directive_count?: number | null;
+    status_counts?: Record<string, number>;
+    category_counts?: Record<string, number>;
+    founder_gate_count?: number | null;
+    automatic_planning?: boolean | null;
+    automatic_production_execution?: boolean | null;
+    execution_mode?: string | null;
+    latest?: Array<{
+      id?: string;
+      title?: string;
+      category?: string;
+      status?: string;
+      authority?: string;
+      priority?: number;
+      coder_task_id?: string | null;
+      coder_job_id?: string | null;
+      implementation_task_id?: string | null;
+      implementation_job_id?: string | null;
+      commit_sha?: string | null;
+    }>;
+  };
   coder?: {
     pending?: number;
     running?: number;
