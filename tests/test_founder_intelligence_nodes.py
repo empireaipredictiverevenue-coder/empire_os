@@ -48,3 +48,39 @@ def test_energy_node_is_explicitly_incubated(tmp_path):
     assert rows["oil_gas_energy"]["execution_authority"] == "intelligence_only"
     assert rows["private_capital"]["lifecycle_state"] == "ACTIVE_BUILD"
     assert rows["property"]["lifecycle_state"] == "ACTIVE_BUILD"
+
+
+
+def test_property_node_uses_real_permit_evidence_without_inventing_opportunities(tmp_path):
+    path = tmp_path / "runtime/acquisition/signal_inbox.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({
+        "permit": {
+            "source": "permits_nyc",
+            "status": "resolved",
+            "metro": "NYC",
+            "created_at": "2026-09-21T10:00:00+00:00",
+            "raw": {"job__": "1"},
+        }
+    }))
+
+    payload = build_intelligence_nodes_projection(tmp_path)
+    rows = {row["key"]: row for row in payload["nodes"]}
+    prop = rows["property"]["runtime_evidence"]
+
+    assert prop["observation_count"] == 1
+    assert prop["evidence_state"] == "EVIDENCE_AVAILABLE"
+    assert "permits_nyc" in prop["observed_sources"]
+    assert prop["opportunity_count"] is None
+    assert prop["revenue_cents"] is None
+
+
+def test_private_capital_node_stays_unknown_without_canonical_snapshot(tmp_path):
+    payload = build_intelligence_nodes_projection(tmp_path)
+    rows = {row["key"]: row for row in payload["nodes"]}
+    pe = rows["private_capital"]["runtime_evidence"]
+
+    assert pe["observation_count"] is None
+    assert pe["evidence_state"] == "UNKNOWN"
+    assert pe["opportunity_count"] is None
+    assert pe["revenue_cents"] is None
