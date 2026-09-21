@@ -87,6 +87,89 @@ WHERE p.product_code='managed_service'
     WHERE v.product_id=p.id
   );
 
+CREATE OR REPLACE FUNCTION public.register_commercial_product_identity(
+  p_product_code text,
+  p_product_name text,
+  p_product_family text,
+  p_billing_model text,
+  p_configuration jsonb,
+  p_provenance jsonb,
+  p_actor text
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path=''
+AS $
+DECLARE
+  product_row public.commercial_products%ROWTYPE;
+BEGIN
+  IF trim(COALESCE(p_product_code,''))=''
+     OR trim(COALESCE(p_product_name,''))=''
+     OR trim(COALESCE(p_product_family,''))=''
+     OR trim(COALESCE(p_billing_model,''))=''
+     OR trim(COALESCE(p_actor,''))='' THEN
+    RAISE EXCEPTION 'complete product identity and actor required';
+  END IF;
+
+  IF jsonb_typeof(COALESCE(p_configuration,'{}'::jsonb))<>'object'
+     OR jsonb_typeof(COALESCE(p_provenance,'{}'::jsonb))<>'object' THEN
+    RAISE EXCEPTION 'configuration and provenance must be objects';
+  END IF;
+
+  INSERT INTO public.commercial_products(
+    product_code,
+    product_name,
+    product_family,
+    billing_model,
+    active,
+    configuration,
+    currency,
+    catalog_state,
+    provenance
+  ) VALUES (
+    trim(p_product_code),
+    trim(p_product_name),
+    trim(p_product_family),
+    trim(p_billing_model),
+    true,
+    COALESCE(p_configuration,'{}'::jsonb),
+    'USD',
+    'UNKNOWN',
+    COALESCE(p_provenance,'{}'::jsonb)
+  )
+  ON CONFLICT (product_code) DO UPDATE
+  SET product_name=excluded.product_name,
+      product_family=excluded.product_family,
+      configuration=excluded.configuration,
+      provenance=public.commercial_products.provenance || excluded.provenance,
+      updated_at=clock_timestamp()
+  RETURNING * INTO product_row;
+
+  INSERT INTO public.commercial_product_catalog_events(
+    product_id,event_type,actor,payload
+  ) VALUES (
+    product_row.id,
+    'identity_synchronized',
+    p_actor,
+    jsonb_build_object(
+      'product_code',product_row.product_code,
+      'catalog_state',product_row.catalog_state,
+      'economics_mutated',false,
+      'actual_revenue',false
+    )
+  );
+
+  RETURN jsonb_build_object(
+    'decision','identity_synchronized',
+    'product_id',product_row.id,
+    'product_code',product_row.product_code,
+    'catalog_state',product_row.catalog_state,
+    'economics_mutated',false,
+    'actual_revenue',false
+  );
+END;
+$;
+
 CREATE OR REPLACE FUNCTION public.propose_commercial_product_version(
   p_product_code text,
   p_billing_model text,
@@ -443,6 +526,10 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.register_commercial_product_identity(
+  text,text,text,text,jsonb,jsonb,text
+) FROM PUBLIC,anon,authenticated;
+
 REVOKE ALL ON FUNCTION public.propose_commercial_product_version(
   text,text,text,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,
   timestamptz,timestamptz,text
@@ -454,6 +541,10 @@ FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.decide_commercial_product_version(
   uuid,text,text,text
 ) FROM PUBLIC,anon,authenticated,service_role;
+
+GRANT EXECUTE ON FUNCTION public.register_commercial_product_identity(
+  text,text,text,text,jsonb,jsonb,text
+) TO service_role;
 
 GRANT EXECUTE ON FUNCTION public.propose_commercial_product_version(
   text,text,text,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,
