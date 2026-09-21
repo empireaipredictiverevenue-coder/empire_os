@@ -113,3 +113,26 @@ def test_context_builder_filters_guarded_knowledge(tmp_path):
     assert "empire_os/skills_library/skills/mcp-builder/SKILL.md" in paths
     assert "empire_os/data/prompts/stale.txt" not in paths
     assert "empire_os/data/prompts/review.txt" not in paths
+
+
+def test_manifest_sync_is_safe_under_concurrent_writers(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    import json
+
+    root = make_repo(tmp_path)
+    garden = KnowledgeGarden(root)
+    report = garden.scan()
+
+    def sync_once(_index):
+        payload = garden.sync_manifest(report=report)
+        return len(payload["active"])
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(sync_once, range(40)))
+
+    assert all(value >= 1 for value in results)
+    target = root / "runtime/coder/knowledge/active.json"
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload["version"] == 1
+    assert payload["policy"] == "active_only_default"
+    assert not list(target.parent.glob(".active.json.*.tmp"))

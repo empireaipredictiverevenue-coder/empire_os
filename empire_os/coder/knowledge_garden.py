@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import uuid
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
@@ -332,12 +333,20 @@ class KnowledgeGarden:
                 if row.status is KnowledgeStatus.QUARANTINED
             ],
         }
-        tmp = target.with_suffix(target.suffix + ".tmp")
-        tmp.write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        tmp = target.with_name(
+            f".{target.name}.{uuid.uuid4().hex}.tmp"
         )
-        tmp.replace(target)
+        try:
+            tmp.write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            tmp.replace(target)
+        finally:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
         return payload
 
     def _candidates(
