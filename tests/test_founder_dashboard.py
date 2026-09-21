@@ -229,3 +229,20 @@ def test_dashboard_does_not_raise_founder_gate_for_external_wait(tmp_path):
     result = build_founder_dashboard(root)
     assert result["control_conveyor"]["authority"] == "internal_write"
     assert result["founder_gate"]["required"] is False
+
+
+
+def test_dashboard_exposes_recovery_portfolio_without_commercial_authority(tmp_path):
+    result = build_founder_dashboard(make_root(tmp_path))
+    portfolio = result["recovery_portfolio"]
+    assert portfolio["summary"]["product_count"] >= 10
+    assert portfolio["summary"]["pricing_observed_count"] == 0
+    assert portfolio["pricing_authority"] == "none"
+    assert portfolio["execution_authority"] == "none"
+    assert portfolio["actual_revenue"] is False
+
+    rows = {row["key"]: row for row in portfolio["products"]}
+    assert rows["permit_intelligence"]["state"] == "ACTIVE_BUILD"
+    assert rows["property_intelligence"]["state"] == "ACTIVE_BUILD"
+    assert rows["private_capital_rollup"]["state"] == "ACTIVE_BUILD"
+    assert rows["oil_gas_intelligence"]["state"] == "INCUBATE"
