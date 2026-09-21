@@ -1,5 +1,6 @@
 from empire_os.commercial_product_identity_sync import (
     search_product_identity_rows,
+    strategic_product_identity_rows,
     sync_commercial_product_identities,
 )
 
@@ -47,3 +48,23 @@ def test_identity_sync_calls_only_identity_rpc():
         payload["p_provenance"]["pricing_observed"] is False
         for _method, _path, payload in calls
     )
+
+
+
+def test_strategic_products_sync_without_economics():
+    rows = strategic_product_identity_rows()
+    codes = {row["product_code"] for row in rows}
+
+    assert codes == {
+        "permit_intelligence",
+        "property_intelligence",
+        "private_capital_rollup",
+    }
+
+    for row in rows:
+        assert row["billing_model"] == "terms_required"
+        assert row["provenance"]["pricing_observed"] is False
+        assert row["provenance"]["economics_state"] == "UNKNOWN"
+        assert row["configuration"]["execution_authority"] == "none"
+        assert "price" not in row
+        assert "cost" not in row
