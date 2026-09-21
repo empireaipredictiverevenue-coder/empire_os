@@ -47,6 +47,8 @@ const CHAPTERS = [
   },
 ] as const;
 
+const CHAPTER_TARGETS = [0.24, 0.44, 0.63, 0.8, 0.94] as const;
+
 function FallbackEngine() {
   return (
     <div className="pointer-events-none fixed inset-0 z-10 overflow-hidden bg-[#020817]">
@@ -168,7 +170,7 @@ export default function Home() {
 
       <aside className="pointer-events-auto fixed right-5 top-1/2 z-50 hidden -translate-y-1/2 flex-col gap-2 xl:flex">
         {CHAPTERS.map((chapter, index) => {
-          const target = 0.18 + index * 0.18;
+          const target = CHAPTER_TARGETS[index];
           const selected = activeChapter === index;
           return (
             <button
@@ -218,7 +220,7 @@ export default function Home() {
                   Empire is the predictive revenue infrastructure layer for discovering where value is forming, deciding what deserves action, and turning verified market evidence into governed commercial execution.
                 </p>
                 <div className="pointer-events-auto mt-8 flex flex-wrap gap-3">
-                  <button type="button" onClick={() => jumpToChapter(0.18)} className="group inline-flex min-h-12 items-center gap-3 rounded-full bg-[#eaf2ff] px-5 text-[9px] font-semibold tracking-[0.13em] text-[#07132c] shadow-[0_10px_45px_rgba(59,130,246,.22)] transition hover:-translate-y-0.5 hover:bg-white">
+                  <button type="button" onClick={() => jumpToChapter(CHAPTER_TARGETS[0])} className="group inline-flex min-h-12 items-center gap-3 rounded-full bg-[#eaf2ff] px-5 text-[9px] font-semibold tracking-[0.13em] text-[#07132c] shadow-[0_10px_45px_rgba(59,130,246,.22)] transition hover:-translate-y-0.5 hover:bg-white">
                     ENTER THE SYSTEM
                     <ChevronDown className="size-3.5 transition-transform group-hover:translate-y-0.5" />
                   </button>
