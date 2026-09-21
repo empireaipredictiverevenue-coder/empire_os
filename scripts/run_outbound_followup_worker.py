@@ -16,11 +16,11 @@ def main() -> int:
     result = run_followup_worker(
         request_json,
         limit=args.limit,
-        start_hour_utc=int(
-            os.getenv("EMPIRE_OUTBOUND_WINDOW_START_UTC", "14")
+        start_hour_local=int(
+            os.getenv("EMPIRE_OUTBOUND_LOCAL_START_HOUR", "8")
         ),
-        end_hour_utc=int(
-            os.getenv("EMPIRE_OUTBOUND_WINDOW_END_UTC", "21")
+        end_hour_local=int(
+            os.getenv("EMPIRE_OUTBOUND_LOCAL_END_HOUR", "18")
         ),
     )
     payload = result.as_dict()
