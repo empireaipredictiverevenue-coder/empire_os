@@ -222,10 +222,19 @@ def test_run_source_safe_rejects_signal_before_ingest(monkeypatch):
     )
 
     calls = []
+    queued = []
 
     monkeypatch.setattr(
         "empire_os.crawler_runner.ingest_candidate",
         lambda cand: calls.append(cand.name),
+    )
+    monkeypatch.setattr(
+        "empire_os.crawler_runner.enqueue_signal",
+        lambda cand, quality=None: queued.append(cand.name) or {
+            "signal_id": "test-signal-1",
+            "decision": "created",
+            "locale": {},
+        },
     )
     monkeypatch.setattr(
         "empire_os.crawler_runner.log",
@@ -239,8 +248,9 @@ def test_run_source_safe_rejects_signal_before_ingest(monkeypatch):
         max_candidates=1,
     )
 
-    assert (found, accepted, errors) == (1, 0, 0)
+    assert (found, accepted, errors) == (1, 1, 0)
     assert calls == []
+    assert queued == ["Example Property Owner LLC (Queens)"]
 
 
 
