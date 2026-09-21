@@ -101,6 +101,7 @@ New first-class intelligence layers:
 
 Current work:
 - Intelligence Nodes: Home Services, Solar & Energy, HVAC & Climate Services, Property, Market Intent, Corporate Change, Private Capital & Roll-Up, Government Spend, Healthcare Growth, Compliance/Risk, Legal & Mass Tort;
+- Incubation node: Oil & Gas / Energy Infrastructure Intelligence. Reuse Permit, Property, Industrial, Satellite/Volumetric, Corporate Change and Market Intelligence foundations; remain read-only/research until source rights, canonical asset/operator identity, buyer demand, compliance, fulfilment and economics are validated;
 - canonical entity/evidence reconciliation and temporal provenance;
 - recover the existing Legal/Mass Tort firm dataset into canonical truth without promoting dry-run candidates blindly;
 - define read-only product contracts for market maps, directories, opportunity feeds, trigger alerts, territory intelligence and buyer intelligence.
@@ -716,3 +717,18 @@ Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deploym
 
 ## Definition of Actual Revenue
 Actual revenue requires independently verifiable payment evidence tied to a real buyer, real commercial terms and the relevant Empire request/order. Escrow funding is not revenue; a verified escrow release is only revenue-eligible until a separate governed accounting event recognizes it. Modeled, forecast, quoted, pending, simulated or manually asserted values are not actual revenue.
+
+
+## Commercial Recovery / Salvage Continuity
+
+`docs/COMMERCIAL_RECOVERY_AND_REVENUE_MAP.md` is the canonical recovery and
+commercialization index for legacy/half-built products and marketing plans.
+
+It preserves multi-revenue scope across Permit, Property, Private Capital,
+Storm, Satellite, Warehouse/Industrial, Search, Revenue Pulse, recovered
+Retainer/Evaluation/Audit/Marketplace concepts, Enterprise/White Label and
+incubation opportunities such as Oil & Gas / Energy Infrastructure.
+
+Recovery status is not production status. Historical pricing is not current
+pricing. The governed commercial catalog, runtime and canonical Supabase remain
+the final truth for what is sellable, executable or recognized as revenue.
