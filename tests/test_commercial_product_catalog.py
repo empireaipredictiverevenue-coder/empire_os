@@ -112,3 +112,21 @@ def test_snapshot_write_is_read_only_projection(tmp_path):
     assert written == path
     assert path.exists()
     assert '"product_count": 0' in path.read_text()
+
+
+def test_database_effective_window_can_block_otherwise_verified_item():
+    row = base_row()
+    row["binding_terms_ready"] = False
+    result = assess_catalog_item(row)
+    assert result["binding_terms_ready"] is False
+    assert result["readiness_blockers"] == [
+        "catalog_effective_window_inactive"
+    ]
+
+
+def test_public_projection_hides_verified_but_inactive_economics_window():
+    row = base_row()
+    row["binding_terms_ready"] = False
+    result = public_catalog_projection({"products": [row]})
+    assert result["count"] == 0
+    assert result["products"] == []
