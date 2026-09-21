@@ -153,6 +153,23 @@ def run_commercial_terms_materializer(
                 raise ValueError("fulfilment order not found")
             order = orders[0]
             capacity = capacities[0] if capacities else {}
+            catalog = _rpc(
+                request,
+                "get_commercial_product_readiness",
+                {"p_product_code": "managed_service"},
+            )
+            if catalog.get("binding_terms_ready") is not True:
+                blocked += 1
+                catalog_blockers = catalog.get("blockers")
+                if isinstance(catalog_blockers, list) and catalog_blockers:
+                    blockers.update(
+                        f"catalog_{str(value)}"
+                        for value in catalog_blockers
+                    )
+                else:
+                    blockers["commercial_product_catalog_not_ready"] += 1
+                continue
+
             evidence = _rpc(
                 request,
                 "get_verified_terms_evidence",
