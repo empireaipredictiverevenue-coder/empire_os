@@ -304,3 +304,32 @@ def test_main_keeps_healthy_zero_result_as_success(monkeypatch):
     )
 
     assert crawler.main() == 0
+
+
+
+def test_run_source_safe_logs_matched_inventory_separately(monkeypatch):
+    src = SimpleNamespace(
+        name="overpass",
+        tier="real",
+        requires=[],
+        run_fn=lambda metro=None: iter([candidate()]),
+    )
+    events = []
+
+    monkeypatch.setattr(
+        "empire_os.crawler_runner.ingest_candidate",
+        lambda cand: {
+            "decision": "matched",
+            "prospect": {"id": "existing-1"},
+        },
+    )
+    monkeypatch.setattr(
+        "empire_os.crawler_runner.log",
+        lambda level, msg, **kwargs: events.append((level, msg, kwargs)),
+    )
+
+    found, accepted, errors = run_source_safe(src, None, False)
+
+    assert (found, accepted, errors) == (1, 1, 0)
+    assert any(msg == "prospect_matched" for _, msg, _ in events)
+    assert not any(msg == "prospect_acquired" for _, msg, _ in events)
