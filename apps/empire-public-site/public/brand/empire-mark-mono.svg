@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Empire AI mark">
+  <path d="M64 7 114 36v56L64 121 14 92V36L64 7Z" fill="currentColor" opacity=".08"/>
+  <path d="M64 13 108 39v50l-44 26-44-26V39l44-26Z" fill="none" stroke="currentColor" stroke-width="3.2"/>
+  <path d="M39 37h51l-8 12H54v10h24l-8 12H54v10h36L82 93H39V37Z" fill="currentColor"/>
+  <path d="M64 50V28M64 102V80M27 64h12m50 0h12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="64" cy="65" r="6.2" fill="currentColor"/>
+</svg>

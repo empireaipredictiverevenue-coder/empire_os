@@ -129,3 +129,63 @@ h2 {
     animation-iteration-count: 1;
   }
 }
+
+
+@keyframes empireAtmosphere {
+  0%, 100% { transform: translate3d(-1.5%, -1%, 0) scale(1.02); opacity: .58; }
+  50% { transform: translate3d(1.5%, 1%, 0) scale(1.05); opacity: .82; }
+}
+
+@keyframes empireGrain {
+  0% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-1.5%, .7%, 0); }
+  40% { transform: translate3d(1%, -1.2%, 0); }
+  60% { transform: translate3d(.6%, 1.1%, 0); }
+  80% { transform: translate3d(-.8%, -.6%, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes empireCopyEnter {
+  from {
+    opacity: 0;
+    filter: blur(12px);
+    transform: translate3d(0, 24px, 0);
+    clip-path: inset(0 0 18% 0);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(0, 0, 0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.empire-copy-enter {
+  animation: empireCopyEnter .72s cubic-bezier(.2,.72,.2,1) both;
+}
+
+.empire-atmosphere {
+  inset: -8%;
+  background:
+    radial-gradient(circle at 72% 42%, rgba(37, 99, 235, .09), transparent 23%),
+    radial-gradient(circle at 56% 64%, rgba(34, 211, 238, .035), transparent 22%),
+    linear-gradient(118deg, transparent 35%, rgba(96, 165, 250, .025) 50%, transparent 66%);
+  mix-blend-mode: screen;
+  animation: empireAtmosphere 12s ease-in-out infinite;
+}
+
+.empire-film-grain {
+  inset: -15%;
+  opacity: .07;
+  background-image:
+    repeating-radial-gradient(circle at 17% 23%, rgba(255,255,255,.14) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(125,211,252,.035) 0 1px, transparent 1px 5px);
+  background-size: 13px 11px, 100% 7px;
+  mix-blend-mode: soft-light;
+  animation: empireGrain .42s steps(2, end) infinite;
+}
+
+@media (max-width: 900px) {
+  .empire-film-grain { opacity: .045; }
+  .empire-copy-enter { animation-duration: .56s; }
+}

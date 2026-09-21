@@ -79,8 +79,12 @@ function Brand() {
       aria-label="Empire AI home"
     >
       <span className="relative grid size-10 place-items-center overflow-hidden rounded-xl border border-[#4f8cff]/25 bg-[#06112c]/85 shadow-[0_0_40px_rgba(37,99,235,.16)] backdrop-blur-xl">
-        <span className="absolute inset-[6px] rounded-[7px] border border-[#60a5fa]/35" />
-        <span className="font-black text-[#93c5fd]">E</span>
+        <img
+          src="/brand/empire-mark.svg?v=1"
+          alt=""
+          aria-hidden="true"
+          className="size-7 object-contain opacity-95"
+        />
       </span>
       <span>
         <strong className="block text-[11px] font-semibold tracking-[0.22em] text-white">
@@ -149,6 +153,8 @@ export default function Home() {
 
       <div className="pointer-events-none fixed inset-0 z-20 bg-[radial-gradient(circle_at_62%_45%,rgba(37,99,235,.06),transparent_34%,rgba(2,8,23,.74)_100%)]" />
       <div className="pointer-events-none fixed inset-0 z-20 bg-[linear-gradient(90deg,rgba(2,8,23,.72),rgba(2,8,23,.28)_42%,rgba(2,8,23,.06)_67%,rgba(2,8,23,.34))]" />
+      <div className="empire-atmosphere pointer-events-none fixed inset-0 z-20" />
+      <div className="empire-film-grain pointer-events-none fixed inset-0 z-20" />
 
       <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-5 py-5 md:px-8 lg:px-12">
         <div className="mx-auto flex max-w-[1560px] items-center justify-between">
@@ -192,7 +198,7 @@ export default function Home() {
         <div className="mx-auto w-full max-w-[1560px]">
           <div className="max-w-[780px]">
             {active ? (
-              <div key={active.eyebrow} className="animate-[fadeIn_.45s_ease-out]">
+              <div key={active.eyebrow} className="empire-copy-enter">
                 <div className="mb-5 flex items-center gap-3 text-[9px] font-semibold tracking-[0.22em] text-[#60a5fa]">
                   <span className="h-px w-8 bg-gradient-to-r from-[#60a5fa] to-transparent" />
                   {active.eyebrow}
@@ -205,7 +211,7 @@ export default function Home() {
                 </p>
               </div>
             ) : (
-              <div>
+              <div className="empire-copy-enter">
                 <div className="mb-5 flex items-center gap-3 text-[9px] font-semibold tracking-[0.22em] text-[#60a5fa]">
                   <span className="size-1.5 rounded-full bg-[#60a5fa] shadow-[0_0_18px_rgba(96,165,250,.8)]" />
                   PREDICTIVE REVENUE INFRASTRUCTURE

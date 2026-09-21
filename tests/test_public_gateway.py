@@ -133,6 +133,26 @@ def test_csp_allows_only_hashed_inline_scripts(monkeypatch, tmp_path):
     assert "'unsafe-inline'" not in csp.split("style-src", 1)[0]
 
 
+def test_brand_asset_is_served_from_export(monkeypatch, tmp_path):
+    brand_dir = tmp_path / "brand"
+    brand_dir.mkdir()
+    mark = brand_dir / "empire-mark.svg"
+    mark.write_text("<svg></svg>")
+    monkeypatch.setattr("empire_os.public_gateway.SITE_OUT", tmp_path)
+    from empire_os.public_gateway import brand_asset
+
+    response = brand_asset("empire-mark.svg")
+    assert Path(response.path) == mark
+    assert response.media_type == "image/svg+xml"
+
+
+def test_unknown_brand_asset_is_rejected():
+    from empire_os.public_gateway import brand_asset
+
+    response = brand_asset("../secret.svg")
+    assert response.status_code == 404
+
+
 def test_site_icon_is_served_from_export(monkeypatch, tmp_path):
     icon = tmp_path / "icon.svg"
     icon.write_text("<svg></svg>")

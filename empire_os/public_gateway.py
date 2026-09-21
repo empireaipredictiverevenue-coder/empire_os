@@ -350,6 +350,27 @@ def robots():
     )
 
 
+_PUBLIC_BRAND_ASSETS = {
+    "empire-mark.svg",
+    "empire-mark-mono.svg",
+    "empire-logo.svg",
+}
+
+
+@app.get("/brand/{asset_name}")
+def brand_asset(asset_name: str):
+    if asset_name not in _PUBLIC_BRAND_ASSETS:
+        return JSONResponse({"error": "brand_asset_not_found"}, status_code=404)
+    path = SITE_OUT / "brand" / asset_name
+    if not path.is_file():
+        return JSONResponse({"error": "brand_asset_unavailable"}, status_code=404)
+    return FileResponse(
+        path,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.get("/icon.svg")
 def site_icon():
     path = SITE_OUT / "icon.svg"
