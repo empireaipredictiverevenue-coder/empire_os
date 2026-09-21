@@ -230,9 +230,14 @@ def run_source_safe(src, metro, dry_run, max_candidates=None):
                 (prepare_candidate(cand).get("evidence") or {}).get("locale")
                 or {}
             )
+            event = (
+                "prospect_acquired"
+                if decision == "created"
+                else "prospect_matched"
+            )
             log(
                 "CANONICAL",
-                "prospect_acquired",
+                event,
                 source=cand.source,
                 name=cand.name[:40],
                 decision=decision,
