@@ -1,6 +1,7 @@
 from empire_os.revenue_pulse import (
     RevenuePulseForecast,
     RevenuePulseWindow,
+    SpatialPhysicalPulse,
     StormPulse,
     build_revenue_pulse,
 )
@@ -52,6 +53,24 @@ def test_forecast_and_storm_never_enter_revenue_truth():
     assert truth["forecast_included_in_truth"] is False
     assert pulse["forecast"]["items"][0]["forecast_revenue_cents"] == 500_000
     assert pulse["storm_pulse"]["max_multiplier"] == 2.454
+
+
+def test_spatial_physical_pulse_stays_outside_revenue_truth():
+    pulse = build_revenue_pulse(
+        current=window(),
+        spatial_physical=SpatialPhysicalPulse(
+            volumetric_observations=4,
+            physical_observations=3,
+            modeled_opportunities=2,
+            max_combined_priority_boost=48.2,
+            evidence_refs=("spatial:batch:1", "physical:batch:1"),
+        ),
+    )
+
+    assert pulse["spatial_physical_pulse"]["modeled_opportunities"] == 2
+    assert pulse["recognized_revenue_truth"]["recognized_revenue_cents"] == 0
+    assert pulse["recognized_revenue_truth"]["forecast_included_in_truth"] is False
+    assert "spatial:batch:1" in pulse["evidence_refs"]
 
 
 def test_conversion_and_blocker_state_are_evidence_backed():

@@ -454,6 +454,36 @@ export default async function FounderPage() {
                   value={int(daily?.control_fabric?.component_count)}
                 />
               </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Evidence
+                  label="Volumetric observations"
+                  value={int(
+                    daily?.revenue_pulse?.spatial_physical_pulse
+                      ?.volumetric_observations,
+                  )}
+                />
+                <Evidence
+                  label="Physical observations"
+                  value={int(
+                    daily?.revenue_pulse?.spatial_physical_pulse
+                      ?.physical_observations,
+                  )}
+                />
+                <Evidence
+                  label="Modeled physical opportunities"
+                  value={int(
+                    daily?.revenue_pulse?.spatial_physical_pulse
+                      ?.modeled_opportunities,
+                  )}
+                />
+                <Evidence
+                  label="Max modeled priority boost"
+                  value={show(
+                    daily?.revenue_pulse?.spatial_physical_pulse
+                      ?.max_combined_priority_boost,
+                  )}
+                />
+              </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Evidence
                   label="Intent observations"

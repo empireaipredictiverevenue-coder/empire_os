@@ -213,6 +213,7 @@ def build_daily_results(
             "velocity": revenue_pulse.get("velocity"),
             "recognized_revenue_truth": revenue_pulse.get("recognized_revenue_truth"),
             "storm_pulse": revenue_pulse.get("storm_pulse"),
+            "spatial_physical_pulse": revenue_pulse.get("spatial_physical_pulse"),
             "forecast_separate_from_truth": (
                 (revenue_pulse.get("forecast") or {}).get("separate_from_revenue_truth")
                 if isinstance(revenue_pulse.get("forecast"), Mapping)

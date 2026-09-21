@@ -87,6 +87,35 @@ class RevenuePulseForecast:
 
 
 @dataclass(frozen=True)
+class SpatialPhysicalPulse:
+    volumetric_observations: int | None
+    physical_observations: int | None
+    modeled_opportunities: int | None
+    max_combined_priority_boost: float | None
+    evidence_refs: tuple[str, ...]
+
+    def validate(self) -> None:
+        for key in (
+            "volumetric_observations",
+            "physical_observations",
+            "modeled_opportunities",
+        ):
+            value = getattr(self, key)
+            if value is not None and value < 0:
+                raise ValueError(f"{key} must be nonnegative")
+        if (
+            self.max_combined_priority_boost is not None
+            and not 0 <= self.max_combined_priority_boost <= 60
+        ):
+            raise ValueError("spatial/physical priority boost must be 0..60")
+        if not self.evidence_refs:
+            raise ValueError("spatial/physical pulse evidence required")
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class StormPulse:
     opportunity_count: int
     max_multiplier: float | None
@@ -215,6 +244,7 @@ def build_revenue_pulse(
     blocker_state: str | None = None,
     forecasts: Iterable[RevenuePulseForecast] = (),
     storm: StormPulse | None = None,
+    spatial_physical: SpatialPhysicalPulse | None = None,
     node_pulses: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     current.validate()
@@ -225,6 +255,8 @@ def build_revenue_pulse(
         row.validate()
     if storm is not None:
         storm.validate()
+    if spatial_physical is not None:
+        spatial_physical.validate()
 
     velocity = {
         key: _delta(
@@ -252,6 +284,8 @@ def build_revenue_pulse(
         observed_refs.extend(previous.evidence_refs)
     if storm is not None:
         observed_refs.extend(storm.evidence_refs)
+    if spatial_physical is not None:
+        observed_refs.extend(spatial_physical.evidence_refs)
 
     return {
         "schema_version": "empire.revenue-pulse.v3",
@@ -287,6 +321,11 @@ def build_revenue_pulse(
         "storm_pulse": (
             storm.as_dict()
             if storm is not None
+            else None
+        ),
+        "spatial_physical_pulse": (
+            spatial_physical.as_dict()
+            if spatial_physical is not None
             else None
         ),
         "node_pulses": dict(node_pulses or {}),

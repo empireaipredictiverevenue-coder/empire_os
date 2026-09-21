@@ -46,6 +46,7 @@ NODES = (
         sensors=(
             "overpass", "biz_search", "permits", "nws_alerts",
             "registry", "site_probe", "property_signals",
+            "volumetric", "natural_physical",
         ),
         products=(
             "solar_installer_directory", "solar_territory_intelligence",
@@ -64,6 +65,7 @@ NODES = (
         sensors=(
             "overpass", "biz_search", "permits", "nws_alerts",
             "registry", "site_probe", "property_signals",
+            "volumetric", "natural_physical",
         ),
         products=(
             "hvac_contractor_directory", "hvac_territory_intelligence",
@@ -81,7 +83,7 @@ NODES = (
         market="property_and_facilities",
         sensors=(
             "permits", "chicago_311", "nyc_hpd", "nws_alerts",
-            "ownership_records",
+            "ownership_records", "volumetric", "natural_physical",
         ),
         products=(
             "property_opportunity_graph", "distress_alerts",

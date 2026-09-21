@@ -20,6 +20,12 @@ def test_nodes_projection_preserves_unknown_counts(tmp_path):
     assert payload["node_count"] >= 13
     keys = {row["key"] for row in payload["nodes"]}
     assert {"volumetric", "natural_physical"} <= keys
+    solar = next(row for row in payload["nodes"] if row["key"] == "solar_energy")
+    hvac = next(row for row in payload["nodes"] if row["key"] == "hvac_climate")
+    property_node = next(row for row in payload["nodes"] if row["key"] == "property")
+    for node in (solar, hvac, property_node):
+        assert "volumetric" in node["sensors"]
+        assert "natural_physical" in node["sensors"]
     home = next(row for row in payload["nodes"] if row["key"] == "home_services")
     assert set(home["runtime_evidence"]["observed_sources"]) == {
         "overpass", "nws_alerts"

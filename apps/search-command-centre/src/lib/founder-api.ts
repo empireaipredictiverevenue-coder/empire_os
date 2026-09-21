@@ -368,6 +368,13 @@ export type FounderDailyResults = {
       priority_boost_max?: number | null;
       evidence_refs?: string[];
     } | null;
+    spatial_physical_pulse?: {
+      volumetric_observations?: number | null;
+      physical_observations?: number | null;
+      modeled_opportunities?: number | null;
+      max_combined_priority_boost?: number | null;
+      evidence_refs?: string[];
+    } | null;
     forecast_separate_from_truth?: boolean | null;
   };
   control_fabric?: {

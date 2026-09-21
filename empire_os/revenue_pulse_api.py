@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from empire_os.revenue_pulse import (
     RevenuePulseForecast,
     RevenuePulseWindow,
+    SpatialPhysicalPulse,
     StormPulse,
     build_revenue_pulse,
 )
@@ -38,6 +39,14 @@ class ForecastRequest(BaseModel):
     model_key: str | None = None
 
 
+class SpatialPhysicalPulseRequest(BaseModel):
+    volumetric_observations: int | None = Field(default=None, ge=0)
+    physical_observations: int | None = Field(default=None, ge=0)
+    modeled_opportunities: int | None = Field(default=None, ge=0)
+    max_combined_priority_boost: float | None = Field(default=None, ge=0, le=60)
+    evidence_refs: list[str] = Field(min_length=1)
+
+
 class StormPulseRequest(BaseModel):
     opportunity_count: int = Field(ge=0)
     max_multiplier: float | None = Field(default=None, ge=1)
@@ -52,6 +61,7 @@ class RevenuePulsePreviewRequest(BaseModel):
     blocker_state: str | None = None
     forecasts: list[ForecastRequest] = Field(default_factory=list)
     storm: StormPulseRequest | None = None
+    spatial_physical: SpatialPhysicalPulseRequest | None = None
     node_pulses: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
@@ -88,6 +98,7 @@ def create_revenue_pulse_router() -> APIRouter:
             "canonical_truth_only": True,
             "forecast_separate_from_revenue": True,
             "storm_multiplier_modeled_only": True,
+            "spatial_physical_modeled_only": True,
         }
 
     @router.post("/preview")
@@ -122,6 +133,27 @@ def create_revenue_pulse_router() -> APIRouter:
                         evidence_refs=tuple(req.storm.evidence_refs),
                     )
                     if req.storm is not None
+                    else None
+                ),
+                spatial_physical=(
+                    SpatialPhysicalPulse(
+                        volumetric_observations=(
+                            req.spatial_physical.volumetric_observations
+                        ),
+                        physical_observations=(
+                            req.spatial_physical.physical_observations
+                        ),
+                        modeled_opportunities=(
+                            req.spatial_physical.modeled_opportunities
+                        ),
+                        max_combined_priority_boost=(
+                            req.spatial_physical.max_combined_priority_boost
+                        ),
+                        evidence_refs=tuple(
+                            req.spatial_physical.evidence_refs
+                        ),
+                    )
+                    if req.spatial_physical is not None
                     else None
                 ),
                 node_pulses=req.node_pulses,

@@ -48,6 +48,13 @@ def test_revenue_pulse_api_is_read_only_and_truth_separated():
                 "priority_boost_max": 36.35,
                 "evidence_refs": ["nws:dfw"],
             },
+            "spatial_physical": {
+                "volumetric_observations": 4,
+                "physical_observations": 3,
+                "modeled_opportunities": 2,
+                "max_combined_priority_boost": 48.2,
+                "evidence_refs": ["spatial:dfw", "physical:dfw"],
+            },
         },
     )
 
@@ -58,3 +65,5 @@ def test_revenue_pulse_api_is_read_only_and_truth_separated():
     assert payload["recognized_revenue_truth"]["recognized_revenue_cents"] == 0
     assert payload["forecast"]["items"][0]["forecast_revenue_cents"] == 100000
     assert payload["storm_pulse"]["opportunity_count"] == 8
+    assert payload["spatial_physical_pulse"]["modeled_opportunities"] == 2
+    assert payload["recognized_revenue_truth"]["recognized_revenue_cents"] == 0
