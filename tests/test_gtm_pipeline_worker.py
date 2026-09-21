@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from empire_os.gtm_pipeline_worker import (
+    _hydrate_review_evidence,
     POSTAL_ADDRESS,
     build_outbound_payload,
     run_gtm_pipeline,
@@ -317,6 +318,7 @@ def test_gtm_defers_multilingual_country_without_explicit_language():
 
 def test_hydrate_review_refreshes_public_proof_even_when_context_complete():
     row = review("00000000-0000-0000-0000-000000000071")
+    row["prospect_id"] = "00000000-0000-0000-0000-000000000072"
     row["evidence"].pop("rating", None)
     row["evidence"].pop("review_count", None)
 
