@@ -99,7 +99,7 @@ CREATE OR REPLACE FUNCTION public.register_commercial_product_identity(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path=''
-AS $
+AS $$
 DECLARE
   product_row public.commercial_products%ROWTYPE;
 BEGIN
@@ -168,7 +168,7 @@ BEGIN
     'actual_revenue',false
   );
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.propose_commercial_product_version(
   p_product_code text,
