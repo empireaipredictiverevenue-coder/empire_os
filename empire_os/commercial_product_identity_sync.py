@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any, Callable, Mapping
 
 from empire_os.search_intelligence.products import SEARCH_PRODUCTS
+from empire_os.commercial_recovery_registry import RECOVERY_PRODUCTS
 
 
 Request = Callable[..., Any]
@@ -44,10 +45,43 @@ def search_product_identity_rows() -> list[dict[str, Any]]:
     return rows
 
 
+def strategic_product_identity_rows() -> list[dict[str, Any]]:
+    promoted_codes = {
+        "permit_intelligence",
+        "property_intelligence",
+        "private_capital_rollup",
+    }
+    rows: list[dict[str, Any]] = []
+    for product in RECOVERY_PRODUCTS:
+        if product.key not in promoted_codes:
+            continue
+        rows.append({
+            "product_code": product.key,
+            "product_name": product.name,
+            "product_family": product.family,
+            "billing_model": "terms_required",
+            "configuration": {
+                "recovery_state": product.state,
+                "revenue_models": list(product.revenue_models),
+                "surfaces": list(product.surfaces),
+                "execution_authority": product.execution_authority,
+            },
+            "provenance": {
+                "source": "empire_os.commercial_recovery_registry",
+                "pricing_observed": False,
+                "economics_state": "UNKNOWN",
+            },
+        })
+    return rows
+
+
 def sync_commercial_product_identities(
     request: Request,
 ) -> dict[str, Any]:
-    rows = search_product_identity_rows()
+    rows = [
+        *search_product_identity_rows(),
+        *strategic_product_identity_rows(),
+    ]
     synchronized = 0
     errors: list[str] = []
 
