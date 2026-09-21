@@ -26,6 +26,13 @@ button {
   font: inherit;
 }
 
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-kerning: normal;
+  text-wrap: balance;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translate3d(0, 12px, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
