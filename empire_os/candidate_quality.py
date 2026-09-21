@@ -30,6 +30,8 @@ SIGNAL_ONLY_SOURCES = frozenset({
     "storm_alerts",
     "reddit",
     "reddit_json",
+    "reddit_intent",
+    "linkedin_intent",
 })
 
 IDENTITY_OR_DIRECT_SOURCES = frozenset({

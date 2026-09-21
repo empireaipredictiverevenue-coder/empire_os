@@ -64,7 +64,13 @@ def default_registry() -> tuple[ComponentSpec, ...]:
     return (
         ComponentSpec(
             "market_opportunity_agent",
-            ("signal_discovered", "search_gap_detected", "storm_opportunity_detected"),
+            (
+                "signal_discovered",
+                "search_gap_detected",
+                "storm_opportunity_detected",
+                "community_pain_observed",
+                "search_growth_gap_observed",
+            ),
             ("opportunity_candidate_created",),
             ("search_fabric",),
             "internal_write",

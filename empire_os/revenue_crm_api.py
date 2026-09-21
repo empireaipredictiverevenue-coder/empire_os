@@ -11,6 +11,9 @@ from pydantic import BaseModel, Field
 from empire_os.revenue_crm_customer_success import (
     route_customer_success_review,
 )
+from empire_os.revenue_crm_search_growth import build_crm_search_growth_brief
+from empire_os.search_intelligence.ai_visibility import AiCitationObservation
+from empire_os.search_intelligence.backlinks import BacklinkObservation
 from empire_os.revenue_crm_readiness import assess_close_readiness
 from empire_os.revenue_crm_retention import (
     RevenueCrmRetentionEvidence,
@@ -46,6 +49,37 @@ class RevenueCrmRetentionRequest(BaseModel):
     outcome_evidence_ref: str | None = None
     buyer_available_capacity: int | None = Field(default=None, ge=0)
     capacity_evidence_ref: str | None = None
+
+
+class RevenueCrmBacklinkObservationRequest(BaseModel):
+    source_url: str
+    target_url: str
+    observed_at: str
+    anchor_text: str | None = None
+    rel: str | None = None
+    source: str = "observed_backlink"
+    provenance: list[str] = Field(min_length=1)
+
+
+class RevenueCrmCitationObservationRequest(BaseModel):
+    query: str
+    engine: str
+    observed_at: str
+    cited_url: str
+    source_url: str | None = None
+    citation_position: int | None = Field(default=None, ge=1)
+    mention_text: str | None = None
+    provenance: list[str] = Field(min_length=1)
+
+
+class RevenueCrmSearchGrowthRequest(BaseModel):
+    prospect_id: str
+    domain: str
+    query: str
+    engine: str
+    competitor_domains: list[str] = Field(default_factory=list)
+    backlinks: list[RevenueCrmBacklinkObservationRequest] = Field(default_factory=list)
+    citations: list[RevenueCrmCitationObservationRequest] = Field(default_factory=list)
 
 
 class RevenueCrmRetentionFreshnessRequest(RevenueCrmRetentionRequest):
@@ -236,6 +270,60 @@ def create_revenue_crm_router(
                 detail="revenue_crm_repository_not_activated",
             )
         return repository
+
+    @router.post("/search-growth/preview")
+    def search_growth_preview(req: RevenueCrmSearchGrowthRequest):
+        try:
+            brief = build_crm_search_growth_brief(
+                prospect_id=req.prospect_id,
+                domain=req.domain,
+                query=req.query,
+                engine=req.engine,
+                backlinks=tuple(
+                    BacklinkObservation(
+                        source_url=item.source_url,
+                        target_url=item.target_url,
+                        observed_at=item.observed_at,
+                        anchor_text=item.anchor_text,
+                        rel=item.rel,
+                        source=item.source,
+                        provenance=tuple(item.provenance),
+                    )
+                    for item in req.backlinks
+                ),
+                citations=tuple(
+                    AiCitationObservation(
+                        query=item.query,
+                        engine=item.engine,
+                        observed_at=item.observed_at,
+                        cited_url=item.cited_url,
+                        source_url=item.source_url,
+                        citation_position=item.citation_position,
+                        mention_text=item.mention_text,
+                        provenance=tuple(item.provenance),
+                    )
+                    for item in req.citations
+                ),
+                competitor_domains=tuple(req.competitor_domains),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "crm_mutation": False,
+            "publishing_execution": False,
+            "link_building_execution": False,
+            "outreach_execution": False,
+            "search_products": [
+                "authority_intelligence",
+                "geo_ai_visibility",
+                "competitor_search_gap",
+                "search_growth_command",
+            ],
+            "brief": brief.as_dict(),
+        }
 
     @router.post("/retention-expansion/preview")
     def retention_expansion_preview(req: RevenueCrmRetentionRequest):

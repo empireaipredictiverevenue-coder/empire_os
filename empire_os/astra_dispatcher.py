@@ -25,7 +25,7 @@ SAFE_JOBS = {
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/run_buyer_deferred_enrichment.py"),
         "--limit",
-        "5",
+        "2",
     ],
     "buyer_review_materializer": [
         str(ROOT / ".venv/bin/python"),
@@ -150,15 +150,40 @@ def dispatch(
             continue
 
         command = SAFE_JOBS[job]
-        completed = subprocess.run(
-            command,
-            cwd=ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=max(10, min(int(timeout_seconds), 300)),
-            env=os.environ.copy(),
-        )
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=max(10, min(int(timeout_seconds), 300)),
+                env=os.environ.copy(),
+            )
+        except subprocess.TimeoutExpired as exc:
+            executed.append({
+                "job": job,
+                "decision": "TIMED_OUT",
+                "returncode": 124,
+                "stdout_tail": (
+                    (exc.stdout.decode(errors="ignore") if isinstance(exc.stdout, bytes) else exc.stdout)
+                    or ""
+                )[-1200:],
+                "stderr_tail": (
+                    (exc.stderr.decode(errors="ignore") if isinstance(exc.stderr, bytes) else exc.stderr)
+                    or ""
+                )[-800:],
+            })
+            continue
+        except OSError as exc:
+            executed.append({
+                "job": job,
+                "decision": "EXECUTION_ERROR",
+                "returncode": 127,
+                "stdout_tail": "",
+                "stderr_tail": str(exc)[:800],
+            })
+            continue
         executed.append({
             "job": job,
             "decision": "DISPATCHED",

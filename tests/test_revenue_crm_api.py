@@ -165,3 +165,37 @@ def test_missing_repository_fails_closed():
     response = TestClient(app).get("/v1/revenue-crm/prospects")
     assert response.status_code == 503
     assert response.json()["detail"] == "revenue_crm_repository_not_activated"
+
+
+def test_search_growth_preview_connects_crm_to_seo_products():
+    response = client().post(
+        "/v1/revenue-crm/search-growth/preview",
+        json={
+            "prospect_id": "prospect-1",
+            "domain": "example.com",
+            "query": "best roofing company dallas",
+            "engine": "chatgpt",
+            "competitor_domains": ["competitor.com"],
+            "backlinks": [{
+                "source_url": "https://directory.example/listing",
+                "target_url": "https://example.com/",
+                "observed_at": "2026-09-21T09:00:00+00:00",
+                "provenance": ["search:backlink:1"],
+            }],
+            "citations": [{
+                "query": "best roofing company dallas",
+                "engine": "chatgpt",
+                "observed_at": "2026-09-21T09:00:00+00:00",
+                "cited_url": "https://competitor.com/roofing",
+                "mention_text": "Competitor Roofing",
+                "provenance": ["ai:query:1"],
+            }],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["read_only"] is True
+    assert body["crm_mutation"] is False
+    assert body["link_building_execution"] is False
+    assert "authority_intelligence" in body["search_products"]
+    assert "competitor_citation_gap" in body["brief"]["opportunities"]

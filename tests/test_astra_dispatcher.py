@@ -65,3 +65,32 @@ def test_deferred_enrichment_is_knitted_before_buyer_review():
     assert jobs[0] == "buyer_deferred_enrichment"
     assert jobs.index("buyer_deferred_enrichment") < jobs.index("buyer_review_materializer")
     assert jobs[-1] == "revenue_pulse_refresh"
+
+
+def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
+    import subprocess
+    import empire_os.astra_dispatcher as module
+
+    monkeypatch.setattr(module, "LOOP", tmp_path / "loop.json")
+    monkeypatch.setattr(module, "SOURCE", tmp_path / "source.json")
+    monkeypatch.setattr(module, "BUYER_REVIEW", tmp_path / "review.json")
+    monkeypatch.setattr(module, "OUTPUT", tmp_path / "dispatch.json")
+    module.LOOP.write_text('{"loop_complete": false, "stages": [{"stage":"recognized_revenue","observed":false},{"stage":"buyer_conversation","observed":true},{"stage":"commercial_terms","observed":true}]}')
+    module.SOURCE.write_text('{"end_to_end_healthy": true}')
+    module.BUYER_REVIEW.write_text('{"deferred_enrichment": 1}')
+
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if any(
+            str(part).endswith("run_buyer_deferred_enrichment.py")
+            for part in command
+        ):
+            raise subprocess.TimeoutExpired(command, 10)
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    result = module.dispatch(mode="GUARDED_EXECUTE", timeout_seconds=10)
+    assert result["executions"][0]["decision"] == "TIMED_OUT"
+    assert any(row["decision"] == "DISPATCHED" for row in result["executions"][1:])
