@@ -9,6 +9,10 @@ from typing import Any
 
 from empire_os.control_conveyor import build_conveyor
 from empire_os.permit_intelligence_runtime import build_permit_intelligence_runtime
+from empire_os.vertical_intelligence_runtime import (
+    build_private_capital_intelligence_runtime,
+    build_property_intelligence_runtime,
+)
 from empire_os.commercial_recovery_registry import (
     recovery_product_catalog,
     recovery_summary,
@@ -303,6 +307,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             catalog_path,
         ),
         "permit_intelligence": build_permit_intelligence_runtime(repo_root),
+        "property_intelligence": build_property_intelligence_runtime(repo_root),
+        "private_capital_intelligence": (
+            build_private_capital_intelligence_runtime(repo_root)
+        ),
         "recovery_portfolio": {
             "summary": recovery_summary(),
             "products": recovery_product_catalog(),
