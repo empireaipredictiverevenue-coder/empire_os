@@ -34,3 +34,13 @@ def test_opportunity_event_routes_to_factory():
     })
     assert routes[0]["component"] == "opportunity_factory"
     assert routes[0]["commercial_priority"] == 88
+
+
+def test_community_pain_routes_to_market_opportunity_agent():
+    routes = route_event({
+        "event_type": "community_pain_observed",
+        "commercial_priority": 91,
+    })
+    assert routes
+    assert routes[0]["component"] == "market_opportunity_agent"
+    assert routes[0]["commercial_priority"] == 91
