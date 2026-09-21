@@ -50,7 +50,7 @@ def test_complete_loop_dispatches_nothing_when_source_is_healthy():
     ) == []
 
 
-def test_deferred_enrichment_is_knitted_before_buyer_review():
+def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
     loop = {
         "loop_complete": False,
         "stages": [
@@ -62,8 +62,8 @@ def test_deferred_enrichment_is_knitted_before_buyer_review():
     source = {"end_to_end_healthy": True}
     review = {"deferred_enrichment": 4}
     jobs = choose_jobs(loop, source, review)
-    assert jobs[0] == "buyer_deferred_enrichment"
-    assert jobs.index("buyer_deferred_enrichment") < jobs.index("buyer_review_materializer")
+    assert "buyer_deferred_enrichment" not in jobs
+    assert jobs[0] == "buyer_review_materializer"
     assert jobs[-1] == "revenue_pulse_refresh"
 
 
@@ -84,7 +84,7 @@ def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
     def fake_run(command, **kwargs):
         calls.append(command)
         if any(
-            str(part).endswith("run_buyer_deferred_enrichment.py")
+            str(part).endswith("run_buyer_review_materializer.py")
             for part in command
         ):
             raise subprocess.TimeoutExpired(command, 10)
@@ -96,10 +96,7 @@ def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
     assert any(row["decision"] == "DISPATCHED" for row in result["executions"][1:])
 
 
-def test_default_deferred_enrichment_timeout_is_longer_than_fast_jobs(
-    monkeypatch,
-    tmp_path,
-):
+def test_default_dispatch_timeout_is_bounded(monkeypatch, tmp_path):
     import subprocess
     import empire_os.astra_dispatcher as module
 
@@ -110,11 +107,11 @@ def test_default_deferred_enrichment_timeout_is_longer_than_fast_jobs(
     module.LOOP.write_text(
         '{"loop_complete": false, "stages": ['
         '{"stage":"recognized_revenue","observed":true},'
-        '{"stage":"buyer_conversation","observed":true},'
+        '{"stage":"buyer_conversation","observed":false},'
         '{"stage":"commercial_terms","observed":true}]}'
     )
     module.SOURCE.write_text('{"end_to_end_healthy": true}')
-    module.BUYER_REVIEW.write_text('{"deferred_enrichment": 1}')
+    module.BUYER_REVIEW.write_text('{"deferred_enrichment": 5}')
 
     seen = []
 
@@ -125,6 +122,10 @@ def test_default_deferred_enrichment_timeout_is_longer_than_fast_jobs(
         )
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
-    module.dispatch(mode="GUARDED_EXECUTE")
-    assert seen[0] == 270
-    assert all(value == 120 for value in seen[1:])
+    result = module.dispatch(mode="GUARDED_EXECUTE")
+    assert result["executions"]
+    assert all(value == 120 for value in seen)
+    assert all(
+        row["job"] != "buyer_deferred_enrichment"
+        for row in result["executions"]
+    )

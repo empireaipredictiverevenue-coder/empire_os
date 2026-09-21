@@ -20,17 +20,7 @@ SOURCE = ROOT / "runtime/source_health/latest.json"
 BUYER_REVIEW = ROOT / "runtime/buyer_review_materializer/latest.json"
 OUTPUT = ROOT / "runtime/astra/dispatch_latest.json"
 
-JOB_TIMEOUT_SECONDS = {
-    "buyer_deferred_enrichment": 270,
-}
-
 SAFE_JOBS = {
-    "buyer_deferred_enrichment": [
-        str(ROOT / ".venv/bin/python"),
-        str(ROOT / "scripts/run_buyer_deferred_enrichment.py"),
-        "--limit",
-        "2",
-    ],
     "buyer_review_materializer": [
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/run_buyer_review_materializer.py"),
@@ -108,9 +98,8 @@ def choose_jobs(
         jobs.append("source_health_refresh")
 
     if loop.get("loop_complete") is not True:
-        review_state = buyer_review or {}
-        if int(review_state.get("deferred_enrichment") or 0) > 0:
-            jobs.append("buyer_deferred_enrichment")
+        # Deferred buyer enrichment is intentionally owned by its dedicated
+        # bounded timer. Astra must not synchronously duplicate that slow lane.
         stages = {
             str(row.get("stage") or ""): row.get("observed")
             for row in (loop.get("stages") or [])
@@ -157,7 +146,7 @@ def dispatch(
         job_timeout = (
             int(timeout_seconds)
             if timeout_seconds is not None
-            else JOB_TIMEOUT_SECONDS.get(job, 120)
+            else 120
         )
         try:
             completed = subprocess.run(
