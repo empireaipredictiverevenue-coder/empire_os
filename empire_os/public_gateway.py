@@ -44,6 +44,30 @@ async def security_headers(request, call_next):
     return response
 
 
+def _aeo_page_urls(root: Path | None = None) -> list[str]:
+    base = root or AEO_ROOT
+    urls: list[str] = []
+    for path in sorted(base.glob("*/*/index.html")):
+        rel = path.relative_to(base)
+        if len(rel.parts) != 3:
+            continue
+        niche, metro, filename = rel.parts
+        if filename != "index.html":
+            continue
+        urls.append(f"{PUBLIC_BASE_URL}/aeo/{niche}/{metro}/")
+    return urls
+
+
+def _sitemap_xml(root: Path | None = None) -> str:
+    urls = [f"{PUBLIC_BASE_URL}/"] + _aeo_page_urls(root)
+    body = "".join(f"<url><loc>{url}</loc></url>" for url in urls)
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{body}</urlset>"
+    )
+
+
 @app.get("/health")
 def health():
     return {
@@ -189,9 +213,24 @@ def webmcp_bootstrap():
     return Response(content=script, media_type="application/javascript")
 
 
+@app.get("/sitemap.xml")
+def sitemap():
+    return Response(
+        content=_sitemap_xml(),
+        media_type="application/xml",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots():
-    return "User-agent: *\nAllow: /\nAllow: /aeo/\nAllow: /.well-known/agent-card.json\n"
+    return (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Allow: /aeo/\n"
+        "Allow: /.well-known/agent-card.json\n"
+        f"Sitemap: {PUBLIC_BASE_URL}/sitemap.xml\n"
+    )
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from empire_os.public_gateway import app
+from empire_os.public_gateway import _sitemap_xml, app
 
 client = TestClient(app)
 
@@ -28,3 +28,23 @@ def test_security_headers_present():
     r = client.get("/")
     assert r.headers["x-frame-options"] == "DENY"
     assert r.headers["x-content-type-options"] == "nosniff"
+
+
+def test_robots_advertises_sitemap():
+    r = client.get("/robots.txt")
+    assert r.status_code == 200
+    assert "Sitemap:" in r.text
+    assert "/sitemap.xml" in r.text
+
+
+def test_sitemap_helper_lists_only_aeo_index_pages(tmp_path):
+    page = tmp_path / "roofing" / "DFW" / "index.html"
+    page.parent.mkdir(parents=True)
+    page.write_text("<html></html>")
+    ignored = tmp_path / "roofing" / "DFW" / "notes.txt"
+    ignored.write_text("ignore")
+
+    xml = _sitemap_xml(tmp_path)
+    assert "/aeo/roofing/DFW/" in xml
+    assert "notes.txt" not in xml
+    assert xml.count("<url>") == 2
