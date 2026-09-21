@@ -377,6 +377,24 @@ export type FounderDailyResults = {
     external_execution_enabled?: boolean | null;
     founder_gates_preserved?: boolean | null;
   };
+  buyer_capacity?: {
+    available?: boolean;
+    buyers_seen?: number | null;
+    status_active?: number | null;
+    is_active_true?: number | null;
+    commercially_activated?: number | null;
+    reviewed?: number | null;
+    terms_verified?: number | null;
+    capacity_verified?: number | null;
+    delivery_verified?: number | null;
+    market_defined?: number | null;
+    delivery_destination_present?: number | null;
+    positive_capacity_configured?: number | null;
+    fully_activated?: number | null;
+    highest_priority_blocker?: string | null;
+    allocation_ready?: boolean | null;
+    activation_blockers?: Record<string, number>;
+  };
   conversation_recovery?: {
     available?: boolean;
     delivered_first_touches?: number | null;

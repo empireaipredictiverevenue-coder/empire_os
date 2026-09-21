@@ -93,6 +93,7 @@ def build_daily_results(
     revenue_pulse = _read(runtime / "revenue_pulse" / "latest.json")
     control_fabric = _read(runtime / "control_fabric" / "latest.json")
     conversation_recovery = _read(runtime / "conversation_recovery" / "latest.json")
+    buyer_capacity = _read(runtime / "buyer_capacity" / "latest.json")
     stages = _stage_map(loop)
     conveyor = (
         dict(ops.get("conveyor"))
@@ -223,6 +224,24 @@ def build_daily_results(
             "authority_counts": control_fabric.get("authority_counts"),
             "external_execution_enabled": control_fabric.get("external_execution_enabled"),
             "founder_gates_preserved": control_fabric.get("founder_gates_preserved"),
+        },
+        "buyer_capacity": {
+            "available": bool(buyer_capacity),
+            "buyers_seen": buyer_capacity.get("buyers_seen"),
+            "status_active": buyer_capacity.get("status_active"),
+            "is_active_true": buyer_capacity.get("is_active_true"),
+            "commercially_activated": buyer_capacity.get("commercially_activated"),
+            "reviewed": buyer_capacity.get("reviewed"),
+            "terms_verified": buyer_capacity.get("terms_verified"),
+            "capacity_verified": buyer_capacity.get("capacity_verified"),
+            "delivery_verified": buyer_capacity.get("delivery_verified"),
+            "market_defined": buyer_capacity.get("market_defined"),
+            "delivery_destination_present": buyer_capacity.get("delivery_destination_present"),
+            "positive_capacity_configured": buyer_capacity.get("positive_capacity_configured"),
+            "fully_activated": buyer_capacity.get("fully_activated"),
+            "highest_priority_blocker": buyer_capacity.get("highest_priority_blocker"),
+            "allocation_ready": buyer_capacity.get("allocation_ready"),
+            "activation_blockers": buyer_capacity.get("activation_blockers"),
         },
         "conversation_recovery": {
             "available": bool(conversation_recovery),

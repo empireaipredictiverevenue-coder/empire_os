@@ -75,6 +75,15 @@ export default async function FounderResultsPage() {
                 </div>
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                  <Result label="Buyer rows" value={int(day.buyer_capacity?.buyers_seen)} />
+                  <Result label="Terms verified" value={int(day.buyer_capacity?.terms_verified)} />
+                  <Result label="Capacity verified" value={int(day.buyer_capacity?.capacity_verified)} />
+                  <Result label="Delivery verified" value={int(day.buyer_capacity?.delivery_verified)} />
+                  <Result label="Fully activated" value={int(day.buyer_capacity?.fully_activated)} />
+                  <Result label="Buyer blocker" value={show(day.buyer_capacity?.highest_priority_blocker)} />
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
                   <Result label="Pulse state" value={show(day.revenue_pulse?.pulse_state)} />
                   <Result label="24h acquisitions" value={int(day.revenue_pulse?.current_window?.acquisitions)} />
                   <Result label="24h qualified" value={int(day.revenue_pulse?.current_window?.qualified)} />

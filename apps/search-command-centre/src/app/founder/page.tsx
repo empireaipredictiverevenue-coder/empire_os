@@ -370,6 +370,32 @@ export default async function FounderPage() {
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <Evidence
+                  label="Buyer rows"
+                  value={int(daily?.buyer_capacity?.buyers_seen)}
+                />
+                <Evidence
+                  label="Status active"
+                  value={int(daily?.buyer_capacity?.status_active)}
+                />
+                <Evidence
+                  label="Terms verified"
+                  value={int(daily?.buyer_capacity?.terms_verified)}
+                />
+                <Evidence
+                  label="Capacity verified"
+                  value={int(daily?.buyer_capacity?.capacity_verified)}
+                />
+                <Evidence
+                  label="Delivery verified"
+                  value={int(daily?.buyer_capacity?.delivery_verified)}
+                />
+                <Evidence
+                  label="Fully activated"
+                  value={int(daily?.buyer_capacity?.fully_activated)}
+                />
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <Evidence
                   label="Recovery ready"
                   value={int(daily?.conversation_recovery?.recoverable)}
                 />

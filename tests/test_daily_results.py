@@ -141,3 +141,35 @@ def test_daily_results_surfaces_conversation_recovery_gap(tmp_path):
     assert recovery["suppressed_after_delivery"] == 1
     assert recovery["pulse_delivery_gap"] == 0
     assert recovery["send_executed"] is False
+
+
+def test_daily_results_surfaces_buyer_capacity_truth(tmp_path):
+    runtime = tmp_path / "runtime"
+    dump(runtime / "buyer_capacity/latest.json", {
+        "buyers_seen": 1057,
+        "status_active": 169,
+        "is_active_true": 168,
+        "commercially_activated": 0,
+        "reviewed": 1,
+        "terms_verified": 0,
+        "capacity_verified": 0,
+        "delivery_verified": 0,
+        "fully_activated": 0,
+        "highest_priority_blocker": "verified_commercial_terms",
+        "allocation_ready": False,
+        "activation_blockers": {
+            "buyer_inactive": 889,
+            "buyer_not_commercially_activated": 168,
+        },
+    })
+    payload = build_daily_results(tmp_path)
+    buyer = payload["buyer_capacity"]
+    assert buyer["available"] is True
+    assert buyer["buyers_seen"] == 1057
+    assert buyer["status_active"] == 169
+    assert buyer["terms_verified"] == 0
+    assert buyer["capacity_verified"] == 0
+    assert buyer["delivery_verified"] == 0
+    assert buyer["fully_activated"] == 0
+    assert buyer["highest_priority_blocker"] == "verified_commercial_terms"
+    assert buyer["allocation_ready"] is False
