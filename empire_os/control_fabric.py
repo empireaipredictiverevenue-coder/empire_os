@@ -63,6 +63,22 @@ def default_registry() -> tuple[ComponentSpec, ...]:
     """Current canonical component map. Expand without coupling modules."""
     return (
         ComponentSpec(
+            "market_opportunity_agent",
+            ("signal_discovered", "search_gap_detected", "storm_opportunity_detected"),
+            ("opportunity_candidate_created",),
+            ("search_fabric",),
+            "internal_write",
+            300,
+        ),
+        ComponentSpec(
+            "opportunity_factory",
+            ("opportunity_candidate_created",),
+            ("opportunity_research_requested", "mvp_build_requested", "opportunity_parked"),
+            ("market_opportunity_agent",),
+            "internal_write",
+            300,
+        ),
+        ComponentSpec(
             "acquisition",
             ("market_sweep_requested", "storm_opportunity_detected", "source_refresh_requested"),
             ("prospect_ingested", "signal_discovered", "acquisition_failed"),

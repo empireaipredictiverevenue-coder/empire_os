@@ -1,15 +1,17 @@
 from empire_os.control_fabric import EventEnvelope, default_registry, route_event
 
 
-def test_storm_event_routes_to_acquisition():
+def test_storm_event_routes_to_acquisition_and_opportunity_agent():
     routes = route_event(EventEnvelope(
         event_type="storm_opportunity_detected",
         source="storm_service",
         commercial_priority=95,
     ))
-    assert routes[0]["component"] == "acquisition"
-    assert routes[0]["authority"] == "internal_write"
-    assert routes[0]["commercial_priority"] == 95
+    by_component = {row["component"]: row for row in routes}
+    assert "acquisition" in by_component
+    assert "market_opportunity_agent" in by_component
+    assert by_component["acquisition"]["authority"] == "internal_write"
+    assert by_component["acquisition"]["commercial_priority"] == 95
 
 
 def test_registry_has_reliability_components():
@@ -19,3 +21,16 @@ def test_registry_has_reliability_components():
 
 def test_unknown_event_routes_nowhere():
     assert route_event({"event_type": "not_registered"}) == []
+
+def test_registry_has_opportunity_factory():
+    names = {spec.name for spec in default_registry()}
+    assert {"market_opportunity_agent", "opportunity_factory"} <= names
+
+
+def test_opportunity_event_routes_to_factory():
+    routes = route_event({
+        "event_type": "opportunity_candidate_created",
+        "commercial_priority": 88,
+    })
+    assert routes[0]["component"] == "opportunity_factory"
+    assert routes[0]["commercial_priority"] == 88
