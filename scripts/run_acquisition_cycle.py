@@ -11,13 +11,17 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from empire_os.acquisition_source_policy import choose_source
-from empire_os.lead_sources.overpass import METRO_COORDS
+from empire_os.geo_registry import acquisition_markets, market_coordinates
+from empire_os.geo_scheduler import choose_market
+
+METRO_COORDS = market_coordinates()
 
 ROOT = Path("/srv/empire_os")
 RUNTIME = ROOT / "runtime" / "acquisition"
@@ -71,9 +75,16 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
         raise ValueError("max_candidates must be between 1 and 25")
 
     RUNTIME.mkdir(parents=True, exist_ok=True)
-    metros = list(METRO_COORDS)
-    if not metros:
-        raise RuntimeError("no acquisition metros configured")
+    country_scope = tuple(
+        value.strip().upper()
+        for value in os.getenv("EMPIRE_ACQUISITION_COUNTRIES", "").split(",")
+        if value.strip()
+    )
+    markets = acquisition_markets(
+        countries=country_scope or None,
+    )
+    if not markets:
+        raise RuntimeError("no acquisition markets configured")
 
     with LOCK.open("a+") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -86,10 +97,15 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
         source = str(choice["source"])
         family = str(choice["family"])
 
-        metro_index = int(
-            state.get("next_metro_index", state.get("next_index", 0))
-        ) % len(metros)
-        overpass_metro = metros[metro_index]
+        geo = choose_market(
+            markets,
+            state=state,
+            source=source,
+            log_path=ROOT / "runtime" / "feedback" / "crawler_runs.jsonl",
+        )
+        selected_market = geo["market"]
+        metro_index = int(geo["market_index"])
+        overpass_metro = selected_market.metro
         metro = (
             overpass_metro
             if source in {"overpass", "biz_search"}
@@ -132,6 +148,15 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
             "source_recent_stats": choice.get("recent_stats") or {},
             "metro": metro,
             "overpass_metro_cursor": overpass_metro,
+            "geo_market_id": selected_market.market_id,
+            "country_code": selected_market.country_code,
+            "geo_country_scope": list(country_scope),
+            "region_code": selected_market.region_code,
+            "language_code": selected_market.language_code,
+            "timezone": selected_market.timezone,
+            "geo_policy": geo["policy"],
+            "geo_score": geo["score"],
+            "geo_recent_stats": geo["recent_stats"],
             "max_candidates": max_candidates,
             "returncode": completed.returncode,
             "ok": completed.returncode == 0,
@@ -159,6 +184,10 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
                         "observed_at": _now(),
                         "source": source,
                         "metro": metro,
+                        "geo_market_id": selected_market.market_id,
+                        "country_code": selected_market.country_code,
+                        "language_code": selected_market.language_code,
+                        "timezone": selected_market.timezone,
                         "canonical_writes": True,
                         "real_data_only": True,
                     },
@@ -169,17 +198,20 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
                 encoding="utf-8",
             )
 
-        next_metro_index = metro_index
-        if source in {"overpass", "biz_search"}:
-            next_metro_index = (metro_index + 1) % len(metros)
+        next_metro_index = int(geo["next_market_index"])
 
         STATE.write_text(
             json.dumps(
                 {
                     "next_family_index": choice["next_family_index"],
+                    "next_market_index": next_metro_index,
                     "next_metro_index": next_metro_index,
                     # Retain compatibility for older tooling reading next_index.
                     "next_index": next_metro_index,
+                    "geo_cycle_count": int(geo["geo_cycle_count"]),
+                    "last_geo_policy": geo["policy"],
+                    "last_geo_market_id": selected_market.market_id,
+                    "last_country_code": selected_market.country_code,
                     "last_source": source,
                     "last_metro": metro,
                     "last_ok": result["ok"],

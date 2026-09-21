@@ -58,3 +58,24 @@ def test_cycle_rotates_after_failed_source_attempt(tmp_path, monkeypatch):
     assert state["last_metro"] == list(cycle.METRO_COORDS)[0]
     assert state["last_ok"] is False
     assert state["next_index"] == 1
+
+
+
+def test_cycle_can_be_scoped_to_one_country(tmp_path, monkeypatch):
+    monkeypatch.setattr(cycle, "RUNTIME", tmp_path)
+    monkeypatch.setattr(cycle, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(cycle, "LATEST", tmp_path / "latest.json")
+    monkeypatch.setattr(cycle, "LAST_SUCCESS", tmp_path / "last_success.json")
+    monkeypatch.setattr(cycle, "LOCK", tmp_path / "cycle.lock")
+    monkeypatch.setenv("EMPIRE_ACQUISITION_COUNTRIES", "GB")
+
+    class Done:
+        returncode = 0
+        stdout = '{"msg": "prospect_acquired"}'
+        stderr = ""
+
+    with patch.object(cycle.subprocess, "run", return_value=Done()):
+        result = cycle.run_cycle(max_candidates=5)
+
+    assert result["country_code"] == "GB"
+    assert result["geo_country_scope"] == ["GB"]

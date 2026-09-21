@@ -11,6 +11,7 @@ import urllib.request
 from typing import Iterator, Optional
 
 from empire_os.lead_sources import LeadCandidate, SourceInfo
+from empire_os.geo_registry import market_by_metro, market_coordinates
 
 
 METRO_COORDS = {
@@ -65,6 +66,8 @@ METRO_COORDS = {
     "Fresno, CA": (36.737797, -119.787125),
     "Omaha, NE": (41.256538, -95.934502),
 }
+
+METRO_COORDS.update(market_coordinates())
 
 CRAFT_TO_NICHE = {
     "roofer": "roofing",
@@ -355,8 +358,16 @@ def run(
 
     for metro_name, (lat, lon) in targets.items():
         try:
+            market = market_by_metro(metro_name)
             for candidate in _fetch(lat, lon):
                 candidate.metro = metro_name
+                if market is not None:
+                    candidate.country_code = market.country_code
+                    candidate.language_code = market.language_code
+                    candidate.source_language = market.language_code
+                    candidate.timezone = market.timezone
+                    if not candidate.state:
+                        candidate.state = market.region_code
                 yield candidate
         except Exception as exc:
             failures += 1

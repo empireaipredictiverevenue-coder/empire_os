@@ -11,6 +11,7 @@ from typing import Iterator
 import biz_scraper
 
 from empire_os.lead_sources import LeadCandidate, SourceInfo
+from empire_os.geo_registry import market_by_metro
 
 
 VERTICALS = (
@@ -54,6 +55,8 @@ def run(metro: str = None) -> Iterator[LeadCandidate]:
     if not target_metro:
         return
 
+    market = market_by_metro(target_metro)
+
     for vertical in VERTICALS:
         try:
             rows = biz_scraper.scrape(vertical, target_metro, limit=8)
@@ -79,7 +82,11 @@ def run(metro: str = None) -> Iterator[LeadCandidate]:
                 phone="",
                 niche=vertical,
                 metro=target_metro,
-                state="",
+                state=market.region_code if market else "",
+                country_code=market.country_code if market else "",
+                language_code=market.language_code if market else "",
+                source_language=market.language_code if market else "",
+                timezone=market.timezone if market else "",
                 details=(
                     f"Business discovered by Empire free search scraper; "
                     f"first-party domain {domain}"
