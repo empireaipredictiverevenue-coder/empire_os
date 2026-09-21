@@ -238,3 +238,67 @@ def test_identity_catchup_skips_rows_already_attempted(monkeypatch):
     monkeypatch.setattr(worker, "request_json", fake_request)
     rows = worker.fetch_unlinked_allocatable_prospects(limit=5)
     assert [row["id"] for row in rows] == [pending_id]
+
+
+def test_verified_enrichment_website_requires_accepted_guard_and_site():
+    prospect = _prospect()
+    enrichment = {
+        "fields": {"website": "https://realroofing.example"},
+        "evidence": [
+            {"source": "identity_guard", "accepted": True},
+            {"source": "website", "accepted": True},
+        ],
+    }
+    assert worker.verified_enrichment_website(
+        prospect,
+        enrichment,
+    ) == "https://realroofing.example"
+
+    rejected = {
+        **enrichment,
+        "evidence": [
+            {"source": "identity_guard", "accepted": False},
+            {"source": "website", "accepted": True},
+        ],
+    }
+    assert worker.verified_enrichment_website(prospect, rejected) == ""
+
+
+def test_verified_website_never_overwrites_existing_canonical_site():
+    prospect = _prospect()
+    prospect["website"] = "https://existing.example"
+    enrichment = {
+        "fields": {"website": "https://new.example"},
+        "evidence": [
+            {"source": "identity_guard", "accepted": True},
+            {"source": "website", "accepted": True},
+        ],
+    }
+    assert worker.verified_enrichment_website(prospect, enrichment) == ""
+
+
+def test_promote_verified_website_patches_and_verifies(monkeypatch):
+    prospect = _prospect()
+    website = "https://realroofing.example"
+    enrichment = {
+        "fields": {"website": website},
+        "evidence": [
+            {"source": "identity_guard", "accepted": True},
+            {"source": "website", "accepted": True},
+        ],
+    }
+    calls = []
+
+    def fake_request(method, path, payload=None, prefer=None):
+        calls.append((method, path, payload, prefer))
+        if method == "GET":
+            return [{"id": prospect["id"], "website": website}]
+        return None
+
+    monkeypatch.setattr(worker, "request_json", fake_request)
+    result = worker.promote_verified_website(prospect, enrichment)
+    assert result == website
+    assert calls[0][0] == "PATCH"
+    assert calls[0][2] == {"website": website}
+    assert calls[0][3] == "return=minimal"
+    assert calls[1][0] == "GET"

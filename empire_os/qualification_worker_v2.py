@@ -303,6 +303,77 @@ def resolve_identity(
     return entity_id
 
 
+def verified_enrichment_website(
+    prospect: dict[str, Any],
+    enrichment: dict[str, Any],
+) -> str:
+    """Return only an identity-accepted discovered first-party website."""
+    if str(prospect.get("website") or "").strip():
+        return ""
+
+    fields = enrichment.get("fields")
+    if not isinstance(fields, dict):
+        return ""
+    website = str(fields.get("website") or "").strip()
+    if not website:
+        return ""
+
+    evidence = enrichment.get("evidence")
+    evidence = evidence if isinstance(evidence, list) else []
+    guard_ok = any(
+        isinstance(item, dict)
+        and item.get("source") == "identity_guard"
+        and item.get("accepted") is True
+        for item in evidence
+    )
+    site_ok = any(
+        isinstance(item, dict)
+        and item.get("source") == "website"
+        and item.get("accepted") is True
+        for item in evidence
+    )
+    return website if guard_ok and site_ok else ""
+
+
+def promote_verified_website(
+    prospect: dict[str, Any],
+    enrichment: dict[str, Any],
+) -> str:
+    """Persist a verified first-party site without overwriting canonical data."""
+    website = verified_enrichment_website(prospect, enrichment)
+    if not website:
+        return ""
+
+    prospect_id = str(prospect.get("id") or "").strip()
+    if not prospect_id:
+        raise RuntimeError("prospect id required for website promotion")
+
+    params = urllib.parse.urlencode({"id": f"eq.{prospect_id}"})
+    request_json(
+        "PATCH",
+        f"/rest/v1/prospects?{params}",
+        payload={"website": website},
+        prefer="return=minimal",
+    )
+
+    verify_params = urllib.parse.urlencode({
+        "select": "id,website",
+        "id": f"eq.{prospect_id}",
+        "limit": 1,
+    })
+    rows = request_json(
+        "GET",
+        f"/rest/v1/prospects?{verify_params}",
+    ) or []
+    if (
+        not isinstance(rows, list)
+        or not rows
+        or str(rows[0].get("website") or "").strip() != website
+    ):
+        raise RuntimeError("verified website promotion did not persist")
+    return website
+
+
 def build_evidence_backed_payload(
     prospect: dict[str, Any],
     *,
@@ -401,6 +472,16 @@ def qualify_prospect(prospect: dict[str, Any]) -> dict[str, Any]:
         enrichment_input["_acquisition_website"] = website
     enrichment = enrich_prospect_for_scoring(enrichment_input)
 
+    promoted_website = promote_verified_website(
+        prospect,
+        enrichment,
+    )
+    if promoted_website:
+        prospect = {
+            **prospect,
+            "website": promoted_website,
+        }
+
     entity_id = resolve_identity(
         prospect,
         acquisition,
@@ -440,6 +521,7 @@ def qualify_prospect(prospect: dict[str, Any]) -> dict[str, Any]:
         "evidence_confidence": payload.get("evidence_confidence"),
         "entity_id": entity_id,
         "identity_resolved": bool(entity_id),
+        "verified_website_promoted": promoted_website or None,
     }
 
 
