@@ -48,7 +48,12 @@ def test_pipeline_auto_reviews_then_proposes_only_ready_reviews():
     def request(method, path, payload=None, **_kwargs):
         calls.append((method, path, payload))
         if method == "GET" and path.startswith("/rest/v1/buyer_candidate_reviews?"):
-            return [{"id": "00000000-0000-0000-0000-000000000010"}]
+            if "status=eq.approved" in path:
+                return []
+            return [{
+                "id": "00000000-0000-0000-0000-000000000010",
+                "contact_email": "clay@example.com",
+            }]
         if path.endswith("auto_review_buyer_candidate"):
             return {
                 "decision": "approved",
@@ -340,3 +345,62 @@ def test_hydrate_review_refreshes_public_proof_even_when_context_complete():
     assert hydrated["evidence"]["rating"] == 4.8
     assert hydrated["evidence"]["review_count"] == 114
     assert hydrated["evidence"]["buy_signal_score"] == 100
+
+
+def test_pipeline_skips_pending_contact_already_approved():
+    pending_id = "00000000-0000-0000-0000-000000000081"
+    calls = []
+
+    def request(method, path, payload=None, **_kwargs):
+        calls.append((method, path, payload))
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            if "status=eq.approved" in path:
+                return [{"contact_email": "same@example.com"}]
+            return [{
+                "id": pending_id,
+                "contact_email": "SAME@example.com",
+                "proposed_at": "2026-09-21T18:00:00+00:00",
+            }]
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        if path.endswith("auto_review_buyer_candidate"):
+            raise AssertionError("duplicate contact must not be auto-reviewed")
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+    assert result.candidate_auto_approved == 0
+    assert result.candidate_skipped == 1
+    assert any(
+        "duplicate_normalized_contact" in reason
+        for reason in result.deferred_reasons
+    )
+
+
+def test_pipeline_skips_second_duplicate_pending_contact_same_cycle():
+    first = "00000000-0000-0000-0000-000000000091"
+    second = "00000000-0000-0000-0000-000000000092"
+    approved_calls = []
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            if "status=eq.approved" in path:
+                return []
+            return [
+                {"id": first, "contact_email": "victor@example.com"},
+                {"id": second, "contact_email": "VICTOR@example.com"},
+            ]
+        if path.endswith("auto_review_buyer_candidate"):
+            approved_calls.append(payload["p_review_id"])
+            return {"status": "approved", "decision": "approved"}
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+    assert approved_calls == [first]
+    assert result.candidate_auto_approved == 1
+    assert result.candidate_skipped == 1

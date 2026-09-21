@@ -187,7 +187,7 @@ def run_gtm_pipeline(
         raise ValueError("now must include timezone")
 
     pending_query = urlencode({
-        "select": "id",
+        "select": "id,contact_email,proposed_at",
         "status": "eq.pending",
         "order": "proposed_at.asc",
         "limit": str(bounded),
@@ -199,12 +199,39 @@ def run_gtm_pipeline(
     if not isinstance(pending, list):
         raise ValueError("pending review projection must be a list")
 
+    approved_query = urlencode({
+        "select": "contact_email",
+        "status": "eq.approved",
+        "limit": "100",
+    })
+    approved_rows = request(
+        "GET",
+        f"/rest/v1/buyer_candidate_reviews?{approved_query}",
+    ) or []
+    if not isinstance(approved_rows, list):
+        raise ValueError("approved review projection must be a list")
+
+    seen_contacts = {
+        str((row or {}).get("contact_email") or "").strip().lower()
+        for row in approved_rows
+        if str((row or {}).get("contact_email") or "").strip()
+    }
+
     approved_count = 0
     skipped = 0
     pending_skip_reasons: list[str] = []
     for row in pending:
         review_id = str((row or {}).get("id") or "").strip()
         if not review_id:
+            continue
+        contact = str(
+            (row or {}).get("contact_email") or ""
+        ).strip().lower()
+        if contact and contact in seen_contacts:
+            skipped += 1
+            pending_skip_reasons.append(
+                f"{review_id}:duplicate_normalized_contact"
+            )
             continue
         try:
             result = request(
@@ -217,6 +244,8 @@ def run_gtm_pipeline(
             )
             if isinstance(result, Mapping) and result.get("status") == "approved":
                 approved_count += 1
+                if contact:
+                    seen_contacts.add(contact)
             else:
                 skipped += 1
                 pending_skip_reasons.append(
