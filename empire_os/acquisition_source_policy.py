@@ -36,6 +36,7 @@ def recent_source_stats(
             "accepted": 0,
             "errors": 0,
             "prospects": 0,
+            "matches": 0,
             "signals": 0,
         }
     )
@@ -55,6 +56,8 @@ def recent_source_stats(
             stats[source]["errors"] += int(row.get("errors") or 0)
         elif msg == "prospect_acquired":
             stats[source]["prospects"] += 1
+        elif msg == "prospect_matched":
+            stats[source]["matches"] += 1
         elif msg == "signal_queued":
             stats[source]["signals"] += 1
     return dict(stats)
@@ -75,11 +78,13 @@ def choose_source(
     def rank(source: str) -> tuple[float, float, str]:
         row = stats.get(source, {})
         runs = int(row.get("runs") or 0)
-        accepted = int(row.get("accepted") or 0)
+        prospects = int(row.get("prospects") or 0)
+        signals = int(row.get("signals") or 0)
         errors = int(row.get("errors") or 0)
-        yield_rate = accepted / max(runs, 1)
-        # Under-tested sources win first; yield breaks equal-run ties.
-        health = yield_rate - (errors / max(runs, 1)) * 5.0
+        novel_yield = (prospects + signals) / max(runs, 1)
+        # Under-tested sources win first; only genuinely new canonical
+        # prospects or durable signal-inbox records count as useful yield.
+        health = novel_yield - (errors / max(runs, 1)) * 5.0
         return (float(runs), -health, source)
 
     source = min(candidates, key=rank)
