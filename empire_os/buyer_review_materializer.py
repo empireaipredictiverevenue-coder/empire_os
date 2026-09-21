@@ -11,6 +11,9 @@ from __future__ import annotations
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+import json
+import subprocess
+import sys
 from typing import Any, Callable, Mapping
 import urllib.parse
 
@@ -19,13 +22,62 @@ from empire_os.buyer_discovery import (
     build_candidate,
     build_candidate_review_plan,
 )
-from empire_os.buyer_probe_worker import rejection_reason, run as run_buyer_probe
+from empire_os.buyer_probe_worker import rejection_reason
 from empire_os.qualification_worker_v2 import request_json
 
 
 Request = Callable[..., Any]
 Probe = Callable[[dict[str, Any]], dict[str, Any]]
 Defer = Callable[[Mapping[str, Any]], bool]
+
+
+def run_buyer_probe_isolated(
+    row: dict[str, Any],
+    *,
+    hard_timeout_seconds: float = 35.0,
+) -> dict[str, Any]:
+    """Run one public-site probe in a bounded child process."""
+    timeout = max(8.0, min(float(hard_timeout_seconds), 60.0))
+    payload = dict(row)
+    payload["_probe_options"] = {
+        "max_pages": 7,
+        "request_timeout": 4.0,
+        "time_budget_seconds": min(20.0, max(6.0, timeout - 10.0)),
+    }
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "empire_os.buyer_probe_worker"],
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+            cwd="/srv/empire_os",
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "prospect_id": row.get("id"),
+            "business_name": row.get("business_name"),
+            "site_ok": False,
+            "review_ready": False,
+            "outreach_ready": False,
+            "rejection_reason": "site_timeout",
+            "mode": "OBSERVE",
+            "write_authorized": False,
+        }
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "buyer probe child failed: "
+            + (proc.stderr or "unknown error")[:240]
+        )
+    try:
+        result = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("buyer probe child returned invalid JSON") from exc
+    if not isinstance(result, dict):
+        raise RuntimeError("buyer probe child returned non-object")
+    return result
 
 
 @dataclass(frozen=True)
@@ -178,7 +230,7 @@ def _eligible_candidate(row: Mapping[str, Any]):
 def run_buyer_review_materializer(
     request: Request = request_json,
     *,
-    probe: Probe = run_buyer_probe,
+    probe: Probe = run_buyer_probe_isolated,
     defer: Defer | None = None,
     scan_limit: int = 25,
     proposal_limit: int = 5,
@@ -257,11 +309,13 @@ def run_buyer_review_materializer(
                 result.get("review_ready") is not True
                 or result.get("outreach_ready") is not True
             ):
-                reason = (
-                    "outreach_not_ready"
-                    if result.get("review_ready") is True
-                    else rejection_reason(dict(result))
-                )
+                reason = str(result.get("rejection_reason") or "").strip()
+                if not reason:
+                    reason = (
+                        "outreach_not_ready"
+                        if result.get("review_ready") is True
+                        else rejection_reason(dict(result))
+                    )
                 reason = reason or "contact_not_ready"
                 rejection_counts[reason] += 1
                 queue_deferred(candidate, reason)

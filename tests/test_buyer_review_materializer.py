@@ -1,4 +1,5 @@
 from empire_os.buyer_review_materializer import (
+    run_buyer_probe_isolated,
     run_buyer_review_materializer,
 )
 
@@ -216,3 +217,45 @@ def test_unlinked_but_verified_candidate_can_still_enter_review():
     )
     assert result.proposed == 1
     assert request.posts[0][1]["p_entity_id"] is None
+
+
+def test_isolated_probe_timeout_returns_bounded_rejection(monkeypatch):
+    import subprocess
+
+    def timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd=["probe"], timeout=12)
+
+    monkeypatch.setattr(
+        "empire_os.buyer_review_materializer.subprocess.run",
+        timeout,
+    )
+    result = run_buyer_probe_isolated(
+        {
+            "id": PROSPECT_ID,
+            "business_name": "Acme Roofing",
+        },
+        hard_timeout_seconds=12,
+    )
+    assert result["rejection_reason"] == "site_timeout"
+    assert result["review_ready"] is False
+    assert result["outreach_ready"] is False
+    assert result["write_authorized"] is False
+
+
+def test_explicit_probe_rejection_reason_is_preserved():
+    request = FakeRequest()
+
+    def timed_out_probe(_row):
+        return {
+            "site_ok": False,
+            "review_ready": False,
+            "outreach_ready": False,
+            "rejection_reason": "site_timeout",
+        }
+
+    result = run_buyer_review_materializer(
+        request,
+        probe=timed_out_probe,
+    )
+    assert result.proposed == 0
+    assert dict(result.rejection_counts)["site_timeout"] == 1
