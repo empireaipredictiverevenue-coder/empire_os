@@ -83,12 +83,9 @@ def _hydrate_review_evidence(
 ) -> dict[str, Any]:
     evidence = review.get("evidence")
     merged = dict(evidence) if isinstance(evidence, Mapping) else {}
-    if all(
-        str(merged.get(key) or "").strip()
-        for key in ("business_name", "niche", "metro")
-    ):
-        return {**dict(review), "evidence": merged}
-
+    # Always hydrate the canonical prospect when available. Core context may
+    # already be present while mutable observed proof (rating/review_count,
+    # buy signal, ads) is missing from the older buyer-review evidence packet.
     prospect_id = str(review.get("prospect_id") or "").strip()
     if not prospect_id:
         return {**dict(review), "evidence": merged}

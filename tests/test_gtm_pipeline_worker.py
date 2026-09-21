@@ -313,3 +313,28 @@ def test_gtm_defers_multilingual_country_without_explicit_language():
     assert result.intents_proposed == 0
     assert result.outreach_deferred == 1
     assert "recipient outreach language unresolved" in result.deferred_reasons[0]
+
+
+def test_hydrate_review_refreshes_public_proof_even_when_context_complete():
+    row = review("00000000-0000-0000-0000-000000000071")
+    row["evidence"].pop("rating", None)
+    row["evidence"].pop("review_count", None)
+
+    def request(method, path, payload=None, **_kwargs):
+        assert method == "GET"
+        assert path.startswith("/rest/v1/prospects?")
+        return [{
+            "business_name": "Clay Roofing",
+            "niche": "roofing",
+            "metro": "Wichita, KS",
+            "rating": 4.8,
+            "review_count": 114,
+            "buy_signal_score": 100,
+            "runs_ads": False,
+        }]
+
+    hydrated = _hydrate_review_evidence(request, row)
+    assert hydrated["evidence"]["business_name"] == row["evidence"]["business_name"]
+    assert hydrated["evidence"]["rating"] == 4.8
+    assert hydrated["evidence"]["review_count"] == 114
+    assert hydrated["evidence"]["buy_signal_score"] == 100
