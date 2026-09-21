@@ -7,6 +7,10 @@ from typing import Any
 
 from empire_os.intelligence_nodes import NODES
 from empire_os.spatial_physical_runtime import build_spatial_physical_runtime
+from empire_os.vertical_intelligence_runtime import (
+    build_private_capital_intelligence_runtime,
+    build_property_intelligence_runtime,
+)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -22,6 +26,10 @@ def build_intelligence_nodes_projection(repo_root: Path) -> dict[str, Any]:
     source_health = _read_json(runtime / "source_health" / "latest.json")
     acquisition = _read_json(runtime / "acquisition" / "latest.json")
     spatial_physical = build_spatial_physical_runtime(repo_root)
+    property_runtime = build_property_intelligence_runtime(repo_root)
+    private_capital_runtime = build_private_capital_intelligence_runtime(
+        repo_root
+    )
     observed_sources = tuple(dict.fromkeys(
         value for value in (
             str(source_health.get("source") or "").strip(),
@@ -52,6 +60,29 @@ def build_intelligence_nodes_projection(repo_root: Path) -> dict[str, Any]:
                 if isinstance(observation_count, int) and observation_count > 0
                 else "no_real_3d_evidence_observed"
             )
+        elif node.key == "property":
+            observation_count = property_runtime.get("evidence_count")
+            evidence_state = property_runtime.get("evidence_state")
+            permit_sources = property_runtime.get("permit_sources")
+            if isinstance(permit_sources, dict):
+                matched = tuple(dict.fromkeys((
+                    *matched,
+                    *(
+                        str(key)
+                        for key, value in permit_sources.items()
+                        if int(value or 0) > 0
+                    ),
+                )))
+            if (
+                isinstance(property_runtime.get("physical_observation_count"), int)
+                and property_runtime["physical_observation_count"] > 0
+            ):
+                matched = tuple(dict.fromkeys((*matched, "natural_physical")))
+        elif node.key == "private_capital":
+            observation_count = private_capital_runtime.get("evidence_count")
+            evidence_state = private_capital_runtime.get("evidence_state")
+            if evidence_state == "EVIDENCE_AVAILABLE":
+                matched = tuple(dict.fromkeys((*matched, "canonical_private_capital")))
 
         row["runtime_evidence"] = {
             "observed_sources": list(matched),
