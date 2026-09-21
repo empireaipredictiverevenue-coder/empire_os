@@ -20,6 +20,10 @@ SOURCE = ROOT / "runtime/source_health/latest.json"
 BUYER_REVIEW = ROOT / "runtime/buyer_review_materializer/latest.json"
 OUTPUT = ROOT / "runtime/astra/dispatch_latest.json"
 
+JOB_TIMEOUT_SECONDS = {
+    "buyer_deferred_enrichment": 270,
+}
+
 SAFE_JOBS = {
     "buyer_deferred_enrichment": [
         str(ROOT / ".venv/bin/python"),
@@ -128,7 +132,7 @@ def choose_jobs(
 def dispatch(
     *,
     mode: str | None = None,
-    timeout_seconds: int = 120,
+    timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
     current_mode = (
         mode
@@ -150,6 +154,11 @@ def dispatch(
             continue
 
         command = SAFE_JOBS[job]
+        job_timeout = (
+            int(timeout_seconds)
+            if timeout_seconds is not None
+            else JOB_TIMEOUT_SECONDS.get(job, 120)
+        )
         try:
             completed = subprocess.run(
                 command,
@@ -157,7 +166,7 @@ def dispatch(
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=max(10, min(int(timeout_seconds), 300)),
+                timeout=max(10, min(job_timeout, 300)),
                 env=os.environ.copy(),
             )
         except subprocess.TimeoutExpired as exc:

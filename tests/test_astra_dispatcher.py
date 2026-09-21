@@ -94,3 +94,37 @@ def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
     result = module.dispatch(mode="GUARDED_EXECUTE", timeout_seconds=10)
     assert result["executions"][0]["decision"] == "TIMED_OUT"
     assert any(row["decision"] == "DISPATCHED" for row in result["executions"][1:])
+
+
+def test_default_deferred_enrichment_timeout_is_longer_than_fast_jobs(
+    monkeypatch,
+    tmp_path,
+):
+    import subprocess
+    import empire_os.astra_dispatcher as module
+
+    monkeypatch.setattr(module, "LOOP", tmp_path / "loop.json")
+    monkeypatch.setattr(module, "SOURCE", tmp_path / "source.json")
+    monkeypatch.setattr(module, "BUYER_REVIEW", tmp_path / "review.json")
+    monkeypatch.setattr(module, "OUTPUT", tmp_path / "dispatch.json")
+    module.LOOP.write_text(
+        '{"loop_complete": false, "stages": ['
+        '{"stage":"recognized_revenue","observed":true},'
+        '{"stage":"buyer_conversation","observed":true},'
+        '{"stage":"commercial_terms","observed":true}]}'
+    )
+    module.SOURCE.write_text('{"end_to_end_healthy": true}')
+    module.BUYER_REVIEW.write_text('{"deferred_enrichment": 1}')
+
+    seen = []
+
+    def fake_run(command, **kwargs):
+        seen.append(kwargs["timeout"])
+        return subprocess.CompletedProcess(
+            command, 0, stdout="ok", stderr=""
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    module.dispatch(mode="GUARDED_EXECUTE")
+    assert seen[0] == 270
+    assert all(value == 120 for value in seen[1:])
