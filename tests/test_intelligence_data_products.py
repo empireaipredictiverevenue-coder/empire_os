@@ -12,6 +12,7 @@ def test_catalog_has_core_data_products_without_invented_pricing():
         "market_signal_feed",
         "forecast_snapshot",
         "entity_graph_export",
+        "spatial_physical_intelligence",
     } <= keys
     assert all(row["pricing_cents"] is None for row in catalog)
     assert all(row["execution_authority"] == "none" for row in catalog)

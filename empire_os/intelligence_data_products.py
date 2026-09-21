@@ -70,6 +70,29 @@ DATA_PRODUCTS = (
         compatible_usage_modes=(UsageMode.HOURLY_INTELLIGENCE,),
     ),
     IntelligenceDataProduct(
+        key="spatial_physical_intelligence",
+        name="Empire Spatial & Physical Intelligence",
+        category="spatial_physical_intelligence",
+        source_nodes=("volumetric", "natural_physical", "property", "home_services", "solar_energy", "hvac_climate"),
+        deliverables=(
+            "evidence_backed_3d_observations",
+            "physical_condition_observations",
+            "modeled_physical_opportunities",
+            "spatial_change_evidence",
+        ),
+        delivery_modes=("api", "export", "dashboard", "digital_twin"),
+        required_evidence=(
+            "canonical_subject",
+            "source_provenance",
+            "observed_at",
+            "spatial_or_physical_evidence_ref",
+        ),
+        compatible_usage_modes=(
+            UsageMode.EVALUATION_SCORE,
+            UsageMode.HOURLY_INTELLIGENCE,
+        ),
+    ),
+    IntelligenceDataProduct(
         key="forecast_snapshot",
         name="Empire Forecast Snapshot",
         category="predictive_intelligence",

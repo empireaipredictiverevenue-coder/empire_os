@@ -92,6 +92,43 @@ NODES = (
         ),
     ),
     IntelligenceNode(
+        key="volumetric",
+        name="Volumetric Intelligence Node",
+        market="property_assets_sites_terrain_and_spatial_environments",
+        sensors=(
+            "satellite_imagery", "drone_imagery", "lidar", "depth_maps",
+            "property_geometry", "digital_twins", "site_photogrammetry",
+        ),
+        products=(
+            "3d_asset_map", "site_geometry_intelligence",
+            "spatial_change_alerts", "volumetric_opportunity_feed",
+        ),
+        opportunity_types=(
+            "spatial_change", "property_fit", "asset_condition",
+            "site_capacity", "storm_surface_change", "terrain_exposure",
+        ),
+    ),
+    IntelligenceNode(
+        key="natural_physical",
+        name="Natural Physical Intelligence Node",
+        market="real_world_asset_condition_and_physical_systems",
+        sensors=(
+            "weather_observations", "storm_signals", "thermal_imagery",
+            "material_condition", "building_systems", "sensor_telemetry",
+            "volumetric",
+        ),
+        products=(
+            "physical_condition_feed", "damage_risk_intelligence",
+            "energy_load_intelligence", "asset_degradation_alerts",
+            "physical_opportunity_feed",
+        ),
+        opportunity_types=(
+            "damage_response", "repair_need", "replacement_cycle",
+            "energy_upgrade", "flood_exposure", "structural_risk",
+            "solar_fit", "maintenance_need",
+        ),
+    ),
+    IntelligenceNode(
         key="market_intent",
         name="Market Intent Node",
         market="cross_vertical_b2b",

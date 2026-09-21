@@ -87,6 +87,34 @@ Perception does not choose actions.
 
 ## 5. Layer 2 — World Model
 
+The world model includes two grounded real-world intelligence sublayers:
+
+### Volumetric Intelligence
+Represents where things are and how they occupy 3D space:
+- point clouds, meshes, voxel fields, Gaussian splats and depth maps;
+- property/building/site geometry;
+- terrain and spatial context;
+- digital-twin geometry;
+- spatial change over time;
+- explicit coordinate-frame and provenance metadata.
+
+### Natural Physical Intelligence
+Represents measured or evidence-backed physical state and plausible consequence:
+- storm/roof/material condition;
+- heat/thermal loss and HVAC load;
+- flood/water exposure;
+- structural/load state;
+- solar exposure;
+- motion and surface change;
+- asset degradation and maintenance condition.
+
+Rules:
+- physical measurements are observations, not guesses;
+- absent measurements remain UNKNOWN;
+- inferred consequences are labeled modeled_only;
+- physics/spatial reasoning grants no execution authority;
+- all derived opportunities retain source evidence refs and confidence where available.
+
 Empire's commercial world model represents:
 - companies
 - people/buying committees

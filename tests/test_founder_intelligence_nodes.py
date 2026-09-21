@@ -17,7 +17,9 @@ def test_nodes_projection_preserves_unknown_counts(tmp_path):
         "source": "nws_alerts",
     }))
     payload = build_intelligence_nodes_projection(tmp_path)
-    assert payload["node_count"] > 0
+    assert payload["node_count"] >= 13
+    keys = {row["key"] for row in payload["nodes"]}
+    assert {"volumetric", "natural_physical"} <= keys
     home = next(row for row in payload["nodes"] if row["key"] == "home_services")
     assert set(home["runtime_evidence"]["observed_sources"]) == {
         "overpass", "nws_alerts"

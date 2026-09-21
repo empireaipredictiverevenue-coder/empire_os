@@ -89,6 +89,13 @@ Exit condition: one fully verified commercial loop with recognized revenue and o
 
 ### Priority 2 — Build the Intelligence Fabric into sellable products
 Goal: turn Empire's sensors, historical assets and external datasets into proprietary intelligence products rather than a lead-scraping identity.
+
+New first-class intelligence layers:
+- Volumetric Intelligence: evidence-backed 3D/spatial understanding of properties, sites, assets, terrain and physical environments from sources such as satellite/drone imagery, LiDAR, depth maps, photogrammetry and digital-twin geometry.
+- Natural Physical Intelligence: evidence-backed reasoning over real-world physical state and consequence including storm damage, roof/material condition, thermal loss, HVAC load, flood exposure, structural load, solar exposure, motion and degradation.
+- These layers feed the shared Intelligence Fabric, Predictive Cloud, Digital Twin and Opportunity Foundry; they do not create commercial truth or execution authority.
+- Missing measurements remain UNKNOWN. Modeled physical opportunities remain explicitly modeled_only until verified by observed evidence/outcomes.
+
 Current work:
 - Intelligence Nodes: Home Services, Solar & Energy, HVAC & Climate Services, Property, Market Intent, Corporate Change, Private Capital & Roll-Up, Government Spend, Healthcare Growth, Compliance/Risk, Legal & Mass Tort;
 - canonical entity/evidence reconciliation and temporal provenance;

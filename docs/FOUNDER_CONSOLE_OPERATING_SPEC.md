@@ -57,6 +57,14 @@ Search/SEO/AEO/GEO, Advertising, Demand Genesis, landing/content performance, pa
 ### Intelligence / Learning
 Omega, Predictive, forecast-vs-actual calibration, Revenue OS, Digital Twin, Capital, Economic Memory and model-review feedback.
 
+The Founder Console must also expose Volumetric Intelligence and Natural Physical Intelligence as read-only drill-down layers:
+- source/modality health and last observed evidence;
+- 3D/spatial assets available by market/property/site;
+- physical phenomena observed vs modeled;
+- spatial/physical opportunity counts, with UNKNOWN preserved when no canonical count exists;
+- linkage into Storm Leads Multiplier, Property, Solar, HVAC and Digital Twin;
+- modeled_only and execution_authority labels visible at all times.
+
 ### System / Operations
 Services/timers, Supabase/API health, sources, Resend, Hunter, Search, Astra, model/provider health, errors, remediation and current OBSERVE/authority state.
 
