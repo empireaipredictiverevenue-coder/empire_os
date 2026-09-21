@@ -12,10 +12,14 @@ import json
 import time
 from pathlib import Path
 
+from empire_os.acquisition_soak_summary import write_soak_summary
 from scripts.run_acquisition_cycle import run_cycle
 
 ROOT = Path("/srv/empire_os")
 SOAK_EXPIRY = ROOT / "runtime" / "acquisition" / "soak_24h.expires"
+SOAK_SUMMARY = ROOT / "runtime" / "acquisition" / "soak_24h_summary.json"
+CRAWLER_LOG = ROOT / "runtime" / "feedback" / "crawler_runs.jsonl"
+SIGNAL_INBOX = ROOT / "runtime" / "acquisition" / "signal_inbox.json"
 
 
 def soak_active(*, now_epoch: int | None = None, expiry_path: Path = SOAK_EXPIRY) -> tuple[bool, int | None]:
@@ -45,6 +49,14 @@ def main() -> int:
             "payment_enabled": False,
         }, indent=2))
         return 0
+
+    if expiry is not None and not SOAK_SUMMARY.exists():
+        write_soak_summary(
+            SOAK_SUMMARY,
+            crawler_log=CRAWLER_LOG,
+            signal_inbox=SIGNAL_INBOX,
+            expiry_epoch=expiry,
+        )
 
     result = run_cycle(max_candidates=args.max_candidates)
     print(json.dumps({
