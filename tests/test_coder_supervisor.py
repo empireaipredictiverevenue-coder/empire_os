@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from empire_os.coder_supervisor import (
+    _nonprotected_dirty,
     _commit_verified_candidate,
     _safe_repo_path,
 )
@@ -63,3 +64,27 @@ def test_failed_verification_never_commits(tmp_path):
     assert result["committed"] is False
     assert result["reason"] == "verification_not_passed"
     assert calls == []
+
+
+def test_exact_protected_roots_are_ignored_as_repo_dirt(tmp_path):
+    def runner(argv, **kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout="?? recovery/\n?? toop\n",
+            stderr="",
+        )
+
+    assert _nonprotected_dirty(tmp_path, runner=runner) == []
+
+
+def test_real_dirty_file_still_blocks_implementation(tmp_path):
+    def runner(argv, **kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout=" M empire_os/real.py\n?? toop\n",
+            stderr="",
+        )
+
+    assert _nonprotected_dirty(tmp_path, runner=runner) == [
+        "empire_os/real.py"
+    ]

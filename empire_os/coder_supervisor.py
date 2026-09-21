@@ -19,7 +19,15 @@ from empire_os.founder_directive_planner import plan_captured_directives
 from empire_os.founder_directives import FounderDirectiveStore
 
 PASS_VERDICTS = {"PASS", "PASS_WITH_WARNINGS"}
-PROTECTED_PREFIXES = ("recovery/", "toop/")
+PROTECTED_ROOTS = frozenset({"recovery", "toop"})
+
+
+def _is_protected_repo_path(value: str) -> bool:
+    raw = str(value or "").strip().replace("\\", "/").rstrip("/")
+    return any(
+        raw == root or raw.startswith(root + "/")
+        for root in PROTECTED_ROOTS
+    )
 
 
 def _active_jobs(queue: LocalJobQueue, kind: JobKind | None = None) -> list[dict[str, Any]]:
@@ -41,7 +49,7 @@ def _safe_repo_path(value: Any) -> str:
     path = Path(raw)
     if not raw or path.is_absolute() or ".." in path.parts:
         raise ValueError("invalid candidate target path")
-    if raw.startswith(PROTECTED_PREFIXES):
+    if _is_protected_repo_path(raw):
         raise ValueError("protected candidate target path")
     return raw
 
@@ -68,7 +76,7 @@ def _nonprotected_dirty(
         path = line[3:].strip()
         if " -> " in path:
             path = path.split(" -> ", 1)[1].strip()
-        if path.startswith(PROTECTED_PREFIXES):
+        if _is_protected_repo_path(path):
             continue
         dirty.append(path)
     return dirty
