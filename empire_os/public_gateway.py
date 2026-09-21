@@ -350,6 +350,18 @@ def robots():
     )
 
 
+@app.get("/icon.svg")
+def site_icon():
+    path = SITE_OUT / "icon.svg"
+    if not path.is_file():
+        return JSONResponse({"error": "site_icon_unavailable"}, status_code=404)
+    return FileResponse(
+        path,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.get("/trust")
 def trust_page():
     path = _site_html_path("trust")

@@ -1,3 +1,4 @@
+from pathlib import Path
 from fastapi.testclient import TestClient
 
 from empire_os.public_gateway import (
@@ -130,3 +131,14 @@ def test_csp_allows_only_hashed_inline_scripts(monkeypatch, tmp_path):
     csp = _site_csp("/")
     assert "script-src 'self' 'sha256-" in csp
     assert "'unsafe-inline'" not in csp.split("style-src", 1)[0]
+
+
+def test_site_icon_is_served_from_export(monkeypatch, tmp_path):
+    icon = tmp_path / "icon.svg"
+    icon.write_text("<svg></svg>")
+    monkeypatch.setattr("empire_os.public_gateway.SITE_OUT", tmp_path)
+    from empire_os.public_gateway import site_icon
+
+    response = site_icon()
+    assert Path(response.path) == icon
+    assert response.media_type == "image/svg+xml"
