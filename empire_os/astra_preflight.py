@@ -12,7 +12,6 @@ from typing import Any, Mapping
 POLICY_KEYS = (
     "EMPIRE_ASTRA_PREMIUM_AI_BUDGET_CENTS",
     "EMPIRE_ASTRA_OUTBOUND_DOMAIN_VERIFIED",
-    "EMPIRE_ASTRA_SOURCE_HEALTH_OK",
 )
 
 
@@ -88,7 +87,23 @@ def assess_runtime_preflight(
     ))
     token_rpc_ok = token_rpc_configured and token_file_exists and token_file_secure
     transport_ok = dsn_ok or token_rpc_ok
-    policy_ok = all(bool(str(values.get(key, "")).strip()) for key in POLICY_KEYS)
+    source_health_static = bool(
+        str(values.get("EMPIRE_ASTRA_SOURCE_HEALTH_OK", "")).strip()
+    )
+    source_health_file_raw = str(
+        values.get("EMPIRE_ASTRA_SOURCE_HEALTH_FILE", "")
+    ).strip()
+    source_health_file_exists = bool(
+        source_health_file_raw and Path(source_health_file_raw).is_file()
+    )
+    source_health_binding_ok = (
+        source_health_static
+        or source_health_file_exists
+    )
+    policy_ok = (
+        all(bool(str(values.get(key, "")).strip()) for key in POLICY_KEYS)
+        and source_health_binding_ok
+    )
     systemd_ready = service_installed and timer_installed and timer_enabled
     scheduler_ready = systemd_ready or cron_scheduler_enabled
 
@@ -105,6 +120,8 @@ def assess_runtime_preflight(
         blockers.append("observer_token_permissions_insecure")
     if not transport_ok:
         blockers.append("observer_transport_not_configured")
+    if source_health_file_raw and not source_health_file_exists:
+        blockers.append("source_health_file_missing")
     if not policy_ok:
         blockers.append("policy_bindings_incomplete")
     if not scheduler_ready:
