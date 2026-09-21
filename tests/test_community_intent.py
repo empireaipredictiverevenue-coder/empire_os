@@ -71,3 +71,40 @@ def test_search_collector_dedupes_urls():
         search_fn=fake_search,
     )
     assert len(rows) == 1
+
+
+def test_reddit_atom_parser_builds_signal_only_observation():
+    from empire_os.community_intent import parse_reddit_atom
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <title>Struggling with lead generation and follow up</title>
+        <updated>2026-09-21T10:00:00+00:00</updated>
+        <author><name>example_user</name></author>
+        <link rel="alternate" href="https://www.reddit.com/r/sales/comments/abc/example/" />
+        <content type="html">&lt;p&gt;We need a better pipeline and CRM follow up process.&lt;/p&gt;</content>
+      </entry>
+    </feed>"""
+    rows = parse_reddit_atom(
+        xml,
+        query="lead generation",
+        niche="b2b",
+    )
+    assert len(rows) == 1
+    assert rows[0].source == "reddit"
+    assert "lead_generation" in rows[0].pain_points
+    assert rows[0].url.startswith("https://www.reddit.com/")
+
+
+def test_linkedin_job_post_is_not_buyer_intent():
+    from empire_os.community_intent import normalize_search_result
+    row = normalize_search_result(
+        platform="linkedin",
+        query="sales automation",
+        result={
+            "title": "We are hiring an Inside Sales Representative",
+            "link": "https://www.linkedin.com/posts/example",
+            "snippet": "Join our team and apply now.",
+        },
+    )
+    assert row is None

@@ -7,9 +7,12 @@ content, or infer revenue.
 from __future__ import annotations
 
 import re
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping
+
+import requests
 
 from empire_os.candidate_quality import assess_candidate
 from empire_os.lead_sources import LeadCandidate
@@ -25,9 +28,20 @@ INTENT_PATTERNS = (
     re.compile(r"\b(need|looking for|searching for|seeking)\b", re.I),
     re.compile(r"\b(recommend|recommendation|anyone using|what tool|which tool)\b", re.I),
     re.compile(r"\b(struggling|frustrated|stuck|pain point|problem with)\b", re.I),
-    re.compile(r"\b(hiring|budget|quote|rfp|switching|replace)\b", re.I),
+    re.compile(r"\b(budget|quote|rfp|switching|replace)\b", re.I),
     re.compile(r"\b(losing|wasting).{0,24}\b(time|money|revenue|leads)\b", re.I),
     re.compile(r"\bhow (do|can) (i|we).{0,40}\b(scale|automate|grow|find|get)\b", re.I),
+)
+
+EMPLOYMENT_PATTERNS = (
+    re.compile(r"\bwe(?:'re| are) hiring\b", re.I),
+    re.compile(r"\bjoin our team\b", re.I),
+    re.compile(r"\bjob opening\b", re.I),
+    re.compile(r"\bapply (?:now|today|here)\b", re.I),
+    re.compile(r"\binside sales representative\b", re.I),
+    re.compile(r"\boutside sales (?:representative|account manager)\b", re.I),
+    re.compile(r"\bopen role\b", re.I),
+    re.compile(r"\bcareer opportunity\b", re.I),
 )
 
 PAIN_TAXONOMY: dict[str, tuple[re.Pattern[str], ...]] = {
@@ -60,6 +74,9 @@ PAIN_TAXONOMY: dict[str, tuple[re.Pattern[str], ...]] = {
         re.compile(r"\b(storm leads?|insurance claims?|catastrophe)\b", re.I),
     ),
 }
+
+_HTML_TAG = re.compile(r"<[^>]+>")
+_REDDIT_UA = "EmpireOS/1.0 (+https://empire-ai.co.uk)"
 
 
 @dataclass(frozen=True)
@@ -131,6 +148,10 @@ def normalize_search_result(
     text = _clean(f"{title} {snippet}")
     if not text:
         return None
+    if source == "linkedin" and any(
+        pattern.search(text) for pattern in EMPLOYMENT_PATTERNS
+    ):
+        return None
 
     score, band = score_intent(text)
     pain_points = classify_pain_points(text)
@@ -150,6 +171,163 @@ def normalize_search_result(
         intent_score=score,
         intent_band=band,
     )
+
+
+def parse_reddit_atom(
+    xml_text: str,
+    *,
+    query: str,
+    niche: str = "b2b",
+    metro: str = "online",
+) -> list[IntentObservation]:
+    """Parse public Reddit Atom search results into signal-only observations."""
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return []
+
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    rows: list[IntentObservation] = []
+    seen: set[str] = set()
+
+    for entry in root.findall("a:entry", ns):
+        title = _clean(entry.findtext("a:title", default="", namespaces=ns))
+        author = _clean(
+            entry.findtext("a:author/a:name", default="", namespaces=ns)
+        )
+        observed_at = _clean(
+            entry.findtext("a:updated", default="", namespaces=ns)
+            or entry.findtext("a:published", default="", namespaces=ns)
+        )
+        content = entry.findtext("a:content", default="", namespaces=ns)
+        summary = entry.findtext("a:summary", default="", namespaces=ns)
+        body = _clean(_HTML_TAG.sub(" ", content or summary or ""))
+
+        url = ""
+        for link in entry.findall("a:link", ns):
+            href = _clean(link.attrib.get("href"))
+            rel = _clean(link.attrib.get("rel") or "alternate")
+            if href and rel in {"alternate", ""}:
+                url = href
+                break
+        if not url:
+            url = _clean(entry.findtext("a:id", default="", namespaces=ns))
+        if not url or "reddit.com" not in url.lower() or url in seen:
+            continue
+
+        combined = _clean(f"{title} {body}")
+        if not combined:
+            continue
+        score, band = score_intent(combined)
+        pain_points = classify_pain_points(combined)
+        if band == "low" and not pain_points:
+            continue
+
+        seen.add(url)
+        rows.append(
+            IntentObservation(
+                source="reddit",
+                url=url,
+                title=title,
+                text=body[:700],
+                author=author,
+                observed_at=(
+                    observed_at
+                    or datetime.now(timezone.utc).isoformat()
+                ),
+                query=_clean(query),
+                metro=_clean(metro),
+                niche=_clean(niche),
+                pain_points=pain_points,
+                intent_score=score,
+                intent_band=band,
+            )
+        )
+
+    rows.sort(key=lambda item: (-item.intent_score, item.url))
+    return rows
+
+
+def collect_reddit_rss_intent(
+    *,
+    subreddit: str,
+    query: str,
+    niche: str = "b2b",
+    metro: str = "online",
+    timeout: int = 15,
+    get_fn: Callable[..., Any] = requests.get,
+) -> dict[str, Any]:
+    """Fetch exactly one public Reddit Atom search feed.
+
+    One request per cycle keeps the observer polite. 429/403 is reported as
+    source health rather than converted into a false zero-demand signal.
+    """
+    sub = re.sub(r"[^A-Za-z0-9_]+", "", str(subreddit or ""))
+    if not sub:
+        raise ValueError("subreddit required")
+    url = f"https://www.reddit.com/r/{sub}/search.rss"
+    try:
+        response = get_fn(
+            url,
+            params={
+                "q": query,
+                "restrict_sr": "on",
+                "sort": "new",
+                "t": "week",
+            },
+            headers={
+                "User-Agent": _REDDIT_UA,
+                "Accept": "application/atom+xml,application/rss+xml,text/xml",
+            },
+            timeout=timeout,
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "status_code": None,
+            "reason": f"request_failed:{type(exc).__name__}",
+            "observations": [],
+            "subreddit": sub,
+            "query": query,
+        }
+
+    status = int(getattr(response, "status_code", 0) or 0)
+    content_type = str(
+        getattr(response, "headers", {}).get("content-type", "")
+    ).lower()
+    if status != 200:
+        return {
+            "ok": False,
+            "status_code": status,
+            "reason": "rate_limited" if status == 429 else f"http_{status}",
+            "observations": [],
+            "subreddit": sub,
+            "query": query,
+        }
+    if "xml" not in content_type and "atom" not in content_type:
+        return {
+            "ok": False,
+            "status_code": status,
+            "reason": "unexpected_content_type",
+            "observations": [],
+            "subreddit": sub,
+            "query": query,
+        }
+
+    observations = parse_reddit_atom(
+        str(getattr(response, "text", "") or ""),
+        query=query,
+        niche=niche,
+        metro=metro,
+    )
+    return {
+        "ok": True,
+        "status_code": status,
+        "reason": None,
+        "observations": observations,
+        "subreddit": sub,
+        "query": query,
+    }
 
 
 def observation_to_signal(observation: IntentObservation) -> LeadCandidate:
