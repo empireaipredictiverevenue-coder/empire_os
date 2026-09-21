@@ -8,6 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.control_conveyor import build_conveyor
+from empire_os.commercial_recovery_registry import (
+    recovery_product_catalog,
+    recovery_summary,
+)
 
 PHASE_RE = re.compile(
     r"^### Phase\s+(\d+)\s+—\s+(.+?)(?:\s+←\s+CURRENT)?$",
@@ -293,5 +297,12 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             _read_json(catalog_path),
             catalog_path,
         ),
+        "recovery_portfolio": {
+            "summary": recovery_summary(),
+            "products": recovery_product_catalog(),
+            "pricing_authority": "none",
+            "execution_authority": "none",
+            "actual_revenue": False,
+        },
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
