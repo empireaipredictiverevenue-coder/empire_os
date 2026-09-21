@@ -34,6 +34,9 @@ def test_first_touch_uses_specific_proof_not_generic_opportunity_pitch():
     assert "small pilot" not in copy.body.lower()
     assert "opportunities in" not in copy.subject.lower()
     assert "send it" in copy.body.lower()
+    assert "three areas" in copy.body.lower()
+    assert "bounded pilot" in copy.body.lower()
+    assert "three highest-priority signals" not in copy.body.lower()
     assert POSTAL_ADDRESS in copy.body
 
 
