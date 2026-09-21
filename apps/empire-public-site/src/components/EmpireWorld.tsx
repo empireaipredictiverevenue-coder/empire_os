@@ -35,10 +35,7 @@ function ScrollBridge({
         1,
       );
       const max = scroll.el.scrollHeight - scroll.el.clientHeight;
-      scroll.el.scrollTo({
-        top: target * max,
-        behavior: "smooth",
-      });
+      scroll.el.scrollTop = target * max;
     };
     window.addEventListener("empire-jump", handleJump as EventListener);
     return () => {
@@ -450,7 +447,7 @@ export default function EmpireWorld({
           pages={7}
           damping={0.14}
           distance={1}
-          maxSpeed={0.25}
+          maxSpeed={0.9}
         >
           <Engine onProgress={onProgress} />
           <ScrollTrack />
