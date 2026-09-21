@@ -47,6 +47,28 @@ const CHAPTERS = [
   },
 ] as const;
 
+function FallbackEngine() {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-10 overflow-hidden bg-[#020817]">
+      <div className="empire-fallback-engine">
+        <div className="empire-fallback-ring empire-fallback-ring-a" />
+        <div className="empire-fallback-ring empire-fallback-ring-b" />
+        <div className="empire-fallback-ring empire-fallback-ring-c" />
+        <div className="empire-fallback-core" />
+        {Array.from({ length: 12 }, (_, index) => (
+          <span
+            key={index}
+            className="empire-fallback-shard"
+            style={{
+              ["--i" as string]: index,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Brand() {
   return (
     <a
@@ -81,9 +103,22 @@ function jumpToChapter(target: number) {
 export default function Home() {
   const [mountWorld, setMountWorld] = useState(false);
   const [worldReady, setWorldReady] = useState(false);
+  const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    const canvas = document.createElement("canvas");
+    let supported = false;
+    try {
+      supported = Boolean(
+        canvas.getContext("webgl2") || canvas.getContext("webgl"),
+      );
+    } catch {
+      supported = false;
+    }
+    setWebglSupported(supported);
+
+    if (!supported) return;
     const id = window.requestAnimationFrame(() => setMountWorld(true));
     return () => window.cancelAnimationFrame(id);
   }, []);
@@ -101,12 +136,14 @@ export default function Home() {
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#020817] text-white">
-      {mountWorld ? (
+      {mountWorld && webglSupported ? (
         <EmpireWorld
           onReady={() => setWorldReady(true)}
           onProgress={setProgress}
         />
       ) : null}
+
+      {!worldReady ? <FallbackEngine /> : null}
 
       <div className="pointer-events-none fixed inset-0 z-20 bg-[radial-gradient(circle_at_62%_45%,rgba(37,99,235,.06),transparent_34%,rgba(2,8,23,.74)_100%)]" />
       <div className="pointer-events-none fixed inset-0 z-20 bg-[linear-gradient(90deg,rgba(2,8,23,.72),rgba(2,8,23,.28)_42%,rgba(2,8,23,.06)_67%,rgba(2,8,23,.34))]" />
@@ -195,8 +232,10 @@ export default function Home() {
         </div>
       </div>
 
-      {!worldReady ? (
-        <div className="pointer-events-none fixed inset-0 z-10 bg-[radial-gradient(circle_at_65%_42%,rgba(37,99,235,.12),transparent_30%),linear-gradient(135deg,#020817_0%,#06142f_54%,#020817_100%)]" />
+      {webglSupported === false ? (
+        <div className="pointer-events-none fixed bottom-5 left-5 z-40 text-[7px] font-medium tracking-[0.18em] text-white/25 md:left-12">
+          MOTION FALLBACK ACTIVE
+        </div>
       ) : null}
 
       <div className="pointer-events-none fixed bottom-5 right-5 z-40 hidden items-center gap-3 text-[7px] font-medium tracking-[0.18em] text-white/25 md:flex lg:right-12">
