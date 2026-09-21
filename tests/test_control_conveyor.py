@@ -36,3 +36,18 @@ def test_unknown_stage_stays_unknown():
     })
     assert payload["unknown_stages"] == ["future_signal"]
     assert payload["current_blocker"] is None
+
+
+def test_capacity_allocation_and_outcome_have_explicit_owners():
+    payload = build_conveyor({
+        "stages": [
+            {"stage": "verified_buyer_capacity", "observed": False},
+            {"stage": "inventory_allocation", "observed": False},
+            {"stage": "commercial_outcome", "observed": False},
+        ],
+    })
+    stages = {row["stage"]: row for row in payload["stages"]}
+    assert stages["verified_buyer_capacity"]["owner_component"] == "buyer_capacity"
+    assert stages["verified_buyer_capacity"]["authority"] == "internal_write"
+    assert stages["inventory_allocation"]["owner_component"] == "fulfilment"
+    assert stages["commercial_outcome"]["owner_component"] == "outcome_feedback"
