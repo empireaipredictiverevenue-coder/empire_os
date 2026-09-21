@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from empire_os.founder_dashboard_api import create_founder_dashboard_router
 from empire_os.founder_objectives_api import create_founder_objectives_router
+from empire_os.founder_ops_api import create_founder_ops_router
 from empire_os.revenue_pulse_api import create_revenue_pulse_router
 
 app = FastAPI(
@@ -20,6 +21,7 @@ app = FastAPI(
 app.include_router(create_founder_dashboard_router())
 app.include_router(create_revenue_pulse_router())
 app.include_router(create_founder_objectives_router())
+app.include_router(create_founder_ops_router())
 
 
 @app.get("/health")
