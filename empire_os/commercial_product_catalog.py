@@ -43,6 +43,9 @@ def assess_catalog_item(row: Mapping[str, Any]) -> dict[str, Any]:
         if _state(row.get(key)) != "VERIFIED":
             blockers.append(blocker)
 
+    if row.get("binding_terms_ready") is False and not blockers:
+        blockers.append("catalog_effective_window_inactive")
+
     return {
         **dict(row),
         "binding_terms_ready": not blockers,
@@ -122,6 +125,8 @@ def public_catalog_projection(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         if str(row.get("catalog_state") or "").upper() != "VERIFIED":
             continue
         if str(row.get("version_state") or "").upper() != "VERIFIED":
+            continue
+        if row.get("binding_terms_ready") is not True:
             continue
 
         price_basis = row.get("price_basis")
