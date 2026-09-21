@@ -25,6 +25,13 @@ ALLOWED_UNITS = frozenset({
     "empire-qualification.service",
     "empire-qualification.timer",
     "empire-public-gateway.service",
+    "empire-ops-mcp.service",
+    "empire-ops-privileged-helper.service",
+    "empire-revenue-pulse.service",
+    "empire-conversation-recovery.service",
+    "empire-buyer-capacity-readiness.service",
+    "empire-outbound-followup.service",
+    "empire-outbound-followup.timer",
 })
 
 
