@@ -113,3 +113,27 @@ def test_daily_results_surfaces_revenue_pulse_and_control_fabric(tmp_path):
     assert payload["control_fabric"]["available"] is True
     assert payload["control_fabric"]["component_count"] == 16
     assert payload["control_fabric"]["external_execution_enabled"] is False
+
+
+def test_daily_results_surfaces_conversation_recovery_gap(tmp_path):
+    runtime = tmp_path / "runtime"
+    dump(runtime / "revenue_pulse/latest.json", {
+        "current_window": {"delivered_outreach": 16},
+    })
+    dump(runtime / "conversation_recovery/latest.json", {
+        "delivered_first_touches": 15,
+        "due_now": 0,
+        "due_within_24h": 0,
+        "recoverable": 15,
+        "blocked_missing_context": 0,
+        "legacy_generic_subjects": 15,
+        "next_due_in_hours": 52.5,
+        "send_executed": False,
+        "proposal_created": False,
+    })
+    payload = build_daily_results(tmp_path)
+    recovery = payload["conversation_recovery"]
+    assert recovery["available"] is True
+    assert recovery["recoverable"] == 15
+    assert recovery["pulse_delivery_gap"] == 1
+    assert recovery["send_executed"] is False

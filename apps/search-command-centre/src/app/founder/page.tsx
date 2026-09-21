@@ -370,6 +370,32 @@ export default async function FounderPage() {
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <Evidence
+                  label="Recovery ready"
+                  value={int(daily?.conversation_recovery?.recoverable)}
+                />
+                <Evidence
+                  label="Follow-ups due"
+                  value={int(daily?.conversation_recovery?.due_now)}
+                />
+                <Evidence
+                  label="Due within 24h"
+                  value={int(daily?.conversation_recovery?.due_within_24h)}
+                />
+                <Evidence
+                  label="Next due (hours)"
+                  value={show(daily?.conversation_recovery?.next_due_in_hours)}
+                />
+                <Evidence
+                  label="Legacy subjects"
+                  value={int(daily?.conversation_recovery?.legacy_generic_subjects)}
+                />
+                <Evidence
+                  label="Delivery coverage gap"
+                  value={int(daily?.conversation_recovery?.pulse_delivery_gap)}
+                />
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <Evidence
                   label="Pulse state"
                   value={show(daily?.revenue_pulse?.pulse_state)}
                 />

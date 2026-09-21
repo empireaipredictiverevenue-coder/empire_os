@@ -377,6 +377,19 @@ export type FounderDailyResults = {
     external_execution_enabled?: boolean | null;
     founder_gates_preserved?: boolean | null;
   };
+  conversation_recovery?: {
+    available?: boolean;
+    delivered_first_touches?: number | null;
+    due_now?: number | null;
+    due_within_24h?: number | null;
+    recoverable?: number | null;
+    blocked_missing_context?: number | null;
+    legacy_generic_subjects?: number | null;
+    next_due_in_hours?: number | null;
+    send_executed?: boolean | null;
+    proposal_created?: boolean | null;
+    pulse_delivery_gap?: number | null;
+  };
   coder?: {
     pending?: number;
     running?: number;

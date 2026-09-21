@@ -92,6 +92,7 @@ def build_daily_results(
     legal_mass_tort = _read(runtime / "legal_mass_tort" / "latest.json")
     revenue_pulse = _read(runtime / "revenue_pulse" / "latest.json")
     control_fabric = _read(runtime / "control_fabric" / "latest.json")
+    conversation_recovery = _read(runtime / "conversation_recovery" / "latest.json")
     stages = _stage_map(loop)
     conveyor = (
         dict(ops.get("conveyor"))
@@ -222,6 +223,33 @@ def build_daily_results(
             "authority_counts": control_fabric.get("authority_counts"),
             "external_execution_enabled": control_fabric.get("external_execution_enabled"),
             "founder_gates_preserved": control_fabric.get("founder_gates_preserved"),
+        },
+        "conversation_recovery": {
+            "available": bool(conversation_recovery),
+            "delivered_first_touches": conversation_recovery.get("delivered_first_touches"),
+            "due_now": conversation_recovery.get("due_now"),
+            "due_within_24h": conversation_recovery.get("due_within_24h"),
+            "recoverable": conversation_recovery.get("recoverable"),
+            "blocked_missing_context": conversation_recovery.get("blocked_missing_context"),
+            "legacy_generic_subjects": conversation_recovery.get("legacy_generic_subjects"),
+            "next_due_in_hours": conversation_recovery.get("next_due_in_hours"),
+            "send_executed": conversation_recovery.get("send_executed"),
+            "proposal_created": conversation_recovery.get("proposal_created"),
+            "pulse_delivery_gap": (
+                (
+                    (revenue_pulse.get("current_window") or {}).get("delivered_outreach")
+                    - conversation_recovery.get("delivered_first_touches")
+                )
+                if (
+                    isinstance(revenue_pulse.get("current_window"), Mapping)
+                    and isinstance(
+                        (revenue_pulse.get("current_window") or {}).get("delivered_outreach"),
+                        int,
+                    )
+                    and isinstance(conversation_recovery.get("delivered_first_touches"), int)
+                )
+                else None
+            ),
         },
         "coder": _job_counts(repo_root),
         "reliability": {
