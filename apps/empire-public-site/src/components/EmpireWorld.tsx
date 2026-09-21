@@ -424,6 +424,25 @@ export default function EmpireWorld({
   onReady?: () => void;
   onProgress?: (progress: number) => void;
 }) {
+  const [pixelRatio, setPixelRatio] = useState(1);
+
+  useEffect(() => {
+    const updateQuality = () => {
+      const rawDpr = Math.max(1, window.devicePixelRatio || 1);
+      const mobile = window.innerWidth < 900;
+      const physicalWidth = window.innerWidth * rawDpr;
+      const physicalHeight = window.innerHeight * rawDpr;
+      const highResolution =
+        Math.max(physicalWidth, physicalHeight) >= 3840;
+      const cap = mobile ? 1.5 : highResolution ? 2 : 1.6;
+      setPixelRatio(Math.min(rawDpr, cap));
+    };
+
+    updateQuality();
+    window.addEventListener("resize", updateQuality);
+    return () => window.removeEventListener("resize", updateQuality);
+  }, []);
+
   return (
     <div className="h-screen w-screen bg-[#020817]">
       <Canvas
@@ -434,7 +453,7 @@ export default function EmpireWorld({
           near: 0.08,
           far: 70,
         }}
-        dpr={[1, 1.3]}
+        dpr={pixelRatio}
         gl={{
           antialias: true,
           alpha: false,
