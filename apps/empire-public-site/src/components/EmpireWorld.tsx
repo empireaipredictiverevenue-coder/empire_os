@@ -55,26 +55,31 @@ function ScrollBridge({
 
 function CameraRig() {
   const scroll = useScroll();
-  const look = useRef(new THREE.Vector3(0, 0, 0));
+  const look = useRef(new THREE.Vector3(0, 0.1, 0));
 
   useFrame((state, delta) => {
     const p = scroll.offset;
-    const angle = -0.38 + p * 1.15;
-    const radius = 10.3 - Math.sin(p * Math.PI) * 1.2;
-    const height = 0.7 + Math.sin(p * Math.PI * 1.4) * 1.15;
+    const phase = p * 4;
+    const index = Math.min(3, Math.floor(phase));
+    const local = phase - index;
+    const ease = local * local * (3 - 2 * local);
+    const shots = [
+      new THREE.Vector3(-3.8, 0.85, 10.3),
+      new THREE.Vector3(4.6, 2.2, 8.6),
+      new THREE.Vector3(7.1, -0.15, 6.5),
+      new THREE.Vector3(1.2, 3.1, 7.4),
+      new THREE.Vector3(-4.8, 0.2, 8.2),
+    ];
+    const goal = shots[index].clone().lerp(shots[index + 1], ease);
+    goal.x += state.pointer.x * 0.62;
+    goal.y += state.pointer.y * 0.34;
 
-    const goal = new THREE.Vector3(
-      Math.sin(angle) * radius + state.pointer.x * 0.5,
-      height + state.pointer.y * 0.28,
-      Math.cos(angle) * radius,
-    );
-
-    const damping = 1 - Math.exp(-delta * 4.8);
+    const damping = 1 - Math.exp(-delta * 4.6);
     state.camera.position.lerp(goal, damping);
     look.current.lerp(
       new THREE.Vector3(
-        0,
-        p > 0.7 ? -0.2 : 0.15,
+        0.65 + Math.sin(p * Math.PI * 2) * 0.35,
+        0.12 - p * 0.28,
         0,
       ),
       damping,
@@ -359,6 +364,118 @@ function DataHalo() {
   );
 }
 
+function AtmosphericField() {
+  const points = useRef<THREE.Points>(null);
+  const geometry = useMemo(() => {
+    const count = 520;
+    const positions = new Float32Array(count * 3);
+    for (let i = 0; i < count; i += 1) {
+      const radius = 6 + ((i * 29) % 100) / 8;
+      const a = (i * 2.399963229728653) % (Math.PI * 2);
+      const y = (((i * 47) % 200) / 100 - 1) * 8;
+      positions[i * 3] = Math.cos(a) * radius;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = Math.sin(a) * radius;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    return g;
+  }, []);
+
+  useFrame((state, delta) => {
+    if (!points.current) return;
+    points.current.rotation.y += delta * 0.018;
+    points.current.rotation.x =
+      Math.sin(state.clock.elapsedTime * 0.08) * 0.035;
+  });
+
+  return (
+    <points ref={points} geometry={geometry}>
+      <pointsMaterial
+        color="#60a5fa"
+        size={0.028}
+        sizeAttenuation
+        transparent
+        opacity={0.42}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        toneMapped={false}
+      />
+    </points>
+  );
+}
+
+function EnergyArchitecture() {
+  const shell = useRef<THREE.Group>(null);
+  const scan = useRef<THREE.Mesh>(null);
+
+  useFrame((state, delta) => {
+    const t = state.clock.elapsedTime;
+    if (shell.current) {
+      shell.current.rotation.y += delta * 0.045;
+      shell.current.rotation.z = Math.sin(t * 0.13) * 0.12;
+    }
+    if (scan.current) {
+      scan.current.rotation.z -= delta * 0.16;
+      const pulse = 1 + Math.sin(t * 1.2) * 0.035;
+      scan.current.scale.setScalar(pulse);
+    }
+  });
+
+  return (
+    <group>
+      <group ref={shell}>
+        <mesh rotation={[0.55, 0.15, 0.2]}>
+          <torusKnotGeometry args={[4.15, 0.018, 280, 12, 2, 5]} />
+          <meshBasicMaterial
+            color="#2563eb"
+            transparent
+            opacity={0.34}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh rotation={[-0.35, 0.72, -0.4]}>
+          <torusKnotGeometry args={[4.42, 0.012, 240, 10, 3, 7]} />
+          <meshBasicMaterial
+            color="#22d3ee"
+            transparent
+            opacity={0.22}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
+
+      <mesh ref={scan} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[5.65, 0.012, 8, 180]} />
+        <meshBasicMaterial
+          color="#7dd3fc"
+          transparent
+          opacity={0.2}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </mesh>
+
+      <mesh scale={5.2}>
+        <icosahedronGeometry args={[1, 2]} />
+        <meshBasicMaterial
+          color="#1d4ed8"
+          wireframe
+          transparent
+          opacity={0.035}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 function Engine({
   onProgress,
 }: {
@@ -383,7 +500,10 @@ function Engine({
         distance={18}
       />
 
+      <AtmosphericField />
+
       <group position={[1.7, 0.2, 0]} scale={1.08}>
+        <EnergyArchitecture />
         <EngineLayers />
         <DataHalo />
         <Core />
