@@ -32,6 +32,27 @@ class SourceHealthObservation:
         return asdict(self)
 
 
+
+
+def resolve_overpass_probe_metro(
+    latest: dict[str, Any],
+    success: dict[str, Any],
+    valid_metros: set[str] | frozenset[str],
+    default: str = "Austin, TX",
+) -> str:
+    """Choose a valid Overpass geography from acquisition runtime state."""
+    candidates = (
+        latest.get("overpass_metro_cursor"),
+        latest.get("metro"),
+        success.get("metro"),
+        default,
+    )
+    for candidate in candidates:
+        value = str(candidate or "").strip()
+        if value in valid_metros:
+            return value
+    raise ValueError("no valid Overpass probe metro configured")
+
 def observe_source_health(
     *,
     source: str,

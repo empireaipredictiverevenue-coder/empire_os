@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from empire_os.ops_sentinel import analyze, build_repair_plan
 
 
@@ -64,10 +66,42 @@ def test_coder_model_cooldown_is_visible_but_not_repaired():
         runtime={
             "coder_model_health": {
                 "routes": {
-                    "ollama:small": {"status": "cooldown"}
+                    "ollama:small": {
+                        "status": "cooldown",
+                        "cooldown_until": (
+                            datetime.now(timezone.utc) + timedelta(minutes=5)
+                        ).isoformat(),
+                    }
                 }
             }
         },
     )
     assert any(f.code == "coder_model_route_degraded" for f in findings)
     assert build_repair_plan(findings) == []
+
+
+def test_expired_coder_cooldown_is_not_reported():
+    units = {
+        "empire-autonomous-execution.service": "active",
+        "empire-public-gateway.service": "active",
+        "empire-ops-mcp.service": "active",
+        "empire-cloudflared.service": "active",
+        "empire-acquisition.timer": "active",
+        "empire-qualification.timer": "active",
+    }
+    findings = analyze(
+        unit_states=units,
+        runtime={
+            "coder_model_health": {
+                "routes": {
+                    "ollama:old": {
+                        "status": "cooldown",
+                        "cooldown_until": (
+                            datetime.now(timezone.utc) - timedelta(minutes=5)
+                        ).isoformat(),
+                    }
+                }
+            }
+        },
+    )
+    assert not any(f.code == "coder_model_route_degraded" for f in findings)

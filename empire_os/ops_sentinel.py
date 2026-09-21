@@ -144,10 +144,20 @@ def analyze(
 
     coder_health = runtime.get("coder_model_health") or {}
     routes = coder_health.get("routes") if isinstance(coder_health, Mapping) else {}
-    degraded_routes = [
-        key for key, row in (routes or {}).items()
-        if isinstance(row, Mapping) and row.get("status") == "cooldown"
-    ]
+    current_time = datetime.now(timezone.utc)
+    degraded_routes = []
+    for key, row in (routes or {}).items():
+        if not isinstance(row, Mapping) or row.get("status") != "cooldown":
+            continue
+        raw_until = row.get("cooldown_until")
+        try:
+            until = datetime.fromisoformat(str(raw_until))
+        except (TypeError, ValueError):
+            continue
+        if until.tzinfo is None:
+            until = until.replace(tzinfo=timezone.utc)
+        if until > current_time:
+            degraded_routes.append(key)
     if degraded_routes:
         findings.append(Finding(
             "coder_model_route_degraded", "warning", "empire_coder",

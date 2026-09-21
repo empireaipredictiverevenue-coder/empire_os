@@ -5,6 +5,7 @@ from empire_os.lead_sources import LeadCandidate
 from empire_os.source_health_observer import (
     atomic_write_observation,
     observe_source_health,
+    resolve_overpass_probe_metro,
 )
 
 
@@ -100,3 +101,21 @@ def test_observation_write_is_atomic_json(tmp_path):
     assert payload["mode"] == "OBSERVE"
     assert payload["canonical_writes"] is False
     assert not path.with_name("latest.json.tmp").exists()
+
+
+def test_probe_metro_prefers_valid_overpass_cursor_over_lane_code():
+    result = resolve_overpass_probe_metro(
+        {"metro": "CHI", "overpass_metro_cursor": "Pittsburgh, PA"},
+        {"metro": "CHI"},
+        frozenset({"Austin, TX", "Pittsburgh, PA", "Chicago, IL"}),
+    )
+    assert result == "Pittsburgh, PA"
+
+
+def test_probe_metro_rejects_lane_code_and_falls_back():
+    result = resolve_overpass_probe_metro(
+        {"metro": "CHI"},
+        {"metro": "CHI"},
+        frozenset({"Austin, TX", "Chicago, IL"}),
+    )
+    assert result == "Austin, TX"

@@ -85,3 +85,16 @@ Near-term optimization must therefore prioritize:
 
 No forecast, score, send, payment request or research-ready prospect is treated
 as revenue.
+
+## Source-health incident resolved
+
+The Control Fabric initially reported source_pipeline_degraded because the
+source-health cron inherited lane code CHI from a Chicago 311 acquisition
+snapshot and passed it directly to Overpass, whose source contract accepts
+full metro names such as Chicago, IL.
+
+The probe now selects a valid Overpass geography from overpass_metro_cursor
+before considering source-specific lane codes. The bounded post-fix health
+check used Pittsburgh, PA and observed 5 candidates, 5 quality-accepted, zero
+errors, and end_to_end_healthy=true. The probe remained OBSERVE-only and wrote
+no acquisition prospects.

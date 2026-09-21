@@ -14,6 +14,9 @@ readarray -t acquisition_state < <(
 import json
 from pathlib import Path
 
+from empire_os.lead_sources.overpass import METRO_COORDS
+from empire_os.source_health_observer import resolve_overpass_probe_metro
+
 latest_path = Path('/srv/empire_os/runtime/acquisition/latest.json')
 success_path = Path('/srv/empire_os/runtime/acquisition/last_success.json')
 try:
@@ -30,7 +33,9 @@ authorized = bool(
     and success.get('real_data_only') is True
 )
 print('true' if authorized else 'false')
-print(str(latest.get('metro') or success.get('metro') or 'Austin, TX'))
+print(resolve_overpass_probe_metro(
+    latest, success, frozenset(METRO_COORDS), default='Austin, TX'
+))
 PY
 )
 
