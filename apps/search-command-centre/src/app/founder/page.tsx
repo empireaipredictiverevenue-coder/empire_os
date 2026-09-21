@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import {
   getFounderDashboard,
   getFounderDataProducts,
+  getFounderDailyResults,
   getFounderIntelligenceNodes,
   getFounderOps,
   type FounderStage,
@@ -47,12 +48,14 @@ function operatingTone(value: string | undefined) {
 
 export default async function FounderPage() {
   await connection();
-  const [result, nodesResult, productsResult, opsResult] = await Promise.all([
-    getFounderDashboard(),
-    getFounderIntelligenceNodes(),
-    getFounderDataProducts(),
-    getFounderOps(),
-  ]);
+  const [result, nodesResult, productsResult, opsResult, dailyResult] =
+    await Promise.all([
+      getFounderDashboard(),
+      getFounderIntelligenceNodes(),
+      getFounderDataProducts(),
+      getFounderOps(),
+      getFounderDailyResults(),
+    ]);
   const data = result.data;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
@@ -67,6 +70,8 @@ export default async function FounderPage() {
   const ops = opsResult.data;
   const incidents = ops?.incident_manager?.diagnoses ?? [];
   const repairPlan = ops?.sentinel?.repair_plan ?? [];
+  const daily = dailyResult.data;
+  const dailyFunnel = daily?.commercial_funnel;
 
   return (
     <main className="min-h-screen bg-[#07100d] text-slate-100">
@@ -324,6 +329,94 @@ export default async function FounderPage() {
                 </div>
               </section>
             </div>
+
+            <section className="panel mt-5">
+              <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
+                <div>
+                  <p className="eyebrow">Daily Results Hub</p>
+                  <h2 className="mt-1 text-xl font-semibold text-white">
+                    One operating result for everything
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-600">
+                  {show(daily?.date)} · generated {show(daily?.generated_at)}
+                </p>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                <Evidence
+                  label="Omega"
+                  value={int(dailyFunnel?.omega_observations)}
+                />
+                <Evidence
+                  label="Approved buyers"
+                  value={int(dailyFunnel?.approved_buyers)}
+                />
+                <Evidence
+                  label="Outbound sent"
+                  value={int(dailyFunnel?.outbound_sent)}
+                />
+                <Evidence
+                  label="Buyer conversations"
+                  value={int(dailyFunnel?.commercial_buyer_replies)}
+                />
+                <Evidence
+                  label="Verified payments"
+                  value={int(dailyFunnel?.verified_payments)}
+                />
+                <Evidence
+                  label="Revenue events"
+                  value={int(dailyFunnel?.recognized_revenue_events)}
+                />
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <Evidence
+                  label="Intent observations"
+                  value={int(daily?.intent_and_pain?.observations)}
+                />
+                <Evidence
+                  label="High intent"
+                  value={int(daily?.intent_and_pain?.high_intent)}
+                />
+                <Evidence
+                  label="Coder running"
+                  value={int(daily?.coder?.running)}
+                />
+                <Evidence
+                  label="Commercial blocker"
+                  value={show(daily?.headline?.commercial_blocker)}
+                />
+              </div>
+              <div className="mt-4 flex flex-col justify-between gap-3 border-t border-white/8 pt-4 md:flex-row md:items-center">
+                <p className="text-xs leading-5 text-slate-500">
+                  Unknown stays unknown. Sends, scores, forecasts and payment
+                  requests are never counted as revenue.
+                </p>
+                <Link
+                  href="/founder/results"
+                  className="text-xs font-semibold text-emerald-300 hover:text-emerald-200"
+                >
+                  Open daily history →
+                </Link>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Evidence
+                  label="AEO assets"
+                  value={int(daily?.search_and_seo?.aeo_asset_count)}
+                />
+                <Evidence
+                  label="RLS disabled"
+                  value={int(daily?.security?.findings?.rls_disabled_in_public)}
+                />
+                <Evidence
+                  label="Incidents"
+                  value={int(daily?.reliability?.incident_count)}
+                />
+                <Evidence
+                  label="Coder failed"
+                  value={int(daily?.coder?.failed)}
+                />
+              </div>
+            </section>
 
             <div className="mt-5 grid gap-5 xl:grid-cols-[.8fr_1.2fr]">
               <section className="panel">

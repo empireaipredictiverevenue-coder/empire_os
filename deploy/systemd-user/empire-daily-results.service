@@ -1,0 +1,17 @@
+[Unit]
+Description=Build EmpireOS daily operating results snapshot
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_aeo_recovery_snapshot.py
+ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_trust_snapshot.py
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_daily_results.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=120

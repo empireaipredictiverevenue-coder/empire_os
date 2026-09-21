@@ -260,3 +260,85 @@ export function getFounderDataProducts() {
 export function getFounderOps() {
   return getFounderRead<FounderOps>("/v1/founder-ops/status");
 }
+
+
+export type FounderDailyResults = {
+  schema_version?: string;
+  date?: string;
+  generated_at?: string;
+  headline?: {
+    technical_health?: boolean | null;
+    commercial_blocker?: string | null;
+    blocker_owner?: string | null;
+    blocker_authority?: string | null;
+    recognized_revenue_events?: number | null;
+    realized_gp_events?: number | null;
+  };
+  commercial_funnel?: {
+    omega_observations?: number | null;
+    approved_buyers?: number | null;
+    outbound_authorized?: number | null;
+    outbound_sent?: number | null;
+    commercial_buyer_replies?: number | null;
+    verified_terms?: number | null;
+    payment_requests?: number | null;
+    verified_payments?: number | null;
+    fulfilments?: number | null;
+    recognized_revenue_events?: number | null;
+    realized_gp_events?: number | null;
+  };
+  acquisition?: Record<string, unknown>;
+  qualification?: Record<string, unknown>;
+  buyer_review?: Record<string, unknown>;
+  intent_and_pain?: {
+    observations?: number | null;
+    high_intent?: number | null;
+    medium_intent?: number | null;
+    by_source?: Record<string, number>;
+    pain_points?: Record<string, number>;
+    opportunity_routes?: number | null;
+  };
+  search_and_seo?: {
+    aeo_asset_count?: number | null;
+    aeo_status_counts?: Record<string, number>;
+    aeo_risk_counts?: Record<string, number>;
+    timesfm_shadow_enabled?: boolean;
+    traffic_forecast_mode?: string;
+  };
+  coder?: {
+    pending?: number;
+    running?: number;
+    completed?: number;
+    failed?: number;
+  };
+  reliability?: {
+    healthy?: boolean | null;
+    incident_count?: number | null;
+    safe_repairs_queued?: number | null;
+    current_blocker?: string | null;
+  };
+  security?: {
+    supabase_audit_available?: boolean;
+    findings?: Record<string, number>;
+    trust_snapshot_available?: boolean;
+    trust_ready?: boolean | null;
+  };
+};
+
+export type FounderDailyResultsHistory = {
+  schema_version?: string;
+  count?: number;
+  items?: FounderDailyResults[];
+};
+
+export function getFounderDailyResults() {
+  return getFounderRead<FounderDailyResults>(
+    "/v1/founder-daily-results/latest",
+  );
+}
+
+export function getFounderDailyResultsHistory(limit = 14) {
+  return getFounderRead<FounderDailyResultsHistory>(
+    `/v1/founder-daily-results/history?limit=${limit}`,
+  );
+}

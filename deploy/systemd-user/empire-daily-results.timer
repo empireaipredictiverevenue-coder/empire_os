@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh EmpireOS daily results hourly
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1h
+AccuracySec=2min
+Persistent=true
+Unit=empire-daily-results.service
+
+[Install]
+WantedBy=timers.target
