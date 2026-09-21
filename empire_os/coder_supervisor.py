@@ -173,6 +173,30 @@ def _commit_verified_candidate(
     }
 
 
+
+
+def _tests_from_implementation_result(result: Mapping[str, Any]) -> list[str]:
+    verification = result.get("verification")
+    verification = verification if isinstance(verification, Mapping) else {}
+    tests: list[str] = []
+    for check in verification.get("checks") or []:
+        if not isinstance(check, Mapping):
+            continue
+        command = check.get("command")
+        if not isinstance(command, list):
+            continue
+        for token in command:
+            value = str(token or "")
+            if value.startswith("tests/") and value.endswith(".py") and value not in tests:
+                tests.append(value)
+    return tests
+
+
+def _verification_passed(result: Mapping[str, Any]) -> bool:
+    verification = result.get("verification")
+    verification = verification if isinstance(verification, Mapping) else {}
+    return str(verification.get("verdict") or "") in PASS_VERDICTS
+
 def run_coder_supervisor(
     repo_root: str | Path,
     *,
@@ -213,7 +237,11 @@ def run_coder_supervisor(
                 result,
                 runner=runner,
             )
-            next_status = "implemented" if commit.get("committed") else "implementation_failed"
+            next_status = (
+                "verification_required"
+                if commit.get("committed")
+                else "implementation_failed"
+            )
             store.update(
                 row.id,
                 status=next_status,
@@ -234,6 +262,85 @@ def run_coder_supervisor(
                 },
             )
             implementation_failed += 1
+
+    verification_reconciled = 0
+    verification_failed = 0
+
+    for row in store.list(statuses={"verifying"}):
+        if not row.verification_job_id:
+            continue
+        try:
+            job = queue.get(row.verification_job_id)
+        except Exception:
+            continue
+
+        if job.status is JobStatus.COMPLETED:
+            result = dict(job.result or {})
+            passed = _verification_passed(result)
+            store.update(
+                row.id,
+                status="implemented" if passed else "verification_failed",
+                verification_result=result,
+            )
+            verification_reconciled += 1
+            verification_failed += int(not passed)
+        elif job.status is JobStatus.FAILED:
+            store.update(
+                row.id,
+                status="verification_failed",
+                verification_result={
+                    "error": str(job.error or "verification_failed")[:2000]
+                },
+            )
+            verification_failed += 1
+
+    active_verify = _active_jobs(queue, JobKind.VERIFY)
+    queued_verification = 0
+    if not active_verify:
+        pending_verification = store.list(statuses={"verification_required"})
+        if pending_verification:
+            row = pending_verification[0]
+            implementation = dict(row.implementation_result or {})
+            target_path = implementation.get("target_path")
+            if not target_path:
+                commit = implementation.get("commit")
+                if isinstance(commit, Mapping):
+                    target_path = commit.get("target_path")
+            changed_files = [str(target_path)] if target_path else []
+            tests = _tests_from_implementation_result(implementation)
+            runtime_note = (
+                " For website, frontend, visual, interaction or other user-facing work, "
+                "verification must include the actual rendered/runtime surface and user "
+                "interaction behavior; build success or static HTML alone is insufficient."
+                if row.category in {"design", "product"}
+                else ""
+            )
+            task = coder.create_task(
+                "VERIFY ONLY: independently verify the implemented Founder Directive "
+                "against its intended real-world behavior and acceptance criteria. "
+                "Do not mutate production or the repository. A commit or passing build "
+                "alone is not sufficient evidence." + runtime_note + " Directive: " + row.text
+            )
+            job = queue.enqueue(
+                task_id=task.id,
+                kind=JobKind.VERIFY,
+                priority=row.priority,
+                payload={
+                    "changed_files": changed_files,
+                    "tests": tests,
+                    "directive_id": row.id,
+                    "commit_sha": row.commit_sha,
+                    "requires_runtime_evidence": row.category in {"design", "product"},
+                },
+            )
+            store.update(
+                row.id,
+                status="verifying",
+                verification_task_id=task.id,
+                verification_job_id=job.id,
+                verification_result={},
+            )
+            queued_verification = 1
 
     active_implement = _active_jobs(queue, JobKind.IMPLEMENT)
     queued_implementation = 0
@@ -288,6 +395,9 @@ def run_coder_supervisor(
         "planning": planning,
         "implementation_reconciled": implementation_reconciled,
         "implementation_failed": implementation_failed,
+        "verification_reconciled": verification_reconciled,
+        "verification_failed": verification_failed,
+        "queued_verification": queued_verification,
         "commits_created": commits,
         "queued_implementation": queued_implementation,
         "active_implementation_jobs": len(_active_jobs(queue, JobKind.IMPLEMENT)),

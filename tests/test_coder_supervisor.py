@@ -4,6 +4,8 @@ from empire_os.coder_supervisor import (
     _nonprotected_dirty,
     _commit_verified_candidate,
     _safe_repo_path,
+    _tests_from_implementation_result,
+    _verification_passed,
 )
 
 
@@ -87,4 +89,29 @@ def test_real_dirty_file_still_blocks_implementation(tmp_path):
 
     assert _nonprotected_dirty(tmp_path, runner=runner) == [
         "empire_os/real.py"
+    ]
+
+
+def test_verification_helpers_require_pass():
+    passed = {
+        "verification": {
+            "verdict": "PASS",
+            "checks": [
+                {
+                    "command": [
+                        "python",
+                        "-m",
+                        "pytest",
+                        "-q",
+                        "tests/test_example.py",
+                    ]
+                }
+            ],
+        }
+    }
+    failed = {"verification": {"verdict": "FAIL", "checks": []}}
+    assert _verification_passed(passed) is True
+    assert _verification_passed(failed) is False
+    assert _tests_from_implementation_result(passed) == [
+        "tests/test_example.py"
     ]
