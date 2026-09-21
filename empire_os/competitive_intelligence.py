@@ -588,16 +588,19 @@ def competitor_audience_intelligence_signal(
             "confidence": item.get("confidence"),
         })
 
+    resolved_source_id = str(source_id or "").strip()
+    if not resolved_source_id:
+        raise ValueError("resolved_source_id_required")
+
     confidences = [
         float(item["confidence"])
         for item in valid_evidence
         if item.get("confidence") is not None
     ]
-    confidence = (
-        round(sum(confidences) / len(confidences), 6)
-        if confidences
-        else None
-    )
+    if not confidences:
+        raise ValueError("evidence_confidence_required")
+
+    confidence = round(sum(confidences) / len(confidences), 6)
 
     return {
         "schema_version": "intelligence_signal_candidate.v1",
@@ -605,7 +608,7 @@ def competitor_audience_intelligence_signal(
         "signal_type": "competitor_audience_evidence",
         "signal_domain": "competitive_intelligence",
         "observed_at": max(observed_times),
-        "source_id": str(source_id or "").strip() or None,
+        "source_id": resolved_source_id,
         "strength": min(1.0, len(valid_evidence) / 3.0),
         "confidence": confidence,
         "payload": {

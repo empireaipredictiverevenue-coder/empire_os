@@ -275,3 +275,43 @@ def test_competitor_audience_signal_preserves_evidence_without_execution():
     assert result["commercial_intent_inferred"] is False
     assert result["outreach_enabled"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_competitor_audience_signal_requires_canonical_source():
+    import pytest
+    from empire_os.competitive_intelligence import (
+        competitor_audience_intelligence_signal,
+    )
+
+    with pytest.raises(ValueError, match="resolved_source_id_required"):
+        competitor_audience_intelligence_signal(
+            _audience_company(),
+            entity_id="entity-acme-001",
+            source_id=None,
+        )
+
+
+def test_competitor_audience_signal_requires_evidence_confidence():
+    import pytest
+    from empire_os.competitive_intelligence import (
+        build_competitor_audience_graph,
+        competitor_audience_intelligence_signal,
+    )
+
+    graph = build_competitor_audience_graph([{
+        "competitor_key": "competitor-a",
+        "competitor_domain": "competitor.example",
+        "company_name": "Acme Roofing",
+        "company_domain": "acme.example",
+        "evidence_type": "public_competitor_activity",
+        "summary": "Observed public competitor relationship evidence.",
+        "source_ref": "web:competitor-a:acme",
+        "observed_at": "2026-09-21T20:00:00Z",
+    }])
+
+    with pytest.raises(ValueError, match="evidence_confidence_required"):
+        competitor_audience_intelligence_signal(
+            graph["companies"][0],
+            entity_id="entity-acme-001",
+            source_id="source-competitive-public",
+        )
