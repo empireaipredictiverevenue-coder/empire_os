@@ -37,3 +37,95 @@ h2 {
   from { opacity: 0; transform: translate3d(0, 12px, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
+
+
+@keyframes empireFallbackOrbit {
+  from { transform: translate(-50%, -50%) rotateX(68deg) rotateZ(0deg); }
+  to { transform: translate(-50%, -50%) rotateX(68deg) rotateZ(360deg); }
+}
+
+@keyframes empireFallbackPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(.92); opacity: .75; }
+  50% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+}
+
+@keyframes empireFallbackShard {
+  0%, 100% { transform: rotate(calc(var(--i) * 30deg)) translateX(220px) scale(.75); opacity: .18; }
+  50% { transform: rotate(calc(var(--i) * 30deg + 14deg)) translateX(285px) scale(1.08); opacity: .78; }
+}
+
+.empire-fallback-engine {
+  position: absolute;
+  left: 68%;
+  top: 49%;
+  width: min(54vw, 760px);
+  aspect-ratio: 1;
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 0 80px rgba(37, 99, 235, .18));
+}
+
+.empire-fallback-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border: 1px solid rgba(96, 165, 250, .34);
+  border-radius: 999px;
+  transform-origin: center;
+  box-shadow: 0 0 50px rgba(37, 99, 235, .12), inset 0 0 40px rgba(34, 211, 238, .05);
+  animation: empireFallbackOrbit linear infinite;
+}
+
+.empire-fallback-ring-a { width: 76%; height: 76%; animation-duration: 15s; }
+.empire-fallback-ring-b { width: 58%; height: 58%; animation-duration: 10s; animation-direction: reverse; border-color: rgba(34, 211, 238, .34); }
+.empire-fallback-ring-c { width: 41%; height: 41%; animation-duration: 7s; }
+
+.empire-fallback-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 25%;
+  aspect-ratio: 1;
+  border-radius: 28%;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(191, 219, 254, .95), rgba(59, 130, 246, .68) 19%, rgba(7, 22, 47, .96) 66%);
+  box-shadow:
+    0 0 45px rgba(96, 165, 250, .55),
+    0 0 120px rgba(37, 99, 235, .25),
+    inset 0 0 40px rgba(125, 211, 252, .28);
+  animation: empireFallbackPulse 2.4s ease-in-out infinite;
+}
+
+.empire-fallback-shard {
+  --i: 0;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42px;
+  height: 8px;
+  margin-left: -21px;
+  margin-top: -4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(96, 165, 250, .16), rgba(125, 211, 252, .94));
+  box-shadow: 0 0 24px rgba(96, 165, 250, .28);
+  transform-origin: 21px 4px;
+  animation: empireFallbackShard 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.13s);
+}
+
+@media (max-width: 900px) {
+  .empire-fallback-engine {
+    left: 66%;
+    top: 40%;
+    width: 88vw;
+    opacity: .78;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empire-fallback-ring,
+  .empire-fallback-core,
+  .empire-fallback-shard {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+  }
+}
