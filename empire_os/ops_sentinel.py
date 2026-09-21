@@ -34,6 +34,7 @@ RUNTIME_INPUTS = {
     "model_health": RUNTIME / "llm/model_health.json",
     "acquisition": RUNTIME / "acquisition/latest.json",
     "buyer_review": RUNTIME / "buyer_review_materializer/latest.json",
+    "coder_model_health": RUNTIME / "coder/model_health.json",
 }
 
 
@@ -139,6 +140,19 @@ def analyze(
             "buyer_review_worker_failed", "warning", "buyer_review",
             "Latest buyer-review materializer cycle reported failure",
             True, 92, {"errors": buyer.get("errors") or []},
+        ))
+
+    coder_health = runtime.get("coder_model_health") or {}
+    routes = coder_health.get("routes") if isinstance(coder_health, Mapping) else {}
+    degraded_routes = [
+        key for key, row in (routes or {}).items()
+        if isinstance(row, Mapping) and row.get("status") == "cooldown"
+    ]
+    if degraded_routes:
+        findings.append(Finding(
+            "coder_model_route_degraded", "warning", "empire_coder",
+            f"{len(degraded_routes)} Coder model route(s) are cooling down; failover is active",
+            False, 75, {"routes": degraded_routes},
         ))
 
     return sorted(

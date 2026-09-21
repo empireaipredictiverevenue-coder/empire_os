@@ -27,6 +27,7 @@ from .models import (
 )
 from .ollama_provider import OllamaProvider
 from .patch import PatchEngine
+from .provider_health import ProviderHealth
 from .permissions import (
     Capability,
     OBSERVE_DEVELOPER,
@@ -175,6 +176,7 @@ class EmpireCoder:
         )
         self.dependencies = DependencyIndex(self.repo)
         self.verifier = Verifier(self.workspace)
+        self.model_health = ProviderHealth(self.runtime_root / "model_health.json")
         requested_profiles = tuple(model_profiles)
         self.providers = ProviderRegistry()
         self.providers.register(DisabledProvider())
@@ -515,15 +517,22 @@ class EmpireCoder:
             context,
             trigger="before_structured_patch_refinement",
         )
-        candidate = StructuredPatchRefiner(
-            provider,
-            self.structured_patch_validator,
-        ).propose(
-            task_id=task_id,
-            objective=objective,
-            context=context,
-            route=route,
-        )
+        try:
+            candidate = StructuredPatchRefiner(
+                provider,
+                self.structured_patch_validator,
+            ).propose(
+                task_id=task_id,
+                objective=objective,
+                context=context,
+                route=route,
+            )
+        except Exception as exc:
+            self.model_health.record_failure(
+                route.provider, route.model, f"{type(exc).__name__}:{exc}"
+            )
+            raise
+        self.model_health.record_success(route.provider, route.model)
         proposal = candidate.proposal
         self.store.save_structured_patch_proposal(
             task_id,
@@ -678,6 +687,7 @@ class EmpireCoder:
         route = self.router.route(
             task.objective,
             role="writer",
+            exclude=self.model_health.excluded_routes(),
         )
         self._record_and_sync(
             task_id=task_id,
@@ -695,6 +705,7 @@ class EmpireCoder:
         route = self.router.route(
             task.objective,
             role="planner",
+            exclude=self.model_health.excluded_routes(),
         )
         self._record_and_sync(
             task_id=task_id,
@@ -712,14 +723,18 @@ class EmpireCoder:
         task_id: str,
     ) -> ModelRoute:
         task = self.store.load(task_id)
+        unhealthy = self.model_health.excluded_routes()
         writer = self.router.route(
             task.objective,
             role="writer",
+            exclude=unhealthy,
         )
         route = self.router.route(
             task.objective,
             role="verifier",
-            exclude=((writer.provider, writer.model),),
+            exclude=tuple(dict.fromkeys(
+                (*unhealthy, (writer.provider, writer.model))
+            )),
         )
         self._record_and_sync(
             task_id=task_id,
@@ -846,15 +861,22 @@ class EmpireCoder:
             context,
             trigger="before_planner_draft",
         )
-        proposal = OutputRefiner(provider).draft(
-            task_id=task_id,
-            instruction=instruction,
-            context=context,
-            route=route,
-            max_output_chars=max(
-                256, min(int(max_output_chars), 2_000)
-            ),
-        )
+        try:
+            proposal = OutputRefiner(provider).draft(
+                task_id=task_id,
+                instruction=instruction,
+                context=context,
+                route=route,
+                max_output_chars=max(
+                    256, min(int(max_output_chars), 2_000)
+                ),
+            )
+        except Exception as exc:
+            self.model_health.record_failure(
+                route.provider, route.model, f"{type(exc).__name__}:{exc}"
+            )
+            raise
+        self.model_health.record_success(route.provider, route.model)
         self.store.save_proposal(
             task_id,
             {
