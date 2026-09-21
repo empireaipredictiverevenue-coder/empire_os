@@ -14,7 +14,8 @@ from empire_os.buyer_discovery import (
     build_candidate,
     build_candidate_review_plan,
 )
-from empire_os.buyer_probe_worker import rejection_reason, run as run_buyer_probe
+from empire_os.buyer_probe_worker import rejection_reason
+from empire_os.buyer_review_materializer import run_buyer_probe_isolated
 from empire_os.qualification_worker_v2 import request_json
 from empire_os.identity_recovery import recover_identity
 
@@ -240,11 +241,9 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
 
             probe_row = candidate.to_dict()
             probe_row["id"] = probe_row.pop("prospect_id")
-            result = run_buyer_probe(
+            result = run_buyer_probe_isolated(
                 probe_row,
-                max_pages=15,
-                request_timeout=5.0,
-                time_budget_seconds=45.0,
+                hard_timeout_seconds=28.0,
             )
 
             recovery = None
@@ -259,11 +258,9 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                     probe_row["contact_name"] = recovered.get("name")
                     probe_row["contact_title"] = recovered.get("title")
                     probe_row["contact_source"] = recovered.get("source")
-                    result = run_buyer_probe(
+                    result = run_buyer_probe_isolated(
                         probe_row,
-                        max_pages=15,
-                        request_timeout=5.0,
-                        time_budget_seconds=45.0,
+                        hard_timeout_seconds=28.0,
                     )
                     if not result.get("decision_maker"):
                         result = dict(result)

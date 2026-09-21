@@ -8,7 +8,7 @@ Type=oneshot
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 EnvironmentFile=/srv/empire_os/runtime/secrets/outbound.env
-ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_deferred_enrichment.py --limit 5
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_deferred_enrichment.py --limit 2
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
