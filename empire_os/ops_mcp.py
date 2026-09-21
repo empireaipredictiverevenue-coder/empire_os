@@ -20,6 +20,7 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import AnyHttpUrl
 
 from empire_os.lead_sources.overpass import METRO_COORDS
+from empire_os.founder_directives import FounderDirectiveStore
 from empire_os.ops_privileged_client import (
     PrivilegedHelperUnavailable,
     privileged_request,
@@ -276,6 +277,52 @@ def run_check(check: str, target: str = "") -> dict[str, Any]:
         "empire_run_check",
         {"check": check, "target": target},
         allowed[check],
+    )
+
+
+@server.tool(name="empire_founder_directive_ingest", structured_output=True)
+def founder_directive_ingest(
+    text: str,
+    title: str = "",
+    priority: int = 90,
+    source: str = "ops_mcp",
+) -> dict[str, Any]:
+    if priority < 0 or priority > 100:
+        raise ValueError("priority must be between 0 and 100")
+    clean_source = str(source or "ops_mcp").strip()
+    if clean_source not in {
+        "ops_mcp", "founder_chat", "founder_console", "founder_voice",
+        "founder",
+    }:
+        raise ValueError("directive source not allowlisted")
+
+    def _ingest() -> dict[str, Any]:
+        directive, created = FounderDirectiveStore(
+            Path("/srv/empire_os")
+        ).ingest(
+            text,
+            source=clean_source,
+            title=title or None,
+            priority=priority,
+            metadata={"ingested_via": "empire_ops_mcp"},
+        )
+        return {
+            "ok": True,
+            "created": created,
+            "directive": directive.as_dict(),
+            "planning_automatic": True,
+            "production_execution_automatic": False,
+        }
+
+    return _record(
+        "empire_founder_directive_ingest",
+        {
+            "title": title,
+            "priority": priority,
+            "source": clean_source,
+            "text_chars": len(str(text or "")),
+        },
+        _ingest,
     )
 
 
