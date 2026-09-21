@@ -305,6 +305,21 @@ export type FounderDailyResults = {
     timesfm_shadow_enabled?: boolean;
     traffic_forecast_mode?: string;
   };
+  legal_intelligence?: {
+    market?: string | null;
+    source_count_ready?: number | null;
+    source_count_total?: number | null;
+    firm_buyer_intelligence?: boolean | null;
+    consumer_targeting?: boolean | null;
+    live_market_evidence_bound?: boolean | null;
+    market_opportunities_observed?: number | null;
+  };
+  deal_room?: {
+    provider?: string;
+    bridge_ready?: boolean;
+    provider_execution_activated?: boolean;
+    binding_acceptance?: boolean;
+  };
   coder?: {
     pending?: number;
     running?: number;

@@ -88,6 +88,7 @@ def build_daily_results(
     aeo = _read(runtime / "search_intelligence" / "aeo_recovery" / "latest.json")
     security = _read(runtime / "security" / "supabase_audit_latest.json")
     trust = _read(runtime / "trust" / "latest.json")
+    legal_mass_tort = _read(runtime / "legal_mass_tort" / "latest.json")
     stages = _stage_map(loop)
     conveyor = (
         dict(ops.get("conveyor"))
@@ -176,6 +177,23 @@ def build_daily_results(
             "aeo_risk_counts": aeo.get("risk_counts"),
             "timesfm_shadow_enabled": False,
             "traffic_forecast_mode": "SHADOW_COMPARE",
+        },
+        "legal_intelligence": {
+            "market": legal_mass_tort.get("market"),
+            "source_count_ready": legal_mass_tort.get("source_count_ready"),
+            "source_count_total": legal_mass_tort.get("source_count_total"),
+            "firm_buyer_intelligence": legal_mass_tort.get("firm_buyer_intelligence"),
+            "consumer_targeting": legal_mass_tort.get("consumer_targeting"),
+            "live_market_evidence_bound": legal_mass_tort.get("live_market_evidence_bound"),
+            "market_opportunities_observed": legal_mass_tort.get("market_opportunities_observed"),
+        },
+        "deal_room": {
+            "provider": "documenso",
+            "bridge_ready": (repo_root / "empire_os/deal_room.py").exists(),
+            "provider_execution_activated": False,
+            "binding_acceptance": False,
+            "payment_request_created": False,
+            "revenue_recognition": False,
         },
         "coder": _job_counts(repo_root),
         "reliability": {

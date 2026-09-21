@@ -5,6 +5,7 @@ allocation, outreach, buyer activation and closer mutation endpoints.
 """
 from __future__ import annotations
 
+import json
 import os
 import uuid
 from pathlib import Path
@@ -22,6 +23,7 @@ GATEWAY_VERSION = "agent-web-v1.1"
 PUBLIC_BASE_URL = os.getenv("EMPIRE_PUBLIC_BASE_URL", "https://empire-ai.co.uk").rstrip("/")
 AEO_ROOT = Path(os.getenv("EMPIRE_PUBLIC_AEO_ROOT", "/srv/empire_os/runtime/aeo"))
 AEO_ROOT.mkdir(parents=True, exist_ok=True)
+TRUST_SNAPSHOT = Path("/srv/empire_os/runtime/trust/latest.json")
 RESEND_INBOUND_URL = os.getenv(
     "EMPIRE_RESEND_INBOUND_URL",
     "http://127.0.0.1:8097/webhooks/resend-inbound",
@@ -42,6 +44,32 @@ async def security_headers(request, call_next):
         "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
     )
     return response
+
+
+def _public_trust_manifest(path: Path | None = None) -> dict:
+    target = path or TRUST_SNAPSHOT
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {
+            "schema_version": "empire.public_trust_manifest.v1",
+            "trust_center_ready": False,
+            "verified_claims": [],
+            "unknowns_hidden": False,
+            "fabricated_social_proof": False,
+            "available": False,
+        }
+    manifest = payload.get("public_manifest")
+    if not isinstance(manifest, dict):
+        return {
+            "schema_version": "empire.public_trust_manifest.v1",
+            "trust_center_ready": False,
+            "verified_claims": [],
+            "unknowns_hidden": False,
+            "fabricated_social_proof": False,
+            "available": False,
+        }
+    return {**manifest, "available": True}
 
 
 def _aeo_page_urls(root: Path | None = None) -> list[str]:
@@ -66,6 +94,11 @@ def _sitemap_xml(root: Path | None = None) -> str:
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
         f"{body}</urlset>"
     )
+
+
+@app.get("/v1/trust/manifest")
+def public_trust_manifest():
+    return _public_trust_manifest()
 
 
 @app.get("/health")

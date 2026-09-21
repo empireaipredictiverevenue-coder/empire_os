@@ -398,10 +398,22 @@ export default async function FounderPage() {
                   Open daily history →
                 </Link>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <Evidence
                   label="AEO assets"
                   value={int(daily?.search_and_seo?.aeo_asset_count)}
+                />
+                <Evidence
+                  label="Legal sources"
+                  value={int(daily?.legal_intelligence?.source_count_ready) + " / " + int(daily?.legal_intelligence?.source_count_total)}
+                />
+                <Evidence
+                  label="Deal Room bridge"
+                  value={truth(daily?.deal_room?.bridge_ready)}
+                />
+                <Evidence
+                  label="Trust ready"
+                  value={truth(daily?.security?.trust_ready)}
                 />
                 <Evidence
                   label="RLS disabled"
@@ -410,10 +422,6 @@ export default async function FounderPage() {
                 <Evidence
                   label="Incidents"
                   value={int(daily?.reliability?.incident_count)}
-                />
-                <Evidence
-                  label="Coder failed"
-                  value={int(daily?.coder?.failed)}
                 />
               </div>
             </section>

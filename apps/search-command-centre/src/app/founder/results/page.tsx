@@ -78,8 +78,8 @@ export default async function FounderResultsPage() {
                   <Result label="Intent" value={int(day.intent_and_pain?.observations)} />
                   <Result label="High intent" value={int(day.intent_and_pain?.high_intent)} />
                   <Result label="AEO assets" value={int(day.search_and_seo?.aeo_asset_count)} />
+                  <Result label="Legal sources" value={int(day.legal_intelligence?.source_count_ready) + " / " + int(day.legal_intelligence?.source_count_total)} />
                   <Result label="RLS disabled" value={int(day.security?.findings?.rls_disabled_in_public)} />
-                  <Result label="Coder running" value={int(day.coder?.running)} />
                   <Result label="Incidents" value={int(day.reliability?.incident_count)} />
                 </div>
               </section>

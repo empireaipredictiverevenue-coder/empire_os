@@ -8,6 +8,7 @@ WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_aeo_recovery_snapshot.py
 ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_trust_snapshot.py
+ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_legal_mass_tort_snapshot.py
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_daily_results.py
 NoNewPrivileges=true
 PrivateTmp=true

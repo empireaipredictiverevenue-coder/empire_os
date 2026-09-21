@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from empire_os.public_gateway import _sitemap_xml, app
+from empire_os.public_gateway import _public_trust_manifest, _sitemap_xml, app
 
 client = TestClient(app)
 
@@ -48,3 +48,25 @@ def test_sitemap_helper_lists_only_aeo_index_pages(tmp_path):
     assert "/aeo/roofing/DFW/" in xml
     assert "notes.txt" not in xml
     assert xml.count("<url>") == 2
+
+
+def test_public_trust_manifest_fails_closed(tmp_path):
+    result = _public_trust_manifest(tmp_path / "missing.json")
+    assert result["available"] is False
+    assert result["trust_center_ready"] is False
+    assert result["verified_claims"] == []
+
+
+def test_public_trust_manifest_exposes_only_snapshot_manifest(tmp_path):
+    path = tmp_path / "trust.json"
+    path.write_text(
+        '{"assessment":{"internal_score":99},"public_manifest":'
+        '{"schema_version":"empire.public_trust_manifest.v1",'
+        '"verified_claims":[{"key":"incident_response","evidence_refs":["ops:1"]}],'
+        '"self_awarded_score":null,"trust_center_ready":false,'
+        '"unknowns_hidden":false,"fabricated_social_proof":false}}'
+    )
+    result = _public_trust_manifest(path)
+    assert result["available"] is True
+    assert result["verified_claims"][0]["key"] == "incident_response"
+    assert "internal_score" not in result
