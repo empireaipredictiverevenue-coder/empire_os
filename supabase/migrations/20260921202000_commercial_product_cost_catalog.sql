@@ -84,11 +84,27 @@ STABLE
 SECURITY DEFINER
 SET search_path=''
 AS $$
-  WITH latest AS (
-    SELECT DISTINCT ON (v.product_id)
-      v.*
+  WITH ranked AS (
+    SELECT
+      v.*,
+      row_number() OVER (
+        PARTITION BY v.product_id
+        ORDER BY
+          CASE
+            WHEN v.version_state='VERIFIED'
+             AND (v.effective_from IS NULL OR v.effective_from <= now())
+             AND (v.effective_until IS NULL OR v.effective_until > now())
+            THEN 0
+            ELSE 1
+          END,
+          v.version DESC
+      ) AS readiness_rank
     FROM public.commercial_product_versions v
-    ORDER BY v.product_id,v.version DESC
+  ),
+  latest AS (
+    SELECT *
+    FROM ranked
+    WHERE readiness_rank=1
   )
   SELECT COALESCE(
     jsonb_agg(
@@ -123,8 +139,8 @@ AS $$
           AND COALESCE(v.acquisition_cost_basis->>'state','UNKNOWN')='VERIFIED'
           AND COALESCE(v.fulfilment_cost_basis->>'state','UNKNOWN')='VERIFIED'
           AND COALESCE(v.margin_policy->>'state','UNKNOWN')='VERIFIED'
-          AND (v.effective_from IS NULL OR v.effective_from <= clock_timestamp())
-          AND (v.effective_until IS NULL OR v.effective_until > clock_timestamp())
+          AND (v.effective_from IS NULL OR v.effective_from <= now())
+          AND (v.effective_until IS NULL OR v.effective_until > now())
         ),
         'actual_revenue',false
       )
@@ -175,7 +191,17 @@ AS $$
         CASE WHEN COALESCE(x->'price_basis'->>'state','UNKNOWN')<>'VERIFIED' THEN 'price_basis_unverified' END,
         CASE WHEN COALESCE(x->'acquisition_cost_basis'->>'state','UNKNOWN')<>'VERIFIED' THEN 'acquisition_cost_basis_unverified' END,
         CASE WHEN COALESCE(x->'fulfilment_cost_basis'->>'state','UNKNOWN')<>'VERIFIED' THEN 'fulfilment_cost_basis_unverified' END,
-        CASE WHEN COALESCE(x->'margin_policy'->>'state','UNKNOWN')<>'VERIFIED' THEN 'margin_policy_unverified' END
+        CASE WHEN COALESCE(x->'margin_policy'->>'state','UNKNOWN')<>'VERIFIED' THEN 'margin_policy_unverified' END,
+        CASE
+          WHEN x->>'effective_from' IS NOT NULL
+           AND (x->>'effective_from')::timestamptz > now()
+          THEN 'version_not_yet_effective'
+        END,
+        CASE
+          WHEN x->>'effective_until' IS NOT NULL
+           AND (x->>'effective_until')::timestamptz <= now()
+          THEN 'version_expired'
+        END
       ],NULL)),
       'catalog',x,
       'actual_revenue',false
