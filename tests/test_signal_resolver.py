@@ -120,3 +120,37 @@ def test_ambiguous_signal_never_writes_canonical_prospect(tmp_path):
     saved = json.loads(inbox.read_text())["sig-1"]
     assert result["needs_review"] == 1
     assert saved["status"] == "needs_review"
+
+
+def test_network_materialization_occurs_outside_inbox_lock(tmp_path):
+    import fcntl
+
+    inbox = tmp_path / "signal_inbox.json"
+    lock = tmp_path / "signal_inbox.lock"
+    inbox.write_text(json.dumps({"sig-1": permit_signal()}))
+
+    def reader(_path, _params):
+        # Resolver must have released the inbox lock before canonical reads.
+        with lock.open("a+") as handle:
+            fcntl.flock(
+                handle.fileno(),
+                fcntl.LOCK_EX | fcntl.LOCK_NB,
+            )
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return []
+
+    def writer(_payload):
+        return {
+            "decision": "created",
+            "prospect": {"id": "prospect-1"},
+        }
+
+    result = run_signal_resolution(
+        1,
+        inbox=inbox,
+        lock=lock,
+        reader=reader,
+        writer=writer,
+        now=datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc),
+    )
+    assert result["resolved"] == 1

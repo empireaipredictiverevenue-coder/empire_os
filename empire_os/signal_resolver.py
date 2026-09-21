@@ -149,9 +149,10 @@ def run_signal_resolution(
 
     inbox.parent.mkdir(parents=True, exist_ok=True)
     lock.touch(exist_ok=True)
-    resolved = matched = deferred = review = failed = 0
-    results: list[dict[str, Any]] = []
 
+    # Claim only the bounded rows under the file lock. Network/database work
+    # happens after the lock is released so the live crawler can keep enqueueing.
+    claimed: list[tuple[str, dict[str, Any]]] = []
     with lock.open("r+") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
@@ -164,87 +165,20 @@ def run_signal_resolution(
                 if next_at is not None and next_at > current:
                     continue
                 eligible.append((key, row))
-            eligible.sort(key=lambda item: str(item[1].get("created_at") or ""))
+            eligible.sort(
+                key=lambda item: str(item[1].get("created_at") or "")
+            )
 
             for key, row in eligible[:limit]:
                 attempts = int(row.get("resolution_attempts") or 0) + 1
                 row["resolution_attempts"] = attempts
                 row["last_resolution_at"] = current.isoformat()
-                candidate, reason = candidate_from_signal(row)
-                row["resolution_reason"] = reason
-
-                if candidate is None:
-                    deferred += 1
-                    row["next_resolution_at"] = (
-                        current + timedelta(hours=min(24, 6 * attempts))
-                    ).isoformat()
-                    results.append({
-                        "signal_id": key,
-                        "source": row.get("source"),
-                        "decision": "deferred",
-                        "reason": reason,
-                    })
-                    continue
-
-                try:
-                    outcome = ingest_candidate(
-                        candidate,
-                        reader=reader,
-                        writer=writer,
-                    )
-                except Exception as exc:
-                    failed += 1
-                    row["resolution_reason"] = (
-                        f"canonical_ingest_failed:{type(exc).__name__}"
-                    )
-                    row["next_resolution_at"] = (
-                        current + timedelta(hours=6)
-                    ).isoformat()
-                    results.append({
-                        "signal_id": key,
-                        "decision": "failed",
-                        "reason": row["resolution_reason"],
-                    })
-                    continue
-
-                decision = str(outcome.get("decision") or "")
-                prospect = outcome.get("prospect")
-                prospect_id = (
-                    str(prospect.get("id") or "")
-                    if isinstance(prospect, Mapping)
-                    else ""
-                )
-                if decision in {"created", "matched"} and prospect_id:
-                    row["status"] = "resolved"
-                    row["prospect_id"] = prospect_id
-                    row["resolved_at"] = current.isoformat()
-                    row["next_resolution_at"] = None
-                    row["resolution_reason"] = (
-                        "canonical_prospect_created"
-                        if decision == "created"
-                        else "canonical_prospect_matched"
-                    )
-                    resolved += 1
-                    matched += int(decision == "matched")
-                elif decision == "ambiguous":
-                    row["status"] = "needs_review"
-                    row["next_resolution_at"] = None
-                    row["resolution_reason"] = str(
-                        outcome.get("reason") or "ambiguous_identity"
-                    )
-                    review += 1
-                else:
-                    row["next_resolution_at"] = (
-                        current + timedelta(hours=6)
-                    ).isoformat()
-                    deferred += 1
-
-                results.append({
-                    "signal_id": key,
-                    "decision": decision or "deferred",
-                    "prospect_id": prospect_id or None,
-                    "reason": row.get("resolution_reason"),
-                })
+                # Lease the row so a second resolver cannot duplicate the same
+                # canonical work while this batch is in flight.
+                row["next_resolution_at"] = (
+                    current + timedelta(minutes=15)
+                ).isoformat()
+                claimed.append((key, dict(row)))
 
             tmp = inbox.with_suffix(".json.tmp")
             tmp.write_text(
@@ -254,6 +188,123 @@ def run_signal_resolution(
             tmp.replace(inbox)
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    resolved = matched = deferred = review = failed = 0
+    results: list[dict[str, Any]] = []
+    updates: dict[str, dict[str, Any]] = {}
+
+    for key, row in claimed:
+        attempts = int(row.get("resolution_attempts") or 1)
+        candidate, reason = candidate_from_signal(row)
+        update: dict[str, Any] = {
+            "resolution_reason": reason,
+        }
+
+        if candidate is None:
+            deferred += 1
+            update["next_resolution_at"] = (
+                current + timedelta(hours=min(24, 6 * attempts))
+            ).isoformat()
+            updates[key] = update
+            results.append({
+                "signal_id": key,
+                "source": row.get("source"),
+                "decision": "deferred",
+                "reason": reason,
+            })
+            continue
+
+        try:
+            outcome = ingest_candidate(
+                candidate,
+                reader=reader,
+                writer=writer,
+            )
+        except Exception as exc:
+            failed += 1
+            failure_reason = (
+                f"canonical_ingest_failed:{type(exc).__name__}"
+            )
+            updates[key] = {
+                "resolution_reason": failure_reason,
+                "next_resolution_at": (
+                    current + timedelta(hours=6)
+                ).isoformat(),
+            }
+            results.append({
+                "signal_id": key,
+                "decision": "failed",
+                "reason": failure_reason,
+            })
+            continue
+
+        decision = str(outcome.get("decision") or "")
+        prospect = outcome.get("prospect")
+        prospect_id = (
+            str(prospect.get("id") or "")
+            if isinstance(prospect, Mapping)
+            else ""
+        )
+        if decision in {"created", "matched"} and prospect_id:
+            updates[key] = {
+                "status": "resolved",
+                "prospect_id": prospect_id,
+                "resolved_at": current.isoformat(),
+                "next_resolution_at": None,
+                "resolution_reason": (
+                    "canonical_prospect_created"
+                    if decision == "created"
+                    else "canonical_prospect_matched"
+                ),
+            }
+            resolved += 1
+            matched += int(decision == "matched")
+        elif decision == "ambiguous":
+            updates[key] = {
+                "status": "needs_review",
+                "next_resolution_at": None,
+                "resolution_reason": str(
+                    outcome.get("reason") or "ambiguous_identity"
+                ),
+            }
+            review += 1
+        else:
+            updates[key] = {
+                "next_resolution_at": (
+                    current + timedelta(hours=6)
+                ).isoformat(),
+            }
+            deferred += 1
+
+        results.append({
+            "signal_id": key,
+            "decision": decision or "deferred",
+            "prospect_id": prospect_id or None,
+            "reason": updates[key].get("resolution_reason"),
+        })
+
+    if updates:
+        with lock.open("r+") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                data = _load(inbox)
+                for key, update in updates.items():
+                    row = data.get(key)
+                    if isinstance(row, dict):
+                        row.update(update)
+                tmp = inbox.with_suffix(".json.tmp")
+                tmp.write_text(
+                    json.dumps(
+                        data,
+                        indent=2,
+                        sort_keys=True,
+                        default=str,
+                    ) + "\n",
+                    encoding="utf-8",
+                )
+                tmp.replace(inbox)
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     return {
         "schema_version": "empire.signal-resolution.v1",
