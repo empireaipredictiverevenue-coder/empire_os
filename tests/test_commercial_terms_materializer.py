@@ -6,9 +6,18 @@ from empire_os.commercial_terms_materializer import (
 
 
 class FakeRequest:
-    def __init__(self, *, include_price=True, catalog_ready=True):
+    def __init__(
+        self,
+        *,
+        include_price=True,
+        catalog_ready=True,
+        product_id="product-1",
+        order_buyer_id="buyer-1",
+    ):
         self.include_price = include_price
         self.catalog_ready = catalog_ready
+        self.product_id = product_id
+        self.order_buyer_id = order_buyer_id
         self.calls = []
 
     def __call__(self, method, path, payload=None, **kwargs):
@@ -29,8 +38,9 @@ class FakeRequest:
                 return [{
                     "id": "order-1",
                     "state": "qualified",
-                    "buyer_id": "buyer-1",
+                    "buyer_id": self.order_buyer_id,
                     "prospect_id": "prospect-1",
+                    "product_id": self.product_id,
                 }]
             if parsed.path == "/rest/v1/buyer_capacity_intakes":
                 return [{
@@ -41,9 +51,18 @@ class FakeRequest:
                     "delivery_route": "webhook",
                     "delivery_reference": "https://acme.test/leads",
                 }]
+            if parsed.path == "/rest/v1/commercial_products":
+                if not self.product_id:
+                    return []
+                return [{
+                    "id": self.product_id,
+                    "product_code": "managed_service",
+                    "active": True,
+                }]
             raise AssertionError((parsed.path, params))
 
         if path == "/rest/v1/rpc/get_commercial_product_readiness":
+            assert payload["p_product_code"] == "managed_service"
             if self.catalog_ready:
                 return {
                     "exists": True,
@@ -83,6 +102,8 @@ class FakeRequest:
             assert payload["p_price_cents"] == 12000
             assert payload["p_acquisition_cost_cents"] == 2500
             assert payload["p_fulfilment_cost_cents"] == 1500
+            assert payload["p_terms"]["product_id"] == "product-1"
+            assert payload["p_terms"]["product_code"] == "managed_service"
             assert payload["p_terms"]["settlement_asset"] == "USDT"
             assert payload["p_terms"]["settlement_chain"] == "BSC"
             assert payload["p_terms"]["binding"] is False
@@ -152,3 +173,29 @@ def test_materializer_blocks_when_catalog_economics_are_unverified():
         for method, path, _ in request.calls
         if method == "POST"
     )
+
+
+
+def test_materializer_blocks_when_order_has_no_product_binding():
+    request = FakeRequest(product_id=None)
+    result = run_commercial_terms_materializer(request)
+
+    assert result.ready == 0
+    assert result.proposed == 0
+    assert result.blocked == 1
+    assert dict(result.blocker_counts)["fulfilment_order_product_missing"] == 1
+    assert not any(
+        path == "/rest/v1/rpc/get_commercial_product_readiness"
+        for method, path, _ in request.calls
+        if method == "POST"
+    )
+
+
+def test_materializer_blocks_cross_buyer_order_binding():
+    request = FakeRequest(order_buyer_id="different-buyer")
+    result = run_commercial_terms_materializer(request)
+
+    assert result.ready == 0
+    assert result.proposed == 0
+    assert result.blocked == 1
+    assert dict(result.blocker_counts)["fulfilment_order_binding_mismatch"] == 1
