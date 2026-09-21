@@ -246,3 +246,21 @@ def test_dashboard_exposes_recovery_portfolio_without_commercial_authority(tmp_p
     assert rows["property_intelligence"]["state"] == "ACTIVE_BUILD"
     assert rows["private_capital_rollup"]["state"] == "ACTIVE_BUILD"
     assert rows["oil_gas_intelligence"]["state"] == "INCUBATE"
+
+
+
+def test_dashboard_exposes_governed_recovered_marketing_plans(tmp_path):
+    result = build_founder_dashboard(make_root(tmp_path))
+    portfolio = result["recovery_portfolio"]
+    summary = portfolio["marketing_summary"]
+
+    assert summary["plan_count"] >= 8
+    assert summary["execution_authority"] == "none"
+    assert summary["outbound_authority"] is False
+    assert summary["publishing_authority"] is False
+    assert summary["paid_spend_authority"] is False
+
+    rows = {row["key"]: row for row in portfolio["marketing_plans"]}
+    assert rows["permit_opportunity_gtm"]["state"] == "ACTIVE_BUILD"
+    assert rows["private_capital_abm"]["state"] == "ACTIVE_BUILD"
+    assert rows["oil_gas_research_gtm"]["state"] == "INCUBATE"
