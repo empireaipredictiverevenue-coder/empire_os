@@ -127,3 +127,18 @@ def test_multi_timezone_country_keeps_timezone_unresolved_without_region():
     assert locale.country_code == "US"
     assert locale.timezone is None
     assert len(locale.timezone_candidates) > 1
+
+
+def test_additional_us_commercial_metros_resolve_without_state_suffix():
+    expected = {
+        "New Orleans": "America/Chicago",
+        "Oklahoma City": "America/Chicago",
+        "Kansas City": "America/Chicago",
+        "Memphis": "America/Chicago",
+        "Virginia Beach": "America/New_York",
+    }
+    for metro, timezone_name in expected.items():
+        locale = resolve_locale({"metro": metro})
+        assert locale.country_code == "US"
+        assert locale.timezone == timezone_name
+        assert locale.outreach_language == "en-US"

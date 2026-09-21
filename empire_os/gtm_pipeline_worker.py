@@ -204,6 +204,7 @@ def run_gtm_pipeline(
 
     approved_count = 0
     skipped = 0
+    pending_skip_reasons: list[str] = []
     for row in pending:
         review_id = str((row or {}).get("id") or "").strip()
         if not review_id:
@@ -221,8 +222,14 @@ def run_gtm_pipeline(
                 approved_count += 1
             else:
                 skipped += 1
-        except Exception:
+                pending_skip_reasons.append(
+                    f"{review_id}:auto_review_returned_{str((result or {}).get('status') or 'unknown')}"
+                )
+        except Exception as exc:
             skipped += 1
+            pending_skip_reasons.append(
+                f"{review_id}:{type(exc).__name__}:{str(exc)[:180]}"
+            )
 
     ready = request(
         "POST",
@@ -283,6 +290,6 @@ def run_gtm_pipeline(
         reviews_ready_for_outbound=len(ready),
         intents_proposed=proposed,
         outreach_deferred=deferred,
-        deferred_reasons=tuple(deferred_reasons),
+        deferred_reasons=tuple(deferred_reasons + pending_skip_reasons),
         proposal_errors=tuple(errors),
     )
