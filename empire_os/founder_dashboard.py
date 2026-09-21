@@ -12,6 +12,10 @@ from empire_os.commercial_recovery_registry import (
     recovery_product_catalog,
     recovery_summary,
 )
+from empire_os.commercial_marketing_registry import (
+    marketing_plan_catalog,
+    marketing_summary,
+)
 
 PHASE_RE = re.compile(
     r"^### Phase\s+(\d+)\s+—\s+(.+?)(?:\s+←\s+CURRENT)?$",
@@ -300,6 +304,8 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "recovery_portfolio": {
             "summary": recovery_summary(),
             "products": recovery_product_catalog(),
+            "marketing_summary": marketing_summary(),
+            "marketing_plans": marketing_plan_catalog(),
             "pricing_authority": "none",
             "execution_authority": "none",
             "actual_revenue": False,
