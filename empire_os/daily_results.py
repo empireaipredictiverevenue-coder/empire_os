@@ -94,6 +94,7 @@ def build_daily_results(
     control_fabric = _read(runtime / "control_fabric" / "latest.json")
     conversation_recovery = _read(runtime / "conversation_recovery" / "latest.json")
     buyer_capacity = _read(runtime / "buyer_capacity" / "latest.json")
+    founder_directives = _read(runtime / "founder_directives" / "latest.json")
     stages = _stage_map(loop)
     conveyor = (
         dict(ops.get("conveyor"))
@@ -271,6 +272,17 @@ def build_daily_results(
                 )
                 else None
             ),
+        },
+        "founder_directives": {
+            "available": bool(founder_directives),
+            "directive_count": founder_directives.get("directive_count"),
+            "status_counts": founder_directives.get("status_counts"),
+            "category_counts": founder_directives.get("category_counts"),
+            "founder_gate_count": founder_directives.get("founder_gate_count"),
+            "automatic_planning": founder_directives.get("automatic_planning"),
+            "automatic_production_execution": founder_directives.get("automatic_production_execution"),
+            "execution_mode": founder_directives.get("execution_mode"),
+            "latest": founder_directives.get("latest"),
         },
         "coder": _job_counts(repo_root),
         "reliability": {
