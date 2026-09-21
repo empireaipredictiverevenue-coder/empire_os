@@ -9,7 +9,7 @@ from empire_os.buyer_capacity_readiness import summarize_buyer_capacity
 from empire_os.qualification_worker_v2 import request_json
 
 ROOT = Path("/srv/empire_os")
-OUT = ROOT / "runtime" / "buyer_capacity" / "latest.json"
+OUT = ROOT / "runtime" / "buyer_capacity_readiness" / "latest.json"
 
 SELECT = ",".join((
     "id","buyer_name","status","is_active","commercial_activation_state",
