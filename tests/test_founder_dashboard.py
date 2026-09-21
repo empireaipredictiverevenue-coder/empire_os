@@ -294,3 +294,35 @@ def test_dashboard_exposes_permit_intelligence_without_commercial_claims(tmp_pat
     assert permit["binding_terms_ready"] is False
     assert permit["actual_revenue"] is False
     assert permit["execution_authority"] == "none"
+
+
+
+def test_dashboard_separates_property_evidence_from_private_capital_unknown(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/acquisition/signal_inbox.json",
+        {
+            "permit": {
+                "source": "permits_nyc",
+                "status": "resolved",
+                "metro": "NYC",
+                "created_at": "2026-09-21T10:00:00+00:00",
+                "raw": {"job__": "1"},
+            }
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    prop = result["property_intelligence"]
+    pe = result["private_capital_intelligence"]
+
+    assert prop["evidence_state"] == "EVIDENCE_AVAILABLE"
+    assert prop["permit_signal_count"] == 1
+    assert prop["opportunity_count"] is None
+    assert prop["actual_revenue"] is False
+
+    assert pe["evidence_state"] == "UNKNOWN"
+    assert pe["snapshot_available"] is False
+    assert pe["deal_intent_observed"] is False
+    assert pe["opportunity_count"] is None
+    assert pe["actual_revenue"] is False
