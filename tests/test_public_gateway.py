@@ -142,3 +142,14 @@ def test_site_icon_is_served_from_export(monkeypatch, tmp_path):
     response = site_icon()
     assert Path(response.path) == icon
     assert response.media_type == "image/svg+xml"
+
+
+def test_favicon_alias_is_served_from_export(monkeypatch, tmp_path):
+    icon = tmp_path / "icon.svg"
+    icon.write_text("<svg></svg>")
+    monkeypatch.setattr("empire_os.public_gateway.SITE_OUT", tmp_path)
+    from empire_os.public_gateway import favicon
+
+    response = favicon()
+    assert Path(response.path) == icon
+    assert response.media_type == "image/svg+xml"
