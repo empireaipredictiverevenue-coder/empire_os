@@ -29,6 +29,7 @@ SIGNALS → OPPORTUNITY GRAPH → OPPORTUNITY FOUNDRY → MARKET ENTRY → EXPER
 - Public domain: `empire-ai.co.uk` through Cloudflare Tunnel `Empire-AI`.
 - Public gateway: read-only, governed, no settlement/allocation/activation mutation endpoints.
 - Agent Web: WebMCP + MCP + A2A share one capability catalogue and governance model.
+- Operations connector: Empire Ops MCP is the canonical server-native control connector for EmpireOS. ChatGPT, Hermes, Founder Console and other AI/operator surfaces are clients of Empire Ops rather than infrastructure dependencies. Desktop Commander is retained only as bootstrap/emergency fallback. External connector quotas must never be allowed to stop core EmpireOS operations.
 - Current payment rail: USDT on BNB Smart Chain. Solana/USDC/Phantom/Anchor settlement is retired from active architecture.
 - Buyer/payment truth: only independently verified commercial evidence counts as actual revenue.
 - Outbound: governed approvals, idempotency, DNC/opt-out/compliance controls.
@@ -47,6 +48,7 @@ SIGNALS → OPPORTUNITY GRAPH → OPPORTUNITY FOUNDRY → MARKET ENTRY → EXPER
 - BSC smart-contract escrow database rail is deployed fail-closed; contract mainnet deployment remains gated by external review and production roles.
 - Empire Intelligence Fabric schema is being built as the shared temporal/provenance graph across intelligence domains.
 - Protected untracked `recovery/` and `toop` remain untouched.
+- Empire Ops MCP v0.2.0 foundation is in-repo with audited repo/file operations, allowlisted checks, protected-path enforcement, bearer-token support, founder-directive ingest, acquisition controls and privileged-helper mediated service control. Direct ChatGPT/custom-client registration is transport/client work; it is not allowed to become a dependency of the operating system itself.
 
 ## Cross-Phase Intelligence Fabric — ACTIVE FOUNDATION
 The Empire Intelligence Fabric is the shared substrate beneath all intelligence domains. It is not a replacement roadmap phase and does not move the CURRENT marker away from Phase 3F.
