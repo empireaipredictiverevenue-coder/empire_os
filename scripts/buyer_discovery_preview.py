@@ -187,6 +187,12 @@ def main(argv=None):
         for candidate in candidates[:max(0, min(args.probe, 50))]:
             row = candidate.to_dict()
             row["id"] = row.pop("prospect_id")
+            inner_budget = max(2.0, timeout - 5.0)
+            row["_probe_options"] = {
+                "max_pages": 7,
+                "request_timeout": min(4.0, max(1.5, inner_budget / 3.0)),
+                "time_budget_seconds": inner_budget,
+            }
             try:
                 proc = subprocess.run(
                     [sys.executable, "-m", "empire_os.buyer_probe_worker"],

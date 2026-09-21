@@ -225,3 +225,84 @@ def test_generated_smtp_contacts_reject_catchall_domain(monkeypatch):
     )
     assert valid == []
     assert meta["catch_all"] is True
+
+
+def test_probe_options_are_bounded_and_removed_from_row():
+    import empire_os.buyer_probe_worker as worker
+
+    row = {
+        "id": "p1",
+        "_probe_options": {
+            "max_pages": 999,
+            "request_timeout": 0.1,
+            "time_budget_seconds": 999,
+        },
+    }
+    options = worker._probe_options_from_row(row)
+    assert options == {
+        "max_pages": 15,
+        "request_timeout": 1.0,
+        "time_budget_seconds": 45.0,
+    }
+    assert "_probe_options" not in row
+
+
+def test_probe_options_default_to_worker_defaults_when_absent():
+    import empire_os.buyer_probe_worker as worker
+
+    row = {"id": "p1"}
+    assert worker._probe_options_from_row(row) == {}
+
+
+def test_confirmed_first_party_economic_buyer_can_replace_unbound_decision_maker():
+    import empire_os.buyer_probe_worker as worker
+
+    enriched = {
+        "decision_maker": {
+            "name": "Chad Thomas",
+            "title": "Owner and Founder",
+            "decision_score": 1.0,
+        },
+        "contact_candidates": [{
+            "email": "info@acme.test",
+            "bound_to_decision_maker": False,
+        }],
+    }
+    result = worker._promote_confirmed_first_party_buyer(
+        enriched,
+        [{
+            "name": "Kathy Thomas",
+            "title": "Owner and Co-Founder",
+            "email": "kathy@acme.test",
+            "source_url": "https://acme.test/about",
+            "source_kind": "official_site",
+        }],
+    )
+    assert result["decision_maker"]["name"] == "Kathy Thomas"
+    assert result["decision_maker"]["decision_role"] == "economic_buyer"
+    assert result["decision_reconciliation"]["review_required"] is False
+    assert result["decision_reconciliation"]["previous_decision_maker"]["name"] == "Chad Thomas"
+
+
+def test_first_party_non_buyer_contact_cannot_replace_decision_maker():
+    import empire_os.buyer_probe_worker as worker
+
+    enriched = {
+        "decision_maker": {
+            "name": "Chad Thomas",
+            "title": "Owner",
+            "decision_score": 1.0,
+        },
+        "contact_candidates": [],
+    }
+    result = worker._promote_confirmed_first_party_buyer(
+        enriched,
+        [{
+            "name": "Alex Smith",
+            "title": "Project Coordinator",
+            "email": "alex@acme.test",
+            "source_url": "https://acme.test/team",
+            "source_kind": "official_site",
+        }],
+    )
+    assert result["decision_maker"]["name"] == "Chad Thomas"

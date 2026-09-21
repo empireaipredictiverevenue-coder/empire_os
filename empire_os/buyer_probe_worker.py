@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from empire_os.buyer_discovery import (
     build_candidate,
+    classify_decision_role,
     enrich_candidate,
     generate_work_email_candidates,
     merge_generated_contact_evidence,
@@ -94,6 +95,71 @@ def _smtp_verified_generated_contacts(
         "smtp_valid": len(valid),
     }
 
+def _promote_confirmed_first_party_buyer(
+    enriched: dict,
+    contacts: list[dict],
+) -> dict:
+    """Promote only confirmed first-party economic/functional buyers.
+
+    This is used when the current decision maker has no person-bound contact.
+    Pattern-only/probable contacts are never eligible for promotion.
+    """
+    current_contacts = [
+        item
+        for item in (enriched.get("contact_candidates") or [])
+        if isinstance(item, dict)
+    ]
+    if any(item.get("bound_to_decision_maker") is True for item in current_contacts):
+        return enriched
+
+    eligible = []
+    for item in contacts:
+        name = str(item.get("name") or "").strip()
+        title = str(item.get("title") or "").strip()
+        email = str(item.get("email") or "").strip().lower()
+        source_url = str(item.get("source_url") or "").strip()
+        if not (name and title and email and source_url):
+            continue
+        role, score = classify_decision_role(title)
+        if role not in {"economic_buyer", "functional_buyer"} or score < 0.7:
+            continue
+        eligible.append({
+            **item,
+            "decision_role": role,
+            "decision_score": score,
+        })
+
+    if not eligible:
+        return enriched
+
+    eligible.sort(
+        key=lambda item: (
+            -float(item.get("decision_score") or 0.0),
+            str(item.get("name") or "").casefold(),
+            str(item.get("email") or "").casefold(),
+        )
+    )
+    chosen = eligible[0]
+    result = dict(enriched)
+    previous = result.get("decision_maker")
+    result["decision_maker"] = {
+        "name": chosen["name"],
+        "title": chosen["title"],
+        "email": chosen["email"],
+        "url": chosen["source_url"],
+        "decision_role": chosen["decision_role"],
+        "decision_score": chosen["decision_score"],
+        "source": "hunter_confirmed_first_party",
+    }
+    result["decision_reconciliation"] = {
+        "status": "confirmed_first_party_contact",
+        "review_required": False,
+        "decision_maker": result["decision_maker"],
+        "previous_decision_maker": previous,
+    }
+    return result
+
+
 def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
         time_budget_seconds: float = 22.0) -> dict:
     candidate = build_candidate(
@@ -168,6 +234,7 @@ def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
     hunter_first_party = [
         {
             "name": item.person_name,
+            "title": item.person_title,
             "email": item.email,
             "source_url": item.source_url or candidate.website,
             "source_kind": "official_site",
@@ -176,9 +243,16 @@ def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
         }
         for item in hunter.confirmed_contacts
         if item.state is VerificationState.CONFIRMED
+        and item.first_party
+        and item.person_bound
         and item.person_name
+        and item.person_title
     ]
     if hunter_first_party:
+        enriched = _promote_confirmed_first_party_buyer(
+            enriched,
+            hunter_first_party,
+        )
         enriched = merge_public_web_contact_evidence(
             enriched,
             hunter_first_party,
@@ -255,9 +329,39 @@ def rejection_reason(result: dict) -> str | None:
     return "contact_not_verified"
 
 
+def _probe_options_from_row(row: dict) -> dict:
+    raw = row.pop("_probe_options", None)
+    if not isinstance(raw, dict):
+        return {}
+    try:
+        max_pages = max(1, min(int(raw.get("max_pages", 9)), 15))
+    except (TypeError, ValueError):
+        max_pages = 9
+    try:
+        request_timeout = max(
+            1.0,
+            min(float(raw.get("request_timeout", 4.0)), 10.0),
+        )
+    except (TypeError, ValueError):
+        request_timeout = 4.0
+    try:
+        time_budget = max(
+            2.0,
+            min(float(raw.get("time_budget_seconds", 22.0)), 45.0),
+        )
+    except (TypeError, ValueError):
+        time_budget = 22.0
+    return {
+        "max_pages": max_pages,
+        "request_timeout": request_timeout,
+        "time_budget_seconds": time_budget,
+    }
+
+
 def main() -> int:
     row = json.loads(sys.stdin.read())
-    result = run(row)
+    options = _probe_options_from_row(row)
+    result = run(row, **options)
     result["rejection_reason"] = rejection_reason(result)
     print(json.dumps(result, default=str))
     return 0
