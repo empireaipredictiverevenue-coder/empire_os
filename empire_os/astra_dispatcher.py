@@ -17,9 +17,16 @@ from typing import Any
 ROOT = Path("/srv/empire_os")
 LOOP = ROOT / "runtime/commercial_loop/latest.json"
 SOURCE = ROOT / "runtime/source_health/latest.json"
+BUYER_REVIEW = ROOT / "runtime/buyer_review_materializer/latest.json"
 OUTPUT = ROOT / "runtime/astra/dispatch_latest.json"
 
 SAFE_JOBS = {
+    "buyer_deferred_enrichment": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/run_buyer_deferred_enrichment.py"),
+        "--limit",
+        "5",
+    ],
     "buyer_review_materializer": [
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/run_buyer_review_materializer.py"),
@@ -65,6 +72,10 @@ SAFE_JOBS = {
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/refresh_commercial_loop.py"),
     ],
+    "revenue_pulse_refresh": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/build_revenue_pulse_snapshot.py"),
+    ],
 }
 
 
@@ -86,12 +97,16 @@ def _write(payload: dict[str, Any]) -> None:
 def choose_jobs(
     loop: dict[str, Any],
     source: dict[str, Any],
+    buyer_review: dict[str, Any] | None = None,
 ) -> list[str]:
     jobs: list[str] = []
     if source.get("end_to_end_healthy") is not True:
         jobs.append("source_health_refresh")
 
     if loop.get("loop_complete") is not True:
+        review_state = buyer_review or {}
+        if int(review_state.get("deferred_enrichment") or 0) > 0:
+            jobs.append("buyer_deferred_enrichment")
         stages = {
             str(row.get("stage") or ""): row.get("observed")
             for row in (loop.get("stages") or [])
@@ -106,6 +121,7 @@ def choose_jobs(
             jobs.append("commercial_terms_materializer")
         jobs.append("conversion_intelligence_refresh")
         jobs.append("commercial_loop_refresh")
+        jobs.append("revenue_pulse_refresh")
     return list(dict.fromkeys(jobs))
 
 
@@ -120,7 +136,8 @@ def dispatch(
     ).strip().upper()
     loop = _read(LOOP)
     source = _read(SOURCE)
-    selected = choose_jobs(loop, source)
+    buyer_review = _read(BUYER_REVIEW)
+    selected = choose_jobs(loop, source, buyer_review)
     executed: list[dict[str, Any]] = []
 
     for job in selected:

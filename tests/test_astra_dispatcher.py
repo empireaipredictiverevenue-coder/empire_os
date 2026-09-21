@@ -18,6 +18,7 @@ def test_choose_jobs_drives_internal_launch_pipeline():
         "commercial_terms_materializer",
         "conversion_intelligence_refresh",
         "commercial_loop_refresh",
+        "revenue_pulse_refresh",
     ]
 
 
@@ -38,6 +39,7 @@ def test_choose_jobs_adds_source_repair_but_no_duplicate_jobs():
         "commercial_terms_materializer",
         "conversion_intelligence_refresh",
         "commercial_loop_refresh",
+        "revenue_pulse_refresh",
     ]
 
 
@@ -46,3 +48,20 @@ def test_complete_loop_dispatches_nothing_when_source_is_healthy():
         {"loop_complete": True, "stages": []},
         {"end_to_end_healthy": True},
     ) == []
+
+
+def test_deferred_enrichment_is_knitted_before_buyer_review():
+    loop = {
+        "loop_complete": False,
+        "stages": [
+            {"stage": "recognized_revenue", "observed": False},
+            {"stage": "buyer_conversation", "observed": False},
+            {"stage": "commercial_terms", "observed": False},
+        ],
+    }
+    source = {"end_to_end_healthy": True}
+    review = {"deferred_enrichment": 4}
+    jobs = choose_jobs(loop, source, review)
+    assert jobs[0] == "buyer_deferred_enrichment"
+    assert jobs.index("buyer_deferred_enrichment") < jobs.index("buyer_review_materializer")
+    assert jobs[-1] == "revenue_pulse_refresh"
