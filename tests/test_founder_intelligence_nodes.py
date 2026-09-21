@@ -36,3 +36,15 @@ def test_nodes_projection_preserves_unknown_counts(tmp_path):
 
 def test_get_node_returns_none_for_unknown(tmp_path):
     assert get_intelligence_node_projection(tmp_path, "nope") is None
+
+
+
+def test_energy_node_is_explicitly_incubated(tmp_path):
+    payload = build_intelligence_nodes_projection(tmp_path)
+    rows = {row["key"]: row for row in payload["nodes"]}
+
+    assert "oil_gas_energy" in rows
+    assert rows["oil_gas_energy"]["lifecycle_state"] == "INCUBATE"
+    assert rows["oil_gas_energy"]["execution_authority"] == "intelligence_only"
+    assert rows["private_capital"]["lifecycle_state"] == "ACTIVE_BUILD"
+    assert rows["property"]["lifecycle_state"] == "ACTIVE_BUILD"
