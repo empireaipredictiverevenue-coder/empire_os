@@ -1,5 +1,5 @@
 [Unit]
-Description=Run governed EmpireOS Swarm V6 every thirty minutes
+Description=Run governed EmpireOS Swarm V6 dispatcher every fifteen minutes
 
 [Timer]
 OnBootSec=5min
