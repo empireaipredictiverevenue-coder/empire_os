@@ -12,7 +12,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import Body, FastAPI, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
@@ -23,6 +23,7 @@ GATEWAY_VERSION = "agent-web-v1.1"
 PUBLIC_BASE_URL = os.getenv("EMPIRE_PUBLIC_BASE_URL", "https://empire-ai.co.uk").rstrip("/")
 AEO_ROOT = Path(os.getenv("EMPIRE_PUBLIC_AEO_ROOT", "/srv/empire_os/runtime/aeo"))
 AEO_ROOT.mkdir(parents=True, exist_ok=True)
+SITE_OUT = Path(os.getenv("EMPIRE_PUBLIC_SITE_OUT", "/srv/empire_os/apps/empire-public-site/out"))
 TRUST_SNAPSHOT = Path("/srv/empire_os/runtime/trust/latest.json")
 RESEND_INBOUND_URL = os.getenv(
     "EMPIRE_RESEND_INBOUND_URL",
@@ -31,6 +32,7 @@ RESEND_INBOUND_URL = os.getenv(
 
 app = FastAPI(title="Empire AI Public Gateway", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/aeo", StaticFiles(directory=str(AEO_ROOT), html=True), name="aeo")
+app.mount("/_next", StaticFiles(directory=str(SITE_OUT / "_next"), check_dir=False), name="next-static")
 
 
 @app.middleware("http")
@@ -44,6 +46,39 @@ async def security_headers(request, call_next):
         "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
     )
     return response
+
+
+def _site_html_path(route: str, root: Path | None = None) -> Path | None:
+    base = root or SITE_OUT
+    clean = str(route or "").strip().strip("/")
+    if not clean:
+        candidate = base / "index.html"
+    elif clean == "trust":
+        candidate = base / "trust.html"
+    elif clean == "industries":
+        candidate = base / "industries.html"
+    elif clean.startswith("industries/"):
+        slug = clean.split("/", 1)[1]
+        if not slug or any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789-" for ch in slug):
+            return None
+        candidate = base / "industries" / f"{slug}.html"
+    else:
+        return None
+    return candidate if candidate.is_file() else None
+
+
+def _public_site_urls(root: Path | None = None) -> list[str]:
+    base = root or SITE_OUT
+    urls: list[str] = []
+    if (base / "trust.html").is_file():
+        urls.append(f"{PUBLIC_BASE_URL}/trust")
+    if (base / "industries.html").is_file():
+        urls.append(f"{PUBLIC_BASE_URL}/industries")
+    industries = base / "industries"
+    if industries.is_dir():
+        for path in sorted(industries.glob("*.html")):
+            urls.append(f"{PUBLIC_BASE_URL}/industries/{path.stem}")
+    return urls
 
 
 def _public_trust_manifest(path: Path | None = None) -> dict:
@@ -86,8 +121,15 @@ def _aeo_page_urls(root: Path | None = None) -> list[str]:
     return urls
 
 
-def _sitemap_xml(root: Path | None = None) -> str:
-    urls = [f"{PUBLIC_BASE_URL}/"] + _aeo_page_urls(root)
+def _sitemap_xml(
+    root: Path | None = None,
+    site_root: Path | None = None,
+) -> str:
+    urls = (
+        [f"{PUBLIC_BASE_URL}/"]
+        + _public_site_urls(site_root)
+        + _aeo_page_urls(root)
+    )
     body = "".join(f"<url><loc>{url}</loc></url>" for url in urls)
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
@@ -266,8 +308,35 @@ def robots():
     )
 
 
+@app.get("/trust")
+def trust_page():
+    path = _site_html_path("trust")
+    if path is None:
+        return JSONResponse({"error": "public_site_page_unavailable"}, status_code=404)
+    return FileResponse(path, media_type="text/html")
+
+
+@app.get("/industries")
+def industries_page():
+    path = _site_html_path("industries")
+    if path is None:
+        return JSONResponse({"error": "public_site_page_unavailable"}, status_code=404)
+    return FileResponse(path, media_type="text/html")
+
+
+@app.get("/industries/{slug}")
+def industry_page(slug: str):
+    path = _site_html_path(f"industries/{slug}")
+    if path is None:
+        return JSONResponse({"error": "industry_page_not_found"}, status_code=404)
+    return FileResponse(path, media_type="text/html")
+
+
 @app.get("/", response_class=HTMLResponse)
 def home():
+    path = _site_html_path("")
+    if path is not None:
+        return FileResponse(path, media_type="text/html")
     return """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Empire AI — Predictive Revenue</title>
