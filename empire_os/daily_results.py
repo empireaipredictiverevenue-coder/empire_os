@@ -87,6 +87,7 @@ def build_daily_results(
     source_health = _read(runtime / "source_health" / "latest.json")
     aeo = _read(runtime / "search_intelligence" / "aeo_recovery" / "latest.json")
     security = _read(runtime / "security" / "supabase_audit_latest.json")
+    rls_classification = _read(runtime / "security" / "rls_classification_latest.json")
     trust = _read(runtime / "trust" / "latest.json")
     legal_mass_tort = _read(runtime / "legal_mass_tort" / "latest.json")
     stages = _stage_map(loop)
@@ -216,6 +217,9 @@ def build_daily_results(
         "security": {
             "supabase_audit_available": bool(security),
             "findings": security_findings,
+            "rls_classification_available": bool(rls_classification),
+            "rls_table_count": rls_classification.get("table_count"),
+            "rls_classes": rls_classification.get("counts"),
             "trust_snapshot_available": bool(trust),
             "trust_ready": (
                 (trust.get("assessment") or {}).get("public_trust_center_ready")

@@ -45,3 +45,20 @@ def test_missing_metrics_stay_none(tmp_path):
     payload = build_daily_results(tmp_path)
     assert payload["commercial_funnel"]["verified_payments"] is None
     assert payload["acquisition"]["accepted"] is None
+
+
+def test_daily_results_surfaces_rls_classification_counts(tmp_path):
+    runtime = tmp_path / "runtime"
+    dump(runtime / "security/rls_classification_latest.json", {
+        "table_count": 222,
+        "counts": {
+            "privileged_operator": 33,
+            "tenant_owned_candidate": 14,
+            "public_read_candidate": 11,
+            "server_only_review": 164,
+        },
+    })
+    payload = build_daily_results(tmp_path)
+    assert payload["security"]["rls_classification_available"] is True
+    assert payload["security"]["rls_table_count"] == 222
+    assert payload["security"]["rls_classes"]["privileged_operator"] == 33

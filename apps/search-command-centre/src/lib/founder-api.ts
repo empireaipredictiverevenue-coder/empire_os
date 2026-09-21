@@ -347,6 +347,9 @@ export type FounderDailyResults = {
   security?: {
     supabase_audit_available?: boolean;
     findings?: Record<string, number>;
+    rls_classification_available?: boolean;
+    rls_table_count?: number | null;
+    rls_classes?: Record<string, number>;
     trust_snapshot_available?: boolean;
     trust_ready?: boolean | null;
   };

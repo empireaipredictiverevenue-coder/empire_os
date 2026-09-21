@@ -428,6 +428,10 @@ export default async function FounderPage() {
                   value={int(daily?.security?.findings?.rls_disabled_in_public)}
                 />
                 <Evidence
+                  label="Privileged tables"
+                  value={int(daily?.security?.rls_classes?.privileged_operator)}
+                />
+                <Evidence
                   label="Incidents"
                   value={int(daily?.reliability?.incident_count)}
                 />
