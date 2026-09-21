@@ -264,3 +264,33 @@ def test_dashboard_exposes_governed_recovered_marketing_plans(tmp_path):
     assert rows["permit_opportunity_gtm"]["state"] == "ACTIVE_BUILD"
     assert rows["private_capital_abm"]["state"] == "ACTIVE_BUILD"
     assert rows["oil_gas_research_gtm"]["state"] == "INCUBATE"
+
+
+
+def test_dashboard_exposes_permit_intelligence_without_commercial_claims(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/acquisition/signal_inbox.json",
+        {
+            "permit-1": {
+                "source": "permits_nyc",
+                "status": "resolved",
+                "metro": "NYC",
+                "created_at": "2026-09-21T10:00:00+00:00",
+                "last_seen_at": "2026-09-21T11:00:00+00:00",
+                "url": "https://example.test/permit/1",
+                "raw": {"job__": "1"},
+            }
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    permit = result["permit_intelligence"]
+
+    assert permit["signal_count"] == 1
+    assert permit["resolved_count"] == 1
+    assert permit["evidence_state"] == "EVIDENCE_AVAILABLE"
+    assert permit["pricing_observed"] is False
+    assert permit["binding_terms_ready"] is False
+    assert permit["actual_revenue"] is False
+    assert permit["execution_authority"] == "none"
