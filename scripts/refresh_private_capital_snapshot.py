@@ -32,9 +32,9 @@ def main() -> int:
         json.dumps(snapshot, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    os.chmod(tmp, 0o600)
+    os.chmod(tmp, 0o644)
     tmp.replace(OUT)
-    os.chmod(OUT, 0o600)
+    os.chmod(OUT, 0o644)
 
     print(json.dumps({
         **snapshot,
