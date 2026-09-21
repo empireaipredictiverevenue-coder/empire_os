@@ -63,6 +63,22 @@ def default_registry() -> tuple[ComponentSpec, ...]:
     """Current canonical component map. Expand without coupling modules."""
     return (
         ComponentSpec(
+            "founder_directive_intake",
+            ("founder_directive_received",),
+            ("founder_directive_captured",),
+            (),
+            "internal_write",
+            60,
+        ),
+        ComponentSpec(
+            "founder_directive_planner",
+            ("founder_directive_captured", "founder_directive_plan_retry"),
+            ("implementation_plan_ready", "founder_gate_required"),
+            ("empire_coder",),
+            "internal_write",
+            300,
+        ),
+        ComponentSpec(
             "market_opportunity_agent",
             (
                 "signal_discovered",
