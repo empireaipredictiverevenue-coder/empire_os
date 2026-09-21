@@ -138,6 +138,8 @@ export type FounderIntelligenceNode = {
   runtime_evidence?: {
     observed_sources?: string[];
     current_source_match?: boolean;
+    observation_count?: number | null;
+    evidence_state?: string | null;
     opportunity_count?: number | null;
     revenue_cents?: number | null;
     realized_gp_cents?: number | null;

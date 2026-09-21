@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from zoneinfo import ZoneInfo
 
 from empire_os.control_conveyor import build_conveyor
+from empire_os.spatial_physical_runtime import build_spatial_physical_runtime
 
 LONDON = ZoneInfo("Europe/London")
 _INT = re.compile(r"(?<![\d.])(\d[\d,]*)")
@@ -91,6 +92,7 @@ def build_daily_results(
     trust = _read(runtime / "trust" / "latest.json")
     legal_mass_tort = _read(runtime / "legal_mass_tort" / "latest.json")
     revenue_pulse = _read(runtime / "revenue_pulse" / "latest.json")
+    spatial_physical_runtime = build_spatial_physical_runtime(repo_root)
     control_fabric = _read(runtime / "control_fabric" / "latest.json")
     conversation_recovery = _read(runtime / "conversation_recovery" / "latest.json")
     buyer_capacity = _read(runtime / "buyer_capacity" / "latest.json")
@@ -213,7 +215,25 @@ def build_daily_results(
             "velocity": revenue_pulse.get("velocity"),
             "recognized_revenue_truth": revenue_pulse.get("recognized_revenue_truth"),
             "storm_pulse": revenue_pulse.get("storm_pulse"),
-            "spatial_physical_pulse": revenue_pulse.get("spatial_physical_pulse"),
+            "spatial_physical_pulse": (
+                revenue_pulse.get("spatial_physical_pulse")
+                if isinstance(revenue_pulse.get("spatial_physical_pulse"), Mapping)
+                else {
+                    "volumetric_observations": spatial_physical_runtime.get(
+                        "volumetric_observations"
+                    ),
+                    "physical_observations": spatial_physical_runtime.get(
+                        "physical_observations"
+                    ),
+                    "modeled_opportunities": spatial_physical_runtime.get(
+                        "modeled_opportunities"
+                    ),
+                    "max_combined_priority_boost": spatial_physical_runtime.get(
+                        "max_combined_priority_boost"
+                    ),
+                    "evidence_refs": spatial_physical_runtime.get("evidence_refs"),
+                }
+            ),
             "forecast_separate_from_truth": (
                 (revenue_pulse.get("forecast") or {}).get("separate_from_revenue_truth")
                 if isinstance(revenue_pulse.get("forecast"), Mapping)

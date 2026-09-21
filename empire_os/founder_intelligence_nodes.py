@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.intelligence_nodes import NODES
+from empire_os.spatial_physical_runtime import build_spatial_physical_runtime
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -20,6 +21,7 @@ def build_intelligence_nodes_projection(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     source_health = _read_json(runtime / "source_health" / "latest.json")
     acquisition = _read_json(runtime / "acquisition" / "latest.json")
+    spatial_physical = build_spatial_physical_runtime(repo_root)
     observed_sources = tuple(dict.fromkeys(
         value for value in (
             str(source_health.get("source") or "").strip(),
@@ -34,9 +36,28 @@ def build_intelligence_nodes_projection(repo_root: Path) -> dict[str, Any]:
             source for source in observed_sources if source in node.sensors
         )
         row = node.as_dict()
+        observation_count = None
+        evidence_state = None
+        if node.key == "natural_physical":
+            observation_count = spatial_physical.get("physical_observations")
+            if isinstance(observation_count, int) and observation_count > 0:
+                matched = tuple(dict.fromkeys((*matched, "storm_signals")))
+                evidence_state = "physical_evidence_observed"
+            else:
+                evidence_state = "physical_evidence_unknown"
+        elif node.key == "volumetric":
+            observation_count = spatial_physical.get("volumetric_observations")
+            evidence_state = (
+                "volumetric_evidence_observed"
+                if isinstance(observation_count, int) and observation_count > 0
+                else "no_real_3d_evidence_observed"
+            )
+
         row["runtime_evidence"] = {
             "observed_sources": list(matched),
             "current_source_match": bool(matched),
+            "observation_count": observation_count,
+            "evidence_state": evidence_state,
             "opportunity_count": None,
             "revenue_cents": None,
             "realized_gp_cents": None,

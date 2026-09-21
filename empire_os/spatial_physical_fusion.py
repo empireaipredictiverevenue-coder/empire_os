@@ -16,6 +16,13 @@ from empire_os.spatial_physical_intelligence import (
 from empire_os.storm_revenue_multiplier import StormOpportunityMultiplier
 
 
+EVIDENCE_CLASS_WEIGHT = {
+    "observed": 1.0,
+    "derived_signal": 0.8,
+    "model_inference": 0.65,
+}
+
+
 VERTICAL_PHENOMENA: dict[str, frozenset[str]] = {
     "roofing": frozenset({
         "storm_damage",
@@ -166,8 +173,18 @@ def fuse_spatial_physical_priority(
 
     # Volumetric confirmation may add up to 8 priority points. Relevant
     # physical-condition evidence may add up to 12. Unknown confidence adds 0.
-    spatial_boost = 8.0 * _confidence(spatial_confidence)
-    physical_boost = 12.0 * _confidence(physical_confidence)
+    spatial_weight = (
+        EVIDENCE_CLASS_WEIGHT.get(volumetric.evidence_class, 0.0)
+        if volumetric is not None
+        else 0.0
+    )
+    physical_weight = (
+        EVIDENCE_CLASS_WEIGHT.get(physical.evidence_class, 0.0)
+        if physical_relevant and physical is not None
+        else 0.0
+    )
+    spatial_boost = 8.0 * _confidence(spatial_confidence) * spatial_weight
+    physical_boost = 12.0 * _confidence(physical_confidence) * physical_weight
     spatial_physical_boost = round(
         min(20.0, spatial_boost + physical_boost),
         2,

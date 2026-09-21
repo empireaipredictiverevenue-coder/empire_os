@@ -20,7 +20,14 @@ _ALLOWED_REPRESENTATIONS = {
     "footprint_3d",
 }
 
+_ALLOWED_EVIDENCE_CLASSES = {
+    "observed",
+    "model_inference",
+    "derived_signal",
+}
+
 _ALLOWED_PHENOMENA = {
+    "storm_exposure",
     "storm_damage",
     "roof_condition",
     "thermal_loss",
@@ -51,6 +58,7 @@ class VolumetricObservation:
     coordinate_frame: str | None = None
     geometry_ref: str | None = None
     confidence: float | None = None
+    evidence_class: str = "observed"
     execution_authority: str = "none"
 
     def __post_init__(self) -> None:
@@ -65,6 +73,8 @@ class VolumetricObservation:
         object.__setattr__(self, "evidence_refs", _clean_refs(self.evidence_refs))
         if self.confidence is not None and not 0 <= self.confidence <= 1:
             raise ValueError("confidence must be between 0 and 1")
+        if self.evidence_class not in _ALLOWED_EVIDENCE_CLASSES:
+            raise ValueError("unsupported evidence_class")
         if self.execution_authority != "none":
             raise ValueError("volumetric intelligence cannot grant execution")
 
@@ -82,6 +92,7 @@ class PhysicalObservation:
     measurements: Mapping[str, float] | None = None
     units: Mapping[str, str] | None = None
     confidence: float | None = None
+    evidence_class: str = "observed"
     execution_authority: str = "none"
 
     def __post_init__(self) -> None:
@@ -96,6 +107,8 @@ class PhysicalObservation:
         object.__setattr__(self, "evidence_refs", _clean_refs(self.evidence_refs))
         if self.confidence is not None and not 0 <= self.confidence <= 1:
             raise ValueError("confidence must be between 0 and 1")
+        if self.evidence_class not in _ALLOWED_EVIDENCE_CLASSES:
+            raise ValueError("unsupported evidence_class")
         if self.execution_authority != "none":
             raise ValueError("physical intelligence cannot grant execution")
 

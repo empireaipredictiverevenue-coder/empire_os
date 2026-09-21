@@ -626,9 +626,16 @@ export default async function FounderPage() {
                         {node.market.replaceAll("_", " ")}
                       </p>
                       <p className="mt-3 text-[11px] text-emerald-200">
-                        {node.runtime_evidence?.current_source_match
-                          ? "Current source evidence observed"
-                          : "No current-source evidence in snapshot"}
+                        {typeof node.runtime_evidence?.observation_count ===
+                        "number"
+                          ? String(node.runtime_evidence.observation_count) +
+                            " current observation(s)"
+                          : node.runtime_evidence?.current_source_match
+                            ? "Current source evidence observed"
+                            : node.runtime_evidence?.evidence_state ===
+                                "no_real_3d_evidence_observed"
+                              ? "No real 3D evidence observed"
+                              : "No current-source evidence in snapshot"}
                       </p>
                       <p className="mt-2 text-[11px] leading-5 text-slate-600">
                         {node.products.slice(0, 3).join(" · ")}
