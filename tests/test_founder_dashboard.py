@@ -183,3 +183,49 @@ def test_conversation_blocker_is_presented_as_external_wait(tmp_path):
     assert state["class"] == "WAITING_EXTERNAL"
     assert state["next_event"] == "genuine_buyer_reply"
     assert state["founder_action_required"] is False
+
+
+def test_dashboard_exposes_control_conveyor_and_founder_gate_state(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/commercial_loop/latest.json",
+        {
+            "mode": "OBSERVE",
+            "loop_complete": False,
+            "highest_priority_blocker": "commercial_terms",
+            "stages": [
+                {"stage": "buyer_conversation", "observed": True},
+                {"stage": "commercial_terms", "observed": False},
+                {"stage": "bsc_payment_request", "observed": False},
+            ],
+        },
+    )
+    result = build_founder_dashboard(root)
+    assert result["control_conveyor"]["current_blocker"] == "commercial_terms"
+    assert result["control_conveyor"]["authority"] == "founder_gate"
+    assert result["founder_gate"] == {
+        "required": True,
+        "current_blocker": "commercial_terms",
+        "owner_component": "commercial_terms",
+        "next_event": "terms_candidate_created",
+        "authority": "founder_gate",
+    }
+
+
+def test_dashboard_does_not_raise_founder_gate_for_external_wait(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/commercial_loop/latest.json",
+        {
+            "mode": "OBSERVE",
+            "loop_complete": False,
+            "highest_priority_blocker": "buyer_conversation",
+            "stages": [
+                {"stage": "outbound_sent", "observed": True},
+                {"stage": "buyer_conversation", "observed": False},
+            ],
+        },
+    )
+    result = build_founder_dashboard(root)
+    assert result["control_conveyor"]["authority"] == "internal_write"
+    assert result["founder_gate"]["required"] is False

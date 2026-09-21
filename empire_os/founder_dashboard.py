@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from empire_os.control_conveyor import build_conveyor
+
 PHASE_RE = re.compile(
     r"^### Phase\s+(\d+)\s+—\s+(.+?)(?:\s+←\s+CURRENT)?$",
     re.MULTILINE,
@@ -228,12 +230,23 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     source_path = runtime / "source_health" / "latest.json"
     conversion_path = runtime / "conversion" / "latest.json"
 
+    raw_loop = _read_json(loop_path)
+    conveyor = build_conveyor(raw_loop or {"stages": []})
+
     return {
         "mode": "OBSERVE",
         "side_effects": "none",
         "execution_authority": "none",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "commercial_loop": _commercial_loop(_read_json(loop_path), loop_path),
+        "commercial_loop": _commercial_loop(raw_loop, loop_path),
+        "control_conveyor": conveyor,
+        "founder_gate": {
+            "required": conveyor.get("authority") == "founder_gate",
+            "current_blocker": conveyor.get("current_blocker"),
+            "owner_component": conveyor.get("owner_component"),
+            "next_event": conveyor.get("next_event"),
+            "authority": conveyor.get("authority"),
+        },
         "astra": _astra(_read_json(astra_path), astra_path),
         "acquisition": _acquisition(
             _read_json(acquisition_path),
