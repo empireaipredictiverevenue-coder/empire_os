@@ -190,7 +190,8 @@ def build_first_touch_copy(
         "so conversations, terms, payments and revenue stay separate from forecasts "
         "and scores.\n\n"
         f"If useful, reply “send it” and I’ll send a one-page brief for {business} "
-        "with the three highest-priority signals. No deck.\n\n"
+        "with the three areas I’d investigate first. If the evidence is useful, "
+        "the next step is a bounded pilot rather than a long retainer. No deck.\n\n"
         "Best,\nPhil\nFounder, Empire AI\nempire-ai.co.uk\n\n"
         f"{POSTAL_ADDRESS}\n"
         "If you’d rather not hear from me, reply “opt out”."
@@ -233,8 +234,8 @@ def build_followup_copy(
         message = (
             "Hi,\n\n"
             f"{useful_detail}\n\n"
-            "It covers the three signals I’d prioritise first and how I’d measure "
-            "whether they turn into conversations and paid work.\n\n"
+            "It covers the three areas I’d investigate first and how I’d separate "
+            "observed evidence from checks that still need validating.\n\n"
             "If you want it, just reply “send it”.\n\n"
         )
     elif step == 2:
