@@ -85,6 +85,69 @@ def _get(path: str, params: dict[str, Any]) -> list[dict[str, Any]]:
     return [row for row in rows if isinstance(row, dict)]
 
 
+def _prospect_rows(prospect_ids: list[str]) -> dict[str, dict[str, Any]]:
+    ids = [str(value).strip() for value in prospect_ids if str(value).strip()]
+    if not ids:
+        return {}
+    encoded = f"in.({','.join(ids)})"
+
+    rows = _get(
+        "/rest/v1/prospects",
+        {
+            "select": (
+                "id,business_name,niche,metro,phone,website,buy_signal_score,"
+                "status,notes,contact_name,contact_title,contact_source,"
+                "contacted_status,created_at"
+            ),
+            "id": encoded,
+            "limit": max(1, len(ids)),
+        },
+    )
+    by_id = {
+        str(row.get("id")): dict(row)
+        for row in rows
+        if row.get("id")
+    }
+
+    links = _get(
+        "/rest/v1/prospect_entity_links",
+        {
+            "select": "prospect_id,entity_id,active,match_score",
+            "prospect_id": encoded,
+            "active": "eq.true",
+            "order": "match_score.desc",
+            "limit": max(1, len(ids) * 2),
+        },
+    )
+    linked: set[str] = set()
+    for link in links:
+        pid = str(link.get("prospect_id") or "")
+        if pid in by_id and pid not in linked:
+            by_id[pid]["entity_id"] = link.get("entity_id")
+            linked.add(pid)
+
+    acquisitions = _get(
+        "/rest/v1/prospect_acquisitions",
+        {
+            "select": "prospect_id,evidence,created_at",
+            "prospect_id": encoded,
+            "order": "created_at.desc",
+            "limit": max(10, len(ids) * 10),
+        },
+    )
+    acquisition_seen: set[str] = set()
+    for acquisition in acquisitions:
+        pid = str(acquisition.get("prospect_id") or "")
+        if pid not in by_id or pid in acquisition_seen:
+            continue
+        evidence = acquisition.get("evidence")
+        if accepted_acquisition_website(evidence):
+            by_id[pid]["_acquisition_evidence"] = evidence
+            acquisition_seen.add(pid)
+
+    return by_id
+
+
 def _prospect_row(prospect_id: str) -> dict[str, Any] | None:
     rows = _get(
         "/rest/v1/prospects",
@@ -240,12 +303,18 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
     processed = proposed = call_ready = deferred_again = identities_recovered = 0
     errors: list[str] = []
     results: list[dict[str, Any]] = []
+    rows_by_id = _prospect_rows([
+        str(item.get("prospect_id") or "")
+        for item in due
+    ])
+    network_probe_budget = 2
+    network_probes = 0
 
     for item in due:
         prospect_id = str(item.get("prospect_id") or "").strip()
         attempts = int(item.get("attempts") or 0) + 1
         try:
-            row = _prospect_row(prospect_id)
+            row = rows_by_id.get(prospect_id)
             if not row:
                 queue.resolve(prospect_id, outcome="prospect_missing")
                 results.append({
@@ -293,6 +362,15 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                     "call_ready": marked_call,
                 })
                 continue
+
+            if network_probes >= network_probe_budget:
+                results.append({
+                    "prospect_id": prospect_id,
+                    "outcome": "deferred_by_network_budget",
+                    "reason": "network_probe_budget_exhausted",
+                })
+                continue
+            network_probes += 1
 
             probe_row = candidate.to_dict()
             probe_row["id"] = probe_row.pop("prospect_id")
@@ -392,6 +470,8 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
         "schema_version": "empire.buyer_deferred_enrichment.v1",
         "mode": "INTERNAL_ENRICHMENT",
         "processed": processed,
+        "network_probes_used": network_probes,
+        "network_probe_budget": network_probe_budget,
         "buyer_reviews_proposed": proposed,
         "identities_recovered": identities_recovered,
         "deferred_again": deferred_again,

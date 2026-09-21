@@ -36,3 +36,34 @@ def test_identity_recovery_accepts_valid_child_json(monkeypatch):
     )
     assert result["decision"] == "resolved"
     assert result["identity"]["name"] == "Alex Smith"
+
+
+def test_batch_prospect_loader_uses_three_bounded_queries(monkeypatch):
+    calls = []
+
+    def fake_get(path, params):
+        calls.append((path, dict(params)))
+        if path == "/rest/v1/prospects":
+            return [{
+                "id": "p1",
+                "business_name": "Acme Roofing",
+                "website": None,
+            }]
+        if path == "/rest/v1/prospect_entity_links":
+            return [{
+                "prospect_id": "p1",
+                "entity_id": "e1",
+                "active": True,
+                "match_score": 1.0,
+            }]
+        if path == "/rest/v1/prospect_acquisitions":
+            return []
+        raise AssertionError(path)
+
+    monkeypatch.setattr(worker, "_get", fake_get)
+    rows = worker._prospect_rows(["p1"])
+    assert rows["p1"]["entity_id"] == "e1"
+    assert len(calls) == 3
+    assert calls[0][1]["id"] == "in.(p1)"
+    assert calls[1][1]["prospect_id"] == "in.(p1)"
+    assert calls[2][1]["prospect_id"] == "in.(p1)"
