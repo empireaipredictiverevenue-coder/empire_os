@@ -26,6 +26,33 @@ def _market(context: Mapping[str, Any]) -> str:
     return metro or niche or "your market"
 
 
+def _send_it_requested(body: str) -> bool:
+    lower = body.lower()
+    return any(
+        phrase in lower
+        for phrase in (
+            "send it",
+            "please send",
+            "send over",
+            "send the brief",
+            "send me the brief",
+        )
+    )
+
+
+def _evidence_line(context: Mapping[str, Any]) -> str:
+    why_now = _text(context.get("why_now_summary"))
+    proof = _text(context.get("specific_proof"))
+    if why_now:
+        return f"Observed signal: {why_now}"
+    if proof:
+        return f"Observed public evidence: {proof}"
+    return (
+        "Observed evidence: the company and market context from the original "
+        "outreach. I’ll keep anything not yet observed clearly labelled as a check."
+    )
+
+
 def _question_answer(body: str, market: str) -> str:
     lower = body.lower()
     if any(k in lower for k in ("price", "cost", "rate", "pricing")):
@@ -76,16 +103,38 @@ def build_closer_reply(context: Mapping[str, Any]) -> dict[str, str]:
     subject = root_subject if root_subject.lower().startswith("re:") else f"Re: {root_subject or 'Empire AI'}"
 
     if classification == "positive":
-        message = (
-            f"{greeting}\n\n"
-            "Thanks for getting back to me. To make sure this is a fit before "
-            "we talk commercial terms, could you send me three things: the "
-            f"area {business} wants to cover, roughly how many qualified "
-            "opportunities per day you could handle, and your preferred "
-            "delivery route (email, webhook or phone)?\n\n"
-            "Once I have that I can map the current opportunity flow against "
-            "your capacity and come back with a small pilot structure."
-        )
+        if _send_it_requested(inbound):
+            evidence_line = _evidence_line(context)
+            message = (
+                f"{greeting}\n\n"
+                f"Absolutely — here’s the concise brief I promised for {business} "
+                f"in {market}.\n\n"
+                f"{evidence_line}\n\n"
+                "The three areas I’d investigate first:\n"
+                "1. Demand — validate current local demand and any permit, event "
+                "or market triggers that are actually observable.\n"
+                "2. Search — map the highest-intent search/AI visibility gaps and "
+                "where demand is leaking to competitors.\n"
+                "3. Competitors — identify who is visibly capturing demand and "
+                "where there is a practical opening.\n\n"
+                "I’ll keep observed evidence separate from anything that still "
+                "needs validating. If that direction is useful, send the exact "
+                "area you want to cover, roughly how many qualified opportunities "
+                "per day you could handle, and whether you prefer email, webhook "
+                "or phone delivery. I can then scope a bounded pilot around the "
+                "strongest evidenced opportunity."
+            )
+        else:
+            message = (
+                f"{greeting}\n\n"
+                "Thanks for getting back to me. To make sure this is a fit before "
+                "we talk commercial terms, could you send me three things: the "
+                f"area {business} wants to cover, roughly how many qualified "
+                "opportunities per day you could handle, and your preferred "
+                "delivery route (email, webhook or phone)?\n\n"
+                "Once I have that I can map the current opportunity flow against "
+                "your capacity and come back with a bounded pilot structure."
+            )
     elif classification == "question":
         answer = _question_answer(inbound, market)
         message = (
