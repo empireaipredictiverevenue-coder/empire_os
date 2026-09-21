@@ -21,6 +21,11 @@ def read_ops_snapshot(path: Path = DEFAULT_SNAPSHOT) -> dict[str, Any]:
             "business_blocker": None,
             "sentinel": {"findings": [], "repair_plan": []},
             "healer": {"proposed": 0, "executed": 0, "results": []},
+            "incident_manager": {
+                "incident_count": 0,
+                "diagnoses": [],
+                "requires_escalation": False,
+            },
         }
     if not isinstance(value, dict):
         return {"available": False}

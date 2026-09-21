@@ -163,6 +163,14 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             120,
         ),
         ComponentSpec(
+            "ops_incident_manager",
+            ("incident_opened", "repair_failed", "service_degraded", "workflow_stalled"),
+            ("incident_diagnosed", "incident_escalated"),
+            ("ops_sentinel", "ops_healer"),
+            "observe",
+            180,
+        ),
+        ComponentSpec(
             "ops_healer",
             ("repair_requested",),
             ("repair_succeeded", "repair_failed"),

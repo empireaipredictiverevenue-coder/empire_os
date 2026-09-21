@@ -8,6 +8,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from empire_os.incident_manager import build_incident_report
 from empire_os.ops_healer import execute_plan
 from empire_os.ops_sentinel import observe
 
@@ -35,6 +36,8 @@ def main() -> int:
     if mode == "GUARDED_EXECUTE":
         repairs = execute_plan(sentinel.get("repair_plan") or [], max_actions=3)
 
+    incident_manager = build_incident_report(sentinel)
+
     payload = {
         "schema_version": "empire.ops_control_cycle.v1",
         "observed_at": datetime.now(timezone.utc).isoformat(),
@@ -45,6 +48,7 @@ def main() -> int:
             "executed": len(repairs),
             "results": repairs,
         },
+        "incident_manager": incident_manager,
         "healthy": not any(
             row.get("severity") in {"critical", "warning"}
             for row in sentinel.get("findings") or []
