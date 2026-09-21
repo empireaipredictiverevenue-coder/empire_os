@@ -175,6 +175,22 @@ Best products:
 - custom integrations
 - private deployment/white-label
 
+### ICP F — Property / Private Capital
+Trigger:
+"I need evidence-backed property, portfolio, market or add-on intelligence before
+I commit capital or operating resources."
+
+Best products:
+- Property Intelligence
+- Permit Intelligence
+- Private Capital & Roll-Up Intelligence
+- Market Intelligence / Revenue GPS
+- portfolio / territory opportunity feeds
+- enterprise data / API / managed intelligence
+
+Oil & Gas / Energy Infrastructure remains a research ICP only until source rights,
+buyer demand, compliance, fulfilment and economics are validated.
+
 ## 5. Messaging Pillars
 
 ### Pillar 1 — See Revenue Earlier
@@ -343,6 +359,27 @@ Assets:
 - territory alerts
 - Permit Radar product
 - agency/data API package
+
+### Campaign 6 — "Property & Portfolio Opportunity Intelligence"
+For property operators, facilities teams, developers, investors and lenders.
+
+Assets:
+- portfolio heatmap
+- permit/property trigger brief
+- multi-site monitoring preview
+- property opportunity report
+
+### Campaign 7 — "Roll-Up Intelligence Before the Auction"
+For private-capital sponsors, operating partners and portfolio teams.
+
+Assets:
+- fragmented-market map
+- add-on opportunity brief
+- sponsor/portfolio intelligence demo
+- Revenue GPS / market-entry brief
+
+No deal intent, valuation, ownership change or investment outcome may be inferred
+without evidence.
 
 ## 10. Conversion Architecture
 
