@@ -45,3 +45,22 @@ def test_objection_keeps_pilot_bounded():
 def test_noncommercial_classification_is_rejected():
     with pytest.raises(ValueError, match="classification"):
         build_closer_reply(context("negative"))
+
+
+
+def test_send_it_reply_delivers_brief_before_capacity_ask():
+    row = context("positive", "Yes please, send it")
+    row["specific_proof"] = "your public profile shows 4.8★ across 114 reviews"
+
+    draft = build_closer_reply(row)
+    body = draft["body_text"]
+
+    assert "here’s the concise brief I promised" in body
+    assert "Observed public evidence" in body
+    assert "4.8★ across 114 reviews" in body
+    assert "1. Demand" in body
+    assert "2. Search" in body
+    assert "3. Competitors" in body
+    assert "bounded pilot" in body
+    assert "price is" not in body.lower()
+    assert POSTAL_ADDRESS in body
