@@ -6,8 +6,9 @@ from empire_os.commercial_terms_materializer import (
 
 
 class FakeRequest:
-    def __init__(self, *, include_price=True):
+    def __init__(self, *, include_price=True, catalog_ready=True):
         self.include_price = include_price
+        self.catalog_ready = catalog_ready
         self.calls = []
 
     def __call__(self, method, path, payload=None, **kwargs):
@@ -41,6 +42,19 @@ class FakeRequest:
                     "delivery_reference": "https://acme.test/leads",
                 }]
             raise AssertionError((parsed.path, params))
+
+        if path == "/rest/v1/rpc/get_commercial_product_readiness":
+            if self.catalog_ready:
+                return {
+                    "exists": True,
+                    "binding_terms_ready": True,
+                    "blockers": [],
+                }
+            return {
+                "exists": True,
+                "binding_terms_ready": False,
+                "blockers": ["acquisition_cost_basis_unverified"],
+            }
 
         if path == "/rest/v1/rpc/get_verified_terms_evidence":
             return {
@@ -107,6 +121,32 @@ def test_materializer_blocks_when_verified_price_is_missing():
     assert result.proposed == 0
     assert result.blocked == 1
     assert dict(result.blocker_counts)["verified_price_missing"] == 1
+    assert not any(
+        path == "/rest/v1/rpc/propose_commercial_terms"
+        for method, path, _ in request.calls
+        if method == "POST"
+    )
+
+
+def test_materializer_blocks_when_catalog_economics_are_unverified():
+    request = FakeRequest(catalog_ready=False)
+    result = run_commercial_terms_materializer(request)
+
+    assert result.scanned == 1
+    assert result.ready == 0
+    assert result.proposed == 0
+    assert result.blocked == 1
+    assert (
+        dict(result.blocker_counts)[
+            "catalog_acquisition_cost_basis_unverified"
+        ]
+        == 1
+    )
+    assert not any(
+        path == "/rest/v1/rpc/get_verified_terms_evidence"
+        for method, path, _ in request.calls
+        if method == "POST"
+    )
     assert not any(
         path == "/rest/v1/rpc/propose_commercial_terms"
         for method, path, _ in request.calls
