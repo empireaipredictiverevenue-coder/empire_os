@@ -7,7 +7,7 @@ from empire_os.gtm_pipeline_worker import (
 )
 
 
-NOW = datetime(2026, 9, 20, 16, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 21, 16, 0, tzinfo=timezone.utc)
 
 
 def review(review_id="00000000-0000-0000-0000-000000000001"):
@@ -19,7 +19,7 @@ def review(review_id="00000000-0000-0000-0000-000000000001"):
         "evidence": {
             "business_name": "Kihle Roofing",
             "niche": "roofing",
-            "metro": "Wichita",
+            "metro": "Wichita, KS",
             "review_ready": True,
             "outreach_ready": True,
             "rating": 4.8,
@@ -30,7 +30,7 @@ def review(review_id="00000000-0000-0000-0000-000000000001"):
 
 def test_build_outbound_payload_is_compliant_and_evidence_safe():
     payload = build_outbound_payload(review(), now=NOW)
-    assert payload["p_subject"] == "Clay — one thing I noticed in Wichita"
+    assert payload["p_subject"] == "Clay — one thing I noticed in Wichita, KS"
     assert POSTAL_ADDRESS in payload["p_body_text"]
     assert "opt out" in payload["p_body_text"].lower()
     assert "Kihle Roofing" in payload["p_body_text"]
@@ -38,7 +38,7 @@ def test_build_outbound_payload_is_compliant_and_evidence_safe():
     assert payload["p_metadata"]["conversation_quality"] == "v2"
     assert "revenue" not in payload["p_metadata"]
     assert payload["p_proposed_by"] == "empire_gtm_agent_v1"
-    assert payload["p_expires_at"].startswith("2026-09-23T16:00:00")
+    assert payload["p_expires_at"].startswith("2026-09-24T16:00:00")
 
 
 def test_pipeline_auto_reviews_then_proposes_only_ready_reviews():
@@ -258,3 +258,58 @@ def test_missing_specific_proof_is_deferred_not_service_error():
     assert result.outreach_deferred == 1
     assert result.proposal_errors == ()
     assert "specific outreach evidence required" in result.deferred_reasons[0]
+
+
+
+def test_gtm_metadata_carries_recipient_locale_and_local_time():
+    payload = build_outbound_payload(review(), now=NOW)
+    meta = payload["p_metadata"]
+    assert meta["recipient_locale"]["country_code"] == "US"
+    assert meta["recipient_locale"]["timezone"] == "America/Chicago"
+    assert meta["outreach_language"] == "en-US"
+    assert meta["recipient_local_timing"]["eligible"] is True
+
+
+def test_gtm_defers_when_recipient_is_outside_local_contact_window():
+    row = review("00000000-0000-0000-0000-000000000061")
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            return []
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return [row]
+        if path.endswith("propose_reviewed_outbound_intent"):
+            raise AssertionError("out-of-hours intent must not be proposed")
+        raise AssertionError((method, path))
+
+    # 11:00 UTC = 06:00 in Wichita in September.
+    result = run_gtm_pipeline(
+        request,
+        now=datetime(2026, 9, 21, 11, 0, tzinfo=timezone.utc),
+    )
+    assert result.intents_proposed == 0
+    assert result.outreach_deferred == 1
+    assert "outside_recipient_local_contact_window" in result.deferred_reasons[0]
+
+
+def test_gtm_defers_multilingual_country_without_explicit_language():
+    row = review("00000000-0000-0000-0000-000000000062")
+    row["evidence"]["metro"] = "Toronto, ON"
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            return []
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return [row]
+        if path.endswith("propose_reviewed_outbound_intent"):
+            raise AssertionError("language-unresolved intent must not be proposed")
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+    assert result.intents_proposed == 0
+    assert result.outreach_deferred == 1
+    assert "recipient outreach language unresolved" in result.deferred_reasons[0]

@@ -13,6 +13,7 @@ from uuid import UUID
 from urllib.parse import urlparse
 
 from empire_os.buyer_allocation import buyer_activation_decision
+from empire_os.locale_intelligence import resolve_locale
 from empire_os.search_fabric.verification import is_directory_url
 
 ECONOMIC_BUYER_TERMS = (
@@ -242,6 +243,24 @@ def build_candidate(record: Mapping[str, Any], *, entity_id: str | None = None,
     offer = choose_offer(record, role)
     raw_website = _text(record.get("website"))
     first_party_website, website_source = _candidate_website(record)
+    acquisition_evidence = record.get("_acquisition_evidence")
+    acquisition_evidence = (
+        acquisition_evidence
+        if isinstance(acquisition_evidence, Mapping)
+        else {}
+    )
+    existing_locale = acquisition_evidence.get("locale")
+    locale_input = (
+        dict(existing_locale)
+        if isinstance(existing_locale, Mapping)
+        else {}
+    )
+    locale_input.setdefault("metro", _text(record.get("metro")))
+    locale_input.setdefault(
+        "state",
+        _text(record.get("state") or acquisition_evidence.get("state")),
+    )
+    locale = resolve_locale(locale_input)
     return BuyerCandidate(
         prospect_id=_text(record.get("id")),
         entity_id=_text(entity_id) or None,
@@ -272,6 +291,7 @@ def build_candidate(record: Mapping[str, Any], *, entity_id: str | None = None,
             "has_named_contact": valid_person,
             "raw_contact_name_present": bool(_text(record.get("contact_name"))),
             "contact_personhood_valid": valid_person,
+            "locale": locale.as_dict(),
         },
     )
 

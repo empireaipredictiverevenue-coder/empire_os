@@ -21,6 +21,8 @@ import re
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+from empire_os.locale_intelligence import resolve_locale
+
 
 class ProspectIngestError(ValueError):
     """Candidate cannot safely enter canonical prospect ingest."""
@@ -136,6 +138,10 @@ def prepare_candidate(candidate: Any) -> dict[str, Any]:
             "niche",
             "metro",
             "state",
+            "country_code",
+            "language_code",
+            "source_language",
+            "timezone",
             "details",
             "source",
             "lead_score",
@@ -175,6 +181,7 @@ def prepare_candidate(candidate: Any) -> dict[str, Any]:
     details = _text(data.get("details"))
     email = _text(data.get("email"))
     state = _text(data.get("state"))
+    locale = resolve_locale(data)
 
     try:
         lead_score = int(
@@ -222,6 +229,7 @@ def prepare_candidate(candidate: Any) -> dict[str, Any]:
         "state": state,
         "details": details,
         "raw": data.get("raw"),
+        "locale": locale.as_dict(),
     }
 
     # Deliberately absent:

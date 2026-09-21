@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.locale_intelligence import resolve_locale
+
 ROOT = Path("/srv/empire_os/runtime/acquisition")
 INBOX = ROOT / "signal_inbox.json"
 LOCK = ROOT / "signal_inbox.lock"
@@ -34,6 +36,7 @@ def _data(candidate: Any) -> dict[str, Any]:
         key: getattr(candidate, key, None)
         for key in (
             "name", "email", "phone", "niche", "metro", "state",
+            "country_code", "language_code", "source_language", "timezone",
             "details", "source", "lead_score", "url", "raw",
         )
     }
@@ -70,6 +73,7 @@ def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
     ROOT.mkdir(parents=True, exist_ok=True)
     LOCK.touch(exist_ok=True)
     row = _data(candidate)
+    locale = resolve_locale(row)
     fp = _fingerprint(row)
 
     with LOCK.open("r+") as handle:
@@ -105,6 +109,7 @@ def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
                     "details": str(row.get("details") or "").strip(),
                     "lead_score": row.get("lead_score"),
                     "raw": row.get("raw"),
+                    "locale": locale.as_dict(),
                     "quality": q,
                     "entity_id": None,
                     "prospect_id": None,
@@ -129,6 +134,7 @@ def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
         "signal_id": fp,
         "status": record.get("status"),
         "source": record.get("source"),
+        "locale": record.get("locale"),
         "execution_authority": "none",
     }
 

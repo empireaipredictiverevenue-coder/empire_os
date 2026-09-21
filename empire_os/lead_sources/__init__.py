@@ -25,6 +25,10 @@ class LeadCandidate:
     niche: str = ""
     metro: str = ""
     state: str = ""
+    country_code: str = ""
+    language_code: str = ""
+    source_language: str = ""
+    timezone: str = ""
     details: str = ""
     source: str = ""
     lead_score: int = 50

@@ -161,6 +161,9 @@ def run_source_safe(src, metro, dry_run, max_candidates=None):
                         quality_confidence=quality.confidence,
                         entity_kind=quality.entity_kind,
                         source_role=quality.source_role,
+                        country_code=((signal.get("locale") or {}).get("country_code")),
+                        language_code=((signal.get("locale") or {}).get("language_code")),
+                        timezone=((signal.get("locale") or {}).get("timezone")),
                     )
                     continue
                 log(
@@ -223,6 +226,10 @@ def run_source_safe(src, metro, dry_run, max_candidates=None):
                 if isinstance(prospect, dict)
                 else result.get("prospect_id")
             )
+            locale = (
+                (prepare_candidate(cand).get("evidence") or {}).get("locale")
+                or {}
+            )
             log(
                 "CANONICAL",
                 "prospect_acquired",
@@ -230,6 +237,9 @@ def run_source_safe(src, metro, dry_run, max_candidates=None):
                 name=cand.name[:40],
                 decision=decision,
                 prospect_id=prospect_id,
+                country_code=locale.get("country_code"),
+                language_code=locale.get("language_code"),
+                timezone=locale.get("timezone"),
             )
 
     except Exception as exc:

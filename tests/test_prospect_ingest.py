@@ -654,3 +654,35 @@ def test_prospect_identity_keys_fall_back_to_name_metro():
     assert prospect_identity_keys(prepared) == [
         "name_metro:acme roofing llc|austin"
     ]
+
+
+def test_prepare_candidate_attaches_locale_evidence():
+    result = prepare_candidate(
+        {
+            "name": "Example Roofing",
+            "niche": "roofing",
+            "metro": "Dallas, TX",
+            "source": "overpass_osm",
+        }
+    )
+    locale = result["evidence"]["locale"]
+    assert locale["country_code"] == "US"
+    assert locale["language_code"] == "en-US"
+    assert locale["timezone"] == "America/Chicago"
+    assert locale["currency"] == "USD"
+    assert locale["execution_authority"] == "none"
+
+
+def test_prepare_candidate_preserves_unknown_locale():
+    result = prepare_candidate(
+        {
+            "name": "Unknown Geo Co",
+            "niche": "roofing",
+            "metro": "Springfield",
+            "source": "business_search",
+        }
+    )
+    locale = result["evidence"]["locale"]
+    assert locale["country_code"] is None
+    assert locale["language_code"] is None
+    assert locale["timezone"] is None

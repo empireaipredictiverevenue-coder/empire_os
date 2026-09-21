@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 
 from empire_os.conversation_value import build_first_touch_copy
 from empire_os.buyer_discovery import looks_like_person_name
+from empire_os.locale_intelligence import contact_window_status, resolve_locale
 
 POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
 
@@ -45,6 +46,14 @@ Request = Callable[..., Any]
 def _first_name(value: Any) -> str:
     clean = str(value or "").strip()
     return clean.split()[0] if clean else ""
+
+
+def _locale_for_evidence(evidence: Mapping[str, Any]):
+    raw = evidence.get("locale")
+    locale_input = dict(raw) if isinstance(raw, Mapping) else {}
+    locale_input.setdefault("metro", str(evidence.get("metro") or "").strip())
+    locale_input.setdefault("state", str(evidence.get("state") or "").strip())
+    return resolve_locale(locale_input)
 
 
 def _required_context(evidence: Mapping[str, Any]) -> tuple[str, str, str]:
@@ -125,6 +134,15 @@ def build_outbound_payload(
     if not first:
         raise ValueError("outbound contact name required")
     business, niche, metro = _required_context(evidence)
+    locale = _locale_for_evidence(evidence)
+    if not locale.outreach_language:
+        raise ValueError("recipient outreach language unresolved")
+    timing = contact_window_status(locale, now=now)
+    if timing["eligible"] is not True:
+        raise ValueError(
+            f"{timing['reason']}; next_eligible_utc="
+            f"{timing.get('next_eligible_utc')}"
+        )
 
     copy = build_first_touch_copy(review, now=now)
     subject = copy.subject
@@ -151,6 +169,9 @@ def build_outbound_payload(
             "why_now_summary": copy.why_now_summary,
             "why_now_evidence_ref": copy.why_now_evidence_ref,
             "specific_proof": copy.specific_proof,
+            "recipient_locale": locale.as_dict(),
+            "recipient_local_timing": timing,
+            "outreach_language": locale.outreach_language,
         },
     }
 
@@ -237,6 +258,11 @@ def run_gtm_pipeline(
                 "specific outreach evidence required" in message
                 or "verified person contact required" in message
                 or "outbound personalization evidence missing" in message
+                or "recipient outreach language unresolved" in message
+                or "recipient_timezone_unresolved" in message
+                or "recipient_timezone_invalid" in message
+                or "outside_recipient_local_contact_window" in message
+                or "recipient_local_weekend" in message
             ):
                 deferred += 1
                 deferred_reasons.append(f"{review_id}:{message[:180]}")
