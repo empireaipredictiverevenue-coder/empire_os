@@ -1,7 +1,7 @@
 [Unit]
 Description=EmpireOS Native Ops MCP
-After=network-online.target
-Wants=network-online.target
+After=network-online.target empire-ops-privileged-helper.service
+Wants=network-online.target empire-ops-privileged-helper.service
 
 [Service]
 Type=simple
