@@ -60,6 +60,12 @@ class FakeRpc:
                 "fulfilment_order_id": "00000000-0000-0000-0000-000000000006",
                 "state": "qualified",
             }
+        if name == "propose_commercial_evidence":
+            return {
+                "decision": "proposed",
+                "evidence_id": "00000000-0000-0000-0000-000000000007",
+                "status": "pending",
+            }
         if name == "record_closer_recommendation":
             return {
                 "decision": "recorded",
@@ -199,3 +205,85 @@ def test_complete_capacity_reply_prepares_nonbinding_order_shell():
     assert capacity["p_territory"] == "Austin and Round Rock"
     assert capacity["p_daily_cap"] == 10
     assert capacity["p_delivery_route"] == "webhook"
+
+
+def test_literal_buyer_price_creates_pending_evidence_proposal_only():
+    class PriceRpc(FakeRpc):
+        def __call__(self, name, params):
+            if name == "get_closer_reply_context":
+                self.calls.append((name, params))
+                return {
+                    "case_id": params["p_case_id"],
+                    "classification": "positive",
+                    "reply_body_text": (
+                        "We cover Austin. We can handle 10 leads per day. "
+                        "We pay $75 per lead. "
+                        "Email leads to ops@acme.test."
+                    ),
+                    "received_at": "2026-09-21T18:00:00+00:00",
+                    "buyer_id": "00000000-0000-0000-0000-000000000004",
+                    "root_subject": "Roofing opportunities",
+                    "business_name": "Acme Roofing",
+                    "niche": "roofing",
+                    "metro": "Austin",
+                    "contact_name": "Jane Smith",
+                }
+            return super().__call__(name, params)
+
+    rpc = PriceRpc([{
+        "reply_id": "00000000-0000-0000-0000-000000000031",
+        "classification": "positive",
+        "confidence": 0.95,
+        "case_id": "00000000-0000-0000-0000-000000000010",
+        "case_origin": "threaded",
+    }])
+    result = run_closer_reply_worker(rpc)
+    assert result.commercial_evidence_proposed == 1
+    proposal = next(
+        params for name, params in rpc.calls
+        if name == "propose_commercial_evidence"
+    )
+    assert proposal["p_evidence_kind"] == "price"
+    assert proposal["p_amount_cents"] == 7500
+    assert proposal["p_unit"] == "per_lead"
+    assert proposal["p_source_type"] == "buyer_stated"
+    assert proposal["p_source_reference"].endswith(":price")
+    assert proposal["p_evidence"]["reply_id"].endswith("0031")
+    assert proposal["p_evidence"]["binding"] is False
+    assert proposal["p_valid_until"] is None
+
+
+def test_ambiguous_buyer_prices_do_not_propose_evidence():
+    class AmbiguousPriceRpc(FakeRpc):
+        def __call__(self, name, params):
+            if name == "get_closer_reply_context":
+                self.calls.append((name, params))
+                return {
+                    "case_id": params["p_case_id"],
+                    "classification": "positive",
+                    "reply_body_text": (
+                        "We pay $70 per lead for one service and "
+                        "$90 per lead for another."
+                    ),
+                    "received_at": "2026-09-21T18:00:00+00:00",
+                    "buyer_id": "00000000-0000-0000-0000-000000000004",
+                    "root_subject": "Roofing opportunities",
+                    "business_name": "Acme Roofing",
+                    "niche": "roofing",
+                    "metro": "Austin",
+                    "contact_name": "Jane Smith",
+                }
+            return super().__call__(name, params)
+
+    rpc = AmbiguousPriceRpc([{
+        "reply_id": "00000000-0000-0000-0000-000000000041",
+        "classification": "positive",
+        "confidence": 0.95,
+        "case_id": "00000000-0000-0000-0000-000000000010",
+    }])
+    result = run_closer_reply_worker(rpc)
+    assert result.commercial_evidence_proposed == 0
+    assert not any(
+        name == "propose_commercial_evidence"
+        for name, _params in rpc.calls
+    )

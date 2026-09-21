@@ -7,6 +7,7 @@ from typing import Any, Callable, Mapping
 
 from empire_os.closer_reply_draft import build_closer_reply
 from empire_os.buyer_capacity_intake import parse_buyer_capacity_reply
+from empire_os.buyer_commercial_terms_intake import parse_buyer_stated_price
 
 COMMERCIAL_CLASSES = {
     "positive": "qualify",
@@ -25,6 +26,7 @@ class CloserReplyWorkerResult:
     existing_cases_reused: int
     capacity_intakes_recorded: int
     fulfilment_orders_prepared: int
+    commercial_evidence_proposed: int
     skipped_existing: int
     errors: tuple[str, ...]
 
@@ -38,6 +40,7 @@ class CloserReplyWorkerResult:
             "existing_cases_reused": self.existing_cases_reused,
             "capacity_intakes_recorded": self.capacity_intakes_recorded,
             "fulfilment_orders_prepared": self.fulfilment_orders_prepared,
+            "commercial_evidence_proposed": self.commercial_evidence_proposed,
             "skipped_existing": self.skipped_existing,
             "errors": list(self.errors),
             "actual_revenue": False,
@@ -68,7 +71,7 @@ def run_closer_reply_worker(
         raise ValueError("closer work projection must be a list")
 
     opened = recorded = provisioned = replies_proposed = reused = skipped = 0
-    capacity_recorded = orders_prepared = 0
+    capacity_recorded = orders_prepared = commercial_evidence = 0
     errors: list[str] = []
 
     for row in rows:
@@ -108,9 +111,12 @@ def run_closer_reply_worker(
                 {"p_case_id": case_id, "p_reply_id": reply_id},
             ) or {}
 
-            capacity = parse_buyer_capacity_reply(
-                str(context.get("reply_body_text") or "")
-            )
+            reply_body = str(context.get("reply_body_text") or "")
+            capacity = parse_buyer_capacity_reply(reply_body)
+            stated_price = parse_buyer_stated_price(reply_body)
+            fulfilment_order_id = str(
+                context.get("fulfilment_order_id") or ""
+            ).strip() or None
             if capacity["has_explicit_capacity_evidence"]:
                 capacity_result = rpc(
                     "record_buyer_capacity_intake",
@@ -137,10 +143,54 @@ def run_closer_reply_worker(
                     ) or {}
                     if str(order_result.get("decision") or "") == "prepared":
                         orders_prepared += 1
+                    fulfilment_order_id = str(
+                        order_result.get("fulfilment_order_id") or ""
+                    ).strip() or fulfilment_order_id
                     context = {
                         **context,
                         "capacity_intake_state": "complete",
+                        "fulfilment_order_id": fulfilment_order_id,
                     }
+
+            if stated_price["has_explicit_price_evidence"]:
+                buyer_id = str(
+                    context.get("buyer_id")
+                    or (buyer_result or {}).get("buyer_id")
+                    or ""
+                ).strip()
+                niche = str(context.get("niche") or "").strip()
+                metro = str(context.get("metro") or "").strip()
+                received_at = str(context.get("received_at") or "").strip()
+                if not all((buyer_id, niche, metro, received_at)):
+                    raise ValueError(
+                        "buyer-stated price missing canonical binding context"
+                    )
+                price_result = rpc(
+                    "propose_commercial_evidence",
+                    {
+                        "p_evidence_kind": "price",
+                        "p_buyer_id": buyer_id,
+                        "p_closer_case_id": case_id,
+                        "p_fulfilment_order_id": fulfilment_order_id,
+                        "p_niche": niche,
+                        "p_metro": metro,
+                        "p_amount_cents": stated_price["amount_cents"],
+                        "p_unit": stated_price["unit"],
+                        "p_source_type": "buyer_stated",
+                        "p_source_reference": f"reply:{reply_id}:price",
+                        "p_evidence": {
+                            **stated_price["evidence"],
+                            "reply_id": reply_id,
+                        },
+                        "p_observed_at": received_at,
+                        "p_valid_until": None,
+                    },
+                ) or {}
+                if str(price_result.get("decision") or "") in {
+                    "proposed",
+                    "existing",
+                }:
+                    commercial_evidence += 1
 
             draft = build_closer_reply(context)
 
@@ -193,6 +243,7 @@ def run_closer_reply_worker(
         existing_cases_reused=reused,
         capacity_intakes_recorded=capacity_recorded,
         fulfilment_orders_prepared=orders_prepared,
+        commercial_evidence_proposed=commercial_evidence,
         skipped_existing=skipped,
         errors=tuple(errors),
     )

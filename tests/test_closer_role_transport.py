@@ -105,6 +105,21 @@ def test_planner_can_open_and_record_but_not_approve():
         "p_case_id": "00000000-0000-0000-0000-000000000002",
         "p_actor": "empire_closer_planner",
     })
+    rpc("propose_commercial_evidence", {
+        "p_evidence_kind": "price",
+        "p_buyer_id": "00000000-0000-0000-0000-000000000004",
+        "p_closer_case_id": "00000000-0000-0000-0000-000000000002",
+        "p_fulfilment_order_id": None,
+        "p_niche": "roofing",
+        "p_metro": "Austin",
+        "p_amount_cents": 7500,
+        "p_unit": "per_lead",
+        "p_source_type": "buyer_stated",
+        "p_source_reference": "reply:r1:price",
+        "p_evidence": {"reply_id": "r1"},
+        "p_observed_at": "2026-09-21T18:00:00+00:00",
+        "p_valid_until": None,
+    })
     rpc("record_closer_recommendation", {
         "p_case_id": "00000000-0000-0000-0000-000000000002",
         "p_type": "qualify",
@@ -116,6 +131,8 @@ def test_planner_can_open_and_record_but_not_approve():
     assert json.loads(factory.cursor.calls[-1][1][3]) == {
         "classification": "positive"
     }
+    with pytest.raises(CloserTransportError, match="not allowed"):
+        rpc("verify_commercial_evidence", {})
     with pytest.raises(CloserTransportError, match="not allowed"):
         rpc("advance_closer_case", {})
 

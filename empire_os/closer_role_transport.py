@@ -64,6 +64,25 @@ ROLE_FUNCTIONS = {
             "select public.prepare_fulfilment_order_from_capacity(%s,%s)",
             ("p_case_id", "p_actor"),
         ),
+        "propose_commercial_evidence": (
+            "select public.propose_commercial_evidence("
+            "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s)",
+            (
+                "p_evidence_kind",
+                "p_buyer_id",
+                "p_closer_case_id",
+                "p_fulfilment_order_id",
+                "p_niche",
+                "p_metro",
+                "p_amount_cents",
+                "p_unit",
+                "p_source_type",
+                "p_source_reference",
+                "p_evidence",
+                "p_observed_at",
+                "p_valid_until",
+            ),
+        ),
         "record_closer_recommendation": (
             "select public.record_closer_recommendation(%s,%s,%s,%s::jsonb,%s,%s)",
             (
@@ -130,7 +149,7 @@ class PostgresCloserRpc:
         values: list[Any] = []
         for key in keys:
             value = params[key]
-            if key == "p_rationale":
+            if key in {"p_rationale", "p_evidence"}:
                 value = json.dumps(
                     value or {},
                     separators=(",", ":"),
