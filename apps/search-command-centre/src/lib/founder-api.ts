@@ -292,9 +292,21 @@ export type FounderDailyResults = {
   buyer_review?: Record<string, unknown>;
   intent_and_pain?: {
     observations?: number | null;
+    new_observations?: number | null;
     high_intent?: number | null;
     medium_intent?: number | null;
     by_source?: Record<string, number>;
+    source_status?: Record<
+      string,
+      {
+        ok?: boolean | null;
+        status_code?: number | null;
+        engine?: string | null;
+        reason?: string | null;
+        error?: string | null;
+        accepted_observations?: number | null;
+      }
+    >;
     pain_points?: Record<string, number>;
     opportunity_routes?: number | null;
   };

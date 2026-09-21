@@ -25,16 +25,16 @@ HISTORY = ROOT / "runtime/community_intent/observations.json"
 # The 15-minute timer rotates the search so we do not hammer providers.
 REDDIT_ROTATION = (
     ("sales", "lead generation", "b2b", "online"),
-    ("smallbusiness", "marketing leads", "b2b", "online"),
-    ("Entrepreneur", "sales automation", "b2b", "online"),
-    ("marketing", "lead generation", "b2b", "online"),
-    ("SEO", "seo leads", "search", "online"),
+    ("sales", "sales pipeline", "b2b", "online"),
+    ("sales", "follow up", "b2b", "online"),
+    ("sales", "sales automation", "b2b", "online"),
+    ("smallbusiness", "lead generation", "b2b", "online"),
     ("Roofing", "roofing leads", "roofing", "DFW"),
 )
 
 LINKEDIN_ROTATION = (
-    ('"struggling with" sales pipeline', "b2b", "online"),
     ('"looking for" sales automation', "b2b", "online"),
+    ('"struggling with" sales pipeline', "b2b", "online"),
     ('"need" lead generation', "b2b", "online"),
     ('"looking for" SEO help', "search", "online"),
     ('"manual" follow up leads', "b2b", "online"),
@@ -139,7 +139,7 @@ def _collect_linkedin(
 ) -> tuple[list[IntentObservation], dict]:
     payload = search(
         f"site:linkedin.com/posts {query}",
-        num=8,
+        num=5,
     )
     engine = (payload.get("searchParameters") or {}).get("engine")
     error = payload.get("error")
@@ -170,8 +170,14 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     slot = int(now.timestamp() // (15 * 60))
 
+    # Reddit RSS is currently most reliable on r/sales. Keep the primary
+    # collector stable while LinkedIn rotates; specialist Reddit lanes can be
+    # added after sustained source-health evidence.
     subreddit, reddit_query, reddit_niche, reddit_metro = (
-        REDDIT_ROTATION[slot % len(REDDIT_ROTATION)]
+        "sales",
+        "lead generation",
+        "b2b",
+        "online",
     )
     reddit = collect_reddit_rss_intent(
         subreddit=subreddit,

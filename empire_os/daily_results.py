@@ -165,9 +165,11 @@ def build_daily_results(
         },
         "intent_and_pain": {
             "observations": intent.get("observations"),
+            "new_observations": intent.get("new_observations"),
             "high_intent": intent.get("high_intent"),
             "medium_intent": intent.get("medium_intent"),
             "by_source": intent.get("by_source"),
+            "source_status": intent.get("source_status"),
             "pain_points": intent.get("pain_points"),
             "opportunity_routes": len(intent.get("control_fabric_routes") or []),
         },

@@ -378,6 +378,14 @@ export default async function FounderPage() {
                   value={int(daily?.intent_and_pain?.high_intent)}
                 />
                 <Evidence
+                  label="Reddit source"
+                  value={truth(daily?.intent_and_pain?.source_status?.reddit?.ok)}
+                />
+                <Evidence
+                  label="LinkedIn source"
+                  value={truth(daily?.intent_and_pain?.source_status?.linkedin?.ok)}
+                />
+                <Evidence
                   label="Coder running"
                   value={int(daily?.coder?.running)}
                 />
