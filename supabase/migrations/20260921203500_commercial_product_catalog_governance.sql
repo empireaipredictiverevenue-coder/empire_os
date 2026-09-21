@@ -268,6 +268,11 @@ DECLARE
   version_row public.commercial_product_versions%ROWTYPE;
   product_row public.commercial_products%ROWTYPE;
   decision text := lower(trim(COALESCE(p_decision,'')));
+  price_cents bigint;
+  acquisition_cents bigint;
+  fulfilment_cents bigint;
+  minimum_margin_bps integer;
+  realized_margin_bps numeric;
 BEGIN
   IF decision NOT IN ('verified','rejected') THEN
     RAISE EXCEPTION 'decision must be verified or rejected';
@@ -304,10 +309,77 @@ BEGIN
        OR COALESCE(
          version_row.margin_policy->>'state','UNKNOWN'
        )<>'VERIFIED'
+       OR jsonb_typeof(version_row.price_basis->'amount_cents')<>'number'
+       OR jsonb_typeof(
+         version_row.acquisition_cost_basis->'amount_cents'
+       )<>'number'
+       OR jsonb_typeof(
+         version_row.fulfilment_cost_basis->'amount_cents'
+       )<>'number'
+       OR jsonb_typeof(
+         version_row.margin_policy->'minimum_margin_bps'
+       )<>'number'
+       OR trim(COALESCE(version_row.price_basis->>'unit',''))=''
+       OR trim(COALESCE(
+         version_row.acquisition_cost_basis->>'unit',''
+       ))=''
+       OR trim(COALESCE(
+         version_row.fulfilment_cost_basis->>'unit',''
+       ))=''
        OR jsonb_typeof(version_row.evidence_refs)<>'array'
        OR jsonb_array_length(version_row.evidence_refs)=0 THEN
       RAISE EXCEPTION
         'verified evidence-backed price/cost/margin basis required';
+    END IF;
+
+    price_cents := (version_row.price_basis->>'amount_cents')::bigint;
+    acquisition_cents := (
+      version_row.acquisition_cost_basis->>'amount_cents'
+    )::bigint;
+    fulfilment_cents := (
+      version_row.fulfilment_cost_basis->>'amount_cents'
+    )::bigint;
+    minimum_margin_bps := (
+      version_row.margin_policy->>'minimum_margin_bps'
+    )::integer;
+
+    IF price_cents <= 0
+       OR acquisition_cents < 0
+       OR fulfilment_cents < 0
+       OR minimum_margin_bps < 0
+       OR minimum_margin_bps > 10000 THEN
+      RAISE EXCEPTION 'invalid verified product economics';
+    END IF;
+
+    IF lower(version_row.price_basis->>'unit')
+       <> lower(version_row.acquisition_cost_basis->>'unit')
+       OR lower(version_row.price_basis->>'unit')
+       <> lower(version_row.fulfilment_cost_basis->>'unit') THEN
+      RAISE EXCEPTION 'price and cost units must match';
+    END IF;
+
+    IF upper(COALESCE(version_row.price_basis->>'currency',''))
+       <> upper(version_row.currency)
+       OR upper(COALESCE(
+         version_row.acquisition_cost_basis->>'currency',''
+       )) <> upper(version_row.currency)
+       OR upper(COALESCE(
+         version_row.fulfilment_cost_basis->>'currency',''
+       )) <> upper(version_row.currency) THEN
+      RAISE EXCEPTION 'price and cost currency must match catalog currency';
+    END IF;
+
+    IF price_cents <= acquisition_cents + fulfilment_cents THEN
+      RAISE EXCEPTION 'verified product economics require positive margin';
+    END IF;
+
+    realized_margin_bps := (
+      (price_cents - acquisition_cents - fulfilment_cents)::numeric
+      * 10000
+      / price_cents::numeric
+    );
+    IF realized_margin_bps < minimum_margin_bps THEN
+      RAISE EXCEPTION 'verified product economics miss minimum margin policy';
     END IF;
 
     UPDATE public.commercial_product_versions
