@@ -10,6 +10,8 @@ def evidence(**overrides):
         "fulfilment_order_id": "order-1",
         "buyer_id": "buyer-1",
         "prospect_id": "prospect-1",
+        "product_id": "product-1",
+        "product_code": "managed_service",
         "order_state": "qualified",
         "buyer_conversation_observed": True,
         "capacity_intake_state": "complete",
@@ -33,6 +35,9 @@ def test_ready_packet_preserves_canonical_settlement_and_margin():
     assert review.ready_for_terms_proposal is True
     assert review.blockers == ()
     assert review.expected_margin_cents == 8000
+    assert review.terms_packet["product_id"] == "product-1"
+    assert review.terms_packet["product_code"] == "managed_service"
+    assert "commercial_product:product-1" in review.evidence_refs
     assert review.terms_packet["currency"] == "USD"
     assert review.terms_packet["settlement_asset"] == "USDT"
     assert review.terms_packet["settlement_chain"] == "BSC"
