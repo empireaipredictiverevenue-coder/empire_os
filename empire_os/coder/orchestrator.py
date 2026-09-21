@@ -208,6 +208,7 @@ class EmpireCoder:
             num_threads=8,
             timeout_seconds=timeout_seconds,
             context_length=context_length,
+            lock_path=self.runtime_root / "ollama.lock",
         )
         local_models: tuple[str, ...] = ()
         if ollama.health():

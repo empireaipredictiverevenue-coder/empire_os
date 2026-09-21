@@ -74,3 +74,26 @@ def test_ollama_provider_caps_prompt_and_prediction():
     assert payload["options"]["num_thread"] == 8
     assert payload["think"] is False
     assert "BLUEPRINT_V6.md" in payload["messages"][0]["content"]
+
+
+def test_ollama_provider_uses_shared_inference_lock(tmp_path):
+    body = json.dumps({
+        "message": {"content": "locked"},
+        "prompt_eval_count": 1,
+        "eval_count": 1,
+    }).encode()
+    lock_path = tmp_path / "ollama.lock"
+    provider = OllamaProvider(lock_path=lock_path)
+    req = ModelRequest(
+        task_id="coder_lock",
+        instruction="Inspect",
+        context=ContextPack("goal", {}, (), (), 1000),
+        route=ModelRoute("ollama", "qwen2.5-coder:7b", "local", True, 0),
+    )
+    with patch(
+        "empire_os.coder.ollama_provider.request.urlopen",
+        return_value=FakeResponse(body),
+    ):
+        result = provider.complete(req)
+    assert result.text == "locked"
+    assert lock_path.exists()

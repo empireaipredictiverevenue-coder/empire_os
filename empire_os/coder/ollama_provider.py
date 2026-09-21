@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import fcntl
 from urllib import error, request
+from pathlib import Path
+from contextlib import contextmanager
 
 from .provider import ModelRequest, ModelResponse
 
@@ -18,12 +21,28 @@ class OllamaProvider:
         context_length: int = 16384,
         num_threads: int | None = None,
         think: bool = False,
+        lock_path: str | Path | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.context_length = max(4096, min(int(context_length), 65536))
         self.num_threads = num_threads
         self.think = bool(think)
+        self.lock_path = Path(lock_path).resolve() if lock_path else None
+
+    @contextmanager
+    def _inference_lease(self):
+        if self.lock_path is None:
+            yield
+            return
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        self.lock_path.touch(exist_ok=True)
+        with self.lock_path.open("r+") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def complete(self, model_request: ModelRequest) -> ModelResponse:
         context = model_request.context.as_dict()
@@ -79,11 +98,12 @@ class OllamaProvider:
             method="POST",
         )
         try:
-            with request.urlopen(
-                req,
-                timeout=self.timeout_seconds,
-            ) as response:
-                body = json.load(response)
+            with self._inference_lease():
+                with request.urlopen(
+                    req,
+                    timeout=self.timeout_seconds,
+                ) as response:
+                    body = json.load(response)
         except (error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             return ModelResponse(
                 provider=self.name,
