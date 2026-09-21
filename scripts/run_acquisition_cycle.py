@@ -186,7 +186,11 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
             "stdout_tail": stdout[-8000:],
             "stderr_tail": stderr[-4000:],
             "real_data_only": True,
-            "canonical_store": "supabase",
+            "canonical_store": (
+                "supabase" if prospect_acquired else "runtime_signal_inbox"
+            ),
+            "prospect_canonical_write": prospect_acquired,
+            "signal_inbox_write": signal_queued,
             "outreach_enabled": False,
             "payment_enabled": False,
         }
@@ -208,7 +212,14 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
                         "country_code": selected_market.country_code,
                         "language_code": selected_market.language_code,
                         "timezone": selected_market.timezone,
-                        "canonical_writes": True,
+                        "canonical_writes": bool(prospect_acquired),
+                        "prospect_canonical_write": bool(prospect_acquired),
+                        "signal_inbox_write": bool(signal_queued),
+                        "write_store": (
+                            "supabase"
+                            if prospect_acquired
+                            else "runtime_signal_inbox"
+                        ),
                         "real_data_only": True,
                     },
                     indent=2,
