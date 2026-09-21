@@ -2,6 +2,9 @@ import Link from "next/link";
 import { connection } from "next/server";
 import {
   getFounderDashboard,
+  getFounderDataProducts,
+  getFounderIntelligenceNodes,
+  getFounderOps,
   type FounderStage,
 } from "@/lib/founder-api";
 
@@ -44,7 +47,12 @@ function operatingTone(value: string | undefined) {
 
 export default async function FounderPage() {
   await connection();
-  const result = await getFounderDashboard();
+  const [result, nodesResult, productsResult, opsResult] = await Promise.all([
+    getFounderDashboard(),
+    getFounderIntelligenceNodes(),
+    getFounderDataProducts(),
+    getFounderOps(),
+  ]);
   const data = result.data;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
@@ -54,6 +62,11 @@ export default async function FounderPage() {
   const phases = data?.phases ?? [];
   const stages = loop?.stages ?? [];
   const operating = loop?.operating_state?.class ?? "UNKNOWN";
+  const intelligenceNodes = nodesResult.data?.nodes ?? [];
+  const dataProducts = productsResult.data?.products ?? [];
+  const ops = opsResult.data;
+  const incidents = ops?.incident_manager?.diagnoses ?? [];
+  const repairPlan = ops?.sentinel?.repair_plan ?? [];
 
   return (
     <main className="min-h-screen bg-[#07100d] text-slate-100">
@@ -311,6 +324,126 @@ export default async function FounderPage() {
                 </div>
               </section>
             </div>
+
+            <div className="mt-5 grid gap-5 xl:grid-cols-[.8fr_1.2fr]">
+              <section className="panel">
+                <p className="eyebrow">System control</p>
+                <h2 className="mt-1 text-xl font-semibold text-white">
+                  Sentinel · Incident Manager
+                </h2>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <Evidence
+                    label="Technical health"
+                    value={truth(ops?.healthy)}
+                  />
+                  <Evidence
+                    label="Incidents"
+                    value={int(ops?.incident_manager?.incident_count)}
+                  />
+                  <Evidence
+                    label="Safe repairs queued"
+                    value={int(repairPlan.length)}
+                  />
+                  <Evidence
+                    label="Commercial blocker"
+                    value={show(ops?.business_blocker)}
+                  />
+                </div>
+                <div className="mt-5 space-y-2 border-t border-white/8 pt-4">
+                  {incidents.length ? (
+                    incidents.slice(0, 4).map((incident, index) => (
+                      <div
+                        key={String(incident.incident_key ?? index)}
+                        className="rounded-xl border border-white/8 bg-white/[0.025] p-3"
+                      >
+                        <p className="text-xs font-semibold text-slate-200">
+                          {show(incident.label).replaceAll("_", " ")}
+                        </p>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          {show(incident.playbook).replaceAll("_", " ")}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      No active incident diagnosis observed.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              <section className="panel">
+                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
+                  <div>
+                    <p className="eyebrow">Intelligence Fabric</p>
+                    <h2 className="mt-1 text-xl font-semibold text-white">
+                      Intelligence Nodes
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    {int(nodesResult.data?.node_count)} catalogued nodes
+                  </p>
+                </div>
+                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {intelligenceNodes.map((node) => (
+                    <div
+                      key={node.key}
+                      className="rounded-2xl border border-white/8 bg-white/[0.025] p-4"
+                    >
+                      <p className="text-sm font-semibold text-white">
+                        {node.name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {node.market.replaceAll("_", " ")}
+                      </p>
+                      <p className="mt-3 text-[11px] text-emerald-200">
+                        {node.runtime_evidence?.current_source_match
+                          ? "Current source evidence observed"
+                          : "No current-source evidence in snapshot"}
+                      </p>
+                      <p className="mt-2 text-[11px] leading-5 text-slate-600">
+                        {node.products.slice(0, 3).join(" · ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+
+            <section className="panel mt-5">
+              <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
+                <div>
+                  <p className="eyebrow">Commercial product layer</p>
+                  <h2 className="mt-1 text-xl font-semibold text-white">
+                    Sellable Intelligence Data Products
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Pricing remains unknown until verified terms exist.
+                </p>
+              </div>
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {dataProducts.map((product) => (
+                  <div
+                    key={product.key}
+                    className="rounded-2xl border border-white/8 bg-white/[0.025] p-4"
+                  >
+                    <p className="text-sm font-semibold text-white">
+                      {product.name}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {product.category.replaceAll("_", " ")}
+                    </p>
+                    <p className="mt-3 text-[11px] text-slate-400">
+                      {product.delivery_modes.join(" · ")}
+                    </p>
+                    <p className="mt-2 text-[11px] text-emerald-200">
+                      {product.commercial_model.replaceAll("_", " ")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <section className="panel mt-5">
               <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">

@@ -125,3 +125,138 @@ export async function getFounderDashboard(): Promise<FounderApiResult> {
     };
   }
 }
+
+
+export type FounderIntelligenceNode = {
+  key: string;
+  name: string;
+  market: string;
+  sensors: string[];
+  products: string[];
+  opportunity_types: string[];
+  execution_authority: string;
+  runtime_evidence?: {
+    observed_sources?: string[];
+    current_source_match?: boolean;
+    opportunity_count?: number | null;
+    revenue_cents?: number | null;
+    realized_gp_cents?: number | null;
+    counts_unknown?: boolean;
+  };
+};
+
+export type FounderIntelligenceNodes = {
+  schema_version?: string;
+  mode?: string;
+  execution_authority?: string;
+  node_count?: number;
+  current_observed_sources?: string[];
+  nodes?: FounderIntelligenceNode[];
+};
+
+export type FounderDataProduct = {
+  key: string;
+  name: string;
+  category: string;
+  source_nodes: string[];
+  deliverables: string[];
+  delivery_modes: string[];
+  required_evidence: string[];
+  compatible_usage_modes: string[];
+  commercial_model: string;
+  pricing_cents?: number | null;
+  execution_authority: string;
+};
+
+export type FounderDataProducts = {
+  schema_version?: string;
+  mode?: string;
+  execution_authority?: string;
+  products?: FounderDataProduct[];
+};
+
+export type FounderOps = {
+  available?: boolean;
+  observed_at?: string;
+  healthy?: boolean | null;
+  business_blocker?: string | null;
+  sentinel?: {
+    findings?: Array<Record<string, unknown>>;
+    repair_plan?: Array<Record<string, unknown>>;
+  };
+  healer?: {
+    proposed?: number;
+    executed?: number;
+    results?: Array<Record<string, unknown>>;
+  };
+  incident_manager?: {
+    incident_count?: number;
+    requires_escalation?: boolean;
+    diagnoses?: Array<Record<string, unknown>>;
+  };
+};
+
+export type FounderReadResult<T> = {
+  ok: boolean;
+  status: number | null;
+  data: T | null;
+  reason: string | null;
+};
+
+async function getFounderRead<T>(
+  path: string,
+): Promise<FounderReadResult<T>> {
+  const base = apiBase();
+  if (!base) {
+    return {
+      ok: false,
+      status: null,
+      data: null,
+      reason: "api_base_not_configured",
+    };
+  }
+
+  try {
+    const response = await fetch(base + path, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        data: null,
+        reason: "http_" + response.status,
+      };
+    }
+    return {
+      ok: true,
+      status: response.status,
+      data: (await response.json()) as T,
+      reason: null,
+    };
+  } catch {
+    return {
+      ok: false,
+      status: null,
+      data: null,
+      reason: "api_unreachable",
+    };
+  }
+}
+
+export function getFounderIntelligenceNodes() {
+  return getFounderRead<FounderIntelligenceNodes>(
+    "/v1/founder-intelligence-nodes",
+  );
+}
+
+export function getFounderDataProducts() {
+  return getFounderRead<FounderDataProducts>(
+    "/v1/founder-data-products",
+  );
+}
+
+export function getFounderOps() {
+  return getFounderRead<FounderOps>("/v1/founder-ops/status");
+}
