@@ -14,6 +14,7 @@ from .context import ContextBuilder, ContextPack
 from .dependencies import DependencyIndex
 from .hermes_provider import HermesProvider
 from .knowledge_garden import KnowledgeGarden
+from .llama_cpp_provider import LlamaCppProvider
 from .memory import ContextMemory
 from .model_review import DistinctModelReviewer, ModelReview
 from .models import (
@@ -218,6 +219,60 @@ class EmpireCoder:
 
         if not requested_profiles:
             default_profiles: list[ModelProfile] = []
+            llama_cpp_enabled = os.getenv(
+                "EMPIRE_CODER_LLAMA_CPP_ENABLED",
+                "false",
+            ).strip().lower() in {"1", "true", "yes", "on"}
+            if llama_cpp_enabled:
+                llama_cpp = LlamaCppProvider(
+                    base_url=os.getenv(
+                        "EMPIRE_CODER_LLAMA_CPP_URL",
+                        "http://127.0.0.1:11435",
+                    ).strip() or "http://127.0.0.1:11435",
+                    timeout_seconds=max(
+                        30,
+                        min(
+                            int(os.getenv(
+                                "EMPIRE_CODER_LLAMA_CPP_TIMEOUT_SECONDS",
+                                "180",
+                            )),
+                            600,
+                        ),
+                    ),
+                )
+                if llama_cpp.health():
+                    self.providers.register(llama_cpp)
+                    model_name = os.getenv(
+                        "EMPIRE_CODER_LLAMA_CPP_MODEL",
+                        LOCAL_FAST_PLANNER_MODEL,
+                    ).strip() or LOCAL_FAST_PLANNER_MODEL
+                    capability = max(
+                        1,
+                        min(
+                            int(os.getenv(
+                                "EMPIRE_CODER_LLAMA_CPP_CAPABILITY",
+                                "1",
+                            )),
+                            3,
+                        ),
+                    )
+                    roles = tuple(
+                        role.strip().lower()
+                        for role in os.getenv(
+                            "EMPIRE_CODER_LLAMA_CPP_ROLES",
+                            "planner",
+                        ).split(",")
+                        if role.strip().lower()
+                        in {"planner", "writer", "verifier"}
+                    ) or ("planner",)
+                    default_profiles.append(ModelProfile(
+                        "llama_cpp",
+                        model_name,
+                        capability=capability,
+                        cost_tier=0,
+                        local=True,
+                        roles=roles,
+                    ))
             hermes_enabled = os.getenv(
                 "EMPIRE_CODER_HERMES_ENABLED",
                 "false",
