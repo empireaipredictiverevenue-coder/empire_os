@@ -7,14 +7,27 @@ behind the separate root-owned helper.
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
+import os
 import uuid
 from pathlib import Path
 from typing import Any
 
+from mcp.server.auth.provider import AccessToken, TokenVerifier
+from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver import MCPServer
+from pydantic import AnyHttpUrl
 
 from empire_os.lead_sources.overpass import METRO_COORDS
+from empire_os.ops_privileged_client import (
+    PrivilegedHelperUnavailable,
+    privileged_request,
+)
+from empire_os.ops_privileged_helper import (
+    ALLOWED_UNITS as PRIVILEGED_ALLOWED_UNITS,
+    SOCKET_PATH as PRIVILEGED_SOCKET,
+)
 from empire_os.ops_core import (
     audit,
     env_key_status,
@@ -27,16 +40,58 @@ from empire_os.ops_core import (
     write_repo_file,
 )
 
-server = MCPServer(
-    name="empire_ops_mcp",
-    title="Empire Ops MCP",
-    description="Audited server-native operations for EmpireOS.",
-    version="0.1.0",
-    instructions=(
-        "Operate only within the EmpireOS repository and explicit allowlists. "
-        "Never treat tool output as commercial truth unless backed by canonical evidence."
-    ),
-)
+class StaticOpsTokenVerifier(TokenVerifier):
+    def __init__(self, token: str, resource: str) -> None:
+        self._token = token
+        self._resource = resource
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if not hmac.compare_digest(str(token), self._token):
+            return None
+        return AccessToken(
+            token=token,
+            client_id="empire-ops-client",
+            scopes=["empire:ops"],
+            resource=self._resource,
+        )
+
+
+def _build_server() -> MCPServer:
+    common = {
+        "name": "empire_ops_mcp",
+        "title": "Empire Ops MCP",
+        "description": "Audited server-native operations for EmpireOS.",
+        "version": "0.2.0",
+        "instructions": (
+            "Operate only within the EmpireOS repository and explicit allowlists. "
+            "Never treat tool output as commercial truth unless backed by canonical evidence."
+        ),
+    }
+    token = os.getenv("EMPIRE_OPS_MCP_BEARER_TOKEN", "").strip()
+    if not token:
+        return MCPServer(**common)
+
+    resource = os.getenv(
+        "EMPIRE_OPS_MCP_RESOURCE_URL",
+        "http://127.0.0.1:8765/mcp",
+    ).strip()
+    issuer = os.getenv(
+        "EMPIRE_OPS_MCP_ISSUER_URL",
+        "https://empire-ai.co.uk",
+    ).strip()
+    return MCPServer(
+        **common,
+        token_verifier=StaticOpsTokenVerifier(token, resource),
+        auth=AuthSettings(
+            issuer_url=AnyHttpUrl(issuer),
+            resource_server_url=AnyHttpUrl(resource),
+            required_scopes=["empire:ops"],
+            validate_token_resource=True,
+        ),
+    )
+
+
+server = _build_server()
 
 
 def _request_id() -> str:
@@ -64,9 +119,13 @@ def ops_health() -> dict[str, Any]:
         lambda: {
             "ok": True,
             "service": "empire-ops-mcp",
-            "version": "0.1.0",
+            "version": "0.2.0",
             "repo": "/srv/empire_os",
-            "privileged_helper": False,
+            "http_bearer_auth": bool(
+                os.getenv("EMPIRE_OPS_MCP_BEARER_TOKEN", "").strip()
+            ),
+            "privileged_helper": PRIVILEGED_SOCKET.exists(),
+            "privileged_units": sorted(PRIVILEGED_ALLOWED_UNITS),
             "general_shell": False,
         },
     )
@@ -119,6 +178,59 @@ def system_service_status(unit: str) -> dict[str, Any]:
         "empire_service_status",
         {"unit": unit},
         lambda: service_status(unit),
+    )
+
+
+@server.tool(name="empire_service_control", structured_output=True)
+def service_control(
+    unit: str,
+    action: str = "restart",
+    execute: bool = False,
+) -> dict[str, Any]:
+    action = str(action or "").strip().lower()
+    if action not in {"restart", "start"}:
+        raise ValueError("service action not allowlisted")
+    if unit not in PRIVILEGED_ALLOWED_UNITS:
+        raise ValueError("unit not allowlisted")
+    helper_action = (
+        "service_restart" if action == "restart" else "service_start"
+    )
+    if not execute:
+        return _record(
+            "empire_service_control",
+            {"unit": unit, "action": action, "execute": False},
+            lambda: {
+                "ok": True,
+                "decision": "PREVIEW",
+                "unit": unit,
+                "action": action,
+                "executed": False,
+                "privileged_helper_required": True,
+            },
+        )
+
+    def _execute() -> dict[str, Any]:
+        try:
+            result = privileged_request(helper_action, unit)
+        except PrivilegedHelperUnavailable as exc:
+            return {
+                "ok": False,
+                "decision": "HELPER_UNAVAILABLE",
+                "unit": unit,
+                "action": action,
+                "executed": False,
+                "error": str(exc),
+            }
+        return {
+            **result,
+            "decision": "EXECUTED" if result.get("ok") else "FAILED",
+            "executed": True,
+        }
+
+    return _record(
+        "empire_service_control",
+        {"unit": unit, "action": action, "execute": True},
+        _execute,
     )
 
 
