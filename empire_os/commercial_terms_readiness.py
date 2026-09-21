@@ -16,6 +16,8 @@ class CommercialTermsReadinessEvidence:
     fulfilment_order_id: str
     buyer_id: str
     prospect_id: str
+    product_id: str
+    product_code: str
     order_state: str
     buyer_conversation_observed: bool
     capacity_intake_state: str
@@ -36,6 +38,8 @@ class CommercialTermsReadinessEvidence:
             ("fulfilment_order_id", self.fulfilment_order_id),
             ("buyer_id", self.buyer_id),
             ("prospect_id", self.prospect_id),
+            ("product_id", self.product_id),
+            ("product_code", self.product_code),
         ):
             if not str(value or "").strip():
                 raise ValueError(f"{label} required")
@@ -67,7 +71,9 @@ def review_commercial_terms_readiness(
 ) -> CommercialTermsReadiness:
     evidence.validate()
     blockers: list[str] = []
-    refs: list[str] = []
+    refs: list[str] = [
+        f"commercial_product:{evidence.product_id}"
+    ]
 
     if evidence.order_state not in {"qualified", "matched"}:
         blockers.append("qualified_or_matched_order_required")
@@ -141,6 +147,8 @@ def review_commercial_terms_readiness(
             "currency": "USD",
             "settlement_asset": "USDT",
             "settlement_chain": "BSC",
+            "product_id": evidence.product_id,
+            "product_code": evidence.product_code,
             "territory": _clean(evidence.territory),
             "daily_cap": evidence.daily_cap,
             "delivery_route": _clean(evidence.delivery_route),
