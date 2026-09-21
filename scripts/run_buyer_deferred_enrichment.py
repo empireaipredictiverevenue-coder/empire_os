@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
+import subprocess
+import sys
 import urllib.parse
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -17,7 +21,58 @@ from empire_os.buyer_discovery import (
 from empire_os.buyer_probe_worker import rejection_reason
 from empire_os.buyer_review_materializer import run_buyer_probe_isolated
 from empire_os.qualification_worker_v2 import request_json
-from empire_os.identity_recovery import recover_identity
+
+
+DEFERRED_LOCK = Path("/srv/empire_os/runtime/buyer_deferred_enrichment/run.lock")
+
+
+def recover_identity_isolated(
+    *,
+    business_name: str,
+    website: str,
+    metro: str,
+    hard_timeout_seconds: float = 45.0,
+) -> dict[str, Any]:
+    timeout = max(10.0, min(float(hard_timeout_seconds), 60.0))
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-m", "empire_os.identity_recovery_worker"],
+            input=json.dumps({
+                "business_name": business_name,
+                "website": website,
+                "metro": metro,
+            }),
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+            cwd="/srv/empire_os",
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "decision": "deferred",
+            "identity": None,
+            "reason": "identity_recovery_timeout",
+        }
+    if completed.returncode != 0:
+        return {
+            "decision": "deferred",
+            "identity": None,
+            "reason": "identity_recovery_worker_failed",
+        }
+    try:
+        result = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return {
+            "decision": "deferred",
+            "identity": None,
+            "reason": "identity_recovery_invalid_json",
+        }
+    return result if isinstance(result, dict) else {
+        "decision": "deferred",
+        "identity": None,
+        "reason": "identity_recovery_invalid_shape",
+    }
 
 
 def _get(path: str, params: dict[str, Any]) -> list[dict[str, Any]]:
@@ -248,10 +303,11 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
 
             recovery = None
             if not result.get("decision_maker"):
-                recovery = recover_identity(
+                recovery = recover_identity_isolated(
                     business_name=candidate.business_name,
                     website=candidate.website,
                     metro=candidate.metro,
+                    hard_timeout_seconds=45.0,
                 )
                 recovered = recovery.get("identity")
                 if isinstance(recovered, dict):
@@ -357,9 +413,26 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=5)
     args = parser.parse_args()
-    result = run_cycle(limit=max(1, min(args.limit, 10)))
-    print(json.dumps(result, indent=2, sort_keys=True))
-    return 0
+
+    DEFERRED_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with DEFERRED_LOCK.open("a+") as handle:
+        try:
+            fcntl.flock(
+                handle.fileno(),
+                fcntl.LOCK_EX | fcntl.LOCK_NB,
+            )
+        except BlockingIOError:
+            print(json.dumps({
+                "schema_version": "empire.buyer_deferred_enrichment.v1",
+                "decision": "ALREADY_RUNNING_SKIP",
+                "processed": 0,
+                "execution_allowed": False,
+            }, indent=2, sort_keys=True))
+            return 0
+
+        result = run_cycle(limit=max(1, min(args.limit, 10)))
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
 
 
 if __name__ == "__main__":
