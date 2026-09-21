@@ -10,8 +10,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 
-POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
-
+from empire_os.conversation_value import (
+    POSTAL_ADDRESS,
+    build_followup_copy as build_value_followup_copy,
+)
 
 @dataclass(frozen=True)
 class FollowupWorkerResult:
@@ -39,62 +41,21 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _business_name(row: Mapping[str, Any]) -> str:
-    evidence = row.get("candidate_evidence")
-    if isinstance(evidence, Mapping):
-        name = _text(evidence.get("business_name"))
-        if name:
-            return name
-    return "your team"
-
-
-def _market_context(row: Mapping[str, Any]) -> str:
-    evidence = row.get("candidate_evidence")
-    if not isinstance(evidence, Mapping):
-        return "the opportunity data"
-    metro = _text(evidence.get("metro"))
-    niche = _text(evidence.get("niche"))
-    if metro and niche:
-        return f"the {metro} {niche} opportunity data"
-    if metro:
-        return f"the {metro} opportunity data"
-    if niche:
-        return f"the {niche} opportunity data"
-    return "the opportunity data"
-
-
-def build_followup_copy(row: Mapping[str, Any]) -> tuple[str, str]:
+def build_followup_copy(
+    row: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+) -> tuple[str, str]:
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        raise ValueError("now must include timezone")
     step = int(row.get("followup_step") or 0)
-    root_subject = _text(row.get("root_subject"))
-    business = _business_name(row)
-    context = _market_context(row)
-    subject = f"Re: {root_subject}" if root_subject else "Quick follow-up"
-
-    if step == 1:
-        message = (
-            "Hi,\n\n"
-            "Just bringing this back to the top of your inbox. "
-            f"The evidence behind {context} is real, and I can send a short "
-            f"breakdown of what we found for {business}.\n\n"
-            "Worth a quick look?\n\n"
-        )
-    elif step == 2:
-        message = (
-            "Hi,\n\n"
-            "Last note from me on this. "
-            f"If this is relevant for {business}, I can send the short "
-            "opportunity breakdown and pilot outline. If not, no problem at all.\n\n"
-        )
-    else:
-        raise ValueError("follow-up step must be 1 or 2")
-
-    body = (
-        message
-        + "Best,\nPhil\nFounder, Empire AI\nempire-ai.co.uk\n\n"
-        + POSTAL_ADDRESS
-        + "\nIf you’d rather not hear from me, reply “opt out”."
+    copy = build_value_followup_copy(
+        row,
+        step=step,
+        now=current,
     )
-    return subject, body
+    return copy.subject, copy.body
 
 
 def within_send_window(
@@ -147,7 +108,7 @@ def run_followup_worker(
         root_id = _text(row.get("root_intent_id"))
         try:
             step = int(row.get("followup_step") or 0)
-            subject, body = build_followup_copy(row)
+            subject, body = build_followup_copy(row, now=current)
             result = request(
                 "POST",
                 "/rest/v1/rpc/propose_outbound_followup",

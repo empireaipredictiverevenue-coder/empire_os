@@ -16,6 +16,19 @@ from empire_os.revenue_pulse_reader import fetch_current_and_previous_windows
 ROOT = Path("/srv/empire_os")
 OUT = ROOT / "runtime" / "revenue_pulse" / "latest.json"
 
+def _parse_time(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 
 def reader(path: str, params: dict[str, str]) -> Any:
     query = urllib.parse.urlencode(params)
@@ -30,13 +43,22 @@ def load_commercial_blocker() -> tuple[str | None, str | None]:
         data = json.loads(path.read_text())
     except Exception:
         return None, None
+    blocker = data.get("highest_priority_blocker")
+    blocker_state = data.get("blocker_state")
+    if blocker:
+        return blocker, blocker_state
+    ops_path = ROOT / "runtime" / "ops_control" / "latest.json"
+    try:
+        ops = json.loads(ops_path.read_text())
+    except Exception:
+        ops = {}
     return (
-        data.get("highest_priority_blocker"),
-        data.get("blocker_state"),
+        ops.get("business_blocker"),
+        blocker_state or ("observed" if ops.get("business_blocker") else None),
     )
 
 
-def load_storm_pulse() -> StormPulse | None:
+def load_storm_pulse(*, now: datetime | None = None) -> StormPulse | None:
     root = ROOT / "runtime" / "revenue_strike"
     if not root.exists():
         return None
@@ -54,6 +76,21 @@ def load_storm_pulse() -> StormPulse | None:
         return None
     source = str(trigger.get("source_url") or "").strip()
     if not source:
+        return None
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    observed = _parse_time(
+        trigger.get("observed_at")
+        or trigger.get("created_at")
+        or data.get("observed_at")
+        or data.get("created_at")
+    )
+    if observed is None:
+        observed = datetime.fromtimestamp(
+            paths[-1].stat().st_mtime,
+            tz=timezone.utc,
+        )
+    age_hours = (current - observed).total_seconds() / 3600
+    if age_hours < 0 or age_hours > 168:
         return None
     return StormPulse(
         opportunity_count=len(prospects),
@@ -84,7 +121,7 @@ def main() -> int:
         previous=previous,
         highest_priority_blocker=blocker,
         blocker_state=blocker_state,
-        storm=load_storm_pulse(),
+        storm=load_storm_pulse(now=now),
     )
     pulse["generated_at"] = now.isoformat()
     pulse["snapshot_source"] = "canonical_supabase_rest"

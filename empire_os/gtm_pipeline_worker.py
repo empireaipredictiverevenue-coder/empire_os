@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 
+from empire_os.conversation_value import build_first_touch_copy
+
 POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
 
 
@@ -78,7 +80,7 @@ def _hydrate_review_evidence(
         return {**dict(review), "evidence": merged}
 
     query = urlencode({
-        "select": "business_name,niche,metro",
+        "select": "business_name,niche,metro,rating,review_count,buy_signal_score,runs_ads",
         "id": f"eq.{prospect_id}",
         "limit": "1",
     })
@@ -94,6 +96,11 @@ def _hydrate_review_evidence(
             value = str(prospect.get(key) or "").strip()
             if value:
                 merged[key] = value
+    # Canonical prospect observation wins for mutable public-proof fields.
+    for key in ("rating", "review_count", "buy_signal_score", "runs_ads"):
+        value = prospect.get(key)
+        if value not in (None, ""):
+            merged[key] = value
     return {**dict(review), "evidence": merged}
 
 
@@ -111,17 +118,9 @@ def build_outbound_payload(
         raise ValueError("outbound contact name required")
     business, niche, metro = _required_context(evidence)
 
-    subject = f"{first} — {niche} opportunities in {metro}"
-    body = (
-        f"Hi {first},\n\n"
-        "I’m Phil, founder of Empire AI. We use real market and search signals "
-        "to identify demand and commercial opportunities for strong operators. "
-        f"{business} surfaced in our {metro} {niche} analysis.\n\n"
-        "Would you be open to a quick look at a small pilot and the evidence behind it?\n\n"
-        "Best,\nPhil\nFounder, Empire AI\nempire-ai.co.uk\n\n"
-        f"{POSTAL_ADDRESS}\n"
-        "If you’d rather not hear from me, reply “opt out”."
-    )
+    copy = build_first_touch_copy(review, now=now)
+    subject = copy.subject
+    body = copy.body
     review_id = str(review.get("id") or "").strip()
     if not review_id:
         raise ValueError("review id required")
@@ -139,6 +138,11 @@ def build_outbound_payload(
             "source": "bounded_gtm_standing_authority",
             "review_id": review_id,
             "business_name": business,
+            "conversation_quality": "v2",
+            "conversation_quality_tier": copy.quality_tier,
+            "why_now_summary": copy.why_now_summary,
+            "why_now_evidence_ref": copy.why_now_evidence_ref,
+            "specific_proof": copy.specific_proof,
         },
     }
 

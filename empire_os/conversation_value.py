@@ -1,0 +1,263 @@
+"""Evidence-first commercial conversation copy.
+
+This module keeps outreach specific without inventing pain, demand, urgency,
+results or revenue. Fresh trigger evidence is preferred; public business proof
+is an acceptable lower-confidence reason to start a useful conversation.
+"""
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from typing import Any, Mapping
+
+POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
+_PLACEHOLDERS = {
+    "", "unknown", "your team", "your market", "local market",
+    "n/a", "none", "null",
+}
+
+
+@dataclass(frozen=True)
+class ConversationCopy:
+    subject: str
+    body: str
+    quality_tier: str
+    why_now_summary: str | None
+    why_now_evidence_ref: str | None
+    specific_proof: str | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _text(value: Any) -> str:
+    return " ".join(str(value or "").split()).strip()
+
+
+def _first_name(value: Any) -> str:
+    clean = _text(value)
+    if not clean:
+        raise ValueError("contact name required")
+    first = clean.split()[0]
+    return first.title() if first.isupper() else first
+
+
+def _usable(value: Any) -> str:
+    text = _text(value)
+    return "" if text.lower() in _PLACEHOLDERS else text
+
+
+def _parse_time(value: Any) -> datetime | None:
+    text = _text(value)
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _fresh_why_now(
+    evidence: Mapping[str, Any],
+    *,
+    now: datetime,
+    max_age_hours: int = 24 * 30,
+) -> dict[str, str] | None:
+    nested = evidence.get("why_now")
+    row = dict(nested) if isinstance(nested, Mapping) else {}
+    summary = _usable(
+        row.get("summary")
+        or evidence.get("why_now_summary")
+        or evidence.get("trigger_summary")
+    )
+    evidence_ref = _usable(
+        row.get("evidence_ref")
+        or evidence.get("why_now_evidence_ref")
+        or evidence.get("trigger_evidence_ref")
+    )
+    observed_at = _parse_time(
+        row.get("observed_at")
+        or evidence.get("why_now_observed_at")
+        or evidence.get("trigger_observed_at")
+    )
+    signal_type = _usable(
+        row.get("signal_type")
+        or evidence.get("why_now_signal_type")
+        or evidence.get("trigger_type")
+    )
+    if not summary or not evidence_ref or observed_at is None:
+        return None
+    age_hours = (now.astimezone(timezone.utc) - observed_at).total_seconds() / 3600
+    if age_hours < 0 or age_hours > max_age_hours:
+        return None
+    return {
+        "summary": summary,
+        "evidence_ref": evidence_ref,
+        "observed_at": observed_at.isoformat(),
+        "signal_type": signal_type or "market signal",
+    }
+
+
+def _specific_public_proof(evidence: Mapping[str, Any]) -> str | None:
+    explicit = _usable(
+        evidence.get("specific_proof")
+        or evidence.get("proof_summary")
+        or evidence.get("observed_proof")
+    )
+    if explicit:
+        return explicit
+
+    rating_raw = evidence.get("rating")
+    reviews_raw = evidence.get("review_count")
+    try:
+        rating = float(rating_raw) if rating_raw not in (None, "") else None
+    except (TypeError, ValueError):
+        rating = None
+    try:
+        reviews = int(reviews_raw) if reviews_raw not in (None, "") else None
+    except (TypeError, ValueError):
+        reviews = None
+
+    if rating is not None and reviews is not None and reviews > 0:
+        rating_text = f"{rating:.1f}".rstrip("0").rstrip(".")
+        return f"your public profile shows {rating_text}★ across {reviews:,} reviews"
+    if reviews is not None and reviews >= 25:
+        return f"your public profile shows {reviews:,} reviews"
+    return None
+
+
+def _context(evidence: Mapping[str, Any]) -> tuple[str, str, str]:
+    business = _usable(evidence.get("business_name"))
+    niche = _usable(evidence.get("niche"))
+    metro = _usable(evidence.get("metro"))
+    missing = [
+        key for key, value in (
+            ("business_name", business),
+            ("niche", niche),
+            ("metro", metro),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError("conversation context missing: " + ",".join(missing))
+    return business, niche, metro
+
+
+def build_first_touch_copy(
+    review: Mapping[str, Any],
+    *,
+    now: datetime,
+) -> ConversationCopy:
+    if now.tzinfo is None:
+        raise ValueError("now must include timezone")
+    evidence = review.get("evidence")
+    evidence = evidence if isinstance(evidence, Mapping) else {}
+    business, niche, metro = _context(evidence)
+    first = _first_name(review.get("contact_name"))
+    trigger = _fresh_why_now(evidence, now=now)
+    proof = _specific_public_proof(evidence)
+
+    if trigger is None and proof is None:
+        raise ValueError(
+            "specific outreach evidence required: fresh why-now or public proof"
+        )
+
+    if trigger is not None:
+        signal = trigger["signal_type"].replace("_", " ")
+        subject = f"{first} — {metro}: {signal}"
+        reason = (
+            f"One thing stood out in the evidence: {trigger['summary']} "
+            "That is why I’m reaching out now."
+        )
+        quality = "trigger_backed"
+    else:
+        subject = f"{first} — one thing I noticed in {metro}"
+        reason = (
+            f"I noticed {proof}. Rather than send a generic lead pitch, "
+            f"I can show you the first demand, search and competitor checks "
+            f"I’d run for {business} in {metro}."
+        )
+        quality = "proof_backed"
+
+    body = (
+        f"Hi {first},\n\n"
+        f"I was looking at {business} while mapping {niche} operators in {metro}. "
+        f"{reason}\n\n"
+        "Empire connects market/search intelligence to follow-up and Revenue Pulse, "
+        "so conversations, terms, payments and revenue stay separate from forecasts "
+        "and scores.\n\n"
+        f"If useful, reply “send it” and I’ll send a one-page brief for {business} "
+        "with the three highest-priority signals. No deck.\n\n"
+        "Best,\nPhil\nFounder, Empire AI\nempire-ai.co.uk\n\n"
+        f"{POSTAL_ADDRESS}\n"
+        "If you’d rather not hear from me, reply “opt out”."
+    )
+    return ConversationCopy(
+        subject=subject,
+        body=body,
+        quality_tier=quality,
+        why_now_summary=(trigger["summary"] if trigger else None),
+        why_now_evidence_ref=(trigger["evidence_ref"] if trigger else None),
+        specific_proof=proof,
+    )
+
+
+def build_followup_copy(
+    row: Mapping[str, Any],
+    *,
+    step: int,
+    now: datetime,
+) -> ConversationCopy:
+    if now.tzinfo is None:
+        raise ValueError("now must include timezone")
+    evidence = row.get("candidate_evidence")
+    evidence = evidence if isinstance(evidence, Mapping) else {}
+    business, niche, metro = _context(evidence)
+    trigger = _fresh_why_now(evidence, now=now)
+    proof = _specific_public_proof(evidence)
+    root_subject = _usable(row.get("root_subject"))
+    subject = f"Re: {root_subject}" if root_subject else f"{business} — quick follow-up"
+
+    if step == 1:
+        useful_detail = (
+            f"The trigger I mentioned is still the useful part: {trigger['summary']}"
+            if trigger is not None
+            else (
+                f"Rather than another pitch, I can send the one-page {metro} "
+                f"{niche} brief I mentioned for {business}."
+            )
+        )
+        message = (
+            "Hi,\n\n"
+            f"{useful_detail}\n\n"
+            "It covers the three signals I’d prioritise first and how I’d measure "
+            "whether they turn into conversations and paid work.\n\n"
+            "If you want it, just reply “send it”.\n\n"
+        )
+    elif step == 2:
+        message = (
+            "Hi,\n\n"
+            f"Closing the loop on {business}. If {niche} demand, search visibility "
+            "or follow-up becomes a priority, reply here and I can send the concise "
+            f"{metro} market brief. No need for a call first.\n\n"
+        )
+    else:
+        raise ValueError("follow-up step must be 1 or 2")
+
+    body = (
+        message
+        + "Best,\nPhil\nFounder, Empire AI\nempire-ai.co.uk\n\n"
+        + POSTAL_ADDRESS
+        + "\nIf you’d rather not hear from me, reply “opt out”."
+    )
+    return ConversationCopy(
+        subject=subject,
+        body=body,
+        quality_tier="trigger_followup" if trigger else "value_followup",
+        why_now_summary=(trigger["summary"] if trigger else None),
+        why_now_evidence_ref=(trigger["evidence_ref"] if trigger else None),
+        specific_proof=proof,
+    )
