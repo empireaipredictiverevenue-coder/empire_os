@@ -26,6 +26,13 @@ def read_ops_snapshot(path: Path = DEFAULT_SNAPSHOT) -> dict[str, Any]:
                 "diagnoses": [],
                 "requires_escalation": False,
             },
+            "conveyor": {
+                "loop_complete": False,
+                "current_blocker": None,
+                "owner_component": None,
+                "authority": "none",
+                "stages": [],
+            },
         }
     if not isinstance(value, dict):
         return {"available": False}

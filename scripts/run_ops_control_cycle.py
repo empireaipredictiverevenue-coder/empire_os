@@ -8,6 +8,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from empire_os.control_conveyor import build_conveyor
 from empire_os.incident_manager import build_incident_report
 from empire_os.ops_healer import execute_plan
 from empire_os.ops_sentinel import observe
@@ -37,6 +38,15 @@ def main() -> int:
         repairs = execute_plan(sentinel.get("repair_plan") or [], max_actions=3)
 
     incident_manager = build_incident_report(sentinel)
+    try:
+        commercial_loop = json.loads(
+            Path("/srv/empire_os/runtime/commercial_loop/latest.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        commercial_loop = {}
+    conveyor = build_conveyor(
+        commercial_loop if isinstance(commercial_loop, dict) else {}
+    )
 
     payload = {
         "schema_version": "empire.ops_control_cycle.v1",
@@ -49,6 +59,7 @@ def main() -> int:
             "results": repairs,
         },
         "incident_manager": incident_manager,
+        "conveyor": conveyor,
         "healthy": not any(
             row.get("severity") in {"critical", "warning"}
             for row in sentinel.get("findings") or []
