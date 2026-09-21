@@ -18,6 +18,7 @@ def base_row():
         "catalog_state": "VERIFIED",
         "version": 1,
         "version_state": "VERIFIED",
+        "binding_terms_ready": True,
         "price_basis": {
             "state": "VERIFIED",
             "amount_cents": 7500,
