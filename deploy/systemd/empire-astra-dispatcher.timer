@@ -2,8 +2,8 @@
 Description=Run bounded Astra launch dispatcher every five minutes
 
 [Timer]
-OnBootSec=3min
-OnUnitActiveSec=5min
+OnActiveSec=1min
+OnUnitInactiveSec=5min
 AccuracySec=1min
 Persistent=true
 Unit=empire-astra-dispatcher.service
