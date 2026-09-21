@@ -18,6 +18,7 @@ class IntelligenceNode:
     sensors: tuple[str, ...]
     products: tuple[str, ...]
     opportunity_types: tuple[str, ...]
+    lifecycle_state: str = "ACTIVE_BUILD"
     execution_authority: str = "intelligence_only"
 
     def as_dict(self) -> dict[str, Any]:
@@ -174,6 +175,26 @@ NODES = (
             "platform_acquisition", "add_on_acquisition", "owner_exit",
             "rollup_cluster", "portfolio_cross_sell", "carve_out",
         ),
+    ),
+    IntelligenceNode(
+        key="oil_gas_energy",
+        name="Oil & Gas / Energy Infrastructure Intelligence Node",
+        market="oil_gas_operators_energy_infrastructure_services_and_investors",
+        sensors=(
+            "permits", "public_registries", "property_signals",
+            "satellite_imagery", "volumetric", "natural_physical",
+            "corporate_change", "search_fabric", "market_data",
+        ),
+        products=(
+            "operator_asset_radar", "permit_activity_feed",
+            "energy_infrastructure_map", "maintenance_expansion_alerts",
+            "basin_territory_intelligence", "service_opportunity_feed",
+        ),
+        opportunity_types=(
+            "permit_activity", "asset_expansion", "maintenance_need",
+            "service_demand", "corporate_change", "territory_opportunity",
+        ),
+        lifecycle_state="INCUBATE",
     ),
     IntelligenceNode(
         key="government",
