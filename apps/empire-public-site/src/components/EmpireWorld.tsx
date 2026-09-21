@@ -11,6 +11,7 @@ import {
 } from "@react-three/drei";
 import * as THREE from "three";
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -84,6 +85,46 @@ const CAMERA_CURVE = new THREE.CatmullRomCurve3(
   "catmullrom",
   0.45,
 );
+
+function ScrollBridge({
+  onProgress,
+}: {
+  onProgress?: (progress: number) => void;
+}) {
+  const scroll = useScroll();
+  const last = useRef(-1);
+
+  useEffect(() => {
+    const handleJump = (event: Event) => {
+      const custom = event as CustomEvent<{ target?: number }>;
+      const target = THREE.MathUtils.clamp(
+        Number(custom.detail?.target ?? 0),
+        0,
+        1,
+      );
+      const max = scroll.el.scrollHeight - scroll.el.clientHeight;
+      scroll.el.scrollTo({
+        top: target * max,
+        behavior: "smooth",
+      });
+    };
+
+    window.addEventListener("empire-jump", handleJump as EventListener);
+    return () => {
+      window.removeEventListener("empire-jump", handleJump as EventListener);
+    };
+  }, [scroll]);
+
+  useFrame(() => {
+    if (!onProgress) return;
+    const value = scroll.offset;
+    if (Math.abs(value - last.current) < 0.008) return;
+    last.current = value;
+    onProgress(value);
+  });
+
+  return null;
+}
 
 function CameraFlight() {
   const scroll = useScroll();
@@ -1004,7 +1045,7 @@ function Hotspot({
         }}
         scale={hovered ? 1.24 : 1}
       >
-        <sphereGeometry args={[0.14, 16, 16]} />
+        <sphereGeometry args={[0.24, 18, 18]} />
         <meshBasicMaterial
           color={hovered ? "#ffffff" : "#4f8cff"}
           toneMapped={false}
@@ -1014,7 +1055,7 @@ function Hotspot({
         rotation={[Math.PI / 2, 0, 0]}
         scale={hovered ? 1.4 : 1}
       >
-        <torusGeometry args={[0.32, 0.012, 8, 48]} />
+        <torusGeometry args={[0.48, 0.018, 8, 56]} />
         <meshBasicMaterial
           color="#4f8cff"
           transparent
@@ -1043,7 +1084,11 @@ function Hotspot({
   );
 }
 
-function World() {
+function World({
+  onProgress,
+}: {
+  onProgress?: (progress: number) => void;
+}) {
   return (
     <>
       <fog attach="fog" args={["#020817", 8, 34]} />
@@ -1060,6 +1105,7 @@ function World() {
         distance={18}
       />
 
+      <ScrollBridge onProgress={onProgress} />
       <CameraFlight />
       <ArchitecturalSpine />
       <SignalDust />
@@ -1174,7 +1220,13 @@ function ScrollNarrative() {
   );
 }
 
-export default function EmpireWorld({ onReady }: { onReady?: () => void }) {
+export default function EmpireWorld({
+  onReady,
+  onProgress,
+}: {
+  onReady?: () => void;
+  onProgress?: (progress: number) => void;
+}) {
   return (
     <div className="h-screen w-screen bg-[#020817]">
       <Canvas
@@ -1200,7 +1252,7 @@ export default function EmpireWorld({ onReady }: { onReady?: () => void }) {
           distance={1}
           maxSpeed={0.18}
         >
-          <World />
+          <World onProgress={onProgress} />
           <ScrollNarrative />
         </ScrollControls>
       </Canvas>
