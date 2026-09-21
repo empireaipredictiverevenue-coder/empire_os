@@ -132,7 +132,7 @@ def run_commercial_terms_materializer(
                 request,
                 "/rest/v1/fulfilment_orders",
                 {
-                    "select": "id,state,buyer_id,prospect_id",
+                    "select": "id,state,buyer_id,prospect_id,product_id",
                     "id": f"eq.{order_id}",
                     "limit": 1,
                 },
@@ -152,11 +152,46 @@ def run_commercial_terms_materializer(
             if not orders:
                 raise ValueError("fulfilment order not found")
             order = orders[0]
+            if (
+                str(order.get("buyer_id") or "") != buyer_id
+                or str(order.get("prospect_id") or "") != prospect_id
+            ):
+                blocked += 1
+                blockers["fulfilment_order_binding_mismatch"] += 1
+                continue
+
+            product_id = str(order.get("product_id") or "").strip()
+            if not product_id:
+                blocked += 1
+                blockers["fulfilment_order_product_missing"] += 1
+                continue
+
+            products = _rows(
+                request,
+                "/rest/v1/commercial_products",
+                {
+                    "select": "id,product_code,active",
+                    "id": f"eq.{product_id}",
+                    "limit": 1,
+                },
+            )
+            if len(products) != 1:
+                blocked += 1
+                blockers["commercial_product_identity_missing"] += 1
+                continue
+
+            product = products[0]
+            product_code = str(product.get("product_code") or "").strip()
+            if not product_code or product.get("active") is not True:
+                blocked += 1
+                blockers["commercial_product_inactive_or_invalid"] += 1
+                continue
+
             capacity = capacities[0] if capacities else {}
             catalog = _rpc(
                 request,
                 "get_commercial_product_readiness",
-                {"p_product_code": "managed_service"},
+                {"p_product_code": product_code},
             )
             if catalog.get("binding_terms_ready") is not True:
                 blocked += 1
@@ -186,6 +221,8 @@ def run_commercial_terms_materializer(
                     fulfilment_order_id=order_id,
                     buyer_id=buyer_id,
                     prospect_id=prospect_id,
+                    product_id=product_id,
+                    product_code=product_code,
                     order_state=str(order.get("state") or ""),
                     buyer_conversation_observed=True,
                     capacity_intake_state=str(capacity.get("state") or ""),
@@ -253,7 +290,7 @@ def run_commercial_terms_materializer(
                     "p_fulfilment_cost_cents": fulfilment_cents,
                     "p_terms": packet,
                     "p_idempotency_key": (
-                        f"terms:{order_id}:{evidence_key}"
+                        f"terms:{order_id}:{product_code}:{evidence_key}"
                     )[:240],
                     "p_actor": "astra-commercial-terms-planner",
                 },
