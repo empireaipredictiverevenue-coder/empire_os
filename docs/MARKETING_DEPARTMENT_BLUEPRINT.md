@@ -217,6 +217,8 @@ Priority product families:
 - Search Intelligence
 - AI Visibility
 - Permit Intelligence
+- Property Intelligence
+- Private Capital & Roll-Up Intelligence
 - Storm/Satellite Intelligence
 - Warehouse/Industrial Radar
 - Territory/Corridor Intelligence
@@ -228,6 +230,8 @@ Priority product families:
 - seats/territories/corridors
 - white-label/agency
 - done-for-you growth
+- Oil & Gas / Energy Infrastructure — research/incubation only until source,
+  buyer, compliance, fulfilment and economics validation is complete
 
 ## 6. Demand Architecture
 
