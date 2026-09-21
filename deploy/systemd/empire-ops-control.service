@@ -1,0 +1,20 @@
+[Unit]
+Description=EmpireOS Control Fabric Sentinel and Bounded Healer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=/etc/empire_os.env
+Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_OPS_HEAL_MODE=GUARDED_EXECUTE
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_ops_control_cycle.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=420
