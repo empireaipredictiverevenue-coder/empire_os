@@ -102,3 +102,32 @@ def test_legacy_soak_market_set_preserves_round_robin(tmp_path, monkeypatch):
     assert result["metro"] == "Houston, TX"
     assert result["geo_policy"] == "legacy_round_robin"
     assert result["geo_market_set"] == "legacy_us"
+
+
+
+def test_signal_success_reports_runtime_inbox_not_supabase(tmp_path, monkeypatch):
+    monkeypatch.setattr(cycle, "RUNTIME", tmp_path)
+    monkeypatch.setattr(cycle, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(cycle, "LATEST", tmp_path / "latest.json")
+    monkeypatch.setattr(cycle, "LAST_SUCCESS", tmp_path / "last_success.json")
+    monkeypatch.setattr(cycle, "LOCK", tmp_path / "cycle.lock")
+
+    class Done:
+        returncode = 0
+        stdout = '{"msg": "signal_queued"}'
+        stderr = ""
+
+    with patch.object(cycle.subprocess, "run", return_value=Done()):
+        result = cycle.run_cycle(max_candidates=5)
+
+    assert result["prospect_canonical_write"] is False
+    assert result["signal_inbox_write"] is True
+    assert result["canonical_store"] == "runtime_signal_inbox"
+
+    last_success = __import__("json").loads(
+        (tmp_path / "last_success.json").read_text()
+    )
+    assert last_success["canonical_writes"] is False
+    assert last_success["prospect_canonical_write"] is False
+    assert last_success["signal_inbox_write"] is True
+    assert last_success["write_store"] == "runtime_signal_inbox"
