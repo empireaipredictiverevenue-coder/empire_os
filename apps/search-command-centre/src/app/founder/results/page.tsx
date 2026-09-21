@@ -75,6 +75,15 @@ export default async function FounderResultsPage() {
                 </div>
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                  <Result label="Pulse state" value={show(day.revenue_pulse?.pulse_state)} />
+                  <Result label="24h acquisitions" value={int(day.revenue_pulse?.current_window?.acquisitions)} />
+                  <Result label="24h qualified" value={int(day.revenue_pulse?.current_window?.qualified)} />
+                  <Result label="24h delivered" value={int(day.revenue_pulse?.current_window?.delivered_outreach)} />
+                  <Result label="24h replies" value={int(day.revenue_pulse?.current_window?.commercial_replies)} />
+                  <Result label="Control components" value={int(day.control_fabric?.component_count)} />
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
                   <Result label="Intent" value={int(day.intent_and_pain?.observations)} />
                   <Result label="High intent" value={int(day.intent_and_pain?.high_intent)} />
                   <Result label="AEO assets" value={int(day.search_and_seo?.aeo_asset_count)} />

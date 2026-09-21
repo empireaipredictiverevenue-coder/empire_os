@@ -368,6 +368,32 @@ export default async function FounderPage() {
                   value={int(dailyFunnel?.recognized_revenue_events)}
                 />
               </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <Evidence
+                  label="Pulse state"
+                  value={show(daily?.revenue_pulse?.pulse_state)}
+                />
+                <Evidence
+                  label="24h acquisitions"
+                  value={int(daily?.revenue_pulse?.current_window?.acquisitions)}
+                />
+                <Evidence
+                  label="24h qualified"
+                  value={int(daily?.revenue_pulse?.current_window?.qualified)}
+                />
+                <Evidence
+                  label="24h delivered"
+                  value={int(daily?.revenue_pulse?.current_window?.delivered_outreach)}
+                />
+                <Evidence
+                  label="24h replies"
+                  value={int(daily?.revenue_pulse?.current_window?.commercial_replies)}
+                />
+                <Evidence
+                  label="Control components"
+                  value={int(daily?.control_fabric?.component_count)}
+                />
+              </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Evidence
                   label="Intent observations"

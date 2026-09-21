@@ -62,3 +62,54 @@ def test_daily_results_surfaces_rls_classification_counts(tmp_path):
     assert payload["security"]["rls_classification_available"] is True
     assert payload["security"]["rls_table_count"] == 222
     assert payload["security"]["rls_classes"]["privileged_operator"] == 33
+
+
+def test_daily_results_surfaces_revenue_pulse_and_control_fabric(tmp_path):
+    runtime = tmp_path / "runtime"
+    dump(runtime / "revenue_pulse/latest.json", {
+        "pulse_state": "conversation_blocked",
+        "highest_priority_blocker": "buyer_conversation",
+        "current_window": {
+            "acquisitions": 306,
+            "qualified": 109,
+            "buyer_reviews": 16,
+            "delivered_outreach": 16,
+            "commercial_replies": 0,
+            "recognized_revenue_cents": 0,
+            "realized_gp_cents": 0,
+        },
+        "conversion": {
+            "delivered_outreach_to_commercial_reply": 0.0,
+        },
+        "recognized_revenue_truth": {
+            "recognized_revenue_cents": 0,
+            "realized_gp_cents": 0,
+            "forecast_included_in_truth": False,
+        },
+        "forecast": {
+            "separate_from_revenue_truth": True,
+            "items": [],
+        },
+    })
+    dump(runtime / "control_fabric/latest.json", {
+        "component_count": 16,
+        "authority_counts": {
+            "observe": 3,
+            "internal_write": 10,
+            "governed_external": 2,
+            "founder_gate": 1,
+        },
+        "external_execution_enabled": False,
+        "founder_gates_preserved": True,
+    })
+    payload = build_daily_results(tmp_path)
+    assert payload["revenue_pulse"]["available"] is True
+    assert payload["revenue_pulse"]["pulse_state"] == "conversation_blocked"
+    assert payload["revenue_pulse"]["current_window"]["acquisitions"] == 306
+    assert payload["revenue_pulse"]["current_window"]["commercial_replies"] == 0
+    assert payload["revenue_pulse"]["recognized_revenue_truth"][
+        "forecast_included_in_truth"
+    ] is False
+    assert payload["control_fabric"]["available"] is True
+    assert payload["control_fabric"]["component_count"] == 16
+    assert payload["control_fabric"]["external_execution_enabled"] is False

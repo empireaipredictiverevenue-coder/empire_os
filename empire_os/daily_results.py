@@ -90,6 +90,8 @@ def build_daily_results(
     rls_classification = _read(runtime / "security" / "rls_classification_latest.json")
     trust = _read(runtime / "trust" / "latest.json")
     legal_mass_tort = _read(runtime / "legal_mass_tort" / "latest.json")
+    revenue_pulse = _read(runtime / "revenue_pulse" / "latest.json")
+    control_fabric = _read(runtime / "control_fabric" / "latest.json")
     stages = _stage_map(loop)
     conveyor = (
         dict(ops.get("conveyor"))
@@ -197,6 +199,29 @@ def build_daily_results(
             "binding_acceptance": False,
             "payment_request_created": False,
             "revenue_recognition": False,
+        },
+        "revenue_pulse": {
+            "available": bool(revenue_pulse),
+            "pulse_state": revenue_pulse.get("pulse_state"),
+            "highest_priority_blocker": revenue_pulse.get("highest_priority_blocker"),
+            "current_window": revenue_pulse.get("current_window"),
+            "previous_window": revenue_pulse.get("previous_window"),
+            "conversion": revenue_pulse.get("conversion"),
+            "velocity": revenue_pulse.get("velocity"),
+            "recognized_revenue_truth": revenue_pulse.get("recognized_revenue_truth"),
+            "storm_pulse": revenue_pulse.get("storm_pulse"),
+            "forecast_separate_from_truth": (
+                (revenue_pulse.get("forecast") or {}).get("separate_from_revenue_truth")
+                if isinstance(revenue_pulse.get("forecast"), Mapping)
+                else None
+            ),
+        },
+        "control_fabric": {
+            "available": bool(control_fabric),
+            "component_count": control_fabric.get("component_count"),
+            "authority_counts": control_fabric.get("authority_counts"),
+            "external_execution_enabled": control_fabric.get("external_execution_enabled"),
+            "founder_gates_preserved": control_fabric.get("founder_gates_preserved"),
         },
         "coder": _job_counts(repo_root),
         "reliability": {

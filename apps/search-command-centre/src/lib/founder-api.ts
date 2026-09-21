@@ -332,6 +332,51 @@ export type FounderDailyResults = {
     provider_execution_activated?: boolean;
     binding_acceptance?: boolean;
   };
+  revenue_pulse?: {
+    available?: boolean;
+    pulse_state?: string | null;
+    highest_priority_blocker?: string | null;
+    current_window?: {
+      acquisitions?: number | null;
+      qualified?: number | null;
+      buyer_reviews?: number | null;
+      delivered_outreach?: number | null;
+      commercial_replies?: number | null;
+      commercial_terms?: number | null;
+      verified_payments?: number | null;
+      fulfilments?: number | null;
+      recognized_revenue_cents?: number | null;
+      realized_gp_cents?: number | null;
+    } | null;
+    conversion?: Record<string, number | null>;
+    velocity?: Record<
+      string,
+      {
+        state?: string;
+        absolute_change?: number | null;
+        pct_change?: number | null;
+      }
+    >;
+    recognized_revenue_truth?: {
+      recognized_revenue_cents?: number | null;
+      realized_gp_cents?: number | null;
+      forecast_included_in_truth?: boolean;
+    };
+    storm_pulse?: {
+      opportunity_count?: number | null;
+      max_multiplier?: number | null;
+      priority_boost_max?: number | null;
+      evidence_refs?: string[];
+    } | null;
+    forecast_separate_from_truth?: boolean | null;
+  };
+  control_fabric?: {
+    available?: boolean;
+    component_count?: number | null;
+    authority_counts?: Record<string, number>;
+    external_execution_enabled?: boolean | null;
+    founder_gates_preserved?: boolean | null;
+  };
   coder?: {
     pending?: number;
     running?: number;
