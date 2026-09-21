@@ -77,34 +77,69 @@ def choose_market(
     values = tuple(markets)
     if not values:
         raise ValueError("no enabled acquisition markets")
-    cursor = int(
-        state.get("next_market_index",
-                  state.get("next_metro_index", state.get("next_index", 0)))
-        or 0
-    ) % len(values)
-    cycle = int(state.get("geo_cycle_count") or 0)
-    stats = recent_market_stats(log_path, source=source)
 
-    # Deterministic 20% exploration keeps new geographies from starving.
-    explore = cycle % 5 == 0 or not stats
+    stats = recent_market_stats(log_path, source=source)
+    cycle = int(state.get("geo_cycle_count") or 0)
+    countries = tuple(dict.fromkeys(m.country_code for m in values))
+    country_index = int(state.get("next_country_index") or 0) % len(countries)
+    raw_cursors = state.get("country_market_cursors")
+    cursors = (
+        {
+            str(key): int(value)
+            for key, value in raw_cursors.items()
+        }
+        if isinstance(raw_cursors, dict)
+        else {}
+    )
+
+    # Use 25% of geo cycles to deliberately sample different countries.
+    # The remaining cycles exploit markets with actual observed yield.
+    tested = [
+        (idx, market)
+        for idx, market in enumerate(values)
+        if float((stats.get(market.metro) or {}).get("runs") or 0) > 0
+    ]
+    explore = cycle % 4 == 0 or not tested
+
     if explore:
-        selected_index = cursor
-        policy = "explore"
+        country = countries[country_index]
+        options = [
+            (idx, market)
+            for idx, market in enumerate(values)
+            if market.country_code == country
+        ]
+        local_cursor = int(cursors.get(country, 0)) % len(options)
+        selected_index, market = options[local_cursor]
+        cursors[country] = (local_cursor + 1) % len(options)
+        next_country_index = (country_index + 1) % len(countries)
+        policy = "explore_country_balanced"
     else:
         ranked = [
-            (_score(market, stats.get(market.metro)), -idx, idx, market)
-            for idx, market in enumerate(values)
+            (
+                _score(market, stats.get(market.metro)),
+                -idx,
+                idx,
+                market,
+            )
+            for idx, market in tested
         ]
-        ranked.sort(reverse=True, key=lambda row: (row[0], row[1]))
+        ranked.sort(
+            reverse=True,
+            key=lambda row: (row[0], row[1]),
+        )
         selected_index = ranked[0][2]
-        policy = "exploit"
+        market = ranked[0][3]
+        next_country_index = country_index
+        policy = "exploit_observed_yield"
 
-    market = values[selected_index]
-    next_cursor = (cursor + 1) % len(values)
+    # Retain the old flat cursor for compatibility/observability only.
+    next_cursor = (selected_index + 1) % len(values)
     return {
         "market": market,
         "market_index": selected_index,
         "next_market_index": next_cursor,
+        "next_country_index": next_country_index,
+        "country_market_cursors": cursors,
         "geo_cycle_count": cycle + 1,
         "policy": policy,
         "score": _score(market, stats.get(market.metro)),

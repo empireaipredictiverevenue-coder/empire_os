@@ -229,6 +229,12 @@ def run_cycle(*, max_candidates: int = 10) -> dict:
                     # Retain compatibility for older tooling reading next_index.
                     "next_index": next_metro_index,
                     "geo_cycle_count": int(geo["geo_cycle_count"]),
+                    "next_country_index": int(
+                        geo.get("next_country_index", 0)
+                    ),
+                    "country_market_cursors": dict(
+                        geo.get("country_market_cursors") or {}
+                    ),
                     "last_geo_policy": geo["policy"],
                     "last_geo_market_id": selected_market.market_id,
                     "last_country_code": selected_market.country_code,

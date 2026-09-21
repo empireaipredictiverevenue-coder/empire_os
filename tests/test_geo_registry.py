@@ -31,7 +31,10 @@ def test_registry_expands_without_losing_existing_high_value_metros():
 
 def test_registry_has_initial_multi_country_coverage():
     countries = {row.country_code for row in acquisition_markets()}
-    assert {"US", "GB", "CA", "AU", "IE", "NZ"} <= countries
+    assert {
+        "US", "GB", "CA", "AU", "IE", "NZ",
+        "DE", "FR", "ES", "IT", "NL", "BE", "PT",
+    } <= countries
 
 
 def test_market_locale_is_explicit_for_multilingual_country():

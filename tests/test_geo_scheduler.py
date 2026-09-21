@@ -41,30 +41,53 @@ def test_recent_market_stats_pairs_start_with_done(tmp_path):
     assert stats["Birmingham, AL"]["accepted"] == 1
 
 
-def test_scheduler_explores_on_every_fifth_cycle(tmp_path):
+def test_scheduler_balances_exploration_across_countries(tmp_path):
     log = tmp_path / "crawler.jsonl"
     _write_runs(log)
     markets = acquisition_markets()
-    result = choose_market(
+
+    state = {
+        "geo_cycle_count": 4,
+        "next_country_index": 0,
+        "country_market_cursors": {},
+    }
+    first = choose_market(
         markets,
-        state={"geo_cycle_count": 5, "next_market_index": 3},
+        state=state,
         source="overpass",
         log_path=log,
     )
-    assert result["policy"] == "explore"
-    assert result["market"] == markets[3]
-    assert result["next_market_index"] == 4
+    assert first["policy"] == "explore_country_balanced"
+    first_country = first["market"].country_code
+
+    state = {
+        "geo_cycle_count": 8,
+        "next_country_index": first["next_country_index"],
+        "country_market_cursors": first["country_market_cursors"],
+    }
+    second = choose_market(
+        markets,
+        state=state,
+        source="overpass",
+        log_path=log,
+    )
+    assert second["policy"] == "explore_country_balanced"
+    assert second["market"].country_code != first_country
 
 
-def test_scheduler_exploits_proven_yield_between_exploration_cycles(tmp_path):
+def test_scheduler_exploits_only_markets_with_observed_yield(tmp_path):
     log = tmp_path / "crawler.jsonl"
     _write_runs(log)
     result = choose_market(
         acquisition_markets(),
-        state={"geo_cycle_count": 1, "next_market_index": 0},
+        state={
+            "geo_cycle_count": 1,
+            "next_country_index": 0,
+            "country_market_cursors": {},
+        },
         source="overpass",
         log_path=log,
     )
-    assert result["policy"] == "exploit"
+    assert result["policy"] == "exploit_observed_yield"
     assert result["market"].metro == "Dallas, TX"
     assert result["recent_stats"]["accepted"] == 25
