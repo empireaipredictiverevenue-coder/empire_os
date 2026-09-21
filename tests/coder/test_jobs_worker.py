@@ -74,12 +74,19 @@ class FakeCoder:
         self.calls.append(("build_context", task_id, kwargs))
         return SimpleNamespace()
 
-    def planner_model_draft(self, task_id, instruction, context, **kwargs):
+    def polished_model_output(
+        self,
+        task_id,
+        instruction,
+        context,
+        **kwargs,
+    ):
         self.calls.append(("plan", task_id, instruction, kwargs))
         return SimpleNamespace(
-            stage=SimpleNamespace(value="DRAFT"),
-            candidate_drafts=["plan a"],
-            revision_count=0,
+            stage=SimpleNamespace(value="REFINED"),
+            candidate_drafts=["plan a", "plan b"],
+            revision_count=1,
+            refined="refined advisory plan",
         )
 
     def propose_next_command(self, task_id, objective, context):
@@ -146,12 +153,15 @@ def test_worker_processes_plan_without_patch_or_command_execution(tmp_path):
     result = worker.run_once()
     assert result.id == job.id
     assert result.status is JobStatus.COMPLETED
-    assert result.result["candidate_count"] == 1
+    assert result.result["candidate_count"] == 2
     assert result.result["actionable_patch"] is False
     context_call = next(call for call in coder.calls if call[0] == "build_context")
-    assert context_call[2]["budget_chars"] == 4500
+    assert context_call[2]["budget_chars"] == 5600
     plan_call = next(call for call in coder.calls if call[0] == "plan")
-    assert plan_call[3]["max_output_chars"] == 450
+    assert plan_call[3]["max_output_chars"] == 1800
+    assert plan_call[3]["role"] == "planner"
+    assert result.result["revision_count"] == 1
+    assert result.result["refined"] is True
     assert not any(call[0] == "run_tool" for call in coder.calls)
 
 
@@ -299,7 +309,13 @@ def test_claim_sets_lease_and_heartbeat(tmp_path):
 
 
 class TimeoutCoder(FakeCoder):
-    def planner_model_draft(self, task_id, instruction, context, **kwargs):
+    def polished_model_output(
+        self,
+        task_id,
+        instruction,
+        context,
+        **kwargs,
+    ):
         raise RuntimeError("ollama_request_failed:TimeoutError")
 
 

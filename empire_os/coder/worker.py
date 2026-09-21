@@ -148,7 +148,7 @@ class CoderTaskWorker:
         terms = tuple(job.payload.get("terms") or ())
         symbols = tuple(job.payload.get("symbols") or ())
         budget = int(job.payload.get("budget_chars") or 12000)
-        budget_cap = 4500 if job.kind is JobKind.PLAN else 8000
+        budget_cap = 5600 if job.kind is JobKind.PLAN else 8000
         context = self.coder.build_context(
             task.id,
             terms=terms,
@@ -157,26 +157,30 @@ class CoderTaskWorker:
         )
 
         if job.kind is JobKind.PLAN:
-            proposal = self.coder.planner_model_draft(
+            proposal = self.coder.polished_model_output(
                 task.id,
                 (
                     "Produce a concise implementation PLAN ONLY for the task. "
                     "Do not emit shell commands, patches, deployment steps, "
                     "credentials, or production actions. Use only supplied "
                     "evidence. Identify affected modules, focused tests, main "
-                    "risks and approval gates. The result is advisory and "
-                    "non-actionable."
+                    "risks and approval gates. Critique the first proposal and "
+                    "return a refined advisory plan. The result remains "
+                    "non-actionable regardless of model output."
                 ),
                 context,
-                max_output_chars=450,
+                max_output_chars=1800,
+                role="planner",
             )
             return {
                 "kind": job.kind.value,
                 "stage": proposal.stage.value,
                 "candidate_count": len(proposal.candidate_drafts),
                 "revision_count": proposal.revision_count,
+                "refined": bool(str(proposal.refined or "").strip()),
                 "actionable_patch": False,
                 "proposal_persisted": True,
+                "production_mutation": False,
             }
 
         if job.kind is JobKind.IMPLEMENT:
