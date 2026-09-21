@@ -222,6 +222,37 @@ def _conversion(raw: dict[str, Any] | None, path: Path) -> dict[str, Any]:
         "execution_authority": raw.get("execution_authority", "none"),
     }
 
+def _commercial_catalog(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "product_count": 0,
+            "binding_terms_ready_count": 0,
+            "blocker_counts": {},
+        }
+    return {
+        "available": True,
+        "observed_at": _mtime_iso(path),
+        "schema_version": raw.get("schema_version"),
+        "product_count": int(raw.get("product_count") or 0),
+        "active_count": int(raw.get("active_count") or 0),
+        "binding_terms_ready_count": int(
+            raw.get("binding_terms_ready_count") or 0
+        ),
+        "blocker_counts": (
+            raw.get("blocker_counts")
+            if isinstance(raw.get("blocker_counts"), dict)
+            else {}
+        ),
+        "actual_revenue": False,
+        "execution_authority": "none",
+    }
+
+
 def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     loop_path = runtime / "commercial_loop" / "latest.json"
@@ -229,6 +260,7 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     acquisition_path = runtime / "acquisition" / "latest.json"
     source_path = runtime / "source_health" / "latest.json"
     conversion_path = runtime / "conversion" / "latest.json"
+    catalog_path = runtime / "commercial_catalog" / "latest.json"
 
     raw_loop = _read_json(loop_path)
     conveyor = build_conveyor(raw_loop or {"stages": []})
@@ -256,6 +288,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "conversion": _conversion(
             _read_json(conversion_path),
             conversion_path,
+        ),
+        "commercial_catalog": _commercial_catalog(
+            _read_json(catalog_path),
+            catalog_path,
         ),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
