@@ -13,6 +13,7 @@ from empire_os.qualification_worker_v2 import (
     run_identity_catchup,
 )
 from empire_os.omega_worker import run_omega_cycle
+from empire_os.signal_resolver import run_signal_resolution
 from empire_os.omega_buyer_readiness import (
     run_omega_buyer_readiness_cycle,
 )
@@ -33,12 +34,31 @@ def main() -> int:
         type=int,
         default=5,
     )
+    parser.add_argument(
+        "--signal-resolution-limit",
+        type=int,
+        default=10,
+    )
     args = parser.parse_args()
     if args.limit < 1 or args.limit > 25:
         parser.error("--limit must be between 1 and 25")
     if args.identity_catchup_limit < 0 or args.identity_catchup_limit > 25:
         parser.error("--identity-catchup-limit must be between 0 and 25")
+    if args.signal_resolution_limit < 0 or args.signal_resolution_limit > 25:
+        parser.error("--signal-resolution-limit must be between 0 and 25")
 
+    signal_resolution = (
+        run_signal_resolution(args.signal_resolution_limit)
+        if args.signal_resolution_limit
+        else {
+            "schema_version": "empire.signal-resolution.v1",
+            "ok": True,
+            "attempted": 0,
+            "resolved": 0,
+            "failed": 0,
+            "results": [],
+        }
+    )
     qualification = run_cycle(args.limit)
     catchup = (
         run_identity_catchup(args.identity_catchup_limit)
@@ -77,13 +97,15 @@ def main() -> int:
     write_commercial_loop_snapshot(commercial_loop)
     result = {
         "schema_version": "qualification_service_cycle.v4",
+        "signal_resolution": signal_resolution,
         "qualification": qualification,
         "identity_catchup": catchup,
         "omega_projection": omega,
         "buyer_readiness": buyer_readiness,
         "commercial_loop": commercial_loop.as_dict(),
         "ok": bool(
-            qualification["ok"]
+            signal_resolution["ok"]
+            and qualification["ok"]
             and catchup["ok"]
             and omega["ok"]
             and buyer_readiness["ok"]
