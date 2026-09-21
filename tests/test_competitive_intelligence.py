@@ -218,3 +218,60 @@ def test_competitor_audience_graph_rejects_unsupported_relationship_claim():
     assert result["rejected_evidence_count"] == 1
     assert result["buyer_intent_inferred"] is False
     assert result["commercial_intent_inferred"] is False
+
+
+def _audience_company():
+    from empire_os.competitive_intelligence import (
+        build_competitor_audience_graph,
+    )
+
+    graph = build_competitor_audience_graph([{
+        "competitor_key": "competitor-a",
+        "competitor_domain": "competitor.example",
+        "company_name": "Acme Roofing",
+        "company_domain": "acme.example",
+        "evidence_type": "customer_case_study",
+        "summary": "Named in a public competitor case study.",
+        "source_ref": "web:competitor-a:case-study:acme",
+        "observed_at": "2026-09-21T20:00:00Z",
+        "confidence": 0.9,
+    }])
+    return graph["companies"][0]
+
+
+def test_competitor_audience_signal_requires_resolved_entity():
+    import pytest
+    from empire_os.competitive_intelligence import (
+        competitor_audience_intelligence_signal,
+    )
+
+    with pytest.raises(ValueError, match="resolved_entity_id_required"):
+        competitor_audience_intelligence_signal(
+            _audience_company(),
+            entity_id=None,
+        )
+
+
+def test_competitor_audience_signal_preserves_evidence_without_execution():
+    from empire_os.competitive_intelligence import (
+        competitor_audience_intelligence_signal,
+    )
+
+    result = competitor_audience_intelligence_signal(
+        _audience_company(),
+        entity_id="entity-acme-001",
+        source_id="source-competitive-public",
+    )
+
+    assert result["entity_id"] == "entity-acme-001"
+    assert result["signal_type"] == "competitor_audience_evidence"
+    assert result["signal_domain"] == "competitive_intelligence"
+    assert result["payload"]["evidence_count"] == 1
+    assert result["payload"]["competitor_keys"] == ["competitor-a"]
+
+    assert result["persistence_performed"] is False
+    assert result["prospect_created"] is False
+    assert result["buyer_intent_inferred"] is False
+    assert result["commercial_intent_inferred"] is False
+    assert result["outreach_enabled"] is False
+    assert result["execution_authority"] == "none"

@@ -528,3 +528,104 @@ def build_competitor_audience_graph(
         "prospect_creation_enabled": False,
         "outreach_enabled": False,
     }
+
+
+def competitor_audience_intelligence_signal(
+    company: Mapping[str, Any],
+    *,
+    entity_id: str | None,
+    source_id: str | None = None,
+) -> dict[str, Any]:
+    """Adapt a resolved audience-graph company to Intelligence Fabric input.
+
+    This is an OBSERVE-only adapter. It does not persist the signal and cannot
+    create a prospect, infer buyer intent or authorize outreach.
+    """
+    resolved_entity_id = str(entity_id or "").strip()
+    if not resolved_entity_id:
+        raise ValueError("resolved_entity_id_required")
+
+    if not isinstance(company, Mapping):
+        raise ValueError("company_mapping_required")
+
+    evidence = company.get("evidence")
+    if not isinstance(evidence, list) or not evidence:
+        raise ValueError("competitor_audience_evidence_required")
+
+    valid_evidence = []
+    observed_times = []
+    competitor_keys = set()
+
+    for item in evidence:
+        if not isinstance(item, Mapping):
+            raise ValueError("invalid_competitor_audience_evidence")
+
+        source_ref = str(item.get("source_ref") or "").strip()
+        observed_at = str(item.get("observed_at") or "").strip()
+        evidence_type = str(item.get("evidence_type") or "").strip()
+        competitor_key = str(item.get("competitor_key") or "").strip()
+
+        if not source_ref:
+            raise ValueError("source_ref_required")
+        if not observed_at:
+            raise ValueError("observed_at_required")
+        if evidence_type not in COMPETITOR_AUDIENCE_EVIDENCE_TYPES:
+            raise ValueError("unsupported_evidence_type")
+        if not competitor_key:
+            raise ValueError("competitor_key_required")
+
+        observed_times.append(observed_at)
+        competitor_keys.add(competitor_key)
+        valid_evidence.append({
+            "competitor_key": competitor_key,
+            "competitor_domain": str(
+                item.get("competitor_domain") or ""
+            ).strip(),
+            "evidence_type": evidence_type,
+            "summary": str(item.get("summary") or "").strip(),
+            "source_ref": source_ref,
+            "observed_at": observed_at,
+            "confidence": item.get("confidence"),
+        })
+
+    confidences = [
+        float(item["confidence"])
+        for item in valid_evidence
+        if item.get("confidence") is not None
+    ]
+    confidence = (
+        round(sum(confidences) / len(confidences), 6)
+        if confidences
+        else None
+    )
+
+    return {
+        "schema_version": "intelligence_signal_candidate.v1",
+        "entity_id": resolved_entity_id,
+        "signal_type": "competitor_audience_evidence",
+        "signal_domain": "competitive_intelligence",
+        "observed_at": max(observed_times),
+        "source_id": str(source_id or "").strip() or None,
+        "strength": min(1.0, len(valid_evidence) / 3.0),
+        "confidence": confidence,
+        "payload": {
+            "company_name": str(company.get("company_name") or "").strip(),
+            "company_domain": _normalise_audience_domain(
+                company.get("company_domain")
+            ),
+            "competitor_keys": sorted(competitor_keys),
+            "evidence_count": len(valid_evidence),
+            "evidence": valid_evidence,
+            "research_candidate": True,
+            "buyer_intent": False,
+            "commercial_intent": False,
+            "prospect_created": False,
+            "outreach_enabled": False,
+        },
+        "persistence_performed": False,
+        "prospect_created": False,
+        "buyer_intent_inferred": False,
+        "commercial_intent_inferred": False,
+        "outreach_enabled": False,
+        "execution_authority": "none",
+    }
