@@ -69,6 +69,9 @@ from empire_os.commercial_funnel import (
 from empire_os.revenue_pulse import (
     build_revenue_pulse_runtime,
 )
+from empire_os.market_sweep_revenue_gps import (
+    build_market_sweep_runtime,
+)
 
 PHASE_RE = re.compile(
     r"^### Phase\s+(\d+)\s+—\s+(.+?)(?:\s+←\s+CURRENT)?$",
@@ -356,6 +359,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         ),
         "commercial_funnel": build_funnel_runtime(repo_root),
         "revenue_pulse": build_revenue_pulse_runtime(repo_root),
+        "market_sweeps_revenue_gps": (
+            build_market_sweep_runtime(repo_root)
+        ),
         "permit_intelligence": build_permit_intelligence_runtime(repo_root),
         "property_intelligence": build_property_intelligence_runtime(repo_root),
         "private_capital_intelligence": (
