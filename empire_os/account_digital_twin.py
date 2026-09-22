@@ -79,6 +79,7 @@ def build_account_twin(
     next_action: Mapping[str, Any] | None = None,
     qualification_history: list[Mapping[str, Any]] | None = None,
     commercial_history: Mapping[str, Any] | None = None,
+    revenue_truth: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     audience = dict(audience or {})
     research = dict(research or {})
@@ -87,6 +88,8 @@ def build_account_twin(
     qualification_history = list(qualification_history or [])
     commercial_history_loaded = commercial_history is not None
     commercial_history = dict(commercial_history or {})
+    revenue_truth_loaded = revenue_truth is not None
+    revenue_truth = dict(revenue_truth or {})
 
     states = _state_map(entity)
     unknown_states = list(entity.get("unknown_states", []) or [])
@@ -266,10 +269,33 @@ def build_account_twin(
             ),
         },
         "revenue_truth": {
-            "recognized_revenue_cents": None,
-            "realized_gp_cents": None,
+            "available": revenue_truth_loaded,
+            "recognized_order_count": (
+                int(revenue_truth.get("recognized_order_count") or 0)
+                if revenue_truth_loaded else None
+            ),
+            "recognized_revenue_cents": (
+                int(revenue_truth.get("recognized_revenue_cents") or 0)
+                if revenue_truth_loaded else None
+            ),
+            "actual_cost_cents": (
+                int(revenue_truth.get("actual_cost_cents") or 0)
+                if revenue_truth_loaded else None
+            ),
+            "realized_gp_cents": (
+                int(revenue_truth.get("realized_gp_cents") or 0)
+                if revenue_truth_loaded else None
+            ),
+            "latest_recognized_at": (
+                revenue_truth.get("latest_recognized_at")
+                if revenue_truth_loaded else None
+            ),
             "forecast_included_in_truth": False,
-            "actual_revenue": False,
+            "actual_revenue": (
+                bool(int(revenue_truth.get("recognized_revenue_cents") or 0) > 0)
+                if revenue_truth_loaded else False
+            ),
+            "recognition_authority": "none",
         },
         "uncertainty": {
             "explicit": True,
@@ -296,6 +322,9 @@ def build_account_twin_snapshot(
     commercial_history_by_entity: Mapping[
         str, Mapping[str, Any]
     ] | None = None,
+    revenue_truth_by_entity: Mapping[
+        str, Mapping[str, Any]
+    ] | None = None,
 ) -> dict[str, Any]:
     audience_by_id = _index(list(audience.get("companies", []) or []))
     research_by_id = _index(list(research.get("actions", []) or []))
@@ -306,6 +335,9 @@ def build_account_twin_snapshot(
     )
     commercial_history_by_entity = dict(
         commercial_history_by_entity or {}
+    )
+    revenue_truth_by_entity = dict(
+        revenue_truth_by_entity or {}
     )
 
     twins = []
@@ -328,6 +360,7 @@ def build_account_twin_snapshot(
             commercial_history=commercial_history_by_entity.get(
                 entity_id
             ),
+            revenue_truth=revenue_truth_by_entity.get(entity_id),
         ))
 
     twins.sort(
@@ -425,6 +458,43 @@ def load_commercial_history(
     return result
 
 
+def load_account_revenue_truth(
+    writer: PostgresIntelligenceMaterializer,
+    entity_ids: list[str],
+) -> dict[str, dict[str, Any]]:
+    if not entity_ids:
+        return {}
+
+    with writer._connect(writer.dsn) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SET LOCAL ROLE {ROLE}")
+            cursor.execute(
+                """
+                SELECT
+                  entity_id,
+                  recognized_order_count,
+                  recognized_revenue_cents,
+                  actual_cost_cents,
+                  realized_gp_cents,
+                  latest_recognized_at
+                FROM public.empire_account_revenue_truth(%s::uuid[])
+                ORDER BY entity_id
+                """,
+                (entity_ids,),
+            )
+            names = [item.name for item in cursor.description]
+            rows = [
+                dict(zip(names, row, strict=True))
+                for row in cursor.fetchall()
+            ]
+
+    return {
+        _clean(row.get("entity_id")): row
+        for row in rows
+        if _clean(row.get("entity_id"))
+    }
+
+
 def refresh_account_twin_snapshot(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     buyer_state = _load_json(
@@ -440,6 +510,7 @@ def refresh_account_twin_snapshot(repo_root: Path) -> dict[str, Any]:
         str, list[dict[str, Any]]
     ] = {}
     commercial_history: dict[str, dict[str, Any]] = {}
+    revenue_truth: dict[str, dict[str, Any]] = {}
     try:
         writer = PostgresIntelligenceMaterializer.from_env()
     except Exception:
@@ -450,6 +521,10 @@ def refresh_account_twin_snapshot(repo_root: Path) -> dict[str, Any]:
             entity_ids,
         )
         commercial_history = load_commercial_history(
+            writer,
+            entity_ids,
+        )
+        revenue_truth = load_account_revenue_truth(
             writer,
             entity_ids,
         )
@@ -478,6 +553,7 @@ def refresh_account_twin_snapshot(repo_root: Path) -> dict[str, Any]:
         ),
         qualification_history_by_entity=qualification_history,
         commercial_history_by_entity=commercial_history,
+        revenue_truth_by_entity=revenue_truth,
     )
     write_account_twin_snapshot(repo_root, payload)
     return payload
