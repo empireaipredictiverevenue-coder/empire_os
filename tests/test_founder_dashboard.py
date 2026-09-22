@@ -1274,7 +1274,7 @@ def test_dashboard_exposes_recovery_portfolio_as_non_production_truth(tmp_path):
         for row in recovery["products"]
     )
     plan = result["canonical_execution_plan"]
-    assert plan["current_phase"] == "3F"
+    assert plan["current_phase"] == "4"
     assert plan["upgrade_and_enhance_required"] is True
     assert plan["revenue_expansion_required"] is True
     assert plan["phase_skipping_allowed"] is False
