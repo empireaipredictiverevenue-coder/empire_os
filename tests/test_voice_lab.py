@@ -47,7 +47,7 @@ def test_voice_lab_dependencies_are_reported_without_loading_models():
     from empire_os.voice_lab import EmpireVoiceLab
 
     readiness = EmpireVoiceLab.dependency_readiness()
-    assert set(readiness) == {"faster_whisper", "kokoro", "numpy"}
+    assert set(readiness) == {"sherpa_onnx", "numpy"}
     assert all(isinstance(value, bool) for value in readiness.values())
 
 
