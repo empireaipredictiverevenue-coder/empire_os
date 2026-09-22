@@ -391,3 +391,44 @@ def test_competitor_signal_rejects_wrong_canonical_source():
         match="source mismatch",
     ):
         persist_competitor_audience_signal(writer, signal)
+
+
+def test_competitor_dedupe_ignores_observed_at():
+    from empire_os.intelligence_materializer_transport import (
+        persist_competitor_audience_signal,
+    )
+
+    writer, cursor = _competitor_writer(duplicate=True)
+    result = persist_competitor_audience_signal(
+        writer,
+        _competitor_signal(),
+    )
+
+    assert result["existing"] is True
+
+    select_sql = next(
+        sql for sql, _ in cursor.calls
+        if sql.startswith("SELECT payload")
+    )
+    assert "observed_at=%s" not in select_sql
+
+
+def test_competitor_evidence_fingerprint_distinguishes_same_page_relationships():
+    from empire_os.intelligence_materializer_transport import (
+        _competitor_evidence_fingerprints,
+    )
+
+    payload_a = _competitor_signal()["payload"]
+    payload_b = {
+        **payload_a,
+        "competitor_keys": ["competitor-b"],
+        "evidence": [{
+            **payload_a["evidence"][0],
+            "competitor_key": "competitor-b",
+        }],
+    }
+
+    assert (
+        _competitor_evidence_fingerprints(payload_a)
+        != _competitor_evidence_fingerprints(payload_b)
+    )
