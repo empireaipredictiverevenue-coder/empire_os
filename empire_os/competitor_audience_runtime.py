@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from empire_os.competitor_audience_omega_cortex import (
+    build_competitor_omega_cortex_context,
+)
 from empire_os.competitor_audience_priority import (
     rank_competitor_audience_companies,
 )
@@ -181,6 +184,9 @@ def summarize_competitor_audience_rows(
     )
 
     priorities = rank_competitor_audience_companies(companies)
+    omega_cortex_context = build_competitor_omega_cortex_context(
+        priorities
+    )
     priority_by_entity = {
         row["entity_id"]: row
         for row in priorities
@@ -221,6 +227,7 @@ def summarize_competitor_audience_rows(
             default=0,
         ),
         "research_priority": priorities,
+        "omega_cortex_context": omega_cortex_context,
         "buyer_intent_inferred": False,
         "commercial_intent_inferred": False,
         "outreach_enabled": False,
