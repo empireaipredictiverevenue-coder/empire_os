@@ -16,6 +16,14 @@ from pathlib import Path
 import sys
 from typing import Any, Callable
 
+from empire_os.decision_judge import (
+    ACTION_CLARIFY,
+    ACTION_HUMAN_HANDOFF,
+    ACTION_STOP,
+    INTENT_OPT_OUT,
+    EmpireDecisionJudge,
+)
+
 
 MODEL_ROOT = Path(
     os.getenv(
@@ -474,6 +482,7 @@ class EmpireVoiceLab:
         self.stt = SherpaWhisperSTT(self.config)
         self.tts = SherpaKokoroTTS(self.config)
         self.brain = VoiceCloserBrain()
+        self.judge = EmpireDecisionJudge()
 
     def opening_text(self, *, business_name: str = "") -> str:
         target = (
@@ -571,17 +580,47 @@ class EmpireVoiceLab:
             return {
                 "transcript": "",
                 "response_text": "",
+                "decision": None,
             }
-        response_text = self.brain.reply(
+
+        decision = self.judge.judge_text(
             transcript,
-            business_name=business_name,
-            niche=niche,
-            metro=metro,
-            history=history,
+            source=self.config.stt_backend,
         )
+        decision_payload = decision.to_dict()
+
+        if decision.action == ACTION_STOP:
+            if decision.intent == INTENT_OPT_OUT:
+                response_text = (
+                    "Understood. I'll end the call now."
+                )
+            else:
+                response_text = (
+                    "Understood. Thanks for your time."
+                )
+        elif decision.action == ACTION_CLARIFY:
+            response_text = (
+                "I want to make sure I heard you correctly. "
+                "Could you repeat that?"
+            )
+        elif decision.action == ACTION_HUMAN_HANDOFF:
+            response_text = (
+                "Thanks. I don't want to make a binding commitment "
+                "on this call. A human can handle that."
+            )
+        else:
+            response_text = self.brain.reply(
+                transcript,
+                business_name=business_name,
+                niche=niche,
+                metro=metro,
+                history=history,
+            )
+
         return {
             "transcript": transcript,
             "response_text": response_text,
+            "decision": decision_payload,
         }
 
     def respond(
