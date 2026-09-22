@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from empire_os.competitor_audience_priority import (
+    rank_competitor_audience_companies,
+)
 from empire_os.intelligence_materializer_transport import (
     ROLE,
     PostgresIntelligenceMaterializer,
@@ -177,6 +180,25 @@ def summarize_competitor_audience_rows(
         )
     )
 
+    priorities = rank_competitor_audience_companies(companies)
+    priority_by_entity = {
+        row["entity_id"]: row
+        for row in priorities
+        if row.get("entity_id")
+    }
+
+    for company in companies:
+        company["research_priority"] = priority_by_entity.get(
+            company["entity_id"],
+            {
+                "research_priority_score": 0.0,
+                "research_priority_rank": None,
+                "stack_state": "NO_EVIDENCE",
+                "recommendation_only": True,
+                "execution_authority": "none",
+            },
+        )
+
     return {
         "schema_version": "empire.competitor_audience_runtime.v1",
         "mode": "OBSERVE",
@@ -198,6 +220,7 @@ def summarize_competitor_audience_rows(
             ),
             default=0,
         ),
+        "research_priority": priorities,
         "buyer_intent_inferred": False,
         "commercial_intent_inferred": False,
         "outreach_enabled": False,
