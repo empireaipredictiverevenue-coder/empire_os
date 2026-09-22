@@ -22,6 +22,7 @@ def test_choose_jobs_drives_internal_launch_pipeline():
         "commercial_loop_refresh",
         "revenue_pulse_refresh",
         "opportunity_loop_refresh",
+        "astra_executive_refresh",
     ]
 
 
@@ -53,7 +54,10 @@ def test_complete_commercial_loop_keeps_discovering_next_opportunity():
     assert choose_jobs(
         {"loop_complete": True, "stages": []},
         {"end_to_end_healthy": True},
-    ) == ["opportunity_loop_refresh"]
+    ) == [
+        "opportunity_loop_refresh",
+        "astra_executive_refresh",
+    ]
 
 
 def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
@@ -70,7 +74,10 @@ def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
     jobs = choose_jobs(loop, source, review)
     assert "buyer_deferred_enrichment" not in jobs
     assert jobs[0] == "buyer_review_materializer"
-    assert jobs[-1] == "opportunity_loop_refresh"
+    assert jobs[-2:] == [
+        "opportunity_loop_refresh",
+        "astra_executive_refresh",
+    ]
 
 
 def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
@@ -173,3 +180,14 @@ def test_canonical_opportunity_loop_is_single_internal_safe_job():
         "opportunity_ai_planner",
     }
     assert retired_direct_dispatch.isdisjoint(module.SAFE_JOBS)
+
+
+def test_astra_executive_refresh_is_safe_internal_job():
+    import empire_os.astra_dispatcher as module
+
+    assert "astra_executive_refresh" in module.SAFE_JOBS
+    command = module.SAFE_JOBS["astra_executive_refresh"]
+    assert any(
+        str(part).endswith("build_astra_executive.py")
+        for part in command
+    )
