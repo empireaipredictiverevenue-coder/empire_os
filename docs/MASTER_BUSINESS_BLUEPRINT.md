@@ -1,4 +1,4 @@
-# Empire AI — Master Predictive Revenue Business Blueprint
+# Empire AI — Master Predictive Cloud & Predictive Revenue Business Blueprint
 
 Date: 2026-09-19
 Status: CANONICAL BUSINESS + PRODUCT MODEL
@@ -9,22 +9,27 @@ It sits above `BLUEPRINT_V6.md` (engineering/phase roadmap) and
 
 ## 1. Company Mission
 
-Empire AI is a **Predictive Revenue Operating System**.
+Empire AI builds **Predictive Cloud**, with **Predictive Revenue** as the commercial engine and revenue-truth loop inside it.
 
 The company does not exist to sell isolated leads, SEO, ads, CRM, scrapers,
-satellite data, seats or AI agents. Those are products and execution surfaces
-inside one system.
+satellite data, seats or AI agents. Those are products, sensors and execution
+surfaces inside Predictive Cloud.
 
 Empire's job is to:
 
-**observe markets -> build intelligence -> predict profitable revenue ->
-create/capture demand -> connect demand to buyers/capacity -> execute GTM ->
-verify payment/fulfilment/outcomes -> measure realized gross profit ->
-learn -> improve the next decision.**
+**observe the business and world -> build temporal intelligence -> explain current state -> predict revenue, demand, risk and other economically relevant future states -> simulate scenarios -> detect opportunities and constraints -> choose the best evidence-backed action -> govern execution -> verify payment/fulfilment/outcomes -> measure realized economics -> learn -> improve the next decision.**
 
-North-star metric:
+North-star commercial metric:
 
 **Predicted Gross Profit -> Realized Gross Profit -> Prediction Error -> Better Allocation**
+
+Predictive Cloud additionally optimizes decision quality across demand, markets,
+customers, conversion, operations, fulfilment, search/attention, physical assets,
+risk, capital allocation and opportunity discovery. These broader predictions
+remain decision support until verified outcomes exist.
+
+Canonical Predictive Cloud architecture:
+`docs/PREDICTIVE_CLOUD_ARCHITECTURE.md`
 
 Supporting commercial metrics:
 - MRR / ARR
@@ -37,7 +42,7 @@ Supporting commercial metrics:
 - source/channel contribution to realized revenue
 - forecast/calibration error
 
-## 2. The Canonical 12-Step Predictive Revenue Intelligence Loop
+## 2. The Canonical 12-Step Predictive Cloud / Predictive Revenue Intelligence Loop
 
 1. **Raw World**
    Open web, search, company sites, registries, permits, public records,
