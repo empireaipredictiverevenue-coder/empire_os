@@ -108,3 +108,36 @@ def test_status_exposes_astra_executive_goal_and_plan(tmp_path):
     assert summary["auto_dispatch_eligible_count"] == 3
     assert summary["founder_gate_step_count"] == 1
     assert summary["external_execution_performed"] is False
+
+
+def test_status_exposes_quant_review_and_department_coverage(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/opportunity_factory/quant_review_latest.json",
+        {
+            "generated_at": "2026-09-22T20:59:00+00:00",
+            "candidate_count": 24,
+            "available_decision_packet_count": 2,
+            "unavailable_decision_packet_count": 22,
+            "missing_field_counts": {
+                "probability_success": 22,
+            },
+            "capital_execution": False,
+            "execution_authority": "none",
+        },
+    )
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime(2026, 9, 22, 21, 0, tzinfo=timezone.utc),
+    )
+    summary = result["components"]["opportunity_quant_review"]["summary"]
+    assert summary["available_decision_packet_count"] == 2
+    assert summary["unavailable_decision_packet_count"] == 22
+    assert summary["capital_execution"] is False
+
+    organization = result["organization"]
+    assert organization["department_count"] >= 10
+    assert organization["all_department_components_registered"] is True
+    assert organization["fully_wired_department_count"] == organization[
+        "department_count"
+    ]
