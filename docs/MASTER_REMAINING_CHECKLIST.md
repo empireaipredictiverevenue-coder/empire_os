@@ -18,6 +18,36 @@ Current truth:
 - payment is not recognized revenue
 - recognized revenue is not realized gross profit
 
+## Quant Brain / Decision Verification — ACTIVE
+
+- [x] Quant Brain deterministic core mounted in main EmpireOS Hub
+- [x] Bayesian update primitive
+- [x] Expected economics
+- [x] Brier calibration
+- [x] Log-loss calibration
+- [x] Reliability/calibration bins
+- [x] Risk-adjusted scoring
+- [x] Deterministic Monte Carlo simulation
+- [x] Value of Information
+- [x] Portfolio concentration
+- [x] Typed Quant Decision Packet — CODED
+- [x] Decision Packet fails closed with explicit missing fields
+- [x] Verified product policy economics flow into Quant inputs
+- [x] Probability/uncertainty/confidence/time-to-revenue remain UNKNOWN unless supported
+- [x] Automatic Opportunity Quant Review stage — CODED
+- [x] Quant Review inserted into canonical Opportunity Loop — CODED
+- [x] Astra Executive consumes Quant missing-evidence state — CODED
+- [x] Predictive Intelligence registered as a Data/Quant capability
+- [x] Quant/Predictive Intelligence remain OBSERVE-only in Control Fabric
+- [ ] Live EmpireOS verification of Quant endpoints and opportunity Quant Review
+- [ ] Calibrated probability-of-success source from verified outcome cohorts
+- [ ] Calibrated time-to-revenue distributions
+- [ ] Prediction intervals / coverage monitoring
+- [ ] Forecast-vs-actual calibration board
+- [ ] Causal/experiment decision packet integration
+- [ ] Capital/portfolio packet integration
+- [ ] Economic Memory feedback from Quant prediction → verified outcome
+
 ## Predictive Cloud convergence — ACTIVE / IMPORTANT
 
 Master architecture: `docs/EMPIRE_MASTER_ARCHITECTURE.md`
@@ -113,7 +143,7 @@ Next wiring:
 - [ ] Add TAM / new-industry / new-country opportunity classes
 - [ ] Add productization / partner / distribution / pricing mismatch opportunity classes
 - [ ] Dedupe opportunity history across cycles and preserve lifecycle
-- [ ] Add DISCOVER → QUALIFY → VALIDATE → EXPERIMENT → PROVE → SCALE lifecycle
+- [x] Add DISCOVER → QUALIFY → VALIDATE → EXPERIMENT → PROVE → SCALE lifecycle — CODED with evidence-first stage promotion
 - [ ] Expose full Radar / research / blockers / opportunity lifecycle in Founder Console
 - [x] Aggregate Predictive Cloud runtime status read surface — CODED
 - [ ] Feed verified outcomes into opportunity calibration / Economic Memory
@@ -124,6 +154,44 @@ Autonomy target:
 - [ ] Existing standing authority handles approved bounded external workflows
 - [ ] Founder involvement is reserved for genuine consequential gates
 - [ ] System keeps pursuing evidence-backed commercial opportunities while founder is away
+
+## Astra Executive / Department Operating System — ACTIVE
+
+Canonical organization:
+**Founder → Astra Executive → Department → Agent/Tool → Control Fabric → Outcome.**
+
+- [x] Astra Executive world-state / goal / plan / delegation foundation — CODED
+- [x] Typed memory scope attached to executive plan steps — CODED
+- [x] Department ownership attached to every Astra executive plan step — CODED
+- [x] Canonical department registry — CODED
+- [x] Strategy & Executive department
+- [x] Marketing & Growth department
+- [x] Sales & Revenue department
+- [x] Research & Development department
+- [x] Product department
+- [x] Engineering & Platform department
+- [x] Data, Quant & Predictive Intelligence department
+- [x] Market & Opportunity Intelligence department
+- [x] Customer & Revenue Operations department
+- [x] Operations & Fulfilment department
+- [x] Finance & Capital department
+- [x] Risk, Legal & Compliance department
+- [x] Partnerships & Distribution department
+- [x] All canonical department components registered in Control Fabric — CODED
+- [x] Architecture regression prevents orphaned Astra delegate targets — CODED
+- [x] Predictive Cloud status exposes department organization/coverage — CODED
+- [ ] Live runtime verification of Astra Executive snapshot on EmpireOS
+- [ ] Department scorecards from live KPIs
+- [ ] Department work queues / budgets / review cadence
+- [ ] Astra automatic dispatch from executive plan into eligible department queues
+- [ ] Executive plan-vs-outcome evaluation / feedback loop
+- [ ] Founder Console department command surface
+
+Canonical docs:
+- `docs/DEPARTMENT_OPERATING_ARCHITECTURE.md`
+- `docs/MARKETING_DEPARTMENT_BLUEPRINT.md`
+- `docs/RD_DEPARTMENT_BLUEPRINT.md`
+- `docs/STRATEGY_DEPARTMENT_BLUEPRINT.md`
 
 ## Autonomous Business Loop — CURRENT PARALLEL FOUNDATION
 
