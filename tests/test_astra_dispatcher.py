@@ -21,9 +21,7 @@ def test_choose_jobs_drives_internal_launch_pipeline():
         "conversion_intelligence_refresh",
         "commercial_loop_refresh",
         "revenue_pulse_refresh",
-        "opportunity_radar_refresh",
-        "opportunity_research_refresh",
-        "opportunity_factory_intake_refresh",
+        "opportunity_loop_refresh",
     ]
 
 
@@ -47,17 +45,15 @@ def test_choose_jobs_adds_source_repair_but_no_duplicate_jobs():
         "conversion_intelligence_refresh",
         "commercial_loop_refresh",
         "revenue_pulse_refresh",
-        "opportunity_radar_refresh",
-        "opportunity_research_refresh",
-        "opportunity_factory_intake_refresh",
+        "opportunity_loop_refresh",
     ]
 
 
-def test_complete_loop_dispatches_nothing_when_source_is_healthy():
+def test_complete_commercial_loop_keeps_discovering_next_opportunity():
     assert choose_jobs(
         {"loop_complete": True, "stages": []},
         {"end_to_end_healthy": True},
-    ) == []
+    ) == ["opportunity_loop_refresh"]
 
 
 def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
@@ -74,11 +70,7 @@ def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
     jobs = choose_jobs(loop, source, review)
     assert "buyer_deferred_enrichment" not in jobs
     assert jobs[0] == "buyer_review_materializer"
-    assert jobs[-2:] == [
-        "opportunity_radar_refresh",
-        "opportunity_research_refresh",
-        "opportunity_factory_intake_refresh",
-    ]
+    assert jobs[-1] == "opportunity_loop_refresh"
 
 
 def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
@@ -89,7 +81,12 @@ def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
     monkeypatch.setattr(module, "SOURCE", tmp_path / "source.json")
     monkeypatch.setattr(module, "BUYER_REVIEW", tmp_path / "review.json")
     monkeypatch.setattr(module, "OUTPUT", tmp_path / "dispatch.json")
-    module.LOOP.write_text('{"loop_complete": false, "stages": [{"stage":"recognized_revenue","observed":false},{"stage":"buyer_conversation","observed":true},{"stage":"commercial_terms","observed":true}]}')
+    module.LOOP.write_text(
+        '{"loop_complete": false, "stages": ['
+        '{"stage":"recognized_revenue","observed":false},'
+        '{"stage":"buyer_conversation","observed":true},'
+        '{"stage":"commercial_terms","observed":true}]}'
+    )
     module.SOURCE.write_text('{"end_to_end_healthy": true}')
     module.BUYER_REVIEW.write_text('{"deferred_enrichment": 1}')
 
@@ -102,12 +99,23 @@ def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
             for part in command
         ):
             raise subprocess.TimeoutExpired(command, 10)
-        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="ok",
+            stderr="",
+        )
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
-    result = module.dispatch(mode="GUARDED_EXECUTE", timeout_seconds=10)
+    result = module.dispatch(
+        mode="GUARDED_EXECUTE",
+        timeout_seconds=10,
+    )
     assert result["executions"][0]["decision"] == "TIMED_OUT"
-    assert any(row["decision"] == "DISPATCHED" for row in result["executions"][1:])
+    assert any(
+        row["decision"] == "DISPATCHED"
+        for row in result["executions"][1:]
+    )
 
 
 def test_default_dispatch_timeout_is_bounded(monkeypatch, tmp_path):
@@ -132,7 +140,10 @@ def test_default_dispatch_timeout_is_bounded(monkeypatch, tmp_path):
     def fake_run(command, **kwargs):
         seen.append(kwargs["timeout"])
         return subprocess.CompletedProcess(
-            command, 0, stdout="ok", stderr=""
+            command,
+            0,
+            stdout="ok",
+            stderr="",
         )
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
@@ -145,47 +156,20 @@ def test_default_dispatch_timeout_is_bounded(monkeypatch, tmp_path):
     )
 
 
-def test_opportunity_radar_is_internal_safe_job():
+def test_canonical_opportunity_loop_is_single_internal_safe_job():
     import empire_os.astra_dispatcher as module
 
-    assert "opportunity_radar_refresh" in module.SAFE_JOBS
-    command = module.SAFE_JOBS["opportunity_radar_refresh"]
+    assert "opportunity_loop_refresh" in module.SAFE_JOBS
+    command = module.SAFE_JOBS["opportunity_loop_refresh"]
     assert any(
-        str(part).endswith("build_opportunity_radar.py")
+        str(part).endswith("run_opportunity_loop.py")
         for part in command
     )
 
-
-def test_opportunity_research_is_internal_safe_job():
-    import empire_os.astra_dispatcher as module
-
-    assert "opportunity_research_refresh" in module.SAFE_JOBS
-    command = module.SAFE_JOBS["opportunity_research_refresh"]
-    assert any(
-        str(part).endswith("run_opportunity_research.py")
-        for part in command
-    )
-
-
-def test_opportunity_factory_intake_is_internal_safe_job():
-    import empire_os.astra_dispatcher as module
-
-    assert "opportunity_factory_intake_refresh" in module.SAFE_JOBS
-    command = module.SAFE_JOBS[
-        "opportunity_factory_intake_refresh"
-    ]
-    assert any(
-        str(part).endswith("build_opportunity_factory_intake.py")
-        for part in command
-    )
-
-
-def test_opportunity_ai_planner_is_internal_safe_job():
-    import empire_os.astra_dispatcher as module
-
-    assert "opportunity_ai_planner" in module.SAFE_JOBS
-    command = module.SAFE_JOBS["opportunity_ai_planner"]
-    assert any(
-        str(part).endswith("run_opportunity_ai_planner.py")
-        for part in command
-    )
+    retired_direct_dispatch = {
+        "opportunity_radar_refresh",
+        "opportunity_research_refresh",
+        "opportunity_factory_intake_refresh",
+        "opportunity_ai_planner",
+    }
+    assert retired_direct_dispatch.isdisjoint(module.SAFE_JOBS)
