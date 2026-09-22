@@ -23,6 +23,7 @@ def test_choose_jobs_drives_internal_launch_pipeline():
         "revenue_pulse_refresh",
         "opportunity_loop_refresh",
         "astra_executive_refresh",
+        "astra_department_dispatch",
     ]
 
 
@@ -57,6 +58,7 @@ def test_complete_commercial_loop_keeps_discovering_next_opportunity():
     ) == [
         "opportunity_loop_refresh",
         "astra_executive_refresh",
+        "astra_department_dispatch",
     ]
 
 
@@ -74,9 +76,10 @@ def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
     jobs = choose_jobs(loop, source, review)
     assert "buyer_deferred_enrichment" not in jobs
     assert jobs[0] == "buyer_review_materializer"
-    assert jobs[-2:] == [
+    assert jobs[-3:] == [
         "opportunity_loop_refresh",
         "astra_executive_refresh",
+        "astra_department_dispatch",
     ]
 
 
@@ -189,5 +192,16 @@ def test_astra_executive_refresh_is_safe_internal_job():
     command = module.SAFE_JOBS["astra_executive_refresh"]
     assert any(
         str(part).endswith("build_astra_executive.py")
+        for part in command
+    )
+
+
+def test_astra_department_dispatch_is_safe_internal_job():
+    import empire_os.astra_dispatcher as module
+
+    assert "astra_department_dispatch" in module.SAFE_JOBS
+    command = module.SAFE_JOBS["astra_department_dispatch"]
+    assert any(
+        str(part).endswith("dispatch_astra_departments.py")
         for part in command
     )
