@@ -654,3 +654,63 @@ def test_dashboard_exposes_account_buyer_digital_twins(tmp_path):
     assert twins["outreach_authorized"] is False
     assert twins["payment_authorized"] is False
     assert twins["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_cortex_learning_loop(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/cortex_learning/"
+        / "cortex_learning_latest.json",
+        {
+            "schema_version": "empire.cortex_learning_snapshot.v1",
+            "mode": "OBSERVE",
+            "packet_count": 2,
+            "learning_ready_count": 0,
+            "verified_customer_learning_count": 0,
+            "reply_observed_count": 0,
+            "forecast_used_as_outcome": False,
+            "synthetic_commercial_label_count": 0,
+            "model_weight_mutation_authorized": False,
+            "execution_authority": "none",
+            "packets": [
+                {
+                    "entity_id": "entity-1",
+                    "company_name": "Golden Spike Roofing Inc",
+                    "learning_ready": False,
+                    "verified_customer_learning": False,
+                    "label": {
+                        "available": False,
+                        "blockers": [
+                            "verified_commercial_outcome_missing"
+                        ],
+                    },
+                },
+                {
+                    "entity_id": "entity-2",
+                    "company_name": "Colorado's Best Roofing",
+                    "learning_ready": False,
+                    "verified_customer_learning": False,
+                    "label": {
+                        "available": False,
+                        "blockers": [
+                            "verified_commercial_outcome_missing"
+                        ],
+                    },
+                },
+            ],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    cortex = result["cortex_learning_loop"]
+
+    assert cortex["available"] is True
+    assert cortex["packet_count"] == 2
+    assert cortex["learning_ready_count"] == 0
+    assert cortex["verified_customer_learning_count"] == 0
+    assert cortex["forecast_used_as_outcome"] is False
+    assert cortex["synthetic_commercial_label_count"] == 0
+    assert cortex["model_weight_mutation_authorized"] is False
+    assert cortex["execution_authority"] == "none"
