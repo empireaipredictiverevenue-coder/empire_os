@@ -4,6 +4,8 @@ Date: 2026-09-22
 Status: CANONICAL MASTER REFERENCE
 
 This document is the top-level architecture reference for the Empire AI business.
+
+Canonical organization architecture: `docs/DEPARTMENT_OPERATING_ARCHITECTURE.md`
 It exists to prevent architecture drift, disconnected subsystem builds and repeated
 rediscovery of the same operating model.
 
@@ -427,3 +429,39 @@ The finish line is a self-operating Empire that continuously discovers,
 evaluates and pursues evidence-backed opportunities, converts them into genuine
 commercial outcomes, learns from the results and reallocates itself toward
 better opportunities.
+
+
+---
+
+## 17. Department Operating Model
+
+Empire operates as an AI-coordinated organization rather than a flat collection
+of agents.
+
+Canonical hierarchy:
+
+**Founder → Astra Executive → Department → Specialist Agent/Tool → Control Fabric
+→ Governed Action → Observed Outcome → Predictive Cloud / Economic Memory.**
+
+Canonical departments:
+- Strategy & Executive
+- Marketing & Growth
+- Sales & Revenue
+- Research & Development
+- Product
+- Engineering & Platform
+- Data, Quant & Predictive Intelligence
+- Market & Opportunity Intelligence
+- Customer & Revenue Operations
+- Operations & Fulfilment
+- Finance & Capital
+- Risk, Legal & Compliance
+- Partnerships & Distribution
+
+Agents are replaceable workers; departments are durable operating systems.
+
+Canonical implementation:
+- `empire_os/departments.py`
+- `empire_os/control_fabric.py`
+- `empire_os/astra_executive.py`
+- `docs/DEPARTMENT_OPERATING_ARCHITECTURE.md`
