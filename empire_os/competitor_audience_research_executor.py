@@ -335,6 +335,7 @@ def execute_snapshot_research(
     snapshot: Mapping[str, Any],
     *,
     search_fn: SearchFn = search_web,
+    fetch_fn: FetchFn = fetch_public_html,
 ) -> dict[str, Any]:
     companies = {
         _clean(row.get("entity_id")): row
@@ -355,6 +356,7 @@ def execute_snapshot_research(
                 company,
                 context,
                 search_fn=search_fn,
+                fetch_fn=fetch_fn,
             )
         )
 
