@@ -326,3 +326,61 @@ def test_dashboard_separates_property_evidence_from_private_capital_unknown(tmp_
     assert pe["deal_intent_observed"] is False
     assert pe["opportunity_count"] is None
     assert pe["actual_revenue"] is False
+
+
+
+def test_dashboard_exposes_competitor_audience_runtime(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_audience_latest.json",
+        {
+            "schema_version": "empire.competitor_audience_runtime.v1",
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "generated_at": "2026-09-22T11:00:00+00:00",
+            "latest_observed_at": "2026-09-22T10:55:05+00:00",
+            "canonical_signal_row_count": 3,
+            "company_count": 2,
+            "competitor_count": 1,
+            "unique_evidence_count": 4,
+            "stacked_company_count": 1,
+            "max_evidence_stack": 3,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "outreach_enabled": False,
+            "companies": [
+                {
+                    "entity_id": "entity-1",
+                    "company_name": "Golden Spike Roofing Inc",
+                    "company_website": "https://goldenspikeroofing.com",
+                    "signal_rows": 2,
+                    "competitors": ["elite-roofing-solar"],
+                    "competitor_count": 1,
+                    "unique_evidence_count": 3,
+                    "stack_strength": 1.0,
+                    "confidence": 0.9,
+                    "research_candidate": True,
+                    "buyer_intent": False,
+                    "commercial_intent": False,
+                    "outreach_enabled": False,
+                    "execution_authority": "none",
+                    "evidence": [],
+                }
+            ],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    audience = result["competitor_audience_intelligence"]
+
+    assert audience["available"] is True
+    assert audience["canonical_signal_row_count"] == 3
+    assert audience["company_count"] == 2
+    assert audience["unique_evidence_count"] == 4
+    assert audience["stacked_company_count"] == 1
+    assert audience["buyer_intent_inferred"] is False
+    assert audience["commercial_intent_inferred"] is False
+    assert audience["outreach_enabled"] is False
+    assert audience["execution_authority"] == "none"
