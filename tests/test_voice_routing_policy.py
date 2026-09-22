@@ -10,6 +10,10 @@ def test_ppc_switchboard_is_parked_by_default(monkeypatch):
         "EMPIRE_PPC_SWITCHBOARD_ROUTE_ENABLED",
         raising=False,
     )
+    monkeypatch.delenv(
+        "EMPIRE_PPC_SWITCHBOARD_CANONICAL_READY",
+        raising=False,
+    )
     status = switchboard_status()
     assert status["mode"] == "PARKED"
     assert status["route_enabled"] is False
@@ -20,7 +24,7 @@ def test_ppc_switchboard_is_parked_by_default(monkeypatch):
     assert should_route_to_switchboard() is False
 
 
-def test_switchboard_needs_both_active_mode_and_route_gate(monkeypatch):
+def test_switchboard_needs_active_route_and_canonical_ready(monkeypatch):
     monkeypatch.setenv("EMPIRE_PPC_SWITCHBOARD_MODE", "ACTIVE")
     monkeypatch.setenv(
         "EMPIRE_PPC_SWITCHBOARD_ROUTE_ENABLED",
@@ -30,6 +34,12 @@ def test_switchboard_needs_both_active_mode_and_route_gate(monkeypatch):
 
     monkeypatch.setenv(
         "EMPIRE_PPC_SWITCHBOARD_ROUTE_ENABLED",
+        "true",
+    )
+    assert should_route_to_switchboard() is False
+
+    monkeypatch.setenv(
+        "EMPIRE_PPC_SWITCHBOARD_CANONICAL_READY",
         "true",
     )
     assert should_route_to_switchboard() is True
