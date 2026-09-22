@@ -86,3 +86,19 @@ def test_rejection_diagnostic_writes_to_stderr(monkeypatch, capsys):
 
     assert result["organic"] == []
     assert "bing_html rejected" in captured.err
+
+
+
+def test_domain_query_does_not_match_on_com_token_only():
+    result = {
+        "title": "Brandon Sanderson White Sand",
+        "link": "https://brandonsanderson.com/white-sand",
+        "snippet": "Fantasy graphic novel.",
+    }
+
+    score = search_module._result_relevance(
+        result,
+        '"goldenspikeroofing.com"',
+    )
+
+    assert score == 0.0
