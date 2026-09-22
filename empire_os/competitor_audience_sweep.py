@@ -210,6 +210,109 @@ SearchFn = Callable[..., Mapping[str, Any]]
 FetchFn = Callable[[str], str | None]
 
 
+def discover_competitor_audience_evidence_from_source_refs(
+    *,
+    competitor_key: str,
+    competitor_name: str,
+    competitor_domain: str,
+    candidates: Iterable[Mapping[str, Any]],
+    source_refs: Iterable[str],
+    fetch_fn: FetchFn = fetch_public_html,
+    observed_at: str | None = None,
+) -> list[dict[str, Any]]:
+    """Read explicit public source pages before relying on search discovery."""
+    key = _clean(competitor_key)
+    name = _clean(competitor_name)
+    domain = _domain(competitor_domain)
+
+    if not key:
+        raise ValueError("competitor_key_required")
+    if not name and not domain:
+        raise ValueError("competitor_identity_required")
+
+    candidate_rows = [
+        {
+            "entity_id": _clean(row.get("entity_id") or row.get("id")),
+            "company_name": _clean(
+                row.get("company_name") or row.get("canonical_name")
+            ),
+            "company_domain": _domain(
+                row.get("company_domain")
+                or row.get("canonical_website")
+            ),
+        }
+        for row in candidates
+        if isinstance(row, Mapping)
+    ]
+
+    timestamp = observed_at or datetime.now(timezone.utc).isoformat()
+    evidence: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for source_ref in source_refs:
+        url = _clean(source_ref)
+        if not url or not _is_public_http_url(url):
+            continue
+
+        html = fetch_fn(url)
+        if not html:
+            continue
+
+        text, hrefs = _page_projection(html)
+        if not _comparison_like(url, text):
+            continue
+        if not _identity_observed(
+            text=text,
+            hrefs=hrefs,
+            name=name,
+            domain=domain,
+        ):
+            continue
+
+        for company in candidate_rows:
+            entity_id = company["entity_id"]
+            company_name = company["company_name"]
+            company_domain = company["company_domain"]
+
+            if not entity_id or (not company_name and not company_domain):
+                continue
+            if company_domain and company_domain == domain:
+                continue
+            if not _identity_observed(
+                text=text,
+                hrefs=hrefs,
+                name=company_name,
+                domain=company_domain,
+            ):
+                continue
+
+            fingerprint = (entity_id, url)
+            if fingerprint in seen:
+                continue
+            seen.add(fingerprint)
+
+            evidence.append({
+                "entity_id": entity_id,
+                "competitor_key": key,
+                "competitor_domain": domain,
+                "company_name": company_name,
+                "company_domain": company_domain,
+                "evidence_type": "comparison_mention",
+                "summary": (
+                    f"{company_name or company_domain} and "
+                    f"{name or domain} were both observed on the same "
+                    "configured public comparison/listing source."
+                ),
+                "source_ref": url,
+                "observed_at": timestamp,
+                "confidence": 0.95,
+                "search_query": None,
+                "discovery_path": "configured_source_ref",
+            })
+
+    return evidence
+
+
 def discover_competitor_audience_evidence(
     *,
     competitor_key: str,
@@ -441,6 +544,7 @@ def run_competitor_audience_sweep(
     persist: bool = False,
     search_fn: SearchFn = search_web,
     fetch_fn: FetchFn = fetch_public_html,
+    source_refs: Iterable[str] = (),
 ) -> dict[str, Any]:
     candidates = load_resolved_market_entities(
         writer,
@@ -448,7 +552,17 @@ def run_competitor_audience_sweep(
         metro=metro,
     )
 
-    evidence = discover_competitor_audience_evidence(
+    configured_evidence = (
+        discover_competitor_audience_evidence_from_source_refs(
+            competitor_key=competitor_key,
+            competitor_name=competitor_name,
+            competitor_domain=competitor_domain,
+            candidates=candidates,
+            source_refs=source_refs,
+            fetch_fn=fetch_fn,
+        )
+    )
+    searched_evidence = discover_competitor_audience_evidence(
         competitor_key=competitor_key,
         competitor_name=competitor_name,
         competitor_domain=competitor_domain,
@@ -457,6 +571,17 @@ def run_competitor_audience_sweep(
         search_fn=search_fn,
         fetch_fn=fetch_fn,
     )
+
+    evidence_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in [*configured_evidence, *searched_evidence]:
+        fingerprint = (
+            _clean(row.get("entity_id")),
+            _clean(row.get("competitor_key")),
+            _clean(row.get("source_ref")),
+        )
+        if all(fingerprint):
+            evidence_by_key.setdefault(fingerprint, row)
+    evidence = list(evidence_by_key.values())
 
     graph = build_competitor_audience_graph(evidence)
 
