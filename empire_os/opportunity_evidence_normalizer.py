@@ -189,6 +189,8 @@ def normalize_candidate(
     scores: dict[str, dict[str, Any]] = {}
     distribution_path: str | None = None
     offer_key = _clean(candidate.get("offer_key")) or None
+    quant_inputs: dict[str, Any] = {}
+    quant_input_evidence: dict[str, Any] = {}
 
     if klass == "market_research" and isinstance(market_gps, Mapping):
         markets = _market_lookup(market_gps)
@@ -202,6 +204,60 @@ def normalize_candidate(
             economics = _economics_score(market)
             if economics is not None:
                 scores["margin_potential"] = economics
+
+            economics_scenario = market.get("economics_scenario")
+            if isinstance(economics_scenario, Mapping) and (
+                economics_scenario.get("available") is True
+            ):
+                price = economics_scenario.get("pilot_price_cents")
+                acquisition = economics_scenario.get(
+                    "acquisition_cost_ceiling_cents"
+                )
+                fulfilment = economics_scenario.get(
+                    "fulfilment_cost_ceiling_cents"
+                )
+                if (
+                    price is not None
+                    and acquisition is not None
+                    and fulfilment is not None
+                ):
+                    quant_inputs.update({
+                        "conditional_revenue_cents": float(price),
+                        "fixed_cost_cents": float(acquisition),
+                        "success_cost_cents": float(fulfilment),
+                        "revenue_low_cents": float(price),
+                        "revenue_high_cents": float(price),
+                        "success_cost_low_cents": float(fulfilment),
+                        "success_cost_high_cents": float(fulfilment),
+                        "probability_success": None,
+                        "uncertainty": None,
+                        "time_to_revenue_days": None,
+                        "confidence": None,
+                    })
+                    quant_input_evidence.update({
+                        "economics_kind": economics_scenario.get(
+                            "economics_kind"
+                        ),
+                        "currency": economics_scenario.get("currency"),
+                        "product_code": economics_scenario.get(
+                            "product_code"
+                        ),
+                        "actual_cost_observed": (
+                            economics_scenario.get(
+                                "actual_cost_observed"
+                            ) is True
+                        ),
+                        "actual_revenue": (
+                            economics_scenario.get("actual_revenue")
+                            is True
+                        ),
+                        "basis": (
+                            "verified_commercial_product_policy_scenario"
+                        ),
+                        "evidence_refs": [
+                            "canonical:commercial_product_catalog"
+                        ],
+                    })
 
             distribution, path = _distribution_score(market)
             if distribution is not None:
@@ -252,6 +308,10 @@ def normalize_candidate(
         "opportunity_class": klass,
         "normalized_signals": normalized_signals,
         "score_evidence": scores,
+        "quant_inputs": quant_inputs,
+        "quant_input_evidence": quant_input_evidence,
+        "quant_inputs_available": bool(quant_inputs),
+        "quant_probability_inferred": False,
         "normalized_score_count": len(scores),
         "missing_normalized_fields": missing,
         "search_result_counts_used_as_scores": False,
