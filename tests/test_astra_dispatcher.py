@@ -21,6 +21,7 @@ def test_choose_jobs_drives_internal_launch_pipeline():
         "conversion_intelligence_refresh",
         "commercial_loop_refresh",
         "revenue_pulse_refresh",
+        "opportunity_radar_refresh",
     ]
 
 
@@ -68,7 +69,7 @@ def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
     jobs = choose_jobs(loop, source, review)
     assert "buyer_deferred_enrichment" not in jobs
     assert jobs[0] == "buyer_review_materializer"
-    assert jobs[-1] == "revenue_pulse_refresh"
+    assert jobs[-1] == "opportunity_radar_refresh"
 
 
 def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
@@ -132,4 +133,15 @@ def test_default_dispatch_timeout_is_bounded(monkeypatch, tmp_path):
     assert all(
         row["job"] != "buyer_deferred_enrichment"
         for row in result["executions"]
+    )
+
+
+def test_opportunity_radar_is_internal_safe_job():
+    import empire_os.astra_dispatcher as module
+
+    assert "opportunity_radar_refresh" in module.SAFE_JOBS
+    command = module.SAFE_JOBS["opportunity_radar_refresh"]
+    assert any(
+        str(part).endswith("build_opportunity_radar.py")
+        for part in command
     )
