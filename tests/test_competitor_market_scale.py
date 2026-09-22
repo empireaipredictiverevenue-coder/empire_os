@@ -94,6 +94,7 @@ def test_market_scale_runs_multiple_competitors():
         writer=object(),
         config=_config(),
         sweep_fn=_sweep_fn,
+        fetch_fn=lambda url: "<html></html>",
     )
 
     assert result["configured_competitor_count"] == 2
@@ -113,6 +114,7 @@ def test_market_scale_builds_shared_audience_overlap_without_market_share():
         writer=object(),
         config=_config(),
         sweep_fn=_sweep_fn,
+        fetch_fn=lambda url: "<html></html>",
     )
 
     by_company = {
@@ -138,6 +140,7 @@ def test_market_scale_can_bound_seed_count():
         config=_config(),
         max_seeds=1,
         sweep_fn=_sweep_fn,
+        fetch_fn=lambda url: "<html></html>",
     )
 
     assert result["configured_competitor_count"] == 2
@@ -157,6 +160,7 @@ def test_market_scale_persistence_counts_do_not_imply_commercial_authority():
         config=_config(),
         persist=True,
         sweep_fn=persisted_sweep,
+        fetch_fn=lambda url: "<html></html>",
     )
 
     assert result["persist_requested"] is True
@@ -164,3 +168,27 @@ def test_market_scale_persistence_counts_do_not_imply_commercial_authority():
     assert result["prospect_created"] is False
     assert result["outreach_enabled"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_market_scale_passes_configured_source_refs_to_sweeps():
+    calls = []
+
+    def recording_sweep(**kwargs):
+        calls.append(kwargs)
+        return _sweep_fn(**kwargs)
+
+    result = run_market_scale_sweep(
+        writer=object(),
+        config=_config(),
+        max_seeds=1,
+        sweep_fn=recording_sweep,
+        fetch_fn=lambda url: "<html></html>",
+    )
+
+    assert result["executed_competitor_count"] == 1
+    assert len(calls) == 1
+    assert calls[0]["source_refs"] == [
+        "https://example.com/denver-roofers"
+    ]
+    assert callable(calls[0]["fetch_fn"])
