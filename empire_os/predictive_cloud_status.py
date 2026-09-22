@@ -91,6 +91,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 900,
     },
+    "commercial_exchange": {
+        "path": Path("runtime/commercial_exchange/latest.json"),
+        "time_keys": ("observed_at", "generated_at"),
+        "fresh_seconds": 600,
+    },
     "astra": {
         "path": Path("runtime/astra/latest.json"),
         "time_keys": ("observed_at", "generated_at"),
@@ -206,6 +211,25 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             ),
             "ai_plan_queued_count": payload.get(
                 "ai_plan_queued_count"
+            ),
+        }
+    if name == "commercial_exchange":
+        return {
+            "inventory_count": payload.get("inventory_count"),
+            "allocation_candidate_count": payload.get(
+                "allocation_candidate_count"
+            ),
+            "overflow_count": payload.get("overflow_count"),
+            "buyer_seat_count": payload.get("buyer_seat_count"),
+            "corridor_count": payload.get("corridor_count"),
+            "buyer_capacity_never_gates_acquisition": payload.get(
+                "buyer_capacity_never_gates_acquisition"
+            ),
+            "overflow_remains_empire_owned": payload.get(
+                "overflow_remains_empire_owned"
+            ),
+            "automatic_external_delivery": payload.get(
+                "automatic_external_delivery"
             ),
         }
     if name == "opportunity_radar":
