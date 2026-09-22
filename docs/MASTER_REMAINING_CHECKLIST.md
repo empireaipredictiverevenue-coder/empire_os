@@ -216,8 +216,14 @@ Canonical organization:
 - [x] Core intelligence/org regression — 73 passed, 1 dependency deprecation warning — 2026-09-22
 - [x] Live runtime verification of Astra Executive snapshot on EmpireOS — VERIFIED 2026-09-22: primary goal `advance_first_verified_revenue`, 8 plan steps, 8 auto-dispatch eligible, 0 founder gates
 - [ ] Department scorecards from live KPIs
-- [ ] Department work queues / budgets / review cadence — durable work queue + 2-minute bounded heartbeat + evaluator CODED; budget ledger still pending
+- [ ] Department work queues / budgets / review cadence — durable deduplicated queue + atomic leases + safe worker + 2-minute bounded heartbeat + evaluator CODED/STAGED; budget ledger still pending
 - [x] Astra automatic dispatch from executive plan into eligible department queues — CODED with deterministic dedupe + authority filter; live verification pending
+- [x] Department work queue persists across process restarts and uses atomic checkout/leases — CODED
+- [x] Unsupported department adapters fail BLOCKED rather than fake completion — CODED
+- [x] Safe internal adapters: Product Catalog, Buyer Capacity, Opportunity Loop, Predictive Cloud Status — CODED
+- [x] Empire Coder department work bridges to governed PLAN jobs only — CODED
+- [x] Astra plan evaluator reports DONE/BLOCKED/FAILED/IN_PROGRESS without claiming success — CODED
+- [x] Department heartbeat systemd service/timer — STAGED, live activation pending
 - [ ] Executive plan-vs-outcome evaluation / feedback loop
 - [ ] Founder Console department command surface
 
