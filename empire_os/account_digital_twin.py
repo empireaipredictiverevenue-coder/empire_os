@@ -78,12 +78,15 @@ def build_account_twin(
     brief: Mapping[str, Any] | None = None,
     next_action: Mapping[str, Any] | None = None,
     qualification_history: list[Mapping[str, Any]] | None = None,
+    commercial_history: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     audience = dict(audience or {})
     research = dict(research or {})
     brief = dict(brief or {})
     next_action = dict(next_action or {})
     qualification_history = list(qualification_history or [])
+    commercial_history_loaded = commercial_history is not None
+    commercial_history = dict(commercial_history or {})
 
     states = _state_map(entity)
     unknown_states = list(entity.get("unknown_states", []) or [])
@@ -130,8 +133,10 @@ def build_account_twin(
         uncertainties.append("research_observations_unavailable")
     if not competitor_evidence:
         uncertainties.append("competitor_relationship_evidence_unavailable")
-    if not _clean(contacted.get("contacted_at")):
-        uncertainties.append("outreach_history_not_observed")
+    if not commercial_history_loaded:
+        uncertainties.append("commercial_history_unavailable")
+        if not _clean(contacted.get("contacted_at")):
+            uncertainties.append("outreach_history_not_observed")
 
     for state_name, observed in downstream.items():
         if observed is None:
@@ -202,12 +207,30 @@ def build_account_twin(
             "contacted_state": states.get("CONTACTED"),
             "contacted_status": contacted.get("contacted_status"),
             "contacted_at": contacted.get("contacted_at"),
-            "history_available": False,
+            "history_available": commercial_history_loaded,
+            "intent_count": len(
+                commercial_history.get("outbound_intents", []) or []
+            ),
+            "intents": list(
+                commercial_history.get("outbound_intents", []) or []
+            ),
         },
         "conversation": {
             "engaged": states.get("ENGAGED"),
             "conversation": states.get("CONVERSATION"),
-            "history_available": False,
+            "history_available": commercial_history_loaded,
+            "source": (
+                "outbound_replies"
+                if commercial_history_loaded
+                else None
+            ),
+            "reply_count": len(
+                commercial_history.get("outbound_replies", []) or []
+            ),
+            "replies": list(
+                commercial_history.get("outbound_replies", []) or []
+            ),
+            "conversation_state_authoritative": False,
         },
         "commercial": {
             "commercial_intent": states.get("COMMERCIAL_INTENT"),
@@ -216,11 +239,31 @@ def build_account_twin(
             "paid": states.get("PAID"),
             "fulfilled": states.get("FULFILLED"),
             "expansion": states.get("EXPANSION"),
+            "history_available": commercial_history_loaded,
+            "terms_reviews": list(
+                commercial_history.get("terms_reviews", []) or []
+            ),
+            "payment_requests": list(
+                commercial_history.get("payment_requests", []) or []
+            ),
+            "payment_evidence": list(
+                commercial_history.get("payment_evidence", []) or []
+            ),
+            "fulfilment_orders": list(
+                commercial_history.get("fulfilment_orders", []) or []
+            ),
             "unknown_stays_unknown": True,
         },
         "outcomes": {
-            "available": False,
-            "verified_outcome": None,
+            "available": commercial_history_loaded,
+            "history": list(
+                commercial_history.get("commercial_outcomes", []) or []
+            ),
+            "verified_outcome": (
+                list(commercial_history.get("commercial_outcomes", []) or [])[-1]
+                if commercial_history.get("commercial_outcomes")
+                else None
+            ),
         },
         "revenue_truth": {
             "recognized_revenue_cents": None,
@@ -250,6 +293,9 @@ def build_account_twin_snapshot(
     qualification_history_by_entity: Mapping[
         str, list[Mapping[str, Any]]
     ] | None = None,
+    commercial_history_by_entity: Mapping[
+        str, Mapping[str, Any]
+    ] | None = None,
 ) -> dict[str, Any]:
     audience_by_id = _index(list(audience.get("companies", []) or []))
     research_by_id = _index(list(research.get("actions", []) or []))
@@ -257,6 +303,9 @@ def build_account_twin_snapshot(
     next_by_id = _index(list(next_actions.get("actions", []) or []))
     qualification_history_by_entity = dict(
         qualification_history_by_entity or {}
+    )
+    commercial_history_by_entity = dict(
+        commercial_history_by_entity or {}
     )
 
     twins = []
@@ -275,6 +324,9 @@ def build_account_twin_snapshot(
             qualification_history=qualification_history_by_entity.get(
                 entity_id,
                 [],
+            ),
+            commercial_history=commercial_history_by_entity.get(
+                entity_id
             ),
         ))
 
@@ -346,6 +398,33 @@ def load_qualification_history(
     return grouped
 
 
+def load_commercial_history(
+    writer: PostgresIntelligenceMaterializer,
+    entity_ids: list[str],
+) -> dict[str, dict[str, Any]]:
+    if not entity_ids:
+        return {}
+
+    with writer._connect(writer.dsn) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SET LOCAL ROLE {ROLE}")
+            cursor.execute(
+                """
+                SELECT entity_id, history
+                FROM public.empire_account_twin_history(%s::uuid[])
+                ORDER BY entity_id
+                """,
+                (entity_ids,),
+            )
+            rows = cursor.fetchall()
+
+    result: dict[str, dict[str, Any]] = {}
+    for entity_id, history in rows:
+        key = _clean(entity_id)
+        result[key] = dict(history) if isinstance(history, Mapping) else {}
+    return result
+
+
 def refresh_account_twin_snapshot(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     buyer_state = _load_json(
@@ -360,12 +439,17 @@ def refresh_account_twin_snapshot(repo_root: Path) -> dict[str, Any]:
     qualification_history: dict[
         str, list[dict[str, Any]]
     ] = {}
+    commercial_history: dict[str, dict[str, Any]] = {}
     try:
         writer = PostgresIntelligenceMaterializer.from_env()
     except Exception:
         writer = None
     if writer is not None:
         qualification_history = load_qualification_history(
+            writer,
+            entity_ids,
+        )
+        commercial_history = load_commercial_history(
             writer,
             entity_ids,
         )
@@ -393,6 +477,7 @@ def refresh_account_twin_snapshot(repo_root: Path) -> dict[str, Any]:
             / "next_best_action_latest.json"
         ),
         qualification_history_by_entity=qualification_history,
+        commercial_history_by_entity=commercial_history,
     )
     write_account_twin_snapshot(repo_root, payload)
     return payload
