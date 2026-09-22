@@ -27,8 +27,22 @@ def test_department_cycle_runs_worker_then_evaluation(
             "result_evidence_refs": ["runtime:x"],
         }
 
+    def fake_memory(root):
+        calls.append(("economic_memory",))
+        return {
+            "department_episode_count": 3,
+            "outcome_conditioned_memory_count": 1,
+            "rejected_outcome_memory_count": 0,
+            "verified_outcomes_only_for_outcome_conditioned_memory": True,
+        }
+
     monkeypatch.setattr(module, "run_department_worker", fake_worker)
     monkeypatch.setattr(module, "evaluate_executive_plan", fake_evaluation)
+    monkeypatch.setattr(
+        module,
+        "refresh_economic_memory_snapshot",
+        fake_memory,
+    )
 
     result = module.run_department_cycle(
         tmp_path,
@@ -38,8 +52,12 @@ def test_department_cycle_runs_worker_then_evaluation(
     assert calls == [
         ("worker", 3, 45),
         ("evaluation",),
+        ("economic_memory",),
     ]
     assert result["worker"]["done_count"] == 2
     assert result["evaluation"]["evaluation_state"] == "BLOCKED"
+    assert result["economic_memory"]["department_episode_count"] == 3
+    assert result["economic_memory"]["outcome_conditioned_memory_count"] == 1
+    assert result["economic_memory"]["verified_outcomes_only"] is True
     assert result["external_execution_performed"] is False
     assert result["execution_authority"] == "none"

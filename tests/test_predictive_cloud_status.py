@@ -169,3 +169,33 @@ def test_status_exposes_verified_predictive_intelligence(tmp_path):
     assert summary["probability_ready_product_count"] == 1
     assert summary["search_scores_used"] is False
     assert summary["llm_probability_used"] is False
+
+
+def test_status_exposes_economic_memory_without_promoting_outcomes(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/economic_memory/latest.json",
+        {
+            "generated_at": "2026-09-22T20:58:00+00:00",
+            "plan_id": "astra_plan_test",
+            "plan_evaluation_state": "BLOCKED",
+            "department_episode_count": 8,
+            "outcome_conditioned_memory_count": 0,
+            "rejected_outcome_memory_count": 0,
+            "verified_outcomes_only_for_outcome_conditioned_memory": True,
+            "model_weight_mutation_authorized": False,
+            "execution_authority": "none",
+        },
+    )
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime(2026, 9, 22, 21, 0, tzinfo=timezone.utc),
+    )
+    row = result["components"]["economic_memory"]
+    assert row["available"] is True
+    assert row["freshness"] == "fresh"
+    assert row["summary"]["department_episode_count"] == 8
+    assert row["summary"]["outcome_conditioned_memory_count"] == 0
+    assert row["summary"]["verified_outcomes_only"] is True
+    assert row["summary"]["model_weight_mutation_authorized"] is False
+    assert row["execution_authority"] == "none"

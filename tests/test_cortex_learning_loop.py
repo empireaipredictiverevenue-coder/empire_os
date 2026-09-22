@@ -56,6 +56,8 @@ def _twin():
 
 def _verified_outcome(conversion="won"):
     return {
+        "id": "outcome-1",
+        "fulfilment_order_id": "order-1",
         "conversion_outcome": conversion,
         "delivery_outcome": "delivered",
         "buyer_satisfaction": 9.0,
@@ -109,10 +111,12 @@ def test_won_outcome_without_full_verified_chain_is_blocked():
 def test_verified_customer_label_requires_payment_fulfilment_and_revenue():
     twin = _twin()
     twin["commercial"]["payment_evidence"] = [{
+        "id": "payment-evidence-1",
         "transaction_hash": "0xabc",
         "verified_at": "2026-09-22T11:45:00+00:00",
     }]
     twin["commercial"]["fulfilment_orders"] = [{
+        "id": "order-1",
         "state": "outcome_captured",
         "delivered_at": "2026-09-22T11:50:00+00:00",
     }]
@@ -130,6 +134,18 @@ def test_verified_customer_label_requires_payment_fulfilment_and_revenue():
     assert result["label"]["value"] == 1
     assert result["label"]["synthetic"] is False
     assert result["label"]["forecast_derived"] is False
+    assert result["label"]["outcome_ref"] == (
+        "canonical:commercial_outcomes:outcome-1"
+    )
+    assert "canonical:bsc_payment_evidence:payment-evidence-1" in (
+        result["label"]["evidence_refs"]
+    )
+    assert "canonical:fulfilment_orders:order-1" in (
+        result["label"]["evidence_refs"]
+    )
+    assert "canonical:account_revenue_truth:entity-golden" in (
+        result["label"]["evidence_refs"]
+    )
     assert result["verified_customer_learning"] is True
     assert result["calibration_feedback"]["available"] is True
     assert result["calibration_feedback"]["qualification_score"] == 86.2

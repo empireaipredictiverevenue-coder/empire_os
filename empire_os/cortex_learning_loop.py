@@ -141,11 +141,65 @@ def build_cortex_learning_packet(twin: Mapping[str, Any]) -> dict[str, Any]:
         and recognized_revenue_cents > 0
     )
 
+    entity_id = _clean(twin.get("entity_id"))
     outcome = _latest_verified_outcome(twin)
     conversion_outcome = (
         _clean(outcome.get("conversion_outcome")).lower()
         if outcome else ""
     )
+
+    verification_refs: list[str] = []
+    outcome_ref = ""
+    if outcome is not None:
+        outcome_id = _clean(outcome.get("id"))
+        outcome_ref = (
+            f"canonical:commercial_outcomes:{outcome_id}"
+            if outcome_id
+            else _clean(outcome.get("evidence_reference"))
+        )
+        if outcome_ref:
+            verification_refs.append(outcome_ref)
+        evidence_reference = _clean(outcome.get("evidence_reference"))
+        if evidence_reference:
+            verification_refs.append(evidence_reference)
+
+    for row in commercial.get("payment_evidence", []) or []:
+        if not isinstance(row, Mapping):
+            continue
+        tx_hash = _clean(row.get("transaction_hash"))
+        verified_at = row.get("verified_at")
+        if not tx_hash or not verified_at:
+            continue
+        evidence_id = _clean(row.get("id"))
+        verification_refs.append(
+            f"canonical:bsc_payment_evidence:{evidence_id}"
+            if evidence_id
+            else f"bsc_transaction:{tx_hash}"
+        )
+
+    for row in commercial.get("fulfilment_orders", []) or []:
+        if not isinstance(row, Mapping):
+            continue
+        state = _clean(row.get("state")).lower()
+        verified = bool(
+            row.get("delivered_at")
+            or row.get("confirmed_at")
+            or row.get("outcome_at")
+            or state in {"delivered", "confirmed", "outcome_captured"}
+        )
+        if not verified:
+            continue
+        order_id = _clean(row.get("id"))
+        if order_id:
+            verification_refs.append(
+                f"canonical:fulfilment_orders:{order_id}"
+            )
+
+    if revenue_recognized and entity_id:
+        verification_refs.append(
+            f"canonical:account_revenue_truth:{entity_id}"
+        )
+    verification_refs = list(dict.fromkeys(verification_refs))
 
     label_value: int | None = None
     label_kind: str | None = None
@@ -175,7 +229,7 @@ def build_cortex_learning_packet(twin: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": "empire.cortex_learning_packet.v1",
         "mode": "OBSERVE",
-        "entity_id": _clean(twin.get("entity_id")),
+        "entity_id": entity_id,
         "company_name": _clean(identity.get("company_name")),
         "feature_namespace": "account_buyer_digital_twin",
         "research_features": {
@@ -208,6 +262,8 @@ def build_cortex_learning_packet(twin: Mapping[str, Any]) -> dict[str, Any]:
             "recognized_revenue": revenue_recognized,
             "recognized_revenue_cents": recognized_revenue_cents,
             "realized_gp_cents": realized_gp_cents,
+            "outcome_ref": outcome_ref or None,
+            "evidence_refs": verification_refs,
         },
         "label": {
             "available": learning_ready,
@@ -215,6 +271,8 @@ def build_cortex_learning_packet(twin: Mapping[str, Any]) -> dict[str, Any]:
             "value": label_value,
             "conversion_outcome": conversion_outcome or None,
             "source": "verified_commercial_outcome" if outcome else None,
+            "outcome_ref": outcome_ref or None,
+            "evidence_refs": verification_refs,
             "blockers": label_blockers,
             "synthetic": False,
             "forecast_derived": False,
@@ -223,6 +281,8 @@ def build_cortex_learning_packet(twin: Mapping[str, Any]) -> dict[str, Any]:
             "available": learning_ready and score is not None,
             "qualification_score": score,
             "verified_label": label_value,
+            "outcome_ref": outcome_ref or None,
+            "evidence_refs": verification_refs,
             "model_weight_mutation_authorized": False,
             "note": (
                 "Raw qualification score paired with verified outcome for "

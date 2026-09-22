@@ -101,6 +101,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 600,
     },
+    "economic_memory": {
+        "path": Path("runtime/economic_memory/latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 900,
+    },
     "founder_directives": {
         "path": Path("runtime/founder_directives/latest.json"),
         "time_keys": ("generated_at", "updated_at", "observed_at"),
@@ -341,6 +346,28 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "status_counts": evaluation.get("status_counts"),
             "external_execution_performed": payload.get(
                 "external_execution_performed"
+            ),
+        }
+    if name == "economic_memory":
+        return {
+            "plan_id": payload.get("plan_id"),
+            "plan_evaluation_state": payload.get(
+                "plan_evaluation_state"
+            ),
+            "department_episode_count": payload.get(
+                "department_episode_count"
+            ),
+            "outcome_conditioned_memory_count": payload.get(
+                "outcome_conditioned_memory_count"
+            ),
+            "rejected_outcome_memory_count": payload.get(
+                "rejected_outcome_memory_count"
+            ),
+            "verified_outcomes_only": payload.get(
+                "verified_outcomes_only_for_outcome_conditioned_memory"
+            ),
+            "model_weight_mutation_authorized": payload.get(
+                "model_weight_mutation_authorized"
             ),
         }
     if name == "founder_directives":

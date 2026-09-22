@@ -8,6 +8,7 @@ from typing import Any
 
 from empire_os.astra_department_evaluator import evaluate_executive_plan
 from empire_os.department_worker import run_department_worker
+from empire_os.economic_memory import refresh_economic_memory_snapshot
 
 
 OUTPUT = Path("runtime/astra/department_cycle_latest.json")
@@ -26,6 +27,7 @@ def run_department_cycle(
         timeout_seconds=timeout_seconds,
     )
     evaluation = evaluate_executive_plan(root)
+    economic_memory = refresh_economic_memory_snapshot(root)
     payload = {
         "schema_version": "empire.department_cycle.v1",
         "mode": "OBSERVE",
@@ -50,6 +52,20 @@ def run_department_cycle(
             "result_evidence_refs": evaluation.get(
                 "result_evidence_refs"
             ) or [],
+        },
+        "economic_memory": {
+            "department_episode_count": economic_memory.get(
+                "department_episode_count"
+            ),
+            "outcome_conditioned_memory_count": economic_memory.get(
+                "outcome_conditioned_memory_count"
+            ),
+            "rejected_outcome_memory_count": economic_memory.get(
+                "rejected_outcome_memory_count"
+            ),
+            "verified_outcomes_only": economic_memory.get(
+                "verified_outcomes_only_for_outcome_conditioned_memory"
+            ),
         },
         "external_execution_performed": False,
         "commercial_authority": "none",

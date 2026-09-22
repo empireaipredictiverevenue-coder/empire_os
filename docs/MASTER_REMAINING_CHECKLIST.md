@@ -74,6 +74,10 @@ Canonical architecture:
 - [x] Predictive Intelligence → Opportunity Normalizer Quant-input bridge — CODED
 - [x] Targeted decision-maker department adapter — CODED; first-party/authoritative evidence only
 - [x] Department worker field-level success checks for Predictive Intelligence — CODED
+- [x] Cortex verified-outcome provenance exported for learning/memory — CODED
+- [x] Astra department execution → episodic Economic Memory bridge — CODED
+- [x] Verified Cortex outcome → outcome-conditioned Economic Memory bridge — CODED; DONE work alone is never outcome truth
+- [x] Predictive Cloud status exposes Economic Memory read surface — CODED
 - [x] Live Opportunity/Quant loop proof — 24 candidates, 13 research observations, 15 normalized scores, 21 QUALIFY / 3 DISCOVER, 0 fabricated Quant packets — 2026-09-22
 - [ ] Live EmpireOS verification of Quant endpoints and opportunity Quant Review
 - [ ] Calibrated probability-of-success source from verified outcome cohorts
@@ -231,7 +235,7 @@ Canonical organization:
 - [x] Empire Coder department work bridges to governed PLAN jobs only — CODED
 - [x] Astra plan evaluator reports DONE/BLOCKED/FAILED/IN_PROGRESS without claiming success — CODED
 - [x] Department heartbeat systemd service/timer — STAGED, live activation pending
-- [ ] Executive plan-vs-outcome evaluation / feedback loop
+- [ ] Executive plan-vs-outcome evaluation / feedback loop — execution episodes + verified outcome memory CODED; causal plan-step → commercial-outcome attribution still pending
 - [ ] Founder Console department command surface
 
 Canonical docs:
@@ -264,7 +268,7 @@ business loop rather than continue building isolated modules.
 - [ ] Wire safe research/build tasks -> Empire Coder — AI planner now queues deduplicated PLAN jobs from Radar + research + Factory blockers; reversible IMPLEMENT promotion still pending
 - [ ] Wire product/GTM preparation -> governed external execution
 - [ ] Wire Conversation OS -> terms/payment/fulfilment progression
-- [ ] Wire verified outcomes -> Economic Memory / calibration
+- [ ] Wire verified outcomes -> Economic Memory / calibration — verified Cortex outcome → Economic Memory CODED; opportunity/Quant prediction → action → outcome calibration join still pending
 - [x] Expose aggregate autonomous-loop/Predictive Cloud status in Founder read API — CODED
 - [ ] Build full visual autonomous-loop status in Founder Console
 - [ ] Prove one real opportunity through the complete autonomous loop
