@@ -1050,3 +1050,50 @@ def test_dashboard_exposes_competitor_intelligence_feed(tmp_path):
         "competitor_gap_inputs_available"
     ] is True
     assert feed["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_real_commercial_funnel(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/commercial_funnel/latest.json",
+        {
+            "schema_version": "empire.founder_commercial_funnel.v1",
+            "generated_at": "2026-09-22T15:00:00+00:00",
+            "counts": {
+                "prospect_acquisitions": 493,
+                "buyer_reviews": 34,
+                "buyer_reviews_approved": 32,
+                "outbound_intents": 31,
+                "outbound_delivered": 25,
+                "commercial_replies": 0,
+                "unsubscribe_replies": 1,
+                "closer_cases": 0,
+                "commercial_terms_reviews": 0,
+                "commercial_terms_approved": 0,
+                "payment_requests": 0,
+                "verified_payment_evidence": 0,
+                "fulfilment_orders": 0,
+                "fulfilled_orders": 0,
+                "commercial_outcomes": 0,
+                "recognized_revenue_events": 0,
+            },
+            "outbound_status_counts": {"delivered": 25},
+            "reply_classification_counts": {"unsubscribe": 1},
+            "recognized_revenue_cents": 0,
+            "realized_margin_cents": 0,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    funnel = result["commercial_funnel"]
+
+    assert funnel["available"] is True
+    assert funnel["counts"]["prospect_acquisitions"] == 493
+    assert funnel["counts"]["outbound_delivered"] == 25
+    assert funnel["current_stage"] == "outbound_delivered"
+    assert funnel["next_event"] == "await_genuine_buyer_reply"
+    assert funnel["actual_revenue"] is False
+    assert funnel["execution_authority"] == "none"
