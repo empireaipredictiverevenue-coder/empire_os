@@ -132,12 +132,15 @@ business loop rather than continue building isolated modules.
 - [x] Founder Directive OS exists
 - [x] Empire Coder exists
 - [x] Control Fabric exists
+- [x] Canonical Opportunity Loop collapses Radar / research / Factory intake / AI planning into one scheduler path
+- [x] Opportunity Loop continues discovery after the current commercial loop completes
+- [x] Opportunity Loop has freshness/dedupe protection against repeated research/AI plans
 - [ ] Classify every major subsystem: CONNECTED / NEEDS WIRING / LEGACY / RETIRED
 - [ ] Wire remaining Sensor Mesh domains -> Opportunity Radar
 - [x] Wire Opportunity Radar -> bounded research -> Opportunity Factory readiness
-- [ ] Wire Opportunity Factory -> Astra work queue
-- [ ] Wire Astra -> automatic research / analysis / enrichment / planning
-- [ ] Wire safe research/build tasks -> Empire Coder
+- [ ] Wire Opportunity Factory -> Astra work queue — CANONICAL Opportunity Loop registered with Astra/Control Fabric; normalized Factory evidence completion + live verification pending
+- [ ] Wire Astra -> automatic research / analysis / enrichment / planning — CODED/STAGED with continuous Opportunity Loop + freshness guard; live timer verification pending
+- [ ] Wire safe research/build tasks -> Empire Coder — AI planner now queues deduplicated PLAN jobs from Radar + research + Factory blockers; reversible IMPLEMENT promotion still pending
 - [ ] Wire product/GTM preparation -> governed external execution
 - [ ] Wire Conversation OS -> terms/payment/fulfilment progression
 - [ ] Wire verified outcomes -> Economic Memory / calibration
