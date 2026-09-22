@@ -405,6 +405,7 @@ async def vonage_socket(websocket: WebSocket):
             result.get("response_text") or ""
         ).strip()
         decision = result.get("decision")
+        asr_candidates = result.get("asr_candidates")
         if not transcript:
             return
 
@@ -419,7 +420,10 @@ async def vonage_socket(websocket: WebSocket):
                 transcript,
                 {
                     "decision_judge": decision,
-                } if isinstance(decision, dict) else None,
+                    "asr_candidates": asr_candidates,
+                }
+                if isinstance(decision, dict)
+                else None,
             )
 
         if not response_text:
