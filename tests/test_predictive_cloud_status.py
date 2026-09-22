@@ -55,3 +55,26 @@ def test_status_reports_fresh_and_stale_without_inventing_health(tmp_path):
         == 0
     )
     assert result["revenue_recognized_by_status"] is False
+
+
+def test_status_exposes_opportunity_normalization_progress(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/opportunity_factory/normalized_signals_latest.json",
+        {
+            "generated_at": "2026-09-22T20:58:00+00:00",
+            "candidate_count": 24,
+            "candidates_with_any_normalized_score": 4,
+            "total_normalized_scores": 13,
+            "search_result_counts_used_as_scores": False,
+        },
+    )
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime(2026, 9, 22, 21, 0, tzinfo=timezone.utc),
+    )
+    summary = result["components"]["opportunity_normalizer"]["summary"]
+    assert summary["candidate_count"] == 24
+    assert summary["candidates_with_any_normalized_score"] == 4
+    assert summary["total_normalized_scores"] == 13
+    assert summary["search_result_counts_used_as_scores"] is False
