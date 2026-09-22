@@ -5,6 +5,7 @@ cd /srv/empire_os
 MODEL_ROOT=/srv/empire_os/runtime/models/voice_lab
 TTS_DIR="$MODEL_ROOT/kokoro-en-v0_19"
 STT_DIR="$MODEL_ROOT/sherpa-onnx-whisper-tiny.en"
+STREAM_STT_DIR="$MODEL_ROOT/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17"
 
 echo "=== EMPIRE VOICE LAB BOOTSTRAP ==="
 echo "Python: $(./.venv/bin/python --version)"
