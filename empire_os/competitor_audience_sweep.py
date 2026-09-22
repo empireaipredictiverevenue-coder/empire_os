@@ -545,6 +545,7 @@ def run_competitor_audience_sweep(
     search_fn: SearchFn = search_web,
     fetch_fn: FetchFn = fetch_public_html,
     source_refs: Iterable[str] = (),
+    search_after_source_match: bool = True,
 ) -> dict[str, Any]:
     candidates = load_resolved_market_entities(
         writer,
@@ -562,15 +563,17 @@ def run_competitor_audience_sweep(
             fetch_fn=fetch_fn,
         )
     )
-    searched_evidence = discover_competitor_audience_evidence(
-        competitor_key=competitor_key,
-        competitor_name=competitor_name,
-        competitor_domain=competitor_domain,
-        market_query=market_query,
-        candidates=candidates,
-        search_fn=search_fn,
-        fetch_fn=fetch_fn,
-    )
+    searched_evidence = []
+    if search_after_source_match or not configured_evidence:
+        searched_evidence = discover_competitor_audience_evidence(
+            competitor_key=competitor_key,
+            competitor_name=competitor_name,
+            competitor_domain=competitor_domain,
+            market_query=market_query,
+            candidates=candidates,
+            search_fn=search_fn,
+            fetch_fn=fetch_fn,
+        )
 
     evidence_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
     for row in [*configured_evidence, *searched_evidence]:
