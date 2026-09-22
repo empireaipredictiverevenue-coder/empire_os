@@ -755,3 +755,58 @@ def test_dashboard_exposes_competitor_market_scale(tmp_path):
     assert scale["market_share_inferred"] is False
     assert scale["outreach_enabled"] is False
     assert scale["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_competitor_market_opportunity(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_market_opportunity_latest.json",
+        {
+            "schema_version": "empire.competitor_market_opportunity.v1",
+            "mode": "OBSERVE",
+            "market_key": "denver-co-roofing",
+            "resolved_company_count": 5,
+            "observed_company_count": 1,
+            "research_gap_company_count": 4,
+            "underserved_audience_candidates": [
+                {
+                    "entity_id": "entity-colorado",
+                    "company_name": "Colorado's Best Roofing",
+                    "observed_evidence_count": 0,
+                    "underserved_demand_inferred": False,
+                    "revenue_opportunity_inferred": False,
+                }
+            ],
+            "territory_heatmap": [{
+                "metro": "denver, co",
+                "resolved_company_count": 5,
+                "company_with_competitor_evidence_count": 1,
+                "company_without_competitor_evidence_count": 4,
+                "evidence_coverage_ratio": 0.2,
+                "heat_metric": "competitor_evidence_coverage_gap",
+                "demand_heat_inferred": False,
+            }],
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "market_share_inferred": False,
+            "revenue_opportunity_inferred": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    market = result["competitor_market_opportunity"]
+
+    assert market["available"] is True
+    assert market["resolved_company_count"] == 5
+    assert market["observed_company_count"] == 1
+    assert market["research_gap_company_count"] == 4
+    assert len(market["territory_heatmap"]) == 1
+    assert market["buyer_intent_inferred"] is False
+    assert market["commercial_intent_inferred"] is False
+    assert market["market_share_inferred"] is False
+    assert market["revenue_opportunity_inferred"] is False
+    assert market["execution_authority"] == "none"
