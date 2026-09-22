@@ -176,6 +176,17 @@ def _commercial_history():
     }
 
 
+def _revenue_truth():
+    return {
+        "entity_id": "entity-golden",
+        "recognized_order_count": 0,
+        "recognized_revenue_cents": 0,
+        "actual_cost_cents": 0,
+        "realized_gp_cents": 0,
+        "latest_recognized_at": None,
+    }
+
+
 def test_twin_composes_identity_research_and_competitor_evidence():
     twin = build_account_twin(
         _buyer_entity(),
@@ -352,3 +363,68 @@ def test_snapshot_can_attach_commercial_history_by_entity():
     assert twin["commercial"]["history_available"] is True
     assert twin["outcomes"]["available"] is True
     assert "commercial_history_unavailable" not in twin["uncertainty"]["items"]
+
+
+
+def test_twin_exposes_known_zero_revenue_truth_when_reader_available():
+    twin = build_account_twin(
+        _buyer_entity(),
+        audience=_audience(),
+        research=_research(),
+        brief=_brief(),
+        next_action=_next_action(),
+        commercial_history=_commercial_history(),
+        revenue_truth=_revenue_truth(),
+    )
+
+    revenue = twin["revenue_truth"]
+    assert revenue["available"] is True
+    assert revenue["recognized_order_count"] == 0
+    assert revenue["recognized_revenue_cents"] == 0
+    assert revenue["actual_cost_cents"] == 0
+    assert revenue["realized_gp_cents"] == 0
+    assert revenue["latest_recognized_at"] is None
+    assert revenue["actual_revenue"] is False
+    assert revenue["forecast_included_in_truth"] is False
+    assert revenue["recognition_authority"] == "none"
+
+
+def test_twin_revenue_truth_does_not_create_accounting_authority():
+    row = _revenue_truth()
+    row.update({
+        "recognized_order_count": 1,
+        "recognized_revenue_cents": 150000,
+        "actual_cost_cents": 60000,
+        "realized_gp_cents": 90000,
+        "latest_recognized_at": "2026-09-22T12:30:00+00:00",
+    })
+
+    twin = build_account_twin(
+        _buyer_entity(),
+        revenue_truth=row,
+    )
+
+    assert twin["revenue_truth"]["actual_revenue"] is True
+    assert twin["revenue_truth"]["recognized_revenue_cents"] == 150000
+    assert twin["revenue_truth"]["realized_gp_cents"] == 90000
+    assert twin["revenue_truth"]["recognition_authority"] == "none"
+    assert twin["execution_authority"] == "none"
+    assert twin["payment_authorized"] is False
+
+
+def test_snapshot_can_attach_revenue_truth_by_entity():
+    result = build_account_twin_snapshot(
+        buyer_state={"entities": [_buyer_entity()]},
+        audience={"companies": [_audience()]},
+        research={"actions": [_research()]},
+        briefs={"briefs": [_brief()]},
+        next_actions={"actions": [_next_action()]},
+        revenue_truth_by_entity={
+            "entity-golden": _revenue_truth(),
+        },
+    )
+
+    twin = result["twins"][0]
+    assert twin["revenue_truth"]["available"] is True
+    assert twin["revenue_truth"]["recognized_revenue_cents"] == 0
+    assert twin["revenue_truth"]["realized_gp_cents"] == 0
