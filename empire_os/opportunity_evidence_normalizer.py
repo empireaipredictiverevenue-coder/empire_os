@@ -18,6 +18,9 @@ from typing import Any, Mapping
 
 MARKET_GPS = Path("runtime/market_sweeps/revenue_gps_latest.json")
 RADAR = Path("runtime/opportunity_radar/latest.json")
+PREDICTIVE_INTELLIGENCE = Path(
+    "runtime/predictive_intelligence/latest.json"
+)
 OUTPUT = Path("runtime/opportunity_factory/normalized_signals_latest.json")
 
 SCORE_KEYS = (
@@ -183,6 +186,7 @@ def normalize_candidate(
     candidate: Mapping[str, Any],
     *,
     market_gps: Mapping[str, Any] | None = None,
+    predictive_intelligence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     klass = _clean(candidate.get("opportunity_class"))
     key = _clean(candidate.get("opportunity_key"))
@@ -281,6 +285,74 @@ def normalize_candidate(
                     or offer_key
                 )
 
+    probability_modeled_from_verified_outcomes = False
+    predictive_product_code = (
+        _clean(quant_input_evidence.get("product_code"))
+        or offer_key
+        or ""
+    )
+    estimates = (
+        predictive_intelligence.get("product_estimates")
+        if isinstance(predictive_intelligence, Mapping)
+        else None
+    )
+    estimate = (
+        estimates.get(predictive_product_code)
+        if isinstance(estimates, Mapping) and predictive_product_code
+        else None
+    )
+    if isinstance(estimate, Mapping):
+        if estimate.get("probability_available") is True:
+            for field in (
+                "probability_success",
+                "uncertainty",
+                "confidence",
+            ):
+                value = estimate.get(field)
+                if value is not None:
+                    quant_inputs[field] = float(value)
+            probability_modeled_from_verified_outcomes = (
+                quant_inputs.get("probability_success") is not None
+            )
+        if estimate.get("time_to_revenue_available") is True:
+            value = estimate.get("time_to_revenue_days")
+            if value is not None:
+                quant_inputs["time_to_revenue_days"] = float(value)
+
+        quant_input_evidence["predictive_intelligence"] = {
+            "product_code": predictive_product_code,
+            "terminal_outcome_count": estimate.get(
+                "terminal_outcome_count"
+            ),
+            "success_count": estimate.get("success_count"),
+            "failure_count": estimate.get("failure_count"),
+            "probability_available": estimate.get(
+                "probability_available"
+            ),
+            "time_to_revenue_available": estimate.get(
+                "time_to_revenue_available"
+            ),
+            "uncertainty_semantics": estimate.get(
+                "uncertainty_semantics"
+            ),
+            "confidence_semantics": estimate.get(
+                "confidence_semantics"
+            ),
+            "candidate_probability_is_product_cohort_baseline": (
+                estimate.get(
+                    "candidate_probability_is_product_cohort_baseline"
+                ) is True
+            ),
+            "candidate_specific_causal_probability_claimed": (
+                estimate.get(
+                    "candidate_specific_causal_probability_claimed"
+                ) is True
+            ),
+            "evidence_refs": list(
+                estimate.get("evidence_refs") or []
+            ),
+        }
+
     normalized_signals: dict[str, Any] = {
         score_key: (
             scores[score_key]["value"]
@@ -312,6 +384,9 @@ def normalize_candidate(
         "quant_input_evidence": quant_input_evidence,
         "quant_inputs_available": bool(quant_inputs),
         "quant_probability_inferred": False,
+        "probability_modeled_from_verified_outcomes": (
+            probability_modeled_from_verified_outcomes
+        ),
         "normalized_score_count": len(scores),
         "missing_normalized_fields": missing,
         "search_result_counts_used_as_scores": False,
@@ -328,11 +403,13 @@ def build_normalized_signal_batch(
     radar: Mapping[str, Any],
     *,
     market_gps: Mapping[str, Any] | None,
+    predictive_intelligence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     rows = [
         normalize_candidate(
             candidate,
             market_gps=market_gps,
+            predictive_intelligence=predictive_intelligence,
         )
         for candidate in (radar.get("candidates") or [])
         if isinstance(candidate, Mapping)
@@ -362,6 +439,9 @@ def refresh_normalized_signals(repo_root: Path) -> dict[str, Any]:
     payload = build_normalized_signal_batch(
         _read(repo_root / RADAR),
         market_gps=_read(repo_root / MARKET_GPS),
+        predictive_intelligence=_read(
+            repo_root / PREDICTIVE_INTELLIGENCE
+        ),
     )
     path = repo_root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
