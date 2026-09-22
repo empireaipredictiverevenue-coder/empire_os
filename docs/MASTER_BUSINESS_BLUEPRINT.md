@@ -626,6 +626,7 @@ fulfilment ability and evidence quality to decide where supply should be created
 - Predictive Revenue
 - Market Intelligence
 - Search Intelligence
+- Organic + AI Recommendation Intelligence
 - AI Visibility
 - Permit Intelligence
 - Storm/Satellite Intelligence
@@ -741,6 +742,20 @@ detect -> predict -> decide -> execute -> verify -> measure -> learn -> realloca
 
 ### Search Command Centre
 Search/SEO/AEO/GEO/AI visibility/citations/content/revenue attribution.
+
+First-class product surface: **Organic + AI Recommendation Intelligence**.
+
+It measures only observed evidence across:
+- organic SERP presence;
+- captured AI-answer brand presence;
+- citations and citation-source domains;
+- explicit brand recommendations;
+- competitor recommendation gaps;
+- share of observed recommendations within the monitored capture set;
+- search/AI touchpoints tied to recognized revenue when canonical attribution evidence exists.
+
+It never claims hidden model preference, global market share, guaranteed rankings or
+guaranteed recommendations. Missing captures stay UNKNOWN.
 
 ### Market Intelligence Console
 markets, TAM, companies, people, signals, permits, storms, territories,
