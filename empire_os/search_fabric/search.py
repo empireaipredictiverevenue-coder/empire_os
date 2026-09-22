@@ -299,20 +299,20 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
             if r.status_code == 200:
                 return _decode_http_response(r)
             elif r.status_code in (403, 429, 503):
-                print(f"[search_api] {engine['name']} HTTP {r.status_code} (attempt {attempt+1}/3)")
+                print(f"[search_api] {engine['name']} HTTP {r.status_code} (attempt {attempt+1}/3)", file=sys.stderr)
                 if attempt < 2:
                     time.sleep(2 ** attempt + random.uniform(0, 1))
                     if proxy and _proxy_cycle:
                         proxy = _next_proxy()  # rotate on block
                 continue
             else:
-                print(f"[search_api] {engine['name']} HTTP {r.status_code}")
+                print(f"[search_api] {engine['name']} HTTP {r.status_code}", file=sys.stderr)
                 return None
 
         except requests.exceptions.Timeout:
-            print(f"[search_api] {engine['name']} timeout (attempt {attempt+1}/3)")
+            print(f"[search_api] {engine['name']} timeout (attempt {attempt+1}/3)", file=sys.stderr)
         except Exception as e:
-            print(f"[search_api] {engine['name']} error: {e}")
+            print(f"[search_api] {engine['name']} error: {e}", file=sys.stderr)
             if attempt == 2:
                 return None
             time.sleep(1)
@@ -740,7 +740,8 @@ def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
         if not results:
             print(
                 f"[search_fabric] {eng['name']} rejected: "
-                "no relevant results"
+                "no relevant results",
+                file=sys.stderr,
             )
             continue
 
