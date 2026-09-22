@@ -765,3 +765,178 @@ def test_public_review_signal_rejects_sentiment_inference():
         match="sentiment",
     ):
         persist_competitor_public_review_signal(writer, signal)
+
+
+
+def _search_presence_signal():
+    return {
+        "schema_version": "intelligence_signal_candidate.v1",
+        "entity_id": ENTITY_ID,
+        "signal_type": "competitor_search_presence",
+        "signal_domain": "search_intelligence",
+        "observed_at": "2026-09-22T13:30:00+00:00",
+        "source_id": SOURCE_ID,
+        "strength": 0.666667,
+        "confidence": 0.85,
+        "payload": {
+            "company_name": "Acme Roofing",
+            "company_domain": "acme.example",
+            "query_presence_count": 2,
+            "observation_count": 2,
+            "best_position": 2,
+            "reciprocal_position_weight": 0.7,
+            "observed_search_presence_share": 0.4,
+            "observations": [
+                {
+                    "query": "Denver roofing",
+                    "engine": "bing_html",
+                    "position": 2,
+                    "domain": "acme.example",
+                    "url": "https://acme.example/roofing",
+                    "observed_at": "2026-09-22T13:30:00+00:00",
+                },
+                {
+                    "query": "roof repair Denver",
+                    "engine": "bing_html",
+                    "position": 5,
+                    "domain": "acme.example",
+                    "url": "https://acme.example/repair",
+                    "observed_at": "2026-09-22T13:30:00+00:00",
+                },
+            ],
+            "research_candidate": True,
+            "market_share_inferred": False,
+            "demand_inferred": False,
+            "buyer_intent": False,
+            "commercial_intent": False,
+            "prospect_created": False,
+            "outreach_enabled": False,
+        },
+        "persistence_performed": False,
+        "market_share_inferred": False,
+        "buyer_intent_inferred": False,
+        "commercial_intent_inferred": False,
+        "outreach_enabled": False,
+        "execution_authority": "none",
+    }
+
+
+class SearchPresenceSignalCursor(FakeCursor):
+    def __init__(self, *, duplicate=False):
+        super().__init__()
+        self.duplicate = duplicate
+
+    def execute(self, sql, params=None):
+        text = " ".join(str(sql).split())
+        self.calls.append((text, tuple(params or ())))
+
+        if text.startswith("SET LOCAL ROLE"):
+            self._set([], [])
+        elif "FROM public.intelligence_sources" in text:
+            self._set(["id"], [(SOURCE_ID,)])
+        elif (
+            text.startswith("SELECT payload")
+            and "FROM public.intelligence_signals" in text
+        ):
+            if self.duplicate:
+                self._set(
+                    ["payload"],
+                    [(_search_presence_signal()["payload"],)],
+                )
+            else:
+                self._set(["payload"], [])
+        elif text.startswith(
+            "INSERT INTO public.intelligence_signals"
+        ):
+            self._set(["id"], [("search-presence-signal-id",)])
+        else:
+            raise AssertionError(f"unexpected SQL: {text}")
+
+
+def _search_presence_writer(*, duplicate=False):
+    cursor = SearchPresenceSignalCursor(duplicate=duplicate)
+    connect = FakeConnect(cursor)
+    writer = PostgresIntelligenceMaterializer(
+        "postgresql://materializer@example/db",
+        connect_factory=connect,
+    )
+    return writer, cursor
+
+
+def test_search_presence_signal_persists_observe_only_shape():
+    from empire_os.intelligence_materializer_transport import (
+        persist_competitor_search_presence_signal,
+    )
+
+    writer, cursor = _search_presence_writer()
+    result = persist_competitor_search_presence_signal(
+        writer,
+        _search_presence_signal(),
+    )
+
+    assert result["inserted"] is True
+    assert result["existing"] is False
+    assert result["execution_authority"] == "none"
+
+    insert_sql = next(
+        sql for sql, _ in cursor.calls
+        if sql.startswith("INSERT INTO public.intelligence_signals")
+    )
+    assert "'competitor_search_presence'" in insert_sql
+    assert "'search_intelligence'" in insert_sql
+
+    assert not any(
+        sql.startswith(("UPDATE ", "DELETE "))
+        for sql, _ in cursor.calls
+    )
+
+
+def test_search_presence_signal_dedupes_by_observations():
+    from empire_os.intelligence_materializer_transport import (
+        persist_competitor_search_presence_signal,
+    )
+
+    writer, cursor = _search_presence_writer(duplicate=True)
+    result = persist_competitor_search_presence_signal(
+        writer,
+        _search_presence_signal(),
+    )
+
+    assert result["inserted"] is False
+    assert result["existing"] is True
+    assert not any(
+        sql.startswith("INSERT INTO public.intelligence_signals")
+        for sql, _ in cursor.calls
+    )
+
+
+def test_search_presence_signal_rejects_market_share_inference():
+    from empire_os.intelligence_materializer_transport import (
+        persist_competitor_search_presence_signal,
+    )
+
+    writer, _ = _search_presence_writer()
+    signal = _search_presence_signal()
+    signal["payload"]["market_share_inferred"] = True
+
+    with pytest.raises(
+        IntelligenceMaterializerTransportError,
+        match="market share",
+    ):
+        persist_competitor_search_presence_signal(writer, signal)
+
+
+def test_search_presence_signal_rejects_execution_authority():
+    from empire_os.intelligence_materializer_transport import (
+        persist_competitor_search_presence_signal,
+    )
+
+    writer, _ = _search_presence_writer()
+    signal = _search_presence_signal()
+    signal["execution_authority"] = "outbound"
+
+    with pytest.raises(
+        IntelligenceMaterializerTransportError,
+        match="execution authority",
+    ):
+        persist_competitor_search_presence_signal(writer, signal)
