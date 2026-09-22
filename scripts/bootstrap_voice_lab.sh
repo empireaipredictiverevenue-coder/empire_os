@@ -33,18 +33,33 @@ download_extract   "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-
 
 download_extract   "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2"   "$STT_DIR"   "$MODEL_ROOT/sherpa-onnx-whisper-tiny.en.tar.bz2"
 
+download_extract   "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2"   "$STREAM_STT_DIR"   "$MODEL_ROOT/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2"
+
 echo "=== READINESS ==="
 PYTHONPATH=/srv/empire_os ./.venv/bin/python - <<'PY'
-from empire_os.voice_lab import EmpireVoiceLab, VoiceLabConfig
+from empire_os.voice_lab import EmpireVoiceLab, VoiceLabConfig, MODEL_ROOT
+from pathlib import Path
 import json
 
 deps = EmpireVoiceLab.dependency_readiness()
 models = EmpireVoiceLab.model_readiness(VoiceLabConfig.from_env())
+stream_dir = Path(MODEL_ROOT) / "sherpa-onnx-streaming-zipformer-en-20M-2023-02-17"
+streaming_stt = {
+    "encoder": (stream_dir / "encoder-epoch-99-avg-1.int8.onnx").is_file(),
+    "decoder": (stream_dir / "decoder-epoch-99-avg-1.onnx").is_file(),
+    "joiner": (stream_dir / "joiner-epoch-99-avg-1.int8.onnx").is_file(),
+    "tokens": (stream_dir / "tokens.txt").is_file(),
+}
 print(json.dumps({
     "dependencies": deps,
     "models": models,
+    "streaming_stt": streaming_stt,
 }, indent=2, sort_keys=True))
-if not all(deps.values()) or not all(models.values()):
+if (
+    not all(deps.values())
+    or not all(models.values())
+    or not all(streaming_stt.values())
+):
     raise SystemExit("Voice Lab runtime/model readiness incomplete")
 PY
 
