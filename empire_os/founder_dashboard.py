@@ -35,6 +35,9 @@ from empire_os.next_best_action import (
 from empire_os.account_digital_twin import (
     build_account_twin_runtime,
 )
+from empire_os.cortex_learning_loop import (
+    build_cortex_learning_runtime,
+)
 from empire_os.commercial_marketing_registry import (
     marketing_plan_catalog,
     marketing_summary,
@@ -346,6 +349,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         ),
         "account_buyer_digital_twins": (
             build_account_twin_runtime(repo_root)
+        ),
+        "cortex_learning_loop": (
+            build_cortex_learning_runtime(repo_root)
         ),
         "recovery_portfolio": {
             "summary": recovery_summary(),
