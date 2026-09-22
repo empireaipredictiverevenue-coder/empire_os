@@ -261,6 +261,40 @@ Current truth:
 - [ ] Sellable plans/API/white-label
 - [ ] Real customer proof
 
+### Organic + AI Recommendation Intelligence — ACTIVE BUILD
+
+Current product contract:
+**organic search visibility + observed AI answer presence + citations + explicit
+recommendations + competitor recommendation gaps + attributable commercial
+outcomes.**
+
+Truth boundary:
+- observed recommendation evidence is not a hidden AI ranking;
+- share-of-observed-recommendations is not market share;
+- Empire never guarantees that ChatGPT, Google or another answer engine will
+  recommend a business;
+- missing captures remain UNKNOWN;
+- only recognized canonical revenue can be reported as actual revenue.
+
+Implementation state:
+- [ ] Evidence model for captured AI answers/recommendations — CODED; focused runtime test pending
+- [ ] Recommendation visibility analysis — CODED; focused runtime test pending
+- [ ] OBSERVE API: `/v1/search/recommendation-visibility/preview` — CODED; route/runtime verification pending
+- [ ] Sellable product contract: `organic_ai_recommendation_intelligence` — CODED; catalog/runtime verification pending
+- [ ] Organic SERP baseline from Search Fabric
+- [ ] Real AI-answer observation adapters / evidence capture
+- [ ] Brand mention/citation/recommendation history
+- [ ] Competitor share-of-observed-recommendations trend
+- [ ] Recommendation-gap query portfolio
+- [ ] Citation/source gap backlog
+- [ ] Search Console + rank-history join where available
+- [ ] Search/AI-touch -> recognized revenue attribution
+- [ ] Search Command Centre / Founder Console product surface
+- [ ] Scheduled monitoring + freshness/expiry
+- [ ] Client report/export
+- [ ] Commercial packaging / pricing evidence
+- [ ] First real customer proof
+
 ## TAM / Market Intelligence
 
 - [ ] TAM graph from canonical companies
