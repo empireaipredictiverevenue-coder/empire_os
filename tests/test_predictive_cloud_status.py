@@ -141,3 +141,31 @@ def test_status_exposes_quant_review_and_department_coverage(tmp_path):
     assert organization["fully_wired_department_count"] == organization[
         "department_count"
     ]
+
+
+def test_status_exposes_verified_predictive_intelligence(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/predictive_intelligence/latest.json",
+        {
+            "generated_at": "2026-09-22T20:59:00+00:00",
+            "source_outcome_count": 30,
+            "matched_outcome_count": 25,
+            "probability_ready_product_count": 1,
+            "timing_ready_product_count": 0,
+            "minimum_terminal_samples": 20,
+            "minimum_timing_samples": 8,
+            "search_scores_used": False,
+            "llm_probability_used": False,
+            "execution_authority": "none",
+        },
+    )
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime(2026, 9, 22, 21, 0, tzinfo=timezone.utc),
+    )
+    summary = result["components"]["predictive_intelligence"]["summary"]
+    assert summary["source_outcome_count"] == 30
+    assert summary["probability_ready_product_count"] == 1
+    assert summary["search_scores_used"] is False
+    assert summary["llm_probability_used"] is False
