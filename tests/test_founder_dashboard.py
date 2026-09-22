@@ -1353,3 +1353,84 @@ def test_dashboard_exposes_predictive_learning_closeout(tmp_path):
     assert memory["model_weight_mutation_authorized"] is False
     assert memory["actual_revenue"] is False
     assert memory["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_phase_3f_closeout_without_claiming_production(tmp_path):
+    root = make_root(tmp_path)
+
+    write_json(
+        root / "runtime/astra/executive_latest.json",
+        {"plan_id": "astra_plan_current"},
+    )
+    write_json(
+        root / "runtime/astra/executive_evaluation_latest.json",
+        {
+            "plan_id": "astra_plan_current",
+            "evaluation_state": "BLOCKED",
+            "status_counts": {"DONE": 4, "BLOCKED": 4},
+            "undispatched_step_ids": [],
+        },
+    )
+    write_json(
+        root / "runtime/predictive_intelligence/latest.json",
+        {
+            "prediction_only": True,
+            "llm_probability_used": False,
+            "search_scores_used": False,
+            "source_outcome_count": 0,
+            "probability_ready_product_count": 0,
+            "timing_ready_product_count": 0,
+        },
+    )
+    write_json(
+        root / "runtime/economic_memory/latest.json",
+        {
+            "verified_outcomes_only_for_outcome_conditioned_memory": True,
+            "department_done_is_verified_outcome": False,
+            "model_weight_mutation_authorized": False,
+            "outcome_conditioned_memory_count": 0,
+        },
+    )
+    write_json(
+        root / "runtime/opportunity_factory/value_latest.json",
+        {
+            "candidate_count": 24,
+            "value_available_count": 0,
+            "prediction_only": True,
+            "actual_revenue": False,
+        },
+    )
+
+    for index, field in enumerate((
+        "probability_success",
+        "confidence",
+        "uncertainty",
+        "time_to_revenue_days",
+    )):
+        write_json(
+            root
+            / "runtime/departments/work/blocked"
+            / f"current-{index}.json",
+            {
+                "id": f"work-{index}",
+                "plan_id": "astra_plan_current",
+                "step_id": f"step-{index}",
+                "target_component": "predictive_intelligence",
+                "action": f"resolve_quant_input:{field}",
+                "error": "insufficient_verified_outcome_cohort",
+            },
+        )
+
+    result = build_founder_dashboard(root)
+    closeout = result["phase_3f_closeout"]
+
+    assert closeout["engineering_ready"] is True
+    assert closeout["phase_can_advance"] is True
+    assert closeout["closeout_state"] == (
+        "ENGINEERING_READY_EVIDENCE_GATED"
+    )
+    assert closeout["production_proof_complete"] is False
+    assert closeout["current_plan_blocker_count"] == 4
+    assert closeout["evidence_only_blockers"] is True
+    assert closeout["actual_revenue"] is False
+    assert closeout["execution_authority"] == "none"
