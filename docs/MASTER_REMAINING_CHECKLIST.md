@@ -8,7 +8,7 @@ This is the canonical execution checklist for the remaining EmpireOS build.
 
 ## Current checkpoint
 
-Competitor-audience intelligence is live through Account Intelligence Brief + Claim Critic.
+Competitor-audience intelligence is live through Account Intelligence Brief + Claim Critic. Buyer State Evidence Stack is now live and verified in the Founder Console.
 
 Current truth:
 - research evidence is not buyer intent
@@ -41,16 +41,16 @@ Current truth:
 - [x] Claim Critic
 - [x] Unsupported commercial claims fail closed
 
-## Buyer State Evidence Stack — NEXT
+## Buyer State Evidence Stack — DONE
 
-- [ ] Merge entity + prospect + qualification + supported claims
-- [ ] Represent factual states separately:
+- [x] Merge entity + prospect + qualification + supported claims
+- [x] Represent factual states separately:
   DISCOVERED -> ICP_MATCH -> SIGNAL_ACTIVE -> RESEARCHED -> READY -> CONTACTED -> ENGAGED -> CONVERSATION -> COMMERCIAL_INTENT -> TERMS -> PAYMENT_PENDING -> PAID -> FULFILLED -> EXPANSION
-- [ ] Unknown states stay unknown
-- [ ] Competitor evidence must not equal buyer intent
-- [ ] Qualification score must not equal commercial intent
-- [ ] Expose buyer-state stack in Founder Console
-- [ ] Add tests against false promotion
+- [x] Unknown states stay unknown
+- [x] Competitor evidence must not equal buyer intent
+- [x] Qualification score must not equal commercial intent
+- [x] Expose buyer-state stack in Founder Console
+- [x] Add tests against false promotion
 
 ## Next-Best Action engine
 
@@ -168,7 +168,7 @@ Current truth:
 - [x] Omega/Cortex context
 - [x] Account research
 - [x] Account Intelligence Brief
-- [ ] Buyer State
+- [x] Buyer State
 - [ ] Next-Best Action
 - [ ] Account digital twin
 - [ ] Market opportunities
