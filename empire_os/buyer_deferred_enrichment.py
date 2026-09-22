@@ -244,6 +244,15 @@ class BuyerDeferredEnrichmentQueue:
                 "execution_allowed": False,
                 "requires_live_call_authority": True,
                 "source": "buyer_deferred_enrichment",
+                "voice_legal_basis": (
+                    str(item.get("voice_legal_basis") or "").strip() or None
+                ),
+                "line_type": (
+                    str(item.get("line_type") or "").strip() or None
+                ),
+                "legal_basis_source": (
+                    str(item.get("legal_basis_source") or "").strip() or None
+                ),
                 "updated_at": now,
             })
             data[prospect_id] = row
