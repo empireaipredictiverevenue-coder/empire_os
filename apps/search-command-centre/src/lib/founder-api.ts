@@ -54,6 +54,33 @@ export type FounderDashboard = {
     recorded_ok?: boolean | null;
     returncode?: number | null;
   };
+  recovery_portfolio?: {
+    summary?: {
+      schema_version?: string;
+      product_count?: number;
+      by_state?: Record<string, number>;
+      by_family?: Record<string, number>;
+      pricing_observed_count?: number;
+      execution_authority?: string;
+      actual_revenue?: boolean;
+    };
+    products?: Array<{
+      key?: string;
+      name?: string;
+      state?: string;
+      family?: string;
+      revenue_models?: string[];
+      surfaces?: string[];
+      notes?: string;
+      pricing_observed?: boolean;
+      execution_authority?: string;
+    }>;
+    marketing_summary?: Record<string, unknown>;
+    marketing_plans?: Array<Record<string, unknown>>;
+    pricing_authority?: string;
+    execution_authority?: string;
+    actual_revenue?: boolean;
+  };
   phases?: Array<{
     phase?: number;
     title?: string;

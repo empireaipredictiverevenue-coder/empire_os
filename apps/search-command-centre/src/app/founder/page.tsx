@@ -63,6 +63,9 @@ export default async function FounderPage() {
   const observed = astra?.observed ?? {};
   const board = astra?.board ?? [];
   const phases = data?.phases ?? [];
+  const recovery = data?.recovery_portfolio;
+  const recoveryProducts = recovery?.products ?? [];
+  const recoveryByState = recovery?.summary?.by_state ?? {};
   const stages = loop?.stages ?? [];
   const operating = loop?.operating_state?.class ?? "UNKNOWN";
   const intelligenceNodes = nodesResult.data?.nodes ?? [];
@@ -684,6 +687,97 @@ export default async function FounderPage() {
             <section className="panel mt-5">
               <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
                 <div>
+                  <p className="eyebrow">Recovery & salvage control</p>
+                  <h2 className="mt-1 text-xl font-semibold text-white">
+                    Half-built · gated · reusable assets
+                  </h2>
+                </div>
+                <p className="max-w-xl text-xs leading-5 text-slate-600">
+                  Historical assets are recovery memory, not production truth.
+                  Promote only after canonical integration, evidence and tests.
+                </p>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                <Evidence
+                  label="Recovery products"
+                  value={int(recovery?.summary?.product_count)}
+                />
+                <Evidence
+                  label="Active build"
+                  value={int(recoveryByState.ACTIVE_BUILD)}
+                />
+                <Evidence
+                  label="Salvage candidates"
+                  value={int(recoveryByState.SALVAGE_CANDIDATE)}
+                />
+                <Evidence
+                  label="Rebuild later"
+                  value={int(recoveryByState.REBUILD_LATER)}
+                />
+                <Evidence
+                  label="Founder gated"
+                  value={int(recoveryByState.FOUNDER_GATE)}
+                />
+                <Evidence
+                  label="Pricing observed"
+                  value={int(recovery?.summary?.pricing_observed_count)}
+                />
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {recoveryProducts.map((product) => (
+                  <div
+                    key={product.key ?? product.name}
+                    className="rounded-2xl border border-white/8 bg-white/[0.025] p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {show(product.name)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {show(product.family).replaceAll("_", " ")}
+                        </p>
+                      </div>
+                      <span
+                        className={[
+                          "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]",
+                          recoveryTone(product.state),
+                        ].join(" ")}
+                      >
+                        {show(product.state).replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <p className="mt-4 text-[11px] leading-5 text-slate-400">
+                      {(product.surfaces ?? []).slice(0, 4).join(" · ") ||
+                        "No canonical surfaces listed"}
+                    </p>
+                    <p className="mt-3 text-[11px] leading-5 text-emerald-200">
+                      {(product.revenue_models ?? []).join(" · ") ||
+                        "Revenue model unknown"}
+                    </p>
+                    {product.notes ? (
+                      <p className="mt-3 border-t border-white/8 pt-3 text-[11px] leading-5 text-slate-600">
+                        {product.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 border-t border-white/8 pt-4">
+                <p className="text-xs leading-5 text-slate-500">
+                  Protected recovery paths stay untouched. Legacy SQLite,
+                  synthetic commercial truth and retired Solana/USDC payment
+                  paths are not restored into production.
+                </p>
+              </div>
+            </section>
+
+            <section className="panel mt-5">
+              <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                <div>
                   <p className="eyebrow">Blueprint control room</p>
                   <h2 className="mt-1 text-xl font-semibold text-white">
                     Phases 3–18
@@ -720,6 +814,22 @@ export default async function FounderPage() {
       </div>
     </main>
   );
+}
+
+function recoveryTone(value: string | undefined) {
+  if (value === "ACTIVE_BUILD" || value === "PRODUCTION") {
+    return "border-emerald-400/25 bg-emerald-400/10 text-emerald-200";
+  }
+  if (value === "FOUNDER_GATE") {
+    return "border-violet-400/25 bg-violet-400/10 text-violet-200";
+  }
+  if (value === "SALVAGE_CANDIDATE" || value === "INCUBATE") {
+    return "border-cyan-400/25 bg-cyan-400/10 text-cyan-200";
+  }
+  if (value === "REBUILD_LATER") {
+    return "border-amber-400/25 bg-amber-400/10 text-amber-200";
+  }
+  return "border-white/10 bg-white/[0.035] text-slate-400";
 }
 
 function MetricCard({

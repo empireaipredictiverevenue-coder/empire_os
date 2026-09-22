@@ -1253,3 +1253,26 @@ def test_dashboard_exposes_market_sweeps_revenue_gps(tmp_path):
     ] == 150000
     assert gps["buyer_intent_inferred"] is False
     assert gps["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_recovery_portfolio_as_non_production_truth(tmp_path):
+    root = make_root(tmp_path)
+    result = build_founder_dashboard(root)
+    recovery = result["recovery_portfolio"]
+
+    assert recovery["summary"]["product_count"] >= 10
+    assert recovery["summary"]["by_state"]["ACTIVE_BUILD"] >= 1
+    assert recovery["products"]
+    assert any(
+        row["key"] == "permit_intelligence"
+        and row["state"] == "ACTIVE_BUILD"
+        for row in recovery["products"]
+    )
+    assert any(
+        row["key"] == "intel_hourly"
+        and row["state"] == "FOUNDER_GATE"
+        for row in recovery["products"]
+    )
+    assert recovery["pricing_authority"] == "none"
+    assert recovery["execution_authority"] == "none"
+    assert recovery["actual_revenue"] is False
