@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.parse import urlparse
 
+from empire_os.competitor_audience_sweep import fetch_public_html
 from empire_os.search_fabric.search import search as search_web
 
 
@@ -43,6 +44,65 @@ def _slug_words(value: Any) -> str:
 
 
 SearchFn = Callable[..., Mapping[str, Any]]
+FetchFn = Callable[[str], str | None]
+
+
+_GENERIC_COMPANY_TOKENS = {
+    "inc", "llc", "ltd", "limited", "corp", "corporation",
+    "company", "co", "plc",
+}
+
+
+def _company_name_tokens(value: Any) -> tuple[str, ...]:
+    return tuple(
+        token
+        for token in re.findall(r"[a-z0-9]+", _clean(value).lower())
+        if len(token) > 1 and token not in _GENERIC_COMPANY_TOKENS
+    )
+
+
+def _result_matches_company(
+    raw: Mapping[str, Any],
+    *,
+    company_name: str,
+    company_domain: str,
+) -> bool:
+    url = _clean(raw.get("link") or raw.get("url"))
+    if company_domain and _domain(url) == company_domain:
+        return True
+
+    haystack = _slug_words(
+        " ".join(
+            (
+                _clean(raw.get("title")),
+                _clean(raw.get("snippet")),
+                url,
+            )
+        )
+    )
+    if not haystack:
+        return False
+
+    exact_name = _slug_words(company_name)
+    if exact_name and exact_name in haystack:
+        return True
+
+    tokens = _company_name_tokens(company_name)
+    if len(tokens) >= 2 and all(token in haystack.split() for token in tokens):
+        return True
+
+    return False
+
+
+def _html_mentions_company(html: str, company_name: str) -> bool:
+    text = _slug_words(re.sub(r"<[^>]+>", " ", html))
+    exact_name = _slug_words(company_name)
+    if exact_name and exact_name in text:
+        return True
+
+    tokens = _company_name_tokens(company_name)
+    words = set(text.split())
+    return len(tokens) >= 2 and all(token in words for token in tokens)
 
 
 def build_account_research_queries(
@@ -92,6 +152,7 @@ def execute_account_research(
     context: Mapping[str, Any],
     *,
     search_fn: SearchFn = search_web,
+    fetch_fn: FetchFn = fetch_public_html,
     max_results_per_query: int = 5,
 ) -> dict[str, Any]:
     entity_id = _clean(company.get("entity_id") or context.get("entity_id"))
@@ -110,6 +171,57 @@ def execute_account_research(
     queries = build_account_research_queries(company, context)
     observations: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
+    rejected_irrelevant_count = 0
+
+    # First-party retrieval is direct and bounded. Search engines are not
+    # trusted to establish company identity for the official domain.
+    if company_domain:
+        first_party_url = f"https://{company_domain}/"
+        html = fetch_fn(first_party_url)
+        if html:
+            seen_urls.add(first_party_url)
+            observations.append({
+                "query": None,
+                "engine": None,
+                "position": None,
+                "title": company_name,
+                "snippet": "",
+                "url": first_party_url,
+                "domain": company_domain,
+                "relevance_score": None,
+                "first_party_domain_match": True,
+                "existing_evidence_source": False,
+                "observation_type": "public_first_party_page",
+                "verified_fact": False,
+            })
+
+    # Re-observe known evidence pages directly. They remain observations here;
+    # the canonical evidence layer owns fact verification.
+    for item in company.get("evidence", []) or []:
+        if not isinstance(item, Mapping):
+            continue
+        evidence_url = _clean(item.get("source_ref"))
+        if not evidence_url or evidence_url in seen_urls:
+            continue
+        html = fetch_fn(evidence_url)
+        if not html or not _html_mentions_company(html, company_name):
+            continue
+
+        seen_urls.add(evidence_url)
+        observations.append({
+            "query": None,
+            "engine": None,
+            "position": None,
+            "title": _clean(item.get("summary")) or company_name,
+            "snippet": "",
+            "url": evidence_url,
+            "domain": _domain(evidence_url) or None,
+            "relevance_score": None,
+            "first_party_domain_match": False,
+            "existing_evidence_source": True,
+            "observation_type": "reobserved_public_evidence",
+            "verified_fact": False,
+        })
 
     for query in queries:
         result = search_fn(
@@ -133,6 +245,15 @@ def execute_account_research(
             url = _clean(raw.get("link") or raw.get("url"))
             if not url or url in seen_urls:
                 continue
+
+            if not _result_matches_company(
+                raw,
+                company_name=company_name,
+                company_domain=company_domain,
+            ):
+                rejected_irrelevant_count += 1
+                continue
+
             seen_urls.add(url)
 
             result_domain = _domain(url)
@@ -193,6 +314,9 @@ def execute_account_research(
         "third_party_observation_count": third_party_count,
         "existing_evidence_source_reobserved_count": (
             evidence_reobserved_count
+        ),
+        "irrelevant_search_result_rejected_count": (
+            rejected_irrelevant_count
         ),
         "next_step": next_step,
         "observations": observations,
