@@ -28,27 +28,33 @@ def switchboard_status() -> dict[str, Any]:
         )
     ).strip()
 
-    route_enabled = (
+    route_requested = (
         mode == ACTIVE
         and str(
             os.getenv("EMPIRE_PPC_SWITCHBOARD_ROUTE_ENABLED") or ""
         ).strip().lower() in {"1", "true", "yes", "on"}
     )
+    canonical_ready = str(
+        os.getenv("EMPIRE_PPC_SWITCHBOARD_CANONICAL_READY") or ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    route_enabled = bool(route_requested and canonical_ready)
 
     return {
         "mode": mode,
         "url": url,
+        "route_requested": route_requested,
+        "canonical_refactor_ready": canonical_ready,
         "route_enabled": route_enabled,
         "canonical_transport": "vonage",
         "canonical_database": "supabase",
         "canonical_payment_rail": "usdt_bsc",
         "legacy_module_present": True,
         "legacy_activation_allowed": False,
-        "execution_allowed": False if not route_enabled else True,
+        "execution_allowed": route_enabled,
         "reason": (
-            "legacy_ppc_switchboard_parked_pending_canonical_refactor"
-            if not route_enabled
-            else "explicit_route_activation_present"
+            "canonical_refactor_and_route_gate_approved"
+            if route_enabled
+            else "legacy_ppc_switchboard_parked_pending_canonical_refactor"
         ),
     }
 
