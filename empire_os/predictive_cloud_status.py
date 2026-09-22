@@ -273,6 +273,10 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "primary_goal": primary.get("key"),
             "primary_goal_priority": primary.get("priority"),
             "plan_step_count": payload.get("plan_step_count"),
+            "departments_in_plan": payload.get("departments_in_plan"),
+            "department_plan_counts": payload.get(
+                "department_plan_counts"
+            ),
             "auto_dispatch_eligible_count": payload.get(
                 "auto_dispatch_eligible_count"
             ),
