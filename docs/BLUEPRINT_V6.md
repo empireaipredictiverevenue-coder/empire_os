@@ -172,6 +172,21 @@ The old standalone Supabase project, legacy SQLite delivery path and forecast-as
 ### Search Growth Product Suite — ACTIVE BUILD
 Empire Search Intelligence is now being productized into sellable SEO/AEO/GEO products rather than remaining only an internal engine.
 
+Organic + AI Recommendation Intelligence status:
+- evidence contract and deterministic analysis: CODED;
+- OBSERVE preview API: CODED;
+- sellable product contract: CODED;
+- Blueprint/Search Intelligence documentation: CODED;
+- focused EmpireOS runtime tests: PENDING;
+- real AI-answer observation adapters: PENDING;
+- canonical observation history: PENDING;
+- Search Command Centre / Founder Console surface: PENDING;
+- commercial pricing and first real customer proof: PENDING.
+
+The product must distinguish organic ranking evidence, AI answer presence, citation,
+explicit recommendation and recognized-revenue attribution. It must never infer
+hidden model preference, claim unobserved market share, or guarantee recommendation.
+
 Initial product contracts:
 - Technical Search Audit;
 - SERP Intelligence API — monetised via API usage, prepaid credits, subscriptions, agency/reseller wholesale, white-label licensing and enterprise data/API contracts;
