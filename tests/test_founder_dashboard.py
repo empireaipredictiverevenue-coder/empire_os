@@ -1174,3 +1174,82 @@ def test_dashboard_exposes_revenue_pulse(tmp_path):
         "forecast_included_in_truth"
     ] is False
     assert pulse["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_market_sweeps_revenue_gps(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/market_sweeps/revenue_gps_latest.json",
+        {
+            "schema_version": "empire.market_sweep_revenue_gps.v1",
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-22T15:00:00+00:00",
+            "window_days": 7,
+            "market_count": 2,
+            "commercial_demand_market_count": 0,
+            "competitive_evidence_market_count": 1,
+            "markets": [{
+                "niche": "roofing",
+                "metro": "denver, co",
+                "acquisition_count": 13,
+                "qualification_count": 5,
+                "approved_buyer_count": 1,
+                "commercial_reply_count": 0,
+                "commercial_demand_state": "not_observed",
+                "competitor_pressure_proxy": 100.0,
+                "competitor_pressure_is_model": True,
+                "supply_gap_state": "unknown_not_measured",
+                "supply_gap_inferred": False,
+                "product_candidate": "managed_service",
+                "product_purchase_inferred": False,
+                "market_revenue_prediction_cents": None,
+                "buyer_intent_inferred": False,
+                "commercial_intent_inferred": False,
+                "market_share_inferred": False,
+                "revenue_inferred": False,
+                "execution_authority": "none",
+            }],
+            "research_queue": [{
+                "niche": "roofing",
+                "metro": "denver, co",
+                "research_priority_score": 80.0,
+                "recommended_next_action":
+                    "advance_existing_approved_buyer",
+                "mutation_authorized": False,
+                "external_execution_authorized": False,
+            }],
+            "verified_product_economics": {
+                "available": True,
+                "product_code": "managed_service",
+                "pilot_price_cents": 150000,
+                "policy_cost_ceiling_cents": 60000,
+                "policy_margin_at_ceiling_cents": 90000,
+                "prediction": False,
+                "actual_revenue": False,
+            },
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "market_share_inferred": False,
+            "revenue_inferred": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    gps = result["market_sweeps_revenue_gps"]
+
+    assert gps["available"] is True
+    assert gps["market_count"] == 2
+    assert gps["commercial_demand_market_count"] == 0
+    assert gps["competitive_evidence_market_count"] == 1
+    assert gps["markets"][0]["commercial_demand_state"] == "not_observed"
+    assert gps["markets"][0]["competitor_pressure_is_model"] is True
+    assert gps["markets"][0]["supply_gap_inferred"] is False
+    assert gps["markets"][0]["product_purchase_inferred"] is False
+    assert gps["verified_product_economics"][
+        "pilot_price_cents"
+    ] == 150000
+    assert gps["buyer_intent_inferred"] is False
+    assert gps["execution_authority"] == "none"
