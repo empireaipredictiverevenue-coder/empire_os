@@ -82,6 +82,89 @@ def _search_query(query: str, num: int = 20) -> dict[str, Any]:
     }
 
 
+def _canonical_company_queries(
+    company_name: str,
+    company_domain: str,
+) -> tuple[str, ...]:
+    """Bounded verification queries for a known canonical company.
+
+    These queries verify observed search/index presence for an already-resolved
+    company. They do not discover companies and do not establish market share.
+    """
+    name = _clean(company_name)
+    domain = _domain(company_domain)
+    queries = []
+    if domain:
+        queries.append(f"site:{domain}")
+    if name:
+        queries.append(f'"{name}" Denver roofing')
+    return tuple(dict.fromkeys(q for q in queries if q))
+
+
+def _canonical_presence_probe(
+    *,
+    company: Mapping[str, Any],
+    search_fn=_search_query,
+) -> list[dict[str, Any]]:
+    entity_id = _clean(company.get("entity_id") or company.get("id"))
+    company_name = _clean(
+        company.get("company_name") or company.get("canonical_name")
+    )
+    company_domain = _domain(
+        company.get("company_domain") or company.get("canonical_website")
+    )
+    if not entity_id or not company_domain:
+        return []
+
+    observations = []
+    for query in _canonical_company_queries(company_name, company_domain):
+        result = search_fn(query, 10)
+        organic = result.get("organic") if isinstance(result, Mapping) else []
+        organic = organic if isinstance(organic, list) else []
+        engine = _clean(
+            (result.get("searchParameters") or {}).get("engine")
+        ) if isinstance(result, Mapping) else ""
+
+        matched = None
+        for idx, row in enumerate(organic, 1):
+            if not isinstance(row, Mapping):
+                continue
+            link = _clean(row.get("link"))
+            observed_domain = _domain(link)
+            if (
+                observed_domain == company_domain
+                or observed_domain.endswith("." + company_domain)
+            ):
+                matched = {
+                    "query": query,
+                    "engine": engine or "unknown",
+                    "position": int(row.get("position") or idx),
+                    "entity_id": entity_id,
+                    "company_name": company_name,
+                    "domain": company_domain,
+                    "url": link,
+                    "title": _clean(row.get("title")),
+                    "snippet": _clean(row.get("snippet")),
+                    "observed_at": datetime.now(timezone.utc).isoformat(),
+                    "provenance": {
+                        "source": "empire_search_fabric",
+                        "discovery_mode": "canonical_company_verification",
+                        "quality_gate": (
+                            (result.get("searchParameters") or {}).get(
+                                "quality_gate"
+                            )
+                        ) if isinstance(result, Mapping) else None,
+                    },
+                }
+                break
+
+        if matched is not None:
+            observations.append(matched)
+            break
+
+    return observations
+
+
 def _match_company_for_domain(
     domain: str,
     domain_to_company: Mapping[str, Mapping[str, Any]],
@@ -105,6 +188,7 @@ def build_search_presence_snapshot(
     queries: tuple[str, ...] = DEFAULT_QUERIES,
     search_fn=_search_query,
     max_workers: int = 4,
+    verify_canonical_companies: bool = True,
 ) -> dict[str, Any]:
     domain_to_company: dict[str, dict[str, Any]] = {}
     for company in companies:
@@ -199,6 +283,46 @@ def build_search_presence_snapshot(
     for row in query_results:
         observations.extend(row["observations"])
 
+    canonical_verification_observations: list[dict[str, Any]] = []
+    if verify_canonical_companies and domain_to_company:
+        verification_workers = min(
+            max(1, int(max_workers)),
+            len(domain_to_company),
+        )
+        with ThreadPoolExecutor(
+            max_workers=verification_workers
+        ) as executor:
+            futures = [
+                executor.submit(
+                    _canonical_presence_probe,
+                    company=company,
+                    search_fn=search_fn,
+                )
+                for company in domain_to_company.values()
+            ]
+            for future in as_completed(futures):
+                canonical_verification_observations.extend(
+                    future.result()
+                )
+
+        seen = {
+            (
+                row["entity_id"],
+                row["query"],
+                row["url"],
+            )
+            for row in observations
+        }
+        for row in canonical_verification_observations:
+            key = (
+                row["entity_id"],
+                row["query"],
+                row["url"],
+            )
+            if key not in seen:
+                observations.append(row)
+                seen.add(key)
+
     company_state: dict[str, dict[str, Any]] = {}
     for company in domain_to_company.values():
         company_state[company["entity_id"]] = {
@@ -287,6 +411,16 @@ def build_search_presence_snapshot(
             if row["search_presence_observed"]
         ),
         "observation_count": len(observations),
+        "generic_query_observation_count": sum(
+            len(row["observations"])
+            for row in query_results
+        ),
+        "canonical_verification_observation_count": len(
+            canonical_verification_observations
+        ),
+        "canonical_verification_enabled": bool(
+            verify_canonical_companies
+        ),
         "query_results": query_results,
         "companies": company_presence,
         "search_presence_available": total_weight > 0,
