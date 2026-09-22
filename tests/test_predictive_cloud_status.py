@@ -78,3 +78,33 @@ def test_status_exposes_opportunity_normalization_progress(tmp_path):
     assert summary["candidates_with_any_normalized_score"] == 4
     assert summary["total_normalized_scores"] == 13
     assert summary["search_result_counts_used_as_scores"] is False
+
+
+def test_status_exposes_astra_executive_goal_and_plan(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/astra/executive_latest.json",
+        {
+            "generated_at": "2026-09-22T20:59:00+00:00",
+            "plan_id": "astra_plan_test",
+            "primary_goal": {
+                "key": "advance_first_verified_revenue",
+                "priority": 98,
+            },
+            "plan_step_count": 4,
+            "auto_dispatch_eligible_count": 3,
+            "founder_gate_step_count": 1,
+            "external_execution_performed": False,
+            "execution_authority": "none",
+        },
+    )
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime(2026, 9, 22, 21, 0, tzinfo=timezone.utc),
+    )
+    summary = result["components"]["astra_executive"]["summary"]
+    assert summary["primary_goal"] == "advance_first_verified_revenue"
+    assert summary["plan_step_count"] == 4
+    assert summary["auto_dispatch_eligible_count"] == 3
+    assert summary["founder_gate_step_count"] == 1
+    assert summary["external_execution_performed"] is False
