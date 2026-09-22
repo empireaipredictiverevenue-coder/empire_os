@@ -87,9 +87,10 @@ Already implemented:
 - [x] bounded Opportunity Radar public-research executor — CODED
 - [x] Astra Radar → Research → Factory Intake internal job chain — CODED
 - [x] truth-preserving Opportunity Factory intake bridge — CODED
+- [x] Evidence normalizer keeps per-score semantic class/provenance and refuses to use search-result counts or competitor gaps as demand — CODED
 - [x] combined Radar → Research → Factory Intake → AI Planner loop runner — CODED
-- [x] 15-minute autonomous Opportunity Loop user-timer packaging — STAGED
-- [x] Opportunity Loop freshness/dedupe guard aligned to 15-minute cadence — CODED
+- [x] 30-minute autonomous Opportunity Loop user-timer packaging — STAGED; Astra may invoke more frequently but the loop freshness guard prevents duplicate work
+- [x] Opportunity Loop freshness/dedupe guard — 15-minute minimum interval CODED
 - [x] Astra dispatches one canonical Opportunity Loop refresh job — CODED
 - [x] canonical autonomous-loop doctrine
 - [x] canonical full-business plain-text architecture
@@ -104,7 +105,7 @@ Verification / activation:
 - [ ] Confirm Astra dispatcher invokes one deduped Opportunity Loop without external mutation
 
 Next wiring:
-- [x] Normalize Radar + research evidence into Opportunity Factory readiness contract — CODED; live evidence normalizers still needed
+- [x] Normalize Radar + research evidence into Opportunity Factory readiness contract — evidence-backed normalizer CODED for observed commercial stages, verified product economics and approved-buyer distribution; unsupported dimensions remain UNKNOWN
 - [x] Automatically generate bounded missing-evidence plans per candidate — AI planner queued 3 deduplicated PLAN jobs from live cycle
 - [ ] Feed validated candidates into Astra workstream ranking
 - [ ] Add Storm / Permit / Property / Search AI Recommendation / Private Capital
