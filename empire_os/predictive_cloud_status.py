@@ -59,6 +59,13 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 3600,
     },
+    "opportunity_quant_review": {
+        "path": Path(
+            "runtime/opportunity_factory/quant_review_latest.json"
+        ),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 3600,
+    },
     "conversion_intelligence": {
         "path": Path("runtime/conversion/latest.json"),
         "time_keys": ("observed_at", "generated_at"),
@@ -168,6 +175,15 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "factory_blocked_count": payload.get(
                 "factory_blocked_count"
             ),
+            "quant_decision_packet_available_count": payload.get(
+                "quant_decision_packet_available_count"
+            ),
+            "quant_decision_packet_unavailable_count": payload.get(
+                "quant_decision_packet_unavailable_count"
+            ),
+            "quant_missing_field_counts": payload.get(
+                "quant_missing_field_counts"
+            ),
             "ai_plan_queued_count": payload.get(
                 "ai_plan_queued_count"
             ),
@@ -203,6 +219,20 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "candidate_count": payload.get("candidate_count"),
             "factory_ready_count": payload.get("factory_ready_count"),
             "blocked_count": payload.get("blocked_count"),
+        }
+    if name == "opportunity_quant_review":
+        return {
+            "candidate_count": payload.get("candidate_count"),
+            "available_decision_packet_count": payload.get(
+                "available_decision_packet_count"
+            ),
+            "unavailable_decision_packet_count": payload.get(
+                "unavailable_decision_packet_count"
+            ),
+            "missing_field_counts": payload.get(
+                "missing_field_counts"
+            ),
+            "capital_execution": payload.get("capital_execution"),
         }
     if name == "conversion_intelligence":
         return {
