@@ -36,6 +36,9 @@ class CallWorkItem:
     priority_score: float
     priority_reasons: tuple[str, ...]
     closer_brief: Mapping[str, Any]
+    voice_legal_basis: str | None
+    line_type: str | None
+    legal_basis_source: str | None
     channel: str = "voice"
     provider: str = "vonage"
     state: str = "ready_for_review"
@@ -248,6 +251,14 @@ def build_call_work(
             },
         }
 
+        voice_legal_basis = str(
+            raw.get("voice_legal_basis") or ""
+        ).strip() or None
+        line_type = str(raw.get("line_type") or "").strip() or None
+        legal_basis_source = str(
+            raw.get("legal_basis_source") or ""
+        ).strip() or None
+
         items.append(CallWorkItem(
             prospect_id=prospect_id,
             business_name=business_name,
@@ -263,6 +274,9 @@ def build_call_work(
             priority_score=priority,
             priority_reasons=priority_reasons,
             closer_brief=brief,
+            voice_legal_basis=voice_legal_basis,
+            line_type=line_type,
+            legal_basis_source=legal_basis_source,
         ))
 
     items.sort(
