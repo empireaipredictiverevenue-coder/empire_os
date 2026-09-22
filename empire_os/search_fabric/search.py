@@ -568,6 +568,8 @@ from urllib.parse import unquote as _url_unquote
 _QUERY_STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
     "in", "is", "of", "on", "or", "the", "to", "with",
+    # URL syntax/TLD tokens must never make an unrelated result relevant.
+    "com", "net", "org", "www", "http", "https",
 }
 
 def _query_terms(query: str) -> List[str]:
