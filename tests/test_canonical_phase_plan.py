@@ -12,8 +12,10 @@ def test_phase_plan_has_one_current_phase_and_no_skipping():
         if row["status"] == "CURRENT"
     ]
     assert len(current) == 1
-    assert current[0]["phase"] == "3F"
-    assert result["current_phase"] == "3F"
+    assert current[0]["phase"] == "4"
+    assert result["current_phase"] == "4"
+    phase_3f = next(row for row in result["phases"] if row["phase"] == "3F")
+    assert phase_3f["status"] == "CLOSED_EVIDENCE_GATED"
     assert result["phase_skipping_allowed"] is False
     assert result["new_ideas_interrupt_current_phase"] is False
 
