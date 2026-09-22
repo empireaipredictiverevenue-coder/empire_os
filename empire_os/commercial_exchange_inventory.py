@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 import json
+import re
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -25,10 +26,7 @@ OUTPUT = Path("runtime/commercial_exchange/latest.json")
 
 def _safe_token(value: Any) -> str:
     text = normalise(value)
-    return "".join(
-        char if char.isalnum() else "_"
-        for char in text
-    ).strip("_")
+    return re.sub(r"[^a-z0-9]+", "_", text).strip("_")
 
 
 def lane_key(family: str) -> str:
