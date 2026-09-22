@@ -1,0 +1,365 @@
+"""Observed market search-presence intelligence for EmpireOS.
+
+Runs a bounded set of public market queries through Search Fabric and measures
+which canonical market-company domains are actually observed in result sets.
+The metric is search presence, not market share, demand, buyer intent, or
+commercial intent.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Mapping
+from urllib.parse import urlparse
+
+from empire_os.competitor_audience_sweep import (
+    load_resolved_market_entities,
+)
+from empire_os.intelligence_materializer_transport import (
+    PostgresIntelligenceMaterializer,
+)
+from empire_os.search_fabric.search import search as search_web
+
+
+SNAPSHOT_RELATIVE_PATH = Path(
+    "runtime/competitive_intelligence/"
+    "competitor_search_presence_latest.json"
+)
+
+DEFAULT_QUERIES = (
+    "Denver roofing",
+    "Denver roofing contractor",
+    "roof repair Denver",
+    "roof replacement Denver",
+    "Denver hail damage roofing",
+    "commercial roofing Denver",
+)
+
+
+def _clean(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _domain(value: Any) -> str:
+    text = _clean(value)
+    if not text:
+        return ""
+    if "://" not in text:
+        text = "https://" + text
+    return (urlparse(text).hostname or "").lower().removeprefix("www.")
+
+
+def _search_query(query: str, num: int = 20) -> dict[str, Any]:
+    """Use bounded fast-fail public providers only."""
+    for engine in ("bing_html", "bing_rss"):
+        result = search_web(query, num=num, engine=engine)
+        if isinstance(result, Mapping) and result.get("organic"):
+            return dict(result)
+    return {
+        "organic": [],
+        "searchParameters": {
+            "q": query,
+            "num": num,
+            "engine": "none",
+        },
+        "credits_left": 999999,
+        "error": "no_relevant_results",
+    }
+
+
+def build_search_presence_snapshot(
+    *,
+    companies: list[Mapping[str, Any]],
+    queries: tuple[str, ...] = DEFAULT_QUERIES,
+    search_fn=_search_query,
+    max_workers: int = 4,
+) -> dict[str, Any]:
+    domain_to_company: dict[str, dict[str, Any]] = {}
+    for company in companies:
+        domain = _domain(
+            company.get("company_domain")
+            or company.get("canonical_website")
+        )
+        entity_id = _clean(company.get("entity_id") or company.get("id"))
+        if not domain or not entity_id:
+            continue
+        domain_to_company[domain] = {
+            "entity_id": entity_id,
+            "company_name": _clean(
+                company.get("company_name")
+                or company.get("canonical_name")
+            ),
+            "company_domain": domain,
+        }
+
+    observations: list[dict[str, Any]] = []
+    query_results: list[dict[str, Any]] = []
+
+    def _run(query: str) -> dict[str, Any]:
+        result = search_fn(query, 20)
+        engine = _clean(
+            (result.get("searchParameters") or {}).get("engine")
+        )
+        organic = result.get("organic")
+        organic = organic if isinstance(organic, list) else []
+
+        seen_domains: set[str] = set()
+        query_observations = []
+        for idx, row in enumerate(organic, 1):
+            if not isinstance(row, Mapping):
+                continue
+            link = _clean(row.get("link"))
+            domain = _domain(link)
+            if not domain or domain in seen_domains:
+                continue
+            seen_domains.add(domain)
+            company = domain_to_company.get(domain)
+            if company is None:
+                continue
+
+            try:
+                position = int(row.get("position") or idx)
+            except (TypeError, ValueError):
+                position = idx
+
+            query_observations.append({
+                "query": query,
+                "engine": engine or "unknown",
+                "position": position,
+                "entity_id": company["entity_id"],
+                "company_name": company["company_name"],
+                "domain": domain,
+                "url": link,
+                "title": _clean(row.get("title")),
+                "snippet": _clean(row.get("snippet")),
+                "observed_at": datetime.now(timezone.utc).isoformat(),
+                "provenance": {
+                    "source": "empire_search_fabric",
+                    "quality_gate": (
+                        (result.get("searchParameters") or {}).get(
+                            "quality_gate"
+                        )
+                    ),
+                },
+            })
+
+        return {
+            "query": query,
+            "engine": engine or "none",
+            "result_count": len(organic),
+            "matched_company_count": len(query_observations),
+            "observations": query_observations,
+        }
+
+    workers = min(max(1, int(max_workers)), max(1, len(queries)))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(_run, query): query
+            for query in queries
+        }
+        for future in as_completed(futures):
+            query_results.append(future.result())
+
+    query_results.sort(key=lambda row: row["query"].casefold())
+    for row in query_results:
+        observations.extend(row["observations"])
+
+    company_state: dict[str, dict[str, Any]] = {}
+    for company in domain_to_company.values():
+        company_state[company["entity_id"]] = {
+            **company,
+            "queries_observed": set(),
+            "positions": [],
+            "observations": [],
+        }
+
+    for row in observations:
+        state = company_state[row["entity_id"]]
+        state["queries_observed"].add(row["query"])
+        state["positions"].append(row["position"])
+        state["observations"].append(row)
+
+    company_presence = []
+    for state in company_state.values():
+        positions = state["positions"]
+        reciprocal_weight = sum(
+            1.0 / max(1, int(position))
+            for position in positions
+        )
+        company_presence.append({
+            "entity_id": state["entity_id"],
+            "company_name": state["company_name"],
+            "company_domain": state["company_domain"],
+            "query_presence_count": len(state["queries_observed"]),
+            "observation_count": len(state["observations"]),
+            "best_position": min(positions) if positions else None,
+            "reciprocal_position_weight": round(
+                reciprocal_weight,
+                6,
+            ),
+            "observations": state["observations"],
+            "search_presence_observed": bool(positions),
+            "market_share_inferred": False,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+        })
+
+    company_presence.sort(
+        key=lambda row: (
+            -row["reciprocal_position_weight"],
+            -row["query_presence_count"],
+            row["company_name"].casefold(),
+        )
+    )
+
+    total_weight = sum(
+        row["reciprocal_position_weight"]
+        for row in company_presence
+    )
+    for row in company_presence:
+        row["observed_search_presence_share"] = (
+            round(
+                row["reciprocal_position_weight"] / total_weight,
+                6,
+            )
+            if total_weight > 0
+            else None
+        )
+
+    engines = sorted({
+        row["engine"]
+        for row in query_results
+        if row["engine"] and row["engine"] != "none"
+    })
+
+    return {
+        "schema_version": "empire.competitor_search_presence.v1",
+        "mode": "OBSERVE",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "query_count": len(queries),
+        "query_with_results_count": sum(
+            1 for row in query_results if row["result_count"] > 0
+        ),
+        "query_with_market_company_count": sum(
+            1 for row in query_results
+            if row["matched_company_count"] > 0
+        ),
+        "engine_count": len(engines),
+        "engines": engines,
+        "canonical_company_count": len(company_presence),
+        "company_with_search_presence_count": sum(
+            1 for row in company_presence
+            if row["search_presence_observed"]
+        ),
+        "observation_count": len(observations),
+        "query_results": query_results,
+        "companies": company_presence,
+        "search_presence_available": total_weight > 0,
+        "share_metric": (
+            "reciprocal_position_weighted_observed_search_presence"
+        ),
+        "market_share": None,
+        "market_share_inferred": False,
+        "demand_inferred": False,
+        "buyer_intent_inferred": False,
+        "commercial_intent_inferred": False,
+        "outreach_enabled": False,
+        "execution_authority": "none",
+    }
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"expected JSON object at {path}")
+    return payload
+
+
+def write_search_presence_snapshot(
+    repo_root: Path,
+    payload: Mapping[str, Any],
+) -> Path:
+    path = repo_root / SNAPSHOT_RELATIVE_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+    return path
+
+
+def refresh_search_presence_snapshot(
+    repo_root: Path,
+    writer: PostgresIntelligenceMaterializer,
+) -> dict[str, Any]:
+    market = _load_json(
+        repo_root
+        / "runtime/competitive_intelligence/"
+        / "competitor_market_scale_latest.json"
+    )
+    companies = load_resolved_market_entities(
+        writer,
+        niche=_clean(market.get("niche")),
+        metro=_clean(market.get("metro")),
+    )
+    payload = build_search_presence_snapshot(companies=companies)
+    write_search_presence_snapshot(repo_root, payload)
+    return payload
+
+
+def build_search_presence_runtime(repo_root: Path) -> dict[str, Any]:
+    path = repo_root / SNAPSHOT_RELATIVE_PATH
+    try:
+        payload = _load_json(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {
+            "available": False,
+            "schema_version": "empire.competitor_search_presence.v1",
+            "mode": "OBSERVE",
+            "query_count": 0,
+            "canonical_company_count": 0,
+            "company_with_search_presence_count": 0,
+            "observation_count": 0,
+            "search_presence_available": False,
+            "market_share": None,
+            "market_share_inferred": False,
+            "execution_authority": "none",
+        }
+    return {"available": True, **payload}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Measure observed competitor search presence"
+    )
+    parser.add_argument(
+        "--repo-root",
+        default=os.getenv("EMPIRE_REPO_ROOT", "/srv/empire_os"),
+    )
+    parser.add_argument("--refresh", action="store_true")
+    args = parser.parse_args()
+
+    repo_root = Path(args.repo_root).resolve()
+    if not args.refresh:
+        print(json.dumps(
+            build_search_presence_runtime(repo_root),
+            indent=2,
+            sort_keys=True,
+            default=str,
+        ))
+        return 0
+
+    writer = PostgresIntelligenceMaterializer.from_env()
+    payload = refresh_search_presence_snapshot(repo_root, writer)
+    print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
