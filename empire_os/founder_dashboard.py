@@ -26,6 +26,9 @@ from empire_os.canonical_phase_plan import (
 from empire_os.phase_3f_closeout import (
     build_phase_3f_closeout,
 )
+from empire_os.commercial_exchange_contract import (
+    build_commercial_exchange_contract,
+)
 from empire_os.competitor_audience_runtime import (
     build_competitor_audience_runtime,
 )
@@ -589,5 +592,6 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         },
         "canonical_execution_plan": build_canonical_phase_plan(),
         "phase_3f_closeout": build_phase_3f_closeout(repo_root),
+        "commercial_exchange": build_commercial_exchange_contract(),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
