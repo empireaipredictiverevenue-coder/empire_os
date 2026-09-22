@@ -746,3 +746,215 @@ def persist_competitor_ecosystem_signal(
         raise IntelligenceMaterializerTransportError(
             "competitor ecosystem signal persistence failed"
         ) from exc
+
+
+
+COMPETITOR_PUBLIC_REVIEW_SOURCE_KEY = (
+    "empire.competitor_public_reviews.public.v1"
+)
+
+
+def _public_review_fingerprints(
+    payload: dict[str, Any],
+) -> tuple[str, ...]:
+    profiles = payload.get("profiles")
+    if not isinstance(profiles, list) or not profiles:
+        raise IntelligenceMaterializerTransportError(
+            "public review profiles are required"
+        )
+
+    fingerprints: list[str] = []
+    for item in profiles:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid public review profile"
+            )
+        platform = str(item.get("platform") or "").strip()
+        profile_url = str(item.get("profile_url") or "").strip()
+        source_ref = str(item.get("source_ref") or "").strip()
+        if not platform or not profile_url or not source_ref:
+            raise IntelligenceMaterializerTransportError(
+                "public review platform/profile/source_ref required"
+            )
+        fingerprints.append(
+            "|".join((platform, profile_url, source_ref))
+        )
+    return tuple(sorted(set(fingerprints)))
+
+
+def persist_competitor_public_review_signal(
+    writer: PostgresIntelligenceMaterializer,
+    signal: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist append-only public review-platform presence evidence."""
+    if signal.get("signal_type") != "competitor_public_review_presence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected public review signal type"
+        )
+    if signal.get("signal_domain") != "competitive_intelligence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected public review signal domain"
+        )
+    if signal.get("execution_authority") != "none":
+        raise IntelligenceMaterializerTransportError(
+            "public review signal has execution authority"
+        )
+    if signal.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review signal cannot enable outreach"
+        )
+    if signal.get("buyer_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review signal cannot infer buyer intent"
+        )
+    if signal.get("commercial_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review signal cannot infer commercial intent"
+        )
+
+    entity_id = _uuid(signal.get("entity_id"), field="entity id")
+    observed_at = str(signal.get("observed_at") or "").strip()
+    if not observed_at:
+        raise IntelligenceMaterializerTransportError(
+            "observed_at is required"
+        )
+
+    try:
+        strength = float(signal.get("strength"))
+        confidence = float(signal.get("confidence"))
+    except (TypeError, ValueError) as exc:
+        raise IntelligenceMaterializerTransportError(
+            "invalid public review signal confidence"
+        ) from exc
+    if not 0.0 <= strength <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "strength must be between 0 and 1"
+        )
+    if not 0.0 <= confidence <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "confidence must be between 0 and 1"
+        )
+
+    payload = signal.get("payload")
+    if not isinstance(payload, dict):
+        raise IntelligenceMaterializerTransportError(
+            "public review signal payload is required"
+        )
+    if payload.get("review_sentiment_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot infer sentiment"
+        )
+    if payload.get("buyer_intent") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot infer buyer intent"
+        )
+    if payload.get("commercial_intent") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot infer commercial intent"
+        )
+    if payload.get("prospect_created") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot create prospect"
+        )
+    if payload.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot enable outreach"
+        )
+
+    fingerprints = _public_review_fingerprints(payload)
+
+    try:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET LOCAL ROLE {ROLE}")
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_PUBLIC_REVIEW_SOURCE_KEY,
+                )
+
+                supplied_source_id = _uuid(
+                    signal.get("source_id"),
+                    field="source id",
+                )
+                if supplied_source_id != _uuid(
+                    source_id,
+                    field="canonical source id",
+                ):
+                    raise IntelligenceMaterializerTransportError(
+                        "public review signal source mismatch"
+                    )
+
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM public.intelligence_signals
+                    WHERE entity_id=%s
+                      AND signal_type='competitor_public_review_presence'
+                      AND signal_domain='competitive_intelligence'
+                      AND source_id=%s
+                    """,
+                    (entity_id, source_id),
+                )
+                for row in cursor.fetchall():
+                    existing_payload = row[0]
+                    if isinstance(existing_payload, str):
+                        existing_payload = json.loads(existing_payload)
+                    if not isinstance(existing_payload, dict):
+                        continue
+                    try:
+                        existing = _public_review_fingerprints(
+                            existing_payload
+                        )
+                    except IntelligenceMaterializerTransportError:
+                        continue
+                    if existing == fingerprints:
+                        return {
+                            "entity_id": entity_id,
+                            "signal_type": (
+                                "competitor_public_review_presence"
+                            ),
+                            "inserted": False,
+                            "existing": True,
+                            "execution_authority": "none",
+                        }
+
+                cursor.execute(
+                    """
+                    INSERT INTO public.intelligence_signals(
+                      entity_id,signal_type,signal_domain,observed_at,
+                      source_id,strength,confidence,payload
+                    )
+                    VALUES(
+                      %s,'competitor_public_review_presence',
+                      'competitive_intelligence',%s,%s,%s,%s,%s::jsonb
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        entity_id,
+                        observed_at,
+                        source_id,
+                        strength,
+                        confidence,
+                        json.dumps(payload, sort_keys=True),
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise IntelligenceMaterializerTransportError(
+                        "public review signal insert failed"
+                    )
+                return {
+                    "id": str(row[0]),
+                    "entity_id": entity_id,
+                    "signal_type": "competitor_public_review_presence",
+                    "inserted": True,
+                    "existing": False,
+                    "execution_authority": "none",
+                }
+    except IntelligenceMaterializerTransportError:
+        raise
+    except Exception as exc:
+        raise IntelligenceMaterializerTransportError(
+            "public review signal persistence failed"
+        ) from exc
