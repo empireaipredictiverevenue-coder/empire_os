@@ -10,6 +10,9 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.control_fabric import default_registry
+from empire_os.departments import default_departments, validate_departments
+
 
 OUTPUT = Path("runtime/predictive_cloud/status_latest.json")
 
@@ -320,8 +323,14 @@ def build_predictive_cloud_status(
         if row["available"] and row["freshness"] == "unknown"
     ]
 
+    department_validation = validate_departments(
+        registered_components={
+            row.name for row in default_registry()
+        }
+    )
+
     return {
-        "schema_version": "empire.predictive_cloud.status.v1",
+        "schema_version": "empire.predictive_cloud.status.v2",
         "mode": "OBSERVE",
         "generated_at": current.isoformat(),
         "component_count": len(components),
@@ -331,6 +340,30 @@ def build_predictive_cloud_status(
         "unavailable_components": unavailable,
         "stale_components": stale,
         "unknown_freshness_components": unknown_freshness,
+        "organization": {
+            "department_count": len(default_departments()),
+            "fully_wired_department_count": department_validation[
+                "fully_wired_department_count"
+            ],
+            "all_department_components_registered": department_validation[
+                "all_components_registered"
+            ],
+            "departments_with_missing_components": department_validation[
+                "departments_with_missing_components"
+            ],
+            "departments": [
+                {
+                    "key": row.key,
+                    "name": row.name,
+                    "mission": row.mission,
+                    "authority": row.authority,
+                    "components": row.components,
+                    "agent_roles": row.agent_roles,
+                    "kpis": row.kpis,
+                }
+                for row in default_departments()
+            ],
+        },
         "components": components,
         "outreach_sent_by_status": False,
         "payment_action_by_status": False,
