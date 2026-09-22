@@ -14,6 +14,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.intelligence_materializer_transport import (
+    ROLE,
+    PostgresIntelligenceMaterializer,
+)
+
 
 SNAPSHOT_RELATIVE_PATH = Path(
     "runtime/account_twin/account_twin_latest.json"
@@ -72,11 +77,13 @@ def build_account_twin(
     research: Mapping[str, Any] | None = None,
     brief: Mapping[str, Any] | None = None,
     next_action: Mapping[str, Any] | None = None,
+    qualification_history: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     audience = dict(audience or {})
     research = dict(research or {})
     brief = dict(brief or {})
     next_action = dict(next_action or {})
+    qualification_history = list(qualification_history or [])
 
     states = _state_map(entity)
     unknown_states = list(entity.get("unknown_states", []) or [])
@@ -152,7 +159,12 @@ def build_account_twin(
             "states": list(entity.get("states", []) or []),
         },
         "qualification": {
-            "history_available": False,
+            "history_available": bool(qualification_history),
+            "history": [
+                dict(item)
+                for item in qualification_history
+                if isinstance(item, Mapping)
+            ],
             "latest_evidence": qualification or None,
             "score_is_commercial_intent": False,
         },
@@ -235,11 +247,17 @@ def build_account_twin_snapshot(
     research: Mapping[str, Any],
     briefs: Mapping[str, Any],
     next_actions: Mapping[str, Any],
+    qualification_history_by_entity: Mapping[
+        str, list[Mapping[str, Any]]
+    ] | None = None,
 ) -> dict[str, Any]:
     audience_by_id = _index(list(audience.get("companies", []) or []))
     research_by_id = _index(list(research.get("actions", []) or []))
     brief_by_id = _index(list(briefs.get("briefs", []) or []))
     next_by_id = _index(list(next_actions.get("actions", []) or []))
+    qualification_history_by_entity = dict(
+        qualification_history_by_entity or {}
+    )
 
     twins = []
     for entity in buyer_state.get("entities", []) or []:
@@ -254,6 +272,10 @@ def build_account_twin_snapshot(
             research=research_by_id.get(entity_id),
             brief=brief_by_id.get(entity_id),
             next_action=next_by_id.get(entity_id),
+            qualification_history=qualification_history_by_entity.get(
+                entity_id,
+                [],
+            ),
         ))
 
     twins.sort(
@@ -276,12 +298,80 @@ def build_account_twin_snapshot(
     }
 
 
+def load_qualification_history(
+    writer: PostgresIntelligenceMaterializer,
+    entity_ids: list[str],
+) -> dict[str, list[dict[str, Any]]]:
+    if not entity_ids:
+        return {}
+
+    with writer._connect(writer.dsn) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SET LOCAL ROLE {ROLE}")
+            cursor.execute(
+                """
+                SELECT
+                  q.id,
+                  q.entity_id,
+                  q.prospect_id,
+                  q.score,
+                  q.tier,
+                  q.status,
+                  q.evidence_confidence,
+                  q.observed_dimensions,
+                  q.unknown_dimensions,
+                  q.recommended_action,
+                  q.scoring_engine,
+                  q.scoring_version,
+                  q.scored_at,
+                  q.created_at
+                FROM public.prospect_qualifications q
+                WHERE q.entity_id = ANY(%s::uuid[])
+                ORDER BY q.entity_id,
+                         q.scored_at ASC NULLS LAST,
+                         q.created_at ASC
+                """,
+                (entity_ids,),
+            )
+            names = [item.name for item in cursor.description]
+            rows = [
+                dict(zip(names, row, strict=True))
+                for row in cursor.fetchall()
+            ]
+
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        entity_id = _clean(row.get("entity_id"))
+        grouped.setdefault(entity_id, []).append(row)
+    return grouped
+
+
 def refresh_account_twin_snapshot(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
+    buyer_state = _load_json(
+        runtime / "buyer_state/buyer_state_latest.json"
+    )
+    entity_ids = [
+        _clean(row.get("entity_id"))
+        for row in buyer_state.get("entities", []) or []
+        if isinstance(row, Mapping) and _clean(row.get("entity_id"))
+    ]
+
+    qualification_history: dict[
+        str, list[dict[str, Any]]
+    ] = {}
+    try:
+        writer = PostgresIntelligenceMaterializer.from_env()
+    except Exception:
+        writer = None
+    if writer is not None:
+        qualification_history = load_qualification_history(
+            writer,
+            entity_ids,
+        )
+
     payload = build_account_twin_snapshot(
-        buyer_state=_load_json(
-            runtime / "buyer_state/buyer_state_latest.json"
-        ),
+        buyer_state=buyer_state,
         audience=_load_json(
             runtime
             / "competitive_intelligence/"
@@ -302,6 +392,7 @@ def refresh_account_twin_snapshot(repo_root: Path) -> dict[str, Any]:
             / "next_best_action/"
             / "next_best_action_latest.json"
         ),
+        qualification_history_by_entity=qualification_history,
     )
     write_account_twin_snapshot(repo_root, payload)
     return payload
