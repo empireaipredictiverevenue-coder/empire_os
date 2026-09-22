@@ -42,3 +42,27 @@ def test_outcome_memory_requires_real_verified_outcome():
         "synthetic": False,
     })
     assert good["accepted_for_retrieval"] is True
+
+
+def test_quantitative_research_memory_scope():
+    query = build_memory_query(
+        task_type="quantitative_research",
+        task_id="quant-1",
+        entity_refs=["opportunity:1"],
+        topic_keys=["probability_success", "calibration"],
+    )
+    assert query["memory_types"] == [
+        "working",
+        "semantic",
+        "procedural",
+        "episodic",
+        "outcome_conditioned",
+    ]
+    assert query["filters"][
+        "outcome_conditioned_requires_verified_outcome"
+    ] is True
+    assert query["filters"][
+        "include_unverified_outcome_memory"
+    ] is False
+    assert query["retrieval_only"] is True
+    assert query["execution_authority"] == "none"
