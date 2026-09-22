@@ -90,6 +90,10 @@ SAFE_JOBS = {
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/build_astra_executive.py"),
     ],
+    "astra_department_dispatch": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/dispatch_astra_departments.py"),
+    ],
 }
 
 
@@ -143,6 +147,7 @@ def choose_jobs(
     # five-minute Astra cadence does not repeat public research unnecessarily.
     jobs.append("opportunity_loop_refresh")
     jobs.append("astra_executive_refresh")
+    jobs.append("astra_department_dispatch")
     return list(dict.fromkeys(jobs))
 
 
