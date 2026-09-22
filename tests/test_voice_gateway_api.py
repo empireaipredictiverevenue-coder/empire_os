@@ -14,6 +14,7 @@ def test_vonage_ncco_uses_empire_voice_lab_websocket(monkeypatch):
     ncco = build_vonage_ncco(
         intent_id="intent-1",
         prospect_id="prospect-1",
+        call_id="call-1",
         context={
             "business_name": "Acme Roofing",
             "niche": "roofing",
@@ -29,7 +30,9 @@ def test_vonage_ncco_uses_empire_voice_lab_websocket(monkeypatch):
         "wss://empire-ai.co.uk/v1/voice-lab/vonage/socket?"
     )
     assert "intent_id=intent-1" in endpoint["uri"]
+    assert "call_id=call-1" in endpoint["uri"]
     assert endpoint["headers"]["voice_engine"] == "empire_voice_lab"
+    assert endpoint["headers"]["call_id"] == "call-1"
     assert endpoint["authorization"] == {
         "type": "custom",
         "value": "Bearer ws-secret",
