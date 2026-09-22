@@ -238,3 +238,36 @@ def test_status_exposes_opportunity_value_without_claiming_revenue(tmp_path):
     assert summary["new_scoring_model_introduced"] is False
     assert summary["prediction_only"] is True
     assert row["execution_authority"] == "none"
+
+
+def test_status_exposes_commercial_exchange_without_external_authority(tmp_path):
+    write_json(
+        tmp_path / "runtime/commercial_exchange/latest.json",
+        {
+            "observed_at": "2026-09-23T00:00:00+00:00",
+            "inventory_count": 7,
+            "allocation_candidate_count": 2,
+            "overflow_count": 5,
+            "buyer_seat_count": 3,
+            "corridor_count": 2,
+            "buyer_capacity_never_gates_acquisition": True,
+            "overflow_remains_empire_owned": True,
+            "automatic_external_delivery": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = module.refresh_predictive_cloud_status(
+        tmp_path,
+        now=datetime.fromisoformat("2026-09-23T00:05:00+00:00"),
+    )
+    component = result["components"]["commercial_exchange"]
+
+    assert component["available"] is True
+    assert component["summary"]["inventory_count"] == 7
+    assert component["summary"]["overflow_count"] == 5
+    assert component["summary"][
+        "buyer_capacity_never_gates_acquisition"
+    ] is True
+    assert component["summary"]["overflow_remains_empire_owned"] is True
+    assert component["summary"]["automatic_external_delivery"] is False
