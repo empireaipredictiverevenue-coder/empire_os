@@ -593,3 +593,64 @@ def test_dashboard_exposes_next_best_actions(tmp_path):
     assert nba["outreach_authorized"] is False
     assert nba["payment_authorized"] is False
     assert nba["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_account_buyer_digital_twins(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/account_twin/"
+        / "account_twin_latest.json",
+        {
+            "schema_version": (
+                "empire.account_buyer_digital_twin_snapshot.v1"
+            ),
+            "mode": "OBSERVE",
+            "twin_count": 2,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "outreach_authorized": False,
+            "payment_authorized": False,
+            "execution_authority": "none",
+            "twins": [
+                {
+                    "entity_id": "entity-1",
+                    "identity": {
+                        "company_name": "Golden Spike Roofing Inc"
+                    },
+                    "buyer_state": {
+                        "current_factual_state": "RESEARCHED"
+                    },
+                    "uncertainty": {
+                        "explicit": True,
+                        "items": ["commercial_intent_not_observed"],
+                    },
+                },
+                {
+                    "entity_id": "entity-2",
+                    "identity": {
+                        "company_name": "Colorado's Best Roofing"
+                    },
+                    "buyer_state": {
+                        "current_factual_state": "READY"
+                    },
+                    "uncertainty": {
+                        "explicit": True,
+                        "items": ["commercial_intent_not_observed"],
+                    },
+                },
+            ],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    twins = result["account_buyer_digital_twins"]
+
+    assert twins["available"] is True
+    assert twins["twin_count"] == 2
+    assert twins["buyer_intent_inferred"] is False
+    assert twins["commercial_intent_inferred"] is False
+    assert twins["outreach_authorized"] is False
+    assert twins["payment_authorized"] is False
+    assert twins["execution_authority"] == "none"
