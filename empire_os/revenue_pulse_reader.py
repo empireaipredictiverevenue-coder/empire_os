@@ -238,3 +238,119 @@ def fetch_current_and_previous_windows(
         end=current_start,
     )
     return current, previous
+
+
+
+def fetch_revenue_pulse_window_postgres(
+    dsn: str,
+    *,
+    label: str,
+    start: datetime,
+    end: datetime,
+    connect_factory=None,
+) -> RevenuePulseWindow:
+    """Read one canonical pulse window through the restricted DB role."""
+    if start.tzinfo is None or end.tzinfo is None:
+        raise ValueError("pulse window timestamps require timezone")
+    start = start.astimezone(timezone.utc)
+    end = end.astimezone(timezone.utc)
+    if end <= start:
+        raise ValueError("pulse window end must be after start")
+    if end - start > timedelta(days=31):
+        raise ValueError("pulse window exceeds 31 days")
+
+    clean = str(dsn or "").strip()
+    if not clean:
+        raise ValueError("materializer database dsn required")
+
+    if connect_factory is None:
+        try:
+            import psycopg
+        except ImportError as exc:
+            raise RuntimeError(
+                "psycopg is required for Revenue Pulse refresh"
+            ) from exc
+        connect_factory = psycopg.connect
+
+    try:
+        with connect_factory(clean) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SET LOCAL ROLE empire_intelligence_materializer"
+                )
+                cursor.execute(
+                    "SELECT public.get_revenue_pulse_window(%s,%s)",
+                    (start, end),
+                )
+                row = cursor.fetchone()
+    except Exception as exc:
+        raise RuntimeError(
+            "restricted Revenue Pulse window read failed"
+        ) from exc
+
+    raw = row[0] if row else {}
+    if not isinstance(raw, dict):
+        raise ValueError("Revenue Pulse window RPC returned invalid payload")
+
+    evidence_refs = (
+        f"canonical:prospect_acquisitions:{label}",
+        f"canonical:prospect_qualifications:scored:{label}",
+        f"canonical:buyer_candidate_reviews:approved_outreach_ready:{label}",
+        f"canonical:outbound_events:delivered:{label}",
+        f"canonical:outbound_replies:commercial:{label}",
+        f"canonical:commercial_terms_reviews:{label}",
+        f"canonical:bsc_payment_evidence:{label}",
+        f"canonical:fulfilment_orders:delivered:{label}",
+        f"canonical:commercial_events:revenue_recognized:{label}",
+    )
+
+    return RevenuePulseWindow(
+        label=label,
+        hours=max(1, round((end-start).total_seconds()/3600)),
+        acquisitions=int(raw.get("acquisitions") or 0),
+        qualified=int(raw.get("qualified") or 0),
+        buyer_reviews=int(raw.get("buyer_reviews") or 0),
+        delivered_outreach=int(raw.get("delivered_outreach") or 0),
+        commercial_replies=int(raw.get("commercial_replies") or 0),
+        commercial_terms=int(raw.get("commercial_terms") or 0),
+        verified_payments=int(raw.get("verified_payments") or 0),
+        fulfilments=int(raw.get("fulfilments") or 0),
+        recognized_revenue_cents=int(
+            raw.get("recognized_revenue_cents") or 0
+        ),
+        realized_gp_cents=int(raw.get("realized_gp_cents") or 0),
+        evidence_refs=evidence_refs,
+    )
+
+
+def fetch_current_and_previous_windows_postgres(
+    dsn: str,
+    *,
+    now: datetime,
+    hours: int = 24,
+    connect_factory=None,
+) -> tuple[RevenuePulseWindow, RevenuePulseWindow]:
+    if hours < 1:
+        raise ValueError("pulse window hours must be positive")
+    if now.tzinfo is None:
+        raise ValueError("now must include timezone")
+
+    end = now.astimezone(timezone.utc)
+    current_start = end - timedelta(hours=hours)
+    previous_start = current_start - timedelta(hours=hours)
+
+    current = fetch_revenue_pulse_window_postgres(
+        dsn,
+        label=f"current_{hours}h",
+        start=current_start,
+        end=end,
+        connect_factory=connect_factory,
+    )
+    previous = fetch_revenue_pulse_window_postgres(
+        dsn,
+        label=f"previous_{hours}h",
+        start=previous_start,
+        end=current_start,
+        connect_factory=connect_factory,
+    )
+    return current, previous
