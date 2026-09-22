@@ -251,6 +251,29 @@ class BuyerDeferredEnrichmentQueue:
 
         return bool(_locked_update(self.call_ready_path, mutate))
 
+    def mark_call_attempted(
+        self,
+        prospect_id: str,
+        *,
+        intent_id: str,
+        provider_call_id: str,
+    ) -> None:
+        def mutate(data: dict[str, dict[str, Any]]) -> None:
+            row = data.get(prospect_id)
+            if not isinstance(row, dict):
+                return
+            row.update({
+                "status": "call_attempted",
+                "intent_id": str(intent_id or "").strip() or None,
+                "provider_call_id": (
+                    str(provider_call_id or "").strip() or None
+                ),
+                "last_call_attempt_at": _iso(),
+                "updated_at": _iso(),
+                "execution_allowed": False,
+            })
+        _locked_update(self.call_ready_path, mutate)
+
     def snapshot(self) -> dict[str, Any]:
         deferred = _load(self.deferred_path)
         calls = _load(self.call_ready_path)
