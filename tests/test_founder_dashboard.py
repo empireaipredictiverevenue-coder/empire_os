@@ -1434,3 +1434,18 @@ def test_dashboard_exposes_phase_3f_closeout_without_claiming_production(tmp_pat
     assert closeout["evidence_only_blockers"] is True
     assert closeout["actual_revenue"] is False
     assert closeout["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_phase4_commercial_exchange_contract(tmp_path):
+    result = build_founder_dashboard(make_root(tmp_path))
+    exchange = result["commercial_exchange"]
+
+    assert exchange["phase"] == "4"
+    assert exchange["status"] == "CURRENT"
+    assert exchange["invariants"][
+        "buyer_capacity_never_gates_acquisition"
+    ] is True
+    assert exchange["invariants"]["overflow_remains_empire_owned"] is True
+    assert exchange["automation"]["automatic_external_delivery"] is False
+    assert exchange["production_schema_applied"] is False
+    assert exchange["execution_authority"] == "none"
