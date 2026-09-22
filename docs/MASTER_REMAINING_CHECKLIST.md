@@ -63,6 +63,59 @@ Data & Decision Intelligence:
 Predictive Cloud truth rule:
 **A prediction can guide a decision; only observed evidence can establish an actual, and only governed verified commercial evidence can establish revenue.**
 
+## Autonomous Predictive Cloud / Opportunity Loop — ACTIVE
+
+Operating model:
+**Sensor Mesh → Opportunity Radar → Research → Opportunity Factory → Predictive
+Cloud/Quant → Astra → AI research/plan/build → GTM/conversation → payment/
+fulfilment → verified outcome → Economic Memory → next opportunity.**
+
+Already implemented:
+- [x] Opportunity Factory deterministic assessment foundation
+- [x] Market Sweeps / Revenue GPS
+- [x] Community Intent
+- [x] competitor market-gap intelligence
+- [x] Geo Scheduler exploration/exploitation policy
+- [x] Astra Observer
+- [x] Astra allow-listed internal dispatcher
+- [x] Founder Directive OS automatic planner
+- [x] Empire Coder orchestration foundation
+- [x] Autonomous Execution Bus foundation
+- [x] Predictive Cloud Opportunity Radar — CODED
+- [x] bounded Opportunity Radar public-research executor — CODED
+- [x] Astra Radar → Research internal job chain — CODED
+- [x] Opportunity Radar 15-minute user-timer packaging — STAGED
+- [x] canonical autonomous-loop doctrine
+- [x] canonical full-business plain-text architecture
+
+Verification / activation:
+- [ ] Pull latest branch onto EmpireOS
+- [ ] Run Opportunity Radar / research / Astra focused tests
+- [ ] Run one real OBSERVE Radar refresh against current snapshots
+- [ ] Run one bounded real Opportunity Research cycle
+- [ ] Install/enable Opportunity Radar timer if tests pass
+- [ ] Confirm Astra dispatcher invokes Radar then Research without external mutation
+
+Next wiring:
+- [ ] Normalize Radar + research evidence into Opportunity Factory readiness
+- [ ] Automatically generate bounded missing-evidence plans per candidate
+- [ ] Feed validated candidates into Astra workstream ranking
+- [ ] Add Storm / Permit / Property / Search AI Recommendation / Private Capital
+      / Corporate Change / Government Spend / Legal node inputs to Radar
+- [ ] Add TAM / new-industry / new-country opportunity classes
+- [ ] Add productization / partner / distribution / pricing mismatch opportunity classes
+- [ ] Dedupe opportunity history across cycles and preserve lifecycle
+- [ ] Add DISCOVER → QUALIFY → VALIDATE → EXPERIMENT → PROVE → SCALE lifecycle
+- [ ] Expose Radar / research / blockers / opportunity lifecycle in Founder Console
+- [ ] Feed verified outcomes into opportunity calibration / Economic Memory
+- [ ] Daily Results: what AI found, researched, advanced, blocked, proved and learned
+
+Autonomy target:
+- [ ] Safe internal work advances continuously without repeated founder approval
+- [ ] Existing standing authority handles approved bounded external workflows
+- [ ] Founder involvement is reserved for genuine consequential gates
+- [ ] System keeps pursuing evidence-backed commercial opportunities while founder is away
+
 ## Autonomous Business Loop — CURRENT PARALLEL FOUNDATION
 
 Canonical objective: connect the existing systems into one continuously operating
@@ -269,12 +322,12 @@ reserved for genuine consequential gates.
 
 ## Market Sweeps / Revenue GPS
 
-- [ ] Scheduled market scanning
-- [ ] Demand signals
-- [ ] Competitor pressure
+- [x] Scheduled market scanning — live hourly timer
+- [x] Observed commercial-demand state from replies/terms/payments
+- [x] Competitor-pressure research proxy from observed competitive evidence
 - [ ] Supply gaps
-- [ ] Opportunity evidence
-- [ ] Product recommendation
+- [x] Opportunity/research evidence queue
+- [x] Product candidate recommendation when verified product + approved-buyer evidence exists
 - [ ] Economics estimate clearly marked prediction
 - [ ] Feed research/NBA
 - [ ] Founder market-opportunity view
