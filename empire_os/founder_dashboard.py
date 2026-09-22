@@ -23,6 +23,9 @@ from empire_os.commercial_recovery_audit import (
 from empire_os.canonical_phase_plan import (
     build_canonical_phase_plan,
 )
+from empire_os.phase_3f_closeout import (
+    build_phase_3f_closeout,
+)
 from empire_os.competitor_audience_runtime import (
     build_competitor_audience_runtime,
 )
@@ -585,5 +588,6 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             "actual_revenue": False,
         },
         "canonical_execution_plan": build_canonical_phase_plan(),
+        "phase_3f_closeout": build_phase_3f_closeout(repo_root),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
