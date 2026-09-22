@@ -213,6 +213,39 @@ def _conversion_map(
     }
 
 
+def _observed_conversion_leaks(
+    window: RevenuePulseWindow,
+) -> list[dict[str, Any]]:
+    stages = (
+        ("acquisitions", window.acquisitions),
+        ("qualified", window.qualified),
+        ("buyer_reviews", window.buyer_reviews),
+        ("delivered_outreach", window.delivered_outreach),
+        ("commercial_replies", window.commercial_replies),
+        ("commercial_terms", window.commercial_terms),
+        ("verified_payments", window.verified_payments),
+        ("fulfilments", window.fulfilments),
+    )
+    leaks: list[dict[str, Any]] = []
+    for (from_stage, entered), (to_stage, converted) in zip(
+        stages,
+        stages[1:],
+    ):
+        if entered is None or converted is None:
+            continue
+        if entered > 0 and converted == 0:
+            leaks.append({
+                "from_stage": from_stage,
+                "to_stage": to_stage,
+                "entered": entered,
+                "converted": converted,
+                "conversion_rate": 0.0,
+                "state": "observed_zero_conversion",
+                "prediction": False,
+            })
+    return leaks
+
+
 def _pulse_state(
     current: RevenuePulseWindow,
     blocker: str | None,
@@ -308,6 +341,24 @@ def build_revenue_pulse(
             else None
         ),
         "conversion": _conversion_map(current),
+        "leak_detection": {
+            "method": "observed_zero_conversion_only",
+            "prediction": False,
+            "items": _observed_conversion_leaks(current),
+        },
+        "alerts": [
+            {
+                "kind": "conversion_gap",
+                "stage": item["to_stage"],
+                "message": (
+                    f"{item['entered']} observed at "
+                    f"{item['from_stage']} and 0 observed at "
+                    f"{item['to_stage']} in {current.label}"
+                ),
+                "prediction": False,
+            }
+            for item in _observed_conversion_leaks(current)
+        ],
         "velocity": velocity,
         "recognized_revenue_truth": {
             "recognized_revenue_cents": (
@@ -339,3 +390,41 @@ def build_revenue_pulse(
         "evidence_refs": sorted(set(observed_refs)),
         "unknown_stays_unknown": True,
     }
+
+
+
+def build_revenue_pulse_runtime(repo_root) -> dict[str, Any]:
+    from pathlib import Path
+    import json
+
+    path = Path(repo_root) / "runtime/revenue_pulse/latest.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {
+            "available": False,
+            "schema_version": "empire.revenue-pulse.v3",
+            "mode": "OBSERVE",
+            "pulse_state": "unavailable",
+            "recognized_revenue_truth": {
+                "recognized_revenue_cents": 0,
+                "realized_gp_cents": 0,
+                "forecast_included_in_truth": False,
+            },
+            "leak_detection": {
+                "method": "observed_zero_conversion_only",
+                "prediction": False,
+                "items": [],
+            },
+            "alerts": [],
+            "execution_authority": "none",
+        }
+    if not isinstance(raw, dict):
+        return {
+            "available": False,
+            "schema_version": "empire.revenue-pulse.v3",
+            "mode": "OBSERVE",
+            "pulse_state": "unavailable",
+            "execution_authority": "none",
+        }
+    return {"available": True, **raw}
