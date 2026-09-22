@@ -21,6 +21,10 @@ from typing import Any, Mapping, Sequence
 
 from empire_os.agi_memory import build_memory_query
 from empire_os.control_fabric import default_registry
+from empire_os.departments import (
+    default_departments,
+    departments_for_component,
+)
 
 
 PREDICTIVE_STATUS = Path("runtime/predictive_cloud/status_latest.json")
@@ -82,6 +86,7 @@ class ExecutivePlanStep:
     goal_key: str
     action: str
     target_component: str
+    department_keys: tuple[str, ...]
     authority: str
     auto_dispatch_eligible: bool
     founder_gate_required: bool
@@ -405,6 +410,7 @@ def _step(
         goal_key=goal.key,
         action=action,
         target_component=component,
+        department_keys=departments_for_component(component),
         authority=authority,
         auto_dispatch_eligible=auto,
         founder_gate_required=founder_gate,
@@ -597,14 +603,24 @@ def build_executive_snapshot(
         plan_material.encode("utf-8")
     ).hexdigest()[:20]
 
+    department_counts: dict[str, int] = {}
+    for step in plan:
+        for department_key in step.department_keys:
+            department_counts[department_key] = (
+                department_counts.get(department_key, 0) + 1
+            )
+
     return {
-        "schema_version": "empire.astra.executive.v1",
+        "schema_version": "empire.astra.executive.v2",
         "mode": "OBSERVE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "plan_id": plan_id,
         "world_state": world,
         "primary_goal": goals[0].as_dict(),
         "goals": [goal.as_dict() for goal in goals],
+        "department_count": len(default_departments()),
+        "departments_in_plan": tuple(sorted(department_counts)),
+        "department_plan_counts": dict(sorted(department_counts.items())),
         "plan_step_count": len(plan),
         "auto_dispatch_eligible_count": sum(
             step.auto_dispatch_eligible for step in plan
