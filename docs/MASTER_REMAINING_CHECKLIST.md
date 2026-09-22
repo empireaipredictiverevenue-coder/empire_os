@@ -73,11 +73,11 @@ Current truth:
 - [x] Competitor relationships
 - [x] Qualification history
 - [x] Research history
-- [ ] Outreach history
-- [ ] Replies/conversation
-- [ ] Commercial state
-- [ ] Terms/payment/fulfilment
-- [ ] Outcomes
+- [x] Outreach history
+- [x] Replies/conversation
+- [x] Commercial state
+- [x] Terms/payment/fulfilment
+- [x] Outcomes
 - [ ] Realized revenue / GP
 - [x] Uncertainty explicitly represented
 
