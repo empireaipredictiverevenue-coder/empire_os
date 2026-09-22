@@ -323,6 +323,87 @@ def _commercial_catalog(
     }
 
 
+def _predictive_intelligence(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "execution_authority": "none",
+        }
+    return {
+        "available": True,
+        "observed_at": raw.get("generated_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "source_outcome_count": int(raw.get("source_outcome_count") or 0),
+        "matched_outcome_count": int(raw.get("matched_outcome_count") or 0),
+        "unmatched_outcome_count": int(raw.get("unmatched_outcome_count") or 0),
+        "probability_ready_product_count": int(
+            raw.get("probability_ready_product_count") or 0
+        ),
+        "timing_ready_product_count": int(
+            raw.get("timing_ready_product_count") or 0
+        ),
+        "minimum_terminal_samples": raw.get("minimum_terminal_samples"),
+        "minimum_timing_samples": raw.get("minimum_timing_samples"),
+        "prediction_only": raw.get("prediction_only") is True,
+        "search_scores_used": raw.get("search_scores_used") is True,
+        "llm_probability_used": raw.get("llm_probability_used") is True,
+        "actual_revenue": False,
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
+def _economic_memory(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "execution_authority": "none",
+        }
+    return {
+        "available": True,
+        "observed_at": raw.get("generated_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "plan_id": raw.get("plan_id"),
+        "plan_evaluation_state": raw.get("plan_evaluation_state"),
+        "department_episode_count": int(
+            raw.get("department_episode_count") or 0
+        ),
+        "retrievable_department_episode_count": int(
+            raw.get("retrievable_department_episode_count") or 0
+        ),
+        "source_learning_ready_count": int(
+            raw.get("source_learning_ready_count") or 0
+        ),
+        "outcome_conditioned_memory_count": int(
+            raw.get("outcome_conditioned_memory_count") or 0
+        ),
+        "rejected_outcome_memory_count": int(
+            raw.get("rejected_outcome_memory_count") or 0
+        ),
+        "verified_outcomes_only": (
+            raw.get(
+                "verified_outcomes_only_for_outcome_conditioned_memory"
+            )
+            is True
+        ),
+        "department_done_is_verified_outcome": (
+            raw.get("department_done_is_verified_outcome") is True
+        ),
+        "model_weight_mutation_authorized": (
+            raw.get("model_weight_mutation_authorized") is True
+        ),
+        "actual_revenue": False,
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
 def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     loop_path = runtime / "commercial_loop" / "latest.json"
@@ -331,6 +412,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     source_path = runtime / "source_health" / "latest.json"
     conversion_path = runtime / "conversion" / "latest.json"
     catalog_path = runtime / "commercial_catalog" / "latest.json"
+    predictive_intelligence_path = (
+        runtime / "predictive_intelligence" / "latest.json"
+    )
+    economic_memory_path = runtime / "economic_memory" / "latest.json"
 
     raw_loop = _read_json(loop_path)
     conveyor = build_conveyor(raw_loop or {"stages": []})
@@ -362,6 +447,14 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "commercial_catalog": _commercial_catalog(
             _read_json(catalog_path),
             catalog_path,
+        ),
+        "predictive_intelligence": _predictive_intelligence(
+            _read_json(predictive_intelligence_path),
+            predictive_intelligence_path,
+        ),
+        "economic_memory": _economic_memory(
+            _read_json(economic_memory_path),
+            economic_memory_path,
         ),
         "commercial_funnel": build_funnel_runtime(repo_root),
         "revenue_pulse": build_revenue_pulse_runtime(repo_root),
