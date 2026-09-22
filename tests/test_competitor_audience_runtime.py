@@ -127,3 +127,30 @@ def test_runtime_reads_atomic_snapshot(tmp_path):
     assert result["company_count"] == 1
     assert result["unique_evidence_count"] == 1
     assert result["companies"][0]["company_name"] == "Golden Spike Roofing Inc"
+
+
+
+def test_runtime_includes_omega_cortex_context():
+    result = summarize_competitor_audience_rows([
+        _row(
+            signal_id="signal-1",
+            entity_id="entity-1",
+            name="Golden Spike Roofing Inc",
+            source_refs=[
+                "https://comparison.example/a",
+                "https://comparison.example/b",
+                "https://comparison.example/c",
+            ],
+        )
+    ])
+
+    context = result["omega_cortex_context"][0]
+
+    assert context["research_rank"] == 1
+    assert context["next_best_research_action"] == "deep_account_research"
+    assert context["omega"]["lead_qualification_mutation"] is False
+    assert context["omega"]["score_persistence_authorized"] is False
+    assert context["cortex"]["verified_outcome"] is False
+    assert context["buyer_intent"] is False
+    assert context["commercial_intent"] is False
+    assert context["outreach_enabled"] is False
