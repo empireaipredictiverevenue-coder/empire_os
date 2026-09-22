@@ -20,6 +20,9 @@ from empire_os.opportunity_evidence_normalizer import (
 )
 from empire_os.opportunity_factory_intake import refresh_factory_intake
 from empire_os.opportunity_quant_review import refresh_quant_review
+from empire_os.opportunity_value_scoring import (
+    refresh_opportunity_value_snapshot,
+)
 from empire_os.opportunity_evidence_router import refresh_evidence_routes
 from empire_os.opportunity_radar import refresh_opportunity_radar
 from empire_os.opportunity_research import refresh_opportunity_research
@@ -100,6 +103,9 @@ def run_opportunity_loop(
     quant_review_fn: Callable[[Path], Mapping[str, Any]] = (
         refresh_quant_review
     ),
+    opportunity_value_fn: Callable[[Path], Mapping[str, Any]] = (
+        refresh_opportunity_value_snapshot
+    ),
     evidence_router_fn: Callable[[Path], Mapping[str, Any]] = (
         refresh_evidence_routes
     ),
@@ -144,6 +150,7 @@ def run_opportunity_loop(
         ("opportunity_evidence_normalizer", normalizer_fn, {}),
         ("opportunity_factory_intake", intake_fn, {}),
         ("opportunity_quant_review", quant_review_fn, {}),
+        ("opportunity_value_scoring", opportunity_value_fn, {}),
         ("opportunity_evidence_router", evidence_router_fn, {}),
         ("opportunity_ai_planner", planner_fn, {"limit": 3}),
     )
@@ -171,6 +178,9 @@ def run_opportunity_loop(
     normalized = step_results.get("opportunity_evidence_normalizer") or {}
     intake = step_results.get("opportunity_factory_intake") or {}
     quant = step_results.get("opportunity_quant_review") or {}
+    opportunity_value = (
+        step_results.get("opportunity_value_scoring") or {}
+    )
     routes = step_results.get("opportunity_evidence_router") or {}
     planner = step_results.get("opportunity_ai_planner") or {}
     complete = len(steps) == len(sequence) and all(
@@ -216,6 +226,12 @@ def run_opportunity_loop(
         "quant_missing_field_counts": (
             quant.get("missing_field_counts") or {}
         ),
+        "opportunity_value_available_count": int(
+            opportunity_value.get("value_available_count") or 0
+        ),
+        "opportunity_value_unavailable_count": int(
+            opportunity_value.get("value_unavailable_count") or 0
+        ),
         "opportunity_stage_counts": routes.get("stage_counts") or {},
         "automatic_internal_evidence_route_count": int(
             routes.get("automatic_internal_route_count") or 0
@@ -239,6 +255,7 @@ def run_opportunity_loop(
         "automatic_evidence_normalization": True,
         "automatic_factory_intake": True,
         "automatic_quant_review": True,
+        "automatic_opportunity_value_scoring": True,
         "automatic_evidence_routing": True,
         "automatic_ai_planning": True,
         "automatic_external_execution_allowed": False,
