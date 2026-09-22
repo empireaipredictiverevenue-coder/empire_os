@@ -47,21 +47,29 @@ def _search_fn(query, num=5):
         "searchParameters": {"engine": "bing_html"},
         "organic": [
             {
-                "title": "Denver roofing comparison",
+                "title": "Golden Spike Roofing Inc Denver comparison",
                 "link": "https://comparison.example/denver",
-                "snippet": "Public roofing comparison.",
+                "snippet": "Golden Spike Roofing Inc public roofing comparison.",
                 "position": 1,
                 "relevance_score": 0.9,
             },
             {
-                "title": "Roofing directory",
+                "title": "Golden Spike Roofing Inc directory",
                 "link": "https://directory.example/golden-spike",
-                "snippet": "Public company listing.",
+                "snippet": "Golden Spike Roofing Inc public company listing.",
                 "position": 2,
                 "relevance_score": 0.8,
             },
         ],
     }
+
+
+def _fetch_fn(url):
+    if url == "https://goldenspikeroofing.com/":
+        return "<html><body>Golden Spike Roofing Inc official site</body></html>"
+    if url == "https://comparison.example/denver":
+        return "<html><body>Golden Spike Roofing Inc comparison</body></html>"
+    return None
 
 
 def test_deep_research_plan_is_bounded_and_public_search_oriented():
@@ -82,6 +90,7 @@ def test_executor_keeps_search_results_as_unverified_observations():
         _company(),
         _context(),
         search_fn=_search_fn,
+        fetch_fn=_fetch_fn,
     )
 
     assert result["observation_count"] >= 2
@@ -105,6 +114,7 @@ def test_deep_research_can_be_ready_for_review_without_becoming_intent():
         _company(),
         _context(),
         search_fn=_search_fn,
+        fetch_fn=_fetch_fn,
     )
 
     assert result["first_party_observation_count"] >= 1
@@ -119,6 +129,7 @@ def test_collect_more_evidence_stays_research_only():
         _company(),
         _context("collect_additional_public_evidence"),
         search_fn=_search_fn,
+        fetch_fn=_fetch_fn,
     )
 
     assert result["next_step"] == (
@@ -137,6 +148,7 @@ def test_snapshot_executor_preserves_rank_and_no_authority():
     result = execute_snapshot_research(
         snapshot,
         search_fn=_search_fn,
+        fetch_fn=_fetch_fn,
     )
 
     assert result["company_count"] == 1
@@ -145,3 +157,41 @@ def test_snapshot_executor_preserves_rank_and_no_authority():
     assert result["commercial_intent_inferred"] is False
     assert result["outreach_enabled"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_irrelevant_search_results_are_rejected_before_research_state():
+    def bad_search(query, num=5):
+        return {
+            "searchParameters": {"engine": "bing_html"},
+            "organic": [
+                {
+                    "title": "Brandon Sanderson White Sand",
+                    "link": "https://brandonsanderson.com/white-sand",
+                    "snippet": "Fantasy graphic novel.",
+                    "position": 1,
+                    "relevance_score": 0.5,
+                },
+                {
+                    "title": "Best Places to Visit in Colorado",
+                    "link": "https://travel.example/colorado",
+                    "snippet": "Travel destinations and scenic mountains.",
+                    "position": 2,
+                    "relevance_score": 0.5,
+                },
+            ],
+        }
+
+    result = execute_account_research(
+        _company(),
+        _context(),
+        search_fn=bad_search,
+        fetch_fn=lambda url: None,
+    )
+
+    assert result["observation_count"] == 0
+    assert result["irrelevant_search_result_rejected_count"] > 0
+    assert result["next_step"] == "search_retrieval_retry"
+    assert result["buyer_intent"] is False
+    assert result["commercial_intent"] is False
+    assert result["outreach_enabled"] is False
