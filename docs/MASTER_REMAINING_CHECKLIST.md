@@ -81,15 +81,15 @@ Current truth:
 - [x] Realized revenue / GP
 - [x] Uncertainty explicitly represented
 
-## Cortex learning loop
+## Cortex learning loop — IMPLEMENTATION DONE / REAL OUTCOME PROOF PENDING
 
-- [ ] Research evidence as features only
-- [ ] Replies as observed outcomes
-- [ ] Verified commercial outcomes as labels
-- [ ] Payment + fulfilment + recognized revenue required for verified-customer learning
-- [ ] No learning from forecasts as if they were outcomes
-- [ ] No synthetic commercial labels
-- [ ] Calibration / feedback loop
+- [x] Research evidence as features only
+- [x] Replies as observed outcomes
+- [x] Verified commercial outcomes as labels
+- [x] Payment + fulfilment + recognized revenue required for verified-customer learning
+- [x] No learning from forecasts as if they were outcomes
+- [x] No synthetic commercial labels
+- [x] Calibration / feedback loop
 
 ## Competitor mining at scale
 
