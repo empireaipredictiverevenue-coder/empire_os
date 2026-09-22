@@ -432,3 +432,188 @@ def test_competitor_evidence_fingerprint_distinguishes_same_page_relationships()
         _competitor_evidence_fingerprints(payload_a)
         != _competitor_evidence_fingerprints(payload_b)
     )
+
+
+
+def _ecosystem_signal():
+    return {
+        "schema_version": "intelligence_signal_candidate.v1",
+        "entity_id": ENTITY_ID,
+        "signal_type": "competitor_ecosystem_evidence",
+        "signal_domain": "competitive_intelligence",
+        "observed_at": "2026-09-22T12:50:00+00:00",
+        "source_id": SOURCE_ID,
+        "strength": 1.0,
+        "confidence": 0.85,
+        "payload": {
+            "company_name": "Acme Roofing",
+            "company_domain": "acme.example",
+            "surface_count": 3,
+            "case_study_surface_count": 1,
+            "testimonial_surface_count": 1,
+            "partner_surface_count": 1,
+            "surfaces": [
+                {
+                    "source_ref": "https://acme.example/projects",
+                    "link_text": "Projects",
+                    "categories": ["case_study"],
+                    "first_party": True,
+                    "observed": True,
+                },
+                {
+                    "source_ref": "https://acme.example/reviews",
+                    "link_text": "Reviews",
+                    "categories": ["testimonial"],
+                    "first_party": True,
+                    "observed": True,
+                },
+                {
+                    "source_ref": "https://acme.example/partners",
+                    "link_text": "Partners",
+                    "categories": ["partner"],
+                    "first_party": True,
+                    "observed": True,
+                },
+            ],
+            "external_relationship_candidates": [{
+                "relationship_type": "public_partner_link_candidate",
+                "category": "partner",
+                "external_domain": "manufacturer.example",
+                "source_ref": "https://acme.example/partners",
+                "partner_status_inferred": False,
+            }],
+            "research_candidate": True,
+            "customer_relationship_inferred": False,
+            "partner_relationship_inferred": False,
+            "buyer_intent": False,
+            "commercial_intent": False,
+            "prospect_created": False,
+            "outreach_enabled": False,
+        },
+        "persistence_performed": False,
+        "buyer_intent_inferred": False,
+        "commercial_intent_inferred": False,
+        "outreach_enabled": False,
+        "execution_authority": "none",
+    }
+
+
+class EcosystemSignalCursor(FakeCursor):
+    def __init__(self, *, duplicate=False):
+        super().__init__()
+        self.duplicate = duplicate
+
+    def execute(self, sql, params=None):
+        text = " ".join(str(sql).split())
+        self.calls.append((text, tuple(params or ())))
+
+        if text.startswith("SET LOCAL ROLE"):
+            self._set([], [])
+        elif "FROM public.intelligence_sources" in text:
+            self._set(["id"], [(SOURCE_ID,)])
+        elif (
+            text.startswith("SELECT payload")
+            and "FROM public.intelligence_signals" in text
+        ):
+            if self.duplicate:
+                self._set(
+                    ["payload"],
+                    [(_ecosystem_signal()["payload"],)],
+                )
+            else:
+                self._set(["payload"], [])
+        elif text.startswith(
+            "INSERT INTO public.intelligence_signals"
+        ):
+            self._set(["id"], [("ecosystem-signal-id",)])
+        else:
+            raise AssertionError(f"unexpected SQL: {text}")
+
+
+def _ecosystem_writer(*, duplicate=False):
+    cursor = EcosystemSignalCursor(duplicate=duplicate)
+    connect = FakeConnect(cursor)
+    writer = PostgresIntelligenceMaterializer(
+        "postgresql://materializer@example/db",
+        connect_factory=connect,
+    )
+    return writer, cursor
+
+
+def test_ecosystem_signal_persists_fixed_observe_only_shape():
+    from empire_os.intelligence_materializer_transport import (
+        persist_competitor_ecosystem_signal,
+    )
+
+    writer, cursor = _ecosystem_writer()
+    result = persist_competitor_ecosystem_signal(
+        writer,
+        _ecosystem_signal(),
+    )
+
+    assert result["inserted"] is True
+    assert result["existing"] is False
+    assert result["execution_authority"] == "none"
+
+    insert_sql = next(
+        sql for sql, _ in cursor.calls
+        if sql.startswith("INSERT INTO public.intelligence_signals")
+    )
+    assert "'competitor_ecosystem_evidence'" in insert_sql
+    assert "'competitive_intelligence'" in insert_sql
+
+    assert not any(
+        sql.startswith(("UPDATE ", "DELETE "))
+        for sql, _ in cursor.calls
+    )
+
+
+def test_ecosystem_signal_dedupes_by_observed_surfaces():
+    from empire_os.intelligence_materializer_transport import (
+        persist_competitor_ecosystem_signal,
+    )
+
+    writer, cursor = _ecosystem_writer(duplicate=True)
+    result = persist_competitor_ecosystem_signal(
+        writer,
+        _ecosystem_signal(),
+    )
+
+    assert result["inserted"] is False
+    assert result["existing"] is True
+    assert not any(
+        sql.startswith("INSERT INTO public.intelligence_signals")
+        for sql, _ in cursor.calls
+    )
+
+
+def test_ecosystem_signal_rejects_inferred_customer_relationship():
+    from empire_os.intelligence_materializer_transport import (
+        persist_competitor_ecosystem_signal,
+    )
+
+    writer, _ = _ecosystem_writer()
+    signal = _ecosystem_signal()
+    signal["payload"]["customer_relationship_inferred"] = True
+
+    with pytest.raises(
+        IntelligenceMaterializerTransportError,
+        match="customer relationship",
+    ):
+        persist_competitor_ecosystem_signal(writer, signal)
+
+
+def test_ecosystem_signal_rejects_execution_authority():
+    from empire_os.intelligence_materializer_transport import (
+        persist_competitor_ecosystem_signal,
+    )
+
+    writer, _ = _ecosystem_writer()
+    signal = _ecosystem_signal()
+    signal["execution_authority"] = "outbound"
+
+    with pytest.raises(
+        IntelligenceMaterializerTransportError,
+        match="execution authority",
+    ):
+        persist_competitor_ecosystem_signal(writer, signal)
