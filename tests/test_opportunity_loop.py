@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scripts.run_opportunity_loop import run_opportunity_loop
+from empire_os.opportunity_loop import run_opportunity_loop
 
 
 def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
@@ -26,19 +26,36 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
             "blocked_count": 3,
         }
 
+    def planner(root: Path, *, limit: int):
+        calls.append(("planner", root, limit))
+        return {
+            "queued_count": 2,
+            "skipped_unchanged": 1,
+        }
+
     result = run_opportunity_loop(
         tmp_path,
+        force=True,
         radar_fn=radar,
         research_fn=research,
         intake_fn=intake,
+        planner_fn=planner,
     )
-    assert [name for name, _ in calls] == [
+
+    assert [item[0] for item in calls] == [
         "radar",
         "research",
         "intake",
+        "planner",
     ]
+    assert calls[-1][2] == 3
     assert result["ok"] is True
+    assert result["research_observation_count"] == 5
+    assert result["factory_blocked_count"] == 3
+    assert result["ai_plan_queued_count"] == 2
     assert result["automatic_internal_research"] is True
+    assert result["automatic_factory_intake"] is True
+    assert result["automatic_ai_planning"] is True
     assert result["automatic_external_execution_allowed"] is False
     assert result["outreach_sent"] is False
     assert result["payment_action"] is False
@@ -53,16 +70,70 @@ def test_opportunity_loop_fails_closed_and_stops_on_step_error(tmp_path):
         calls.append("radar")
         raise RuntimeError("radar failed")
 
-    def should_not_run(_root):
+    def should_not_run(_root, **_kwargs):
         calls.append("unexpected")
         return {}
 
     result = run_opportunity_loop(
         tmp_path,
+        force=True,
         radar_fn=radar,
         research_fn=should_not_run,
         intake_fn=should_not_run,
+        planner_fn=should_not_run,
     )
+
     assert calls == ["radar"]
     assert result["ok"] is False
     assert result["steps"][0]["step"] == "opportunity_radar"
+    assert result["automatic_external_execution_allowed"] is False
+
+
+def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
+    calls = []
+
+    def radar(_root):
+        calls.append("radar")
+        return {"candidate_count": 1}
+
+    def research(_root):
+        calls.append("research")
+        return {
+            "researched_candidate_count": 1,
+            "observation_count": 1,
+        }
+
+    def intake(_root):
+        calls.append("intake")
+        return {
+            "factory_ready_count": 0,
+            "blocked_count": 1,
+        }
+
+    def planner(_root, *, limit):
+        calls.append("planner")
+        return {
+            "queued_count": 1,
+            "skipped_unchanged": 0,
+        }
+
+    first = run_opportunity_loop(
+        tmp_path,
+        min_interval_seconds=1800,
+        radar_fn=radar,
+        research_fn=research,
+        intake_fn=intake,
+        planner_fn=planner,
+    )
+    second = run_opportunity_loop(
+        tmp_path,
+        min_interval_seconds=1800,
+        radar_fn=radar,
+        research_fn=research,
+        intake_fn=intake,
+        planner_fn=planner,
+    )
+
+    assert first["skipped_fresh"] is False
+    assert second["skipped_fresh"] is True
+    assert calls == ["radar", "research", "intake", "planner"]
