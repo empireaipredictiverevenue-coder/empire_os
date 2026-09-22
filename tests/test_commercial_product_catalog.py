@@ -1,6 +1,7 @@
 from empire_os.commercial_product_catalog import (
     assess_catalog_item,
     fetch_catalog,
+    fetch_catalog_postgres,
     public_catalog_projection,
     summarize_catalog,
     write_catalog_snapshot,
@@ -131,3 +132,66 @@ def test_public_projection_hides_verified_but_inactive_economics_window():
     result = public_catalog_projection({"products": [row]})
     assert result["count"] == 0
     assert result["products"] == []
+
+
+
+class _CatalogCursor:
+    def __init__(self):
+        self.calls = []
+        self._row = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def execute(self, sql, params=None):
+        normalized = " ".join(str(sql).split())
+        self.calls.append((normalized, tuple(params or ())))
+        if normalized.startswith("SELECT public.get_commercial_product_catalog"):
+            self._row = ([base_row()],)
+
+    def fetchone(self):
+        return self._row
+
+
+class _CatalogConnection:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def cursor(self):
+        return self._cursor
+
+
+def test_fetch_catalog_postgres_uses_restricted_role():
+    cursor = _CatalogCursor()
+
+    def connect(dsn):
+        assert dsn == "postgresql://restricted/catalog"
+        return _CatalogConnection(cursor)
+
+    result = fetch_catalog_postgres(
+        "postgresql://restricted/catalog",
+        product_code="managed_service",
+        limit=900,
+        connect_factory=connect,
+    )
+
+    assert result["binding_terms_ready_count"] == 1
+    assert cursor.calls == [
+        (
+            "SET LOCAL ROLE empire_intelligence_materializer",
+            (),
+        ),
+        (
+            "SELECT public.get_commercial_product_catalog(%s,%s)",
+            ("managed_service", 500),
+        ),
+    ]
