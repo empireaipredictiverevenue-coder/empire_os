@@ -54,8 +54,29 @@ Show phases as finished engineering, production proof pending, current, parallel
 ### Growth Command
 Search/SEO/AEO/GEO, Advertising, Demand Genesis, landing/content performance, partnerships/distribution, experiments, Conversion Intelligence/CRO and attributed recognized revenue/GP. Conversion shows every canonical boundary from visitor→lead through outcome→repeat purchase, evidence-backed rate/drop-off, sample size, UNKNOWN/stale states, primary bottleneck and next proposal-only experiment.
 
-### Intelligence / Learning
-Omega, Predictive, forecast-vs-actual calibration, Revenue OS, Digital Twin, Capital, Economic Memory and model-review feedback.
+### Predictive Cloud / Intelligence & Learning
+Predictive Cloud is the umbrella intelligence command surface. It must combine
+Omega/Cortex, Predictive Revenue, descriptive/diagnostic analysis, forecasts,
+forecast-vs-actual calibration, Revenue OS, Market/Demand Intelligence,
+Customer/Buyer Intelligence, Conversion Intelligence, Search/Attention/
+Recommendation Intelligence, Operational/Fulfilment Intelligence,
+Physical/Spatial Intelligence, Risk/Resilience, Digital Twin scenarios,
+Quantitative Intelligence, Capital/Portfolio Intelligence, Opportunity
+Intelligence and Economic Memory.
+
+Founder questions this surface must answer:
+- What changed?
+- Why did it change?
+- What is likely next?
+- How uncertain is the prediction?
+- What downside or constraint matters?
+- What opportunity is emerging?
+- What should be investigated or done next?
+- What actually happened?
+- What did Predictive Cloud learn?
+
+Every material output must be visibly typed as OBSERVED, INFERRED, FORECAST,
+SCENARIO, UNKNOWN or VERIFIED OUTCOME.
 
 The Founder Console must also expose Volumetric Intelligence and Natural Physical Intelligence as read-only drill-down layers:
 - source/modality health and last observed evidence;
@@ -92,7 +113,7 @@ Funds, binding terms, destructive infrastructure, accounting recognition, irreve
 
 Founder Console is the top-level cockpit.
 
-Search Command Centre, Revenue Command Centre, Market Intelligence, Buyer/CRM/Closer, Advertising/Demand/Experiments, Conversion Intelligence/CRO, Predictive/Capital and System Operations become drill-downs.
+Predictive Cloud is the umbrella intelligence surface. Search Command Centre, Revenue Command Centre, Market Intelligence, Buyer/CRM/Closer, Advertising/Demand/Experiments, Conversion Intelligence/CRO, Quant/Capital, Physical/Spatial Intelligence and System Operations become drill-downs.
 
 Avoid disconnected apps with conflicting metrics.
 
@@ -108,7 +129,7 @@ Avoid disconnected apps with conflicting metrics.
 8. Global Markets/map.
 9. Buyer/GTM/Closer.
 10. Money/Revenue Truth.
-11. Intelligence/Learning.
+11. Predictive Cloud / Intelligence & Learning.
 12. Safe bounded controls.
 
 ## Anti-drift requirement
