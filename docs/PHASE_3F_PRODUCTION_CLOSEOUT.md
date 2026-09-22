@@ -10,7 +10,6 @@ Production closeout additionally requires durable automation.
 
 System scope:
 
-- `empire-astra-dispatcher.timer` — bounded internal orchestration.
 - `empire-department-cycle.timer` — department execution + Economic Memory.
 - `empire-predictive-intelligence.timer` — refresh verified-cohort predictive
   estimates directly from canonical outcome evidence every five minutes.
@@ -28,7 +27,9 @@ logout and restart.
 ## Automation invariant
 
 A blocked Astra work item must never be the only future trigger for a model or
-learning refresh. Predictive Intelligence therefore has an independent timer:
+learning refresh. Phase 3F production automation does not require the
+GUARDED_EXECUTE Astra dispatcher; autonomy stays within the OBSERVE boundary.
+Predictive Intelligence therefore has an independent timer:
 when real verified commercial outcomes arrive later, the cohort is refreshed
 without requiring the old blocked queue item to be reopened.
 
