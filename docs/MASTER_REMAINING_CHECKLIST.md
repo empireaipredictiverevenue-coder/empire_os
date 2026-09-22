@@ -18,6 +18,37 @@ Current truth:
 - payment is not recognized revenue
 - recognized revenue is not realized gross profit
 
+## Intelligence Router / Model Upgrade Layer — ACTIVE
+
+Canonical rule:
+**intelligence is replaceable; authority is separate.**
+
+- [x] Existing provider/model registry retained
+- [x] Existing cost/capability/reasoning-aware Model Router retained
+- [x] Capability-level Intelligence Router — CODED
+- [x] Quantitative tasks route to deterministic Quant Brain by default
+- [x] Local-fast / local-reasoning intelligence classes
+- [x] Frontier-fast / frontier-reasoning classes
+- [x] Ensemble class
+- [x] Future general-intelligence compatibility slot
+- [x] Future superintelligence compatibility slot
+- [x] No current AGI/ASI availability claim
+- [x] Intelligence level does not inherit execution authority
+- [x] AGI Control API exposes intelligence architecture and route preview
+- [x] Astra Executive plan steps request intelligence capability, not model/provider
+- [x] Intelligence Router registered in Control Fabric
+- [x] Intelligence Router assigned to Strategy, R&D and Engineering departments
+- [x] Architecture regression locks router authority to OBSERVE
+- [ ] Live route verification against installed EmpireOS model registry
+- [ ] Benchmark current local model against stronger candidate model(s)
+- [ ] Matched-pair workload calibration replaces model-quality priors
+- [ ] Department-specific model routing profiles
+- [ ] Shadow-evaluation path for newly discovered models
+- [ ] Automatic promotion/demotion based on verified quality/cost/latency evidence
+
+Canonical architecture:
+`docs/INTELLIGENCE_ROUTER_ARCHITECTURE.md`
+
 ## Quant Brain / Decision Verification — ACTIVE
 
 - [x] Quant Brain deterministic core mounted in main EmpireOS Hub
