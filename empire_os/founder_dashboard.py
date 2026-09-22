@@ -505,6 +505,18 @@ def _commercial_exchange_runtime(
             if isinstance(raw.get("seat_state_counts"), dict)
             else {}
         ),
+        "seat_activation_blocker_counts": (
+            raw.get("seat_activation_blocker_counts")
+            if isinstance(
+                raw.get("seat_activation_blocker_counts"), dict
+            )
+            else {}
+        ),
+        "supply_gate_diagnostics": (
+            raw.get("supply_gate_diagnostics")
+            if isinstance(raw.get("supply_gate_diagnostics"), dict)
+            else {}
+        ),
         "buyer_capacity_never_gates_acquisition": (
             raw.get("buyer_capacity_never_gates_acquisition") is True
         ),
