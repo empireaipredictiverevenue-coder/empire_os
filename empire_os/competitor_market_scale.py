@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Mapping
 
 from empire_os.competitor_audience_sweep import (
+    fetch_public_html,
     run_competitor_audience_sweep,
 )
 from empire_os.intelligence_materializer_transport import (
@@ -302,6 +303,16 @@ def run_market_scale_sweep(
 
     sweeps: list[dict[str, Any]] = []
 
+    source_cache = {
+        url: fetch_public_html(url)
+        for url in reviewed["source_refs"]
+    }
+
+    def _market_fetch(url: str) -> str | None:
+        if url in source_cache:
+            return source_cache[url]
+        return fetch_public_html(url)
+
     def _run_seed(seed: Mapping[str, Any]) -> dict[str, Any]:
         result = sweep_fn(
             writer=writer,
@@ -313,6 +324,8 @@ def run_market_scale_sweep(
             metro=reviewed["metro"],
             persist=persist,
             search_fn=_market_search,
+            fetch_fn=_market_fetch,
+            source_refs=reviewed["source_refs"],
         )
         return dict(result)
 
