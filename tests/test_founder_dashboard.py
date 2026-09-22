@@ -1097,3 +1097,80 @@ def test_dashboard_exposes_real_commercial_funnel(tmp_path):
     assert funnel["next_event"] == "await_genuine_buyer_reply"
     assert funnel["actual_revenue"] is False
     assert funnel["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_revenue_pulse(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/revenue_pulse/latest.json",
+        {
+            "schema_version": "empire.revenue-pulse.v3",
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "pulse_state": "conversation_blocked",
+            "highest_priority_blocker": "buyer_conversation",
+            "blocker_state": "blocked",
+            "current_window": {
+                "label": "current_24h",
+                "hours": 24,
+                "acquisitions": 20,
+                "qualified": 10,
+                "buyer_reviews": 5,
+                "delivered_outreach": 4,
+                "commercial_replies": 0,
+                "commercial_terms": 0,
+                "verified_payments": 0,
+                "fulfilments": 0,
+                "recognized_revenue_cents": 0,
+                "realized_gp_cents": 0,
+                "evidence_refs": ["canonical:current"],
+            },
+            "conversion": {
+                "delivered_outreach_to_commercial_reply": 0.0,
+            },
+            "leak_detection": {
+                "method": "observed_zero_conversion_only",
+                "prediction": False,
+                "items": [{
+                    "from_stage": "delivered_outreach",
+                    "to_stage": "commercial_replies",
+                    "entered": 4,
+                    "converted": 0,
+                    "state": "observed_zero_conversion",
+                    "prediction": False,
+                }],
+            },
+            "alerts": [{
+                "kind": "conversion_gap",
+                "stage": "commercial_replies",
+                "prediction": False,
+            }],
+            "recognized_revenue_truth": {
+                "recognized_revenue_cents": 0,
+                "realized_gp_cents": 0,
+                "forecast_included_in_truth": False,
+            },
+            "forecast": {
+                "separate_from_revenue_truth": True,
+                "items": [],
+            },
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    pulse = result["revenue_pulse"]
+
+    assert pulse["available"] is True
+    assert pulse["pulse_state"] == "conversation_blocked"
+    assert pulse["current_window"]["delivered_outreach"] == 4
+    assert pulse["current_window"]["commercial_replies"] == 0
+    assert pulse["leak_detection"]["prediction"] is False
+    assert pulse["alerts"][0]["stage"] == "commercial_replies"
+    assert pulse["recognized_revenue_truth"][
+        "recognized_revenue_cents"
+    ] == 0
+    assert pulse["recognized_revenue_truth"][
+        "forecast_included_in_truth"
+    ] is False
+    assert pulse["execution_authority"] == "none"
