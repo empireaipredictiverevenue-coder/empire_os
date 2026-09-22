@@ -16,7 +16,7 @@ not content volume, impressions or lead count alone.
 
 **Understand market -> define category -> position product -> create demand ->
 capture intent -> convert qualified buyers -> support expansion -> measure
-realized revenue -> feed learning back into Predictive Revenue.**
+realized revenue -> feed learning back into Predictive Cloud / Predictive Revenue.**
 
 ## 2. Marketing Leadership
 
@@ -171,7 +171,7 @@ Each has:
 ## 4. Category / Positioning
 
 Core category:
-**Predictive Revenue Operating System**
+**Predictive Cloud — with Predictive Revenue as the commercial engine**
 
 Supporting category language:
 - Revenue Intelligence
@@ -211,7 +211,7 @@ Every product requires:
 - success metric
 
 Priority product families:
-- Predictive Revenue platform
+- Predictive Cloud / Predictive Revenue platform
 - Market Intelligence
 - Buyer Intelligence
 - Search Intelligence
@@ -431,9 +431,9 @@ By:
 - confidence
 - incrementality
 
-## 12. Marketing + AGI
+## 12. Marketing + Agentic General Intelligence
 
-AGI layer handles:
+Agentic intelligence layer handles:
 - synthesis
 - planning
 - message hypotheses
