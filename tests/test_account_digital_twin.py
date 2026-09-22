@@ -171,6 +171,15 @@ def test_twin_composes_identity_research_and_competitor_evidence():
         research=_research(),
         brief=_brief(),
         next_action=_next_action(),
+        qualification_history=[{
+            "id": "qual-1",
+            "entity_id": "entity-golden",
+            "prospect_id": "prospect-golden",
+            "score": 86.2,
+            "tier": "insufficient_evidence",
+            "status": "insufficient_evidence",
+            "recommended_action": "Collect evidence before commercial action",
+        }],
     )
 
     assert twin["identity"]["company_name"] == "Golden Spike Roofing Inc"
@@ -181,6 +190,8 @@ def test_twin_composes_identity_research_and_competitor_evidence():
     assert twin["competitor_relationships"]["competitor_count"] == 1
     assert twin["competitor_relationships"]["evidence_count"] == 3
     assert twin["research"]["observation_count"] == 4
+    assert twin["qualification"]["history_available"] is True
+    assert len(twin["qualification"]["history"]) == 1
     assert twin["next_best_action"]["recommended_action"] == "research_more"
 
 
@@ -254,3 +265,28 @@ def test_snapshot_is_read_only_and_entity_keyed():
     assert result["outreach_authorized"] is False
     assert result["payment_authorized"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_snapshot_can_attach_qualification_history_by_entity():
+    result = build_account_twin_snapshot(
+        buyer_state={"entities": [_buyer_entity()]},
+        audience={"companies": [_audience()]},
+        research={"actions": [_research()]},
+        briefs={"briefs": [_brief()]},
+        next_actions={"actions": [_next_action()]},
+        qualification_history_by_entity={
+            "entity-golden": [{
+                "id": "qual-1",
+                "entity_id": "entity-golden",
+                "prospect_id": "prospect-golden",
+                "score": 86.2,
+                "tier": "insufficient_evidence",
+                "status": "insufficient_evidence",
+            }]
+        },
+    )
+
+    twin = result["twins"][0]
+    assert twin["qualification"]["history_available"] is True
+    assert twin["qualification"]["history"][0]["id"] == "qual-1"
