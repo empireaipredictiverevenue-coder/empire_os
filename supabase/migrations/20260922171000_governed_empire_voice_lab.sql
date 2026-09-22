@@ -53,6 +53,18 @@ BEGIN
   IF COALESCE((p_metadata->>'call_ready')::boolean,false) IS NOT TRUE THEN
     RAISE EXCEPTION 'call-ready evidence required';
   END IF;
+  IF COALESCE(p_metadata->>'voice_legal_basis','') NOT IN (
+    'prior_express_written_consent',
+    'verified_business_landline_b2b'
+  ) THEN
+    RAISE EXCEPTION 'verified voice legal basis required';
+  END IF;
+  IF COALESCE(p_metadata->>'voice_legal_basis','')
+      ='verified_business_landline_b2b'
+     AND COALESCE(p_metadata->>'line_type','')
+         NOT IN ('landline','landline_tollfree') THEN
+    RAISE EXCEPTION 'verified business landline evidence required';
+  END IF;
   IF EXISTS (
     SELECT 1 FROM public.outbound_suppressions s
     WHERE s.contact_type='phone'
@@ -129,6 +141,18 @@ BEGIN
   END IF;
   IF COALESCE((i.metadata->>'call_ready')::boolean,false) IS NOT TRUE THEN
     RAISE EXCEPTION 'call-ready evidence required';
+  END IF;
+  IF COALESCE(i.metadata->>'voice_legal_basis','') NOT IN (
+    'prior_express_written_consent',
+    'verified_business_landline_b2b'
+  ) THEN
+    RAISE EXCEPTION 'verified voice legal basis required';
+  END IF;
+  IF COALESCE(i.metadata->>'voice_legal_basis','')
+      ='verified_business_landline_b2b'
+     AND COALESCE(i.metadata->>'line_type','')
+         NOT IN ('landline','landline_tollfree') THEN
+    RAISE EXCEPTION 'verified business landline evidence required';
   END IF;
   IF i.prospect_id IS NULL THEN
     RAISE EXCEPTION 'canonical prospect required';
@@ -332,6 +356,32 @@ BEGIN
     clock_timestamp()
   )
   ON CONFLICT(conversation_id,provider_event_id) DO NOTHING;
+
+  IF p_direction='inbound'
+     AND lower(p_body_text) ~
+       '(do not call|don''t call|stop calling|opt out|remove me|take me off)' THEN
+    INSERT INTO public.outbound_suppressions(
+      normalized_contact,contact_type,reason,source
+    ) VALUES(
+      i.normalized_recipient,'phone','voice_opt_out','empire_voice_lab'
+    )
+    ON CONFLICT(normalized_contact) DO NOTHING;
+
+    UPDATE public.outbound_intents
+    SET status='suppressed',updated_at=clock_timestamp()
+    WHERE id=i.id;
+
+    INSERT INTO public.outbound_events(
+      intent_id,event_type,actor,provider_message_id,payload
+    ) VALUES(
+      i.id,'suppressed','empire_voice_lab',
+      trim(p_external_call_id),
+      jsonb_build_object(
+        'reason','voice_opt_out',
+        'turn_index',p_turn_index
+      )
+    );
+  END IF;
 
   RETURN jsonb_build_object(
     'decision','recorded','conversation_id',c.id,
