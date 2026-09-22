@@ -88,3 +88,28 @@ def test_memory_and_capability_surfaces_are_non_executing():
     assert review.status_code == 200
     assert review.json()["permitted"] is False
     assert review.json()["execution_performed"] is False
+
+
+def test_intelligence_architecture_and_quant_route_are_nonexecuting():
+    architecture = client().get(
+        "/v1/agi-control/intelligence/architecture"
+    )
+    assert architecture.status_code == 200
+    body = architecture.json()
+    assert body["model_provider_agnostic"] is True
+    assert body["future_intelligence_currently_claimed_available"] is False
+    assert body["execution_authority"] == "none"
+
+    route = client().post(
+        "/v1/agi-control/intelligence/route/preview",
+        json={
+            "task": "monte_carlo",
+            "messages": [],
+        },
+    )
+    assert route.status_code == 200
+    routed = route.json()
+    assert routed["engine"] == "quant_brain"
+    assert routed["intelligence_class"] == "deterministic_quant"
+    assert routed["authority_inherited_from_intelligence"] is False
+    assert routed["execution_authority"] == "none"
