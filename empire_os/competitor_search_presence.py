@@ -283,6 +283,7 @@ def build_search_presence_snapshot(
     for row in query_results:
         observations.extend(row["observations"])
 
+    generic_observations = list(observations)
     canonical_verification_observations: list[dict[str, Any]] = []
     if verify_canonical_companies and domain_to_company:
         verification_workers = min(
@@ -327,37 +328,69 @@ def build_search_presence_snapshot(
     for company in domain_to_company.values():
         company_state[company["entity_id"]] = {
             **company,
-            "queries_observed": set(),
-            "positions": [],
-            "observations": [],
+            "generic_queries_observed": set(),
+            "generic_positions": [],
+            "generic_observations": [],
+            "canonical_verification_observations": [],
         }
 
-    for row in observations:
+    for row in generic_observations:
         state = company_state[row["entity_id"]]
-        state["queries_observed"].add(row["query"])
-        state["positions"].append(row["position"])
-        state["observations"].append(row)
+        state["generic_queries_observed"].add(row["query"])
+        state["generic_positions"].append(row["position"])
+        state["generic_observations"].append(row)
+
+    for row in canonical_verification_observations:
+        state = company_state.get(row["entity_id"])
+        if state is not None:
+            state["canonical_verification_observations"].append(row)
 
     company_presence = []
     for state in company_state.values():
-        positions = state["positions"]
-        reciprocal_weight = sum(
+        generic_positions = state["generic_positions"]
+        generic_weight = sum(
             1.0 / max(1, int(position))
-            for position in positions
+            for position in generic_positions
+        )
+        all_observations = (
+            state["generic_observations"]
+            + state["canonical_verification_observations"]
         )
         company_presence.append({
             "entity_id": state["entity_id"],
             "company_name": state["company_name"],
             "company_domain": state["company_domain"],
-            "query_presence_count": len(state["queries_observed"]),
-            "observation_count": len(state["observations"]),
-            "best_position": min(positions) if positions else None,
+            "query_presence_count": len(
+                state["generic_queries_observed"]
+            ),
+            "generic_query_presence_count": len(
+                state["generic_queries_observed"]
+            ),
+            "canonical_search_verified": bool(
+                state["canonical_verification_observations"]
+            ),
+            "observation_count": len(all_observations),
+            "generic_observation_count": len(
+                state["generic_observations"]
+            ),
+            "canonical_verification_observation_count": len(
+                state["canonical_verification_observations"]
+            ),
+            "best_position": (
+                min(generic_positions)
+                if generic_positions
+                else None
+            ),
             "reciprocal_position_weight": round(
-                reciprocal_weight,
+                generic_weight,
                 6,
             ),
-            "observations": state["observations"],
-            "search_presence_observed": bool(positions),
+            "observations": all_observations,
+            "generic_observations": state["generic_observations"],
+            "canonical_verification_observations": (
+                state["canonical_verification_observations"]
+            ),
+            "search_presence_observed": bool(all_observations),
             "market_share_inferred": False,
             "buyer_intent_inferred": False,
             "commercial_intent_inferred": False,
@@ -365,8 +398,9 @@ def build_search_presence_snapshot(
 
     company_presence.sort(
         key=lambda row: (
+            -int(row["canonical_search_verified"]),
             -row["reciprocal_position_weight"],
-            -row["query_presence_count"],
+            -row["generic_query_presence_count"],
             row["company_name"].casefold(),
         )
     )
@@ -410,6 +444,14 @@ def build_search_presence_snapshot(
             1 for row in company_presence
             if row["search_presence_observed"]
         ),
+        "company_with_generic_market_presence_count": sum(
+            1 for row in company_presence
+            if row["generic_observation_count"] > 0
+        ),
+        "canonical_search_verified_company_count": sum(
+            1 for row in company_presence
+            if row["canonical_search_verified"]
+        ),
         "observation_count": len(observations),
         "generic_query_observation_count": sum(
             len(row["observations"])
@@ -423,9 +465,12 @@ def build_search_presence_snapshot(
         ),
         "query_results": query_results,
         "companies": company_presence,
-        "search_presence_available": total_weight > 0,
+        "search_presence_available": bool(observations),
+        "share_of_voice_available": total_weight > 0,
         "share_metric": (
             "reciprocal_position_weighted_observed_search_presence"
+            if total_weight > 0
+            else None
         ),
         "market_share": None,
         "market_share_inferred": False,
