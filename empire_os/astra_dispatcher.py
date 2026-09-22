@@ -90,6 +90,10 @@ SAFE_JOBS = {
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/run_opportunity_research.py"),
     ],
+    "opportunity_factory_intake_refresh": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/build_opportunity_factory_intake.py"),
+    ],
 }
 
 
@@ -139,6 +143,7 @@ def choose_jobs(
         jobs.append("revenue_pulse_refresh")
         jobs.append("opportunity_radar_refresh")
         jobs.append("opportunity_research_refresh")
+        jobs.append("opportunity_factory_intake_refresh")
     return list(dict.fromkeys(jobs))
 
 
