@@ -35,6 +35,7 @@ class VoiceLabConfig:
     tts_model_dir: str = str(
         MODEL_ROOT / "kokoro-en-v0_19"
     )
+    tts_model_file: str = "model.onnx"
     tts_voice: str = "empire_default"
     tts_sid: int = 10
     provider: str = "cpu"
@@ -63,6 +64,10 @@ class VoiceLabConfig:
             tts_model_dir=os.getenv(
                 "EMPIRE_VOICE_TTS_MODEL_DIR",
                 str(MODEL_ROOT / "kokoro-en-v0_19"),
+            ).strip(),
+            tts_model_file=os.getenv(
+                "EMPIRE_VOICE_TTS_MODEL_FILE",
+                "model.onnx",
             ).strip(),
             tts_voice=os.getenv(
                 "EMPIRE_VOICE_TTS_VOICE",
@@ -240,7 +245,8 @@ class SherpaKokoroTTS:
             model=sherpa_onnx.OfflineTtsModelConfig(
                 kokoro=sherpa_onnx.OfflineTtsKokoroModelConfig(
                     model=_require_file(
-                        root / "model.onnx", "Kokoro model"
+                        root / self.config.tts_model_file,
+                        "Kokoro model",
                     ),
                     voices=_require_file(
                         root / "voices.bin", "Kokoro voices"
@@ -524,7 +530,7 @@ class EmpireVoiceLab:
             "stt_tokens": (
                 stt / "tiny.en-tokens.txt"
             ).is_file(),
-            "tts_model": (tts / "model.onnx").is_file(),
+            "tts_model": (tts / cfg.tts_model_file).is_file(),
             "tts_voices": (tts / "voices.bin").is_file(),
             "tts_tokens": (tts / "tokens.txt").is_file(),
             "tts_espeak_data": (tts / "espeak-ng-data").is_dir(),
@@ -542,6 +548,7 @@ class EmpireVoiceLab:
             "stt_model_dir": self.config.stt_model_dir,
             "tts": self.config.tts_backend,
             "tts_model_dir": self.config.tts_model_dir,
+            "tts_model_file": self.config.tts_model_file,
             "tts_voice": self.config.tts_voice,
             "sample_rate": self.config.output_rate,
             "dependencies": deps,
