@@ -543,3 +543,53 @@ def test_dashboard_exposes_buyer_state_evidence(tmp_path):
     assert buyer_state["commercial_intent_inferred"] is False
     assert buyer_state["outreach_enabled"] is False
     assert buyer_state["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_next_best_actions(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/next_best_action/"
+        / "next_best_action_latest.json",
+        {
+            "schema_version": "empire.next_best_action_snapshot.v1",
+            "mode": "OBSERVE",
+            "action_count": 2,
+            "founder_gate_count": 0,
+            "waiting_external_count": 0,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "outreach_authorized": False,
+            "payment_authorized": False,
+            "execution_authority": "none",
+            "actions": [
+                {
+                    "entity_id": "entity-1",
+                    "company_name": "Golden Spike Roofing Inc",
+                    "recommended_action": "research_more",
+                    "mutation_authorized": False,
+                    "external_execution_authorized": False,
+                },
+                {
+                    "entity_id": "entity-2",
+                    "company_name": "Colorado's Best Roofing",
+                    "recommended_action": "verify_decision_maker",
+                    "mutation_authorized": False,
+                    "external_execution_authorized": False,
+                },
+            ],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    nba = result["next_best_actions"]
+
+    assert nba["available"] is True
+    assert nba["action_count"] == 2
+    assert nba["founder_gate_count"] == 0
+    assert nba["buyer_intent_inferred"] is False
+    assert nba["commercial_intent_inferred"] is False
+    assert nba["outreach_authorized"] is False
+    assert nba["payment_authorized"] is False
+    assert nba["execution_authority"] == "none"
