@@ -22,6 +22,7 @@ from empire_os.decision_judge import (
     ACTION_STOP,
     INTENT_OPT_OUT,
     EmpireDecisionJudge,
+    TranscriptCandidate,
 )
 
 
@@ -38,6 +39,10 @@ class VoiceLabConfig:
     stt_backend: str = "sherpa_whisper"
     stt_model_dir: str = str(
         MODEL_ROOT / "sherpa-onnx-whisper-tiny.en"
+    )
+    verifier_stt_model_dir: str = str(
+        MODEL_ROOT
+        / "sherpa-onnx-streaming-zipformer-en-20M-2023-02-17"
     )
     tts_backend: str = "sherpa_kokoro"
     tts_model_dir: str = str(
@@ -64,6 +69,13 @@ class VoiceLabConfig:
             stt_model_dir=os.getenv(
                 "EMPIRE_VOICE_STT_MODEL_DIR",
                 str(MODEL_ROOT / "sherpa-onnx-whisper-tiny.en"),
+            ).strip(),
+            verifier_stt_model_dir=os.getenv(
+                "EMPIRE_VOICE_VERIFIER_STT_MODEL_DIR",
+                str(
+                    MODEL_ROOT
+                    / "sherpa-onnx-streaming-zipformer-en-20M-2023-02-17"
+                ),
             ).strip(),
             tts_backend=os.getenv(
                 "EMPIRE_VOICE_TTS_BACKEND",
@@ -229,6 +241,89 @@ class SherpaWhisperSTT:
         stream.accept_waveform(self.config.input_rate, audio)
         recognizer.decode_stream(stream)
         return str(stream.result.text or "").strip()
+
+
+class SherpaZipformerVerifierSTT:
+    """Independent local ASR verifier used by Empire Decision Judge."""
+
+    REQUIRED_FILES = (
+        "encoder-epoch-99-avg-1.int8.onnx",
+        "decoder-epoch-99-avg-1.onnx",
+        "joiner-epoch-99-avg-1.int8.onnx",
+        "tokens.txt",
+    )
+
+    def __init__(self, config: VoiceLabConfig) -> None:
+        self.config = config
+        self._recognizer = None
+
+    @classmethod
+    def ready(cls, config: VoiceLabConfig) -> bool:
+        root = Path(config.verifier_stt_model_dir)
+        return all((root / name).is_file() for name in cls.REQUIRED_FILES)
+
+    def _load(self):
+        if self._recognizer is not None:
+            return self._recognizer
+        try:
+            import sherpa_onnx
+        except ImportError as exc:
+            raise VoiceLabRuntimeError(
+                "sherpa-onnx is not installed"
+            ) from exc
+
+        root = Path(self.config.verifier_stt_model_dir)
+        self._recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
+            tokens=_require_file(root / "tokens.txt", "Zipformer tokens"),
+            encoder=_require_file(
+                root / "encoder-epoch-99-avg-1.int8.onnx",
+                "Zipformer encoder",
+            ),
+            decoder=_require_file(
+                root / "decoder-epoch-99-avg-1.onnx",
+                "Zipformer decoder",
+            ),
+            joiner=_require_file(
+                root / "joiner-epoch-99-avg-1.int8.onnx",
+                "Zipformer joiner",
+            ),
+            num_threads=self.config.num_threads,
+            sample_rate=self.config.input_rate,
+            decoding_method="greedy_search",
+            provider=self.config.provider,
+        )
+        return self._recognizer
+
+    def transcribe(self, pcm16: bytes) -> str:
+        try:
+            import numpy as np
+        except ImportError as exc:
+            raise VoiceLabRuntimeError(
+                "numpy is required for verifier STT"
+            ) from exc
+
+        audio = (
+            np.frombuffer(pcm16, dtype="<i2")
+            .astype(np.float32)
+            / 32768.0
+        )
+        if audio.size == 0:
+            return ""
+
+        recognizer = self._load()
+        stream = recognizer.create_stream()
+        stream.accept_waveform(self.config.input_rate, audio)
+        stream.accept_waveform(
+            self.config.input_rate,
+            np.zeros(
+                int(0.5 * self.config.input_rate),
+                dtype=np.float32,
+            ),
+        )
+        stream.input_finished()
+        while recognizer.is_ready(stream):
+            recognizer.decode_stream(stream)
+        return str(recognizer.get_result(stream) or "").strip()
 
 
 class SherpaKokoroTTS:
@@ -480,6 +575,11 @@ class EmpireVoiceLab:
                 "unsupported Empire TTS backend"
             )
         self.stt = SherpaWhisperSTT(self.config)
+        self.verifier_stt = (
+            SherpaZipformerVerifierSTT(self.config)
+            if SherpaZipformerVerifierSTT.ready(self.config)
+            else None
+        )
         self.tts = SherpaKokoroTTS(self.config)
         self.brain = VoiceCloserBrain()
         self.judge = EmpireDecisionJudge()
@@ -528,6 +628,7 @@ class EmpireVoiceLab:
     ) -> dict[str, bool]:
         cfg = config or VoiceLabConfig.from_env()
         stt = Path(cfg.stt_model_dir)
+        verifier = Path(cfg.verifier_stt_model_dir)
         tts = Path(cfg.tts_model_dir)
         return {
             "stt_encoder": (
@@ -538,6 +639,18 @@ class EmpireVoiceLab:
             ).is_file(),
             "stt_tokens": (
                 stt / "tiny.en-tokens.txt"
+            ).is_file(),
+            "verifier_stt_encoder": (
+                verifier / "encoder-epoch-99-avg-1.int8.onnx"
+            ).is_file(),
+            "verifier_stt_decoder": (
+                verifier / "decoder-epoch-99-avg-1.onnx"
+            ).is_file(),
+            "verifier_stt_joiner": (
+                verifier / "joiner-epoch-99-avg-1.int8.onnx"
+            ).is_file(),
+            "verifier_stt_tokens": (
+                verifier / "tokens.txt"
             ).is_file(),
             "tts_model": (tts / cfg.tts_model_file).is_file(),
             "tts_voices": (tts / "voices.bin").is_file(),
@@ -555,6 +668,14 @@ class EmpireVoiceLab:
             "speech_vendor": None,
             "stt": self.config.stt_backend,
             "stt_model_dir": self.config.stt_model_dir,
+            "verifier_stt": (
+                "sherpa_zipformer"
+                if self.verifier_stt is not None
+                else None
+            ),
+            "verifier_stt_model_dir": (
+                self.config.verifier_stt_model_dir
+            ),
             "tts": self.config.tts_backend,
             "tts_model_dir": self.config.tts_model_dir,
             "tts_model_file": self.config.tts_model_file,
@@ -576,17 +697,47 @@ class EmpireVoiceLab:
         history: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         transcript = self.stt.transcribe(pcm16)
-        if not transcript:
+        verifier_transcript = (
+            self.verifier_stt.transcribe(pcm16)
+            if self.verifier_stt is not None
+            else ""
+        )
+
+        asr_candidates: list[dict[str, str]] = []
+        judge_candidates: list[TranscriptCandidate] = []
+        if transcript:
+            asr_candidates.append({
+                "source": self.config.stt_backend,
+                "text": transcript,
+            })
+            judge_candidates.append(
+                TranscriptCandidate(
+                    source=self.config.stt_backend,
+                    text=transcript,
+                )
+            )
+        if verifier_transcript:
+            asr_candidates.append({
+                "source": "sherpa_zipformer",
+                "text": verifier_transcript,
+            })
+            judge_candidates.append(
+                TranscriptCandidate(
+                    source="sherpa_zipformer",
+                    text=verifier_transcript,
+                )
+            )
+
+        canonical_transcript = transcript or verifier_transcript
+        if not canonical_transcript:
             return {
                 "transcript": "",
                 "response_text": "",
                 "decision": None,
+                "asr_candidates": [],
             }
 
-        decision = self.judge.judge_text(
-            transcript,
-            source=self.config.stt_backend,
-        )
+        decision = self.judge.judge_candidates(judge_candidates)
         decision_payload = decision.to_dict()
 
         if decision.action == ACTION_STOP:
@@ -610,7 +761,7 @@ class EmpireVoiceLab:
             )
         else:
             response_text = self.brain.reply(
-                transcript,
+                canonical_transcript,
                 business_name=business_name,
                 niche=niche,
                 metro=metro,
@@ -618,9 +769,10 @@ class EmpireVoiceLab:
             )
 
         return {
-            "transcript": transcript,
+            "transcript": canonical_transcript,
             "response_text": response_text,
             "decision": decision_payload,
+            "asr_candidates": asr_candidates,
         }
 
     def respond(
