@@ -129,3 +129,29 @@ def test_window_requires_evidence():
         assert "pulse window evidence required" in str(exc)
     else:
         raise AssertionError("pulse must require evidence")
+
+
+
+def test_zero_conversion_leak_is_observed_not_predicted():
+    pulse = build_revenue_pulse(
+        current=window(
+            delivered_outreach=5,
+            commercial_replies=0,
+            commercial_terms=0,
+        ),
+    )
+
+    leaks = pulse["leak_detection"]["items"]
+    assert pulse["leak_detection"]["prediction"] is False
+    assert any(
+        item["from_stage"] == "delivered_outreach"
+        and item["to_stage"] == "commercial_replies"
+        and item["state"] == "observed_zero_conversion"
+        and item["prediction"] is False
+        for item in leaks
+    )
+    assert any(
+        alert["stage"] == "commercial_replies"
+        and alert["prediction"] is False
+        for alert in pulse["alerts"]
+    )
