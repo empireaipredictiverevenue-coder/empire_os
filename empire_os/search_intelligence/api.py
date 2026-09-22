@@ -26,6 +26,10 @@ from .models import SearchOpportunity, SearchPage
 from .performance import lighthouse_parser_status, parse_lighthouse_report
 from .quality import ContentQualityEvaluator
 from .rank_history import RankObservation, analyse_rank_history
+from .recommendation_intelligence import (
+    AiAnswerObservation,
+    analyse_recommendation_visibility,
+)
 from .reports import build_search_product_report
 from .products import (
     get_search_product,
@@ -65,6 +69,24 @@ class AiVisibilityPreviewRequest(BaseModel):
     engine: str
     empire_domains: list[str] = Field(min_length=1)
     observations: list[AiCitationObservationRequest] = Field(default_factory=list)
+
+
+class AiAnswerObservationRequest(BaseModel):
+    query: str
+    engine: str
+    observed_at: str
+    provenance: list[str] = Field(min_length=1)
+    answer_ref: str | None = None
+    cited_urls: list[str] = Field(default_factory=list)
+    mentioned_domains: list[str] = Field(default_factory=list)
+    recommended_domains: list[str] = Field(default_factory=list)
+
+
+class RecommendationVisibilityPreviewRequest(BaseModel):
+    brand_domains: list[str] = Field(min_length=1)
+    competitor_domains: list[str] = Field(default_factory=list)
+    engine: str | None = None
+    observations: list[AiAnswerObservationRequest] = Field(default_factory=list)
 
 class CitationGapPreviewRequest(BaseModel):
     query: str
@@ -410,6 +432,7 @@ def create_search_router(
             "serp": True,
             "competitor_gap": True,
             "citation_gap": True,
+            "recommendation_visibility": True,
             "traffic_forecast": True,
             "timesfm_shadow": bool(
                 configured_timesfm_provider().status().get("available")
@@ -621,6 +644,42 @@ def create_search_router(
         return {
             "mode": "OBSERVE",
             "recommendation_only": True,
+            "execution_allowed": False,
+            "analysis": analysis.as_dict(),
+        }
+
+    @router.post("/recommendation-visibility/preview")
+    def recommendation_visibility_preview(
+        req: RecommendationVisibilityPreviewRequest,
+    ):
+        try:
+            observations = tuple(
+                AiAnswerObservation(
+                    query=item.query,
+                    engine=item.engine,
+                    observed_at=item.observed_at,
+                    provenance=tuple(item.provenance),
+                    answer_ref=item.answer_ref,
+                    cited_urls=tuple(item.cited_urls),
+                    mentioned_domains=tuple(item.mentioned_domains),
+                    recommended_domains=tuple(item.recommended_domains),
+                )
+                for item in req.observations
+            )
+            analysis = analyse_recommendation_visibility(
+                observations,
+                brand_domains=tuple(req.brand_domains),
+                competitor_domains=tuple(req.competitor_domains),
+                engine=req.engine,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "schema_version": "empire.search.recommendation-visibility.v1",
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "recommendation_guaranteed": False,
+            "market_share_claimed": False,
             "execution_allowed": False,
             "analysis": analysis.as_dict(),
         }
