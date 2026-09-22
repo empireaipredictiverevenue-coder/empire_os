@@ -95,17 +95,17 @@ Already implemented:
 - [x] canonical full-business plain-text architecture
 
 Verification / activation:
-- [ ] Pull latest branch onto EmpireOS
-- [ ] Run Opportunity Radar / research / Factory Intake / AI Planner / loop / Astra focused tests
-- [ ] Run one real OBSERVE Opportunity Loop against current snapshots
-- [ ] Confirm bounded real Opportunity Research produces observations only
-- [ ] Confirm Factory Intake blocks missing normalized signals rather than inferring them
+- [x] Pull latest branch onto EmpireOS — VERIFIED at `219429cd`
+- [x] Run Opportunity Radar / research / Factory Intake / AI Planner / loop / Astra focused tests — 28 passed
+- [x] Run one real OBSERVE Opportunity Loop against current snapshots — 24 radar candidates / 5 researched / 7 observations / 3 AI plans queued
+- [x] Confirm bounded real Opportunity Research produces observations only — VERIFIED; no buyer intent/revenue authority inferred
+- [x] Confirm Factory Intake blocks missing normalized signals rather than inferring them — VERIFIED; 24/24 blocked, 0 factory-ready
 - [ ] Install/enable autonomous Opportunity Loop timer if tests pass
 - [ ] Confirm Astra dispatcher invokes one deduped Opportunity Loop without external mutation
 
 Next wiring:
 - [x] Normalize Radar + research evidence into Opportunity Factory readiness contract — CODED; live evidence normalizers still needed
-- [ ] Automatically generate bounded missing-evidence plans per candidate
+- [x] Automatically generate bounded missing-evidence plans per candidate — AI planner queued 3 deduplicated PLAN jobs from live cycle
 - [ ] Feed validated candidates into Astra workstream ranking
 - [ ] Add Storm / Permit / Property / Search AI Recommendation / Private Capital
       / Corporate Change / Government Spend / Legal node inputs to Radar
