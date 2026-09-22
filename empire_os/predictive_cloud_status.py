@@ -76,6 +76,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("observed_at", "generated_at"),
         "fresh_seconds": 900,
     },
+    "astra_executive": {
+        "path": Path("runtime/astra/executive_latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 900,
+    },
     "founder_directives": {
         "path": Path("runtime/founder_directives/latest.json"),
         "time_keys": ("generated_at", "updated_at", "observed_at"),
@@ -226,6 +231,24 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "available": payload.get("available"),
             "mode": payload.get("mode"),
             "decision": payload.get("decision"),
+        }
+    if name == "astra_executive":
+        primary = payload.get("primary_goal")
+        primary = primary if isinstance(primary, Mapping) else {}
+        return {
+            "plan_id": payload.get("plan_id"),
+            "primary_goal": primary.get("key"),
+            "primary_goal_priority": primary.get("priority"),
+            "plan_step_count": payload.get("plan_step_count"),
+            "auto_dispatch_eligible_count": payload.get(
+                "auto_dispatch_eligible_count"
+            ),
+            "founder_gate_step_count": payload.get(
+                "founder_gate_step_count"
+            ),
+            "external_execution_performed": payload.get(
+                "external_execution_performed"
+            ),
         }
     if name == "founder_directives":
         return {
