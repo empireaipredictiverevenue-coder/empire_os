@@ -102,3 +102,20 @@ def test_follow_up_permission_variants_are_specific_not_generic_interest():
         result = judge.judge_text(text, source="zipformer")
         assert result.action == ACTION_CONTINUE
         assert result.intent == INTENT_FOLLOW_UP
+
+
+def test_any_asr_opt_out_wins_over_other_transcript():
+    result = EmpireDecisionJudge().judge_candidates([
+        TranscriptCandidate(
+            source="whisper",
+            text="Please do not call me again.",
+        ),
+        TranscriptCandidate(
+            source="zipformer",
+            text="Please call me again.",
+        ),
+    ])
+
+    assert result.action == ACTION_STOP
+    assert result.intent == INTENT_OPT_OUT
+    assert result.suppression_requested is True
