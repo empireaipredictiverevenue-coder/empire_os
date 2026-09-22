@@ -19,6 +19,7 @@ from empire_os.opportunity_evidence_normalizer import (
     refresh_normalized_signals,
 )
 from empire_os.opportunity_factory_intake import refresh_factory_intake
+from empire_os.opportunity_evidence_router import refresh_evidence_routes
 from empire_os.opportunity_radar import refresh_opportunity_radar
 from empire_os.opportunity_research import refresh_opportunity_research
 
@@ -95,6 +96,9 @@ def run_opportunity_loop(
     intake_fn: Callable[[Path], Mapping[str, Any]] = (
         refresh_factory_intake
     ),
+    evidence_router_fn: Callable[[Path], Mapping[str, Any]] = (
+        refresh_evidence_routes
+    ),
     planner_fn: Callable[..., Mapping[str, Any]] = (
         plan_radar_opportunities
     ),
@@ -135,6 +139,7 @@ def run_opportunity_loop(
         ("opportunity_research", research_fn, {}),
         ("opportunity_evidence_normalizer", normalizer_fn, {}),
         ("opportunity_factory_intake", intake_fn, {}),
+        ("opportunity_evidence_router", evidence_router_fn, {}),
         ("opportunity_ai_planner", planner_fn, {"limit": 3}),
     )
 
@@ -160,6 +165,7 @@ def run_opportunity_loop(
     research = step_results.get("opportunity_research") or {}
     normalized = step_results.get("opportunity_evidence_normalizer") or {}
     intake = step_results.get("opportunity_factory_intake") or {}
+    routes = step_results.get("opportunity_evidence_router") or {}
     planner = step_results.get("opportunity_ai_planner") or {}
     complete = len(steps) == len(sequence) and all(
         row["ok"] for row in steps
@@ -195,6 +201,13 @@ def run_opportunity_loop(
         "factory_blocked_count": int(
             intake.get("blocked_count") or 0
         ),
+        "opportunity_stage_counts": routes.get("stage_counts") or {},
+        "automatic_internal_evidence_route_count": int(
+            routes.get("automatic_internal_route_count") or 0
+        ),
+        "commercial_observation_route_count": int(
+            routes.get("commercial_observation_route_count") or 0
+        ),
         "ai_plan_queued_count": int(
             planner.get("queued_count") or 0
         ),
@@ -210,6 +223,7 @@ def run_opportunity_loop(
         "automatic_internal_research": True,
         "automatic_evidence_normalization": True,
         "automatic_factory_intake": True,
+        "automatic_evidence_routing": True,
         "automatic_ai_planning": True,
         "automatic_external_execution_allowed": False,
         "outreach_sent": False,
