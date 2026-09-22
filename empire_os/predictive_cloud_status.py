@@ -231,6 +231,12 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "automatic_external_delivery": payload.get(
                 "automatic_external_delivery"
             ),
+            "seat_activation_blocker_counts": payload.get(
+                "seat_activation_blocker_counts"
+            ),
+            "supply_gate_diagnostics": payload.get(
+                "supply_gate_diagnostics"
+            ),
         }
     if name == "opportunity_radar":
         return {
