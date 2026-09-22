@@ -28,6 +28,8 @@ def test_core_recovered_families_are_preserved():
     assert rows["private_capital_rollup"]["state"] == "ACTIVE_BUILD"
     assert rows["oil_gas_intelligence"]["state"] == "INCUBATE"
     assert rows["revenue_pulse"]["state"] == "ACTIVE_BUILD"
+    assert rows["lane_seat_corridor_exchange"]["state"] == "ACTIVE_BUILD"
+    assert "buyer_seats" in rows["lane_seat_corridor_exchange"]["surfaces"]
     assert rows["intel_hourly"]["state"] == "FOUNDER_GATE"
 
 

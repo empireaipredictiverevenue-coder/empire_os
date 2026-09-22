@@ -106,6 +106,35 @@ RECOVERY_PRODUCTS: tuple[RecoveryProduct, ...] = (
         surfaces=("market_maps", "tam", "opportunity_feed", "revenue_gps"),
     ),
     RecoveryProduct(
+        key="lane_seat_corridor_exchange",
+        name="Lead Lanes / Buyer Seats / Corridors",
+        state="ACTIVE_BUILD",
+        family="commercial_exchange",
+        revenue_models=(
+            "subscription",
+            "usage",
+            "transactional",
+            "enterprise",
+            "white_label",
+        ),
+        surfaces=(
+            "lane_registry",
+            "corridor_registry",
+            "buyer_seats",
+            "capacity",
+            "territory_exclusivity",
+            "overflow_inventory",
+            "allocation",
+        ),
+        notes=(
+            "Canonical buyer-capacity and allocation foundations exist. "
+            "Legacy 462 lane-slot code is reference/salvage only because it "
+            "depends on SQLite and old runtime paths. Rebuild explicit seats "
+            "and corridors on Supabase + governed commercial terms + USDT/BSC; "
+            "historical seat pricing is not current pricing evidence."
+        ),
+    ),
+    RecoveryProduct(
         key="revenue_pulse",
         name="Revenue Pulse",
         state="ACTIVE_BUILD",
