@@ -39,3 +39,18 @@ def test_validation_reports_unregistered_department_components():
     assert "marketing_growth" in result[
         "departments_with_missing_components"
     ]
+
+
+def test_default_control_fabric_covers_all_department_components():
+    from empire_os.control_fabric import default_registry
+
+    result = validate_departments(
+        registered_components={
+            row.name for row in default_registry()
+        }
+    )
+    assert result["all_components_registered"] is True
+    assert result["fully_wired_department_count"] == result[
+        "department_count"
+    ]
+    assert result["departments_with_missing_components"] == {}
