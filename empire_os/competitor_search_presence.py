@@ -34,11 +34,15 @@ SNAPSHOT_RELATIVE_PATH = Path(
 
 DEFAULT_QUERIES = (
     "Denver roofing",
+    "Denver roofers",
+    "roofing contractors Denver CO",
     "Denver roofing contractor",
     "roof repair Denver",
     "roof replacement Denver",
     "Denver hail damage roofing",
+    "storm damage roofing Denver",
     "commercial roofing Denver",
+    "residential roofing Denver",
 )
 
 
@@ -56,11 +60,16 @@ def _domain(value: Any) -> str:
 
 
 def _search_query(query: str, num: int = 20) -> dict[str, Any]:
-    """Use bounded fast-fail public providers only."""
-    for engine in ("bing_html", "bing_rss"):
-        result = search_web(query, num=num, engine=engine)
-        if isinstance(result, Mapping) and result.get("organic"):
-            return dict(result)
+    """Use Search Fabric's bounded provider rotation and quality gate.
+
+    Auto mode prefers Brave when configured, then bounded public providers and
+    recovery adapters. This is intentionally broader than the earlier Bing-only
+    path because a single provider returning zero relevant results is not proof
+    of zero public search presence.
+    """
+    result = search_web(query, num=num)
+    if isinstance(result, Mapping):
+        return dict(result)
     return {
         "organic": [],
         "searchParameters": {
@@ -71,6 +80,23 @@ def _search_query(query: str, num: int = 20) -> dict[str, Any]:
         "credits_left": 999999,
         "error": "no_relevant_results",
     }
+
+
+def _match_company_for_domain(
+    domain: str,
+    domain_to_company: Mapping[str, Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    """Resolve exact or owned subdomain SERP hits to canonical companies."""
+    normalized = _domain(domain)
+    if not normalized:
+        return None
+    direct = domain_to_company.get(normalized)
+    if direct is not None:
+        return direct
+    for canonical, company in domain_to_company.items():
+        if normalized.endswith("." + canonical):
+            return company
+    return None
 
 
 def build_search_presence_snapshot(
@@ -119,7 +145,10 @@ def build_search_presence_snapshot(
             if not domain or domain in seen_domains:
                 continue
             seen_domains.add(domain)
-            company = domain_to_company.get(domain)
+            company = _match_company_for_domain(
+                domain,
+                domain_to_company,
+            )
             if company is None:
                 continue
 
