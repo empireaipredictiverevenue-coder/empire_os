@@ -86,7 +86,8 @@ DECISION_MAKER_PATTERNS = (
 )
 
 FOLLOW_UP_PATTERNS = (
-    r"\bsend (?:me )?(?:an? )?(?:email|brief|details|information)\b",
+    r"\bsend (?:me )?(?:an? |the )?(?:email|brief|details|information)\b",
+    r"\bsend (?:it|that|the brief) (?:to me )?(?:by )?email\b",
     r"\bfollow up\b",
     r"\bcall me (?:back|later)\b",
     r"\bemail me\b",
