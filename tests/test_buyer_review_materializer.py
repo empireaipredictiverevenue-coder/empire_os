@@ -1,4 +1,5 @@
 from empire_os.buyer_review_materializer import (
+    fetch_candidate_rows,
     run_buyer_probe_isolated,
     run_buyer_review_materializer,
 )
@@ -259,3 +260,37 @@ def test_explicit_probe_rejection_reason_is_preserved():
     )
     assert result.proposed == 0
     assert dict(result.rejection_counts)["site_timeout"] == 1
+
+
+
+def test_candidate_fetch_prioritizes_managed_service_revenue_pool():
+    paths = []
+
+    class InspectRequest(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if method == "GET":
+                paths.append(path)
+            return super().__call__(
+                method,
+                path,
+                payload=payload,
+                **kwargs,
+            )
+
+    rows, skipped = fetch_candidate_rows(
+        InspectRequest(),
+        scan_limit=10,
+        scan_offset=0,
+    )
+
+    assert len(rows) == 1
+    assert skipped == 0
+    prospect_path = next(
+        path for path in paths
+        if path.startswith("/rest/v1/prospects?")
+    )
+    assert "buy_signal_score=gte.70" in prospect_path
+    assert "website=not.is.null" in prospect_path
+    assert "niche.ilike.%2Aroof%2A" in prospect_path
+    assert "niche.ilike.%2Ahvac%2A" in prospect_path
+    assert "buy_signal_score.desc.nullslast" in prospect_path
