@@ -192,3 +192,4 @@ def test_market_scale_passes_configured_source_refs_to_sweeps():
         "https://example.com/denver-roofers"
     ]
     assert callable(calls[0]["fetch_fn"])
+    assert calls[0]["search_after_source_match"] is False
