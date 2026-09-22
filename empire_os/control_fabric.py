@@ -79,6 +79,25 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             300,
         ),
         ComponentSpec(
+            "predictive_cloud_opportunity_loop",
+            (
+                "opportunity_cycle_tick",
+                "signal_discovered",
+                "market_snapshot_refreshed",
+                "community_pain_observed",
+                "competitive_evidence_refreshed",
+            ),
+            (
+                "opportunity_radar_refreshed",
+                "opportunity_research_refreshed",
+                "opportunity_factory_intake_refreshed",
+                "opportunity_ai_plan_queued",
+            ),
+            ("search_fabric", "empire_coder"),
+            "internal_write",
+            1800,
+        ),
+        ComponentSpec(
             "market_opportunity_agent",
             (
                 "signal_discovered",
