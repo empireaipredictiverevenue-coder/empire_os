@@ -29,7 +29,7 @@ PHASES: tuple[dict[str, Any], ...] = (
     {
         "phase": "3F",
         "title": "Intelligence & Learning Closeout",
-        "status": "CURRENT",
+        "status": "CLOSED_EVIDENCE_GATED",
         "objective": (
             "Close the verified intelligence, Economic Memory, predictive "
             "provenance, recovery-audit and Founder Console feedback loop."
@@ -49,7 +49,7 @@ PHASES: tuple[dict[str, Any], ...] = (
     {
         "phase": "4",
         "title": "Commercial Exchange",
-        "status": "QUEUED",
+        "status": "CURRENT",
         "objective": (
             "Turn qualified opportunities into governed inventory with "
             "Supabase-native lanes, corridors, buyer seats and capacity."
