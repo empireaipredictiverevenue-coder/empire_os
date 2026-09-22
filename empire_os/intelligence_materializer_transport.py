@@ -304,6 +304,53 @@ def _competitor_evidence_refs(payload: dict[str, Any]) -> tuple[str, ...]:
     return tuple(sorted(set(refs)))
 
 
+def _competitor_evidence_fingerprints(
+    payload: dict[str, Any],
+) -> tuple[str, ...]:
+    """Stable evidence identity across repeated sweeps.
+
+    observed_at is deliberately excluded so revisiting the same public source
+    does not create a duplicate signal. competitor_key and evidence_type stay
+    in the fingerprint so separate relationships found on one page remain
+    distinct evidence.
+    """
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, list) or not evidence:
+        raise IntelligenceMaterializerTransportError(
+            "competitor audience evidence is required"
+        )
+
+    fingerprints = []
+    for item in evidence:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid competitor audience evidence"
+            )
+
+        source_ref = str(item.get("source_ref") or "").strip()
+        competitor_key = str(item.get("competitor_key") or "").strip()
+        evidence_type = str(item.get("evidence_type") or "").strip()
+
+        if not source_ref:
+            raise IntelligenceMaterializerTransportError(
+                "competitor audience source_ref is required"
+            )
+        if not competitor_key:
+            raise IntelligenceMaterializerTransportError(
+                "competitor audience competitor_key is required"
+            )
+        if not evidence_type:
+            raise IntelligenceMaterializerTransportError(
+                "competitor audience evidence_type is required"
+            )
+
+        fingerprints.append(
+            "|".join((competitor_key, evidence_type, source_ref))
+        )
+
+    return tuple(sorted(set(fingerprints)))
+
+
 def persist_competitor_audience_signal(
     writer: PostgresIntelligenceMaterializer,
     signal: dict[str, Any],
@@ -369,6 +416,7 @@ def persist_competitor_audience_signal(
         )
 
     evidence_refs = _competitor_evidence_refs(payload)
+    evidence_fingerprints = _competitor_evidence_fingerprints(payload)
 
     try:
         with writer._connect(writer.dsn) as connection:
@@ -399,10 +447,9 @@ def persist_competitor_audience_signal(
                     WHERE entity_id=%s
                       AND signal_type='competitor_audience_evidence'
                       AND signal_domain='competitive_intelligence'
-                      AND observed_at=%s
                       AND source_id=%s
                     """,
-                    (entity_id, observed_at, source_id),
+                    (entity_id, source_id),
                 )
 
                 for row in cursor.fetchall():
@@ -412,12 +459,14 @@ def persist_competitor_audience_signal(
                     if not isinstance(existing_payload, dict):
                         continue
                     try:
-                        existing_refs = _competitor_evidence_refs(
-                            existing_payload
+                        existing_fingerprints = (
+                            _competitor_evidence_fingerprints(
+                                existing_payload
+                            )
                         )
                     except IntelligenceMaterializerTransportError:
                         continue
-                    if existing_refs == evidence_refs:
+                    if existing_fingerprints == evidence_fingerprints:
                         return {
                             "entity_id": entity_id,
                             "signal_type": "competitor_audience_evidence",
