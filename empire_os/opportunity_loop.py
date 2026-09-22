@@ -15,6 +15,9 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from empire_os.opportunity_ai_planner import plan_radar_opportunities
+from empire_os.opportunity_evidence_normalizer import (
+    refresh_normalized_signals,
+)
 from empire_os.opportunity_factory_intake import refresh_factory_intake
 from empire_os.opportunity_radar import refresh_opportunity_radar
 from empire_os.opportunity_research import refresh_opportunity_research
@@ -86,6 +89,9 @@ def run_opportunity_loop(
     research_fn: Callable[[Path], Mapping[str, Any]] = (
         refresh_opportunity_research
     ),
+    normalizer_fn: Callable[[Path], Mapping[str, Any]] = (
+        refresh_normalized_signals
+    ),
     intake_fn: Callable[[Path], Mapping[str, Any]] = (
         refresh_factory_intake
     ),
@@ -127,6 +133,7 @@ def run_opportunity_loop(
     ] = (
         ("opportunity_radar", radar_fn, {}),
         ("opportunity_research", research_fn, {}),
+        ("opportunity_evidence_normalizer", normalizer_fn, {}),
         ("opportunity_factory_intake", intake_fn, {}),
         ("opportunity_ai_planner", planner_fn, {"limit": 3}),
     )
@@ -151,6 +158,7 @@ def run_opportunity_loop(
     finished = datetime.now(timezone.utc)
     radar = step_results.get("opportunity_radar") or {}
     research = step_results.get("opportunity_research") or {}
+    normalized = step_results.get("opportunity_evidence_normalizer") or {}
     intake = step_results.get("opportunity_factory_intake") or {}
     planner = step_results.get("opportunity_ai_planner") or {}
     complete = len(steps) == len(sequence) and all(
@@ -175,6 +183,12 @@ def run_opportunity_loop(
         "research_observation_count": int(
             research.get("observation_count") or 0
         ),
+        "candidates_with_any_normalized_score": int(
+            normalized.get("candidates_with_any_normalized_score") or 0
+        ),
+        "total_normalized_scores": int(
+            normalized.get("total_normalized_scores") or 0
+        ),
         "factory_ready_count": int(
             intake.get("factory_ready_count") or 0
         ),
@@ -194,6 +208,7 @@ def run_opportunity_loop(
         ),
         "automatic_radar": True,
         "automatic_internal_research": True,
+        "automatic_evidence_normalization": True,
         "automatic_factory_intake": True,
         "automatic_ai_planning": True,
         "automatic_external_execution_allowed": False,
