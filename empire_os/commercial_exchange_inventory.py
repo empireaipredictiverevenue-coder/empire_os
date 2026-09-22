@@ -330,10 +330,11 @@ def build_exchange_snapshot(
     allocated_prospect_ids: set[str] | None = None,
     observed_at: datetime | None = None,
 ) -> dict[str, Any]:
+    prospect_rows = [dict(row) for row in prospects]
     buyer_rows = [dict(row) for row in buyers]
     seats = project_buyer_seats(buyer_rows)
     inventory = project_inventory(
-        prospects,
+        prospect_rows,
         qualifications=qualifications,
         identity_links=identity_links,
         buyers=buyer_rows,
@@ -352,7 +353,7 @@ def build_exchange_snapshot(
         if row.get("seat_state") == "blocked_missing_evidence"
     )
     supply_diagnostics = build_supply_gate_diagnostics(
-        prospects,
+        prospect_rows,
         qualifications=qualifications,
         identity_links=identity_links,
     )
