@@ -18,6 +18,7 @@ from empire_os.coder.jobs import JobKind, LocalJobQueue
 
 RADAR_RELATIVE = Path("runtime/opportunity_radar/latest.json")
 RESEARCH_RELATIVE = Path("runtime/opportunity_radar/research_latest.json")
+FACTORY_INTAKE_RELATIVE = Path("runtime/opportunity_factory/intake_latest.json")
 STATE_RELATIVE = Path("runtime/opportunity_radar/ai_planner_state.json")
 OUTPUT_RELATIVE = Path("runtime/opportunity_radar/ai_planner_latest.json")
 
@@ -56,6 +57,7 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 def _fingerprint(
     candidate: Mapping[str, Any],
     research: Mapping[str, Any] | None = None,
+    factory_item: Mapping[str, Any] | None = None,
 ) -> str:
     material = {
         "opportunity_key": candidate.get("opportunity_key"),
@@ -89,6 +91,14 @@ def _fingerprint(
         "research_observation_count": int(
             (research or {}).get("observation_count") or 0
         ),
+        "factory_ready": bool(
+            (factory_item or {}).get("factory_ready") is True
+        ),
+        "factory_blockers_actual": sorted(
+            str(item)
+            for item in ((factory_item or {}).get("blockers") or [])
+            if str(item).strip()
+        ),
     }
     raw = json.dumps(
         material,
@@ -110,6 +120,7 @@ def _priority(candidate: Mapping[str, Any]) -> int:
 def _objective(
     candidate: Mapping[str, Any],
     research: Mapping[str, Any] | None = None,
+    factory_item: Mapping[str, Any] | None = None,
 ) -> str:
     key = str(candidate.get("opportunity_key") or "").strip()
     klass = str(candidate.get("opportunity_class") or "").strip()
@@ -137,6 +148,14 @@ def _objective(
     research_count = int(
         (research or {}).get("observation_count") or 0
     )
+    actual_factory_blockers = [
+        str(item).strip()
+        for item in ((factory_item or {}).get("blockers") or [])
+        if str(item).strip()
+    ]
+    factory_ready = bool(
+        (factory_item or {}).get("factory_ready") is True
+    )
     return (
         "PLAN ONLY: advance this existing Predictive Cloud opportunity toward "
         "the canonical Opportunity Factory without inventing evidence or "
@@ -154,7 +173,8 @@ def _objective(
         f"Opportunity key={key}; class={klass}; title={title}; "
         f"blockers={blockers}; recommended_actions={actions}; "
         f"evidence_refs={refs}; public_search_observation_count={research_count}; "
-        f"public_search_evidence_urls={research_urls}. Public search observations "
+        f"public_search_evidence_urls={research_urls}; factory_ready={factory_ready}; "
+        f"actual_factory_blockers={actual_factory_blockers}. Public search observations "
         "are research evidence candidates only and must not be treated as verified "
         "demand, buyer intent, economics or revenue."
     )
@@ -170,6 +190,7 @@ def plan_radar_opportunities(
     root = Path(repo_root).resolve()
     radar = _read_json(root / RADAR_RELATIVE)
     research_batch = _read_json(root / RESEARCH_RELATIVE)
+    factory_batch = _read_json(root / FACTORY_INTAKE_RELATIVE)
     candidates = radar.get("candidates")
     candidates = candidates if isinstance(candidates, list) else []
     research_actions = research_batch.get("actions")
@@ -182,6 +203,16 @@ def plan_radar_opportunities(
         if isinstance(row, Mapping)
         and str(row.get("opportunity_key") or "").strip()
     }
+    factory_items = factory_batch.get("items")
+    factory_items = (
+        factory_items if isinstance(factory_items, list) else []
+    )
+    factory_by_key = {
+        str(row.get("opportunity_key") or "").strip(): row
+        for row in factory_items
+        if isinstance(row, Mapping)
+        and str(row.get("opportunity_key") or "").strip()
+    }
     state_path = root / STATE_RELATIVE
     state = _read_json(state_path)
     fingerprints = state.get("fingerprints")
@@ -191,7 +222,9 @@ def plan_radar_opportunities(
         else {}
     )
 
-    eligible: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
+    eligible: list[
+        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]
+    ] = []
     skipped_unchanged = 0
     skipped_no_evidence = 0
     for raw in candidates:
@@ -207,11 +240,12 @@ def plan_radar_opportunities(
             skipped_no_evidence += 1
             continue
         research = research_by_key.get(key) or {}
-        fp = _fingerprint(raw, research)
+        factory_item = factory_by_key.get(key) or {}
+        fp = _fingerprint(raw, research, factory_item)
         if fingerprints.get(key) == fp:
             skipped_unchanged += 1
             continue
-        eligible.append((raw, research))
+        eligible.append((raw, research, factory_item))
 
     eligible.sort(
         key=lambda item: (
@@ -231,10 +265,12 @@ def plan_radar_opportunities(
         coder = None
         queue = None
 
-    for candidate, research in eligible[:bounded]:
+    for candidate, research, factory_item in eligible[:bounded]:
         key = str(candidate.get("opportunity_key") or "").strip()
-        fp = _fingerprint(candidate, research)
-        task = coder.create_task(_objective(candidate, research))
+        fp = _fingerprint(candidate, research, factory_item)
+        task = coder.create_task(
+            _objective(candidate, research, factory_item)
+        )
         job = queue.enqueue(
             task_id=task.id,
             kind=JobKind.PLAN,
@@ -279,6 +315,13 @@ def plan_radar_opportunities(
         "radar_candidate_count": len(candidates),
         "research_available": bool(research_batch),
         "research_action_count": len(research_actions),
+        "factory_intake_available": bool(factory_batch),
+        "factory_intake_item_count": len(factory_items),
+        "factory_ready_count": sum(
+            row.get("factory_ready") is True
+            for row in factory_items
+            if isinstance(row, Mapping)
+        ),
         "research_observation_count": sum(
             int(row.get("observation_count") or 0)
             for row in research_actions
