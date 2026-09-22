@@ -1,0 +1,16 @@
+[Unit]
+Description=EmpireOS governed self-hosted Voice Lab outbound worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=/srv/empire_os/runtime/secrets/outbound.env
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_voice_outbound_worker.py --limit 5 --daily-cap 5 --execute
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=240
