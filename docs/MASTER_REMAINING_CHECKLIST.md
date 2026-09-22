@@ -8,7 +8,7 @@ This is the canonical execution checklist for the remaining EmpireOS build.
 
 ## Current checkpoint
 
-Competitor-audience intelligence is live through Account Intelligence Brief + Claim Critic. Buyer State Evidence Stack is now live and verified in the Founder Console.
+Competitor-audience intelligence is live through Account Intelligence Brief + Claim Critic. Buyer State, Next-Best Action and the Account / Buyer Digital Twin are live and verified in the Founder Console.
 
 Current truth:
 - research evidence is not buyer intent
@@ -66,7 +66,7 @@ Current truth:
 - [x] No autonomous jump across founder/commercial gates
 - [x] Show NBA reasoning/evidence in Founder Console
 
-## Account / Buyer Digital Twin
+## Account / Buyer Digital Twin — DONE
 
 - [x] Company identity
 - [x] Public evidence
@@ -78,7 +78,7 @@ Current truth:
 - [x] Commercial state
 - [x] Terms/payment/fulfilment
 - [x] Outcomes
-- [ ] Realized revenue / GP
+- [x] Realized revenue / GP
 - [x] Uncertainty explicitly represented
 
 ## Cortex learning loop
