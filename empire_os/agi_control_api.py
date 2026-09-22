@@ -16,6 +16,10 @@ from empire_os.agi_capabilities import (
     capability_registry,
     review_capability_request,
 )
+from empire_os.intelligence_router import (
+    intelligence_architecture,
+    preview_intelligence_route,
+)
 
 
 class AgiReadinessRequest(BaseModel):
@@ -55,6 +59,17 @@ class MemoryItemReviewRequest(BaseModel):
 
 class CapabilityReviewRequest(BaseModel):
     request: dict[str, Any] = Field(default_factory=dict)
+
+
+class IntelligenceRouteRequest(BaseModel):
+    task: str = "reasoning"
+    messages: list[dict[str, Any]] = Field(default_factory=list)
+    system: str | None = None
+    stakes: str = "normal"
+    require_reasoning: bool = False
+    require_vision: bool = False
+    budget_remaining: float | None = None
+    remaining_queries: int | None = None
 
 
 def create_agi_control_router() -> APIRouter:
@@ -119,6 +134,26 @@ def create_agi_control_router() -> APIRouter:
     @router.post("/memory/item/review")
     def memory_item_review(req: MemoryItemReviewRequest):
         return review_memory_item(req.item)
+
+    @router.get("/intelligence/architecture")
+    def intelligence_architecture_endpoint():
+        return intelligence_architecture()
+
+    @router.post("/intelligence/route/preview")
+    def intelligence_route_preview(req: IntelligenceRouteRequest):
+        try:
+            return preview_intelligence_route(
+                task=req.task,
+                messages=req.messages,
+                system=req.system,
+                stakes=req.stakes,
+                require_reasoning=req.require_reasoning,
+                require_vision=req.require_vision,
+                budget_remaining=req.budget_remaining,
+                remaining_queries=req.remaining_queries,
+            )
+        except (RuntimeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @router.get("/capabilities")
     def capabilities():
