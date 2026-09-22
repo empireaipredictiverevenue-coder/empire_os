@@ -4,8 +4,15 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from empire_os.quant_brain import (
-    brier_score, expected_economics, monte_carlo_economics,
-    portfolio_concentration, rank_candidates, update_beta_posterior,
+    brier_score,
+    calibration_bins,
+    expected_economics,
+    log_loss,
+    monte_carlo_economics,
+    portfolio_concentration,
+    quant_decision_packet,
+    rank_candidates,
+    update_beta_posterior,
     value_of_information,
 )
 
@@ -24,9 +31,24 @@ def create_quant_brain_router() -> APIRouter:
     @router.get("/health")
     def health():
         return {
-            "mode":"OBSERVE","execution_authority":"none",
-            "prediction_is_actual":False,"simulation_is_actual":False,
-            "model_weight_mutation":False,"capital_execution":False,
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "prediction_is_actual": False,
+            "simulation_is_actual": False,
+            "model_weight_mutation": False,
+            "capital_execution": False,
+            "capabilities": [
+                "bayesian_update",
+                "expected_economics",
+                "brier_calibration",
+                "log_loss",
+                "reliability_bins",
+                "risk_adjusted_ranking",
+                "monte_carlo",
+                "value_of_information",
+                "portfolio_concentration",
+                "decision_packet",
+            ],
         }
 
     @router.post("/bayes/beta/preview")
@@ -40,6 +62,14 @@ def create_quant_brain_router() -> APIRouter:
     @router.post("/calibration/brier/preview")
     def calibration(req:Payload):
         return run(brier_score,**req.data)
+
+    @router.post("/calibration/log-loss/preview")
+    def calibration_log_loss(req: Payload):
+        return run(log_loss, **req.data)
+
+    @router.post("/calibration/reliability/preview")
+    def calibration_reliability(req: Payload):
+        return run(calibration_bins, **req.data)
 
     @router.post("/rank/preview")
     def rank(req:Payload):
@@ -56,6 +86,28 @@ def create_quant_brain_router() -> APIRouter:
     @router.post("/value-of-information/preview")
     def voi(req:Payload):
         return run(value_of_information,**req.data)
+
+    @router.post("/decision-packet/preview")
+    def decision_packet(req: Payload):
+        data = dict(req.data)
+        candidate_id = data.pop("candidate_id", "")
+        inputs = data.pop("inputs", {})
+        trials = data.pop("trials", 5000)
+        seed = data.pop("seed", 0)
+        if data:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "decision packet accepts candidate_id, inputs, trials, seed"
+                ),
+            )
+        return run(
+            quant_decision_packet,
+            candidate_id=candidate_id,
+            inputs=inputs,
+            trials=trials,
+            seed=seed,
+        )
 
     @router.post("/portfolio/concentration/preview")
     def portfolio(req:Payload):
