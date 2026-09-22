@@ -191,6 +191,18 @@ def build_factory_intake_batch(
             "score_evidence": dict(
                 normalized_row.get("score_evidence") or {}
             ),
+            "quant_inputs": dict(
+                normalized_row.get("quant_inputs") or {}
+            ),
+            "quant_input_evidence": dict(
+                normalized_row.get("quant_input_evidence") or {}
+            ),
+            "quant_inputs_available": (
+                normalized_row.get("quant_inputs_available") is True
+            ),
+            "quant_probability_inferred": (
+                normalized_row.get("quant_probability_inferred") is True
+            ),
             "search_result_counts_used_as_scores": (
                 normalized_row.get(
                     "search_result_counts_used_as_scores"
