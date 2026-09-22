@@ -41,3 +41,13 @@ def test_quant_stays_nonexecuting_in_control_fabric():
     by_name = {row.name: row for row in default_registry()}
     assert by_name["quant_brain"].authority == "observe"
     assert by_name["predictive_intelligence"].authority == "observe"
+
+
+def test_intelligence_router_is_registered_owned_and_nonexecuting():
+    by_name = {row.name: row for row in default_registry()}
+    assert "intelligence_router" in by_name
+    assert by_name["intelligence_router"].authority == "observe"
+    owners = departments_for_component("intelligence_router")
+    assert "strategy" in owners
+    assert "rd_innovation" in owners
+    assert "engineering" in owners
