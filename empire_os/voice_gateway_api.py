@@ -45,12 +45,13 @@ def _require_webhook_token(value: str) -> None:
         raise HTTPException(status_code=401, detail="voice_webhook_unauthorized")
 
 
-def _ws_url(intent_id: str, prospect_id: str) -> str:
+def _ws_url(intent_id: str, prospect_id: str, call_id: str = "") -> str:
     parsed = urlparse(_public_base())
     scheme = "wss" if parsed.scheme == "https" else "ws"
     query = urlencode({
         "intent_id": intent_id,
         "prospect_id": prospect_id,
+        "call_id": call_id,
     })
     return urlunparse((
         scheme,
@@ -89,6 +90,7 @@ def build_vonage_ncco(
     intent_id: str,
     prospect_id: str,
     context: dict[str, str],
+    call_id: str = "",
 ) -> list[dict[str, Any]]:
     token = _ws_token()
     if not token:
@@ -100,12 +102,13 @@ def build_vonage_ncco(
         "niche": context.get("niche", ""),
         "metro": context.get("metro", ""),
         "voice_engine": "empire_voice_lab",
+        "call_id": call_id,
     }
     return [{
         "action": "connect",
         "endpoint": [{
             "type": "websocket",
-            "uri": _ws_url(intent_id, prospect_id),
+            "uri": _ws_url(intent_id, prospect_id, call_id),
             "content-type": "audio/l16;rate=16000",
             "headers": headers,
             "authorization": {
@@ -199,6 +202,7 @@ def voice_lab_health():
 
 @router.get("/vonage/answer")
 def vonage_answer(
+    request: Request,
     intent_id: str,
     prospect_id: str,
     token: str,
@@ -211,10 +215,16 @@ def vonage_answer(
             detail="empire_voice_lab_not_ready",
         )
     context = _prospect_context(prospect_id)
+    call_id = str(
+        request.query_params.get("uuid")
+        or request.query_params.get("conversation_uuid")
+        or ""
+    ).strip()
     return build_vonage_ncco(
         intent_id=intent_id,
         prospect_id=prospect_id,
         context=context,
+        call_id=call_id,
     )
 
 
@@ -284,8 +294,11 @@ async def vonage_socket(websocket: WebSocket):
     lab = _runtime()
     context = _prospect_context(prospect_id)
     history: list[dict[str, str]] = []
-    call_id = ""
+    call_id = str(
+        websocket.query_params.get("call_id") or ""
+    ).strip()
     turn_index = 0
+    opening_played = False
     playback: asyncio.Task | None = None
     response_task: asyncio.Task | None = None
 
@@ -363,8 +376,33 @@ async def vonage_socket(websocket: WebSocket):
                 call_id = str(
                     event.get("uuid")
                     or event.get("conversation_uuid")
+                    or event.get("call_id")
                     or call_id
                 ).strip()
+                if (
+                    event.get("event") == "websocket:connected"
+                    and not opening_played
+                ):
+                    opening_text = lab.opening_text(
+                        business_name=context.get("business_name", "")
+                    )
+                    opening_audio = await asyncio.to_thread(
+                        lab.synthesize_text,
+                        opening_text,
+                    )
+                    if intent_id and call_id:
+                        await asyncio.to_thread(
+                            _record_turn,
+                            intent_id,
+                            call_id,
+                            0,
+                            "outbound",
+                            opening_text,
+                        )
+                    playback = asyncio.create_task(
+                        _play_pcm(websocket, opening_audio)
+                    )
+                    opening_played = True
                 continue
 
             frame = message.get("bytes")
