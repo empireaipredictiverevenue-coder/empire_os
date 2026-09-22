@@ -22,6 +22,7 @@ def test_product_catalog_has_core_sellable_products():
         "content_protection",
         "authority_intelligence",
         "geo_ai_visibility",
+        "organic_ai_recommendation_intelligence",
         "competitor_search_gap",
         "search_growth_command",
     } <= keys
@@ -115,3 +116,24 @@ def test_serp_product_preserves_monetisation_models():
         "white_label_license",
         "enterprise_data_api_contract",
     } <= set(product.revenue_models)
+
+
+def test_organic_ai_recommendation_product_has_measurement_not_guarantee_contract():
+    product = get_search_product("organic_ai_recommendation_intelligence")
+    assert product is not None
+    assert product.name == "Organic + AI Recommendation Intelligence"
+    assert {
+        "organic_visibility_baseline",
+        "ai_answer_presence",
+        "ai_citation_presence",
+        "ai_recommendation_presence",
+        "share_of_observed_recommendations",
+        "competitor_recommendation_gap",
+        "search_to_revenue_attribution",
+    } <= set(product.deliverables)
+    assert product.required_capabilities == (
+        "serp",
+        "recommendation_visibility",
+    )
+    assert product.publishing_authority is False
+    assert product.indexation_authority is False
