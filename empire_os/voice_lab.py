@@ -290,6 +290,22 @@ class EmpireVoiceLab:
         self.tts = KokoroTTS(self.config)
         self.brain = VoiceCloserBrain()
 
+    def opening_text(self, *, business_name: str = "") -> str:
+        target = (
+            f" at {business_name}"
+            if str(business_name or "").strip()
+            else ""
+        )
+        return (
+            "Hi, this is Empire AI's AI assistant calling on behalf of "
+            "Empire AI. I'm trying to reach the person responsible for "
+            f"growth or new business{target}. "
+            "If you'd rather not receive calls from us, just say stop calling."
+        )
+
+    def synthesize_text(self, text: str) -> bytes:
+        return self.tts.synthesize(str(text or "").strip())
+
     @staticmethod
     def dependency_readiness() -> dict[str, Any]:
         import importlib.util
