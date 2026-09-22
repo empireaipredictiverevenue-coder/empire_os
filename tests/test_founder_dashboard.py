@@ -484,3 +484,62 @@ def test_dashboard_exposes_claim_critic_account_briefs(tmp_path):
     assert briefs["outreach_enabled"] is False
     assert briefs["actual_revenue"] is False
     assert briefs["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_buyer_state_evidence(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/buyer_state/"
+        / "buyer_state_latest.json",
+        {
+            "schema_version": "empire.buyer_state_evidence_snapshot.v1",
+            "mode": "OBSERVE",
+            "entity_count": 2,
+            "states": [
+                "DISCOVERED",
+                "ICP_MATCH",
+                "SIGNAL_ACTIVE",
+                "RESEARCHED",
+                "READY",
+                "CONTACTED",
+                "ENGAGED",
+                "CONVERSATION",
+                "COMMERCIAL_INTENT",
+                "TERMS",
+                "PAYMENT_PENDING",
+                "PAID",
+                "FULFILLED",
+                "EXPANSION",
+            ],
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+            "entities": [
+                {
+                    "entity_id": "entity-1",
+                    "company_name": "Golden Spike Roofing Inc",
+                    "current_factual_state": "RESEARCHED",
+                    "states": [],
+                },
+                {
+                    "entity_id": "entity-2",
+                    "company_name": "Colorado's Best Roofing",
+                    "current_factual_state": "READY",
+                    "states": [],
+                },
+            ],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    buyer_state = result["buyer_state_evidence"]
+
+    assert buyer_state["available"] is True
+    assert buyer_state["entity_count"] == 2
+    assert buyer_state["buyer_intent_inferred"] is False
+    assert buyer_state["commercial_intent_inferred"] is False
+    assert buyer_state["outreach_enabled"] is False
+    assert buyer_state["execution_authority"] == "none"
