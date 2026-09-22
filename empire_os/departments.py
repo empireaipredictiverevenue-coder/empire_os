@@ -106,6 +106,7 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "payment and expansion without fabricating commercial state."
             ),
             components=(
+                "identity_enrichment",
                 "conversation_os",
                 "buyer_review",
                 "commercial_terms",
@@ -297,6 +298,7 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "predictive_cloud_opportunity_loop",
                 "market_opportunity_agent",
                 "intelligence_fabric",
+                "search_fabric",
             ),
             agent_roles=("research", "deep_research"),
             kpis=(
