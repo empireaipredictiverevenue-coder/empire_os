@@ -20,6 +20,8 @@ Current truth:
 
 ## Predictive Cloud convergence — ACTIVE / IMPORTANT
 
+Master architecture: `docs/EMPIRE_MASTER_ARCHITECTURE.md`
+
 Canonical name and hierarchy:
 **Empire AI → EmpireOS → Predictive Cloud → Predictive Revenue + wider business/economic intelligence.**
 
@@ -60,6 +62,35 @@ Data & Decision Intelligence:
 
 Predictive Cloud truth rule:
 **A prediction can guide a decision; only observed evidence can establish an actual, and only governed verified commercial evidence can establish revenue.**
+
+## Autonomous Business Loop — CURRENT PARALLEL FOUNDATION
+
+Canonical objective: connect the existing systems into one continuously operating
+business loop rather than continue building isolated modules.
+
+- [x] Save canonical master architecture
+- [x] Opportunity Radar code + 15-minute timer staged
+- [x] Astra safe internal refresh path includes Opportunity Radar
+- [x] Autonomous Revenue OS foundation exists
+- [x] Autonomous Execution Bus foundation exists
+- [x] Founder Directive OS exists
+- [x] Empire Coder exists
+- [x] Control Fabric exists
+- [ ] Classify every major subsystem: CONNECTED / NEEDS WIRING / LEGACY / RETIRED
+- [ ] Wire Sensor Mesh -> Opportunity Radar
+- [ ] Wire Opportunity Radar -> Opportunity Factory evidence-completion queue
+- [ ] Wire Opportunity Factory -> Astra work queue
+- [ ] Wire Astra -> automatic research / analysis / enrichment / planning
+- [ ] Wire safe research/build tasks -> Empire Coder
+- [ ] Wire product/GTM preparation -> governed external execution
+- [ ] Wire Conversation OS -> terms/payment/fulfilment progression
+- [ ] Wire verified outcomes -> Economic Memory / calibration
+- [ ] Expose end-to-end autonomous-loop status in Founder Console
+- [ ] Prove one real opportunity through the complete autonomous loop
+
+Operating rule:
+safe reversible internal work should continue automatically; founder attention is
+reserved for genuine consequential gates.
 
 ## Competitor Audience Graph
 
