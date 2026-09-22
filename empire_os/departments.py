@@ -258,6 +258,7 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
             ),
             components=(
                 "quant_brain",
+                "predictive_intelligence",
                 "predictive_cloud_status",
                 "intelligence_fabric",
             ),
