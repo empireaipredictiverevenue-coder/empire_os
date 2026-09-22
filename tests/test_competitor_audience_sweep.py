@@ -1,6 +1,7 @@
 from empire_os.competitor_audience_sweep import (
     _is_public_http_url,
     discover_competitor_audience_evidence,
+    discover_competitor_audience_evidence_from_source_refs,
 )
 
 
@@ -171,3 +172,45 @@ def test_discovery_never_emits_buyer_or_commercial_intent():
     assert "buyer_intent" not in row
     assert "commercial_intent" not in row
     assert "outreach_enabled" not in row
+
+
+
+def test_configured_source_ref_can_create_observed_overlap():
+    evidence = discover_competitor_audience_evidence_from_source_refs(
+        competitor_key="elite-roofing-solar",
+        competitor_name="Elite Roofing & Solar",
+        competitor_domain="eliteroofingandsolar.com",
+        candidates=[_candidate()],
+        source_refs=["https://comparison.example/denver-roofers"],
+        fetch_fn=lambda url: _comparison_html(),
+        observed_at="2026-09-22T10:18:02+00:00",
+    )
+
+    assert len(evidence) == 1
+    row = evidence[0]
+    assert row["entity_id"] == _candidate()["entity_id"]
+    assert row["competitor_key"] == "elite-roofing-solar"
+    assert row["source_ref"] == (
+        "https://comparison.example/denver-roofers"
+    )
+    assert row["confidence"] == 0.95
+    assert row["discovery_path"] == "configured_source_ref"
+
+
+def test_configured_source_ref_requires_both_identities_on_page():
+    evidence = discover_competitor_audience_evidence_from_source_refs(
+        competitor_key="elite-roofing-solar",
+        competitor_name="Elite Roofing & Solar",
+        competitor_domain="eliteroofingandsolar.com",
+        candidates=[_candidate()],
+        source_refs=["https://comparison.example/denver-roofers"],
+        fetch_fn=lambda url: """
+        <html><body>
+          <h1>Top Denver Roofing Companies</h1>
+          <a href="https://eliteroofingandsolar.com/">Elite</a>
+        </body></html>
+        """,
+        observed_at="2026-09-22T10:18:02+00:00",
+    )
+
+    assert evidence == []
