@@ -17,6 +17,7 @@ from empire_os.buyer_allocation import (
     buyer_activation_decision,
     plan_allocation,
     qualification_decision,
+    qualification_identity_decision,
 )
 from empire_os.niche_taxonomy import metro_key, niche_family, normalise
 
@@ -87,6 +88,66 @@ def _observed_rate(row: Mapping[str, Any]) -> float | None:
         if value > 0:
             return value
     return None
+
+
+def build_supply_gate_diagnostics(
+    prospects: Iterable[Mapping[str, Any]],
+    *,
+    qualifications: Mapping[str, Mapping[str, Any] | None],
+    identity_links: Mapping[str, Mapping[str, Any] | None],
+) -> dict[str, Any]:
+    total = 0
+    qualified = 0
+    qualification_blockers: Counter[str] = Counter()
+    identity_ready = 0
+    identity_blockers: Counter[str] = Counter()
+
+    for raw in prospects:
+        prospect = dict(raw)
+        prospect_id = str(prospect.get("id") or "").strip()
+        if not prospect_id:
+            continue
+        total += 1
+
+        qualification = qualifications.get(prospect_id)
+        qrow = (
+            dict(qualification)
+            if isinstance(qualification, Mapping)
+            else None
+        )
+        allowed, reason = qualification_decision(qrow)
+        if not allowed:
+            qualification_blockers[str(reason or "unknown")] += 1
+            continue
+
+        qualified += 1
+        identity = identity_links.get(prospect_id)
+        irow = dict(identity) if isinstance(identity, Mapping) else None
+        identity_allowed, identity_reason = qualification_identity_decision(
+            prospect_id,
+            qrow,
+            irow,
+        )
+        if identity_allowed:
+            identity_ready += 1
+        else:
+            identity_blockers[
+                str(identity_reason or "unknown")
+            ] += 1
+
+    return {
+        "prospects_seen": total,
+        "qualification_ready_count": qualified,
+        "qualification_blocker_counts": dict(
+            sorted(qualification_blockers.items())
+        ),
+        "identity_ready_count": identity_ready,
+        "identity_blocker_counts": dict(
+            sorted(identity_blockers.items())
+        ),
+        "exchange_inventory_ready_count": identity_ready,
+        "unknown_stays_unknown": True,
+    }
 
 
 def project_buyer_seats(
@@ -285,6 +346,16 @@ def build_exchange_snapshot(
     seat_counts = Counter(
         str(row.get("seat_state") or "unknown") for row in seats
     )
+    seat_blocker_counts = Counter(
+        str(row.get("activation_reason") or "unknown")
+        for row in seats
+        if row.get("seat_state") == "blocked_missing_evidence"
+    )
+    supply_diagnostics = build_supply_gate_diagnostics(
+        prospects,
+        qualifications=qualifications,
+        identity_links=identity_links,
+    )
     corridors = sorted({
         str(row["corridor_key"])
         for row in [*inventory, *seats]
@@ -312,6 +383,10 @@ def build_exchange_snapshot(
         "inventory_count": len(inventory),
         "inventory_state_counts": dict(sorted(inventory_counts.items())),
         "seat_state_counts": dict(sorted(seat_counts.items())),
+        "seat_activation_blocker_counts": dict(
+            sorted(seat_blocker_counts.items())
+        ),
+        "supply_gate_diagnostics": supply_diagnostics,
         "overflow_count": int(
             inventory_counts.get("overflow_no_capacity", 0)
         ),
