@@ -897,3 +897,49 @@ def test_dashboard_exposes_competitor_public_review_overlap(tmp_path):
     assert reviews["buyer_intent_inferred"] is False
     assert reviews["market_share_inferred"] is False
     assert reviews["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_competitor_search_presence(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_search_presence_latest.json",
+        {
+            "schema_version": "empire.competitor_search_presence.v1",
+            "mode": "OBSERVE",
+            "query_count": 6,
+            "query_with_results_count": 5,
+            "query_with_market_company_count": 4,
+            "canonical_company_count": 14,
+            "company_with_search_presence_count": 6,
+            "observation_count": 12,
+            "search_presence_available": True,
+            "share_metric":
+                "reciprocal_position_weighted_observed_search_presence",
+            "market_share": None,
+            "market_share_inferred": False,
+            "demand_inferred": False,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+            "companies": [],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    search = result["competitor_search_presence"]
+
+    assert search["available"] is True
+    assert search["query_count"] == 6
+    assert search["canonical_company_count"] == 14
+    assert search["company_with_search_presence_count"] == 6
+    assert search["observation_count"] == 12
+    assert search["search_presence_available"] is True
+    assert search["market_share"] is None
+    assert search["market_share_inferred"] is False
+    assert search["demand_inferred"] is False
+    assert search["buyer_intent_inferred"] is False
+    assert search["execution_authority"] == "none"
