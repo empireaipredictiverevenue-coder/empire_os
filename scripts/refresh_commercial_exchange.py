@@ -192,6 +192,12 @@ def main() -> int:
         ],
         "buyer_seat_count": snapshot["buyer_seat_count"],
         "corridor_count": snapshot["corridor_count"],
+        "supply_gate_diagnostics": snapshot[
+            "supply_gate_diagnostics"
+        ],
+        "seat_activation_blocker_counts": snapshot[
+            "seat_activation_blocker_counts"
+        ],
         "automatic_external_delivery": False,
         "execution_authority": "none",
     }, indent=2, sort_keys=True))
