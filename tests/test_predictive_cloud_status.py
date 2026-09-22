@@ -254,6 +254,14 @@ def test_status_exposes_commercial_exchange_without_external_authority(tmp_path)
             "buyer_capacity_never_gates_acquisition": True,
             "overflow_remains_empire_owned": True,
             "automatic_external_delivery": False,
+            "seat_activation_blocker_counts": {
+                "buyer_not_commercially_activated": 3,
+            },
+            "supply_gate_diagnostics": {
+                "prospects_seen": 7,
+                "qualification_ready_count": 2,
+                "exchange_inventory_ready_count": 2,
+            },
             "execution_authority": "none",
         },
     )
@@ -272,3 +280,9 @@ def test_status_exposes_commercial_exchange_without_external_authority(tmp_path)
     ] is True
     assert component["summary"]["overflow_remains_empire_owned"] is True
     assert component["summary"]["automatic_external_delivery"] is False
+    assert component["summary"]["seat_activation_blocker_counts"] == {
+        "buyer_not_commercially_activated": 3
+    }
+    assert component["summary"]["supply_gate_diagnostics"][
+        "qualification_ready_count"
+    ] == 2
