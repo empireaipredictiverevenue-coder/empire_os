@@ -89,6 +89,7 @@ MRR buys governed access/capacity rights; actual delivered inventory and overage
 
 ### 3. Intelligence MRR
 - Search Intelligence / SEO / AEO / GEO
+- Organic + AI Recommendation Intelligence
 - AI Visibility monitoring
 - Competitor Revenue Radar
 - Territory Opportunity Radar
@@ -99,6 +100,31 @@ MRR buys governed access/capacity rights; actual delivered inventory and overage
 - Signal feeds
 - Market/Storm/Event alerts
 - Benchmark reports and API/data feeds
+
+#### Organic + AI Recommendation Intelligence packaging
+
+Sellable outcome:
+measure and improve discoverability across organic search and captured AI-answer
+surfaces without promising a specific ranking or recommendation.
+
+Deliverables may include:
+- organic visibility baseline;
+- AI answer/citation/recommendation observation report;
+- monitored-query share of observed recommendations;
+- competitor recommendation-gap report;
+- citation/source opportunity map;
+- recurring change alerts;
+- search/AI-touch to recognized-revenue attribution where evidence exists.
+
+Commercial models:
+- subscription monitoring;
+- managed service;
+- agency/reseller wholesale;
+- white-label licence;
+- enterprise reporting/API.
+
+Pricing remains evidence-driven until real willingness-to-pay, delivery cost,
+retention and outcome data are observed.
 
 ### 4. Growth / Managed MRR
 - managed SEO/AEO/GEO
