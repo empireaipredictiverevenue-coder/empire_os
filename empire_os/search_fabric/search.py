@@ -48,6 +48,25 @@ PROXY_LIST = [p.strip() for p in os.environ.get("SEARCH_PROXIES", "").split(",")
 # Brave API key (free: 2000 queries/month at api.search.brave.com)
 BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY", "")
 
+# Public scraper engines must fail fast. Long 20s x 3 retry chains multiply
+# badly during market sweeps. Keyed APIs retain a slightly larger budget.
+SEARCH_PUBLIC_TIMEOUT = max(
+    2.0,
+    min(float(os.environ.get("EMPIRE_SEARCH_PUBLIC_TIMEOUT_SECONDS", "6")), 12.0),
+)
+SEARCH_PUBLIC_ATTEMPTS = max(
+    1,
+    min(int(os.environ.get("EMPIRE_SEARCH_PUBLIC_ATTEMPTS", "1")), 2),
+)
+SEARCH_KEYED_TIMEOUT = max(
+    3.0,
+    min(float(os.environ.get("EMPIRE_SEARCH_KEYED_TIMEOUT_SECONDS", "10")), 20.0),
+)
+SEARCH_KEYED_ATTEMPTS = max(
+    1,
+    min(int(os.environ.get("EMPIRE_SEARCH_KEYED_ATTEMPTS", "2")), 3),
+)
+
 # Rate limits per engine (seconds between requests)
 RATE_LIMIT = {
     "brave": 0.5,
@@ -238,7 +257,11 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
     proxy = _next_proxy()
     headers = _headers(engine["name"])
 
-    for attempt in range(3):
+    keyed = bool(engine.get("requires_key"))
+    attempts = SEARCH_KEYED_ATTEMPTS if keyed else SEARCH_PUBLIC_ATTEMPTS
+    timeout = SEARCH_KEYED_TIMEOUT if keyed else SEARCH_PUBLIC_TIMEOUT
+
+    for attempt in range(attempts):
         try:
             if engine["name"] == "brave":
                 params = {"q": query, "count": min(num, 20)}
@@ -247,7 +270,7 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                     params=params,
                     headers=headers,
                     proxies=proxy,
-                    timeout=20,
+                    timeout=timeout,
                 )
             elif engine["name"] == "bing_html":
                 params = {
@@ -261,7 +284,7 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                     params=params,
                     headers=headers,
                     proxies=proxy,
-                    timeout=20,
+                    timeout=timeout,
                 )
 
             elif engine["name"] in ("bing", "bing_rss"):
@@ -272,7 +295,7 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                     params=params,
                     headers=headers,
                     proxies=proxy,
-                    timeout=20,
+                    timeout=timeout,
                 )
             elif engine["method"] == "POST":
                 data = {engine["query_param"]: query}
@@ -283,7 +306,7 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                     data=data,
                     headers=headers,
                     proxies=proxy,
-                    timeout=20,
+                    timeout=timeout,
                 )
             else:
                 params = {engine["query_param"]: query}
@@ -294,14 +317,14 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                     params=params,
                     headers=headers,
                     proxies=proxy,
-                    timeout=20,
+                    timeout=timeout,
                 )
 
             if r.status_code == 200:
                 return _decode_http_response(r)
             elif r.status_code in (403, 429, 503):
-                print(f"[search_api] {engine['name']} HTTP {r.status_code} (attempt {attempt+1}/3)", file=sys.stderr)
-                if attempt < 2:
+                print(f"[search_api] {engine['name']} HTTP {r.status_code} (attempt {attempt+1}/{attempts})", file=sys.stderr)
+                if attempt + 1 < attempts:
                     time.sleep(2 ** attempt + random.uniform(0, 1))
                     if proxy and _proxy_cycle:
                         proxy = _next_proxy()  # rotate on block
@@ -311,10 +334,10 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                 return None
 
         except requests.exceptions.Timeout:
-            print(f"[search_api] {engine['name']} timeout (attempt {attempt+1}/3)", file=sys.stderr)
+            print(f"[search_api] {engine['name']} timeout (attempt {attempt+1}/{attempts})", file=sys.stderr)
         except Exception as e:
             print(f"[search_api] {engine['name']} error: {e}", file=sys.stderr)
-            if attempt == 2:
+            if attempt + 1 >= attempts:
                 return None
             time.sleep(1)
 
