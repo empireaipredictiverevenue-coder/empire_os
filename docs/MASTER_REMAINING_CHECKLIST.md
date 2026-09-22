@@ -94,12 +94,12 @@ Current truth:
 ## Competitor mining at scale
 
 - [x] More competitors per market
-- [ ] More Denver roofing companies
+- [x] More Denver roofing companies
 - [ ] Customer/case-study ecosystem
 - [ ] Testimonial companies
 - [ ] Partner ecosystem
 - [ ] Public review/company overlap
-- [ ] Comparison pages
+- [x] Comparison pages
 - [ ] Search overlap
 - [ ] Ads/offers/creative tracking
 - [ ] Jobs/hiring signals
