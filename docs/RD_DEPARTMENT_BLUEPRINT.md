@@ -16,9 +16,9 @@ transfer -> productize -> measure commercial impact -> learn.**
 ## 2. R&D Mandate
 
 R&D explores:
-- Predictive Revenue models
+- Predictive Cloud / Predictive Revenue models
 - Quant Brain methods
-- agentic intelligence / AGI layers
+- agentic/general intelligence layers
 - memory/world models
 - causal inference
 - optimization
@@ -244,7 +244,7 @@ Quant Brain supplies:
 
 Research with high uncertainty but high VOI may outrank obvious incremental work.
 
-## 10. R&D + AGI
+## 10. R&D + Agentic General Intelligence
 
 Agentic research system may:
 - discover papers/tools
