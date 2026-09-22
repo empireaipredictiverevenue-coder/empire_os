@@ -199,3 +199,42 @@ def test_status_exposes_economic_memory_without_promoting_outcomes(tmp_path):
     assert row["summary"]["verified_outcomes_only"] is True
     assert row["summary"]["model_weight_mutation_authorized"] is False
     assert row["execution_authority"] == "none"
+
+
+def test_status_exposes_opportunity_value_without_claiming_revenue(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/opportunity_factory/value_latest.json",
+        {
+            "generated_at": "2026-09-22T20:59:00+00:00",
+            "candidate_count": 3,
+            "value_available_count": 1,
+            "value_unavailable_count": 2,
+            "items": [{
+                "opportunity_key": "opp-1",
+                "status": "AVAILABLE",
+                "rank": 1,
+                "risk_adjusted_score": 42000.0,
+            }],
+            "new_scoring_model_introduced": False,
+            "prediction_only": True,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime(2026, 9, 22, 21, 0, tzinfo=timezone.utc),
+    )
+    row = result["components"]["opportunity_value"]
+    summary = row["summary"]
+
+    assert row["available"] is True
+    assert row["freshness"] == "fresh"
+    assert summary["value_available_count"] == 1
+    assert summary["value_unavailable_count"] == 2
+    assert summary["top_opportunity_key"] == "opp-1"
+    assert summary["top_risk_adjusted_score"] == 42000.0
+    assert summary["new_scoring_model_introduced"] is False
+    assert summary["prediction_only"] is True
+    assert row["execution_authority"] == "none"
