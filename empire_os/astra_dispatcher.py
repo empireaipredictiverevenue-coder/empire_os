@@ -86,6 +86,10 @@ SAFE_JOBS = {
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/run_opportunity_loop.py"),
     ],
+    "astra_executive_refresh": [
+        str(ROOT / ".venv/bin/python"),
+        str(ROOT / "scripts/build_astra_executive.py"),
+    ],
 }
 
 
@@ -138,6 +142,7 @@ def choose_jobs(
     # loop completes. The canonical loop has its own freshness guard so the
     # five-minute Astra cadence does not repeat public research unnecessarily.
     jobs.append("opportunity_loop_refresh")
+    jobs.append("astra_executive_refresh")
     return list(dict.fromkeys(jobs))
 
 
