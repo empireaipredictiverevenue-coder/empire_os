@@ -29,6 +29,13 @@ TASK_MEMORY_DEFAULTS = {
     "learning_review": (
         "episodic", "semantic", "procedural", "outcome_conditioned"
     ),
+    "quantitative_research": (
+        "working",
+        "semantic",
+        "procedural",
+        "episodic",
+        "outcome_conditioned",
+    ),
     "coding": ("working", "semantic", "procedural", "episodic"),
 }
 
