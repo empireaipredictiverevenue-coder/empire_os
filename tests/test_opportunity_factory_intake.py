@@ -71,3 +71,35 @@ def test_batch_without_normalizers_remains_blocked():
     assert result["factory_ready_count"] == 0
     assert result["blocked_count"] == 1
     assert result["search_observation_scores_inferred"] is False
+
+
+def test_batch_accepts_evidence_normalizer_output():
+    normalized_batch = {
+        "items": [{
+            "opportunity_key": "storm-dfw-roofing",
+            "normalized_score_count": 8,
+            "missing_normalized_fields": [],
+            "score_evidence": {
+                "demand": {
+                    "value": 0.8,
+                    "semantic_class": "observed_stage",
+                },
+            },
+            "search_result_counts_used_as_scores": False,
+            "normalized_signals": normalized(),
+        }]
+    }
+    result = build_factory_intake_batch(
+        {"candidates": [candidate()]},
+        {"actions": [research()]},
+        normalized_batch,
+    )
+    assert result["candidate_count"] == 1
+    assert result["factory_ready_count"] == 1
+    assert result["blocked_count"] == 0
+    item = result["items"][0]
+    assert item["normalization"]["available"] is True
+    assert item["normalization"]["normalized_score_count"] == 8
+    assert item["normalization"][
+        "search_result_counts_used_as_scores"
+    ] is False
