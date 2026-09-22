@@ -147,3 +147,38 @@ def test_no_results_stays_available_as_known_zero_presence():
     assert result["observation_count"] == 0
     assert result["search_presence_available"] is False
     assert result["market_share"] is None
+
+
+
+def test_search_presence_matches_owned_subdomains():
+    def search_with_subdomain(query, num):
+        return {
+            "organic": [{
+                "title": "Roofer A Blog",
+                "link": "https://blog.roofer-a.example/denver-roofing",
+                "snippet": "Denver roofing",
+                "position": 4,
+            }],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": "bing_html",
+                "quality_gate": "lexical_v1",
+            },
+        }
+
+    result = build_search_presence_snapshot(
+        companies=_companies(),
+        queries=("Denver roofing",),
+        search_fn=search_with_subdomain,
+        max_workers=1,
+    )
+
+    assert result["company_with_search_presence_count"] == 1
+    assert result["observation_count"] == 1
+    company = next(
+        row for row in result["companies"]
+        if row["company_name"] == "Roofer A"
+    )
+    assert company["search_presence_observed"] is True
+    assert company["best_position"] == 4
