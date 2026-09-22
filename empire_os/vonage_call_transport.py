@@ -78,6 +78,12 @@ class VonageCallConfig:
             missing.append("VONAGE_VIRTUAL_NUMBER")
         if not self.answer_url:
             missing.append("EMPIRE_VONAGE_ANSWER_URL")
+        if not self.event_url:
+            missing.append("EMPIRE_VONAGE_EVENT_URL")
+        if not str(os.getenv("EMPIRE_VONAGE_WEBHOOK_TOKEN") or "").strip():
+            missing.append("EMPIRE_VONAGE_WEBHOOK_TOKEN")
+        if not str(os.getenv("EMPIRE_VOICE_WS_TOKEN") or "").strip():
+            missing.append("EMPIRE_VOICE_WS_TOKEN")
         return {
             "provider": "vonage",
             "configured": not missing,
