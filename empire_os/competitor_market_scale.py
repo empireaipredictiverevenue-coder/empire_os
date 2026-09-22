@@ -327,6 +327,7 @@ def run_market_scale_sweep(
             search_fn=_market_search,
             fetch_fn=_market_fetch,
             source_refs=reviewed["source_refs"],
+            search_after_source_match=False,
         )
         return dict(result)
 
