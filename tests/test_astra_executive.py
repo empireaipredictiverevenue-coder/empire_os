@@ -133,6 +133,14 @@ def test_executive_delegates_to_existing_components_with_memory_scope():
     assert result["execution_authority"] == "none"
     for row in result["plan"]:
         assert row["memory_query"]["retrieval_only"] is True
+        assert row["intelligence_request"]["resolve_via"] == (
+            "intelligence_router"
+        )
+        assert row["intelligence_request"]["provider_pinned"] is False
+        assert row["intelligence_request"]["model_pinned"] is False
+        assert row["intelligence_request"][
+            "authority_must_not_expand"
+        ] is True
         assert row["success_condition"]
 
 
