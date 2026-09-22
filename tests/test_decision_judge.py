@@ -90,3 +90,15 @@ def test_judge_returns_typed_fast_decision_envelope():
     assert payload["candidate_count"] == 1
     assert payload["latency_ms"] >= 0
     assert payload["signals"]["sources"] == ["zipformer"]
+
+
+def test_follow_up_permission_variants_are_specific_not_generic_interest():
+    judge = EmpireDecisionJudge()
+    for text in (
+        "Send me the brief.",
+        "Send the brief by email.",
+        "Email me the details.",
+    ):
+        result = judge.judge_text(text, source="zipformer")
+        assert result.action == ACTION_CONTINUE
+        assert result.intent == INTENT_FOLLOW_UP
