@@ -3,6 +3,8 @@
 Date: 2026-09-22
 Status: CANONICAL CROSS-SYSTEM INTELLIGENCE ARCHITECTURE
 
+Parent architecture: `docs/EMPIRE_MASTER_ARCHITECTURE.md`
+
 ## Identity
 
 **Predictive Cloud** is the umbrella intelligence layer inside EmpireOS.
