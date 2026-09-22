@@ -164,6 +164,18 @@ def _next_action():
     }
 
 
+def _commercial_history():
+    return {
+        "outbound_intents": [],
+        "outbound_replies": [],
+        "terms_reviews": [],
+        "payment_requests": [],
+        "payment_evidence": [],
+        "fulfilment_orders": [],
+        "commercial_outcomes": [],
+    }
+
+
 def test_twin_composes_identity_research_and_competitor_evidence():
     twin = build_account_twin(
         _buyer_entity(),
@@ -290,3 +302,53 @@ def test_snapshot_can_attach_qualification_history_by_entity():
     twin = result["twins"][0]
     assert twin["qualification"]["history_available"] is True
     assert twin["qualification"]["history"][0]["id"] == "qual-1"
+
+
+
+def test_twin_exposes_canonical_commercial_history_without_promoting_state():
+    twin = build_account_twin(
+        _buyer_entity(),
+        audience=_audience(),
+        research=_research(),
+        brief=_brief(),
+        next_action=_next_action(),
+        commercial_history=_commercial_history(),
+    )
+
+    assert twin["outreach"]["history_available"] is True
+    assert twin["outreach"]["intent_count"] == 0
+    assert twin["conversation"]["history_available"] is True
+    assert twin["conversation"]["reply_count"] == 0
+    assert twin["conversation"]["conversation_state_authoritative"] is False
+    assert twin["commercial"]["history_available"] is True
+    assert twin["commercial"]["terms_reviews"] == []
+    assert twin["commercial"]["payment_requests"] == []
+    assert twin["commercial"]["payment_evidence"] == []
+    assert twin["commercial"]["fulfilment_orders"] == []
+    assert twin["outcomes"]["available"] is True
+    assert twin["outcomes"]["history"] == []
+    assert twin["commercial"]["commercial_intent"] is None
+    assert twin["commercial"]["terms"] is None
+    assert twin["commercial"]["paid"] is None
+    assert twin["buyer_intent_inferred"] is False
+    assert twin["commercial_intent_inferred"] is False
+
+
+def test_snapshot_can_attach_commercial_history_by_entity():
+    result = build_account_twin_snapshot(
+        buyer_state={"entities": [_buyer_entity()]},
+        audience={"companies": [_audience()]},
+        research={"actions": [_research()]},
+        briefs={"briefs": [_brief()]},
+        next_actions={"actions": [_next_action()]},
+        commercial_history_by_entity={
+            "entity-golden": _commercial_history(),
+        },
+    )
+
+    twin = result["twins"][0]
+    assert twin["outreach"]["history_available"] is True
+    assert twin["conversation"]["history_available"] is True
+    assert twin["commercial"]["history_available"] is True
+    assert twin["outcomes"]["available"] is True
+    assert "commercial_history_unavailable" not in twin["uncertainty"]["items"]
