@@ -62,6 +62,9 @@ def dispatch_executive_plan(repo_root: str | Path) -> dict[str, Any]:
                 plan_id=plan_id,
                 step=step,
                 priority=priority,
+                reopen_blocked_reasons=(
+                    "specialist_adapter_required",
+                ),
             )
             queued += int(created)
             existing += int(not created)
