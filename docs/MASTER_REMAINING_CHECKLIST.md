@@ -52,19 +52,19 @@ Current truth:
 - [x] Expose buyer-state stack in Founder Console
 - [x] Add tests against false promotion
 
-## Next-Best Action engine
+## Next-Best Action engine — DONE
 
-- [ ] Research more
-- [ ] Enrich identity
-- [ ] Verify decision-maker
-- [ ] Prepare buyer review
-- [ ] Hold
-- [ ] Conversation follow-up
-- [ ] Terms candidate
-- [ ] Payment review
-- [ ] Fulfilment review
-- [ ] No autonomous jump across founder/commercial gates
-- [ ] Show NBA reasoning/evidence in Founder Console
+- [x] Research more
+- [x] Enrich identity
+- [x] Verify decision-maker
+- [x] Prepare buyer review
+- [x] Hold
+- [x] Conversation follow-up
+- [x] Terms candidate
+- [x] Payment review
+- [x] Fulfilment review
+- [x] No autonomous jump across founder/commercial gates
+- [x] Show NBA reasoning/evidence in Founder Console
 
 ## Account / Buyer Digital Twin
 
@@ -169,7 +169,7 @@ Current truth:
 - [x] Account research
 - [x] Account Intelligence Brief
 - [x] Buyer State
-- [ ] Next-Best Action
+- [x] Next-Best Action
 - [ ] Account digital twin
 - [ ] Market opportunities
 - [ ] Competitor graph visualization
