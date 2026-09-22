@@ -154,3 +154,57 @@ def public_catalog_projection(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         "products": products,
         "count": len(products),
     }
+
+
+
+def fetch_catalog_postgres(
+    dsn: str,
+    *,
+    product_code: str | None = None,
+    limit: int = 100,
+    connect_factory: Callable | None = None,
+) -> dict[str, Any]:
+    """Read canonical catalog through the restricted materializer connection.
+
+    This is read-only. The database RPC remains authoritative and the caller
+    receives the same summarized projection as the PostgREST path.
+    """
+    bounded = max(1, min(int(limit), 500))
+    dsn = str(dsn or "").strip()
+    if not dsn:
+        raise ValueError("materializer database dsn required")
+
+    if connect_factory is None:
+        try:
+            import psycopg
+        except ImportError as exc:
+            raise RuntimeError(
+                "psycopg is required for direct catalog refresh"
+            ) from exc
+        connect_factory = psycopg.connect
+
+    try:
+        with connect_factory(dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SET LOCAL ROLE empire_intelligence_materializer"
+                )
+                cursor.execute(
+                    "SELECT public.get_commercial_product_catalog(%s,%s)",
+                    (product_code, bounded),
+                )
+                row = cursor.fetchone()
+    except Exception as exc:
+        raise RuntimeError(
+            "restricted catalog read failed"
+        ) from exc
+
+    payload = row[0] if row else []
+    if isinstance(payload, Mapping):
+        payload = [payload]
+    if not isinstance(payload, list):
+        raise ValueError(
+            "commercial product catalog RPC must return a list"
+        )
+    clean = [item for item in payload if isinstance(item, Mapping)]
+    return summarize_catalog(clean)
