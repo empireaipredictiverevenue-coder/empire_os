@@ -1,4 +1,6 @@
-from empire_os.search_fabric import search as search_module
+import importlib
+
+search_module = importlib.import_module("empire_os.search_fabric.search")
 
 
 def test_auto_search_uses_existing_recovery_engine(monkeypatch):
