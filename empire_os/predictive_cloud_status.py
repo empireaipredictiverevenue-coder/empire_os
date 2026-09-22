@@ -66,6 +66,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 3600,
     },
+    "opportunity_value": {
+        "path": Path("runtime/opportunity_factory/value_latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 3600,
+    },
     "predictive_intelligence": {
         "path": Path("runtime/predictive_intelligence/latest.json"),
         "time_keys": ("generated_at", "observed_at"),
@@ -248,6 +253,36 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
                 "missing_field_counts"
             ),
             "capital_execution": payload.get("capital_execution"),
+        }
+    if name == "opportunity_value":
+        items = payload.get("items")
+        items = items if isinstance(items, list) else []
+        top = next(
+            (
+                row for row in items
+                if isinstance(row, Mapping)
+                and row.get("status") == "AVAILABLE"
+            ),
+            None,
+        )
+        return {
+            "candidate_count": payload.get("candidate_count"),
+            "value_available_count": payload.get("value_available_count"),
+            "value_unavailable_count": payload.get("value_unavailable_count"),
+            "top_opportunity_key": (
+                top.get("opportunity_key")
+                if isinstance(top, Mapping)
+                else None
+            ),
+            "top_risk_adjusted_score": (
+                top.get("risk_adjusted_score")
+                if isinstance(top, Mapping)
+                else None
+            ),
+            "new_scoring_model_introduced": payload.get(
+                "new_scoring_model_introduced"
+            ),
+            "prediction_only": payload.get("prediction_only"),
         }
     if name == "predictive_intelligence":
         return {
