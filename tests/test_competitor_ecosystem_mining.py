@@ -1,5 +1,6 @@
 from empire_os.competitor_ecosystem_mining import (
     build_ecosystem_snapshot,
+    competitor_ecosystem_intelligence_signal,
     discover_company_ecosystem,
 )
 
@@ -103,3 +104,32 @@ def test_snapshot_aggregates_company_surface_counts():
     assert result["commercial_intent_inferred"] is False
     assert result["outreach_enabled"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_ecosystem_signal_is_observe_only():
+    company = discover_company_ecosystem(
+        entity_id="00000000-0000-0000-0000-000000000011",
+        company_name="Example Roofing",
+        company_website="https://roofer.example",
+        fetch_fn=_fetch,
+    )
+
+    signal = competitor_ecosystem_intelligence_signal(
+        company,
+        source_id="00000000-0000-0000-0000-000000000031",
+    )
+
+    assert signal["signal_type"] == "competitor_ecosystem_evidence"
+    assert signal["signal_domain"] == "competitive_intelligence"
+    assert signal["payload"]["research_candidate"] is True
+    assert signal["payload"]["customer_relationship_inferred"] is False
+    assert signal["payload"]["partner_relationship_inferred"] is False
+    assert signal["payload"]["buyer_intent"] is False
+    assert signal["payload"]["commercial_intent"] is False
+    assert signal["payload"]["prospect_created"] is False
+    assert signal["payload"]["outreach_enabled"] is False
+    assert signal["buyer_intent_inferred"] is False
+    assert signal["commercial_intent_inferred"] is False
+    assert signal["outreach_enabled"] is False
+    assert signal["execution_authority"] == "none"
