@@ -83,21 +83,24 @@ Already implemented:
 - [x] Autonomous Execution Bus foundation
 - [x] Predictive Cloud Opportunity Radar — CODED
 - [x] bounded Opportunity Radar public-research executor — CODED
-- [x] Astra Radar → Research internal job chain — CODED
-- [x] Opportunity Radar 15-minute user-timer packaging — STAGED
+- [x] Astra Radar → Research → Factory Intake internal job chain — CODED
+- [x] truth-preserving Opportunity Factory intake bridge — CODED
+- [x] combined Radar → Research → Factory Intake loop runner — CODED
+- [x] 15-minute autonomous Opportunity Loop user-timer packaging — STAGED
 - [x] canonical autonomous-loop doctrine
 - [x] canonical full-business plain-text architecture
 
 Verification / activation:
 - [ ] Pull latest branch onto EmpireOS
-- [ ] Run Opportunity Radar / research / Astra focused tests
-- [ ] Run one real OBSERVE Radar refresh against current snapshots
-- [ ] Run one bounded real Opportunity Research cycle
-- [ ] Install/enable Opportunity Radar timer if tests pass
-- [ ] Confirm Astra dispatcher invokes Radar then Research without external mutation
+- [ ] Run Opportunity Radar / research / Factory Intake / loop / Astra focused tests
+- [ ] Run one real OBSERVE Opportunity Loop against current snapshots
+- [ ] Confirm bounded real Opportunity Research produces observations only
+- [ ] Confirm Factory Intake blocks missing normalized signals rather than inferring them
+- [ ] Install/enable autonomous Opportunity Loop timer if tests pass
+- [ ] Confirm Astra dispatcher invokes Radar → Research → Factory Intake without external mutation
 
 Next wiring:
-- [ ] Normalize Radar + research evidence into Opportunity Factory readiness
+- [x] Normalize Radar + research evidence into Opportunity Factory readiness contract — CODED; live evidence normalizers still needed
 - [ ] Automatically generate bounded missing-evidence plans per candidate
 - [ ] Feed validated candidates into Astra workstream ranking
 - [ ] Add Storm / Permit / Property / Search AI Recommendation / Private Capital
@@ -130,8 +133,8 @@ business loop rather than continue building isolated modules.
 - [x] Empire Coder exists
 - [x] Control Fabric exists
 - [ ] Classify every major subsystem: CONNECTED / NEEDS WIRING / LEGACY / RETIRED
-- [ ] Wire Sensor Mesh -> Opportunity Radar
-- [ ] Wire Opportunity Radar -> Opportunity Factory evidence-completion queue
+- [ ] Wire remaining Sensor Mesh domains -> Opportunity Radar
+- [x] Wire Opportunity Radar -> bounded research -> Opportunity Factory readiness
 - [ ] Wire Opportunity Factory -> Astra work queue
 - [ ] Wire Astra -> automatic research / analysis / enrichment / planning
 - [ ] Wire safe research/build tasks -> Empire Coder
