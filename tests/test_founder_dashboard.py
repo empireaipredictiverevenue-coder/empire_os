@@ -1288,3 +1288,68 @@ def test_dashboard_exposes_recovery_portfolio_as_non_production_truth(tmp_path):
     assert recovery["pricing_authority"] == "none"
     assert recovery["execution_authority"] == "none"
     assert recovery["actual_revenue"] is False
+
+
+def test_dashboard_exposes_predictive_learning_closeout(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/predictive_intelligence/latest.json",
+        {
+            "schema_version": "empire.predictive_intelligence.v1",
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T20:00:00+00:00",
+            "source_outcome_count": 28,
+            "matched_outcome_count": 24,
+            "unmatched_outcome_count": 4,
+            "probability_ready_product_count": 1,
+            "timing_ready_product_count": 1,
+            "minimum_terminal_samples": 20,
+            "minimum_timing_samples": 8,
+            "prediction_only": True,
+            "search_scores_used": False,
+            "llm_probability_used": False,
+            "execution_authority": "none",
+        },
+    )
+    write_json(
+        root / "runtime/economic_memory/latest.json",
+        {
+            "schema_version": "empire.economic_memory.v1",
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T20:01:00+00:00",
+            "plan_id": "astra-plan-1",
+            "plan_evaluation_state": "INTERNAL_WORK_COMPLETE",
+            "department_episode_count": 5,
+            "retrievable_department_episode_count": 5,
+            "source_learning_ready_count": 2,
+            "outcome_conditioned_memory_count": 2,
+            "rejected_outcome_memory_count": 1,
+            "verified_outcomes_only_for_outcome_conditioned_memory": True,
+            "department_done_is_verified_outcome": False,
+            "model_weight_mutation_authorized": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    predictive = result["predictive_intelligence"]
+    memory = result["economic_memory"]
+
+    assert predictive["available"] is True
+    assert predictive["matched_outcome_count"] == 24
+    assert predictive["probability_ready_product_count"] == 1
+    assert predictive["timing_ready_product_count"] == 1
+    assert predictive["prediction_only"] is True
+    assert predictive["search_scores_used"] is False
+    assert predictive["llm_probability_used"] is False
+    assert predictive["actual_revenue"] is False
+
+    assert memory["available"] is True
+    assert memory["plan_id"] == "astra-plan-1"
+    assert memory["department_episode_count"] == 5
+    assert memory["outcome_conditioned_memory_count"] == 2
+    assert memory["verified_outcomes_only"] is True
+    assert memory["department_done_is_verified_outcome"] is False
+    assert memory["model_weight_mutation_authorized"] is False
+    assert memory["actual_revenue"] is False
+    assert memory["execution_authority"] == "none"
