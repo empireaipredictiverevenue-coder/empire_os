@@ -56,6 +56,7 @@ def test_search_presence_observes_only_canonical_market_domains():
         queries=("Denver roofing",),
         search_fn=_search,
         max_workers=1,
+        verify_canonical_companies=False,
     )
 
     assert result["canonical_company_count"] == 2
@@ -75,6 +76,7 @@ def test_search_presence_share_is_observed_presence_not_market_share():
         queries=("Denver roofing",),
         search_fn=_search,
         max_workers=1,
+        verify_canonical_companies=False,
     )
 
     by_name = {
@@ -101,6 +103,7 @@ def test_search_presence_signal_is_observe_only():
         queries=("Denver roofing",),
         search_fn=_search,
         max_workers=1,
+        verify_canonical_companies=False,
     )
     company = next(
         row for row in result["companies"]
@@ -141,6 +144,7 @@ def test_no_results_stays_available_as_known_zero_presence():
         queries=("Denver roofing",),
         search_fn=empty_search,
         max_workers=1,
+        verify_canonical_companies=False,
     )
 
     assert result["company_with_search_presence_count"] == 0
@@ -172,6 +176,7 @@ def test_search_presence_matches_owned_subdomains():
         queries=("Denver roofing",),
         search_fn=search_with_subdomain,
         max_workers=1,
+        verify_canonical_companies=False,
     )
 
     assert result["company_with_search_presence_count"] == 1
@@ -182,3 +187,127 @@ def test_search_presence_matches_owned_subdomains():
     )
     assert company["search_presence_observed"] is True
     assert company["best_position"] == 4
+
+
+
+def test_canonical_company_verification_is_one_query_per_company():
+    calls = []
+
+    def targeted_search(query, num):
+        calls.append(query)
+        if "roofer-a.example" in query:
+            return {
+                "organic": [{
+                    "title": "Roofer A",
+                    "link": "https://roofer-a.example/",
+                    "snippet": "Roofer A",
+                    "position": 1,
+                }],
+                "searchParameters": {
+                    "q": query,
+                    "num": num,
+                    "engine": "bing_html",
+                    "quality_gate": "lexical_v1",
+                },
+            }
+        if "roofer-b.example" in query:
+            return {
+                "organic": [{
+                    "title": "Roofer B",
+                    "link": "https://www.roofer-b.example/services",
+                    "snippet": "Roofer B",
+                    "position": 1,
+                }],
+                "searchParameters": {
+                    "q": query,
+                    "num": num,
+                    "engine": "bing_html",
+                    "quality_gate": "lexical_v1",
+                },
+            }
+        return {
+            "organic": [],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": "none",
+            },
+        }
+
+    result = build_search_presence_snapshot(
+        companies=_companies(),
+        queries=(),
+        search_fn=targeted_search,
+        max_workers=2,
+        verify_canonical_companies=True,
+    )
+
+    assert len(calls) == 2
+    assert all(call.startswith("site:") for call in calls)
+    assert result["canonical_search_verified_company_count"] == 2
+    assert result["company_with_search_presence_count"] == 2
+    assert result["company_with_generic_market_presence_count"] == 0
+    assert result["canonical_verification_observation_count"] == 2
+    assert result["generic_query_observation_count"] == 0
+    assert result["search_presence_available"] is True
+    assert result["share_of_voice_available"] is False
+    assert result["share_metric"] is None
+    assert all(
+        row["observed_search_presence_share"] is None
+        for row in result["companies"]
+    )
+
+
+def test_targeted_verification_does_not_pollute_generic_share():
+    def mixed_search(query, num):
+        if query == "Denver roofing":
+            return {
+                "organic": [{
+                    "title": "Roofer A",
+                    "link": "https://roofer-a.example/service",
+                    "snippet": "Denver roofing",
+                    "position": 2,
+                }],
+                "searchParameters": {
+                    "q": query,
+                    "num": num,
+                    "engine": "bing_html",
+                    "quality_gate": "lexical_v1",
+                },
+            }
+        domain = (
+            "roofer-a.example"
+            if "roofer-a.example" in query
+            else "roofer-b.example"
+        )
+        name = "Roofer A" if domain.startswith("roofer-a") else "Roofer B"
+        return {
+            "organic": [{
+                "title": name,
+                "link": f"https://{domain}/",
+                "snippet": name,
+                "position": 1,
+            }],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": "bing_html",
+                "quality_gate": "lexical_v1",
+            },
+        }
+
+    result = build_search_presence_snapshot(
+        companies=_companies(),
+        queries=("Denver roofing",),
+        search_fn=mixed_search,
+        max_workers=2,
+        verify_canonical_companies=True,
+    )
+
+    by_name = {row["company_name"]: row for row in result["companies"]}
+
+    assert result["canonical_search_verified_company_count"] == 2
+    assert result["company_with_generic_market_presence_count"] == 1
+    assert result["share_of_voice_available"] is True
+    assert by_name["Roofer A"]["observed_search_presence_share"] == 1.0
+    assert by_name["Roofer B"]["observed_search_presence_share"] == 0.0
