@@ -66,6 +66,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 3600,
     },
+    "predictive_intelligence": {
+        "path": Path("runtime/predictive_intelligence/latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 1800,
+    },
     "conversion_intelligence": {
         "path": Path("runtime/conversion/latest.json"),
         "time_keys": ("observed_at", "generated_at"),
@@ -238,6 +243,33 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
                 "missing_field_counts"
             ),
             "capital_execution": payload.get("capital_execution"),
+        }
+    if name == "predictive_intelligence":
+        return {
+            "source_outcome_count": payload.get(
+                "source_outcome_count"
+            ),
+            "matched_outcome_count": payload.get(
+                "matched_outcome_count"
+            ),
+            "probability_ready_product_count": payload.get(
+                "probability_ready_product_count"
+            ),
+            "timing_ready_product_count": payload.get(
+                "timing_ready_product_count"
+            ),
+            "minimum_terminal_samples": payload.get(
+                "minimum_terminal_samples"
+            ),
+            "minimum_timing_samples": payload.get(
+                "minimum_timing_samples"
+            ),
+            "search_scores_used": payload.get(
+                "search_scores_used"
+            ),
+            "llm_probability_used": payload.get(
+                "llm_probability_used"
+            ),
         }
     if name == "conversion_intelligence":
         return {
