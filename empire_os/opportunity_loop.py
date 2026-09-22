@@ -19,6 +19,7 @@ from empire_os.opportunity_evidence_normalizer import (
     refresh_normalized_signals,
 )
 from empire_os.opportunity_factory_intake import refresh_factory_intake
+from empire_os.opportunity_quant_review import refresh_quant_review
 from empire_os.opportunity_evidence_router import refresh_evidence_routes
 from empire_os.opportunity_radar import refresh_opportunity_radar
 from empire_os.opportunity_research import refresh_opportunity_research
@@ -96,6 +97,9 @@ def run_opportunity_loop(
     intake_fn: Callable[[Path], Mapping[str, Any]] = (
         refresh_factory_intake
     ),
+    quant_review_fn: Callable[[Path], Mapping[str, Any]] = (
+        refresh_quant_review
+    ),
     evidence_router_fn: Callable[[Path], Mapping[str, Any]] = (
         refresh_evidence_routes
     ),
@@ -139,6 +143,7 @@ def run_opportunity_loop(
         ("opportunity_research", research_fn, {}),
         ("opportunity_evidence_normalizer", normalizer_fn, {}),
         ("opportunity_factory_intake", intake_fn, {}),
+        ("opportunity_quant_review", quant_review_fn, {}),
         ("opportunity_evidence_router", evidence_router_fn, {}),
         ("opportunity_ai_planner", planner_fn, {"limit": 3}),
     )
@@ -165,6 +170,7 @@ def run_opportunity_loop(
     research = step_results.get("opportunity_research") or {}
     normalized = step_results.get("opportunity_evidence_normalizer") or {}
     intake = step_results.get("opportunity_factory_intake") or {}
+    quant = step_results.get("opportunity_quant_review") or {}
     routes = step_results.get("opportunity_evidence_router") or {}
     planner = step_results.get("opportunity_ai_planner") or {}
     complete = len(steps) == len(sequence) and all(
@@ -201,6 +207,15 @@ def run_opportunity_loop(
         "factory_blocked_count": int(
             intake.get("blocked_count") or 0
         ),
+        "quant_decision_packet_available_count": int(
+            quant.get("available_decision_packet_count") or 0
+        ),
+        "quant_decision_packet_unavailable_count": int(
+            quant.get("unavailable_decision_packet_count") or 0
+        ),
+        "quant_missing_field_counts": (
+            quant.get("missing_field_counts") or {}
+        ),
         "opportunity_stage_counts": routes.get("stage_counts") or {},
         "automatic_internal_evidence_route_count": int(
             routes.get("automatic_internal_route_count") or 0
@@ -223,6 +238,7 @@ def run_opportunity_loop(
         "automatic_internal_research": True,
         "automatic_evidence_normalization": True,
         "automatic_factory_intake": True,
+        "automatic_quant_review": True,
         "automatic_evidence_routing": True,
         "automatic_ai_planning": True,
         "automatic_external_execution_allowed": False,
