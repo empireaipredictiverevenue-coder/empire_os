@@ -48,7 +48,7 @@ SIGNALS → OPPORTUNITY GRAPH → OPPORTUNITY FOUNDRY → MARKET ENTRY → EXPER
 - Current payment rail: USDT on BNB Smart Chain. Solana/USDC/Phantom/Anchor settlement is retired from active architecture.
 - Buyer/payment truth: only independently verified commercial evidence counts as actual revenue.
 - Outbound: governed approvals, idempotency, DNC/opt-out/compliance controls.
-- Voice: Vonage + ElevenLabs when Conversation OS phase activates.
+- Voice: Vonage transport + self-hosted Empire Voice Lab (local STT, Decision Judge, local TTS) + Conversation OS; external voice vendors are not canonical dependencies.
 
 ## Current Live State
 - Domain/tunnel restored and reboot-persistent.
