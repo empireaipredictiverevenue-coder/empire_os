@@ -11,7 +11,6 @@ def test_phase_3f_production_verifier_checks_required_automation():
 
     for unit in (
         "empire-department-cycle.timer",
-        "empire-astra-dispatcher.timer",
         "empire-predictive-intelligence.timer",
         "empire-opportunity-loop.timer",
         "empire-predictive-cloud-status.timer",
@@ -25,3 +24,11 @@ def test_phase_3f_production_verifier_checks_required_automation():
     assert '"production_ready": production_ready' in text
     assert '"execution_authority": "none"' in text
     assert '"database_migration_applied_by_verifier": False' in text
+
+
+def test_production_verifier_does_not_require_guarded_execute_dispatcher():
+    text = (
+        ROOT / "scripts/verify_phase_3f_production.py"
+    ).read_text()
+
+    assert "empire-astra-dispatcher.timer" not in text
