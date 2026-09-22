@@ -985,3 +985,68 @@ def test_dashboard_exposes_competitor_public_activity(tmp_path):
     assert activity["buyer_intent_inferred"] is False
     assert activity["market_share_inferred"] is False
     assert activity["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_competitor_intelligence_feed(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_intelligence_feed_latest.json",
+        {
+            "schema_version": "empire.competitor_intelligence_feed.v1",
+            "mode": "OBSERVE",
+            "niche": "roofing",
+            "metro": "denver, co",
+            "canonical_company_count": 14,
+            "feed_targets": [
+                "tam_market_intelligence",
+                "revenue_gps",
+                "gtm",
+                "search_intelligence",
+            ],
+            "tam": {
+                "canonical_company_count": 14,
+                "tam_size_inferred": False,
+            },
+            "revenue_gps": {
+                "companies_with_research_context": 12,
+                "demand_inferred": False,
+                "revenue_opportunity_inferred": False,
+            },
+            "gtm": {
+                "market_context_only": True,
+                "prospect_created": False,
+                "outreach_enabled": False,
+                "execution_authority": "none",
+            },
+            "search_intelligence": {
+                "canonical_competitor_domain_count": 14,
+                "competitor_gap_inputs_available": True,
+                "share_of_voice_available": False,
+                "market_share_inferred": False,
+            },
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "demand_inferred": False,
+            "market_share_inferred": False,
+            "revenue_opportunity_inferred": False,
+            "prospect_created": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    feed = result["competitor_intelligence_feed"]
+
+    assert feed["available"] is True
+    assert feed["canonical_company_count"] == 14
+    assert feed["tam"]["canonical_company_count"] == 14
+    assert feed["revenue_gps"]["demand_inferred"] is False
+    assert feed["gtm"]["prospect_created"] is False
+    assert feed["search_intelligence"][
+        "competitor_gap_inputs_available"
+    ] is True
+    assert feed["execution_authority"] == "none"
