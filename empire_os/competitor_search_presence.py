@@ -93,12 +93,13 @@ def _canonical_company_queries(
     """
     name = _clean(company_name)
     domain = _domain(company_domain)
-    queries = []
+    if domain and name:
+        return (f'site:{domain} "{name}"',)
     if domain:
-        queries.append(f"site:{domain}")
+        return (f"site:{domain}",)
     if name:
-        queries.append(f'"{name}" Denver roofing')
-    return tuple(dict.fromkeys(q for q in queries if q))
+        return (f'"{name}" Denver roofing',)
+    return ()
 
 
 def _canonical_presence_probe(
