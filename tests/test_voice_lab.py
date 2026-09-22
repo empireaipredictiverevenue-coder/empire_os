@@ -131,3 +131,53 @@ def test_kokoro_stream_honours_barge_in_stop(monkeypatch):
     assert callback_returns == [0]
     assert stats["chunks"] == 1
     assert stats["stopped"] is True
+
+
+def test_voice_lab_ambiguous_transcript_never_reaches_closer():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+    lab.stt.transcribe = lambda _pcm: (
+        "Empire Voice Lab test. Now external voice vendor is being used."
+    )
+
+    def should_not_run(*_args, **_kwargs):
+        raise AssertionError("closer must not run for ambiguous transcript")
+
+    lab.brain.reply = should_not_run
+    result = lab.respond_text(b"pcm")
+
+    assert result["decision"]["action"] == "clarify"
+    assert result["decision"]["requires_clarification"] is True
+    assert "repeat" in result["response_text"].lower()
+
+
+def test_voice_lab_opt_out_never_reaches_closer():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+    lab.stt.transcribe = lambda _pcm: "Please do not call me again."
+
+    def should_not_run(*_args, **_kwargs):
+        raise AssertionError("closer must not run for opt-out")
+
+    lab.brain.reply = should_not_run
+    result = lab.respond_text(b"pcm")
+
+    assert result["decision"]["action"] == "stop"
+    assert result["decision"]["suppression_requested"] is True
+    assert "end the call" in result["response_text"].lower()
+
+
+def test_voice_lab_safe_interest_routes_to_closer():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+    lab.stt.transcribe = lambda _pcm: "Yes, send me the brief by email."
+    lab.brain.reply = lambda *_args, **_kwargs: "Absolutely."
+
+    result = lab.respond_text(b"pcm")
+
+    assert result["decision"]["action"] == "continue"
+    assert result["decision"]["intent"] == "follow_up_permission"
+    assert result["response_text"] == "Absolutely."
