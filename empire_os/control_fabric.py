@@ -273,6 +273,20 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             900,
         ),
         ComponentSpec(
+            "intelligence_router",
+            (
+                "intelligence_route_requested",
+                "model_capability_requested",
+            ),
+            (
+                "intelligence_route_ready",
+                "model_capability_route_ready",
+            ),
+            (),
+            "observe",
+            60,
+        ),
+        ComponentSpec(
             "predictive_intelligence",
             (
                 "probability_estimate_requested",
