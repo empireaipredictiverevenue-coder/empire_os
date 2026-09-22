@@ -10,14 +10,35 @@ END_FILE="$RUNTIME/end_epoch"
 RUN_LOG="$RUNTIME/runner.log"
 CRAWLER_LOG="$RUNTIME/crawler_runs.jsonl"
 
-# Fresh bounded trial: never mix prior run evidence into this report.
-: > "$RUN_LOG"
-: > "$CRAWLER_LOG"
+# Preserve an active trial across service/script upgrades. A deliberate
+# reset must be explicit so real evidence is never silently discarded.
+NOW_EPOCH="$(date +%s)"
+RESET="${EMPIRE_CRAWLER_72H_RESET:-false}"
 
-START="$(date +%s)"
-END="$((START + 72*60*60))"
-echo "$START" > "$START_FILE"
-echo "$END" > "$END_FILE"
+if [[ "$RESET" == "true" || ! -s "$START_FILE" || ! -s "$END_FILE" ]]; then
+  START="$NOW_EPOCH"
+  END="$((START + 72*60*60))"
+  : > "$RUN_LOG"
+  : > "$CRAWLER_LOG"
+  echo "$START" > "$START_FILE"
+  echo "$END" > "$END_FILE"
+  RESUMED="false"
+else
+  START="$(cat "$START_FILE")"
+  END="$(cat "$END_FILE")"
+  if ! [[ "$START" =~ ^[0-9]+$ && "$END" =~ ^[0-9]+$ ]] || (( END <= NOW_EPOCH )); then
+    START="$NOW_EPOCH"
+    END="$((START + 72*60*60))"
+    : > "$RUN_LOG"
+    : > "$CRAWLER_LOG"
+    echo "$START" > "$START_FILE"
+    echo "$END" > "$END_FILE"
+    RESUMED="false"
+  else
+    touch "$RUN_LOG" "$CRAWLER_LOG"
+    RESUMED="true"
+  fi
+fi
 
 export PYTHONPATH="$ROOT"
 export PYTHONUNBUFFERED=1
@@ -40,7 +61,7 @@ SOURCES=(
   biz_search
 )
 
-echo "[crawler-72h] started_at=$(date -Is) start_epoch=$START end_epoch=$END interval=${INTERVAL}s source_timeout=${SOURCE_TIMEOUT}s source_cap=$SOURCE_CAP" | tee -a "$RUN_LOG"
+echo "[crawler-72h] started_at=$(date -Is) start_epoch=$START end_epoch=$END resumed=$RESUMED interval=${INTERVAL}s source_timeout=${SOURCE_TIMEOUT}s source_cap=$SOURCE_CAP" | tee -a "$RUN_LOG"
 
 CYCLE=0
 while true; do
