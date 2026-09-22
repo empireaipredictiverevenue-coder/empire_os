@@ -958,3 +958,210 @@ def persist_competitor_public_review_signal(
         raise IntelligenceMaterializerTransportError(
             "public review signal persistence failed"
         ) from exc
+
+
+
+COMPETITOR_SEARCH_PRESENCE_SOURCE_KEY = (
+    "empire.competitor_search_presence.public.v1"
+)
+
+
+def _search_presence_fingerprints(
+    payload: dict[str, Any],
+) -> tuple[str, ...]:
+    observations = payload.get("observations")
+    if not isinstance(observations, list) or not observations:
+        raise IntelligenceMaterializerTransportError(
+            "search presence observations are required"
+        )
+
+    fingerprints: list[str] = []
+    for item in observations:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid search presence observation"
+            )
+        query = str(item.get("query") or "").strip()
+        domain = str(item.get("domain") or "").strip()
+        url = str(item.get("url") or "").strip()
+        position = str(item.get("position") or "").strip()
+        if not query or not domain or not url or not position:
+            raise IntelligenceMaterializerTransportError(
+                "search query/domain/url/position required"
+            )
+        fingerprints.append(
+            "|".join((query, domain, url, position))
+        )
+    return tuple(sorted(set(fingerprints)))
+
+
+def persist_competitor_search_presence_signal(
+    writer: PostgresIntelligenceMaterializer,
+    signal: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist append-only observed SERP presence evidence."""
+    if signal.get("signal_type") != "competitor_search_presence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected search presence signal type"
+        )
+    if signal.get("signal_domain") != "search_intelligence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected search presence signal domain"
+        )
+    if signal.get("execution_authority") != "none":
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal has execution authority"
+        )
+    if signal.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal cannot enable outreach"
+        )
+    if signal.get("buyer_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal cannot infer buyer intent"
+        )
+    if signal.get("commercial_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal cannot infer commercial intent"
+        )
+    if signal.get("market_share_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal cannot infer market share"
+        )
+
+    entity_id = _uuid(signal.get("entity_id"), field="entity id")
+    observed_at = str(signal.get("observed_at") or "").strip()
+    if not observed_at:
+        raise IntelligenceMaterializerTransportError(
+            "observed_at is required"
+        )
+
+    try:
+        strength = float(signal.get("strength"))
+        confidence = float(signal.get("confidence"))
+    except (TypeError, ValueError) as exc:
+        raise IntelligenceMaterializerTransportError(
+            "invalid search presence signal confidence"
+        ) from exc
+    if not 0.0 <= strength <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "strength must be between 0 and 1"
+        )
+    if not 0.0 <= confidence <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "confidence must be between 0 and 1"
+        )
+
+    payload = signal.get("payload")
+    if not isinstance(payload, dict):
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal payload is required"
+        )
+    for key, label in (
+        ("market_share_inferred", "market share"),
+        ("demand_inferred", "demand"),
+        ("buyer_intent", "buyer intent"),
+        ("commercial_intent", "commercial intent"),
+        ("prospect_created", "prospect creation"),
+        ("outreach_enabled", "outreach"),
+    ):
+        if payload.get(key) is not False:
+            raise IntelligenceMaterializerTransportError(
+                f"search presence payload cannot infer/enable {label}"
+            )
+
+    fingerprints = _search_presence_fingerprints(payload)
+
+    try:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET LOCAL ROLE {ROLE}")
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_SEARCH_PRESENCE_SOURCE_KEY,
+                )
+
+                supplied_source_id = _uuid(
+                    signal.get("source_id"),
+                    field="source id",
+                )
+                if supplied_source_id != _uuid(
+                    source_id,
+                    field="canonical source id",
+                ):
+                    raise IntelligenceMaterializerTransportError(
+                        "search presence signal source mismatch"
+                    )
+
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM public.intelligence_signals
+                    WHERE entity_id=%s
+                      AND signal_type='competitor_search_presence'
+                      AND signal_domain='search_intelligence'
+                      AND source_id=%s
+                    """,
+                    (entity_id, source_id),
+                )
+                for row in cursor.fetchall():
+                    existing_payload = row[0]
+                    if isinstance(existing_payload, str):
+                        existing_payload = json.loads(existing_payload)
+                    if not isinstance(existing_payload, dict):
+                        continue
+                    try:
+                        existing = _search_presence_fingerprints(
+                            existing_payload
+                        )
+                    except IntelligenceMaterializerTransportError:
+                        continue
+                    if existing == fingerprints:
+                        return {
+                            "entity_id": entity_id,
+                            "signal_type": "competitor_search_presence",
+                            "inserted": False,
+                            "existing": True,
+                            "execution_authority": "none",
+                        }
+
+                cursor.execute(
+                    """
+                    INSERT INTO public.intelligence_signals(
+                      entity_id,signal_type,signal_domain,observed_at,
+                      source_id,strength,confidence,payload
+                    )
+                    VALUES(
+                      %s,'competitor_search_presence',
+                      'search_intelligence',%s,%s,%s,%s,%s::jsonb
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        entity_id,
+                        observed_at,
+                        source_id,
+                        strength,
+                        confidence,
+                        json.dumps(payload, sort_keys=True),
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise IntelligenceMaterializerTransportError(
+                        "search presence signal insert failed"
+                    )
+                return {
+                    "id": str(row[0]),
+                    "entity_id": entity_id,
+                    "signal_type": "competitor_search_presence",
+                    "inserted": True,
+                    "existing": False,
+                    "execution_authority": "none",
+                }
+    except IntelligenceMaterializerTransportError:
+        raise
+    except Exception as exc:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal persistence failed"
+        ) from exc
