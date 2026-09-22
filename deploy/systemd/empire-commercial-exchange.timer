@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh Phase 4 Commercial Exchange every five minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=empire-commercial-exchange.service
+
+[Install]
+WantedBy=timers.target
