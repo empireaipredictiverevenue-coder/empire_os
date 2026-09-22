@@ -54,3 +54,25 @@ def test_opportunity_cycle_routes_to_canonical_loop():
     assert routes
     assert routes[0]["component"] == "predictive_cloud_opportunity_loop"
     assert routes[0]["authority"] == "internal_write"
+
+
+def test_executive_and_specialist_departments_are_registered():
+    from empire_os.control_fabric import default_registry
+
+    by_name = {row.name: row for row in default_registry()}
+    for name in (
+        "astra_executive",
+        "commercial_product_catalog",
+        "buyer_capacity_readiness",
+        "fulfilment_readiness",
+        "intelligence_fabric",
+        "empire_coder",
+    ):
+        assert name in by_name
+        assert by_name[name].authority == "internal_write"
+
+    routes = route_event({
+        "event_type": "build_complexity_evidence_required",
+        "commercial_priority": 80,
+    })
+    assert routes[0]["component"] == "empire_coder"
