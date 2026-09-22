@@ -943,3 +943,45 @@ def test_dashboard_exposes_competitor_search_presence(tmp_path):
     assert search["demand_inferred"] is False
     assert search["buyer_intent_inferred"] is False
     assert search["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_competitor_public_activity(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_public_activity_latest.json",
+        {
+            "schema_version": "empire.competitor_public_activity.v1",
+            "mode": "OBSERVE",
+            "company_count": 14,
+            "homepage_observed_count": 14,
+            "company_with_activity_count": 9,
+            "observation_count": 20,
+            "ads_offers_creative_company_count": 4,
+            "hiring_company_count": 3,
+            "event_company_count": 2,
+            "public_activity_company_count": 7,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "market_share_inferred": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+            "companies": [],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    activity = result["competitor_public_activity"]
+
+    assert activity["available"] is True
+    assert activity["company_count"] == 14
+    assert activity["company_with_activity_count"] == 9
+    assert activity["ads_offers_creative_company_count"] == 4
+    assert activity["hiring_company_count"] == 3
+    assert activity["event_company_count"] == 2
+    assert activity["public_activity_company_count"] == 7
+    assert activity["buyer_intent_inferred"] is False
+    assert activity["market_share_inferred"] is False
+    assert activity["execution_authority"] == "none"
