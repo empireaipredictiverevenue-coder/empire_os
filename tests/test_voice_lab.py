@@ -49,3 +49,16 @@ def test_voice_lab_dependencies_are_reported_without_loading_models():
     readiness = EmpireVoiceLab.dependency_readiness()
     assert set(readiness) == {"faster_whisper", "kokoro", "numpy"}
     assert all(isinstance(value, bool) for value in readiness.values())
+
+
+
+def test_opening_discloses_ai_identity_and_opt_out():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = object.__new__(EmpireVoiceLab)
+    text = lab.opening_text(business_name="Acme Roofing")
+    lower = text.lower()
+    assert "ai assistant" in lower
+    assert "empire ai" in lower
+    assert "acme roofing" in lower
+    assert "stop calling" in lower
