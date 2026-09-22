@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import threading
 from typing import Any
 from urllib.parse import quote, urlencode, urlparse, urlunparse
 
@@ -279,6 +280,46 @@ async def _play_pcm(websocket: WebSocket, pcm: bytes) -> None:
         await asyncio.sleep(0.019)
 
 
+async def _stream_tts(
+    websocket: WebSocket,
+    lab: EmpireVoiceLab,
+    text: str,
+    stop_event: threading.Event,
+) -> None:
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[bytes | BaseException | None] = asyncio.Queue()
+
+    def on_chunk(pcm: bytes, _progress: float) -> None:
+        if not stop_event.is_set():
+            loop.call_soon_threadsafe(queue.put_nowait, pcm)
+
+    def produce() -> None:
+        try:
+            lab.stream_text(
+                text,
+                on_chunk,
+                should_stop=stop_event.is_set,
+            )
+        except BaseException as exc:
+            loop.call_soon_threadsafe(queue.put_nowait, exc)
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    producer = asyncio.create_task(asyncio.to_thread(produce))
+    try:
+        while not stop_event.is_set():
+            item = await queue.get()
+            if item is None:
+                break
+            if isinstance(item, BaseException):
+                raise item
+            await _play_pcm(websocket, item)
+    finally:
+        stop_event.set()
+        if producer.done():
+            await producer
+
+
 @router.websocket("/vonage/socket")
 async def vonage_socket(websocket: WebSocket):
     expected = _ws_token()
@@ -309,10 +350,25 @@ async def vonage_socket(websocket: WebSocket):
     turn_index = 0
     opening_played = False
     playback: asyncio.Task | None = None
+    playback_stop: threading.Event | None = None
     response_task: asyncio.Task | None = None
 
+    async def start_playback(text: str) -> None:
+        nonlocal playback, playback_stop
+        playback_stop = threading.Event()
+        playback = asyncio.create_task(
+            _stream_tts(
+                websocket,
+                lab,
+                text,
+                playback_stop,
+            )
+        )
+
     async def stop_playback() -> None:
-        nonlocal playback
+        nonlocal playback, playback_stop
+        if playback_stop is not None:
+            playback_stop.set()
         if playback and not playback.done():
             playback.cancel()
             try:
@@ -321,11 +377,11 @@ async def vonage_socket(websocket: WebSocket):
                 pass
             await websocket.send_text(json.dumps({"action": "clear"}))
         playback = None
+        playback_stop = None
 
     async def respond(audio: bytes, index: int) -> None:
-        nonlocal playback
         result = await asyncio.to_thread(
-            lab.respond,
+            lab.respond_text,
             audio,
             business_name=context.get("business_name", ""),
             niche=context.get("niche", ""),
@@ -336,7 +392,6 @@ async def vonage_socket(websocket: WebSocket):
         response_text = str(
             result.get("response_text") or ""
         ).strip()
-        response_audio = result.get("audio") or b""
         if not transcript:
             return
 
@@ -351,7 +406,7 @@ async def vonage_socket(websocket: WebSocket):
                 transcript,
             )
 
-        if not response_text or not response_audio:
+        if not response_text:
             return
         history.append({
             "role": "assistant",
@@ -366,9 +421,7 @@ async def vonage_socket(websocket: WebSocket):
                 "outbound",
                 response_text,
             )
-        playback = asyncio.create_task(
-            _play_pcm(websocket, response_audio)
-        )
+        await start_playback(response_text)
 
     try:
         while True:
@@ -395,10 +448,6 @@ async def vonage_socket(websocket: WebSocket):
                     opening_text = lab.opening_text(
                         business_name=context.get("business_name", "")
                     )
-                    opening_audio = await asyncio.to_thread(
-                        lab.synthesize_text,
-                        opening_text,
-                    )
                     if intent_id and call_id:
                         await asyncio.to_thread(
                             _record_turn,
@@ -408,9 +457,7 @@ async def vonage_socket(websocket: WebSocket):
                             "outbound",
                             opening_text,
                         )
-                    playback = asyncio.create_task(
-                        _play_pcm(websocket, opening_audio)
-                    )
+                    await start_playback(opening_text)
                     opening_played = True
                 continue
 
