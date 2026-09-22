@@ -95,9 +95,9 @@ Current truth:
 
 - [x] More competitors per market
 - [x] More Denver roofing companies
-- [ ] Customer/case-study ecosystem
-- [ ] Testimonial companies
-- [ ] Partner ecosystem
+- [x] Customer/case-study ecosystem
+- [x] Testimonial companies
+- [x] Partner ecosystem
 - [ ] Public review/company overlap
 - [x] Comparison pages
 - [ ] Search overlap
