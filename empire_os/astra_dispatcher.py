@@ -82,23 +82,9 @@ SAFE_JOBS = {
         str(ROOT / ".venv/bin/python"),
         str(ROOT / "scripts/build_revenue_pulse_snapshot.py"),
     ],
-    "opportunity_radar_refresh": [
+    "opportunity_loop_refresh": [
         str(ROOT / ".venv/bin/python"),
-        str(ROOT / "scripts/build_opportunity_radar.py"),
-    ],
-    "opportunity_research_refresh": [
-        str(ROOT / ".venv/bin/python"),
-        str(ROOT / "scripts/run_opportunity_research.py"),
-    ],
-    "opportunity_ai_planner": [
-        str(ROOT / ".venv/bin/python"),
-        str(ROOT / "scripts/run_opportunity_ai_planner.py"),
-        "--limit",
-        "3",
-    ],
-    "opportunity_factory_intake_refresh": [
-        str(ROOT / ".venv/bin/python"),
-        str(ROOT / "scripts/build_opportunity_factory_intake.py"),
+        str(ROOT / "scripts/run_opportunity_loop.py"),
     ],
 }
 
@@ -147,10 +133,11 @@ def choose_jobs(
         jobs.append("conversion_intelligence_refresh")
         jobs.append("commercial_loop_refresh")
         jobs.append("revenue_pulse_refresh")
-        jobs.append("opportunity_radar_refresh")
-        jobs.append("opportunity_research_refresh")
-        jobs.append("opportunity_ai_planner")
-        jobs.append("opportunity_factory_intake_refresh")
+
+    # Opportunity discovery is continuous even when the current commercial
+    # loop completes. The canonical loop has its own freshness guard so the
+    # five-minute Astra cadence does not repeat public research unnecessarily.
+    jobs.append("opportunity_loop_refresh")
     return list(dict.fromkeys(jobs))
 
 
