@@ -44,11 +44,16 @@ def main() -> int:
             counters["runs_started"] += 1
         elif msg == "crawler_run_done":
             counters["runs_completed"] += 1
+        elif msg == "source_run_done":
+            counters["source_runs_completed"] += 1
             counters["candidates"] += int(event.get("candidates") or 0)
             counters["accepted"] += int(event.get("accepted") or 0)
-            counters["errors"] += int(event.get("errors") or 0)
-            counters["sources_ok"] += int(event.get("sources_ok") or 0)
-            counters["sources_err"] += int(event.get("sources_err") or 0)
+            source_errors = int(event.get("errors") or 0)
+            counters["errors"] += source_errors
+            if source_errors:
+                counters["sources_err"] += 1
+            else:
+                counters["sources_ok"] += 1
         elif msg == "prospect_acquired":
             counters["prospects_created_events"] += 1
             pid = str(event.get("prospect_id") or "")
@@ -87,6 +92,7 @@ def main() -> int:
         "log_lines": rows,
         "runs_started": counters["runs_started"],
         "runs_completed": counters["runs_completed"],
+        "source_runs_completed": counters["source_runs_completed"],
         "candidates_seen": counters["candidates"],
         "accepted_total": counters["accepted"],
         "unique_prospects_created": len(created_ids),
