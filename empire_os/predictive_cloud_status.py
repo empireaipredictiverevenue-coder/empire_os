@@ -91,6 +91,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 900,
     },
+    "department_cycle": {
+        "path": Path("runtime/astra/department_cycle_latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 600,
+    },
     "founder_directives": {
         "path": Path("runtime/founder_directives/latest.json"),
         "time_keys": ("generated_at", "updated_at", "observed_at"),
@@ -283,6 +288,25 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "founder_gate_step_count": payload.get(
                 "founder_gate_step_count"
             ),
+            "external_execution_performed": payload.get(
+                "external_execution_performed"
+            ),
+        }
+    if name == "department_cycle":
+        worker = payload.get("worker")
+        worker = worker if isinstance(worker, Mapping) else {}
+        evaluation = payload.get("evaluation")
+        evaluation = (
+            evaluation if isinstance(evaluation, Mapping) else {}
+        )
+        return {
+            "processed_count": worker.get("processed_count"),
+            "done_count": worker.get("done_count"),
+            "blocked_count": worker.get("blocked_count"),
+            "failed_count": worker.get("failed_count"),
+            "plan_id": evaluation.get("plan_id"),
+            "evaluation_state": evaluation.get("evaluation_state"),
+            "status_counts": evaluation.get("status_counts"),
             "external_execution_performed": payload.get(
                 "external_execution_performed"
             ),
