@@ -149,9 +149,9 @@ Current truth:
 - [x] Offer defined
 - [x] $1,500 pilot economics defined
 - [x] Acquisition/fulfilment ceilings defined
-- [ ] Move managed_service v2 through legitimate catalog verifier
-- [ ] Verify commercial evidence rows
-- [ ] Activate approved product version
+- [x] Move managed_service v2 through deterministic catalog verifier
+- [x] Verify commercial evidence rows
+- [x] Activate approved product version
 - [ ] Bind first real buyer
 - [ ] First verified paid pilot
 - [ ] First fulfilled pilot
