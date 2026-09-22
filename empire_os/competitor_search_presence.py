@@ -20,7 +20,9 @@ from empire_os.competitor_audience_sweep import (
     load_resolved_market_entities,
 )
 from empire_os.intelligence_materializer_transport import (
+    COMPETITOR_SEARCH_PRESENCE_SOURCE_KEY,
     PostgresIntelligenceMaterializer,
+    persist_competitor_search_presence_signal,
 )
 from empire_os.search_fabric.search import search as search_web
 
@@ -272,6 +274,72 @@ def build_search_presence_snapshot(
     }
 
 
+def search_presence_intelligence_signal(
+    company: Mapping[str, Any],
+    *,
+    source_id: str,
+) -> dict[str, Any]:
+    entity_id = _clean(company.get("entity_id"))
+    observations = [
+        dict(row)
+        for row in company.get("observations", []) or []
+        if isinstance(row, Mapping)
+    ]
+    if not entity_id:
+        raise ValueError("entity_id_required")
+    if not observations:
+        raise ValueError("search_presence_observations_required")
+
+    observed_at = max(
+        _clean(row.get("observed_at"))
+        for row in observations
+        if _clean(row.get("observed_at"))
+    )
+
+    return {
+        "schema_version": "intelligence_signal_candidate.v1",
+        "entity_id": entity_id,
+        "signal_type": "competitor_search_presence",
+        "signal_domain": "search_intelligence",
+        "observed_at": observed_at,
+        "source_id": _clean(source_id),
+        "strength": min(
+            1.0,
+            float(company.get("query_presence_count") or 0) / 3.0,
+        ),
+        "confidence": 0.85,
+        "payload": {
+            "company_name": _clean(company.get("company_name")),
+            "company_domain": _clean(company.get("company_domain")),
+            "query_presence_count": int(
+                company.get("query_presence_count") or 0
+            ),
+            "observation_count": len(observations),
+            "best_position": company.get("best_position"),
+            "reciprocal_position_weight": company.get(
+                "reciprocal_position_weight"
+            ),
+            "observed_search_presence_share": company.get(
+                "observed_search_presence_share"
+            ),
+            "observations": observations,
+            "research_candidate": True,
+            "market_share_inferred": False,
+            "demand_inferred": False,
+            "buyer_intent": False,
+            "commercial_intent": False,
+            "prospect_created": False,
+            "outreach_enabled": False,
+        },
+        "persistence_performed": False,
+        "market_share_inferred": False,
+        "buyer_intent_inferred": False,
+        "commercial_intent_inferred": False,
+        "outreach_enabled": False,
+        "execution_authority": "none",
+    }
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -297,6 +365,8 @@ def write_search_presence_snapshot(
 def refresh_search_presence_snapshot(
     repo_root: Path,
     writer: PostgresIntelligenceMaterializer,
+    *,
+    persist: bool = False,
 ) -> dict[str, Any]:
     market = _load_json(
         repo_root
@@ -309,6 +379,42 @@ def refresh_search_presence_snapshot(
         metro=_clean(market.get("metro")),
     )
     payload = build_search_presence_snapshot(companies=companies)
+
+    persistence = []
+    if persist:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SET LOCAL ROLE empire_intelligence_materializer"
+                )
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_SEARCH_PRESENCE_SOURCE_KEY,
+                )
+
+        for company in payload["companies"]:
+            if int(company.get("observation_count") or 0) < 1:
+                continue
+            signal = search_presence_intelligence_signal(
+                company,
+                source_id=source_id,
+            )
+            persistence.append(
+                persist_competitor_search_presence_signal(
+                    writer,
+                    signal,
+                )
+            )
+
+    payload["persist_requested"] = bool(persist)
+    payload["persisted_signal_count"] = sum(
+        1 for row in persistence if row.get("inserted") is True
+    )
+    payload["existing_signal_count"] = sum(
+        1 for row in persistence if row.get("existing") is True
+    )
+    payload["persistence"] = persistence
+
     write_search_presence_snapshot(repo_root, payload)
     return payload
 
@@ -343,6 +449,7 @@ def main() -> int:
         default=os.getenv("EMPIRE_REPO_ROOT", "/srv/empire_os"),
     )
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--persist", action="store_true")
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -356,7 +463,11 @@ def main() -> int:
         return 0
 
     writer = PostgresIntelligenceMaterializer.from_env()
-    payload = refresh_search_presence_snapshot(repo_root, writer)
+    payload = refresh_search_presence_snapshot(
+        repo_root,
+        writer,
+        persist=args.persist,
+    )
     print(json.dumps(payload, indent=2, sort_keys=True, default=str))
     return 0
 
