@@ -70,6 +70,10 @@ Canonical architecture:
 - [x] Astra Executive consumes Quant missing-evidence state — CODED
 - [x] Predictive Intelligence registered as a Data/Quant capability
 - [x] Quant/Predictive Intelligence remain OBSERVE-only in Control Fabric
+- [x] Verified-cohort Predictive Intelligence engine — CODED; product-specific terminal outcomes only
+- [x] Predictive Intelligence → Opportunity Normalizer Quant-input bridge — CODED
+- [x] Targeted decision-maker department adapter — CODED; first-party/authoritative evidence only
+- [x] Department worker field-level success checks for Predictive Intelligence — CODED
 - [x] Live Opportunity/Quant loop proof — 24 candidates, 13 research observations, 15 normalized scores, 21 QUALIFY / 3 DISCOVER, 0 fabricated Quant packets — 2026-09-22
 - [ ] Live EmpireOS verification of Quant endpoints and opportunity Quant Review
 - [ ] Calibrated probability-of-success source from verified outcome cohorts
@@ -217,7 +221,10 @@ Canonical organization:
 - [x] Live runtime verification of Astra Executive snapshot on EmpireOS — VERIFIED 2026-09-22: primary goal `advance_first_verified_revenue`, 8 plan steps, 8 auto-dispatch eligible, 0 founder gates
 - [ ] Department scorecards from live KPIs
 - [ ] Department work queues / budgets / review cadence — durable deduplicated queue + atomic leases + safe worker + 2-minute bounded heartbeat + evaluator CODED/STAGED; budget ledger still pending
-- [x] Astra automatic dispatch from executive plan into eligible department queues — CODED with deterministic dedupe + authority filter; live verification pending
+- [x] Astra automatic dispatch from executive plan into eligible department queues — LIVE VERIFIED 2026-09-22: 8/8 eligible steps queued, 0 authority-blocked, 0 unowned
+- [x] Department execution spine live proof — 8 processed, 3 DONE, 5 BLOCKED, 0 FAILED; queue drained with 0 ready/running
+- [x] Obsolete `specialist_adapter_required` work can reopen deterministically after adapter rollout — CODED
+- [x] Genuine evidence blockers remain blocked and do not hot-loop — CODED
 - [x] Department work queue persists across process restarts and uses atomic checkout/leases — CODED
 - [x] Unsupported department adapters fail BLOCKED rather than fake completion — CODED
 - [x] Safe internal adapters: Product Catalog, Buyer Capacity, Opportunity Loop, Predictive Cloud Status — CODED
