@@ -98,3 +98,49 @@ def test_dispatch_only_enqueues_safe_owned_steps(tmp_path):
     second = dispatch_executive_plan(tmp_path)
     assert second["queued_count"] == 0
     assert second["existing_count"] == 1
+
+
+def test_queue_reopens_only_explicit_obsolete_blocker(tmp_path):
+    queue = DepartmentWorkQueue(tmp_path)
+    work, _ = queue.enqueue_step(
+        plan_id="astra_plan_one",
+        step=step(),
+    )
+    claimed = queue.claim_next(worker_id="worker:test")
+    assert claimed is not None
+    queue.block(claimed, "specialist_adapter_required")
+    assert queue.counts()["blocked"] == 1
+
+    reopened, created = queue.enqueue_step(
+        plan_id="astra_plan_one",
+        step=step(),
+        reopen_blocked_reasons=("specialist_adapter_required",),
+    )
+    assert created is True
+    assert reopened.status is DepartmentWorkStatus.READY
+    assert queue.counts()["ready"] == 1
+    assert queue.counts()["blocked"] == 0
+
+
+def test_queue_does_not_reopen_real_evidence_blocker(tmp_path):
+    queue = DepartmentWorkQueue(tmp_path)
+    _, _ = queue.enqueue_step(
+        plan_id="astra_plan_one",
+        step=step(),
+    )
+    claimed = queue.claim_next(worker_id="worker:test")
+    assert claimed is not None
+    queue.block(
+        claimed,
+        "insufficient_verified_outcome_cohort",
+    )
+
+    existing, created = queue.enqueue_step(
+        plan_id="astra_plan_one",
+        step=step(),
+        reopen_blocked_reasons=("specialist_adapter_required",),
+    )
+    assert created is False
+    assert existing.status is DepartmentWorkStatus.BLOCKED
+    assert existing.error == "insufficient_verified_outcome_cohort"
+    assert queue.counts()["blocked"] == 1
