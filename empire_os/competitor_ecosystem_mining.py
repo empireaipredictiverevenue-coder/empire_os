@@ -155,6 +155,8 @@ def discover_company_ecosystem(
     max_follow_pages: int = 6,
 ) -> dict[str, Any]:
     base = _clean(company_website)
+    if base and "://" not in base:
+        base = "https://" + base
     company_domain = _domain(base)
     if not base or not company_domain:
         return {
