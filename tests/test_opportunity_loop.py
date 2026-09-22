@@ -41,6 +41,13 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
             "missing_field_counts": {"probability_success": 3},
         }
 
+    def value(root: Path):
+        calls.append(("value", root))
+        return {
+            "value_available_count": 0,
+            "value_unavailable_count": 3,
+        }
+
     def router(root: Path):
         calls.append(("router", root))
         return {
@@ -64,6 +71,7 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
         normalizer_fn=normalizer,
         intake_fn=intake,
         quant_review_fn=quant,
+        opportunity_value_fn=value,
         evidence_router_fn=router,
         planner_fn=planner,
     )
@@ -74,6 +82,7 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
         "normalizer",
         "intake",
         "quant",
+        "value",
         "router",
         "planner",
     ]
@@ -87,12 +96,15 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
     assert result["quant_missing_field_counts"] == {
         "probability_success": 3
     }
+    assert result["opportunity_value_available_count"] == 0
+    assert result["opportunity_value_unavailable_count"] == 3
     assert result["opportunity_stage_counts"] == {"QUALIFY": 3}
     assert result["ai_plan_queued_count"] == 2
     assert result["automatic_internal_research"] is True
     assert result["automatic_evidence_normalization"] is True
     assert result["automatic_factory_intake"] is True
     assert result["automatic_quant_review"] is True
+    assert result["automatic_opportunity_value_scoring"] is True
     assert result["automatic_evidence_routing"] is True
     assert result["automatic_ai_planning"] is True
     assert result["automatic_external_execution_allowed"] is False
@@ -121,6 +133,7 @@ def test_opportunity_loop_fails_closed_and_stops_on_step_error(tmp_path):
         normalizer_fn=should_not_run,
         intake_fn=should_not_run,
         quant_review_fn=should_not_run,
+        opportunity_value_fn=should_not_run,
         evidence_router_fn=should_not_run,
         planner_fn=should_not_run,
     )
@@ -167,6 +180,13 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
             "missing_field_counts": {"probability_success": 1},
         }
 
+    def value(_root):
+        calls.append("value")
+        return {
+            "value_available_count": 0,
+            "value_unavailable_count": 1,
+        }
+
     def router(_root):
         calls.append("router")
         return {
@@ -190,6 +210,7 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
         normalizer_fn=normalizer,
         intake_fn=intake,
         quant_review_fn=quant,
+        opportunity_value_fn=value,
         evidence_router_fn=router,
         planner_fn=planner,
     )
@@ -201,6 +222,7 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
         normalizer_fn=normalizer,
         intake_fn=intake,
         quant_review_fn=quant,
+        opportunity_value_fn=value,
         evidence_router_fn=router,
         planner_fn=planner,
     )
@@ -213,6 +235,7 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
         "normalizer",
         "intake",
         "quant",
+        "value",
         "router",
         "planner",
     ]
