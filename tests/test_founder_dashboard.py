@@ -384,3 +384,55 @@ def test_dashboard_exposes_competitor_audience_runtime(tmp_path):
     assert audience["commercial_intent_inferred"] is False
     assert audience["outreach_enabled"] is False
     assert audience["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_competitor_account_research(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_account_research_latest.json",
+        {
+            "schema_version": (
+                "empire.competitor_account_research_batch.v1"
+            ),
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-22T12:10:00+00:00",
+            "company_count": 2,
+            "observation_count": 9,
+            "brief_ready_count": 1,
+            "additional_evidence_review_count": 1,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+            "actions": [
+                {
+                    "company_name": "Golden Spike Roofing Inc",
+                    "research_rank": 1,
+                    "requested_action": "deep_account_research",
+                    "observation_count": 6,
+                    "next_step": (
+                        "account_research_brief_ready_for_review"
+                    ),
+                    "buyer_intent": False,
+                    "commercial_intent": False,
+                    "outreach_enabled": False,
+                    "execution_authority": "none",
+                }
+            ],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    research = result["competitor_account_research"]
+
+    assert research["available"] is True
+    assert research["company_count"] == 2
+    assert research["observation_count"] == 9
+    assert research["brief_ready_count"] == 1
+    assert research["buyer_intent_inferred"] is False
+    assert research["commercial_intent_inferred"] is False
+    assert research["outreach_enabled"] is False
+    assert research["execution_authority"] == "none"
