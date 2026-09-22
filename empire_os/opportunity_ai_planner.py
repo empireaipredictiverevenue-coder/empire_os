@@ -17,6 +17,7 @@ from empire_os.coder.jobs import JobKind, LocalJobQueue
 
 
 RADAR_RELATIVE = Path("runtime/opportunity_radar/latest.json")
+RESEARCH_RELATIVE = Path("runtime/opportunity_radar/research_latest.json")
 STATE_RELATIVE = Path("runtime/opportunity_radar/ai_planner_state.json")
 OUTPUT_RELATIVE = Path("runtime/opportunity_radar/ai_planner_latest.json")
 
@@ -52,7 +53,10 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     tmp.replace(path)
 
 
-def _fingerprint(candidate: Mapping[str, Any]) -> str:
+def _fingerprint(
+    candidate: Mapping[str, Any],
+    research: Mapping[str, Any] | None = None,
+) -> str:
     material = {
         "opportunity_key": candidate.get("opportunity_key"),
         "opportunity_class": candidate.get("opportunity_class"),
@@ -77,6 +81,14 @@ def _fingerprint(candidate: Mapping[str, Any]) -> str:
             )
             if str(item).strip()
         ),
+        "research_evidence_urls": sorted(
+            str(item)
+            for item in ((research or {}).get("evidence_urls") or [])
+            if str(item).strip()
+        ),
+        "research_observation_count": int(
+            (research or {}).get("observation_count") or 0
+        ),
     }
     raw = json.dumps(
         material,
@@ -95,7 +107,10 @@ def _priority(candidate: Mapping[str, Any]) -> int:
     return max(10, min(90, int(round(score))))
 
 
-def _objective(candidate: Mapping[str, Any]) -> str:
+def _objective(
+    candidate: Mapping[str, Any],
+    research: Mapping[str, Any] | None = None,
+) -> str:
     key = str(candidate.get("opportunity_key") or "").strip()
     klass = str(candidate.get("opportunity_class") or "").strip()
     title = str(candidate.get("title") or key).strip()
@@ -114,6 +129,14 @@ def _objective(candidate: Mapping[str, Any]) -> str:
         for item in (candidate.get("evidence_refs") or [])
         if str(item).strip()
     ]
+    research_urls = [
+        str(item).strip()
+        for item in ((research or {}).get("evidence_urls") or [])
+        if str(item).strip()
+    ]
+    research_count = int(
+        (research or {}).get("observation_count") or 0
+    )
     return (
         "PLAN ONLY: advance this existing Predictive Cloud opportunity toward "
         "the canonical Opportunity Factory without inventing evidence or "
@@ -130,7 +153,10 @@ def _objective(candidate: Mapping[str, Any]) -> str:
         "fabricate buyer intent/demand/economics, or expand authority. "
         f"Opportunity key={key}; class={klass}; title={title}; "
         f"blockers={blockers}; recommended_actions={actions}; "
-        f"evidence_refs={refs}."
+        f"evidence_refs={refs}; public_search_observation_count={research_count}; "
+        f"public_search_evidence_urls={research_urls}. Public search observations "
+        "are research evidence candidates only and must not be treated as verified "
+        "demand, buyer intent, economics or revenue."
     )
 
 
@@ -143,8 +169,19 @@ def plan_radar_opportunities(
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     radar = _read_json(root / RADAR_RELATIVE)
+    research_batch = _read_json(root / RESEARCH_RELATIVE)
     candidates = radar.get("candidates")
     candidates = candidates if isinstance(candidates, list) else []
+    research_actions = research_batch.get("actions")
+    research_actions = (
+        research_actions if isinstance(research_actions, list) else []
+    )
+    research_by_key = {
+        str(row.get("opportunity_key") or "").strip(): row
+        for row in research_actions
+        if isinstance(row, Mapping)
+        and str(row.get("opportunity_key") or "").strip()
+    }
     state_path = root / STATE_RELATIVE
     state = _read_json(state_path)
     fingerprints = state.get("fingerprints")
@@ -154,11 +191,7 @@ def plan_radar_opportunities(
         else {}
     )
 
-    coder_root = root / "runtime" / "coder"
-    coder = coder_factory(root, runtime_root=coder_root)
-    queue = queue_factory(root, runtime_root=coder_root)
-
-    eligible: list[Mapping[str, Any]] = []
+    eligible: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
     skipped_unchanged = 0
     skipped_no_evidence = 0
     for raw in candidates:
@@ -173,26 +206,35 @@ def plan_radar_opportunities(
         if not key or not refs:
             skipped_no_evidence += 1
             continue
-        fp = _fingerprint(raw)
+        research = research_by_key.get(key) or {}
+        fp = _fingerprint(raw, research)
         if fingerprints.get(key) == fp:
             skipped_unchanged += 1
             continue
-        eligible.append(raw)
+        eligible.append((raw, research))
 
     eligible.sort(
-        key=lambda row: (
-            -_priority(row),
-            str(row.get("opportunity_key") or ""),
+        key=lambda item: (
+            -_priority(item[0]),
+            str(item[0].get("opportunity_key") or ""),
         )
     )
 
     now = datetime.now(timezone.utc).isoformat()
     planned: list[PlannedOpportunity] = []
     bounded = max(1, min(int(limit), 10))
-    for candidate in eligible[:bounded]:
+    if eligible:
+        coder_root = root / "runtime" / "coder"
+        coder = coder_factory(root, runtime_root=coder_root)
+        queue = queue_factory(root, runtime_root=coder_root)
+    else:
+        coder = None
+        queue = None
+
+    for candidate, research in eligible[:bounded]:
         key = str(candidate.get("opportunity_key") or "").strip()
-        fp = _fingerprint(candidate)
-        task = coder.create_task(_objective(candidate))
+        fp = _fingerprint(candidate, research)
+        task = coder.create_task(_objective(candidate, research))
         job = queue.enqueue(
             task_id=task.id,
             kind=JobKind.PLAN,
@@ -235,6 +277,13 @@ def plan_radar_opportunities(
         "generated_at": now,
         "radar_available": bool(radar),
         "radar_candidate_count": len(candidates),
+        "research_available": bool(research_batch),
+        "research_action_count": len(research_actions),
+        "research_observation_count": sum(
+            int(row.get("observation_count") or 0)
+            for row in research_actions
+            if isinstance(row, Mapping)
+        ),
         "eligible_changed_count": len(eligible),
         "queued_count": len(planned),
         "skipped_unchanged": skipped_unchanged,
