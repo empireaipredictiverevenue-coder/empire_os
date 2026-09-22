@@ -173,7 +173,7 @@ Current truth:
 - [x] Account digital twin
 - [x] Market opportunities
 - [ ] Competitor graph visualization
-- [ ] Real funnel
+- [x] Real funnel
 - [ ] Terms/payment/fulfilment
 - [ ] Recognized revenue/GP
 - [ ] Revenue Pulse
