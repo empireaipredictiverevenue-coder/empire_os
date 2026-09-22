@@ -101,10 +101,10 @@ Current truth:
 - [x] Public review/company overlap
 - [x] Comparison pages
 - [ ] Search overlap
-- [ ] Ads/offers/creative tracking
-- [ ] Jobs/hiring signals
-- [ ] Events/webinars
-- [ ] Public company activity
+- [x] Ads/offers/creative tracking
+- [x] Jobs/hiring signals
+- [x] Events/webinars
+- [x] Public company activity
 - [x] Competitor audience overlap map
 - [x] Underserved audience finder
 - [x] Territory heatmap
