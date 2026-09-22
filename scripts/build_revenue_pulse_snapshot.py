@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import json
-import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from empire_os.qualification_worker_v2 import request_json
 from empire_os.revenue_pulse import StormPulse, build_revenue_pulse
-from empire_os.revenue_pulse_reader import fetch_current_and_previous_windows
+from empire_os.revenue_pulse_reader import (
+    fetch_current_and_previous_windows_postgres,
+)
+from empire_os.runtime_env import load_runtime_env
 
 
 ROOT = Path("/srv/empire_os")
@@ -28,11 +29,6 @@ def _parse_time(value: Any) -> datetime | None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
 
-
-
-def reader(path: str, params: dict[str, str]) -> Any:
-    query = urllib.parse.urlencode(params)
-    return request_json("GET", f"{path}?{query}")
 
 
 def load_commercial_blocker() -> tuple[str | None, str | None]:
@@ -110,8 +106,12 @@ def load_storm_pulse(*, now: datetime | None = None) -> StormPulse | None:
 
 def main() -> int:
     now = datetime.now(timezone.utc)
-    current, previous = fetch_current_and_previous_windows(
-        reader,
+    env = load_runtime_env(
+        ROOT / "runtime/secrets/intelligence_materializer.env",
+        required=("EMPIRE_INTELLIGENCE_MATERIALIZER_DSN",),
+    )
+    current, previous = fetch_current_and_previous_windows_postgres(
+        env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"],
         now=now,
         hours=24,
     )
@@ -124,7 +124,7 @@ def main() -> int:
         storm=load_storm_pulse(now=now),
     )
     pulse["generated_at"] = now.isoformat()
-    pulse["snapshot_source"] = "canonical_supabase_rest"
+    pulse["snapshot_source"] = "canonical_supabase_postgres"
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     tmp = OUT.with_suffix(".tmp")
