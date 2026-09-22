@@ -17,6 +17,9 @@ from empire_os.commercial_recovery_registry import (
     recovery_product_catalog,
     recovery_summary,
 )
+from empire_os.commercial_recovery_audit import (
+    build_recovery_implementation_audit,
+)
 from empire_os.competitor_audience_runtime import (
     build_competitor_audience_runtime,
 )
@@ -412,6 +415,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "recovery_portfolio": {
             "summary": recovery_summary(),
             "products": recovery_product_catalog(),
+            "implementation_audit": (
+                build_recovery_implementation_audit(repo_root)
+            ),
             "marketing_summary": marketing_summary(),
             "marketing_plans": marketing_plan_catalog(),
             "pricing_authority": "none",
