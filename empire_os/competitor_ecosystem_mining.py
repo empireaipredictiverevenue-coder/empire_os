@@ -22,7 +22,9 @@ from empire_os.competitor_audience_sweep import (
     load_resolved_market_entities,
 )
 from empire_os.intelligence_materializer_transport import (
+    COMPETITOR_ECOSYSTEM_SOURCE_KEY,
     PostgresIntelligenceMaterializer,
+    persist_competitor_ecosystem_signal,
 )
 
 
@@ -163,9 +165,18 @@ def discover_company_ecosystem(
             "entity_id": entity_id,
             "company_name": company_name,
             "company_domain": company_domain,
+            "observed_at": datetime.now(timezone.utc).isoformat(),
             "homepage_observed": False,
+            "surface_count": 0,
+            "case_study_surface_count": 0,
+            "testimonial_surface_count": 0,
+            "partner_surface_count": 0,
             "surfaces": [],
             "external_relationship_candidates": [],
+            "customer_relationship_inferred": False,
+            "partner_relationship_inferred": False,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
         }
 
     homepage = fetch_fn(base)
@@ -174,9 +185,18 @@ def discover_company_ecosystem(
             "entity_id": entity_id,
             "company_name": company_name,
             "company_domain": company_domain,
+            "observed_at": datetime.now(timezone.utc).isoformat(),
             "homepage_observed": False,
+            "surface_count": 0,
+            "case_study_surface_count": 0,
+            "testimonial_surface_count": 0,
+            "partner_surface_count": 0,
             "surfaces": [],
             "external_relationship_candidates": [],
+            "customer_relationship_inferred": False,
+            "partner_relationship_inferred": False,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
         }
 
     parser = _LinkParser()
@@ -238,6 +258,7 @@ def discover_company_ecosystem(
         "entity_id": entity_id,
         "company_name": company_name,
         "company_domain": company_domain,
+        "observed_at": datetime.now(timezone.utc).isoformat(),
         "homepage_observed": True,
         "surface_count": len(surfaces),
         "case_study_surface_count": sum(
@@ -255,6 +276,73 @@ def discover_company_ecosystem(
         "partner_relationship_inferred": False,
         "buyer_intent_inferred": False,
         "commercial_intent_inferred": False,
+    }
+
+
+def competitor_ecosystem_intelligence_signal(
+    company: Mapping[str, Any],
+    *,
+    source_id: str,
+) -> dict[str, Any]:
+    entity_id = _clean(company.get("entity_id"))
+    if not entity_id:
+        raise ValueError("entity_id_required")
+
+    surfaces = [
+        dict(row)
+        for row in company.get("surfaces", []) or []
+        if isinstance(row, Mapping)
+    ]
+    if not surfaces:
+        raise ValueError("ecosystem_surfaces_required")
+
+    observed_at = _clean(company.get("observed_at"))
+    if not observed_at:
+        observed_at = datetime.now(timezone.utc).isoformat()
+
+    external = [
+        dict(row)
+        for row in company.get("external_relationship_candidates", []) or []
+        if isinstance(row, Mapping)
+    ]
+
+    return {
+        "schema_version": "intelligence_signal_candidate.v1",
+        "entity_id": entity_id,
+        "signal_type": "competitor_ecosystem_evidence",
+        "signal_domain": "competitive_intelligence",
+        "observed_at": observed_at,
+        "source_id": _clean(source_id),
+        "strength": min(1.0, len(surfaces) / 3.0),
+        "confidence": 0.85,
+        "payload": {
+            "company_name": _clean(company.get("company_name")),
+            "company_domain": _clean(company.get("company_domain")),
+            "surface_count": len(surfaces),
+            "case_study_surface_count": int(
+                company.get("case_study_surface_count") or 0
+            ),
+            "testimonial_surface_count": int(
+                company.get("testimonial_surface_count") or 0
+            ),
+            "partner_surface_count": int(
+                company.get("partner_surface_count") or 0
+            ),
+            "surfaces": surfaces,
+            "external_relationship_candidates": external,
+            "research_candidate": True,
+            "customer_relationship_inferred": False,
+            "partner_relationship_inferred": False,
+            "buyer_intent": False,
+            "commercial_intent": False,
+            "prospect_created": False,
+            "outreach_enabled": False,
+        },
+        "persistence_performed": False,
+        "buyer_intent_inferred": False,
+        "commercial_intent_inferred": False,
+        "outreach_enabled": False,
+        "execution_authority": "none",
     }
 
 
@@ -352,6 +440,8 @@ def _load_json(path: Path) -> dict[str, Any]:
 def refresh_ecosystem_snapshot(
     repo_root: Path,
     writer: PostgresIntelligenceMaterializer,
+    *,
+    persist: bool = False,
 ) -> dict[str, Any]:
     market = _load_json(
         repo_root
@@ -364,6 +454,39 @@ def refresh_ecosystem_snapshot(
         metro=_clean(market.get("metro")),
     )
     payload = build_ecosystem_snapshot(companies=companies)
+
+    persistence = []
+    if persist:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SET LOCAL ROLE empire_intelligence_materializer"
+                )
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_ECOSYSTEM_SOURCE_KEY,
+                )
+
+        for company in payload.get("companies", []):
+            if int(company.get("surface_count") or 0) < 1:
+                continue
+            signal = competitor_ecosystem_intelligence_signal(
+                company,
+                source_id=source_id,
+            )
+            persistence.append(
+                persist_competitor_ecosystem_signal(writer, signal)
+            )
+
+    payload["persist_requested"] = bool(persist)
+    payload["persisted_signal_count"] = sum(
+        1 for row in persistence if row.get("inserted") is True
+    )
+    payload["existing_signal_count"] = sum(
+        1 for row in persistence if row.get("existing") is True
+    )
+    payload["persistence"] = persistence
+
     write_ecosystem_snapshot(repo_root, payload)
     return payload
 
@@ -401,6 +524,7 @@ def main() -> int:
         default=os.getenv("EMPIRE_REPO_ROOT", "/srv/empire_os"),
     )
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--persist", action="store_true")
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -415,7 +539,11 @@ def main() -> int:
         return 0
 
     writer = PostgresIntelligenceMaterializer.from_env()
-    payload = refresh_ecosystem_snapshot(repo_root, writer)
+    payload = refresh_ecosystem_snapshot(
+        repo_root,
+        writer,
+        persist=args.persist,
+    )
     print(json.dumps(payload, indent=2, sort_keys=True, default=str))
     return 0
 
