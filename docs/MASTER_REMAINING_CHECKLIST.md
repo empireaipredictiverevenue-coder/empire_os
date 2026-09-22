@@ -18,6 +18,49 @@ Current truth:
 - payment is not recognized revenue
 - recognized revenue is not realized gross profit
 
+## Predictive Cloud convergence — ACTIVE / IMPORTANT
+
+Canonical name and hierarchy:
+**Empire AI → EmpireOS → Predictive Cloud → Predictive Revenue + wider business/economic intelligence.**
+
+Architecture:
+- [x] Restore **Predictive Cloud** as the canonical umbrella name
+- [x] Define `docs/PREDICTIVE_CLOUD_ARCHITECTURE.md`
+- [x] Keep Predictive Revenue as the commercial/revenue-truth core
+- [x] Preserve OBSERVED / INFERRED / FORECAST / SCENARIO / VERIFIED OUTCOME separation
+- [x] Inventory existing modern analytics/intelligence modules
+- [ ] Remove remaining architecture/document naming drift
+- [ ] Expose one canonical Predictive Cloud capability/status contract
+
+Data & Decision Intelligence:
+- [x] Revenue Intelligence scoring/expected-value foundation exists
+- [x] Conversion Intelligence funnel/bottleneck analysis exists
+- [x] Revenue Pulse foundation exists
+- [x] Market Sweeps / Revenue GPS foundation exists
+- [x] Search / AEO / GEO / recommendation intelligence foundation exists
+- [x] Experiment Analysis foundation exists
+- [x] Trend / Regime foundation exists
+- [x] Digital Twin analysis foundation exists
+- [x] Quantitative Intelligence architecture exists
+- [x] TimesFM shadow forecast adapter exists
+- [x] Omega / Cortex evidence + learning foundations exist
+- [ ] Retire/migrate the legacy SQLite `agents/data_analysis_agent.py` concepts into canonical Supabase/Intelligence Fabric reads
+- [ ] Unified descriptive analytics: counts, distributions, cohorts, trends, rolling windows, freshness/missingness
+- [ ] Unified diagnostic analytics: funnel/segment/source/market/product decomposition and anomaly explanations
+- [ ] Unified predictive analytics: demand/revenue/GP/conversion/churn/capacity/search forecasts with uncertainty
+- [ ] Unified prescriptive layer: next-best decision + risk-adjusted expected value + value-of-information
+- [ ] Unified causal layer: experiments/holdouts/incrementality/forecast-vs-actual
+- [ ] Calibration board: Brier/forecast error/interval coverage/drift where applicable
+- [ ] Risk & resilience read model: downside, concentration, capacity and operational risk
+- [ ] Capital/portfolio read model: expected return, capital at risk, opportunity cost and diversification
+- [ ] Economic Memory join across prediction → action → verified outcome
+- [ ] Predictive Cloud API/read-model convergence
+- [ ] Predictive Cloud Founder Console surface
+- [ ] Real production evidence through the full prediction → outcome → calibration loop
+
+Predictive Cloud truth rule:
+**A prediction can guide a decision; only observed evidence can establish an actual, and only governed verified commercial evidence can establish revenue.**
+
 ## Competitor Audience Graph
 
 - [x] Public evidence discovery
@@ -347,6 +390,8 @@ Implementation state:
 - [ ] Prove repeatability before scaling spend
 
 ## Execution order
+
+Parallel foundation: Predictive Cloud convergence + canonical Data & Decision Intelligence must advance without replacing the first-revenue priority.
 
 1. Buyer State Evidence Stack
 2. Next-Best Action
