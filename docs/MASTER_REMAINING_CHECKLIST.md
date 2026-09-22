@@ -98,7 +98,7 @@ Current truth:
 - [x] Customer/case-study ecosystem
 - [x] Testimonial companies
 - [x] Partner ecosystem
-- [ ] Public review/company overlap
+- [x] Public review/company overlap
 - [x] Comparison pages
 - [ ] Search overlap
 - [ ] Ads/offers/creative tracking
