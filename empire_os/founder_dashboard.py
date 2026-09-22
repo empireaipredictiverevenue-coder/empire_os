@@ -323,6 +323,63 @@ def _commercial_catalog(
     }
 
 
+def _opportunity_value(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "execution_authority": "none",
+        }
+    items = raw.get("items")
+    items = items if isinstance(items, list) else []
+    top = next(
+        (
+            row for row in items
+            if isinstance(row, dict)
+            and row.get("status") == "AVAILABLE"
+        ),
+        None,
+    )
+    return {
+        "available": True,
+        "observed_at": raw.get("generated_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "candidate_count": int(raw.get("candidate_count") or 0),
+        "value_available_count": int(
+            raw.get("value_available_count") or 0
+        ),
+        "value_unavailable_count": int(
+            raw.get("value_unavailable_count") or 0
+        ),
+        "top_opportunity": (
+            {
+                "opportunity_key": top.get("opportunity_key"),
+                "rank": top.get("rank"),
+                "expected_revenue_cents": top.get(
+                    "expected_revenue_cents"
+                ),
+                "expected_gross_profit_cents": top.get(
+                    "expected_gross_profit_cents"
+                ),
+                "risk_adjusted_score": top.get(
+                    "risk_adjusted_score"
+                ),
+            }
+            if isinstance(top, dict)
+            else None
+        ),
+        "new_scoring_model_introduced": (
+            raw.get("new_scoring_model_introduced") is True
+        ),
+        "prediction_only": raw.get("prediction_only") is True,
+        "actual_revenue": False,
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
 def _predictive_intelligence(
     raw: dict[str, Any] | None,
     path: Path,
@@ -412,6 +469,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     source_path = runtime / "source_health" / "latest.json"
     conversion_path = runtime / "conversion" / "latest.json"
     catalog_path = runtime / "commercial_catalog" / "latest.json"
+    opportunity_value_path = (
+        runtime / "opportunity_factory" / "value_latest.json"
+    )
     predictive_intelligence_path = (
         runtime / "predictive_intelligence" / "latest.json"
     )
@@ -447,6 +507,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "commercial_catalog": _commercial_catalog(
             _read_json(catalog_path),
             catalog_path,
+        ),
+        "opportunity_value": _opportunity_value(
+            _read_json(opportunity_value_path),
+            opportunity_value_path,
         ),
         "predictive_intelligence": _predictive_intelligence(
             _read_json(predictive_intelligence_path),
