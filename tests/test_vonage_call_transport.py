@@ -8,7 +8,7 @@ def config():
     return VonageCallConfig(
         application_id="app-1",
         private_key="not-used-in-build-request",
-        virtual_number="+12025550100",
+        virtual_number="+12026401234",
         answer_url=(
             "https://empire-ai.co.uk/v1/voice-lab/vonage/answer"
         ),
@@ -27,10 +27,10 @@ def test_call_request_binds_callbacks_to_canonical_context(monkeypatch):
     body = transport.build_request({
         "intent_id": "00000000-0000-0000-0000-000000000101",
         "prospect_id": "00000000-0000-0000-0000-000000000201",
-        "phone": "+13105550123",
+        "phone": "+13106401234",
     })
 
-    assert body["to"][0]["number"] == "13105550123"
+    assert body["to"][0]["number"] == "13106401234"
     answer = body["answer_url"][0]
     event = body["event_url"][0]
     assert "intent_id=00000000-0000-0000-0000-000000000101" in answer
