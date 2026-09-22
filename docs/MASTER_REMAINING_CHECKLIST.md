@@ -601,6 +601,56 @@ Implementation state:
 - [ ] Repeat with second customer
 - [ ] Prove repeatability before scaling spend
 
+## Salvage / half-built / gated completion lane — PRESERVE AND FINISH
+
+Source-of-truth recovery references:
+- `docs/ASSET_HOLDING_AND_SALVAGE_POLICY.md`
+- `docs/LEGACY_ASSET_SALVAGE_AUDIT_2026-09-20.md`
+- `docs/LEGACY_COMMERCIAL_INTELLIGENCE_RECOVERY_INDEX.md`
+- `docs/COMMERCIAL_RECOVERY_AND_REVENUE_MAP.md`
+- `empire_os/commercial_recovery_registry.py`
+
+Operating rule:
+**Blueprint v6 + live runtime are production truth. Historical assets are recovery memory: inspect, classify and component-mine them; never restore them wholesale or treat them as live without evidence.**
+
+Protected paths remain untouched:
+- `/srv/empire_os/recovery/`
+- `/srv/empire_os/toop`
+
+Completion backlog:
+- [ ] Review every registered `ACTIVE_BUILD`, `SALVAGE_CANDIDATE`, `REBUILD_LATER` and `FOUNDER_GATE` asset against the current canonical architecture
+- [ ] Finish Permit Intelligence product/runtime integration
+- [ ] Finish Property Intelligence product/runtime integration
+- [ ] Finish Private Capital / Roll-Up Intelligence product/runtime integration
+- [ ] Finish Storm / Weather Intelligence and Storm Leads Multiplier integration
+- [ ] Finish Satellite / Volumetric / spatial-intelligence recovery where evidence quality supports it
+- [ ] Finish Warehouse / Industrial / Idle-Asset Radar recovery or explicitly retain as INCUBATE
+- [ ] Finish Revenue Pulse restoration on canonical Revenue Truth
+- [ ] Finish Search / SEO / AEO / GEO productization and monetized read surfaces
+- [ ] Rebuild Revenue Leak / Commercial Audit tooling without fabricated loss estimates
+- [ ] Rebuild Hourly Intelligence Retainer against current product catalog, usage/entitlement, BSC/USDT and Revenue Truth; historical $150/hour remains unapproved pricing
+- [ ] Rebuild Omega Evaluation / Value Meter against Omega 2 + Quant + verified outcomes + canonical usage billing
+- [ ] Recover buyer-waterfall / opportunity marketplace concepts only after verified buyer/capacity/terms/allocation controls are satisfied
+- [ ] Finish Managed Growth / done-for-you product family against real scope, cost, margin and capacity
+- [ ] Finish Enterprise / White Label / Partner product and reseller surfaces
+- [ ] Component-mine Hermes-era Harvester / Snipers / Whale Finder / Whale Harvester into current Source Mesh, identity and enterprise-fit layers
+- [ ] Recover strongest legacy usage-metering / pay-per-call / PPL / appointment/value-meter concepts without JSONL or legacy settlement becoming commercial truth
+- [ ] Recover business-loop watchdog / circuit-breaker / kill-switch / real-time Founder-event patterns into current operating fabric
+- [ ] Reconcile old GTM/marketing packs, Founding Partner patterns, enterprise campaigns, roofing/restoration/storm campaigns, account-based/whale GTM and inbound speed-to-lead against fresh contacts/evidence
+- [ ] Review remaining half-built/gated phases 6–18 components and classify each as CONNECTED / NEEDS WIRING / INCUBATE / REBUILD_LATER / RETIRED / FOUNDER_GATE
+- [ ] Surface recovery state, canonical replacement, readiness, blocker, evidence and next safe action in Founder Console
+- [ ] Close salvage items only when the canonical replacement is proven; do not mark historical existence as completion
+
+Explicit rejects:
+- retired Solana/USDC settlement
+- Phantom/Anchor/Jupiter payment paths
+- legacy SQLite/JSON commercial truth
+- synthetic/mock leads, fabricated revenue or fallback dollar-loss estimates
+- stale/placeholder contacts
+- Vapi/Twilio regressions where current Vonage/Voice Lab architecture is canonical
+- duplicate Omega/Cortex systems instead of integration with current Omega 2 / Cortex / Quant
+- unrestricted legacy direct-send, payment, allocation or autonomous execution paths
+
 ## Execution order
 
 Parallel foundation: Predictive Cloud convergence + canonical Data & Decision Intelligence must advance without replacing the first-revenue priority.
