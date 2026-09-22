@@ -76,10 +76,12 @@ def zipformer_transcribe(pcm16: bytes, threads: int) -> str:
     )
     stream = recognizer.create_stream()
     stream.accept_waveform(16000, audio)
+    tail = np.zeros(int(0.5 * 16000), dtype=np.float32)
+    stream.accept_waveform(16000, tail)
     stream.input_finished()
     while recognizer.is_ready(stream):
         recognizer.decode_stream(stream)
-    return str(recognizer.get_result(stream).text or "").strip()
+    return str(recognizer.get_result(stream) or "").strip()
 
 
 def benchmark_threads(threads: int) -> dict:
