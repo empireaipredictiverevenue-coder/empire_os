@@ -93,7 +93,7 @@ Current truth:
 
 ## Competitor mining at scale
 
-- [ ] More competitors per market
+- [x] More competitors per market
 - [ ] More Denver roofing companies
 - [ ] Customer/case-study ecosystem
 - [ ] Testimonial companies
@@ -105,7 +105,7 @@ Current truth:
 - [ ] Jobs/hiring signals
 - [ ] Events/webinars
 - [ ] Public company activity
-- [ ] Competitor audience overlap map
+- [x] Competitor audience overlap map
 - [ ] Underserved audience finder
 - [ ] Territory heatmap
 - [ ] Share-of-voice / search presence
