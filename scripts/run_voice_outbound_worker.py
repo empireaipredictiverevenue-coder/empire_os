@@ -34,7 +34,32 @@ def parser() -> argparse.ArgumentParser:
     return p
 
 
+def voice_legal_decision(item: dict[str, Any]) -> tuple[bool, str]:
+    legal_basis = str(
+        item.get("voice_legal_basis") or ""
+    ).strip()
+    line_type = str(item.get("line_type") or "").strip()
+
+    if not legal_basis:
+        return False, "HOLD_LEGAL_BASIS_UNVERIFIED"
+    if legal_basis not in {
+        "prior_express_written_consent",
+        "verified_business_landline_b2b",
+    }:
+        return False, "HOLD_UNSUPPORTED_LEGAL_BASIS"
+    if (
+        legal_basis == "verified_business_landline_b2b"
+        and line_type not in {"landline", "landline_tollfree"}
+    ):
+        return False, "HOLD_BUSINESS_LANDLINE_UNVERIFIED"
+    return True, "VOICE_LEGAL_BASIS_VERIFIED"
+
+
 def _voice_intent(item: dict[str, Any], daily_cap: int) -> tuple[str, Any]:
+    legal_basis = str(
+        item.get("voice_legal_basis") or ""
+    ).strip()
+    line_type = str(item.get("line_type") or "").strip()
     date_key = datetime.now(timezone.utc).strftime("%Y%m%d")
     proposed = request_json(
         "POST",
@@ -116,22 +141,9 @@ def main(argv=None) -> int:
             "legal_basis_source": item.get("legal_basis_source"),
             "executed": False,
         }
-        if not legal_basis:
-            record["decision"] = "HOLD_LEGAL_BASIS_UNVERIFIED"
-            results.append(record)
-            continue
-        if (
-            legal_basis == "verified_business_landline_b2b"
-            and line_type not in {"landline", "landline_tollfree"}
-        ):
-            record["decision"] = "HOLD_BUSINESS_LANDLINE_UNVERIFIED"
-            results.append(record)
-            continue
-        if legal_basis not in {
-            "prior_express_written_consent",
-            "verified_business_landline_b2b",
-        }:
-            record["decision"] = "HOLD_UNSUPPORTED_LEGAL_BASIS"
+        legal_ok, legal_decision = voice_legal_decision(item)
+        if not legal_ok:
+            record["decision"] = legal_decision
             results.append(record)
             continue
         if window.get("eligible") is not True:
