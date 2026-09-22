@@ -70,6 +70,7 @@ Canonical architecture:
 - [x] Astra Executive consumes Quant missing-evidence state — CODED
 - [x] Predictive Intelligence registered as a Data/Quant capability
 - [x] Quant/Predictive Intelligence remain OBSERVE-only in Control Fabric
+- [x] Live Opportunity/Quant loop proof — 24 candidates, 13 research observations, 15 normalized scores, 21 QUALIFY / 3 DISCOVER, 0 fabricated Quant packets — 2026-09-22
 - [ ] Live EmpireOS verification of Quant endpoints and opportunity Quant Review
 - [ ] Calibrated probability-of-success source from verified outcome cohorts
 - [ ] Calibrated time-to-revenue distributions
@@ -211,10 +212,12 @@ Canonical organization:
 - [x] All canonical department components registered in Control Fabric — CODED
 - [x] Architecture regression prevents orphaned Astra delegate targets — CODED
 - [x] Predictive Cloud status exposes department organization/coverage — CODED
-- [ ] Live runtime verification of Astra Executive snapshot on EmpireOS
+- [x] 13/13 canonical departments live-verified as fully registered with no missing components — 2026-09-22
+- [x] Core intelligence/org regression — 73 passed, 1 dependency deprecation warning — 2026-09-22
+- [x] Live runtime verification of Astra Executive snapshot on EmpireOS — VERIFIED 2026-09-22: primary goal `advance_first_verified_revenue`, 8 plan steps, 8 auto-dispatch eligible, 0 founder gates
 - [ ] Department scorecards from live KPIs
-- [ ] Department work queues / budgets / review cadence
-- [ ] Astra automatic dispatch from executive plan into eligible department queues
+- [ ] Department work queues / budgets / review cadence — durable work queue + 2-minute bounded heartbeat + evaluator CODED; budget ledger still pending
+- [x] Astra automatic dispatch from executive plan into eligible department queues — CODED with deterministic dedupe + authority filter; live verification pending
 - [ ] Executive plan-vs-outcome evaluation / feedback loop
 - [ ] Founder Console department command surface
 
