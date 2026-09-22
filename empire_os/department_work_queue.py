@@ -144,6 +144,7 @@ class DepartmentWorkQueue:
         plan_id: str,
         step: Mapping[str, Any],
         priority: int = 50,
+        reopen_blocked_reasons: tuple[str, ...] = (),
     ) -> tuple[DepartmentWorkItem, bool]:
         plan = self._safe(str(plan_id or ""))
         step_id = self._safe(str(step.get("step_id") or ""))
@@ -185,7 +186,26 @@ class DepartmentWorkQueue:
         with self._locked():
             existing = self._find_path(work_id)
             if existing is not None:
-                return self._load(existing), False
+                current = self._load(existing)
+                reopen = (
+                    existing.parent == self.blocked
+                    and str(current.error or "")
+                    in set(reopen_blocked_reasons)
+                )
+                if reopen:
+                    current.status = DepartmentWorkStatus.READY
+                    current.error = None
+                    current.result = {}
+                    current.result_evidence_refs = ()
+                    current.lease_id = None
+                    current.worker_id = None
+                    current.lease_expires_at = None
+                    current.updated_at = self._now()
+                    self._write(existing, current)
+                    destination = self.ready / existing.name
+                    existing.replace(destination)
+                    return self._load(destination), True
+                return current, False
             self._write(self.ready / f"{work_id}.json", item)
         return item, True
 
