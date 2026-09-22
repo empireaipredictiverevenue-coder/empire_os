@@ -13,6 +13,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Mapping
 
 from empire_os.competitor_audience_sweep import (
@@ -21,6 +22,7 @@ from empire_os.competitor_audience_sweep import (
 from empire_os.intelligence_materializer_transport import (
     PostgresIntelligenceMaterializer,
 )
+from empire_os.search_fabric.search import search as search_web
 
 
 SNAPSHOT_RELATIVE_PATH = Path(
@@ -28,6 +30,23 @@ SNAPSHOT_RELATIVE_PATH = Path(
 )
 
 SweepFn = Callable[..., Mapping[str, Any]]
+
+
+def _market_search(query: str, num: int = 10) -> Mapping[str, Any]:
+    """Fast-fail market discovery over the two currently useful Bing paths."""
+    for engine in ("bing_html", "bing_rss"):
+        result = search_web(query, num=num, engine=engine)
+        if isinstance(result, Mapping) and result.get("organic"):
+            return result
+    return {
+        "organic": [],
+        "searchParameters": {
+            "q": query,
+            "num": num,
+            "engine": "market_fast_fail",
+        },
+        "credits_left": 999999,
+    }
 
 
 def _clean(value: Any) -> str:
@@ -282,7 +301,8 @@ def run_market_scale_sweep(
         seeds = seeds[:max(1, int(max_seeds))]
 
     sweeps: list[dict[str, Any]] = []
-    for seed in seeds:
+
+    def _run_seed(seed: Mapping[str, Any]) -> dict[str, Any]:
         result = sweep_fn(
             writer=writer,
             competitor_key=seed["competitor_key"],
@@ -292,8 +312,27 @@ def run_market_scale_sweep(
             niche=reviewed["niche"],
             metro=reviewed["metro"],
             persist=persist,
+            search_fn=_market_search,
         )
-        sweeps.append(dict(result))
+        return dict(result)
+
+    workers = min(3, max(1, len(seeds)))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(_run_seed, seed): seed
+            for seed in seeds
+        }
+        for future in as_completed(futures):
+            sweeps.append(future.result())
+
+    sweeps.sort(
+        key=lambda row: _clean(
+            row.get("signals", [{}])[0].get("payload", {}).get(
+                "competitor_key"
+            )
+            if row.get("signals") else row.get("market_query")
+        )
+    )
 
     aggregate = _aggregate_market_results(reviewed, sweeps)
 
