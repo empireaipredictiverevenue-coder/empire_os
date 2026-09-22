@@ -7,6 +7,7 @@ from pathlib import Path
 
 from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
 from empire_os.buyer_review_materializer import run_buyer_review_materializer
+from empire_os.gtm_standing_bridge import run_standing_bridge
 
 STATE = Path("/srv/empire_os/runtime/buyer_review_materializer/state.json")
 LATEST = Path("/srv/empire_os/runtime/buyer_review_materializer/latest.json")
@@ -58,7 +59,17 @@ def main() -> int:
     payload["scan_offset"] = offset
     payload["mode"] = "INTERNAL_MATERIALIZE"
     payload["owner"] = "astra"
-    payload["ok"] = not payload["errors"]
+
+    bridge = run_standing_bridge(
+        review_limit=min(50, max(10, int(args.proposal_limit) * 2)),
+        outbound_limit=min(50, max(10, int(args.proposal_limit) * 2)),
+        daily_cap=10,
+    )
+    payload["standing_bridge"] = bridge.as_dict()
+    payload["ok"] = (
+        not payload["errors"]
+        and not payload["standing_bridge"]["outbound_errors"]
+    )
     _write(LATEST, payload)
 
     next_scan_fresh = not scan_fresh
