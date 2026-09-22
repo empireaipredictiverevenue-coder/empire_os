@@ -663,7 +663,9 @@ def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
     else:
         # Production auto order:
         # Brave when configured -> Bing HTML -> DuckDuckGo HTML.
-        # Historical endpoints remain explicit-only fallbacks.
+        # If those fail or are blocked, reuse the already-shipped historical
+        # adapters as bounded recovery providers. Every recovered result still
+        # passes the same lexical quality gate before it can leave Search Fabric.
         engines_to_try = [
             e for e in ENGINES
             if e.get("auto", True)
@@ -677,6 +679,19 @@ def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
                 e for e in engines_to_try
                 if e["name"] != "brave"
             ]
+
+        recovery_names = {
+            "bing_rss",
+            "duckduckgo_lite",
+            "mojeek",
+        }
+        recovery_engines = [
+            e for e in ENGINES
+            if e["name"] in recovery_names
+            and not e["requires_key"]
+            and e not in engines_to_try
+        ]
+        engines_to_try.extend(recovery_engines)
 
     for eng in engines_to_try:
         # Check cache first
