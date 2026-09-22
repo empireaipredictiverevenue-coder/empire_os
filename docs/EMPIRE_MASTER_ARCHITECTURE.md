@@ -6,6 +6,8 @@ Status: CANONICAL MASTER REFERENCE
 This document is the top-level architecture reference for the Empire AI business.
 
 Canonical organization architecture: `docs/DEPARTMENT_OPERATING_ARCHITECTURE.md`
+
+Canonical intelligence-provider architecture: `docs/INTELLIGENCE_ROUTER_ARCHITECTURE.md`
 It exists to prevent architecture drift, disconnected subsystem builds and repeated
 rediscovery of the same operating model.
 
