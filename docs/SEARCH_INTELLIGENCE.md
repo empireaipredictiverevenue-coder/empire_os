@@ -254,3 +254,44 @@ Foundation validation must include:
 - ASGI route registration/health check;
 - `git diff --check`;
 - no production migration, restart or indexing action.
+
+
+## Organic + AI Recommendation Intelligence
+
+This is a first-class sellable Search Intelligence product that joins organic
+search evidence with captured AI-answer evidence.
+
+Customer question:
+"Can buyers discover us in organic search, and when they ask AI systems for
+companies like us, are we observed, cited or explicitly recommended?"
+
+Measured outputs:
+- organic SERP visibility from real Search Fabric observations;
+- observed AI answer presence;
+- observed citation presence and source domains;
+- observed explicit recommendation presence;
+- share of observed recommendations across the monitored brand + competitor set;
+- competitor recommendation-gap queries;
+- citation/source gaps that can inform content, authority and digital-PR work;
+- query portfolios built from real buyer questions;
+- search/AI-touch attribution to recognized revenue only where canonical evidence exists.
+
+Truth rules:
+- no model preference, hidden ranking or market share may be inferred;
+- "share of observed recommendations" is scoped only to the captured answer set;
+- no recommendation can be guaranteed;
+- missing answer captures remain UNKNOWN rather than zero visibility;
+- recommendation/citation observations require timestamped provenance;
+- no observed mention, citation or recommendation creates outreach, publishing,
+  indexing, payment or commercial execution authority;
+- actual revenue remains recognized revenue only.
+
+API foundation:
+- `POST /v1/search/recommendation-visibility/preview`
+- product key: `organic_ai_recommendation_intelligence`
+- mode: OBSERVE
+- execution authority: none
+
+The product is designed to combine with Search Console, SERP Intelligence,
+AEO/GEO visibility, citation gaps, competitor gaps and Search-to-Revenue
+Attribution as those real evidence adapters become available.
