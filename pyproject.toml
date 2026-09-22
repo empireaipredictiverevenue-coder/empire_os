@@ -27,6 +27,12 @@ payment-ops = [
 outbound-email = [
     "resend>=2.21.0,<3",
 ]
+voice = [
+    "numpy>=1.26,<3",
+    "faster-whisper>=1.1,<2",
+    "kokoro>=0.9.4,<2",
+    "PyJWT[crypto]>=2.9,<3",
+]
 search-console = [
     "google-auth>=2.0,<3",
 ]
