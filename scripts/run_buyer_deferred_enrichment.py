@@ -307,7 +307,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
         str(item.get("prospect_id") or "")
         for item in due
     ])
-    network_probe_budget = 2
+    network_probe_budget = min(max(1, int(limit)), 8)
     network_probes = 0
 
     for item in due:
