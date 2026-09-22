@@ -48,6 +48,8 @@ def test_choose_jobs_adds_source_repair_but_no_duplicate_jobs():
         "commercial_loop_refresh",
         "revenue_pulse_refresh",
         "opportunity_loop_refresh",
+        "astra_executive_refresh",
+        "astra_department_dispatch",
     ]
 
 
