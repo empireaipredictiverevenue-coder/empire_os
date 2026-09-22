@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 import jwt
@@ -88,6 +89,30 @@ class VonageCallConfig:
         }
 
 
+def _context_url(
+    url: str,
+    *,
+    intent_id: str,
+    prospect_id: str,
+    token: str,
+) -> str:
+    parsed = urlparse(url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query.update({
+        "intent_id": intent_id,
+        "prospect_id": prospect_id,
+        "token": token,
+    })
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path,
+        parsed.params,
+        urlencode(query),
+        parsed.fragment,
+    ))
+
+
 def _provider_number(value: Any) -> str:
     phone = canonical_phone(value)
     if not phone:
@@ -113,13 +138,39 @@ class VonageCallTransport:
         from_number = _provider_number(self.config.virtual_number)
         if not self.config.answer_url:
             raise VonageCallTransportError("Vonage answer URL required")
+        intent_id = str(plan.get("intent_id") or "").strip()
+        prospect_id = str(plan.get("prospect_id") or "").strip()
+        webhook_token = str(
+            os.getenv("EMPIRE_VONAGE_WEBHOOK_TOKEN") or ""
+        ).strip()
+        if not intent_id or not prospect_id:
+            raise VonageCallTransportError(
+                "voice intent and prospect context required"
+            )
+        if not webhook_token:
+            raise VonageCallTransportError(
+                "EMPIRE_VONAGE_WEBHOOK_TOKEN required"
+            )
+        answer_url = _context_url(
+            self.config.answer_url,
+            intent_id=intent_id,
+            prospect_id=prospect_id,
+            token=webhook_token,
+        )
         body: dict[str, Any] = {
             "to": [{"type": "phone", "number": to_number}],
             "from": {"type": "phone", "number": from_number},
-            "answer_url": [self.config.answer_url],
+            "answer_url": [answer_url],
         }
         if self.config.event_url:
-            body["event_url"] = [self.config.event_url]
+            body["event_url"] = [
+                _context_url(
+                    self.config.event_url,
+                    intent_id=intent_id,
+                    prospect_id=prospect_id,
+                    token=webhook_token,
+                )
+            ]
         return body
 
     def _jwt(self) -> str:
