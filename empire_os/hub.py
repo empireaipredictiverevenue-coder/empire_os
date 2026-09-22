@@ -84,6 +84,7 @@ from empire_os.predictive_api import create_predictive_router
 from empire_os.advertising_api import create_advertising_router
 from empire_os.revenue_crm_api import create_revenue_crm_router
 from empire_os.conversation_api import create_conversation_router
+from empire_os.voice_gateway_api import router as voice_gateway_router
 from empire_os.a2a_identity_api import create_a2a_identity_router
 from empire_os.a2a_commerce_api import create_a2a_commerce_router
 from empire_os.deal_room_api import create_deal_room_router
@@ -495,6 +496,7 @@ app.include_router(create_predictive_router())
 app.include_router(create_advertising_router())
 app.include_router(create_revenue_crm_router())
 app.include_router(create_conversation_router())
+app.include_router(voice_gateway_router)
 app.include_router(create_a2a_identity_router())
 app.include_router(create_a2a_commerce_router())
 app.include_router(create_deal_room_router())
