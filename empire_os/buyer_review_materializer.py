@@ -145,10 +145,15 @@ def fetch_candidate_rows(
                 "status,notes,contact_name,contact_title,contact_source,"
                 "contacted_status,created_at"
             ),
+            "buy_signal_score": "gte.70",
+            "website": "not.is.null",
+            "or": (
+                "(niche.ilike.*roof*,niche.ilike.*hvac*,"
+                "niche.ilike.*plumb*,niche.ilike.*solar*,"
+                "niche.ilike.*contractor*,niche.ilike.*restoration*)"
+            ),
             "order": (
-                "created_at.desc"
-                if offset == 0
-                else "buy_signal_score.desc.nullslast,created_at.desc"
+                "buy_signal_score.desc.nullslast,created_at.desc"
             ),
             "limit": bounded,
             "offset": offset,
