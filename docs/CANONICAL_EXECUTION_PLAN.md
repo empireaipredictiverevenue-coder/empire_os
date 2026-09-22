@@ -19,26 +19,24 @@ New ideas are captured against the correct phase. They do not interrupt the
 current phase unless they reveal a genuine blocker, security issue,
 revenue-critical dependency or fundamental correctness problem.
 
-## Current phase — 3F: Intelligence & Learning Closeout
+## Closed phase — 3F: Intelligence & Learning Closeout
 
-Finish in this order:
+Status: **CLOSED — EVIDENCE DEPENDENCIES CARRIED FORWARD**
 
-1. Verified outcome provenance and evidence-gated Economic Memory.
-2. Predictive Intelligence closeout using verified commercial evidence.
-3. Recovery/salvage implementation audit: declared state must be separate from
-   observable code, tests, services and runtime evidence.
-4. Founder Console visibility for the above.
-5. Relevant regression and runtime verification.
-6. Upgrade & Enhance review.
-7. Revenue Expansion review.
-8. Re-test and close Phase 3F.
+Phase 3F passed engineering closeout and production automation verification.
+The remaining verified-outcome cohort and time-to-revenue dependencies require
+future genuine commercial evidence; they are not engineering blockers and must
+not be filled with synthetic outcomes.
 
-Revenue features assigned here:
+Revenue foundations delivered:
 - Opportunity Value Scoring.
-- Outcome-Based Product Development.
+- Outcome-Based Product Development foundation.
 - Commercial Diagnostics foundation.
 
-## Phase 4 — Commercial Exchange
+The staged predictive outcome-timing read-model migration remains a separate
+production database gate and was not applied by the Phase 3F closeout.
+
+## Current phase — 4: Commercial Exchange
 
 Build the Supabase-native commercial exchange around:
 - lanes;
