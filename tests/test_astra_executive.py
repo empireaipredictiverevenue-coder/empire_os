@@ -46,6 +46,18 @@ def routes():
     }
 
 
+def quant_review():
+    return {
+        "available_decision_packet_count": 0,
+        "unavailable_decision_packet_count": 2,
+        "missing_field_counts": {
+            "probability_success": 2,
+            "time_to_revenue_days": 1,
+        },
+        "items": [],
+    }
+
+
 def nba():
     return {
         "founder_gate_count": 0,
@@ -144,3 +156,41 @@ def test_founder_gate_next_action_is_never_auto_dispatch_eligible():
     assert payment["authority"] == "founder_gate"
     assert payment["auto_dispatch_eligible"] is False
     assert payment["founder_gate_required"] is True
+
+
+def test_executive_plan_steps_have_department_ownership():
+    result = build_executive_snapshot(
+        predictive_status=status(),
+        evidence_routes=routes(),
+        next_best_action=nba(),
+        revenue_pulse=pulse(),
+    )
+    assert result["department_count"] > 5
+    assert result["departments_in_plan"]
+    for row in result["plan"]:
+        assert row["department_keys"]
+
+
+def test_executive_routes_missing_quant_inputs_to_data_quant_department():
+    result = build_executive_snapshot(
+        predictive_status=status(),
+        evidence_routes={},
+        next_best_action={"actions": []},
+        revenue_pulse=pulse(),
+        quant_review=quant_review(),
+    )
+    quant_steps = [
+        row for row in result["plan"]
+        if row["action"].startswith("resolve_quant_input:")
+    ]
+    assert quant_steps
+    probability = next(
+        row for row in quant_steps
+        if row["action"] == "resolve_quant_input:probability_success"
+    )
+    assert probability["target_component"] == "predictive_intelligence"
+    assert "data_quant" in probability["department_keys"]
+    assert probability["authority"] == "observe"
+    assert probability["auto_dispatch_eligible"] is True
+    goal_keys = {row["key"] for row in result["goals"]}
+    assert "complete_quantitative_evidence" in goal_keys
