@@ -810,3 +810,45 @@ def test_dashboard_exposes_competitor_market_opportunity(tmp_path):
     assert market["market_share_inferred"] is False
     assert market["revenue_opportunity_inferred"] is False
     assert market["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_competitor_ecosystem(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_ecosystem_latest.json",
+        {
+            "schema_version": "empire.competitor_ecosystem_snapshot.v1",
+            "mode": "OBSERVE",
+            "company_count": 14,
+            "homepage_observed_count": 10,
+            "case_study_company_count": 4,
+            "testimonial_company_count": 5,
+            "partner_surface_company_count": 6,
+            "surface_count": 22,
+            "external_relationship_candidate_count": 7,
+            "customer_relationship_inferred": False,
+            "partner_relationship_inferred": False,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+            "companies": [],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    eco = result["competitor_ecosystem"]
+
+    assert eco["available"] is True
+    assert eco["company_count"] == 14
+    assert eco["case_study_company_count"] == 4
+    assert eco["testimonial_company_count"] == 5
+    assert eco["partner_surface_company_count"] == 6
+    assert eco["external_relationship_candidate_count"] == 7
+    assert eco["buyer_intent_inferred"] is False
+    assert eco["commercial_intent_inferred"] is False
+    assert eco["outreach_enabled"] is False
+    assert eco["execution_authority"] == "none"
