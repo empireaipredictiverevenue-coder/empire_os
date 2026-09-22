@@ -1449,3 +1449,51 @@ def test_dashboard_exposes_phase4_commercial_exchange_contract(tmp_path):
     assert exchange["automation"]["automatic_external_delivery"] is False
     assert exchange["production_schema_applied"] is False
     assert exchange["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_live_phase4_exchange_runtime(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/commercial_exchange/latest.json",
+        {
+            "mode": "OBSERVE",
+            "observed_at": "2026-09-23T00:00:00+00:00",
+            "source": "canonical_supabase_projection",
+            "prospects_scanned": 20,
+            "inventory_count": 6,
+            "allocation_candidate_count": 2,
+            "overflow_count": 3,
+            "allocated_count": 1,
+            "blocked_missing_evidence_count": 0,
+            "buyer_seat_count": 4,
+            "corridor_count": 3,
+            "inventory_state_counts": {
+                "allocated": 1,
+                "allocation_candidate": 2,
+                "overflow_no_capacity": 3,
+            },
+            "seat_state_counts": {
+                "active_capacity": 2,
+                "full": 2,
+            },
+            "buyer_capacity_never_gates_acquisition": True,
+            "overflow_remains_empire_owned": True,
+            "automatic_external_delivery": False,
+            "production_schema_applied": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    runtime = result["commercial_exchange_runtime"]
+
+    assert runtime["available"] is True
+    assert runtime["inventory_count"] == 6
+    assert runtime["allocation_candidate_count"] == 2
+    assert runtime["overflow_count"] == 3
+    assert runtime["buyer_seat_count"] == 4
+    assert runtime["buyer_capacity_never_gates_acquisition"] is True
+    assert runtime["overflow_remains_empire_owned"] is True
+    assert runtime["automatic_external_delivery"] is False
+    assert runtime["production_schema_applied"] is False
+    assert runtime["execution_authority"] == "none"
