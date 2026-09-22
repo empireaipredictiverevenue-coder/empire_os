@@ -1273,6 +1273,12 @@ def test_dashboard_exposes_recovery_portfolio_as_non_production_truth(tmp_path):
         and row["state"] == "FOUNDER_GATE"
         for row in recovery["products"]
     )
+    audit = recovery["implementation_audit"]
+    assert audit["product_count"] == recovery["summary"]["product_count"]
+    assert audit["registry_state_is_production_proof"] is False
+    assert audit["runtime_artifact_is_revenue_proof"] is False
+    assert audit["protected_paths_read"] is False
+    assert audit["execution_authority"] == "none"
     assert recovery["pricing_authority"] == "none"
     assert recovery["execution_authority"] == "none"
     assert recovery["actual_revenue"] is False
