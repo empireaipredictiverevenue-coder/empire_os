@@ -152,3 +152,59 @@ def test_unqualified_prospect_is_not_promoted_to_exchange_inventory():
     )
     assert snapshot["inventory"] == []
     assert snapshot["inventory_count"] == 0
+
+
+def test_supply_gate_diagnostics_preserve_qualification_and_identity_blockers():
+    ready_id = "33333333-3333-4333-8333-333333333333"
+    blocked_id = "44444444-4444-4444-8444-444444444444"
+
+    snapshot = build_exchange_snapshot(
+        prospects=[
+            prospect(pid=ready_id),
+            prospect(pid=blocked_id),
+        ],
+        qualifications={
+            ready_id: {
+                **qualification(pid=ready_id),
+                "entity_id": ENTITY_ID,
+            },
+            blocked_id: None,
+        },
+        identity_links={
+            ready_id: {
+                **identity(pid=ready_id),
+                "entity_id": ENTITY_ID,
+            },
+            blocked_id: None,
+        },
+        buyers=[],
+        observed_at=datetime(2026, 9, 23, tzinfo=timezone.utc),
+    )
+
+    diagnostics = snapshot["supply_gate_diagnostics"]
+    assert diagnostics["prospects_seen"] == 2
+    assert diagnostics["qualification_ready_count"] == 1
+    assert diagnostics["exchange_inventory_ready_count"] == 1
+    assert diagnostics["qualification_blocker_counts"] == {
+        "missing_qualification": 1
+    }
+
+
+def test_seat_activation_blockers_are_counted_without_weakening_gate():
+    blocked = buyer()
+    blocked["commercial_activation_state"] = "discovered"
+
+    snapshot = build_exchange_snapshot(
+        prospects=[],
+        qualifications={},
+        identity_links={},
+        buyers=[blocked],
+        observed_at=datetime(2026, 9, 23, tzinfo=timezone.utc),
+    )
+
+    assert snapshot["seat_activation_blocker_counts"] == {
+        "buyer_not_commercially_activated": 1
+    }
+    assert snapshot["buyer_seats"][0]["seat_state"] == (
+        "blocked_missing_evidence"
+    )
