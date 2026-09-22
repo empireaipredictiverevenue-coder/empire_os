@@ -91,6 +91,46 @@ def _first_name(value: Any) -> str:
     return text.split()[0] if text else ""
 
 
+def _normalized_words(value: Any) -> list[str]:
+    text = str(value or "").strip().casefold()
+    cleaned = "".join(
+        ch if ch.isalnum() else " "
+        for ch in text
+    )
+    return [word for word in cleaned.split() if word]
+
+
+def _looks_like_real_person_for_business(
+    contact_name: Any,
+    business_name: Any,
+) -> bool:
+    if not looks_like_person_name(contact_name):
+        return False
+
+    contact_words = _normalized_words(contact_name)
+    business_words = _normalized_words(business_name)
+    if not contact_words or not business_words:
+        return True
+
+    contact = " ".join(contact_words)
+    business = " ".join(business_words)
+    if contact == business:
+        return False
+
+    prefix = " ".join(business_words[: len(contact_words)])
+    if len(contact_words) >= 2 and contact == prefix:
+        return False
+
+    generic = {
+        "team", "company", "services", "service", "office",
+        "sales", "support", "contact", "referral", "program",
+    }
+    if set(contact_words) & generic:
+        return False
+
+    return True
+
+
 def _message(review: Mapping[str, Any]) -> tuple[str, str]:
     evidence = review.get("evidence")
     evidence = evidence if isinstance(evidence, Mapping) else {}
@@ -173,7 +213,15 @@ def run_standing_bridge(
         ).strip()
         if not review_id:
             continue
-        if not looks_like_person_name(contact_name):
+        evidence = review.get("evidence")
+        evidence = evidence if isinstance(evidence, Mapping) else {}
+        business_name = str(
+            evidence.get("business_name") or ""
+        ).strip()
+        if not _looks_like_real_person_for_business(
+            contact_name,
+            business_name,
+        ):
             skipped_invalid_person += 1
             continue
 
