@@ -467,6 +467,61 @@ def _economic_memory(
     }
 
 
+def _commercial_exchange_runtime(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "mode": "unknown",
+            "execution_authority": "none",
+        }
+    return {
+        "available": True,
+        "observed_at": raw.get("observed_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "source": raw.get("source"),
+        "prospects_scanned": int(raw.get("prospects_scanned") or 0),
+        "inventory_count": int(raw.get("inventory_count") or 0),
+        "allocation_candidate_count": int(
+            raw.get("allocation_candidate_count") or 0
+        ),
+        "overflow_count": int(raw.get("overflow_count") or 0),
+        "allocated_count": int(raw.get("allocated_count") or 0),
+        "blocked_missing_evidence_count": int(
+            raw.get("blocked_missing_evidence_count") or 0
+        ),
+        "buyer_seat_count": int(raw.get("buyer_seat_count") or 0),
+        "corridor_count": int(raw.get("corridor_count") or 0),
+        "inventory_state_counts": (
+            raw.get("inventory_state_counts")
+            if isinstance(raw.get("inventory_state_counts"), dict)
+            else {}
+        ),
+        "seat_state_counts": (
+            raw.get("seat_state_counts")
+            if isinstance(raw.get("seat_state_counts"), dict)
+            else {}
+        ),
+        "buyer_capacity_never_gates_acquisition": (
+            raw.get("buyer_capacity_never_gates_acquisition") is True
+        ),
+        "overflow_remains_empire_owned": (
+            raw.get("overflow_remains_empire_owned") is True
+        ),
+        "automatic_external_delivery": (
+            raw.get("automatic_external_delivery") is True
+        ),
+        "production_schema_applied": (
+            raw.get("production_schema_applied") is True
+        ),
+        "actual_revenue": False,
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
 def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     loop_path = runtime / "commercial_loop" / "latest.json"
@@ -482,6 +537,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         runtime / "predictive_intelligence" / "latest.json"
     )
     economic_memory_path = runtime / "economic_memory" / "latest.json"
+    commercial_exchange_runtime_path = (
+        runtime / "commercial_exchange" / "latest.json"
+    )
 
     raw_loop = _read_json(loop_path)
     conveyor = build_conveyor(raw_loop or {"stages": []})
@@ -593,5 +651,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "canonical_execution_plan": build_canonical_phase_plan(),
         "phase_3f_closeout": build_phase_3f_closeout(repo_root),
         "commercial_exchange": build_commercial_exchange_contract(),
+        "commercial_exchange_runtime": _commercial_exchange_runtime(
+            _read_json(commercial_exchange_runtime_path),
+            commercial_exchange_runtime_path,
+        ),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
