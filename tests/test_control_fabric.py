@@ -76,3 +76,22 @@ def test_executive_and_specialist_departments_are_registered():
         "commercial_priority": 80,
     })
     assert routes[0]["component"] == "empire_coder"
+
+
+def test_department_capabilities_route_through_control_fabric():
+    expected = {
+        "campaign_plan_requested": "marketing",
+        "quant_review_requested": "quant_brain",
+        "experiment_review_requested": "experiment_intelligence",
+        "scenario_review_requested": "digital_twin",
+        "customer_state_refresh_requested": "revenue_crm",
+        "capital_review_requested": "capital_allocator",
+        "partner_research_requested": "strategic_partnerships",
+    }
+    for event_type, component in expected.items():
+        routes = route_event({
+            "event_type": event_type,
+            "commercial_priority": 75,
+        })
+        assert routes
+        assert routes[0]["component"] == component
