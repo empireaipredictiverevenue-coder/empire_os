@@ -28,6 +28,7 @@ Truth boundary: OBSERVED ≠ INFERRED ≠ FORECAST ≠ SCENARIO ≠ VERIFIED OUT
 Empire is a global Predictive Cloud intelligence company with Predictive Revenue as its commercial engine and revenue infrastructure layer. Global architecture is mandatory; market entry remains sequential, jurisdiction-aware and evidence-first.
 
 Canonical strategy documents:
+- docs/EMPIRE_MASTER_ARCHITECTURE.md — canonical top-level business/system architecture and autonomous operating-loop reference.
 - docs/PREDICTIVE_CLOUD_ARCHITECTURE.md — canonical umbrella for Predictive Revenue, data/decision intelligence, Digital Twin, Quant, risk, capital, opportunity and learning.
 - docs/GLOBAL_OPPORTUNITY_GROWTH_DOCTRINE.md — Global Opportunity Graph, Opportunity Foundry, Market Entry OS, Buyer/Distribution/Pricing Intelligence, Productization, Economic Memory, Astra portfolio growth and anti-drift rules.
 - docs/FOUNDER_CONSOLE_OPERATING_SPEC.md — Founder Console as the top-level truth/operating surface.
