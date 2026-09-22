@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 from empire_os.revenue_pulse_reader import (
     fetch_current_and_previous_windows,
     fetch_revenue_pulse_window,
+    fetch_revenue_pulse_window_postgres,
+    fetch_current_and_previous_windows_postgres,
 )
 
 
@@ -122,3 +124,109 @@ def test_reader_rejects_invalid_window():
         assert "end must be after start" in str(exc)
     else:
         raise AssertionError("invalid window must fail")
+
+
+
+class _PulseCursor:
+    def __init__(self, values):
+        self.values = list(values)
+        self.calls = []
+        self.row = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def execute(self, sql, params=None):
+        normalized = " ".join(str(sql).split())
+        self.calls.append((normalized, tuple(params or ())))
+        if normalized.startswith(
+            "SELECT public.get_revenue_pulse_window"
+        ):
+            self.row = (self.values.pop(0),)
+
+    def fetchone(self):
+        return self.row
+
+
+class _PulseConnection:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def cursor(self):
+        return self._cursor
+
+
+def _pulse_raw(acquisitions=2, delivered=1):
+    return {
+        "acquisitions": acquisitions,
+        "qualified": 1,
+        "buyer_reviews": 1,
+        "delivered_outreach": delivered,
+        "commercial_replies": 0,
+        "commercial_terms": 0,
+        "verified_payments": 0,
+        "fulfilments": 0,
+        "recognized_revenue_cents": 0,
+        "realized_gp_cents": 0,
+        "actual_revenue": False,
+        "execution_authority": "none",
+    }
+
+
+def test_postgres_reader_uses_restricted_role():
+    cursor = _PulseCursor([_pulse_raw()])
+
+    def connect(dsn):
+        assert dsn == "postgresql://restricted/pulse"
+        return _PulseConnection(cursor)
+
+    window = fetch_revenue_pulse_window_postgres(
+        "postgresql://restricted/pulse",
+        label="current_24h",
+        start=NOW - timedelta(hours=24),
+        end=NOW,
+        connect_factory=connect,
+    )
+
+    assert window.acquisitions == 2
+    assert window.delivered_outreach == 1
+    assert window.commercial_replies == 0
+    assert window.recognized_revenue_cents == 0
+    assert cursor.calls[0] == (
+        "SET LOCAL ROLE empire_intelligence_materializer",
+        (),
+    )
+    assert cursor.calls[1][0].startswith(
+        "SELECT public.get_revenue_pulse_window"
+    )
+
+
+def test_postgres_current_previous_are_separate_windows():
+    cursor = _PulseCursor([
+        _pulse_raw(acquisitions=4, delivered=2),
+        _pulse_raw(acquisitions=1, delivered=0),
+    ])
+
+    def connect(_dsn):
+        return _PulseConnection(cursor)
+
+    current, previous = fetch_current_and_previous_windows_postgres(
+        "postgresql://restricted/pulse",
+        now=NOW,
+        hours=24,
+        connect_factory=connect,
+    )
+
+    assert current.acquisitions == 4
+    assert previous.acquisitions == 1
+    assert current.delivered_outreach == 2
+    assert previous.delivered_outreach == 0
