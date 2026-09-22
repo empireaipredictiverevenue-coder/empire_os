@@ -10,6 +10,10 @@ END_FILE="$RUNTIME/end_epoch"
 RUN_LOG="$RUNTIME/runner.log"
 CRAWLER_LOG="$RUNTIME/crawler_runs.jsonl"
 
+# Fresh bounded trial: never mix prior run evidence into this report.
+: > "$RUN_LOG"
+: > "$CRAWLER_LOG"
+
 START="$(date +%s)"
 END="$((START + 72*60*60))"
 echo "$START" > "$START_FILE"
