@@ -109,8 +109,10 @@ def main(argv=None) -> int:
     provider = VonageCallTransport(VonageCallConfig.from_env())
     provider_ready = provider.config.readiness()
     voice_deps = EmpireVoiceLab.dependency_readiness()
+    voice_models = EmpireVoiceLab.model_readiness()
     runtime_ready = bool(
         all(voice_deps.values())
+        and all(voice_models.values())
         and provider_ready.get("execution_allowed") is True
     )
 
@@ -158,6 +160,7 @@ def main(argv=None) -> int:
             record["decision"] = "HOLD_RUNTIME_NOT_READY"
             record["provider_readiness"] = provider_ready
             record["voice_dependencies"] = voice_deps
+            record["voice_models"] = voice_models
             results.append(record)
             continue
 
@@ -256,6 +259,7 @@ def main(argv=None) -> int:
         "runtime_ready": runtime_ready,
         "provider_readiness": provider_ready,
         "voice_dependencies": voice_deps,
+        "voice_models": voice_models,
         "queue_total": work.get("queue_total", 0),
         "selected": work.get("selected", 0),
         "daily_cap": daily_cap,
