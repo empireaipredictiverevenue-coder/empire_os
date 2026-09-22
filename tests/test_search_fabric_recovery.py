@@ -102,3 +102,32 @@ def test_domain_query_does_not_match_on_com_token_only():
     )
 
     assert score == 0.0
+
+
+
+def test_public_fetch_fails_fast_on_timeout(monkeypatch):
+    monkeypatch.setattr(search_module, "_polite", lambda *args: None)
+    monkeypatch.setattr(search_module, "_next_proxy", lambda: None)
+    monkeypatch.setattr(search_module, "SEARCH_PUBLIC_TIMEOUT", 4.0)
+    monkeypatch.setattr(search_module, "SEARCH_PUBLIC_ATTEMPTS", 1)
+
+    calls = []
+
+    def timeout_get(*args, **kwargs):
+        calls.append(kwargs.get("timeout"))
+        raise search_module.requests.exceptions.Timeout()
+
+    monkeypatch.setattr(search_module.requests, "get", timeout_get)
+
+    engine = next(
+        row for row in search_module.ENGINES
+        if row["name"] == "bing_html"
+    )
+    result = search_module._fetch(
+        engine,
+        "Denver roofing",
+        5,
+    )
+
+    assert result is None
+    assert calls == [4.0]
