@@ -20,6 +20,9 @@ from empire_os.commercial_recovery_registry import (
 from empire_os.commercial_recovery_audit import (
     build_recovery_implementation_audit,
 )
+from empire_os.canonical_phase_plan import (
+    build_canonical_phase_plan,
+)
 from empire_os.competitor_audience_runtime import (
     build_competitor_audience_runtime,
 )
@@ -424,5 +427,6 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             "execution_authority": "none",
             "actual_revenue": False,
         },
+        "canonical_execution_plan": build_canonical_phase_plan(),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
