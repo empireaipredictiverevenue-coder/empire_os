@@ -14,7 +14,7 @@ def main() -> int:
     parser.add_argument(
         "--min-interval-seconds",
         type=int,
-        default=1500,
+        default=900,
     )
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
