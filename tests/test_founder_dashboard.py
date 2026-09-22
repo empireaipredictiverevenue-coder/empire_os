@@ -1476,6 +1476,20 @@ def test_dashboard_exposes_live_phase4_exchange_runtime(tmp_path):
                 "active_capacity": 2,
                 "full": 2,
             },
+            "seat_activation_blocker_counts": {
+                "buyer_not_commercially_activated": 4,
+            },
+            "supply_gate_diagnostics": {
+                "prospects_seen": 20,
+                "qualification_ready_count": 6,
+                "qualification_blocker_counts": {
+                    "qualification_evidence_confidence_below_floor": 14,
+                },
+                "identity_ready_count": 6,
+                "identity_blocker_counts": {},
+                "exchange_inventory_ready_count": 6,
+                "unknown_stays_unknown": True,
+            },
             "buyer_capacity_never_gates_acquisition": True,
             "overflow_remains_empire_owned": True,
             "automatic_external_delivery": False,
@@ -1492,6 +1506,12 @@ def test_dashboard_exposes_live_phase4_exchange_runtime(tmp_path):
     assert runtime["allocation_candidate_count"] == 2
     assert runtime["overflow_count"] == 3
     assert runtime["buyer_seat_count"] == 4
+    assert runtime["seat_activation_blocker_counts"] == {
+        "buyer_not_commercially_activated": 4
+    }
+    assert runtime["supply_gate_diagnostics"][
+        "qualification_ready_count"
+    ] == 6
     assert runtime["buyer_capacity_never_gates_acquisition"] is True
     assert runtime["overflow_remains_empire_owned"] is True
     assert runtime["automatic_external_delivery"] is False
