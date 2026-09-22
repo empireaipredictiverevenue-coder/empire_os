@@ -852,3 +852,48 @@ def test_dashboard_exposes_competitor_ecosystem(tmp_path):
     assert eco["commercial_intent_inferred"] is False
     assert eco["outreach_enabled"] is False
     assert eco["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_competitor_public_review_overlap(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_public_review_overlap_latest.json",
+        {
+            "schema_version": "empire.competitor_public_review_overlap.v1",
+            "mode": "OBSERVE",
+            "company_count": 14,
+            "company_with_review_profile_count": 8,
+            "review_profile_count": 12,
+            "review_platform_count": 4,
+            "company_overlap_edge_count": 9,
+            "review_platforms": [{
+                "platform": "bbb",
+                "company_count": 5,
+                "companies": ["A", "B", "C", "D", "E"],
+            }],
+            "company_overlap_edges": [],
+            "review_sentiment_inferred": False,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "market_share_inferred": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    reviews = result["competitor_public_review_overlap"]
+
+    assert reviews["available"] is True
+    assert reviews["company_count"] == 14
+    assert reviews["company_with_review_profile_count"] == 8
+    assert reviews["review_profile_count"] == 12
+    assert reviews["review_platform_count"] == 4
+    assert reviews["company_overlap_edge_count"] == 9
+    assert reviews["review_sentiment_inferred"] is False
+    assert reviews["buyer_intent_inferred"] is False
+    assert reviews["market_share_inferred"] is False
+    assert reviews["execution_authority"] == "none"
