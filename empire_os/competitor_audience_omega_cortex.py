@@ -22,7 +22,7 @@ def _priority_fraction(value: Any) -> float:
         number = float(value)
     except (TypeError, ValueError):
         return 0.0
-    return max(0.0, min(number / 100.0, 1.0))
+    return round(max(0.0, min(number / 100.0, 1.0)), 6)
 
 
 def _research_action(
