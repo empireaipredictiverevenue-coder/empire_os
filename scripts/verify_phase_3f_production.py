@@ -11,7 +11,6 @@ from typing import Any
 
 SYSTEM_UNITS = (
     "empire-department-cycle.timer",
-    "empire-astra-dispatcher.timer",
     "empire-predictive-intelligence.timer",
 )
 
