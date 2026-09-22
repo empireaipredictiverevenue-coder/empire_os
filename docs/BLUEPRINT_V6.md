@@ -1,19 +1,34 @@
-# Empire AI — Predictive Revenue OS Blueprint v6
+# Empire AI — Predictive Cloud / Predictive Revenue OS Blueprint v6
 
 Date: 2026-09-17
 Status: CANONICAL CURRENT ROADMAP
 Supersedes blueprint_v5.md for current architecture decisions. v5 is retained as history only.
 
 ## Mission
-Build a governed Predictive Revenue operating system that detects commercial signals, predicts economics, creates demand, acquires and qualifies opportunities, matches buyers, closes revenue, verifies payment, measures profit, learns from outcomes, and reallocates resources through Astra.
+Build **Predictive Cloud** as the governed intelligence and decision layer inside EmpireOS, with **Predictive Revenue** as its commercial engine. Empire must observe real-world and business signals, explain current state, predict economically relevant future states, detect opportunity and risk, evaluate uncertainty and expected economics, propose the next best decision, govern execution, verify outcomes, learn from prediction error, and compound that learning through Astra and Economic Memory.
 
 ## Build Principle
 QUALITY → FIRST REVENUE → PROVE ECONOMICS → CAPTURE OUTCOMES → IMPROVE PREDICTIONS → AUTOMATE → SCALE.
+
+## Predictive Cloud Strategic Lock
+
+**Predictive Cloud is the umbrella intelligence architecture. Predictive Revenue is the commercial core inside it.**
+
+Canonical hierarchy:
+
+**Empire AI → EmpireOS → Predictive Cloud → Predictive Revenue + Market/Demand + Customer/Buyer + Conversion/Growth + Search/Attention/Recommendation + Operational/Fulfilment + Physical/Spatial + Risk/Resilience + Capital/Portfolio + Opportunity + Digital Twin/Scenario + Quantitative/Decision Intelligence + Economic Memory.**
+
+Predictive Cloud must answer more than "what revenue will happen?" It must also answer what changed, why, what is likely next, where opportunity or risk is emerging, which constraint matters, what information is worth acquiring, what action has the strongest expected economics, what actually happened, and what the system should learn.
+
+Canonical architecture: `docs/PREDICTIVE_CLOUD_ARCHITECTURE.md`.
+
+Truth boundary: OBSERVED ≠ INFERRED ≠ FORECAST ≠ SCENARIO ≠ VERIFIED OUTCOME. No score, model, recommendation or simulation creates commercial intent, execution authority, payment or revenue.
 
 ## Global Growth Strategic Lock
 Empire is a global Predictive Revenue operating system and revenue infrastructure company. Global architecture is mandatory; market entry remains sequential, jurisdiction-aware and evidence-first.
 
 Canonical strategy documents:
+- docs/PREDICTIVE_CLOUD_ARCHITECTURE.md — canonical umbrella for Predictive Revenue, data/decision intelligence, Digital Twin, Quant, risk, capital, opportunity and learning.
 - docs/GLOBAL_OPPORTUNITY_GROWTH_DOCTRINE.md — Global Opportunity Graph, Opportunity Foundry, Market Entry OS, Buyer/Distribution/Pricing Intelligence, Productization, Economic Memory, Astra portfolio growth and anti-drift rules.
 - docs/FOUNDER_CONSOLE_OPERATING_SPEC.md — Founder Console as the top-level truth/operating surface.
 - docs/history/VULTR_BILLION_SCALE_ANALYSIS_RECOVERED_2026-09-20.txt — recovered historical strategy evidence only; old numbers/forecasts are not current truth.
