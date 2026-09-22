@@ -9,7 +9,7 @@ Its job is to decide:
 **where to play, how to win, what capabilities must be built, which markets to
 enter, which bets to fund, which advantages to compound, and what to stop.**
 
-Strategy sits across Marketing, R&D, Product, Data, AGI/Quant, Sales and Finance.
+Strategy sits across Marketing, R&D, Product, Engineering, Data/Quant, Market Intelligence, Sales, Customer Success, Operations, Finance, Risk/Compliance and Partnerships.
 It does not replace those functions.
 
 ## 1. Department Mission
