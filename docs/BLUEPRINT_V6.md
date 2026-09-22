@@ -30,6 +30,8 @@ Empire is a global Predictive Cloud intelligence company with Predictive Revenue
 Canonical strategy documents:
 - docs/EMPIRE_MASTER_ARCHITECTURE.md — canonical top-level business/system architecture and autonomous operating-loop reference.
 - docs/PREDICTIVE_CLOUD_ARCHITECTURE.md — canonical umbrella for Predictive Revenue, data/decision intelligence, Digital Twin, Quant, risk, capital, opportunity and learning.
+- docs/AUTONOMOUS_PREDICTIVE_CLOUD_REVENUE_LOOP.md — canonical self-operating loop: sensors → opportunities → research/build/GTM → verified outcomes → learning, with governed authority.
+- docs/EMPIRE_MASTER_ARCHITECTURE.txt — canonical plain-text map of the complete business and system architecture.
 - docs/GLOBAL_OPPORTUNITY_GROWTH_DOCTRINE.md — Global Opportunity Graph, Opportunity Foundry, Market Entry OS, Buyer/Distribution/Pricing Intelligence, Productization, Economic Memory, Astra portfolio growth and anti-drift rules.
 - docs/FOUNDER_CONSOLE_OPERATING_SPEC.md — Founder Console as the top-level truth/operating surface.
 - docs/history/VULTR_BILLION_SCALE_ANALYSIS_RECOVERED_2026-09-20.txt — recovered historical strategy evidence only; old numbers/forecasts are not current truth.
@@ -65,6 +67,31 @@ SIGNALS → OPPORTUNITY GRAPH → OPPORTUNITY FOUNDRY → MARKET ENTRY → EXPER
 - Empire Intelligence Fabric schema is being built as the shared temporal/provenance graph across intelligence domains.
 - Protected untracked `recovery/` and `toop` remain untouched.
 - Empire Ops MCP v0.2.0 foundation is in-repo with audited repo/file operations, allowlisted checks, protected-path enforcement, bearer-token support, founder-directive ingest, acquisition controls and privileged-helper mediated service control. Direct ChatGPT/custom-client registration is transport/client work; it is not allowed to become a dependency of the operating system itself.
+
+## Autonomous Operating Model — ACTIVE
+
+Autonomy is not a distant phase. EmpireOS should continuously advance safe,
+reversible work without waiting for the founder to manually move each module.
+
+Current autonomous spine:
+SENSOR MESH → INTELLIGENCE FABRIC → OPPORTUNITY RADAR → BOUNDED OPPORTUNITY
+RESEARCH → OPPORTUNITY FACTORY → PREDICTIVE CLOUD / QUANT → ASTRA → AI
+RESEARCH/PLAN/BUILD → GTM/CONVERSATION → PAYMENT/FULFILMENT → VERIFIED OUTCOME
+→ ECONOMIC MEMORY → NEXT OPPORTUNITY.
+
+Current implementation state:
+- Opportunity Radar aggregation ✅ coded;
+- bounded Opportunity Research via Search Fabric ✅ coded;
+- Astra allow-listed Radar → Research refresh ✅ coded;
+- 15-minute Opportunity Radar systemd-user packaging ✅ staged;
+- live EmpireOS pull/tests/runtime activation ⏳ pending;
+- research evidence → Opportunity Factory normalized readiness ⏳ active next slice;
+- Founder Console opportunity-radar surface ⏳ pending;
+- broader sensor ingestion (storm, permit/property, Search recommendation,
+  private capital, corporate/government/legal nodes) into Radar ⏳ pending.
+
+Safe internal research/analysis/planning may run automatically. External
+commercial actions remain within standing authority and canonical gates.
 
 ## Cross-Phase Intelligence Fabric — ACTIVE FOUNDATION
 The Empire Intelligence Fabric is the shared substrate beneath all intelligence domains. It is not a replacement roadmap phase and does not move the CURRENT marker away from Phase 3F.
