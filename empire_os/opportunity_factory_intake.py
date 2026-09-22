@@ -19,6 +19,7 @@ from empire_os.opportunity_factory import (
 
 RADAR = Path("runtime/opportunity_radar/latest.json")
 RESEARCH = Path("runtime/opportunity_radar/research_latest.json")
+NORMALIZED = Path("runtime/opportunity_factory/normalized_signals_latest.json")
 OUTPUT = Path("runtime/opportunity_factory/intake_latest.json")
 
 SCORE_KEYS = (
@@ -148,8 +149,10 @@ def build_factory_intake(
 def build_factory_intake_batch(
     radar: Mapping[str, Any],
     research_batch: Mapping[str, Any] | None,
+    normalized_batch: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     research_batch = research_batch or {}
+    normalized_batch = normalized_batch or {}
     research_by_key = {
         _clean(row.get("opportunity_key")): row
         for row in (research_batch.get("actions") or [])
@@ -157,14 +160,44 @@ def build_factory_intake_batch(
         and _clean(row.get("opportunity_key"))
     }
 
-    rows = [
-        build_factory_intake(
+    normalized_by_key = {
+        _clean(row.get("opportunity_key")): row
+        for row in (normalized_batch.get("items") or [])
+        if isinstance(row, Mapping)
+        and _clean(row.get("opportunity_key"))
+    }
+
+    rows = []
+    for candidate in (radar.get("candidates") or []):
+        if not isinstance(candidate, Mapping):
+            continue
+        key = _clean(candidate.get("opportunity_key"))
+        normalized_row = normalized_by_key.get(key) or {}
+        signals = normalized_row.get("normalized_signals")
+        signals = signals if isinstance(signals, Mapping) else {}
+        row = build_factory_intake(
             candidate,
-            research_by_key.get(_clean(candidate.get("opportunity_key"))),
+            research_by_key.get(key),
+            normalized_signals=signals,
         )
-        for candidate in (radar.get("candidates") or [])
-        if isinstance(candidate, Mapping)
-    ]
+        row["normalization"] = {
+            "available": bool(normalized_row),
+            "normalized_score_count": int(
+                normalized_row.get("normalized_score_count") or 0
+            ),
+            "missing_normalized_fields": list(
+                normalized_row.get("missing_normalized_fields") or []
+            ),
+            "score_evidence": dict(
+                normalized_row.get("score_evidence") or {}
+            ),
+            "search_result_counts_used_as_scores": (
+                normalized_row.get(
+                    "search_result_counts_used_as_scores"
+                ) is True
+            ),
+        }
+        rows.append(row)
 
     return {
         "schema_version": "empire.opportunity_factory_intake_batch.v1",
@@ -178,6 +211,13 @@ def build_factory_intake_batch(
             not row["factory_ready"] for row in rows
         ),
         "items": rows,
+        "normalized_signal_source_available": bool(normalized_batch),
+        "candidates_with_any_normalized_score": sum(
+            int((row.get("normalization") or {}).get(
+                "normalized_score_count", 0
+            ) > 0)
+            for row in rows
+        ),
         "search_observation_scores_inferred": False,
         "automatic_external_execution_allowed": False,
         "execution_authority": "none",
@@ -196,6 +236,7 @@ def refresh_factory_intake(repo_root: Path) -> dict[str, Any]:
     payload = build_factory_intake_batch(
         _read(repo_root / RADAR),
         _read(repo_root / RESEARCH),
+        _read(repo_root / NORMALIZED),
     )
     path = repo_root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
