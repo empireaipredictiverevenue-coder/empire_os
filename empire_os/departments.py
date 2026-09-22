@@ -36,7 +36,12 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "Set priorities, allocate attention/capital, coordinate "
                 "departments and evaluate company-wide outcomes."
             ),
-            components=("astra_executive", "astra", "control_fabric"),
+            components=(
+                "astra_executive",
+                "astra",
+                "control_fabric",
+                "intelligence_router",
+            ),
             agent_roles=("supervisor", "executive_operations"),
             kpis=(
                 "realized_gross_profit",
@@ -149,6 +154,7 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "empire_coder",
                 "quant_brain",
                 "experiment_intelligence",
+                "intelligence_router",
             ),
             agent_roles=(
                 "research",
@@ -224,7 +230,12 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "Build, test, operate and improve secure reliable EmpireOS "
                 "capabilities from approved product and architecture plans."
             ),
-            components=("empire_coder", "ops_sentinel", "control_fabric"),
+            components=(
+                "empire_coder",
+                "ops_sentinel",
+                "control_fabric",
+                "intelligence_router",
+            ),
             agent_roles=("engineering", "coder"),
             kpis=(
                 "deployment_quality",
