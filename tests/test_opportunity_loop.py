@@ -18,6 +18,13 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
             "error_count": 0,
         }
 
+    def normalizer(root: Path):
+        calls.append(("normalizer", root))
+        return {
+            "candidates_with_any_normalized_score": 2,
+            "total_normalized_scores": 7,
+        }
+
     def intake(root: Path):
         calls.append(("intake", root))
         return {
@@ -38,6 +45,7 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
         force=True,
         radar_fn=radar,
         research_fn=research,
+        normalizer_fn=normalizer,
         intake_fn=intake,
         planner_fn=planner,
     )
@@ -45,15 +53,19 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
     assert [item[0] for item in calls] == [
         "radar",
         "research",
+        "normalizer",
         "intake",
         "planner",
     ]
     assert calls[-1][2] == 3
     assert result["ok"] is True
     assert result["research_observation_count"] == 5
+    assert result["candidates_with_any_normalized_score"] == 2
+    assert result["total_normalized_scores"] == 7
     assert result["factory_blocked_count"] == 3
     assert result["ai_plan_queued_count"] == 2
     assert result["automatic_internal_research"] is True
+    assert result["automatic_evidence_normalization"] is True
     assert result["automatic_factory_intake"] is True
     assert result["automatic_ai_planning"] is True
     assert result["automatic_external_execution_allowed"] is False
@@ -79,6 +91,7 @@ def test_opportunity_loop_fails_closed_and_stops_on_step_error(tmp_path):
         force=True,
         radar_fn=radar,
         research_fn=should_not_run,
+        normalizer_fn=should_not_run,
         intake_fn=should_not_run,
         planner_fn=should_not_run,
     )
@@ -103,6 +116,13 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
             "observation_count": 1,
         }
 
+    def normalizer(_root):
+        calls.append("normalizer")
+        return {
+            "candidates_with_any_normalized_score": 1,
+            "total_normalized_scores": 3,
+        }
+
     def intake(_root):
         calls.append("intake")
         return {
@@ -122,6 +142,7 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
         min_interval_seconds=1800,
         radar_fn=radar,
         research_fn=research,
+        normalizer_fn=normalizer,
         intake_fn=intake,
         planner_fn=planner,
     )
@@ -130,10 +151,17 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
         min_interval_seconds=1800,
         radar_fn=radar,
         research_fn=research,
+        normalizer_fn=normalizer,
         intake_fn=intake,
         planner_fn=planner,
     )
 
     assert first["skipped_fresh"] is False
     assert second["skipped_fresh"] is True
-    assert calls == ["radar", "research", "intake", "planner"]
+    assert calls == [
+        "radar",
+        "research",
+        "normalizer",
+        "intake",
+        "planner",
+    ]
