@@ -44,6 +44,13 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 3600,
     },
+    "opportunity_normalizer": {
+        "path": Path(
+            "runtime/opportunity_factory/normalized_signals_latest.json"
+        ),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 3600,
+    },
     "opportunity_factory_intake": {
         "path": Path("runtime/opportunity_factory/intake_latest.json"),
         "time_keys": ("generated_at", "observed_at"),
@@ -135,6 +142,27 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
         return {
             "ok": payload.get("ok"),
             "step_count": len(payload.get("steps") or []),
+            "radar_candidate_count": payload.get(
+                "radar_candidate_count"
+            ),
+            "research_observation_count": payload.get(
+                "research_observation_count"
+            ),
+            "candidates_with_any_normalized_score": payload.get(
+                "candidates_with_any_normalized_score"
+            ),
+            "total_normalized_scores": payload.get(
+                "total_normalized_scores"
+            ),
+            "factory_ready_count": payload.get(
+                "factory_ready_count"
+            ),
+            "factory_blocked_count": payload.get(
+                "factory_blocked_count"
+            ),
+            "ai_plan_queued_count": payload.get(
+                "ai_plan_queued_count"
+            ),
         }
     if name == "opportunity_radar":
         return {
@@ -148,6 +176,19 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             ),
             "observation_count": payload.get("observation_count"),
             "error_count": payload.get("error_count"),
+        }
+    if name == "opportunity_normalizer":
+        return {
+            "candidate_count": payload.get("candidate_count"),
+            "candidates_with_any_normalized_score": payload.get(
+                "candidates_with_any_normalized_score"
+            ),
+            "total_normalized_scores": payload.get(
+                "total_normalized_scores"
+            ),
+            "search_result_counts_used_as_scores": payload.get(
+                "search_result_counts_used_as_scores"
+            ),
         }
     if name == "opportunity_factory_intake":
         return {
