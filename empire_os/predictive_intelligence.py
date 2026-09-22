@@ -334,14 +334,43 @@ def fetch_catalog(
     }
 
 
+def _fresh_snapshot(
+    path: Path,
+    *,
+    max_age_seconds: int,
+) -> dict[str, Any] | None:
+    payload = _read(path)
+    generated = _parse_ts(payload.get("generated_at"))
+    if generated is None:
+        return None
+    age = (
+        datetime.now(timezone.utc) - generated
+    ).total_seconds()
+    if age < 0 or age > max(0, int(max_age_seconds)):
+        return None
+    return payload
+
+
 def refresh_predictive_intelligence(
     repo_root: str | Path,
     *,
     request: Request,
     min_terminal_samples: int = 20,
     min_timing_samples: int = 8,
+    max_age_seconds: int = 300,
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
+    path = root / OUTPUT
+    fresh = _fresh_snapshot(
+        path,
+        max_age_seconds=max_age_seconds,
+    )
+    if fresh is not None:
+        return {
+            **fresh,
+            "reused_existing_snapshot": True,
+        }
+
     catalog = _read(root / CATALOG)
     if not catalog.get("products"):
         catalog = fetch_catalog(request)
@@ -352,7 +381,7 @@ def refresh_predictive_intelligence(
         min_terminal_samples=min_terminal_samples,
         min_timing_samples=min_timing_samples,
     )
-    path = root / OUTPUT
+    payload["reused_existing_snapshot"] = False
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(
