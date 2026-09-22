@@ -117,3 +117,37 @@ def test_bridge_uses_bounded_standing_authority_cap():
         if path.endswith("/auto_review_buyer_candidate")
     )
     assert approval["p_daily_cap"] == 50
+
+
+
+def test_bridge_rejects_business_name_prefix_as_person():
+    class BusinessPrefixRequest(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if path.endswith("/list_buyer_reviews_for_outbound"):
+                self.calls.append((method, path, payload))
+                return [{
+                    "id": REVIEW_ID,
+                    "contact_name": "COMFY CAVE",
+                    "contact_title": "OWNER",
+                    "contact_email": "comfycave@gmail.com",
+                    "evidence": {
+                        "business_name": "Comfy Cave Heating and Air",
+                        "metro": "Denver, CO",
+                    },
+                }]
+            return super().__call__(
+                method,
+                path,
+                payload=payload,
+                **kwargs,
+            )
+
+    request = BusinessPrefixRequest()
+    result = run_standing_bridge(request)
+
+    assert result.outbound_proposed == 0
+    assert result.skipped_invalid_person == 1
+    assert not any(
+        path.endswith("/propose_reviewed_outbound_intent")
+        for _method, path, _payload in request.calls
+    )
