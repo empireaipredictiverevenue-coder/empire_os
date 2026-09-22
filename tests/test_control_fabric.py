@@ -44,3 +44,13 @@ def test_community_pain_routes_to_market_opportunity_agent():
     assert routes
     assert routes[0]["component"] == "market_opportunity_agent"
     assert routes[0]["commercial_priority"] == 91
+
+
+def test_opportunity_cycle_routes_to_canonical_loop():
+    routes = route_event({
+        "event_type": "opportunity_cycle_tick",
+        "commercial_priority": 80,
+    })
+    assert routes
+    assert routes[0]["component"] == "predictive_cloud_opportunity_loop"
+    assert routes[0]["authority"] == "internal_write"
