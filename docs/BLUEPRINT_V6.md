@@ -179,6 +179,7 @@ Initial product contracts:
 - Content Decay & Cannibalisation Monitor;
 - Authority & Backlink Intelligence;
 - AEO / GEO AI Visibility;
+- Organic + AI Recommendation Intelligence — organic discovery + observed AI answer/citation/recommendation presence, competitor recommendation gaps and evidence-backed search-to-revenue attribution; no recommendation guarantees or inferred market share;
 - Competitor Search Gap;
 - Search Growth Command.
 
