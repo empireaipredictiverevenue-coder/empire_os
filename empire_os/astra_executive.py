@@ -110,6 +110,7 @@ class ExecutivePlanStep:
     founder_gate_required: bool
     evidence_refs: tuple[str, ...]
     memory_query: Mapping[str, Any]
+    intelligence_request: Mapping[str, Any]
     success_condition: str
     rationale: str
 
@@ -451,6 +452,47 @@ def _memory_query(
     )
 
 
+def _intelligence_request(
+    task_type: str,
+    *,
+    founder_gate: bool,
+) -> dict[str, Any]:
+    normalized = str(task_type or "planning").strip().lower()
+    if normalized == "quantitative_research":
+        task = "quantitative"
+        require_reasoning = False
+        stakes = "normal"
+    elif normalized == "coding":
+        task = "coding"
+        require_reasoning = True
+        stakes = "normal"
+    elif normalized in {"commercial_decision", "execution_review"}:
+        task = "verification"
+        require_reasoning = True
+        stakes = "high"
+    elif normalized == "research":
+        task = "research"
+        require_reasoning = False
+        stakes = "normal"
+    else:
+        task = "reasoning"
+        require_reasoning = True
+        stakes = "normal"
+
+    return {
+        "task": task,
+        "task_type": normalized,
+        "require_reasoning": require_reasoning,
+        "stakes": stakes,
+        "resolve_via": "intelligence_router",
+        "provider_pinned": False,
+        "model_pinned": False,
+        "future_intelligence_compatible": True,
+        "authority_must_not_expand": True,
+        "founder_gate": founder_gate,
+    }
+
+
 def _step(
     *,
     goal: ExecutiveGoal,
@@ -495,6 +537,10 @@ def _step(
             task_type=task_type,
             entity_refs=entity_refs,
             topic_keys=topic_keys,
+        ),
+        intelligence_request=_intelligence_request(
+            task_type,
+            founder_gate=founder_gate,
         ),
         success_condition=success_condition,
         rationale=rationale,
