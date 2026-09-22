@@ -7,7 +7,9 @@ BLUEPRINT_V6 remains phase/status authority. This document is authoritative for 
 
 ## Strategic identity
 
-Empire is a global Predictive Revenue operating system and revenue infrastructure company.
+Predictive Cloud is the umbrella intelligence architecture; Predictive Revenue is the commercial core. This doctrine governs how that intelligence finds and compounds global opportunity.
+
+Empire is a global **Predictive Cloud** intelligence company with **Predictive Revenue** as its commercial engine and revenue infrastructure layer.
 
 It is not limited to one country, one industry, lead generation, or one monetisation model. Leads remain one product/input alongside SaaS, APIs, intelligence/data products, white-label systems, AI agents, managed growth, Search/AEO/GEO, advertising, partnerships, enterprise agreements and governed marketplaces.
 
