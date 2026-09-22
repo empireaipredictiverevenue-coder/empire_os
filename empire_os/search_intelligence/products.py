@@ -196,6 +196,57 @@ SEARCH_PRODUCTS: tuple[SearchProduct, ...] = (
         optional_capabilities=("citation_gap", "competitor_gap"),
     ),
     SearchProduct(
+        key="organic_ai_recommendation_intelligence",
+        name="Organic + AI Recommendation Intelligence",
+        category="search_and_ai_discovery",
+        outcome=(
+            "Measure how a brand is discovered across organic search and "
+            "captured AI answers, including observed citations, mentions, "
+            "explicit recommendations and competitor recommendation gaps."
+        ),
+        buyer_types=(
+            "local_business",
+            "smb",
+            "agency",
+            "multi_location",
+            "growth_team",
+            "enterprise",
+            "white_label_partner",
+        ),
+        deliverables=(
+            "organic_visibility_baseline",
+            "ai_answer_presence",
+            "ai_citation_presence",
+            "ai_recommendation_presence",
+            "share_of_observed_recommendations",
+            "competitor_recommendation_gap",
+            "citation_source_map",
+            "query_portfolio",
+            "source_gap_backlog",
+            "search_to_revenue_attribution",
+        ),
+        required_capabilities=(
+            "serp",
+            "recommendation_visibility",
+        ),
+        optional_capabilities=(
+            "ai_visibility",
+            "citation_gap",
+            "competitor_gap",
+            "search_console",
+            "revenue",
+            "rank_history",
+        ),
+        commercial_model="subscription_and_managed_service",
+        revenue_models=(
+            "subscription",
+            "managed_service",
+            "agency_reseller_wholesale",
+            "white_label_license",
+            "enterprise_reporting",
+        ),
+    ),
+    SearchProduct(
         key="competitor_search_gap",
         name="Competitor Search Gap",
         category="competitive_intelligence",
