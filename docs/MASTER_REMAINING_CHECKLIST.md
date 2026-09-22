@@ -68,18 +68,18 @@ Current truth:
 
 ## Account / Buyer Digital Twin
 
-- [ ] Company identity
-- [ ] Public evidence
-- [ ] Competitor relationships
-- [ ] Qualification history
-- [ ] Research history
+- [x] Company identity
+- [x] Public evidence
+- [x] Competitor relationships
+- [x] Qualification history
+- [x] Research history
 - [ ] Outreach history
 - [ ] Replies/conversation
 - [ ] Commercial state
 - [ ] Terms/payment/fulfilment
 - [ ] Outcomes
 - [ ] Realized revenue / GP
-- [ ] Uncertainty explicitly represented
+- [x] Uncertainty explicitly represented
 
 ## Cortex learning loop
 
@@ -170,7 +170,7 @@ Current truth:
 - [x] Account Intelligence Brief
 - [x] Buyer State
 - [x] Next-Best Action
-- [ ] Account digital twin
+- [x] Account digital twin
 - [ ] Market opportunities
 - [ ] Competitor graph visualization
 - [ ] Real funnel
