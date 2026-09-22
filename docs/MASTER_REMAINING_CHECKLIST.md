@@ -29,7 +29,7 @@ Architecture:
 - [x] Keep Predictive Revenue as the commercial/revenue-truth core
 - [x] Preserve OBSERVED / INFERRED / FORECAST / SCENARIO / VERIFIED OUTCOME separation
 - [x] Inventory existing modern analytics/intelligence modules
-- [ ] Remove remaining architecture/document naming drift
+- [x] Align canonical architecture/strategy documents to Predictive Cloud naming; historical files may retain prior wording
 - [ ] Expose one canonical Predictive Cloud capability/status contract
 
 Data & Decision Intelligence:
