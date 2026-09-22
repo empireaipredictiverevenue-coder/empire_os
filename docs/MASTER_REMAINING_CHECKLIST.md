@@ -109,7 +109,7 @@ Current truth:
 - [x] Underserved audience finder
 - [x] Territory heatmap
 - [ ] Share-of-voice / search presence — PARKED: optional SERP overlay; provider reliability does not block downstream intelligence
-- [ ] Feed TAM + Revenue GPS + GTM + Search Intelligence
+- [x] Feed TAM + Revenue GPS + GTM + Search Intelligence
 
 ## Automate recurring intelligence
 
