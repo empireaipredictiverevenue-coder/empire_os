@@ -41,6 +41,9 @@ from empire_os.cortex_learning_loop import (
 from empire_os.competitor_market_scale import (
     build_market_scale_runtime,
 )
+from empire_os.competitor_market_opportunity import (
+    build_market_opportunity_runtime,
+)
 from empire_os.commercial_marketing_registry import (
     marketing_plan_catalog,
     marketing_summary,
@@ -358,6 +361,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         ),
         "competitor_market_scale": (
             build_market_scale_runtime(repo_root)
+        ),
+        "competitor_market_opportunity": (
+            build_market_opportunity_runtime(repo_root)
         ),
         "recovery_portfolio": {
             "summary": recovery_summary(),
