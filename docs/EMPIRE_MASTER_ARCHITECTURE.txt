@@ -1,0 +1,256 @@
+EMPIRE AI — MASTER BUSINESS / SYSTEM ARCHITECTURE
+Date: 2026-09-22
+Status: CANONICAL PLAIN-TEXT REFERENCE
+
+EMPIRE AI
+|
++-- EMPIREOS
+|   |
+|   +-- Control Fabric
+|   +-- Astra
+|   +-- Founder Directive OS
+|   +-- Empire Coder
+|   +-- Autonomous Execution Bus
+|   +-- Agent Web / MCP / A2A
+|   +-- Governance / Authority / Audit
+|   +-- Founder Console
+|
++-- PREDICTIVE CLOUD
+|   |
+|   +-- Evidence / Intelligence Fabric
+|   |   +-- Canonical companies
+|   |   +-- People / buying committees
+|   |   +-- Markets / territories
+|   |   +-- Products / offers
+|   |   +-- Buyers / capacity
+|   |   +-- Events / signals
+|   |   +-- Payments / fulfilment
+|   |   +-- Outcomes
+|   |   +-- Economic Memory
+|   |
+|   +-- Data & Decision Intelligence
+|   |   +-- Descriptive analysis
+|   |   +-- Diagnostic analysis
+|   |   +-- Predictive analysis
+|   |   +-- Prescriptive analysis
+|   |   +-- Causal analysis
+|   |   +-- Forecasting
+|   |   +-- Calibration
+|   |   +-- Anomaly / regime detection
+|   |
+|   +-- Omega / Cortex
+|   +-- Quant Brain
+|   +-- Digital Twins
+|   +-- Risk Intelligence
+|   +-- Capital / Portfolio Intelligence
+|   +-- Opportunity Radar
+|   +-- Opportunity Factory
+|   +-- Economic Memory / Learning
+|
++-- SIGNAL & SENSOR MESH
+|   |
+|   +-- Canonical crawler
+|   +-- Business-web crawler
+|   +-- Search / SERP scanner
+|   +-- Community Intent
+|   +-- Reddit / public social signals
+|   +-- Competitor audience mining
+|   +-- Competitor market scanner
+|   +-- Permit scanners
+|   +-- Property intelligence
+|   +-- Storm / weather feeds
+|   +-- Satellite / geospatial intelligence
+|   +-- Warehouse / industrial sniper
+|   +-- Corporate-change signals
+|   +-- Government-spend signals
+|   +-- Legal / court signals
+|   +-- Private-capital / roll-up signals
+|   +-- Search / AI recommendation observations
+|   +-- Voice / conversation signals
+|   +-- CRM / GTM activity
+|   +-- Payment signals
+|   +-- Fulfilment / outcome signals
+|
++-- OPPORTUNITY & MARKET INTELLIGENCE
+|   |
+|   +-- Global Opportunity Graph
+|   +-- Market Sweeps
+|   +-- Revenue GPS
+|   +-- TAM Intelligence
+|   +-- ICP clustering
+|   +-- Territory intelligence
+|   +-- Geo Scheduler
+|   +-- Demand intelligence
+|   +-- Supply-gap detection
+|   +-- Competitor pressure
+|   +-- Event-driven opportunities
+|   +-- Product opportunities
+|   +-- Buyer expansion opportunities
+|   +-- Distribution opportunities
+|   +-- Pricing mismatches
+|   +-- Cross-sell / expansion
+|   +-- Arbitrage / information-gap opportunities
+|
++-- PREDICTIVE REVENUE
+|   |
+|   +-- Revenue Intelligence
+|   +-- Buyer State
+|   +-- Next-Best Action
+|   +-- Account Digital Twin
+|   +-- Revenue Pulse
+|   +-- Conversion Intelligence
+|   +-- Revenue forecasting
+|   +-- Deal-value prediction
+|   +-- Time-to-revenue prediction
+|   +-- Buyer-fit prediction
+|   +-- Pricing / offer fit
+|   +-- Channel attribution
+|   +-- Retention / expansion
+|   +-- Forecast-vs-actual calibration
+|
++-- REVENUE GENERATION SYSTEMS
+|   |
+|   +-- Hunter / lead discovery
+|   +-- Enrichment
+|   +-- Decision-maker resolution
+|   +-- Revenue CRM
+|   +-- Governed outbound
+|   +-- Email automation
+|   +-- SMS automation
+|   +-- AI Closer
+|   +-- Empire Voice Lab / Vonage
+|   +-- Conversation OS
+|   +-- Landing-page generator
+|   +-- Ad / creative engine
+|   +-- Media buyer
+|   +-- Search growth
+|   +-- Content systems
+|   +-- Partnerships
+|   +-- Affiliate / distribution network
+|
++-- SEARCH & DISCOVERY PRODUCTS
+|   |
+|   +-- Technical SEO
+|   +-- Search Opportunity Map
+|   +-- SERP Intelligence API
+|   +-- Rank tracking
+|   +-- Content opportunities
+|   +-- Content decay
+|   +-- Cannibalisation
+|   +-- Authority / backlink intelligence
+|   +-- Competitor search gaps
+|   +-- AEO / GEO
+|   +-- AI citation tracking
+|   +-- Organic + AI Recommendation Intelligence
+|   +-- Search-to-Revenue Attribution
+|
++-- INTELLIGENCE PRODUCTS / NODES
+|   |
+|   +-- Permit Intelligence
+|   +-- Property Intelligence
+|   +-- Roofing / Home Services Intelligence
+|   +-- Storm Intelligence
+|   +-- Solar / Energy Intelligence
+|   +-- HVAC / Climate Intelligence
+|   +-- Private Capital / Roll-Up Intelligence
+|   +-- Corporate Change Intelligence
+|   +-- Government Spend Intelligence
+|   +-- Healthcare Growth Intelligence
+|   +-- Compliance / Risk Intelligence
+|   +-- Legal / Mass Tort Intelligence
+|   +-- Market Intent Intelligence
+|   +-- Oil & Gas / Energy Infrastructure (incubation)
+|
++-- DATA PRODUCTS
+|   |
+|   +-- Opportunity feeds
+|   +-- Trigger feeds
+|   +-- Market maps
+|   +-- Territory intelligence
+|   +-- Company / entity graph
+|   +-- Buyer intelligence
+|   +-- TAM datasets
+|   +-- API access
+|   +-- White-label data
+|   +-- Enterprise intelligence feeds
+|
++-- COMMERCIAL EXCHANGE
+|   |
+|   +-- Buyer network
+|   +-- Verified buyer capacity
+|   +-- Allocation / routing
+|   +-- Lead marketplace
+|   +-- Pay-per-call routing
+|   +-- Territory / exclusivity
+|   +-- Pricing engine
+|   +-- Commercial terms
+|   +-- Smart-contract escrow
+|   +-- Revenue Exchange
+|
++-- PAYMENTS & REVENUE TRUTH
+|   |
+|   +-- USDT / BSC
+|   +-- Payment request
+|   +-- Payment verification
+|   +-- Escrow funding
+|   +-- Escrow release
+|   +-- Fulfilment
+|   +-- Outcome capture
+|   +-- Revenue recognition
+|   +-- Cost tracking
+|   +-- Realized Gross Profit
+|
++-- BUSINESS MODELS
+|   |
+|   +-- SaaS subscriptions
+|   +-- Managed services
+|   +-- Data subscriptions
+|   +-- API usage
+|   +-- Usage-based billing
+|   +-- Per-lead
+|   +-- Pay-per-call
+|   +-- Territory licenses
+|   +-- White-label licensing
+|   +-- Agency wholesale
+|   +-- Enterprise contracts
+|   +-- Intelligence reports
+|   +-- Marketplace fees
+|   +-- Partner / affiliate revenue
+|   +-- Search / growth services
+|   +-- Advertising services
+|   +-- Outcome / value-linked models where legal/commercially appropriate
+|
++-- AUTONOMOUS BUSINESS LOOP
+    |
+    +-- WORLD / MARKET / CUSTOMER SIGNALS
+        -> SENSOR & SIGNAL MESH
+        -> INTELLIGENCE FABRIC
+        -> PREDICTIVE CLOUD
+        -> OPPORTUNITY RADAR
+        -> OPPORTUNITY FACTORY
+        -> OMEGA / CORTEX
+        -> QUANT
+        -> ASTRA
+        -> AI RESEARCH / ANALYSIS / ENRICHMENT / PLANNING
+        -> EMPIRE CODER / BUILD SYSTEM
+        -> PRODUCT / OFFER / GTM PREPARATION
+        -> BUYER ACQUISITION / DEMAND CREATION
+        -> AI CLOSER / CONVERSATION OS
+        -> TERMS / PAYMENT / FULFILMENT
+        -> VERIFIED OUTCOME
+        -> RECOGNIZED REVENUE
+        -> REALIZED GROSS PROFIT
+        -> ECONOMIC MEMORY
+        -> CALIBRATION / LEARNING
+        -> NEXT BEST OPPORTUNITY
+        -> LOOP
+
+AUTONOMY RULE
+Safe, reversible internal work should run continuously without repeated founder
+approval. Consequential external actions remain governed by standing authority
+and explicit founder gates where required.
+
+TRUTH RULE
+OBSERVED != INFERRED != FORECAST != SCENARIO != VERIFIED OUTCOME.
+Prediction is decision support. Verified evidence establishes actuals.
+Revenue is recognized only from canonical verified commercial evidence.
