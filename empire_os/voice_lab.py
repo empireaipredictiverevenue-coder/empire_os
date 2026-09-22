@@ -14,7 +14,7 @@ import math
 import os
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Callable
 
 
 MODEL_ROOT = Path(
@@ -38,7 +38,7 @@ class VoiceLabConfig:
     tts_voice: str = "empire_default"
     tts_sid: int = 10
     provider: str = "cpu"
-    num_threads: int = 2
+    num_threads: int = 4
     input_rate: int = 16000
     output_rate: int = 16000
     silence_ms: int = 650
@@ -76,7 +76,7 @@ class VoiceLabConfig:
             ).strip(),
             num_threads=max(
                 1,
-                int(os.getenv("EMPIRE_VOICE_NUM_THREADS", "2")),
+                int(os.getenv("EMPIRE_VOICE_NUM_THREADS", "4")),
             ),
             silence_ms=int(
                 os.getenv("EMPIRE_VOICE_SILENCE_MS", "650")
@@ -264,50 +264,129 @@ class SherpaKokoroTTS:
         self._tts = sherpa_onnx.OfflineTts(tts_config)
         return self._tts
 
-    def synthesize(self, text: str) -> bytes:
+    def _samples_to_pcm16(
+        self,
+        samples: Any,
+        *,
+        source_rate: int,
+    ) -> bytes:
         try:
             import numpy as np
+        except ImportError as exc:
+            raise VoiceLabRuntimeError(
+                "numpy is required for TTS"
+            ) from exc
+
+        values = np.asarray(samples, dtype=np.float32)
+        if values.size == 0:
+            return b""
+
+        if source_rate != self.config.output_rate:
+            out_len = max(
+                1,
+                round(
+                    len(values)
+                    * self.config.output_rate
+                    / source_rate
+                ),
+            )
+            old_axis = np.linspace(
+                0.0, 1.0, len(values), endpoint=False
+            )
+            new_axis = np.linspace(
+                0.0, 1.0, out_len, endpoint=False
+            )
+            values = np.interp(
+                new_axis, old_axis, values
+            ).astype(np.float32)
+
+        pcm = np.clip(values, -1.0, 1.0)
+        return (pcm * 32767.0).astype("<i2").tobytes()
+
+    def _generation_config(self):
+        try:
             import sherpa_onnx
         except ImportError as exc:
             raise VoiceLabRuntimeError(
-                "sherpa-onnx and numpy are required for TTS"
+                "sherpa-onnx is required for TTS"
             ) from exc
 
         generation = sherpa_onnx.GenerationConfig()
         generation.sid = self.config.tts_sid
         generation.speed = 1.0
         generation.silence_scale = 0.2
+        return generation
 
-        audio = self._load().generate(
+    def synthesize(self, text: str) -> bytes:
+        tts = self._load()
+        audio = tts.generate(
             str(text or "").strip(),
-            generation,
+            self._generation_config(),
         )
-        samples = np.asarray(audio.samples, dtype=np.float32)
-        if samples.size == 0:
-            return b""
+        source_rate = int(
+            audio.sample_rate
+            or getattr(tts, "sample_rate", 0)
+            or self.SOURCE_RATE
+        )
+        return self._samples_to_pcm16(
+            audio.samples,
+            source_rate=source_rate,
+        )
 
-        source_rate = int(audio.sample_rate or self.SOURCE_RATE)
-        if source_rate != self.config.output_rate:
-            out_len = max(
-                1,
-                round(
-                    len(samples)
-                    * self.config.output_rate
-                    / source_rate
-                ),
-            )
-            old = np.linspace(
-                0.0, 1.0, len(samples), endpoint=False
-            )
-            new = np.linspace(
-                0.0, 1.0, out_len, endpoint=False
-            )
-            samples = np.interp(
-                new, old, samples
-            ).astype(np.float32)
+    def stream(
+        self,
+        text: str,
+        on_chunk: Callable[[bytes, float], None],
+        *,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
+        """Generate Kokoro speech and emit sentence-sized PCM chunks.
 
-        pcm = np.clip(samples, -1.0, 1.0)
-        return (pcm * 32767.0).astype("<i2").tobytes()
+        sherpa-onnx invokes the callback after each configured sentence
+        batch. max_num_sentences=1 keeps first-audio latency bounded by the
+        first sentence instead of the whole reply.
+        """
+        content = str(text or "").strip()
+        if not content:
+            return {"chunks": 0, "pcm_bytes": 0, "stopped": False}
+
+        tts = self._load()
+        source_rate = int(
+            getattr(tts, "sample_rate", 0) or self.SOURCE_RATE
+        )
+        chunks = 0
+        pcm_bytes = 0
+        stopped = False
+
+        def callback(samples, progress: float) -> int:
+            nonlocal chunks, pcm_bytes, stopped
+            if should_stop is not None and should_stop():
+                stopped = True
+                return 0
+            pcm = self._samples_to_pcm16(
+                samples,
+                source_rate=source_rate,
+            )
+            if pcm:
+                chunks += 1
+                pcm_bytes += len(pcm)
+                on_chunk(pcm, float(progress))
+            if should_stop is not None and should_stop():
+                stopped = True
+                return 0
+            # sherpa-onnx core uses 0=stop and non-zero=continue.
+            return 1
+
+        tts.generate(
+            content,
+            self._generation_config(),
+            callback,
+        )
+        return {
+            "chunks": chunks,
+            "pcm_bytes": pcm_bytes,
+            "stopped": stopped,
+        }
 
 
 class VoiceCloserBrain:
@@ -406,6 +485,19 @@ class EmpireVoiceLab:
     def synthesize_text(self, text: str) -> bytes:
         return self.tts.synthesize(str(text or "").strip())
 
+    def stream_text(
+        self,
+        text: str,
+        on_chunk: Callable[[bytes, float], None],
+        *,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
+        return self.tts.stream(
+            str(text or "").strip(),
+            on_chunk,
+            should_stop=should_stop,
+        )
+
     @staticmethod
     def dependency_readiness() -> dict[str, Any]:
         return {
@@ -458,7 +550,7 @@ class EmpireVoiceLab:
             "execution_allowed": configured,
         }
 
-    def respond(
+    def respond_text(
         self,
         pcm16: bytes,
         *,
@@ -472,7 +564,6 @@ class EmpireVoiceLab:
             return {
                 "transcript": "",
                 "response_text": "",
-                "audio": b"",
             }
         response_text = self.brain.reply(
             transcript,
@@ -481,9 +572,34 @@ class EmpireVoiceLab:
             metro=metro,
             history=history,
         )
-        audio = self.tts.synthesize(response_text)
         return {
             "transcript": transcript,
             "response_text": response_text,
+        }
+
+    def respond(
+        self,
+        pcm16: bytes,
+        *,
+        business_name: str = "",
+        niche: str = "",
+        metro: str = "",
+        history: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
+        result = self.respond_text(
+            pcm16,
+            business_name=business_name,
+            niche=niche,
+            metro=metro,
+            history=history,
+        )
+        response_text = str(result.get("response_text") or "")
+        audio = (
+            self.tts.synthesize(response_text)
+            if response_text
+            else b""
+        )
+        return {
+            **result,
             "audio": audio,
         }
