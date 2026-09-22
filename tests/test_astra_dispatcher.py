@@ -178,3 +178,14 @@ def test_opportunity_factory_intake_is_internal_safe_job():
         str(part).endswith("build_opportunity_factory_intake.py")
         for part in command
     )
+
+
+def test_opportunity_ai_planner_is_internal_safe_job():
+    import empire_os.astra_dispatcher as module
+
+    assert "opportunity_ai_planner" in module.SAFE_JOBS
+    command = module.SAFE_JOBS["opportunity_ai_planner"]
+    assert any(
+        str(part).endswith("run_opportunity_ai_planner.py")
+        for part in command
+    )
