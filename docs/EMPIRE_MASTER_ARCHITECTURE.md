@@ -304,6 +304,10 @@ PREDICTIVE CLOUD
 ↓
 OPPORTUNITY RADAR
 ↓
+BOUNDED OPPORTUNITY RESEARCH
+↓
+OPPORTUNITY FACTORY INTAKE / EVIDENCE READINESS
+↓
 OPPORTUNITY FACTORY
 ↓
 OMEGA / CORTEX
@@ -351,6 +355,8 @@ The system should increasingly run these automatically:
 - bounded acquisition cycles
 - market and sector sweeps
 - opportunity discovery and dedupe
+- bounded opportunity research
+- Opportunity Factory readiness checks without inferred scores
 - Community Intent
 - competitor research
 - storm/event intelligence
@@ -358,7 +364,7 @@ The system should increasingly run these automatically:
 - evidence freshness and changed-page detection
 - entity resolution and enrichment
 - TAM / ICP / territory analysis
-- Opportunity Factory evidence completion
+- Opportunity Factory evidence completion and readiness
 - descriptive/diagnostic/predictive analysis
 - forecast and calibration refresh
 - conversion/bottleneck analysis
