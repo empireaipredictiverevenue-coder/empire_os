@@ -3,8 +3,7 @@
 Date: 2026-09-20
 Status: CANONICAL QUANT / DECISION-SCIENCE LAYER
 
-The Quantitative Intelligence layer is the mathematical brain beneath Astra,
-Predictive Revenue, Digital Twin, Experiment/Causal and Capital Allocation.
+The Quantitative Intelligence layer is the mathematical verifier beneath **Predictive Cloud**: Astra, Predictive Revenue, Digital Twin, Experiment/Causal, Risk and Capital/Portfolio Intelligence.
 
 It exists so high-value decisions are not based on LLM confidence or persuasive
 language. LLMs generate hypotheses and plans; the Quant layer measures
@@ -214,7 +213,7 @@ Quant calculations must consume:
 
 Training/evaluation cannot use future information.
 
-## 5. Quant + Predictive Revenue
+## 5. Quant + Predictive Cloud / Predictive Revenue
 
 Canonical commercial score is not one opaque number.
 
