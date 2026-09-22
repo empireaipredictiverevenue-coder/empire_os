@@ -25,7 +25,7 @@ Canonical architecture: `docs/PREDICTIVE_CLOUD_ARCHITECTURE.md`.
 Truth boundary: OBSERVED ≠ INFERRED ≠ FORECAST ≠ SCENARIO ≠ VERIFIED OUTCOME. No score, model, recommendation or simulation creates commercial intent, execution authority, payment or revenue.
 
 ## Global Growth Strategic Lock
-Empire is a global Predictive Revenue operating system and revenue infrastructure company. Global architecture is mandatory; market entry remains sequential, jurisdiction-aware and evidence-first.
+Empire is a global Predictive Cloud intelligence company with Predictive Revenue as its commercial engine and revenue infrastructure layer. Global architecture is mandatory; market entry remains sequential, jurisdiction-aware and evidence-first.
 
 Canonical strategy documents:
 - docs/PREDICTIVE_CLOUD_ARCHITECTURE.md — canonical umbrella for Predictive Revenue, data/decision intelligence, Digital Twin, Quant, risk, capital, opportunity and learning.
