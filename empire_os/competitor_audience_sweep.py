@@ -258,6 +258,14 @@ def discover_competitor_audience_evidence(
         f"{market} comparison",
         f"{market} reviews",
     ]
+    if name:
+        queries.extend([
+            f"{name} {market}",
+            f"{name} {market} comparison",
+            f"{name} {market} reviews",
+        ])
+    if domain:
+        queries.append(f"{domain} {market} comparison")
 
     pages: list[dict[str, str]] = []
     seen_urls: set[str] = set()
