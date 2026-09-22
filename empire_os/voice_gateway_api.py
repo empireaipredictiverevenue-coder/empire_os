@@ -10,7 +10,7 @@ from urllib.parse import quote, urlencode, urlparse, urlunparse
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
 from empire_os.qualification_worker_v2 import request_json
-from empire_os.voice_lab import EmpireVoiceLab, VoiceTurnDetector
+from empire_os.voice_lab import EmpireVoiceLab, VoiceLabConfig, VoiceTurnDetector
 
 
 router = APIRouter(prefix="/v1/voice-lab", tags=["voice-lab"])
@@ -171,8 +171,8 @@ def _record_turn(
             "p_direction": direction,
             "p_body_text": text,
             "p_evidence": {
-                "stt": "faster_whisper" if direction == "inbound" else None,
-                "tts": "kokoro" if direction == "outbound" else None,
+                "stt": "sherpa_whisper" if direction == "inbound" else None,
+                "tts": "sherpa_kokoro" if direction == "outbound" else None,
                 "speech_vendor": None,
             },
         },
@@ -181,21 +181,29 @@ def _record_turn(
 
 @router.get("/health")
 def voice_lab_health():
+    config = VoiceLabConfig.from_env()
     readiness = EmpireVoiceLab.dependency_readiness()
+    models = EmpireVoiceLab.model_readiness(config)
     ws_auth = bool(_ws_token())
     webhook_auth = bool(_webhook_token())
+    switchboard = switchboard_status()
     return {
         "engine": "empire_voice_lab",
         "ownership": "self_hosted",
         "speech_vendor": None,
-        "stt": "faster_whisper",
-        "tts": "kokoro",
-        "sample_rate": 16000,
+        "stt": config.stt_backend,
+        "tts": config.tts_backend,
+        "sample_rate": config.output_rate,
         "dependencies": readiness,
+        "models": models,
         "websocket_auth_configured": ws_auth,
         "webhook_auth_configured": webhook_auth,
+        "pay_per_call_switchboard": switchboard,
         "execution_allowed": (
-            all(readiness.values()) and ws_auth and webhook_auth
+            all(readiness.values())
+            and all(models.values())
+            and ws_auth
+            and webhook_auth
         ),
     }
 
