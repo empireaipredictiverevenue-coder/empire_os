@@ -242,7 +242,8 @@ def test_status_exposes_opportunity_value_without_claiming_revenue(tmp_path):
 
 def test_status_exposes_commercial_exchange_without_external_authority(tmp_path):
     write_json(
-        tmp_path / "runtime/commercial_exchange/latest.json",
+        tmp_path,
+        "runtime/commercial_exchange/latest.json",
         {
             "observed_at": "2026-09-23T00:00:00+00:00",
             "inventory_count": 7,
