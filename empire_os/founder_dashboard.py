@@ -50,6 +50,9 @@ from empire_os.competitor_ecosystem_mining import (
 from empire_os.competitor_public_review_overlap import (
     build_public_review_overlap_runtime,
 )
+from empire_os.competitor_search_presence import (
+    build_search_presence_runtime,
+)
 from empire_os.commercial_marketing_registry import (
     marketing_plan_catalog,
     marketing_summary,
@@ -376,6 +379,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         ),
         "competitor_public_review_overlap": (
             build_public_review_overlap_runtime(repo_root)
+        ),
+        "competitor_search_presence": (
+            build_search_presence_runtime(repo_root)
         ),
         "recovery_portfolio": {
             "summary": recovery_summary(),
