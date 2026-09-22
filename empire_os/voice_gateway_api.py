@@ -10,6 +10,7 @@ from urllib.parse import quote, urlencode, urlparse, urlunparse
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
+from empire_os.decision_judge import SCHEMA_VERSION as DECISION_JUDGE_SCHEMA_VERSION
 from empire_os.qualification_worker_v2 import request_json
 from empire_os.voice_routing_policy import switchboard_status
 from empire_os.voice_lab import EmpireVoiceLab, VoiceLabConfig, VoiceTurnDetector
@@ -162,7 +163,15 @@ def _record_turn(
     index: int,
     direction: str,
     text: str,
+    evidence_extra: dict[str, Any] | None = None,
 ) -> Any:
+    evidence: dict[str, Any] = {
+        "stt": "sherpa_whisper" if direction == "inbound" else None,
+        "tts": "sherpa_kokoro" if direction == "outbound" else None,
+        "speech_vendor": None,
+    }
+    if evidence_extra:
+        evidence.update(evidence_extra)
     return request_json(
         "POST",
         "/rest/v1/rpc/record_voice_turn",
@@ -172,11 +181,7 @@ def _record_turn(
             "p_turn_index": index,
             "p_direction": direction,
             "p_body_text": text,
-            "p_evidence": {
-                "stt": "sherpa_whisper" if direction == "inbound" else None,
-                "tts": "sherpa_kokoro" if direction == "outbound" else None,
-                "speech_vendor": None,
-            },
+            "p_evidence": evidence,
         },
     )
 
@@ -201,6 +206,13 @@ def voice_lab_health():
         "websocket_auth_configured": ws_auth,
         "webhook_auth_configured": webhook_auth,
         "pay_per_call_switchboard": switchboard,
+        "decision_judge": {
+            "engine": "empire_decision_judge",
+            "schema_version": DECISION_JUDGE_SCHEMA_VERSION,
+            "mode": "deterministic_local",
+            "network_dependency": False,
+            "execution_authority": False,
+        },
         "execution_allowed": (
             all(readiness.values())
             and all(models.values())
@@ -392,6 +404,7 @@ async def vonage_socket(websocket: WebSocket):
         response_text = str(
             result.get("response_text") or ""
         ).strip()
+        decision = result.get("decision")
         if not transcript:
             return
 
@@ -404,6 +417,9 @@ async def vonage_socket(websocket: WebSocket):
                 index,
                 "inbound",
                 transcript,
+                {
+                    "decision_judge": decision,
+                } if isinstance(decision, dict) else None,
             )
 
         if not response_text:
