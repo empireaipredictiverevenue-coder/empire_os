@@ -1,26 +1,44 @@
-"""Empire Voice Lab: self-hosted STT, closer reasoning and TTS.
+"""Empire Voice Lab: self-hosted speech stack for Python 3.14.
 
-No third-party speech vendor is required. Models are loaded lazily so the
-normal EmpireOS API can start even when the optional voice runtime is absent.
+Speech runtime:
+- sherpa-onnx Whisper for local STT
+- sherpa-onnx Kokoro for local TTS
+- no third-party speech API
 """
 from __future__ import annotations
 
 from array import array
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
+import importlib.util
 import math
 import os
+from pathlib import Path
 import sys
 from typing import Any
 
 
+MODEL_ROOT = Path(
+    os.getenv(
+        "EMPIRE_VOICE_MODEL_ROOT",
+        "/srv/empire_os/runtime/models/voice_lab",
+    )
+)
+
+
 @dataclass(frozen=True)
 class VoiceLabConfig:
-    stt_backend: str = "faster_whisper"
-    stt_model: str = "small.en"
-    tts_backend: str = "kokoro"
-    tts_voice: str = "af_heart"
-    device: str = "cpu"
-    compute_type: str = "int8"
+    stt_backend: str = "sherpa_whisper"
+    stt_model_dir: str = str(
+        MODEL_ROOT / "sherpa-onnx-whisper-tiny.en"
+    )
+    tts_backend: str = "sherpa_kokoro"
+    tts_model_dir: str = str(
+        MODEL_ROOT / "kokoro-en-v0_19"
+    )
+    tts_voice: str = "empire_default"
+    tts_sid: int = 10
+    provider: str = "cpu"
+    num_threads: int = 2
     input_rate: int = 16000
     output_rate: int = 16000
     silence_ms: int = 650
@@ -31,26 +49,44 @@ class VoiceLabConfig:
     def from_env(cls) -> "VoiceLabConfig":
         return cls(
             stt_backend=os.getenv(
-                "EMPIRE_VOICE_STT_BACKEND", "faster_whisper"
+                "EMPIRE_VOICE_STT_BACKEND",
+                "sherpa_whisper",
             ).strip(),
-            stt_model=os.getenv(
-                "EMPIRE_VOICE_STT_MODEL", "small.en"
+            stt_model_dir=os.getenv(
+                "EMPIRE_VOICE_STT_MODEL_DIR",
+                str(MODEL_ROOT / "sherpa-onnx-whisper-tiny.en"),
             ).strip(),
             tts_backend=os.getenv(
-                "EMPIRE_VOICE_TTS_BACKEND", "kokoro"
+                "EMPIRE_VOICE_TTS_BACKEND",
+                "sherpa_kokoro",
+            ).strip(),
+            tts_model_dir=os.getenv(
+                "EMPIRE_VOICE_TTS_MODEL_DIR",
+                str(MODEL_ROOT / "kokoro-en-v0_19"),
             ).strip(),
             tts_voice=os.getenv(
-                "EMPIRE_VOICE_TTS_VOICE", "af_heart"
+                "EMPIRE_VOICE_TTS_VOICE",
+                "empire_default",
             ).strip(),
-            device=os.getenv(
-                "EMPIRE_VOICE_DEVICE", "cpu"
+            tts_sid=int(
+                os.getenv("EMPIRE_VOICE_TTS_SID", "10")
+            ),
+            provider=os.getenv(
+                "EMPIRE_VOICE_PROVIDER", "cpu"
             ).strip(),
-            compute_type=os.getenv(
-                "EMPIRE_VOICE_COMPUTE_TYPE", "int8"
-            ).strip(),
-            silence_ms=int(os.getenv("EMPIRE_VOICE_SILENCE_MS", "650")),
-            min_speech_ms=int(os.getenv("EMPIRE_VOICE_MIN_SPEECH_MS", "280")),
-            rms_threshold=int(os.getenv("EMPIRE_VOICE_RMS_THRESHOLD", "420")),
+            num_threads=max(
+                1,
+                int(os.getenv("EMPIRE_VOICE_NUM_THREADS", "2")),
+            ),
+            silence_ms=int(
+                os.getenv("EMPIRE_VOICE_SILENCE_MS", "650")
+            ),
+            min_speech_ms=int(
+                os.getenv("EMPIRE_VOICE_MIN_SPEECH_MS", "280")
+            ),
+            rms_threshold=int(
+                os.getenv("EMPIRE_VOICE_RMS_THRESHOLD", "420")
+            ),
         )
 
 
@@ -67,12 +103,14 @@ def pcm16_rms(frame: bytes) -> float:
         samples.byteswap()
     if not samples:
         return 0.0
-    mean_square = sum(int(v) * int(v) for v in samples) / len(samples)
+    mean_square = sum(
+        int(v) * int(v) for v in samples
+    ) / len(samples)
     return math.sqrt(mean_square)
 
 
 class VoiceTurnDetector:
-    """Tiny streaming VAD/turn detector for 16 kHz PCM16 phone audio."""
+    """Streaming turn detector for 16 kHz PCM16 phone audio."""
 
     def __init__(self, config: VoiceLabConfig | None = None) -> None:
         self.config = config or VoiceLabConfig.from_env()
@@ -121,98 +159,154 @@ class VoiceTurnDetector:
         return "utterance", audio
 
 
-class FasterWhisperSTT:
+def _require_file(path: Path, label: str) -> str:
+    if not path.is_file():
+        raise VoiceLabRuntimeError(
+            f"{label} missing: {path}"
+        )
+    return str(path)
+
+
+class SherpaWhisperSTT:
     def __init__(self, config: VoiceLabConfig) -> None:
         self.config = config
-        self._model = None
+        self._recognizer = None
 
     def _load(self):
-        if self._model is None:
-            try:
-                from faster_whisper import WhisperModel
-            except ImportError as exc:
-                raise VoiceLabRuntimeError(
-                    "faster-whisper is not installed"
-                ) from exc
-            self._model = WhisperModel(
-                self.config.stt_model,
-                device=self.config.device,
-                compute_type=self.config.compute_type,
-            )
-        return self._model
+        if self._recognizer is not None:
+            return self._recognizer
+        try:
+            import sherpa_onnx
+        except ImportError as exc:
+            raise VoiceLabRuntimeError(
+                "sherpa-onnx is not installed"
+            ) from exc
+
+        root = Path(self.config.stt_model_dir)
+        encoder = root / "tiny.en-encoder.int8.onnx"
+        decoder = root / "tiny.en-decoder.int8.onnx"
+        tokens = root / "tiny.en-tokens.txt"
+        self._recognizer = sherpa_onnx.OfflineRecognizer.from_whisper(
+            encoder=_require_file(encoder, "Whisper encoder"),
+            decoder=_require_file(decoder, "Whisper decoder"),
+            tokens=_require_file(tokens, "Whisper tokens"),
+            num_threads=self.config.num_threads,
+            provider=self.config.provider,
+            debug=False,
+        )
+        return self._recognizer
 
     def transcribe(self, pcm16: bytes) -> str:
         try:
             import numpy as np
         except ImportError as exc:
-            raise VoiceLabRuntimeError("numpy is required for STT") from exc
+            raise VoiceLabRuntimeError(
+                "numpy is required for STT"
+            ) from exc
+
         audio = (
             np.frombuffer(pcm16, dtype="<i2")
             .astype(np.float32)
             / 32768.0
         )
-        segments, _info = self._load().transcribe(
-            audio,
-            language="en",
-            beam_size=1,
-            vad_filter=False,
-            condition_on_previous_text=False,
-        )
-        return " ".join(
-            segment.text.strip()
-            for segment in segments
-            if segment.text.strip()
-        ).strip()
+        if audio.size == 0:
+            return ""
+        recognizer = self._load()
+        stream = recognizer.create_stream()
+        stream.accept_waveform(self.config.input_rate, audio)
+        recognizer.decode_stream(stream)
+        return str(stream.result.text or "").strip()
 
 
-class KokoroTTS:
+class SherpaKokoroTTS:
     SOURCE_RATE = 24000
 
     def __init__(self, config: VoiceLabConfig) -> None:
         self.config = config
-        self._pipeline = None
+        self._tts = None
 
     def _load(self):
-        if self._pipeline is None:
-            try:
-                from kokoro import KPipeline
-            except ImportError as exc:
-                raise VoiceLabRuntimeError(
-                    "kokoro is not installed"
-                ) from exc
-            self._pipeline = KPipeline(lang_code="a")
-        return self._pipeline
+        if self._tts is not None:
+            return self._tts
+        try:
+            import sherpa_onnx
+        except ImportError as exc:
+            raise VoiceLabRuntimeError(
+                "sherpa-onnx is not installed"
+            ) from exc
+
+        root = Path(self.config.tts_model_dir)
+        tts_config = sherpa_onnx.OfflineTtsConfig(
+            model=sherpa_onnx.OfflineTtsModelConfig(
+                kokoro=sherpa_onnx.OfflineTtsKokoroModelConfig(
+                    model=_require_file(
+                        root / "model.onnx", "Kokoro model"
+                    ),
+                    voices=_require_file(
+                        root / "voices.bin", "Kokoro voices"
+                    ),
+                    tokens=_require_file(
+                        root / "tokens.txt", "Kokoro tokens"
+                    ),
+                    data_dir=str(root / "espeak-ng-data"),
+                    lexicon="",
+                ),
+                provider=self.config.provider,
+                debug=False,
+                num_threads=self.config.num_threads,
+            ),
+            max_num_sentences=1,
+        )
+        if not tts_config.validate():
+            raise VoiceLabRuntimeError(
+                "invalid sherpa Kokoro configuration"
+            )
+        self._tts = sherpa_onnx.OfflineTts(tts_config)
+        return self._tts
 
     def synthesize(self, text: str) -> bytes:
         try:
             import numpy as np
+            import sherpa_onnx
         except ImportError as exc:
-            raise VoiceLabRuntimeError("numpy is required for TTS") from exc
+            raise VoiceLabRuntimeError(
+                "sherpa-onnx and numpy are required for TTS"
+            ) from exc
 
-        chunks = []
-        for _graphemes, _phonemes, audio in self._load()(
-            text,
-            voice=self.config.tts_voice,
-            speed=1.0,
-        ):
-            chunks.append(np.asarray(audio, dtype=np.float32))
-        if not chunks:
+        generation = sherpa_onnx.GenerationConfig()
+        generation.sid = self.config.tts_sid
+        generation.speed = 1.0
+        generation.silence_scale = 0.2
+
+        audio = self._load().generate(
+            str(text or "").strip(),
+            generation,
+        )
+        samples = np.asarray(audio.samples, dtype=np.float32)
+        if samples.size == 0:
             return b""
 
-        audio = np.concatenate(chunks)
-        if self.SOURCE_RATE != self.config.output_rate:
+        source_rate = int(audio.sample_rate or self.SOURCE_RATE)
+        if source_rate != self.config.output_rate:
             out_len = max(
                 1,
                 round(
-                    len(audio)
+                    len(samples)
                     * self.config.output_rate
-                    / self.SOURCE_RATE
+                    / source_rate
                 ),
             )
-            old = np.linspace(0.0, 1.0, len(audio), endpoint=False)
-            new = np.linspace(0.0, 1.0, out_len, endpoint=False)
-            audio = np.interp(new, old, audio).astype(np.float32)
-        pcm = np.clip(audio, -1.0, 1.0)
+            old = np.linspace(
+                0.0, 1.0, len(samples), endpoint=False
+            )
+            new = np.linspace(
+                0.0, 1.0, out_len, endpoint=False
+            )
+            samples = np.interp(
+                new, old, samples
+            ).astype(np.float32)
+
+        pcm = np.clip(samples, -1.0, 1.0)
         return (pcm * 32767.0).astype("<i2").tobytes()
 
 
@@ -243,7 +337,9 @@ Rules:
                 "EMPIRE_VOICE_LLM_MODEL",
                 "qwen2.5:7b",
             ),
-            timeout=int(os.getenv("EMPIRE_VOICE_LLM_TIMEOUT", "12")),
+            timeout=int(
+                os.getenv("EMPIRE_VOICE_LLM_TIMEOUT", "12")
+            ),
         )
 
     def reply(
@@ -282,12 +378,16 @@ Rules:
 class EmpireVoiceLab:
     def __init__(self, config: VoiceLabConfig | None = None) -> None:
         self.config = config or VoiceLabConfig.from_env()
-        if self.config.stt_backend != "faster_whisper":
-            raise VoiceLabRuntimeError("unsupported Empire STT backend")
-        if self.config.tts_backend != "kokoro":
-            raise VoiceLabRuntimeError("unsupported Empire TTS backend")
-        self.stt = FasterWhisperSTT(self.config)
-        self.tts = KokoroTTS(self.config)
+        if self.config.stt_backend != "sherpa_whisper":
+            raise VoiceLabRuntimeError(
+                "unsupported Empire STT backend"
+            )
+        if self.config.tts_backend != "sherpa_kokoro":
+            raise VoiceLabRuntimeError(
+                "unsupported Empire TTS backend"
+            )
+        self.stt = SherpaWhisperSTT(self.config)
+        self.tts = SherpaKokoroTTS(self.config)
         self.brain = VoiceCloserBrain()
 
     def opening_text(self, *, business_name: str = "") -> str:
@@ -308,28 +408,52 @@ class EmpireVoiceLab:
 
     @staticmethod
     def dependency_readiness() -> dict[str, Any]:
-        import importlib.util
         return {
-            "faster_whisper": (
-                importlib.util.find_spec("faster_whisper") is not None
+            "sherpa_onnx": (
+                importlib.util.find_spec("sherpa_onnx") is not None
             ),
-            "kokoro": importlib.util.find_spec("kokoro") is not None,
             "numpy": importlib.util.find_spec("numpy") is not None,
+        }
+
+    @staticmethod
+    def model_readiness(
+        config: VoiceLabConfig | None = None,
+    ) -> dict[str, bool]:
+        cfg = config or VoiceLabConfig.from_env()
+        stt = Path(cfg.stt_model_dir)
+        tts = Path(cfg.tts_model_dir)
+        return {
+            "stt_encoder": (
+                stt / "tiny.en-encoder.int8.onnx"
+            ).is_file(),
+            "stt_decoder": (
+                stt / "tiny.en-decoder.int8.onnx"
+            ).is_file(),
+            "stt_tokens": (
+                stt / "tiny.en-tokens.txt"
+            ).is_file(),
+            "tts_model": (tts / "model.onnx").is_file(),
+            "tts_voices": (tts / "voices.bin").is_file(),
+            "tts_tokens": (tts / "tokens.txt").is_file(),
+            "tts_espeak_data": (tts / "espeak-ng-data").is_dir(),
         }
 
     def readiness(self) -> dict[str, Any]:
         deps = self.dependency_readiness()
-        configured = all(deps.values())
+        models = self.model_readiness(self.config)
+        configured = all(deps.values()) and all(models.values())
         return {
             "engine": "empire_voice_lab",
             "ownership": "self_hosted",
             "speech_vendor": None,
             "stt": self.config.stt_backend,
-            "stt_model": self.config.stt_model,
+            "stt_model_dir": self.config.stt_model_dir,
             "tts": self.config.tts_backend,
+            "tts_model_dir": self.config.tts_model_dir,
             "tts_voice": self.config.tts_voice,
             "sample_rate": self.config.output_rate,
             "dependencies": deps,
+            "models": models,
             "configured": configured,
             "execution_allowed": configured,
         }
