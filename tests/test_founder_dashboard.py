@@ -714,3 +714,44 @@ def test_dashboard_exposes_cortex_learning_loop(tmp_path):
     assert cortex["synthetic_commercial_label_count"] == 0
     assert cortex["model_weight_mutation_authorized"] is False
     assert cortex["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_competitor_market_scale(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_market_scale_latest.json",
+        {
+            "schema_version": "empire.competitor_market_scale.v1",
+            "mode": "OBSERVE",
+            "market_key": "denver-co-roofing",
+            "configured_competitor_count": 9,
+            "executed_competitor_count": 9,
+            "company_count": 4,
+            "unique_evidence_count": 12,
+            "shared_audience_edge_count": 3,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "market_share_inferred": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    scale = result["competitor_market_scale"]
+
+    assert scale["available"] is True
+    assert scale["market_key"] == "denver-co-roofing"
+    assert scale["configured_competitor_count"] == 9
+    assert scale["executed_competitor_count"] == 9
+    assert scale["company_count"] == 4
+    assert scale["unique_evidence_count"] == 12
+    assert scale["shared_audience_edge_count"] == 3
+    assert scale["buyer_intent_inferred"] is False
+    assert scale["commercial_intent_inferred"] is False
+    assert scale["market_share_inferred"] is False
+    assert scale["outreach_enabled"] is False
+    assert scale["execution_authority"] == "none"
