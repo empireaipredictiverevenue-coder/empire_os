@@ -26,6 +26,9 @@ from empire_os.competitor_audience_research_executor import (
 from empire_os.competitor_account_brief import (
     build_account_brief_runtime,
 )
+from empire_os.buyer_state_evidence import (
+    build_buyer_state_runtime,
+)
 from empire_os.commercial_marketing_registry import (
     marketing_plan_catalog,
     marketing_summary,
@@ -328,6 +331,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         ),
         "competitor_account_briefs": (
             build_account_brief_runtime(repo_root)
+        ),
+        "buyer_state_evidence": (
+            build_buyer_state_runtime(repo_root)
         ),
         "recovery_portfolio": {
             "summary": recovery_summary(),
