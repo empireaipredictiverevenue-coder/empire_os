@@ -19,6 +19,7 @@ from empire_os.coder.jobs import JobKind, LocalJobQueue
 RADAR_RELATIVE = Path("runtime/opportunity_radar/latest.json")
 RESEARCH_RELATIVE = Path("runtime/opportunity_radar/research_latest.json")
 FACTORY_INTAKE_RELATIVE = Path("runtime/opportunity_factory/intake_latest.json")
+EVIDENCE_ROUTES_RELATIVE = Path("runtime/opportunity_factory/evidence_routes_latest.json")
 STATE_RELATIVE = Path("runtime/opportunity_radar/ai_planner_state.json")
 OUTPUT_RELATIVE = Path("runtime/opportunity_radar/ai_planner_latest.json")
 
@@ -58,6 +59,7 @@ def _fingerprint(
     candidate: Mapping[str, Any],
     research: Mapping[str, Any] | None = None,
     factory_item: Mapping[str, Any] | None = None,
+    route_item: Mapping[str, Any] | None = None,
 ) -> str:
     material = {
         "opportunity_key": candidate.get("opportunity_key"),
@@ -99,6 +101,16 @@ def _fingerprint(
             for item in ((factory_item or {}).get("blockers") or [])
             if str(item).strip()
         ),
+        "evidence_routes": sorted(
+            (
+                str(row.get("blocker") or ""),
+                str(row.get("capability") or ""),
+                str(row.get("action") or ""),
+                str(row.get("mode") or ""),
+            )
+            for row in ((route_item or {}).get("routes") or [])
+            if isinstance(row, Mapping)
+        ),
     }
     raw = json.dumps(
         material,
@@ -121,6 +133,7 @@ def _objective(
     candidate: Mapping[str, Any],
     research: Mapping[str, Any] | None = None,
     factory_item: Mapping[str, Any] | None = None,
+    route_item: Mapping[str, Any] | None = None,
 ) -> str:
     key = str(candidate.get("opportunity_key") or "").strip()
     klass = str(candidate.get("opportunity_class") or "").strip()
@@ -156,6 +169,21 @@ def _objective(
     factory_ready = bool(
         (factory_item or {}).get("factory_ready") is True
     )
+    evidence_routes = [
+        {
+            "blocker": row.get("blocker"),
+            "capability": row.get("capability"),
+            "action": row.get("action"),
+            "mode": row.get("mode"),
+            "automatic_internal_work": row.get(
+                "automatic_internal_work"
+            ),
+        }
+        for row in ((route_item or {}).get("routes") or [])
+        if isinstance(row, Mapping)
+    ]
+    lifecycle = (route_item or {}).get("lifecycle")
+    lifecycle = lifecycle if isinstance(lifecycle, Mapping) else {}
     return (
         "PLAN ONLY: advance this existing Predictive Cloud opportunity toward "
         "the canonical Opportunity Factory without inventing evidence or "
@@ -174,7 +202,10 @@ def _objective(
         f"blockers={blockers}; recommended_actions={actions}; "
         f"evidence_refs={refs}; public_search_observation_count={research_count}; "
         f"public_search_evidence_urls={research_urls}; factory_ready={factory_ready}; "
-        f"actual_factory_blockers={actual_factory_blockers}. Public search observations "
+        f"actual_factory_blockers={actual_factory_blockers}; "
+        f"lifecycle_stage={lifecycle.get('current_stage')}; "
+        f"next_stage={lifecycle.get('next_stage')}; "
+        f"evidence_routes={evidence_routes}. Public search observations "
         "are research evidence candidates only and must not be treated as verified "
         "demand, buyer intent, economics or revenue."
     )
@@ -191,6 +222,7 @@ def plan_radar_opportunities(
     radar = _read_json(root / RADAR_RELATIVE)
     research_batch = _read_json(root / RESEARCH_RELATIVE)
     factory_batch = _read_json(root / FACTORY_INTAKE_RELATIVE)
+    route_batch = _read_json(root / EVIDENCE_ROUTES_RELATIVE)
     candidates = radar.get("candidates")
     candidates = candidates if isinstance(candidates, list) else []
     research_actions = research_batch.get("actions")
@@ -213,6 +245,16 @@ def plan_radar_opportunities(
         if isinstance(row, Mapping)
         and str(row.get("opportunity_key") or "").strip()
     }
+    route_items = route_batch.get("items")
+    route_items = (
+        route_items if isinstance(route_items, list) else []
+    )
+    route_by_key = {
+        str(row.get("opportunity_key") or "").strip(): row
+        for row in route_items
+        if isinstance(row, Mapping)
+        and str(row.get("opportunity_key") or "").strip()
+    }
     state_path = root / STATE_RELATIVE
     state = _read_json(state_path)
     fingerprints = state.get("fingerprints")
@@ -223,7 +265,12 @@ def plan_radar_opportunities(
     )
 
     eligible: list[
-        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]
+        tuple[
+            Mapping[str, Any],
+            Mapping[str, Any],
+            Mapping[str, Any],
+            Mapping[str, Any],
+        ]
     ] = []
     skipped_unchanged = 0
     skipped_no_evidence = 0
@@ -241,11 +288,17 @@ def plan_radar_opportunities(
             continue
         research = research_by_key.get(key) or {}
         factory_item = factory_by_key.get(key) or {}
-        fp = _fingerprint(raw, research, factory_item)
+        route_item = route_by_key.get(key) or {}
+        fp = _fingerprint(
+            raw,
+            research,
+            factory_item,
+            route_item,
+        )
         if fingerprints.get(key) == fp:
             skipped_unchanged += 1
             continue
-        eligible.append((raw, research, factory_item))
+        eligible.append((raw, research, factory_item, route_item))
 
     eligible.sort(
         key=lambda item: (
@@ -265,11 +318,21 @@ def plan_radar_opportunities(
         coder = None
         queue = None
 
-    for candidate, research, factory_item in eligible[:bounded]:
+    for candidate, research, factory_item, route_item in eligible[:bounded]:
         key = str(candidate.get("opportunity_key") or "").strip()
-        fp = _fingerprint(candidate, research, factory_item)
+        fp = _fingerprint(
+            candidate,
+            research,
+            factory_item,
+            route_item,
+        )
         task = coder.create_task(
-            _objective(candidate, research, factory_item)
+            _objective(
+                candidate,
+                research,
+                factory_item,
+                route_item,
+            )
         )
         job = queue.enqueue(
             task_id=task.id,
@@ -317,6 +380,8 @@ def plan_radar_opportunities(
         "research_action_count": len(research_actions),
         "factory_intake_available": bool(factory_batch),
         "factory_intake_item_count": len(factory_items),
+        "evidence_routes_available": bool(route_batch),
+        "evidence_route_item_count": len(route_items),
         "factory_ready_count": sum(
             row.get("factory_ready") is True
             for row in factory_items
