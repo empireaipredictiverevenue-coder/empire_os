@@ -273,6 +273,27 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             900,
         ),
         ComponentSpec(
+            "predictive_intelligence",
+            (
+                "probability_estimate_requested",
+                "uncertainty_estimate_requested",
+                "time_to_revenue_estimate_requested",
+                "confidence_review_requested",
+            ),
+            (
+                "probability_estimate_ready",
+                "uncertainty_estimate_ready",
+                "time_to_revenue_estimate_ready",
+                "confidence_review_ready",
+            ),
+            (
+                "intelligence_fabric",
+                "quant_brain",
+            ),
+            "observe",
+            900,
+        ),
+        ComponentSpec(
             "quant_brain",
             (
                 "quant_review_requested",
