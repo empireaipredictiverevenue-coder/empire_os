@@ -286,6 +286,7 @@ def run_market_scale_sweep(
     persist: bool = False,
     max_seeds: int | None = None,
     sweep_fn: SweepFn = run_competitor_audience_sweep,
+    fetch_fn: Callable[[str], str | None] = fetch_public_html,
 ) -> dict[str, Any]:
     reviewed = review_market_seed_config(config)
     if not reviewed["review_ready"]:
@@ -304,14 +305,14 @@ def run_market_scale_sweep(
     sweeps: list[dict[str, Any]] = []
 
     source_cache = {
-        url: fetch_public_html(url)
+        url: fetch_fn(url)
         for url in reviewed["source_refs"]
     }
 
     def _market_fetch(url: str) -> str | None:
         if url in source_cache:
             return source_cache[url]
-        return fetch_public_html(url)
+        return fetch_fn(url)
 
     def _run_seed(seed: Mapping[str, Any]) -> dict[str, Any]:
         result = sweep_fn(
