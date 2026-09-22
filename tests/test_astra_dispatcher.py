@@ -45,6 +45,7 @@ def test_choose_jobs_adds_source_repair_but_no_duplicate_jobs():
         "conversion_intelligence_refresh",
         "commercial_loop_refresh",
         "revenue_pulse_refresh",
+        "opportunity_radar_refresh",
     ]
 
 
