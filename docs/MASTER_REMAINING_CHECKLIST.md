@@ -32,7 +32,9 @@ Architecture:
 - [x] Preserve OBSERVED / INFERRED / FORECAST / SCENARIO / VERIFIED OUTCOME separation
 - [x] Inventory existing modern analytics/intelligence modules
 - [x] Align canonical architecture/strategy documents to Predictive Cloud naming; historical files may retain prior wording
-- [ ] Expose one canonical Predictive Cloud capability/status contract
+- [x] Canonical Predictive Cloud runtime status contract — CODED
+- [x] Read-only Founder API `/v1/predictive-cloud/status` — CODED
+- [x] Predictive Cloud 5-minute status timer packaging — STAGED
 
 Data & Decision Intelligence:
 - [x] Revenue Intelligence scoring/expected-value foundation exists
@@ -85,19 +87,21 @@ Already implemented:
 - [x] bounded Opportunity Radar public-research executor — CODED
 - [x] Astra Radar → Research → Factory Intake internal job chain — CODED
 - [x] truth-preserving Opportunity Factory intake bridge — CODED
-- [x] combined Radar → Research → Factory Intake loop runner — CODED
+- [x] combined Radar → Research → Factory Intake → AI Planner loop runner — CODED
 - [x] 15-minute autonomous Opportunity Loop user-timer packaging — STAGED
+- [x] Opportunity Loop freshness/dedupe guard aligned to 15-minute cadence — CODED
+- [x] Astra dispatches one canonical Opportunity Loop refresh job — CODED
 - [x] canonical autonomous-loop doctrine
 - [x] canonical full-business plain-text architecture
 
 Verification / activation:
 - [ ] Pull latest branch onto EmpireOS
-- [ ] Run Opportunity Radar / research / Factory Intake / loop / Astra focused tests
+- [ ] Run Opportunity Radar / research / Factory Intake / AI Planner / loop / Astra focused tests
 - [ ] Run one real OBSERVE Opportunity Loop against current snapshots
 - [ ] Confirm bounded real Opportunity Research produces observations only
 - [ ] Confirm Factory Intake blocks missing normalized signals rather than inferring them
 - [ ] Install/enable autonomous Opportunity Loop timer if tests pass
-- [ ] Confirm Astra dispatcher invokes Radar → Research → Factory Intake without external mutation
+- [ ] Confirm Astra dispatcher invokes one deduped Opportunity Loop without external mutation
 
 Next wiring:
 - [x] Normalize Radar + research evidence into Opportunity Factory readiness contract — CODED; live evidence normalizers still needed
@@ -109,7 +113,8 @@ Next wiring:
 - [ ] Add productization / partner / distribution / pricing mismatch opportunity classes
 - [ ] Dedupe opportunity history across cycles and preserve lifecycle
 - [ ] Add DISCOVER → QUALIFY → VALIDATE → EXPERIMENT → PROVE → SCALE lifecycle
-- [ ] Expose Radar / research / blockers / opportunity lifecycle in Founder Console
+- [ ] Expose full Radar / research / blockers / opportunity lifecycle in Founder Console
+- [x] Aggregate Predictive Cloud runtime status read surface — CODED
 - [ ] Feed verified outcomes into opportunity calibration / Economic Memory
 - [ ] Daily Results: what AI found, researched, advanced, blocked, proved and learned
 
@@ -144,7 +149,8 @@ business loop rather than continue building isolated modules.
 - [ ] Wire product/GTM preparation -> governed external execution
 - [ ] Wire Conversation OS -> terms/payment/fulfilment progression
 - [ ] Wire verified outcomes -> Economic Memory / calibration
-- [ ] Expose end-to-end autonomous-loop status in Founder Console
+- [x] Expose aggregate autonomous-loop/Predictive Cloud status in Founder read API — CODED
+- [ ] Build full visual autonomous-loop status in Founder Console
 - [ ] Prove one real opportunity through the complete autonomous loop
 
 Operating rule:
