@@ -23,6 +23,7 @@ def test_choose_jobs_drives_internal_launch_pipeline():
         "revenue_pulse_refresh",
         "opportunity_radar_refresh",
         "opportunity_research_refresh",
+        "opportunity_factory_intake_refresh",
     ]
 
 
@@ -48,6 +49,7 @@ def test_choose_jobs_adds_source_repair_but_no_duplicate_jobs():
         "revenue_pulse_refresh",
         "opportunity_radar_refresh",
         "opportunity_research_refresh",
+        "opportunity_factory_intake_refresh",
     ]
 
 
@@ -75,6 +77,7 @@ def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
     assert jobs[-2:] == [
         "opportunity_radar_refresh",
         "opportunity_research_refresh",
+        "opportunity_factory_intake_refresh",
     ]
 
 
@@ -160,5 +163,18 @@ def test_opportunity_research_is_internal_safe_job():
     command = module.SAFE_JOBS["opportunity_research_refresh"]
     assert any(
         str(part).endswith("run_opportunity_research.py")
+        for part in command
+    )
+
+
+def test_opportunity_factory_intake_is_internal_safe_job():
+    import empire_os.astra_dispatcher as module
+
+    assert "opportunity_factory_intake_refresh" in module.SAFE_JOBS
+    command = module.SAFE_JOBS[
+        "opportunity_factory_intake_refresh"
+    ]
+    assert any(
+        str(part).endswith("build_opportunity_factory_intake.py")
         for part in command
     )
