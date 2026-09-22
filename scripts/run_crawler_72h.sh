@@ -18,7 +18,7 @@ echo "$END" > "$END_FILE"
 export PYTHONPATH="$ROOT"
 export PYTHONUNBUFFERED=1
 export CRAWLER_LOG_PATH="$CRAWLER_LOG"
-if [[ -z "$CRAWLER_TIMEOUT" ]]; then
+if [[ -z "${CRAWLER_TIMEOUT:-}" ]]; then
   export CRAWLER_TIMEOUT="1800"
 fi
 
