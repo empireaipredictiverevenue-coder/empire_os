@@ -106,8 +106,8 @@ Current truth:
 - [ ] Events/webinars
 - [ ] Public company activity
 - [x] Competitor audience overlap map
-- [ ] Underserved audience finder
-- [ ] Territory heatmap
+- [x] Underserved audience finder
+- [x] Territory heatmap
 - [ ] Share-of-voice / search presence
 - [ ] Feed TAM + Revenue GPS + GTM + Search Intelligence
 
@@ -171,7 +171,7 @@ Current truth:
 - [x] Buyer State
 - [x] Next-Best Action
 - [x] Account digital twin
-- [ ] Market opportunities
+- [x] Market opportunities
 - [ ] Competitor graph visualization
 - [ ] Real funnel
 - [ ] Terms/payment/fulfilment
