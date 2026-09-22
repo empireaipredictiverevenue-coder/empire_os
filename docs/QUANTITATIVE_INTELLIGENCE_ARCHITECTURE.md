@@ -333,3 +333,35 @@ The Quant Brain is successful when Empire can say:
 "We chose this action because its expected gross profit, downside, uncertainty,
 evidence quality and information value dominated the alternatives — and here is
 how that prediction compared with the real outcome."
+
+
+## Quant Decision Packet
+
+Quant Brain now exposes one typed decision-support packet combining:
+
+- expected economics;
+- Monte Carlo downside distribution;
+- risk-adjusted value;
+- optional Value of Information;
+- optional Brier/log-loss/reliability calibration from verified outcomes.
+
+The packet is **UNAVAILABLE** when required evidence is missing.
+
+It must not manufacture:
+- probability of success;
+- uncertainty;
+- confidence;
+- time-to-revenue;
+- price/cost bounds.
+
+Verified Commercial Product Catalog policy economics may supply price/cost
+scenario inputs. Probability and uncertainty remain UNKNOWN until supported by
+Predictive Intelligence / verified outcome cohorts.
+
+Canonical implementation:
+- `empire_os/quant_brain.py::quant_decision_packet`
+- `empire_os/opportunity_quant_review.py`
+- `POST /v1/quant-brain/decision-packet/preview`
+
+Quant output remains recommendation/decision support only and has no capital,
+commercial, payment or revenue-recognition authority.
