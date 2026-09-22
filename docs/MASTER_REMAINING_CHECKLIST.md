@@ -100,7 +100,7 @@ Current truth:
 - [x] Partner ecosystem
 - [x] Public review/company overlap
 - [x] Comparison pages
-- [ ] Search overlap
+- [ ] Search overlap — PARKED: provider evidence unavailable; canonical roster is non-blocking
 - [x] Ads/offers/creative tracking
 - [x] Jobs/hiring signals
 - [x] Events/webinars
@@ -108,7 +108,7 @@ Current truth:
 - [x] Competitor audience overlap map
 - [x] Underserved audience finder
 - [x] Territory heatmap
-- [ ] Share-of-voice / search presence
+- [ ] Share-of-voice / search presence — PARKED: optional SERP overlay; provider reliability does not block downstream intelligence
 - [ ] Feed TAM + Revenue GPS + GTM + Search Intelligence
 
 ## Automate recurring intelligence
