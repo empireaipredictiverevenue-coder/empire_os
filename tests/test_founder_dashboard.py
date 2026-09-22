@@ -436,3 +436,51 @@ def test_dashboard_exposes_competitor_account_research(tmp_path):
     assert research["commercial_intent_inferred"] is False
     assert research["outreach_enabled"] is False
     assert research["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_claim_critic_account_briefs(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root
+        / "runtime/competitive_intelligence/"
+        / "competitor_account_briefs_latest.json",
+        {
+            "schema_version": "empire.account_intelligence_brief_batch.v1",
+            "mode": "OBSERVE",
+            "brief_count": 1,
+            "supported_claim_count": 3,
+            "blocked_claim_count": 0,
+            "all_published_claims_supported": True,
+            "buyer_intent_inferred": False,
+            "commercial_intent_inferred": False,
+            "outreach_enabled": False,
+            "actual_revenue": False,
+            "execution_authority": "none",
+            "briefs": [{
+                "entity_id": "entity-1",
+                "company_name": "Golden Spike Roofing Inc",
+                "claim_critic": {
+                    "reviewed_count": 3,
+                    "supported_count": 3,
+                    "blocked_count": 0,
+                    "all_published_claims_supported": True,
+                    "blocked_claims": [],
+                },
+            }],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    briefs = result["competitor_account_briefs"]
+
+    assert briefs["available"] is True
+    assert briefs["brief_count"] == 1
+    assert briefs["supported_claim_count"] == 3
+    assert briefs["blocked_claim_count"] == 0
+    assert briefs["all_published_claims_supported"] is True
+    assert briefs["buyer_intent_inferred"] is False
+    assert briefs["commercial_intent_inferred"] is False
+    assert briefs["outreach_enabled"] is False
+    assert briefs["actual_revenue"] is False
+    assert briefs["execution_authority"] == "none"
