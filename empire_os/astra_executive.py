@@ -35,6 +35,9 @@ NEXT_BEST_ACTION = Path(
     "runtime/next_best_action/next_best_action_latest.json"
 )
 REVENUE_PULSE = Path("runtime/revenue_pulse/latest.json")
+QUANT_REVIEW = Path(
+    "runtime/opportunity_factory/quant_review_latest.json"
+)
 CONTROL_FABRIC = Path("runtime/control_fabric/latest.json")
 OUTPUT = Path("runtime/astra/executive_latest.json")
 
@@ -51,6 +54,21 @@ CAPABILITY_COMPONENT = {
     "search_fabric_and_sensor_mesh": "predictive_cloud_opportunity_loop",
     "entity_resolution": "identity_enrichment",
     "search_fabric": "search_fabric",
+}
+
+
+QUANT_FIELD_COMPONENT = {
+    "probability_success": "predictive_intelligence",
+    "uncertainty": "predictive_intelligence",
+    "time_to_revenue_days": "predictive_intelligence",
+    "confidence": "predictive_intelligence",
+    "conditional_revenue_cents": "commercial_product_catalog",
+    "fixed_cost_cents": "commercial_product_catalog",
+    "success_cost_cents": "commercial_product_catalog",
+    "revenue_low_cents": "commercial_product_catalog",
+    "revenue_high_cents": "commercial_product_catalog",
+    "success_cost_low_cents": "commercial_product_catalog",
+    "success_cost_high_cents": "commercial_product_catalog",
 }
 
 
@@ -131,11 +149,13 @@ def build_world_state(
     evidence_routes: Mapping[str, Any] | None,
     next_best_action: Mapping[str, Any] | None,
     revenue_pulse: Mapping[str, Any] | None,
+    quant_review: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     status = dict(predictive_status or {})
     routes = dict(evidence_routes or {})
     nba = dict(next_best_action or {})
     pulse = dict(revenue_pulse or {})
+    quant = dict(quant_review or {})
 
     truth = pulse.get("recognized_revenue_truth")
     truth = truth if isinstance(truth, Mapping) else {}
@@ -211,6 +231,19 @@ def build_world_state(
         ),
         "outreach_authorized": nba.get("outreach_authorized") is True,
         "payment_authorized": nba.get("payment_authorized") is True,
+        "quant_decision_packet_available_count": int(
+            quant.get("available_decision_packet_count") or 0
+        ),
+        "quant_decision_packet_unavailable_count": int(
+            quant.get("unavailable_decision_packet_count") or 0
+        ),
+        "quant_missing_field_counts": dict(
+            quant.get("missing_field_counts") or {}
+        ),
+        "quant_review_items": [
+            row for row in (quant.get("items") or [])
+            if isinstance(row, Mapping)
+        ],
         "execution_authority": "none",
     }
 
@@ -297,6 +330,45 @@ def derive_goals(world: Mapping[str, Any]) -> tuple[ExecutiveGoal, ...]:
             success_condition=(
                 "opportunity blockers decrease, lifecycle stage advances, "
                 "or candidate is explicitly parked"
+            ),
+        ))
+
+    quant_available = int(
+        world.get("quant_decision_packet_available_count") or 0
+    )
+    if quant_available > 0:
+        goals.append(ExecutiveGoal(
+            key="evaluate_quantified_opportunities",
+            objective=(
+                "Use deterministic Quant decision packets to compare "
+                "evidence-backed opportunity economics, downside and uncertainty."
+            ),
+            priority=92,
+            reason=f"{quant_available} Quant decision packets are available",
+            evidence_refs=("runtime:opportunity_factory:quant_review",),
+            success_condition=(
+                "Astra records a decision rationale grounded in Quant output "
+                "without treating the recommendation as execution authority"
+            ),
+        ))
+
+    quant_missing = world.get("quant_missing_field_counts") or {}
+    if quant_missing:
+        goals.append(ExecutiveGoal(
+            key="complete_quantitative_evidence",
+            objective=(
+                "Resolve missing probability, uncertainty, timing or economics "
+                "inputs required for deterministic Quant review."
+            ),
+            priority=89,
+            reason=(
+                f"{sum(int(v) for v in quant_missing.values())} missing "
+                "Quant inputs remain across opportunities"
+            ),
+            evidence_refs=("runtime:opportunity_factory:quant_review",),
+            success_condition=(
+                "missing Quant fields decrease or remain explicitly UNKNOWN "
+                "after bounded evidence review"
             ),
         ))
 
@@ -513,6 +585,44 @@ def build_plan(
         if len(steps) >= max_steps:
             return tuple(steps)
 
+    # Resolve missing Quant inputs before using economic ranking.
+    quant_missing = world.get("quant_missing_field_counts") or {}
+    for field_name, count in sorted(
+        quant_missing.items(),
+        key=lambda item: (-int(item[1]), str(item[0])),
+    ):
+        component = QUANT_FIELD_COMPONENT.get(str(field_name))
+        if not component:
+            continue
+        steps.append(_step(
+            goal=next(
+                (
+                    goal for goal in goals
+                    if goal.key == "complete_quantitative_evidence"
+                ),
+                primary,
+            ),
+            ordinal=len(steps) + 1,
+            action=f"resolve_quant_input:{field_name}",
+            component=component,
+            rationale=(
+                f"{count} opportunities are missing Quant input "
+                f"{field_name}"
+            ),
+            success_condition=(
+                f"{field_name} is populated from typed evidence or remains "
+                "explicitly UNKNOWN after bounded review"
+            ),
+            evidence_refs=(
+                "runtime:opportunity_factory:quant_review",
+                f"quant_missing:{field_name}",
+            ),
+            topic_keys=(str(field_name), "quant_decision_packet"),
+            task_type="quantitative_research",
+        ))
+        if len(steps) >= max_steps:
+            return tuple(steps)
+
     # Route missing evidence to the existing capability that owns it.
     seen: set[tuple[str, str, str]] = set()
     for route in world.get("automatic_internal_evidence_routes") or []:
@@ -582,12 +692,14 @@ def build_executive_snapshot(
     evidence_routes: Mapping[str, Any] | None,
     next_best_action: Mapping[str, Any] | None,
     revenue_pulse: Mapping[str, Any] | None,
+    quant_review: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     world = build_world_state(
         predictive_status=predictive_status,
         evidence_routes=evidence_routes,
         next_best_action=next_best_action,
         revenue_pulse=revenue_pulse,
+        quant_review=quant_review,
     )
     goals = derive_goals(world)
     plan = build_plan(world, goals)
@@ -650,6 +762,7 @@ def refresh_astra_executive(repo_root: Path) -> dict[str, Any]:
         evidence_routes=_read(repo_root / EVIDENCE_ROUTES),
         next_best_action=_read(repo_root / NEXT_BEST_ACTION),
         revenue_pulse=_read(repo_root / REVENUE_PULSE),
+        quant_review=_read(repo_root / QUANT_REVIEW),
     )
     path = repo_root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
