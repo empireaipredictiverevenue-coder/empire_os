@@ -33,6 +33,22 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
             "blocked_count": 3,
         }
 
+    def quant(root: Path):
+        calls.append(("quant", root))
+        return {
+            "available_decision_packet_count": 0,
+            "unavailable_decision_packet_count": 3,
+            "missing_field_counts": {"probability_success": 3},
+        }
+
+    def router(root: Path):
+        calls.append(("router", root))
+        return {
+            "stage_counts": {"QUALIFY": 3},
+            "automatic_internal_route_count": 4,
+            "commercial_observation_route_count": 2,
+        }
+
     def planner(root: Path, *, limit: int):
         calls.append(("planner", root, limit))
         return {
@@ -47,6 +63,8 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
         research_fn=research,
         normalizer_fn=normalizer,
         intake_fn=intake,
+        quant_review_fn=quant,
+        evidence_router_fn=router,
         planner_fn=planner,
     )
 
@@ -55,6 +73,8 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
         "research",
         "normalizer",
         "intake",
+        "quant",
+        "router",
         "planner",
     ]
     assert calls[-1][2] == 3
@@ -63,10 +83,17 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
     assert result["candidates_with_any_normalized_score"] == 2
     assert result["total_normalized_scores"] == 7
     assert result["factory_blocked_count"] == 3
+    assert result["quant_decision_packet_unavailable_count"] == 3
+    assert result["quant_missing_field_counts"] == {
+        "probability_success": 3
+    }
+    assert result["opportunity_stage_counts"] == {"QUALIFY": 3}
     assert result["ai_plan_queued_count"] == 2
     assert result["automatic_internal_research"] is True
     assert result["automatic_evidence_normalization"] is True
     assert result["automatic_factory_intake"] is True
+    assert result["automatic_quant_review"] is True
+    assert result["automatic_evidence_routing"] is True
     assert result["automatic_ai_planning"] is True
     assert result["automatic_external_execution_allowed"] is False
     assert result["outreach_sent"] is False
@@ -93,6 +120,8 @@ def test_opportunity_loop_fails_closed_and_stops_on_step_error(tmp_path):
         research_fn=should_not_run,
         normalizer_fn=should_not_run,
         intake_fn=should_not_run,
+        quant_review_fn=should_not_run,
+        evidence_router_fn=should_not_run,
         planner_fn=should_not_run,
     )
 
@@ -130,6 +159,22 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
             "blocked_count": 1,
         }
 
+    def quant(_root):
+        calls.append("quant")
+        return {
+            "available_decision_packet_count": 0,
+            "unavailable_decision_packet_count": 1,
+            "missing_field_counts": {"probability_success": 1},
+        }
+
+    def router(_root):
+        calls.append("router")
+        return {
+            "stage_counts": {"QUALIFY": 1},
+            "automatic_internal_route_count": 1,
+            "commercial_observation_route_count": 1,
+        }
+
     def planner(_root, *, limit):
         calls.append("planner")
         return {
@@ -144,6 +189,8 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
         research_fn=research,
         normalizer_fn=normalizer,
         intake_fn=intake,
+        quant_review_fn=quant,
+        evidence_router_fn=router,
         planner_fn=planner,
     )
     second = run_opportunity_loop(
@@ -153,6 +200,8 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
         research_fn=research,
         normalizer_fn=normalizer,
         intake_fn=intake,
+        quant_review_fn=quant,
+        evidence_router_fn=router,
         planner_fn=planner,
     )
 
@@ -163,5 +212,7 @@ def test_opportunity_loop_freshness_guard_avoids_duplicate_work(tmp_path):
         "research",
         "normalizer",
         "intake",
+        "quant",
+        "router",
         "planner",
     ]
