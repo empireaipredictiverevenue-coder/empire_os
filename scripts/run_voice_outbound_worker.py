@@ -52,6 +52,9 @@ def _voice_intent(item: dict[str, Any], daily_cap: int) -> tuple[str, Any]:
                 "reason": item.get("reason"),
                 "timezone_governed": True,
                 "actual_revenue": False,
+                "voice_legal_basis": legal_basis,
+                "line_type": line_type or None,
+                "legal_basis_source": item.get("legal_basis_source"),
             },
         },
     )
@@ -98,14 +101,39 @@ def main(argv=None) -> int:
             start_hour=9,
             end_hour=17,
         )
+        legal_basis = str(
+            item.get("voice_legal_basis") or ""
+        ).strip()
+        line_type = str(item.get("line_type") or "").strip()
         record: dict[str, Any] = {
             "prospect_id": item.get("prospect_id"),
             "business_name": item.get("business_name"),
             "priority_score": item.get("priority_score"),
             "timezone": locale.timezone,
             "contact_window": window,
+            "voice_legal_basis": legal_basis or None,
+            "line_type": line_type or None,
+            "legal_basis_source": item.get("legal_basis_source"),
             "executed": False,
         }
+        if not legal_basis:
+            record["decision"] = "HOLD_LEGAL_BASIS_UNVERIFIED"
+            results.append(record)
+            continue
+        if (
+            legal_basis == "verified_business_landline_b2b"
+            and line_type not in {"landline", "landline_tollfree"}
+        ):
+            record["decision"] = "HOLD_BUSINESS_LANDLINE_UNVERIFIED"
+            results.append(record)
+            continue
+        if legal_basis not in {
+            "prior_express_written_consent",
+            "verified_business_landline_b2b",
+        }:
+            record["decision"] = "HOLD_UNSUPPORTED_LEGAL_BASIS"
+            results.append(record)
+            continue
         if window.get("eligible") is not True:
             record["decision"] = "HOLD_CONTACT_WINDOW"
             results.append(record)
