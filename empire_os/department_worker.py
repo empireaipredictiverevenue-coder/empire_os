@@ -5,6 +5,7 @@ with evidence rather than being treated as complete.
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -40,6 +41,64 @@ SAFE_COMMANDS = {
         "runtime:predictive_cloud:status_latest",
     ),
 }
+
+
+def _isolated_identity_recoverer(
+    repo_root: Path,
+    *,
+    timeout_seconds: int,
+    business_name: str,
+    website: str,
+    metro: str = "",
+) -> dict[str, Any]:
+    timeout = max(10, min(int(timeout_seconds), 60))
+    try:
+        completed = subprocess.run(
+            [
+                str(repo_root / ".venv" / "bin" / "python"),
+                "-m",
+                "empire_os.identity_recovery_worker",
+            ],
+            cwd=str(repo_root),
+            env={
+                **os.environ.copy(),
+                "PYTHONPATH": str(repo_root),
+            },
+            input=json.dumps({
+                "business_name": business_name,
+                "website": website,
+                "metro": metro,
+            }),
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "recovered": False,
+            "identity": None,
+            "reason": "identity_recovery_timeout",
+        }
+    if completed.returncode != 0:
+        return {
+            "recovered": False,
+            "identity": None,
+            "reason": "identity_recovery_worker_failed",
+        }
+    try:
+        payload = json.loads(completed.stdout or "{}")
+    except json.JSONDecodeError:
+        return {
+            "recovered": False,
+            "identity": None,
+            "reason": "identity_recovery_invalid_json",
+        }
+    return payload if isinstance(payload, dict) else {
+        "recovered": False,
+        "identity": None,
+        "reason": "identity_recovery_invalid_shape",
+    }
 
 
 def _coder_bridge(repo_root: Path, item: Any) -> dict[str, Any]:
@@ -150,6 +209,13 @@ def run_one_department_work(
             result = resolve_entity_decision_maker(
                 entity_id=entity_id,
                 request=request_json,
+                recoverer=lambda **kwargs: (
+                    _isolated_identity_recoverer(
+                        root,
+                        timeout_seconds=min(timeout_seconds, 60),
+                        **kwargs,
+                    )
+                ),
             )
         except Exception as exc:
             failed = queue.fail(item, str(exc))
