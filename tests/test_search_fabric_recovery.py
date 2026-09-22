@@ -58,3 +58,31 @@ def test_explicit_engine_does_not_expand_to_recovery_chain(monkeypatch):
 
     assert result["organic"] == []
     assert calls == ["bing_html"]
+
+
+
+def test_rejection_diagnostic_writes_to_stderr(monkeypatch, capsys):
+    monkeypatch.setattr(search_module, "_get_cache", lambda *args: None)
+    monkeypatch.setattr(search_module, "_set_cache", lambda *args: None)
+    monkeypatch.setattr(search_module, "_fetch", lambda *args: "raw")
+    monkeypatch.setitem(
+        search_module.PARSERS,
+        "bing_html",
+        lambda raw: [{
+            "title": "Completely unrelated result",
+            "link": "https://example.com/unrelated",
+            "snippet": "Nothing about the requested market.",
+            "position": 1,
+        }],
+    )
+
+    result = search_module.search(
+        "Denver roofing",
+        num=5,
+        engine="bing_html",
+    )
+
+    captured = capsys.readouterr()
+
+    assert result["organic"] == []
+    assert "bing_html rejected" in captured.err
