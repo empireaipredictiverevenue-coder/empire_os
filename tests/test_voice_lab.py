@@ -140,6 +140,10 @@ def test_voice_lab_ambiguous_transcript_never_reaches_closer():
     lab.stt.transcribe = lambda _pcm: (
         "Empire Voice Lab test. Now external voice vendor is being used."
     )
+    class FakeVerifier:
+        def transcribe(self, _pcm):
+            return "Empire Voice Lab test. Now external voice vendor is being used."
+    lab.verifier_stt = FakeVerifier()
 
     def should_not_run(*_args, **_kwargs):
         raise AssertionError("closer must not run for ambiguous transcript")
@@ -157,6 +161,10 @@ def test_voice_lab_opt_out_never_reaches_closer():
 
     lab = EmpireVoiceLab()
     lab.stt.transcribe = lambda _pcm: "Please do not call me again."
+    class FakeVerifier:
+        def transcribe(self, _pcm):
+            return "Please do not call me again."
+    lab.verifier_stt = FakeVerifier()
 
     def should_not_run(*_args, **_kwargs):
         raise AssertionError("closer must not run for opt-out")
@@ -174,6 +182,10 @@ def test_voice_lab_safe_interest_routes_to_closer():
 
     lab = EmpireVoiceLab()
     lab.stt.transcribe = lambda _pcm: "Yes, send me the brief by email."
+    class FakeVerifier:
+        def transcribe(self, _pcm):
+            return "YES SEND ME THE BRIEF BY EMAIL"
+    lab.verifier_stt = FakeVerifier()
     lab.brain.reply = lambda *_args, **_kwargs: "Absolutely."
 
     result = lab.respond_text(b"pcm")
@@ -181,3 +193,51 @@ def test_voice_lab_safe_interest_routes_to_closer():
     assert result["decision"]["action"] == "continue"
     assert result["decision"]["intent"] == "follow_up_permission"
     assert result["response_text"] == "Absolutely."
+
+
+def test_voice_lab_dual_asr_price_disagreement_forces_clarification():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+    lab.stt.transcribe = lambda _pcm: "The pilot is 1500 pounds."
+
+    class FakeVerifier:
+        def transcribe(self, _pcm):
+            return "THE PILOT IS 500 POUNDS"
+
+    lab.verifier_stt = FakeVerifier()
+
+    def should_not_run(*_args, **_kwargs):
+        raise AssertionError("closer must not run on price disagreement")
+
+    lab.brain.reply = should_not_run
+    result = lab.respond_text(b"pcm")
+
+    assert result["decision"]["action"] == "clarify"
+    assert "asr_disagreement:numbers" in result["decision"]["risk_flags"]
+    assert "asr_disagreement:money" in result["decision"]["risk_flags"]
+    assert [item["source"] for item in result["asr_candidates"]] == [
+        "sherpa_whisper",
+        "sherpa_zipformer",
+    ]
+
+
+def test_voice_lab_dual_asr_preserves_both_candidates_when_safe():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+    lab.stt.transcribe = lambda _pcm: "Yes, send me the brief by email."
+
+    class FakeVerifier:
+        def transcribe(self, _pcm):
+            return "YES SEND ME THE BRIEF BY EMAIL"
+
+    lab.verifier_stt = FakeVerifier()
+    lab.brain.reply = lambda *_args, **_kwargs: "Absolutely."
+
+    result = lab.respond_text(b"pcm")
+
+    assert result["decision"]["action"] == "continue"
+    assert result["decision"]["candidate_count"] == 2
+    assert len(result["asr_candidates"]) == 2
+    assert result["transcript"] == "Yes, send me the brief by email."
