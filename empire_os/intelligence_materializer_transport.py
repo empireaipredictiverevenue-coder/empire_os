@@ -519,3 +519,230 @@ def persist_competitor_audience_signal(
         raise IntelligenceMaterializerTransportError(
             "competitor audience signal persistence failed"
         ) from exc
+
+
+
+COMPETITOR_ECOSYSTEM_SOURCE_KEY = "empire.competitor_ecosystem.public.v1"
+
+
+def _ecosystem_evidence_fingerprints(
+    payload: dict[str, Any],
+) -> tuple[str, ...]:
+    surfaces = payload.get("surfaces")
+    if not isinstance(surfaces, list) or not surfaces:
+        raise IntelligenceMaterializerTransportError(
+            "competitor ecosystem surfaces are required"
+        )
+
+    fingerprints: list[str] = []
+    for item in surfaces:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid competitor ecosystem surface"
+            )
+        source_ref = str(item.get("source_ref") or "").strip()
+        categories = item.get("categories")
+        if not source_ref or not isinstance(categories, list) or not categories:
+            raise IntelligenceMaterializerTransportError(
+                "ecosystem source_ref and categories are required"
+            )
+        fingerprints.append(
+            "surface|"
+            + source_ref
+            + "|"
+            + ",".join(sorted(str(x).strip() for x in categories if str(x).strip()))
+        )
+
+    for item in payload.get("external_relationship_candidates", []) or []:
+        if not isinstance(item, dict):
+            continue
+        source_ref = str(item.get("source_ref") or "").strip()
+        external_domain = str(item.get("external_domain") or "").strip()
+        category = str(item.get("category") or "").strip()
+        if source_ref and external_domain and category:
+            fingerprints.append(
+                "|".join(("external", category, external_domain, source_ref))
+            )
+
+    return tuple(sorted(set(fingerprints)))
+
+
+def persist_competitor_ecosystem_signal(
+    writer: PostgresIntelligenceMaterializer,
+    signal: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist one append-only public ecosystem evidence signal."""
+    if signal.get("signal_type") != "competitor_ecosystem_evidence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected ecosystem signal type"
+        )
+    if signal.get("signal_domain") != "competitive_intelligence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected ecosystem signal domain"
+        )
+    if signal.get("execution_authority") != "none":
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal has execution authority"
+        )
+    if signal.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal cannot enable outreach"
+        )
+    if signal.get("buyer_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal cannot infer buyer intent"
+        )
+    if signal.get("commercial_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal cannot infer commercial intent"
+        )
+
+    entity_id = _uuid(signal.get("entity_id"), field="entity id")
+    observed_at = str(signal.get("observed_at") or "").strip()
+    if not observed_at:
+        raise IntelligenceMaterializerTransportError(
+            "observed_at is required"
+        )
+
+    try:
+        strength = float(signal.get("strength"))
+        confidence = float(signal.get("confidence"))
+    except (TypeError, ValueError) as exc:
+        raise IntelligenceMaterializerTransportError(
+            "invalid ecosystem signal confidence"
+        ) from exc
+    if not 0.0 <= strength <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "strength must be between 0 and 1"
+        )
+    if not 0.0 <= confidence <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "confidence must be between 0 and 1"
+        )
+
+    payload = signal.get("payload")
+    if not isinstance(payload, dict):
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal payload is required"
+        )
+
+    if payload.get("customer_relationship_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot infer customer relationship"
+        )
+    if payload.get("partner_relationship_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot infer partner relationship"
+        )
+    if payload.get("buyer_intent") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot infer buyer intent"
+        )
+    if payload.get("commercial_intent") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot infer commercial intent"
+        )
+    if payload.get("prospect_created") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot create prospect"
+        )
+    if payload.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot enable outreach"
+        )
+
+    fingerprints = _ecosystem_evidence_fingerprints(payload)
+
+    try:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET LOCAL ROLE {ROLE}")
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_ECOSYSTEM_SOURCE_KEY,
+                )
+
+                supplied_source_id = _uuid(
+                    signal.get("source_id"),
+                    field="source id",
+                )
+                if supplied_source_id != _uuid(
+                    source_id,
+                    field="canonical source id",
+                ):
+                    raise IntelligenceMaterializerTransportError(
+                        "ecosystem signal source mismatch"
+                    )
+
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM public.intelligence_signals
+                    WHERE entity_id=%s
+                      AND signal_type='competitor_ecosystem_evidence'
+                      AND signal_domain='competitive_intelligence'
+                      AND source_id=%s
+                    """,
+                    (entity_id, source_id),
+                )
+                for row in cursor.fetchall():
+                    existing_payload = row[0]
+                    if isinstance(existing_payload, str):
+                        existing_payload = json.loads(existing_payload)
+                    if not isinstance(existing_payload, dict):
+                        continue
+                    try:
+                        existing = _ecosystem_evidence_fingerprints(
+                            existing_payload
+                        )
+                    except IntelligenceMaterializerTransportError:
+                        continue
+                    if existing == fingerprints:
+                        return {
+                            "entity_id": entity_id,
+                            "signal_type": "competitor_ecosystem_evidence",
+                            "inserted": False,
+                            "existing": True,
+                            "execution_authority": "none",
+                        }
+
+                cursor.execute(
+                    """
+                    INSERT INTO public.intelligence_signals(
+                      entity_id,signal_type,signal_domain,observed_at,
+                      source_id,strength,confidence,payload
+                    )
+                    VALUES(
+                      %s,'competitor_ecosystem_evidence',
+                      'competitive_intelligence',%s,%s,%s,%s,%s::jsonb
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        entity_id,
+                        observed_at,
+                        source_id,
+                        strength,
+                        confidence,
+                        json.dumps(payload, sort_keys=True),
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise IntelligenceMaterializerTransportError(
+                        "ecosystem signal insert failed"
+                    )
+                return {
+                    "id": str(row[0]),
+                    "entity_id": entity_id,
+                    "signal_type": "competitor_ecosystem_evidence",
+                    "inserted": True,
+                    "existing": False,
+                    "execution_authority": "none",
+                }
+    except IntelligenceMaterializerTransportError:
+        raise
+    except Exception as exc:
+        raise IntelligenceMaterializerTransportError(
+            "competitor ecosystem signal persistence failed"
+        ) from exc
