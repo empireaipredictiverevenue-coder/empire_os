@@ -32,6 +32,7 @@ REQUIRED_ARTIFACTS = (
     "runtime/commercial_exchange/latest.json",
     "runtime/buyer_acquisition/latest.json",
     "runtime/buyer_acquisition/scout_latest.json",
+    "runtime/buyer_acquisition/reconciliation_latest.json",
 )
 
 
@@ -83,6 +84,9 @@ def main() -> int:
     scout = _read_json(
         root / "runtime/buyer_acquisition/scout_latest.json"
     )
+    reconciliation = _read_json(
+        root / "runtime/buyer_acquisition/reconciliation_latest.json"
+    )
     exchange = _read_json(root / "runtime/commercial_exchange/latest.json")
 
     safe_automation_ready = all(
@@ -109,6 +113,13 @@ def main() -> int:
         and scout.get("outbound_sent") is False
         and scout.get("execution_authority") == "none"
     )
+    reconciliation_safe = (
+        reconciliation.get("mode") == "OBSERVE"
+        and reconciliation.get("database_write_performed") is False
+        and reconciliation.get("automatic_ingest_authorized") is False
+        and reconciliation.get("outbound_sent") is False
+        and reconciliation.get("execution_authority") == "none"
+    )
     exchange_safe = (
         exchange.get("mode") == "OBSERVE"
         and exchange.get("automatic_external_delivery") is False
@@ -120,6 +131,7 @@ def main() -> int:
         artifacts_ready,
         plan_safe,
         scout_safe,
+        reconciliation_safe,
         exchange_safe,
         not live_external_automation_detected,
     ))
@@ -131,6 +143,7 @@ def main() -> int:
         "required_artifacts_present": artifacts_ready,
         "buyer_plan_safe": plan_safe,
         "buyer_scout_safe": scout_safe,
+        "buyer_scout_reconciliation_safe": reconciliation_safe,
         "commercial_exchange_safe": exchange_safe,
         "live_external_automation_detected": (
             live_external_automation_detected
@@ -153,6 +166,15 @@ def main() -> int:
         ),
         "explicit_direct_buyer_candidate_count": int(
             scout.get("explicit_direct_buyer_candidate_count") or 0
+        ),
+        "existing_buyer_match_count": int(
+            reconciliation.get("existing_buyer_count") or 0
+        ),
+        "existing_prospect_match_count": int(
+            reconciliation.get("existing_prospect_count") or 0
+        ),
+        "new_external_buyer_candidate_count": int(
+            reconciliation.get("new_external_candidate_count") or 0
         ),
         "market_validate_product_count": int(
             buyer_plan.get("market_validate_product_count") or 0
