@@ -58,6 +58,15 @@ INPUTS = {
     "research_pack_candidates": (
         INPUT_DIR / "research_pack_candidates.json"
     ),
+    "verified_research_packs": (
+        INPUT_DIR / "verified_research_packs.json"
+    ),
+    "canonical_content_candidates": (
+        INPUT_DIR / "canonical_content_candidates.json"
+    ),
+    "script_brief_candidates": (
+        INPUT_DIR / "script_brief_candidates.json"
+    ),
 }
 
 
@@ -640,13 +649,40 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
         ],
         keys=("idea_id",),
     )
+    raw_research_pack_rows = _records(
+        _read_json(
+            repo_root / INPUTS["research_pack_candidates"]
+        )
+    )
+    verified_research_rows = _records(
+        _read_json(
+            repo_root / INPUTS["verified_research_packs"]
+        )
+    )
+    # Verified rows take precedence over their unverified source candidate
+    # with the same research_id.
     research_pack_rows = _dedupe_records(
+        [
+            *verified_research_rows,
+            *raw_research_pack_rows,
+        ],
+        keys=("research_id",),
+    )
+    canonical_content_rows = _dedupe_records(
         _records(
             _read_json(
-                repo_root / INPUTS["research_pack_candidates"]
+                repo_root / INPUTS["canonical_content_candidates"]
             )
         ),
-        keys=("research_id",),
+        keys=("content_id",),
+    )
+    script_brief_rows = _dedupe_records(
+        _records(
+            _read_json(
+                repo_root / INPUTS["script_brief_candidates"]
+            )
+        ),
+        keys=("content_id", "content_ref"),
     )
 
     youtube_public = _youtube_public_runtime(public_rows)
@@ -659,6 +695,7 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
     ideas = _idea_runtime(idea_rows)
     research_packs = {
         "candidate_count": len(research_pack_rows),
+        "verified_pack_count": len(verified_research_rows),
         "verified_claim_count": sum(
             int(row.get("verified_claim_count") or 0)
             for row in research_pack_rows
@@ -673,6 +710,19 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
         ),
         "candidates": research_pack_rows,
         "automatic_script_generation_authorized": False,
+        "execution_authority": "none",
+    }
+    content_pipeline = {
+        "canonical_content_candidate_count": len(
+            canonical_content_rows
+        ),
+        "script_brief_candidate_count": len(
+            script_brief_rows
+        ),
+        "script_prose_generated": False,
+        "canonical_content_candidates": canonical_content_rows,
+        "script_brief_candidates": script_brief_rows,
+        "public_publish_authorized": False,
         "execution_authority": "none",
     }
 
@@ -701,6 +751,7 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
         "build_journal": journal,
         "idea_backlog": ideas,
         "research_packs": research_packs,
+        "content_pipeline": content_pipeline,
         "runtime_active": True,
         "real_evidence_present": observed_source_count > 0,
         "ready_for_research_generation": (
@@ -716,6 +767,10 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
         "ready_for_script_generation": (
             research_packs["script_ready_count"] > 0
         ),
+        "ready_for_script_prose_generation": (
+            content_pipeline["script_brief_candidate_count"] > 0
+        ),
+        "ready_for_storyboard_generation": False,
         "public_publish_authorized": False,
         "comment_publish_authorized": False,
         "new_channel_launch_authorized": False,
