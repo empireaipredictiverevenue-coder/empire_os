@@ -30,3 +30,12 @@ def test_catalog_refresh_runs_pricing_drift_verifier():
     ).read_text()
 
     assert "verify_commercial_pricing_snapshot.py" in text
+
+
+def test_catalog_cycle_owns_country_native_pricing_sync():
+    text = (
+        ROOT / "deploy/systemd/empire-commercial-product-catalog.service"
+    ).read_text()
+
+    assert "sync_market_pricing.py" in text
+    assert "EnvironmentFile=/etc/empire_os.env" in text
