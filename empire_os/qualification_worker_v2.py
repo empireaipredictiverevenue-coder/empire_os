@@ -200,6 +200,47 @@ def acquisition_website(acquisition: dict[str, Any] | None) -> str:
     ).strip()
 
 
+def resolve_acquisition_website(
+    prospect: dict[str, Any],
+    acquisition: dict[str, Any] | None,
+) -> str:
+    """Resolve the strongest current acquisition website evidence.
+
+    Stored evidence wins when present. For sources with a bounded official
+    member/detail page resolver, the live source may refresh missing website
+    evidence in memory before Search Fabric is needed. This function does not
+    mutate the acquisition ledger.
+    """
+    stored = acquisition_website(acquisition)
+    if stored:
+        return stored
+
+    if not isinstance(acquisition, dict):
+        return ""
+
+    source = str(acquisition.get("source") or "").strip()
+    source_url = str(acquisition.get("source_url") or "").strip()
+    business_name = str(prospect.get("business_name") or "").strip()
+
+    if (
+        source != "recc_solar"
+        or not source_url
+        or not business_name
+    ):
+        return ""
+
+    try:
+        from empire_os.lead_sources.recc_solar import _detail
+        candidate = _detail(business_name, source_url)
+    except Exception:
+        return ""
+
+    raw = getattr(candidate, "raw", None) if candidate is not None else None
+    if not isinstance(raw, dict):
+        return ""
+    return str(raw.get("business_website") or "").strip()
+
+
 def fetch_active_identity_link(prospect_id: str) -> dict[str, Any] | None:
     params = urllib.parse.urlencode(
         {
@@ -465,7 +506,10 @@ def emit_event(
 def qualify_prospect(prospect: dict[str, Any]) -> dict[str, Any]:
     prospect_id = str(prospect["id"])
     acquisition = fetch_latest_acquisition(prospect_id)
-    website = acquisition_website(acquisition)
+    website = resolve_acquisition_website(
+        prospect,
+        acquisition,
+    )
 
     enrichment_input = dict(prospect)
     if website:
