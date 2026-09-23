@@ -510,10 +510,18 @@ def run_hermes(
         ),
     ]
     provider = str(
-        os.environ.get("EMPIRE_HERMES_PROVIDER") or ""
+        os.environ.get("EMPIRE_HERMES_PROVIDER")
+        or "openrouter"
     ).strip()
+    model = str(
+        os.environ.get("EMPIRE_HERMES_MODEL")
+        or "moonshotai/kimi-k2.6:free"
+    ).strip()
+
     if provider:
         args[2:2] = ["--provider", provider]
+    if model:
+        args[2:2] = ["--model", model]
 
     started = _utc_now()
     env = _hermes_environment()
