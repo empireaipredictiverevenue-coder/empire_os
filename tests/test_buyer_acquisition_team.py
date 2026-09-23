@@ -321,3 +321,35 @@ def test_tag_intelligence_enters_buyer_demand_without_price_claim():
     assert "growth_team" in row["target_buyer_types"]
     assert "enterprise" in row["target_buyer_types"]
     assert "white_label_partner" in row["target_buyer_types"]
+
+
+def test_icp_intelligence_precedes_scout_and_covers_full_research_loop():
+    plan = build_buyer_acquisition_plan(
+        {"inventory": [], "buyer_seats": []},
+        generated_at=datetime(
+            2026, 9, 23, 0, 0, tzinfo=timezone.utc
+        ),
+    )
+
+    icp = plan["icp_buyer_trigger_intelligence"]
+    stages = [row["stage"] for row in icp["research_stages"]]
+
+    assert icp["enabled"] is True
+    assert icp["profile_count"] >= 6
+    assert "define_icp" in stages
+    assert "find_matching_companies" in stages
+    assert "resolve_decision_maker" in stages
+    assert "find_evidence_backed_pain" in stages
+    assert "prepare_one_to_one_message" in stages
+    assert "prepare_batch_personalization" in stages
+    assert icp["budget_estimates_are_verified"] is False
+    assert icp["binding_intent_created"] is False
+    assert icp["qualification_created"] is False
+    assert icp["outreach_authorized"] is False
+    assert icp["execution_authority"] == "none"
+    assert plan["automation"]["icp_definition"] is True
+    assert plan["automation"]["buying_trigger_detection"] is True
+    assert plan["automation"]["evidence_backed_pain_research"] is True
+    assert plan["automation"]["personalized_outreach_preparation"] is True
+    assert plan["automation"]["batch_personalization_preparation"] is True
+    assert plan["automation"]["live_outbound_send"] is False
