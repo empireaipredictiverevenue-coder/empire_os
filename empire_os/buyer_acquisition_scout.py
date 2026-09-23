@@ -11,6 +11,7 @@ through canonical identity/review flows.
 from __future__ import annotations
 
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -139,14 +140,34 @@ def run_buyer_scout(
 
     candidates: list[dict[str, Any]] = []
     probe_failures: Counter[str] = Counter()
+    probe_domains = ranked_domains[:max(1, min(max_probes, 100))]
 
-    for domain in ranked_domains[:max(1, min(max_probes, 100))]:
-        evidence = probe_site(
+    def _probe(domain: str) -> tuple[str, dict[str, Any]]:
+        return domain, probe_site(
             "https://" + domain,
             max_pages=4,
-            request_timeout=6.0,
-            time_budget_seconds=20.0,
+            request_timeout=5.0,
+            time_budget_seconds=12.0,
         )
+
+    probe_results: dict[str, dict[str, Any]] = {}
+    workers = max(1, min(5, len(probe_domains)))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(_probe, domain): domain
+            for domain in probe_domains
+        }
+        for future in as_completed(futures):
+            domain = futures[future]
+            try:
+                _, evidence = future.result()
+            except Exception as exc:
+                probe_failures[type(exc).__name__] += 1
+                continue
+            probe_results[domain] = evidence
+
+    for domain in probe_domains:
+        evidence = probe_results.get(domain) or {}
         if evidence.get("ok") is not True:
             probe_failures[
                 str(evidence.get("error") or "site_probe_failed")
