@@ -186,6 +186,7 @@ def _source_probe(row: dict[str, Any]) -> dict[str, Any]:
             "max_pages": 12,
             "request_timeout": 5.0,
             "time_budget_seconds": 35.0,
+            "allow_company_routed": True,
         },
     )
     if (
@@ -242,6 +243,7 @@ def _source_probe(row: dict[str, Any]) -> dict[str, Any]:
             "max_pages": 12,
             "request_timeout": 5.0,
             "time_budget_seconds": 35.0,
+            "allow_company_routed": True,
         },
     )
     second = dict(second)
