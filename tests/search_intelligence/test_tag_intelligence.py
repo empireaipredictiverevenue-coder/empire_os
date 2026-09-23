@@ -210,3 +210,32 @@ def test_tag_change_monitor_has_no_fake_changes():
 
     assert result["change_count"] == 0
     assert result["changes"] == []
+
+
+
+def test_expected_paid_media_channels_are_checked_without_guessing():
+    result = review_tag_intelligence(
+        measurement_tags={
+            "linkedin_insight_partner_ids": [],
+            "tiktok_pixel_ids": [],
+            "reddit_pixel_ids": [],
+            "pinterest_tag_ids": [],
+            "microsoft_uet_present": False,
+        },
+        expectations={
+            "linkedin_ads_expected": True,
+            "tiktok_ads_expected": True,
+            "microsoft_ads_expected": True,
+            "reddit_ads_expected": True,
+            "pinterest_ads_expected": True,
+        },
+    )
+
+    codes = {issue.code for issue in result.issues}
+    assert "linkedin_insight_tag_missing" in codes
+    assert "tiktok_pixel_missing" in codes
+    assert "microsoft_uet_missing" in codes
+    assert "reddit_pixel_missing" in codes
+    assert "pinterest_tag_missing" in codes
+    assert result.estimated_revenue_loss_cents is None
+    assert result.execution_authority == "none"
