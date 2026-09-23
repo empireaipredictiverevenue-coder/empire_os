@@ -21,6 +21,8 @@ def test_only_new_external_candidates_are_persisted():
                 "domain": "new.example",
                 "website": "https://new.example",
                 "business_name": "New Buyer",
+                "business_name_source": "first_party_business_name",
+                "site_business_names": ["New Buyer"],
                 "description": "We buy leads.",
                 "buyer_type": "direct_lead_buyer",
                 "direct_buyer_score": 90,
@@ -81,6 +83,12 @@ def test_only_new_external_candidates_are_persisted():
     assert payload["p_domain"] == "new.example"
     assert payload["p_direct_buyer_score"] == 90
     assert payload["p_explicit_direct_buyer_evidence"] is True
+    assert payload["p_site_evidence"]["business_name_source"] == (
+        "first_party_business_name"
+    )
+    assert payload["p_site_evidence"]["site_business_names"] == [
+        "New Buyer"
+    ]
     assert payload["p_site_evidence"]["first_party_emails"] == [
         "sales@new.example"
     ]
