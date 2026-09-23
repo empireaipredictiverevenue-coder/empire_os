@@ -167,3 +167,119 @@ def test_license_seed_alone_does_not_promote_identity(monkeypatch):
     assert result["recovered"] is False
     assert result["identity"] is None
     assert result["license_seeds"][0]["person_name"] == "Jane Doe"
+
+
+def test_uk_companies_house_seed_requires_first_party_buyer_role(monkeypatch):
+    monkeypatch.setattr(
+        ir,
+        "find_companies_house_principals",
+        lambda **kwargs: [{
+            "company_name": "Example Solar Limited",
+            "company_number": "12345678",
+            "person_name": "Jane Smith",
+            "officer_role": "director",
+            "source": "companies_house",
+            "source_url": (
+                "https://find-and-update.company-information.service.gov.uk/"
+                "company/12345678/officers"
+            ),
+            "confidence": 0.99,
+            "buyer_authority_proven": False,
+        }],
+    )
+    monkeypatch.setattr(
+        ir,
+        "find_official_license_principals",
+        lambda **kwargs: [],
+    )
+    monkeypatch.setattr(
+        ir,
+        "RegistryScraper",
+        lambda *args, **kwargs: SimpleNamespace(
+            search=lambda *a, **k: SimpleNamespace(records=[])
+        ),
+    )
+
+    def fake_search(query, num=8):
+        if '"Jane Smith"' in query:
+            return {
+                "organic": [{
+                    "link": "https://example-solar.co.uk/about",
+                    "title": "Jane Smith - Managing Director",
+                }]
+            }
+        return {"organic": []}
+
+    monkeypatch.setattr(ir, "search", fake_search)
+    monkeypatch.setattr(
+        ir,
+        "probe_site",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "people": [{
+                "name": "Jane Smith",
+                "title": "Managing Director",
+                "url": "https://example-solar.co.uk/about",
+            }],
+        },
+    )
+    monkeypatch.setattr(
+        ir,
+        "rank_site_people",
+        lambda people: [{**people[0], "decision_score": 1.0}],
+    )
+
+    result = ir.recover_identity(
+        business_name="Example Solar Ltd",
+        website="https://example-solar.co.uk",
+        metro="United Kingdom",
+    )
+
+    assert result["recovered"] is True
+    assert result["identity"]["name"] == "Jane Smith"
+    assert result["identity"]["title"] == "Managing Director"
+    assert result["identity"]["source"] == "empire_first_party_people_probe"
+    assert result["companies_house_seeds"][0]["person_name"] == "Jane Smith"
+
+
+def test_companies_house_seed_alone_does_not_prove_buyer_authority(monkeypatch):
+    monkeypatch.setattr(
+        ir,
+        "find_companies_house_principals",
+        lambda **kwargs: [{
+            "company_name": "Example Solar Limited",
+            "company_number": "12345678",
+            "person_name": "John Director",
+            "officer_role": "director",
+            "source": "companies_house",
+            "source_url": (
+                "https://find-and-update.company-information.service.gov.uk/"
+                "company/12345678/officers"
+            ),
+            "confidence": 0.99,
+            "buyer_authority_proven": False,
+        }],
+    )
+    monkeypatch.setattr(
+        ir,
+        "find_official_license_principals",
+        lambda **kwargs: [],
+    )
+    monkeypatch.setattr(
+        ir,
+        "RegistryScraper",
+        lambda *args, **kwargs: SimpleNamespace(
+            search=lambda *a, **k: SimpleNamespace(records=[])
+        ),
+    )
+    monkeypatch.setattr(ir, "search", lambda query, num=8: {"organic": []})
+
+    result = ir.recover_identity(
+        business_name="Example Solar Ltd",
+        website="https://example-solar.co.uk",
+        metro="United Kingdom",
+    )
+
+    assert result["recovered"] is False
+    assert result["identity"] is None
+    assert result["companies_house_seeds"][0]["person_name"] == "John Director"
