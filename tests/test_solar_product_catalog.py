@@ -6,12 +6,6 @@ def test_solar_product_sync_proposes_founder_approved_price_without_fake_costs()
 
     def request(method, path, payload=None, **kwargs):
         calls.append((method, path, payload))
-        if path.endswith("/register_commercial_product_identity"):
-            return {
-                "decision": "identity_synchronized",
-                "product_id": "product-1",
-                "catalog_state": "UNKNOWN",
-            }
         if path.endswith("/get_commercial_product_catalog"):
             return [{
                 "product_code": "solar_opportunity_map",
@@ -22,6 +16,12 @@ def test_solar_product_sync_proposes_founder_approved_price_without_fake_costs()
                 "price_basis": {"state": "UNKNOWN"},
                 "binding_terms_ready": False,
             }]
+        if path.endswith("/register_commercial_product_identity"):
+            return {
+                "decision": "identity_synchronized",
+                "product_id": "product-1",
+                "catalog_state": "UNKNOWN",
+            }
         if path.endswith("/propose_commercial_product_version"):
             assert payload["p_currency"] == "GBP"
             assert payload["p_price_basis"] == {
@@ -72,7 +72,7 @@ def test_solar_product_sync_is_idempotent_when_price_version_exists():
         if path.endswith("/get_commercial_product_catalog"):
             return [{
                 "product_code": "solar_opportunity_map",
-                "currency": "GBP",
+                "currency": "USD",
                 "billing_model": "one_time",
                 "version_id": "version-1",
                 "version": 1,
@@ -91,6 +91,10 @@ def test_solar_product_sync_is_idempotent_when_price_version_exists():
 
     assert result["price_version"]["decision"] == "existing"
     assert result["binding_terms_ready"] is False
+    assert not any(
+        path.endswith("/register_commercial_product_identity")
+        for _method, path, _payload in calls
+    )
     assert not any(
         path.endswith("/propose_commercial_product_version")
         for _method, path, _payload in calls
