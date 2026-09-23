@@ -101,6 +101,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 600,
     },
+    "buyer_acquisition_scout": {
+        "path": Path("runtime/buyer_acquisition/scout_latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 2700,
+    },
     "astra": {
         "path": Path("runtime/astra/latest.json"),
         "time_keys": ("observed_at", "generated_at"),
@@ -274,6 +279,19 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "buyer_capacity_never_gates_acquisition": payload.get(
                 "buyer_capacity_never_gates_acquisition"
             ),
+        }
+    if name == "buyer_acquisition_scout":
+        return {
+            "query_count": payload.get("query_count"),
+            "domain_count": payload.get("domain_count"),
+            "candidate_count": payload.get("candidate_count"),
+            "explicit_direct_buyer_candidate_count": payload.get(
+                "explicit_direct_buyer_candidate_count"
+            ),
+            "database_write_performed": payload.get(
+                "database_write_performed"
+            ),
+            "outbound_sent": payload.get("outbound_sent"),
         }
     if name == "opportunity_radar":
         return {
