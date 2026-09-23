@@ -113,6 +113,8 @@ def test_materializer_proposes_only_review_ready_outreach_ready_candidate():
         "decision_name": "Jane Smith",
         "decision_title": "CEO",
         "identity_recovery": None,
+        "preferred_email": "jane@acmeroofing.test",
+        "contact_route": None,
     },)
 
     path, payload = request.posts[0]
@@ -451,3 +453,53 @@ def test_isolated_probe_accepts_bounded_override_options(monkeypatch):
         "request_timeout": 5.0,
         "time_budget_seconds": 35.0,
     }
+
+
+def test_company_routed_review_evidence_is_explicit():
+    request = FakeRequest()
+
+    def company_probe(row):
+        assert row["id"] == PROSPECT_ID
+        return {
+            "review_ready": True,
+            "outreach_ready": True,
+            "preferred_email": "info@acmeroofing.test",
+            "contact_route": "company_routed",
+            "person_bound": False,
+            "routing_name": "Jane Smith",
+            "routing_title": "CEO",
+            "decision_maker": {
+                "name": "Jane Smith",
+                "title": "CEO",
+                "decision_score": 1.0,
+                "decision_role": "economic_buyer",
+                "source": "empire_first_party_people_probe",
+            },
+            "verified_contacts": [{
+                "email": "info@acmeroofing.test",
+                "is_valid": False,
+                "confidence": 0.0,
+                "is_role_address": True,
+                "is_disposable": False,
+                "has_mx": False,
+                "smtp_accepts": False,
+                "source": "site_observed",
+                "bound_to_decision_maker": False,
+            }],
+        }
+
+    result = run_buyer_review_materializer(
+        request,
+        probe=company_probe,
+        proposal_limit=1,
+    )
+
+    assert result.proposed == 1
+    payload = request.posts[0][1]
+    evidence = payload["p_evidence"]
+    assert payload["p_contact_email"] == "info@acmeroofing.test"
+    assert evidence["contact_route"] == "company_routed"
+    assert evidence["person_bound"] is False
+    assert evidence["routing_name"] == "Jane Smith"
+    assert evidence["routing_title"] == "CEO"
+    assert evidence["outreach_ready"] is True
