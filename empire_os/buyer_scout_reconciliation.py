@@ -28,7 +28,22 @@ def _host(value: Any) -> str:
     return host[4:] if host.startswith("www.") else host
 
 
-def _domain_index(
+FREE_EMAIL_DOMAINS = frozenset({
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "icloud.com",
+    "me.com",
+    "yahoo.com",
+    "aol.com",
+    "proton.me",
+    "protonmail.com",
+})
+
+
+def _website_domain_index(
     rows: Iterable[Mapping[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
     index: dict[str, list[dict[str, Any]]] = {}
@@ -41,14 +56,37 @@ def _domain_index(
     return index
 
 
+def _email_domain(value: Any) -> str:
+    email = str(value or "").strip().lower()
+    if "@" not in email:
+        return ""
+    domain = email.rsplit("@", 1)[-1].strip()
+    if not domain or domain in FREE_EMAIL_DOMAINS:
+        return ""
+    return domain
+
+
+def _buyer_domain_index(
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    index: dict[str, list[dict[str, Any]]] = {}
+    for raw in rows:
+        row = dict(raw)
+        host = _email_domain(row.get("email"))
+        if not host:
+            continue
+        index.setdefault(host, []).append(row)
+    return index
+
+
 def reconcile_scout_candidates(
     scout: Mapping[str, Any],
     *,
     prospects: Iterable[Mapping[str, Any]],
     buyers: Iterable[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    prospect_index = _domain_index(prospects)
-    buyer_index = _domain_index(buyers)
+    prospect_index = _website_domain_index(prospects)
+    buyer_index = _buyer_domain_index(buyers)
 
     results: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
