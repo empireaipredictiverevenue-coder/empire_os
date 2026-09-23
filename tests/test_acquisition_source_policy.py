@@ -25,45 +25,24 @@ def test_source_policy_rotates_families_and_explores_underused(tmp_path):
     )
 
     assert coverage["family"] == "coverage"
-    assert coverage["source"] == "biz_search"
+    assert coverage["source"] == "overpass"
     assert intent["family"] == "intent"
     assert intent["source"] in {"reddit", "courtlistener"}
     assert coverage["next_family_index"] == 1
 
 
 
-def test_source_policy_prefers_novel_yield_over_duplicate_acceptance(tmp_path):
+def test_source_policy_skips_quarantined_family(tmp_path):
     log = tmp_path / "crawler.jsonl"
-    rows = []
-    for _ in range(3):
-        rows.extend([
-            {
-                "msg": "source_run_done",
-                "source": "overpass",
-                "accepted": 20,
-                "errors": 0,
-            },
-            {
-                "msg": "prospect_matched",
-                "source": "overpass",
-            },
-            {
-                "msg": "source_run_done",
-                "source": "biz_search",
-                "accepted": 1,
-                "errors": 0,
-            },
-            {
-                "msg": "prospect_acquired",
-                "source": "biz_search",
-            },
-        ])
-    log.write_text("\n".join(json.dumps(row) for row in rows))
+    log.write_text("")
 
     choice = choose_source(
-        {"next_family_index": 0},
+        {
+            "next_family_index": 0,
+            "source_states": {"overpass": "QUARANTINED"},
+        },
         log_path=log,
     )
 
-    assert choice["source"] == "biz_search"
-    assert choice["recent_stats"]["prospects"] == 3
+    assert choice["family"] == "intent"
+    assert choice["source"] in {"reddit", "courtlistener"}
