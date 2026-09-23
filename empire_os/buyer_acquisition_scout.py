@@ -22,6 +22,9 @@ from empire_os.buyer_acquisition_team import direct_buyer_profile
 from empire_os.icp_buyer_trigger_intelligence import (
     assess_icp_candidate,
 )
+from empire_os.icp_buyer_trigger_intelligence import (
+    assess_icp_candidate,
+)
 from empire_os.search_fabric.search import search_domains_parallel
 from empire_os.search_fabric.site_probe import probe_site
 
@@ -220,6 +223,34 @@ def run_buyer_scout(
         }
         profile = direct_buyer_profile(record)
 
+        target_profile_keys = sorted({
+            str(item.get("icp_profile_key") or "")
+            for item in provenance[domain]
+            if str(item.get("icp_profile_key") or "")
+        })
+        icp = assess_icp_candidate(
+            {
+                **record,
+                "buyer_type": profile["buyer_type"],
+                "direct_signal_hits": profile["direct_signal_hits"],
+                "reseller_signal_hits": profile["reseller_signal_hits"],
+                "first_party_people": list(
+                    evidence.get("people") or []
+                )[:10],
+                "target_buyer_pools": [
+                    str(item.get("buyer_pool") or "")
+                    for item in provenance[domain]
+                    if str(item.get("buyer_pool") or "")
+                ],
+                "target_product_codes": [
+                    str(item.get("product_code") or "")
+                    for item in provenance[domain]
+                    if str(item.get("product_code") or "")
+                ],
+            },
+            target_profile_keys=target_profile_keys,
+        )
+
         pools = sorted({
             str(item.get("buyer_pool") or "")
             for item in provenance[domain]
@@ -302,6 +333,17 @@ def run_buyer_scout(
             "first_party_email_count": len(evidence.get("emails") or []),
             "first_party_phone_count": len(evidence.get("phones") or []),
             "people_count": len(evidence.get("people") or []),
+            "icp_intelligence": icp,
+            "target_icp_profile_keys": target_profile_keys,
+            "observed_buying_triggers": list(
+                icp.get("observed_buying_triggers") or []
+            ),
+            "why_now_state": icp.get("why_now_state"),
+            "decision_maker_state": icp.get("decision_maker_state"),
+            "economic_capacity_state": icp.get(
+                "economic_capacity_state"
+            ),
+            "budget_verified": False,
             "candidate_state": "RESEARCH_EVIDENCE_ONLY",
             "canonical_identity_verified": False,
             "commercial_terms_verified": False,
@@ -311,6 +353,9 @@ def run_buyer_scout(
     candidates.sort(
         key=lambda row: (
             -int(row["direct_buyer_score"]),
+            -int((row.get("icp_intelligence") or {}).get(
+                "model_fit_score"
+            ) or 0),
             -int(row["query_evidence_count"]),
             -float(row.get("site_evidence_score") or 0.0),
             str(row["domain"]),
