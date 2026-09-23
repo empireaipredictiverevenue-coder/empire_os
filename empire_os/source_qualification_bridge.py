@@ -1,13 +1,16 @@
 """Source-targeted bridge into the canonical qualification rail.
 
 This module does not introduce a new scoring model. It selects prospects backed
-by a named acquisition source, excludes prospects already scored by Lead
-Scoring v2, then delegates each row to the existing canonical qualification
-worker.
+by a named acquisition source and delegates them to the existing canonical
+qualification worker.
 
-It may enrich and materialize internal canonical evidence through that existing
-worker, but it never sends outreach, accepts terms, moves funds, or recognizes
-revenue.
+Prospects may enter when they have not yet been scored by Lead Scoring v2 or
+when their current v2 qualification is explicitly insufficient_evidence. Rows
+already carrying a substantive v2 qualification are left alone.
+
+The existing qualification worker may enrich and materialize internal canonical
+evidence, but this bridge never sends outreach, accepts terms, moves funds, or
+recognizes revenue.
 """
 from __future__ import annotations
 
@@ -49,7 +52,7 @@ def fetch_pending_source_prospects(
     limit: int = 10,
     request: Request = request_json,
 ) -> list[dict[str, Any]]:
-    """Return canonical prospects acquired from source and not yet v2-scored."""
+    """Return source prospects needing first-pass or insufficient-evidence retry."""
     source = str(source or "").strip()
     if not source:
         raise ValueError("source required")
@@ -81,19 +84,35 @@ def fetch_pending_source_prospects(
         request,
         "/rest/v1/prospect_qualifications",
         {
-            "select": "prospect_id",
+            "select": "prospect_id,status,tier,scored_at",
             "scoring_engine": f"eq.{SCORING_ENGINE}",
             "scoring_version": f"eq.{SCORING_VERSION}",
             "prospect_id": f"in.({','.join(ordered_ids)})",
         },
     )
-    scored = {
-        str(row.get("prospect_id") or "").strip()
+
+    qualification_by_id = {
+        str(row.get("prospect_id") or "").strip(): row
         for row in existing
         if row.get("prospect_id")
     }
-    pending_ids = [pid for pid in ordered_ids if pid not in scored]
-    if not pending_ids:
+
+    retry_ids: list[str] = []
+    for prospect_id in ordered_ids:
+        current = qualification_by_id.get(prospect_id)
+        if current is None:
+            retry_ids.append(prospect_id)
+            continue
+
+        status = str(current.get("status") or "").strip().casefold()
+        tier = str(current.get("tier") or "").strip().casefold()
+        if (
+            status == "insufficient_evidence"
+            or tier == "insufficient_evidence"
+        ):
+            retry_ids.append(prospect_id)
+
+    if not retry_ids:
         return []
 
     params: dict[str, str | int] = {
@@ -102,8 +121,8 @@ def fetch_pending_source_prospects(
             "rating,review_count,buy_signal_score,runs_ads,status,notes,"
             "contact_name,contact_title,contact_source"
         ),
-        "id": f"in.({','.join(pending_ids)})",
-        "limit": len(pending_ids),
+        "id": f"in.({','.join(retry_ids)})",
+        "limit": len(retry_ids),
     }
     if niche:
         params["niche"] = f"eq.{str(niche).strip()}"
@@ -120,7 +139,7 @@ def fetch_pending_source_prospects(
     }
     return [
         by_id[pid]
-        for pid in pending_ids
+        for pid in retry_ids
         if pid in by_id
     ][:bounded]
 
@@ -131,7 +150,7 @@ def run_source_qualification(
     niche: str | None = None,
     limit: int = 5,
 ) -> dict[str, Any]:
-    """Qualify a bounded real-data batch from one acquisition source."""
+    """Qualify or re-enrich a bounded real-data batch from one source."""
     prospects = fetch_pending_source_prospects(
         source=source,
         niche=niche,
@@ -151,12 +170,12 @@ def run_source_qualification(
             })
 
     return {
-        "schema_version": "empire.source_qualification_bridge.v1",
+        "schema_version": "empire.source_qualification_bridge.v2",
         "mode": "INTERNAL_MATERIALIZE",
         "source": source,
         "niche": niche,
         "attempted": len(prospects),
-        "qualified": len(results),
+        "qualified_or_rescored": len(results),
         "failed": len(errors),
         "identity_resolved": sum(
             1 for row in results if row.get("identity_resolved")
