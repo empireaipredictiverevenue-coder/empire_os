@@ -22,6 +22,9 @@ from empire_os.buyer_review_materializer import (
 from empire_os.solar_opportunity_map_automation import (
     materialize_solar_maps_for_review_outcomes,
 )
+from empire_os.solar_product_catalog import (
+    sync_solar_opportunity_map_product,
+)
 from empire_os.qualification_worker_v2 import (
     SCORING_ENGINE,
     SCORING_VERSION,
@@ -274,6 +277,8 @@ def run_source_buyer_review(
     min_company_score: float = 70.0,
     prospect_ids: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
+    product_catalog = sync_solar_opportunity_map_product()
+
     eligible_ids = fetch_hot_source_prospect_ids(
         source=source,
         niche=niche,
@@ -317,6 +322,7 @@ def run_source_buyer_review(
         "niche": niche,
         "selected_hot_prospects": len(selected_ids),
         "prospect_ids": selected_ids,
+        "product_catalog": product_catalog,
         "materializer": materialized.as_dict(),
         "artifact_materialization": artifact_materialization,
         "deferred_queue": queue.snapshot(),
