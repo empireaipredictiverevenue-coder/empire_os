@@ -76,6 +76,7 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "search_intelligence",
                 "demand_genesis",
                 "conversion_intelligence",
+                "media_os",
             ),
             agent_roles=("marketing", "growth"),
             kpis=(
@@ -92,11 +93,14 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "search_gaps",
                 "product_evidence",
                 "rd_findings",
+                "audience_signals",
             ),
             outputs=(
                 "positioning",
                 "campaigns",
                 "content",
+                "media_drafts",
+                "audience_intelligence",
                 "qualified_demand",
                 "growth_experiments",
             ),
