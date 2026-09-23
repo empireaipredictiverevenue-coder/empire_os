@@ -72,6 +72,12 @@ def persist_new_external_candidates(
             continue
 
         site_evidence = {
+            "business_name_source": candidate.get(
+                "business_name_source"
+            ),
+            "site_business_names": list(
+                candidate.get("site_business_names") or []
+            )[:10],
             "site_evidence_score": candidate.get("site_evidence_score"),
             "first_party_email_count": candidate.get(
                 "first_party_email_count"
