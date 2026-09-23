@@ -1,0 +1,19 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "revenue-sprint-command-queue-001",
+  "kind": "code_task",
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "prompt": "72-hour revenue sprint, task 1. Audit the existing canonical revenue systems before coding: Revenue Pulse, Buyer Acquisition, Revenue CRM, Opportunity Radar/Factory, first-revenue readiness, commercial terms/exchange, Founder Console and any existing revenue-command or next-action logic. REUSE or ENHANCE existing canonical modules; do not create a shadow CRM, shadow revenue ledger, shadow buyer store or duplicate opportunity engine. Implement the smallest production-quality Revenue Command Queue that answers from real evidence: who/what can move toward revenue now, what offer/product is relevant when known, the next reversible internal action, the exact blocker, evidence refs, and current commercial state. Unknown remains unknown. A forecast, score, proposal, send, payment request or unverified payment is not revenue. Surface the queue read-only in Founder Console if the existing architecture supports it cleanly. Add a concise docs/REVENUE_SPRINT_72H.md describing the 72-hour sequence and the founder gates. Add focused tests. Do not enable live outbound, send email/SMS/voice, issue payment requests, move funds, apply database migrations, recognize revenue, alter RLS, or expand execution authority. Do not touch recovery/ or toop/.",
+  "allowed_paths": [
+    "empire_os/",
+    "tests/",
+    "docs/"
+  ],
+  "pytest_targets": [
+    "tests/test_revenue_command_queue.py",
+    "tests/test_founder_dashboard.py"
+  ],
+  "max_runtime_seconds": 1200,
+  "created_at": "2026-09-23T00:01:00Z"
+}
