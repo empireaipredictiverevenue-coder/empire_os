@@ -34,6 +34,22 @@ _FB_EVENT_RE = re.compile(
     r"fbq\s*\(\s*['\"]track(?:Custom)?['\"]\s*,\s*['\"]([^'\"]+)['\"]",
     re.I,
 )
+_LINKEDIN_RE = re.compile(
+    r"_linkedin_partner_id\s*=\s*['\"]?([0-9]+)",
+    re.I,
+)
+_TIKTOK_RE = re.compile(
+    r"ttq\.load\s*\(\s*['\"]([^'\"]+)['\"]",
+    re.I,
+)
+_REDDIT_RE = re.compile(
+    r"rdt\s*\(\s*['\"]init['\"]\s*,\s*['\"]([^'\"]+)['\"]",
+    re.I,
+)
+_PINTEREST_RE = re.compile(
+    r"pintrk\s*\(\s*['\"]load['\"]\s*,\s*['\"]([^'\"]+)['\"]",
+    re.I,
+)
 
 
 def _public_http_url(value: str) -> str:
@@ -233,6 +249,14 @@ def observe_tag_surface(
     ga4_counts = _counts(_GA4_RE, combined)
     ads_counts = _counts(_ADS_RE, combined)
     pixel_counts = _counts(_FB_INIT_RE, combined)
+    linkedin_counts = _counts(_LINKEDIN_RE, combined)
+    tiktok_counts = _counts(_TIKTOK_RE, combined)
+    reddit_counts = _counts(_REDDIT_RE, combined)
+    pinterest_counts = _counts(_PINTEREST_RE, combined)
+    microsoft_uet_present = (
+        "bat.bing.com/bat.js" in combined
+        or "bat.bing.com/action/0" in combined
+    )
 
     duplicate_tag_counts = {
         key: count
@@ -242,6 +266,10 @@ def observe_tag_surface(
             ga4_counts,
             ads_counts,
             pixel_counts,
+            linkedin_counts,
+            tiktok_counts,
+            reddit_counts,
+            pinterest_counts,
         )
         for key, count in group.items()
         if count > 1
@@ -272,6 +300,12 @@ def observe_tag_surface(
         "meta_description": _content(soup, name="description"),
         "canonical_url": canonical,
         "robots": _content(soup, name="robots"),
+        "googlebot": _content(soup, name="googlebot"),
+        "site_verification_tags": {
+            "google": _content(soup, name="google-site-verification"),
+            "facebook": _content(soup, name="facebook-domain-verification"),
+            "bing": _content(soup, name="msvalidate.01"),
+        },
         "x_robots_tag": str(
             getattr(response, "headers", {}).get("X-Robots-Tag") or ""
         ).strip() or None,
@@ -304,6 +338,11 @@ def observe_tag_surface(
         "ga4_measurement_ids": sorted(ga4_counts),
         "google_ads_conversion_ids": sorted(ads_counts),
         "meta_pixel_ids": sorted(pixel_counts),
+        "linkedin_insight_partner_ids": sorted(linkedin_counts),
+        "tiktok_pixel_ids": sorted(tiktok_counts),
+        "reddit_pixel_ids": sorted(reddit_counts),
+        "pinterest_tag_ids": sorted(pinterest_counts),
+        "microsoft_uet_present": microsoft_uet_present,
         "duplicate_tag_counts": duplicate_tag_counts,
         "observed_events": sorted(set(declared_events)),
         "duplicate_event_counts": {
