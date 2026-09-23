@@ -125,7 +125,7 @@ set_env OMNIROUTE_SERVER_HOST 0.0.0.0
 set_env BASE_URL http://127.0.0.1:20128
 set_env NEXT_PUBLIC_BASE_URL http://127.0.0.1:20128
 set_env NODE_ENV production
-set_env REQUIRE_API_KEY false
+set_env REQUIRE_API_KEY true
 set_env ALLOW_API_KEY_REVEAL false
 set_env APP_LOG_TO_FILE true
 set_env OMNIROUTE_MEMORY_MB 512
@@ -134,8 +134,17 @@ set_env STORAGE_ENCRYPTION_KEY_VERSION v1
 if ! grep -q '^OMNIROUTE_WS_BRIDGE_SECRET=' "$ENV_FILE"; then
   echo "OMNIROUTE_WS_BRIDGE_SECRET=$(openssl rand -hex 32)" >>"$ENV_FILE"
 fi
+if ! grep -q '^OMNIROUTE_API_KEY=' "$ENV_FILE"; then
+  echo "OMNIROUTE_API_KEY=sk-empire-$(openssl rand -hex 32)" >>"$ENV_FILE"
+fi
 chown "$TARGET_USER:$TARGET_USER" "$ENV_FILE"
 chmod 600 "$ENV_FILE"
+
+OMNIROUTE_API_KEY_VALUE="$(sed -n 's/^OMNIROUTE_API_KEY=//p' "$ENV_FILE" | head -n1)"
+if [[ -z "$OMNIROUTE_API_KEY_VALUE" ]]; then
+  echo "ERROR: OMNIROUTE_API_KEY was not created" >&2
+  exit 1
+fi
 
 echo "=== RECOVER EXISTING HERMES / EMPIRE KEYS INTO PRIVATE ENV ==="
 PYTHONPATH="$REPO_ROOT"   "$REPO_ROOT/.venv/bin/python"   "$REPO_ROOT/scripts/export_omniroute_provider_env.py"   --home "$TARGET_HOME"   --output "$PROVIDER_ENV"
@@ -154,16 +163,21 @@ install -m 0644 "$REPO_ROOT/deploy/systemd/empire-hermes-control.timer"   /etc/s
 systemctl daemon-reload
 
 echo "=== START OMNIROUTE ==="
-systemctl enable --now empire-omniroute.service
+systemctl enable empire-omniroute.service
+systemctl restart empire-omniroute.service
 
 echo "=== WAIT FOR LOOPBACK API ==="
 for _ in $(seq 1 60); do
-  if curl -fsS --max-time 2 http://127.0.0.1:20128/v1/models >/dev/null 2>&1; then
+  if curl -fsS --max-time 2 \
+      -H "Authorization: Bearer $OMNIROUTE_API_KEY_VALUE" \
+      http://127.0.0.1:20128/v1/models >/dev/null 2>&1; then
     break
   fi
   sleep 2
 done
-curl -fsS --max-time 5 http://127.0.0.1:20128/v1/models >/dev/null
+curl -fsS --max-time 5 \
+  -H "Authorization: Bearer $OMNIROUTE_API_KEY_VALUE" \
+  http://127.0.0.1:20128/v1/models >/dev/null
 
 echo "=== VERIFY LISTEN IS LOOPBACK-ONLY ==="
 if ss -ltnH '( sport = :20128 )' | awk '{print $4}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):20128$' | grep -q .; then
@@ -173,21 +187,34 @@ if ss -ltnH '( sport = :20128 )' | awk '{print $4}' | grep -Ev '^(127\.0\.0\.1|\
 fi
 
 echo "=== HERMES -> OMNIROUTE ENV ==="
-cat >/etc/empire_os/omniroute-hermes.env <<'EOF'
+cat >/etc/empire_os/omniroute-hermes.env <<EOF
 EMPIRE_HERMES_PROVIDER=custom
 EMPIRE_HERMES_MODEL=auto
 OPENAI_BASE_URL=http://127.0.0.1:20128/v1
-OPENAI_API_KEY=local-omniroute
+OPENAI_API_KEY=$OMNIROUTE_API_KEY_VALUE
 EOF
 chmod 640 /etc/empire_os/omniroute-hermes.env
 chown root:ubuntu /etc/empire_os/omniroute-hermes.env
 
+echo "=== CONFIGURE EXISTING PROVIDER KEYS ==="
+PYTHONPATH="$REPO_ROOT" \
+  "$REPO_ROOT/.venv/bin/python" \
+  "$REPO_ROOT/scripts/configure_omniroute_providers.py" \
+  --home "$TARGET_HOME" \
+  --provider-env "$PROVIDER_ENV" \
+  --base-url http://127.0.0.1:20128
+
 echo "=== ROUTER MODEL CATALOG ==="
-curl -fsS --max-time 10 http://127.0.0.1:20128/v1/models   | python3 -c 'import json,sys; x=json.load(sys.stdin); print("models:", len(x.get("data", [])))'
+curl -fsS --max-time 10 \
+  -H "Authorization: Bearer $OMNIROUTE_API_KEY_VALUE" \
+  http://127.0.0.1:20128/v1/models \
+  | python3 -c 'import json,sys; x=json.load(sys.stdin); print("models:", len(x.get("data", [])))'
 
 echo "=== ROUTER AUTO TEST ==="
 AUTO_TMP="$(mktemp)"
-HTTP_CODE="$(curl -sS --max-time 90   -o "$AUTO_TMP"   -w '%{http_code}'   -H 'Content-Type: application/json'   http://127.0.0.1:20128/v1/chat/completions   -d '{"model":"auto","messages":[{"role":"user","content":"Reply exactly OMNIROUTE_OK."}],"max_tokens":32}' || true)"
+HTTP_CODE="$(curl -sS --max-time 90   -o "$AUTO_TMP"   -w '%{http_code}'   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $OMNIROUTE_API_KEY_VALUE" \
+  http://127.0.0.1:20128/v1/chat/completions   -d '{"model":"auto","messages":[{"role":"user","content":"Reply exactly OMNIROUTE_OK."}],"max_tokens":32}' || true)"
 python3 - "$AUTO_TMP" "$HTTP_CODE" <<'PY'
 import json, sys
 path, code = sys.argv[1], sys.argv[2]
