@@ -235,9 +235,9 @@ def test_product_demand_separates_sellable_from_market_validation():
         ),
     )
 
-    assert plan["product_demand_count"] == 6
+    assert plan["product_demand_count"] == 7
     assert plan["sellable_product_demand_count"] == 1
-    assert plan["market_validate_product_count"] == 5
+    assert plan["market_validate_product_count"] == 6
 
     managed = next(
         row for row in plan["product_demand_queue"]
@@ -290,3 +290,28 @@ def test_phase4_exchange_mrr_products_enter_buyer_demand_queue():
         assert row["price_claim_allowed"] is False
         assert row["recovered_mrr_product"] is True
         assert "local_and_smb_buyers" in row["target_buyer_pools"]
+
+
+
+def test_tag_intelligence_enters_buyer_demand_without_price_claim():
+    plan = build_buyer_acquisition_plan(
+        {"inventory": [], "buyer_seats": []},
+        catalog_snapshot={"products": []},
+        generated_at=datetime(
+            2026, 9, 23, 0, 0, tzinfo=timezone.utc
+        ),
+    )
+
+    row = next(
+        item for item in plan["product_demand_queue"]
+        if item["product_code"] == "tag_intelligence_monitor"
+    )
+
+    assert row["billing_model"] == "monthly_subscription"
+    assert row["commercial_state"] == "MARKET_VALIDATE_TERMS_REQUIRED"
+    assert row["binding_terms_ready"] is False
+    assert row["catalog_verified"] is False
+    assert row["price_claim_allowed"] is False
+    assert row["new_mrr_product"] is True
+    assert "local_and_smb_buyers" in row["target_buyer_pools"]
+    assert "agency_and_reseller_buyers" in row["target_buyer_pools"]
