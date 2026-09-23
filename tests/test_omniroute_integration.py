@@ -37,7 +37,7 @@ def test_bootstrap_uses_docker_and_authenticated_local_api():
     assert "configure_omniroute_providers.py" in text
     assert "OPENAI_BASE_URL=http://127.0.0.1:20128/v1" in text
     assert "OPENAI_API_KEY=$OMNIROUTE_API_KEY_VALUE" in text
-    assert "EMPIRE_HERMES_PROVIDER=custom" in text
+    assert "EMPIRE_HERMES_PROVIDER=openai-api" in text
     assert "EMPIRE_HERMES_MODEL=auto" in text
     assert "enable --now empire-hermes-control.timer" in text
     assert "VERIFY LISTEN IS LOOPBACK-ONLY" in text
