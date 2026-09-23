@@ -81,6 +81,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("observed_at", "generated_at"),
         "fresh_seconds": 3600,
     },
+    "tag_intelligence": {
+        "path": Path("runtime/tag_intelligence/latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 28800,
+    },
     "revenue_pulse": {
         "path": Path("runtime/revenue_pulse/latest.json"),
         "time_keys": ("generated_at", "observed_at"),
@@ -394,6 +399,29 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             ),
             "llm_probability_used": payload.get(
                 "llm_probability_used"
+            ),
+        }
+    if name == "tag_intelligence":
+        return {
+            "target_count": payload.get("target_count"),
+            "available_target_count": payload.get(
+                "available_target_count"
+            ),
+            "failed_target_count": payload.get(
+                "failed_target_count"
+            ),
+            "critical_issue_count": payload.get(
+                "critical_issue_count"
+            ),
+            "high_issue_count": payload.get("high_issue_count"),
+            "critical_change_count": payload.get(
+                "critical_change_count"
+            ),
+            "automatic_tag_mutation": payload.get(
+                "automatic_tag_mutation"
+            ),
+            "measurement_platform_write": payload.get(
+                "measurement_platform_write"
             ),
         }
     if name == "conversion_intelligence":
