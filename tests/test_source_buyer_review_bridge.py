@@ -66,8 +66,11 @@ def test_hot_source_selector_returns_empty_without_acquisition_rows():
 def test_source_probe_reprobes_only_buyer_level_recovered_identity(monkeypatch):
     calls = []
 
-    def fake_probe(row, hard_timeout_seconds=55.0):
-        calls.append(dict(row))
+    def fake_probe(row, hard_timeout_seconds=55.0, probe_options=None):
+        calls.append({
+            "row": dict(row),
+            "probe_options": dict(probe_options or {}),
+        })
         if len(calls) == 1:
             return {
                 "site_ok": True,
@@ -117,8 +120,13 @@ def test_source_probe_reprobes_only_buyer_level_recovered_identity(monkeypatch):
     })
 
     assert len(calls) == 2
-    assert calls[1]["contact_name"] == "Jane Smith"
-    assert calls[1]["contact_title"] == "Managing Director"
+    assert calls[1]["row"]["contact_name"] == "Jane Smith"
+    assert calls[1]["row"]["contact_title"] == "Managing Director"
+    assert calls[0]["probe_options"] == {
+        "max_pages": 12,
+        "request_timeout": 5.0,
+        "time_budget_seconds": 35.0,
+    }
     assert result["review_ready"] is True
     assert result["identity_recovery"]["promoted"] is True
 
@@ -126,7 +134,7 @@ def test_source_probe_reprobes_only_buyer_level_recovered_identity(monkeypatch):
 def test_source_probe_does_not_promote_director_from_identity_confidence(monkeypatch):
     calls = []
 
-    def fake_probe(row, hard_timeout_seconds=55.0):
+    def fake_probe(row, hard_timeout_seconds=55.0, probe_options=None):
         calls.append(dict(row))
         return {
             "site_ok": True,
