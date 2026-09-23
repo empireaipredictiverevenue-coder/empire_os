@@ -88,3 +88,13 @@ def test_buyer_acquisition_verifier_requires_pricing_drift_artifact():
     assert "pricing_verification_latest.json" in text
     assert "pricing_policy_safe" in text
     assert "pricing_matches_approved_policy" in text
+
+
+def test_buyer_acquisition_verifier_requires_review_readiness():
+    text = (
+        ROOT / "scripts/verify_buyer_acquisition_automation.py"
+    ).read_text()
+
+    assert "review_readiness_latest.json" in text
+    assert "buyer_scout_review_readiness_safe" in text
+    assert "review_ready_candidate_count" in text
