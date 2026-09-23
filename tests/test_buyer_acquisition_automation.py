@@ -98,3 +98,14 @@ def test_buyer_acquisition_verifier_requires_review_readiness():
     assert "review_readiness_latest.json" in text
     assert "buyer_scout_review_readiness_safe" in text
     assert "review_ready_candidate_count" in text
+
+
+def test_buyer_acquisition_verifier_requires_safe_promotion_plan():
+    text = (
+        ROOT / "scripts/verify_buyer_acquisition_automation.py"
+    ).read_text()
+
+    assert "promotion_plan_latest.json" in text
+    assert "buyer_scout_promotion_plan_safe" in text
+    assert "buy_signal_score_policy" in text
+    assert "UNKNOWN_NULL" in text
