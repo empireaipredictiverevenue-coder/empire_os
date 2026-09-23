@@ -302,3 +302,55 @@ def test_promote_verified_website_patches_and_verifies(monkeypatch):
     assert calls[0][2] == {"website": website}
     assert calls[0][3] == "return=minimal"
     assert calls[1][0] == "GET"
+
+
+def test_recc_missing_stored_website_refreshes_from_member_page(monkeypatch):
+    from types import SimpleNamespace
+    from empire_os.lead_sources import recc_solar
+
+    monkeypatch.setattr(
+        recc_solar,
+        "_detail",
+        lambda name, url: SimpleNamespace(
+            raw={"business_website": "https://real-solar.example"}
+        ),
+    )
+
+    website = worker.resolve_acquisition_website(
+        {
+            "business_name": "Real Solar Ltd",
+        },
+        {
+            "source": "recc_solar",
+            "source_url": "https://www.recc.org.uk/scheme/members/example",
+            "evidence": {"raw": {}},
+        },
+    )
+
+    assert website == "https://real-solar.example"
+
+
+def test_stored_acquisition_website_wins_without_live_refresh(monkeypatch):
+    from empire_os.lead_sources import recc_solar
+
+    def fail(*args, **kwargs):
+        raise AssertionError("live source should not be queried")
+
+    monkeypatch.setattr(recc_solar, "_detail", fail)
+
+    website = worker.resolve_acquisition_website(
+        {
+            "business_name": "Real Solar Ltd",
+        },
+        {
+            "source": "recc_solar",
+            "source_url": "https://www.recc.org.uk/scheme/members/example",
+            "evidence": {
+                "raw": {
+                    "business_website": "https://stored.example"
+                }
+            },
+        },
+    )
+
+    assert website == "https://stored.example"
