@@ -4,6 +4,9 @@ export const metadata: Metadata = {
   title: "Trust Center | Empire AI",
   description:
     "How Empire AI handles evidence, security, commercial proof and trust.",
+  alternates: {
+    canonical: "/trust",
+  },
 };
 
 const verified = [
