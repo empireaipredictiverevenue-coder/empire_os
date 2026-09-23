@@ -1,0 +1,24 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "revp0-09-live-post-deploy-verification",
+  "kind": "code_task",
+  "authority": "observe",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "prompt": "Verify the live Revenue P0 runtime after deployment commit bdeb4c2f. Do not modify files. Confirm the resident worker is executing code from the current feature/revenue-intelligence-v2 branch and that Hermes preflight sees the current OpenRouter-prefixed candidate order including openrouter/z-ai/glm-5.3-flash:free and openrouter/deepseek/deepseek-v4-flash-0731:free before fallbacks. Run focused tests for hermes control, Resend inbound webhook, reply classifier, closer reply worker, revenue command queue and founder dashboard. Inspect only read-only evidence for inbound receiving readiness and delivered->reply->closer state. Do not send outbound, do not create credentials, do not mutate production database, do not touch recovery/ or toop/, and do not infer revenue.",
+  "allowed_paths": [
+    "empire_os/",
+    "tests/",
+    "docs/"
+  ],
+  "pytest_targets": [
+    "tests/test_hermes_control.py",
+    "tests/test_hermes_control_systemd.py",
+    "tests/test_resend_webhook_app.py",
+    "tests/test_reply_classifier.py",
+    "tests/test_closer_reply_worker.py",
+    "tests/test_revenue_command_queue.py",
+    "tests/test_founder_dashboard.py"
+  ],
+  "max_runtime_seconds": 1200,
+  "created_at": "2026-09-23T17:20:00Z"
+}
