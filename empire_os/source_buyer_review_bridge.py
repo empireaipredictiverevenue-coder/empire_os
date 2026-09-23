@@ -22,8 +22,10 @@ from empire_os.buyer_review_materializer import (
 from empire_os.solar_opportunity_map_automation import (
     materialize_solar_maps_for_review_outcomes,
 )
-from empire_os.solar_product_catalog import (
-    sync_solar_opportunity_map_product,
+from empire_os.market_pricing import (
+    infer_country_code,
+    market_price,
+    sync_market_price,
 )
 from empire_os.qualification_worker_v2 import (
     SCORING_ENGINE,
@@ -277,7 +279,19 @@ def run_source_buyer_review(
     min_company_score: float = 70.0,
     prospect_ids: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
-    product_catalog = sync_solar_opportunity_map_product()
+    source_country = infer_country_code(source=source)
+    if source_country:
+        product_catalog = sync_market_price(
+            market_price(source_country),
+        )
+    else:
+        product_catalog = {
+            "decision": "skipped",
+            "reason": "source_country_price_not_configured",
+            "source": source,
+            "binding_terms_ready": False,
+            "actual_revenue": False,
+        }
 
     eligible_ids = fetch_hot_source_prospect_ids(
         source=source,
