@@ -449,6 +449,16 @@ def media_os_founder_status(
         if isinstance(youtube.get("outliers"), Mapping)
         else {}
     )
+    owned = (
+        runtime.get("owned_video_metrics")
+        if isinstance(runtime.get("owned_video_metrics"), Mapping)
+        else {}
+    )
+    owned_totals = (
+        owned.get("observed_totals")
+        if isinstance(owned.get("observed_totals"), Mapping)
+        else {}
+    )
     algorithm = (
         runtime.get("algorithm_intelligence")
         if isinstance(runtime.get("algorithm_intelligence"), Mapping)
@@ -493,6 +503,22 @@ def media_os_founder_status(
         ),
         "outlier_candidate_count": int(
             outliers.get("candidate_count") or 0
+        ),
+        "owned_video_metric_count": int(
+            owned.get("record_count") or 0
+        ),
+        "owned_views_observed": owned_totals.get("views"),
+        "owned_engaged_views_observed": owned_totals.get(
+            "engaged_views"
+        ),
+        "owned_watch_time_minutes_observed": owned_totals.get(
+            "watch_time_minutes"
+        ),
+        "owned_subscribers_gained_observed": owned_totals.get(
+            "subscribers_gained"
+        ),
+        "owned_subscribers_lost_observed": owned_totals.get(
+            "subscribers_lost"
         ),
         "algorithm_observation_count": int(
             algorithm.get("observation_count") or 0
