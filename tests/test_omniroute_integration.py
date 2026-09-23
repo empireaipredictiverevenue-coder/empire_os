@@ -34,7 +34,7 @@ def test_bootstrap_generates_secrets_and_never_commits_them():
     assert "openssl rand -base64 48" in text
     assert "openssl rand -hex 32" in text
     assert "/home/ubuntu" not in text
-    assert "omniroute@3.8.51" in text
+    assert "omniroute@3.8.50" in text
     assert "/etc/empire_os/omniroute-hermes.env" in text
     assert "OPENAI_BASE_URL=http://127.0.0.1:20128/v1" in text
     assert "EMPIRE_HERMES_PROVIDER=custom" in text
