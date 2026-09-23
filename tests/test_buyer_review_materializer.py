@@ -164,7 +164,7 @@ def test_weak_decision_evidence_does_not_create_review():
     assert request.posts == []
 
 
-def test_non_managed_service_candidate_is_skipped_before_probe():
+def test_software_buyer_candidate_can_enter_review_pipeline():
     request = FakeRequest()
 
     def software_prospect():
@@ -197,9 +197,9 @@ def test_non_managed_service_candidate_is_skipped_before_probe():
         request,
         probe=probe,
     )
-    assert result.proposed == 0
-    assert result.skipped_ineligible == 1
-    assert called == []
+    assert result.proposed == 1
+    assert result.skipped_ineligible == 0
+    assert len(called) == 1
 
 
 def test_unlinked_but_verified_candidate_can_still_enter_review():
@@ -263,7 +263,7 @@ def test_explicit_probe_rejection_reason_is_preserved():
 
 
 
-def test_candidate_fetch_prioritizes_managed_service_revenue_pool():
+def test_candidate_fetch_is_cross_pool_and_uses_score_only_for_ordering():
     paths = []
 
     class InspectRequest(FakeRequest):
@@ -289,8 +289,46 @@ def test_candidate_fetch_prioritizes_managed_service_revenue_pool():
         path for path in paths
         if path.startswith("/rest/v1/prospects?")
     )
-    assert "buy_signal_score=gte.70" in prospect_path
+    assert "buy_signal_score=gte.70" not in prospect_path
     assert "website=not.is.null" in prospect_path
-    assert "niche.ilike.%2Aroof%2A" in prospect_path
-    assert "niche.ilike.%2Ahvac%2A" in prospect_path
+    assert "niche.ilike." not in prospect_path
     assert "buy_signal_score.desc.nullslast" in prospect_path
+
+
+def test_cross_pool_review_still_requires_company_score_floor():
+    weak = prospect()
+    weak["website"] = "https://local.example"
+    weak["phone"] = ""
+    weak["business_name"] = "Local Shop"
+    weak["niche"] = "retail"
+    weak["buy_signal_score"] = None
+
+    class WeakRequest(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if method == "GET" and path.startswith("/rest/v1/prospects?"):
+                return [weak]
+            if method == "GET" and path.startswith(
+                "/rest/v1/prospect_entity_links?"
+            ):
+                return []
+            return super().__call__(
+                method,
+                path,
+                payload=payload,
+                **kwargs,
+            )
+
+    called = []
+
+    def probe(row):
+        called.append(row)
+        return strong_probe(row)
+
+    result = run_buyer_review_materializer(
+        WeakRequest(),
+        probe=probe,
+    )
+
+    assert result.proposed == 0
+    assert result.skipped_ineligible == 1
+    assert called == []
