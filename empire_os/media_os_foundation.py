@@ -361,6 +361,7 @@ def media_os_architecture_contract() -> dict[str, Any]:
             "canonical_content_object",
             "media_opportunity_feature_packet",
             "youtube_intelligence_adapter",
+            "algorithm_intelligence_engine",
             "media_trend_fusion",
             "media_research_pack",
             "video_idea_factory",
@@ -439,6 +440,10 @@ def media_os_founder_status() -> dict[str, Any]:
         "publishing_state": contract["publishing_state"],
         "source_adapter_count": len(contract["source_adapters"]),
         "media_contract_count": len(contract["new_media_contracts"]),
+        "algorithm_intelligence_available": (
+            "algorithm_intelligence_engine"
+            in contract["new_media_contracts"]
+        ),
         "first_major_scale_milestone": 100_000,
         "long_term_network_objective": 1_000_000,
         "subscriber_targets_are_guarantees": False,
