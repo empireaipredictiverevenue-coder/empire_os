@@ -43,15 +43,27 @@ def run_buyer_probe_isolated(
     row: dict[str, Any],
     *,
     hard_timeout_seconds: float = 35.0,
+    probe_options: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run one public-site probe in a bounded child process."""
     timeout = max(8.0, min(float(hard_timeout_seconds), 60.0))
     payload = dict(row)
-    payload["_probe_options"] = {
+    defaults = {
         "max_pages": 7,
         "request_timeout": 4.0,
         "time_budget_seconds": min(20.0, max(6.0, timeout - 10.0)),
     }
+    if isinstance(probe_options, Mapping):
+        defaults.update({
+            key: value
+            for key, value in probe_options.items()
+            if key in {
+                "max_pages",
+                "request_timeout",
+                "time_budget_seconds",
+            }
+        })
+    payload["_probe_options"] = defaults
     try:
         proc = subprocess.run(
             [sys.executable, "-m", "empire_os.buyer_probe_worker"],
