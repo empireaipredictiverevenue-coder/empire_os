@@ -38,4 +38,5 @@ def test_catalog_cycle_owns_country_native_pricing_sync():
     ).read_text()
 
     assert "sync_market_pricing.py" in text
+    assert "refresh_solar_economics.py" in text
     assert "EnvironmentFile=/etc/empire_os.env" in text
