@@ -561,6 +561,18 @@ def _buyer_acquisition_runtime(
         "buyer_pool_count": len(raw.get("buyer_pools") or []),
         "demand_gap_count": int(raw.get("demand_gap_count") or 0),
         "priority_target_count": len(raw.get("priority_targets") or []),
+        "product_demand_count": int(
+            raw.get("product_demand_count") or 0
+        ),
+        "sellable_product_demand_count": int(
+            raw.get("sellable_product_demand_count") or 0
+        ),
+        "market_validate_product_count": int(
+            raw.get("market_validate_product_count") or 0
+        ),
+        "product_priority_target_count": len(
+            raw.get("product_priority_targets") or []
+        ),
         "target_buyer_types": list(raw.get("target_buyer_types") or []),
         "buyer_pools": list(raw.get("buyer_pools") or []),
         "supply_gate_diagnostics": (
