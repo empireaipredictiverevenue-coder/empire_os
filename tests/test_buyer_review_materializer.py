@@ -103,6 +103,17 @@ def test_materializer_proposes_only_review_ready_outreach_ready_candidate():
     assert result.review_ready == 1
     assert result.proposed == 1
     assert result.errors == ()
+    assert result.outcomes == ({
+        "prospect_id": PROSPECT_ID,
+        "business_name": "Acme Roofing",
+        "status": "proposed",
+        "reason": None,
+        "review_ready": True,
+        "outreach_ready": True,
+        "decision_name": "Jane Smith",
+        "decision_title": "CEO",
+        "identity_recovery": None,
+    },)
 
     path, payload = request.posts[0]
     assert path.endswith("propose_buyer_candidate_review")
