@@ -255,7 +255,7 @@ def test_market_context_labels_niche_portfolio_as_not_local():
     assert len(context["markets"]) == 2
 
 
-def test_non_uk_solar_map_uses_native_proposed_price():
+def test_non_uk_solar_map_uses_native_founder_approved_price():
     def us_request(method, path, payload=None, prefer=None):
         if path.startswith("/rest/v1/prospects?"):
             return [{
@@ -310,5 +310,5 @@ def test_non_uk_solar_map_uses_native_proposed_price():
     assert payload["offer"]["product_code"] == "solar_opportunity_map_us"
     assert payload["offer"]["currency"] == "USD"
     assert payload["offer"]["price_display"] == "$299"
-    assert payload["offer"]["approval_state"] == "PROPOSED"
+    assert payload["offer"]["approval_state"] == "FOUNDER_APPROVED"
     assert payload["offer"]["catalog_binding"] is False
