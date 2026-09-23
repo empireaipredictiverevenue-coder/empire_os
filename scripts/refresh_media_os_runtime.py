@@ -29,6 +29,9 @@ def main() -> int:
         "outlier_candidate_count": (
             payload["youtube_public"]["outliers"]["candidate_count"]
         ),
+        "owned_video_metric_count": (
+            payload["owned_video_metrics"]["record_count"]
+        ),
         "algorithm_observation_count": (
             payload["algorithm_intelligence"]["observation_count"]
         ),
