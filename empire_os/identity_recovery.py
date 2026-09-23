@@ -16,6 +16,10 @@ from empire_os.registry_scraper import RegistryScraper
 from empire_os.official_license_identity import find_official_license_principals
 from empire_os.search_fabric.search import search
 from empire_os.search_fabric.site_probe import probe_site
+from empire_os.search_intelligence.serp import (
+    SearchFabricSerpAdapter,
+    SerpSnapshotError,
+)
 
 
 DECISION_ROLES = (
@@ -102,6 +106,31 @@ def _rank_people(evidence: dict[str, Any], website: str) -> list[IdentityEvidenc
     return rows
 
 
+def _serp_results(query: str, *, num: int) -> list[dict[str, Any]]:
+    """Query Empire SERP and preserve search provenance for identity recovery."""
+    try:
+        snapshot = SearchFabricSerpAdapter(search).snapshot(
+            query,
+            num=max(1, min(int(num), 10)),
+        )
+    except SerpSnapshotError:
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for result in snapshot.results:
+        rows.append({
+            "title": result.title,
+            "link": result.url,
+            "snippet": result.snippet,
+            "position": result.position,
+            "relevance_score": result.relevance_score,
+            "engine": result.engine,
+            "provenance": list(result.provenance),
+            "observed_at": snapshot.observed_at,
+        })
+    return rows
+
+
 def recover_identity(
     *,
     business_name: str,
@@ -132,9 +161,11 @@ def recover_identity(
     )
     seen_urls: set[str] = set()
     for query in queries:
-        sources_tried.append("search_fabric")
-        result = search(query, num=max(1, min(max_search_results, 10)))
-        for organic in result.get("organic") or []:
+        sources_tried.append("empire_serp")
+        for organic in _serp_results(
+            query,
+            num=max_search_results,
+        ):
             if not isinstance(organic, dict):
                 continue
             link = str(organic.get("link") or "").strip()
@@ -173,12 +204,11 @@ def recover_identity(
             person_name = str(seed.get("person_name") or "").strip()
             if not person_name:
                 continue
-            sources_tried.append("search_fabric")
-            result = search(
+            sources_tried.append("empire_serp")
+            for organic in _serp_results(
                 f'site:{domain} "{person_name}"',
-                num=max(1, min(max_search_results, 10)),
-            )
-            for organic in result.get("organic") or []:
+                num=max_search_results,
+            ):
                 if not isinstance(organic, dict):
                     continue
                 link = str(organic.get("link") or "").strip()
