@@ -7,6 +7,7 @@ creates payment requests, moves funds, or recognizes revenue.
 from __future__ import annotations
 
 from pathlib import Path
+import urllib.parse
 from typing import Any, Mapping, Sequence
 
 from empire_os.qualification_worker_v2 import request_json
@@ -109,13 +110,16 @@ def materialize_missing_solar_map_backlog(
     """Retry only missing artifacts for pending/approved solar reviews."""
     target_root = Path(root or ARTIFACT_ROOT)
     bounded = max(1, min(int(limit), 50))
+    query = urllib.parse.urlencode({
+        "select": "id,prospect_id,status,evidence,proposed_at",
+        "status": "in.(pending,approved)",
+        "evidence->>niche": "eq.solar",
+        "order": "proposed_at.desc",
+        "limit": bounded,
+    })
     reviews = request(
         "GET",
-        "/rest/v1/buyer_candidate_reviews?"
-        "select=id,prospect_id,status,evidence,proposed_at"
-        "&status=in.(pending,approved)"
-        "&order=proposed_at.desc"
-        f"&limit={bounded}",
+        f"/rest/v1/buyer_candidate_reviews?{query}",
     ) or []
     reviews = [
         row for row in reviews
