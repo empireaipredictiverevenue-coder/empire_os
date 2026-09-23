@@ -105,12 +105,40 @@ def persist_new_external_candidates(
             "reseller_signal_hits": list(
                 candidate.get("reseller_signal_hits") or []
             ),
+            "icp_intelligence": (
+                dict(candidate.get("icp_intelligence"))
+                if isinstance(candidate.get("icp_intelligence"), Mapping)
+                else {}
+            ),
+            "observed_buying_triggers": list(
+                candidate.get("observed_buying_triggers") or []
+            ),
+            "why_now_state": candidate.get("why_now_state"),
+            "decision_maker_state": candidate.get(
+                "decision_maker_state"
+            ),
+            "economic_capacity_state": candidate.get(
+                "economic_capacity_state"
+            ),
+            "budget_verified": False,
         }
         provenance = {
             "source": "empire_buyer_acquisition_scout",
             "candidate_state": candidate.get("candidate_state"),
             "query_evidence_count": candidate.get(
                 "query_evidence_count"
+            ),
+            "target_icp_profile_keys": list(
+                candidate.get("target_icp_profile_keys") or []
+            ),
+            "icp_score_classification": (
+                (candidate.get("icp_intelligence") or {}).get(
+                    "score_classification"
+                )
+                if isinstance(
+                    candidate.get("icp_intelligence"), Mapping
+                )
+                else None
             ),
             "canonical_identity_verified": False,
             "commercial_terms_verified": False,
