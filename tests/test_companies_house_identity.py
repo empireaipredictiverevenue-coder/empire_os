@@ -90,3 +90,8 @@ def test_companies_house_fails_closed_on_ambiguous_company_match(monkeypatch):
         company_name="Alpha Solar Ltd",
         api_key="test-key",
     ) == []
+
+
+def test_display_name_normalizes_uppercase_component_without_mangling_mixed_case():
+    assert ch._display_name("SMITH, Jane") == "Jane Smith"
+    assert ch._display_name("McDonald, Anne-Marie") == "Anne-Marie McDonald"
