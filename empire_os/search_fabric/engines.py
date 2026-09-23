@@ -113,10 +113,30 @@ ENGINES: Dict[str, SearchEngine] = {
         mode="candidate",
         automatic=False,
     ),
+    # Recovery providers are automatic and remain behind the same
+    # Search Fabric relevance/entity verification gates. This gives Fusion
+    # independent zero-cost paths when DuckDuckGo HTML is blocked or returns
+    # a non-200 response.
+    "bing_rss": SearchEngine(
+        name="bing_rss",
+        mode="recovery_rss",
+        automatic=True,
+        country="GB",
+        language="en",
+    ),
+    "duckduckgo_lite": SearchEngine(
+        name="duckduckgo_lite",
+        mode="recovery_html",
+        automatic=True,
+        country="GB",
+        language="en",
+    ),
     "mojeek": SearchEngine(
         name="mojeek",
-        mode="candidate",
-        automatic=False,
+        mode="recovery_html",
+        automatic=True,
+        country="GB",
+        language="en",
     ),
     "ecosia": SearchEngine(
         name="ecosia",
