@@ -59,7 +59,7 @@ def test_probe_stops_internal_fetches_when_budget_exhausted(monkeypatch):
         "text":'<a href="/contact">Contact</a><a href="/team">Team</a>',
         "title":"Acme","description":"","structured_data":[],"emails":[],"phones":[],"socials":[]
     })()
-    def fake_fetch(session, url, *, timeout=15.0):
+    def fake_fetch(session, url, *, timeout=15.0, public_only=False):
         calls.append(url)
         return doc
     times = iter([0.0, 2.0, 2.0, 2.0, 2.0])
@@ -93,7 +93,7 @@ def test_probe_preserves_bounded_page_email_context(monkeypatch):
     monkeypatch.setattr(
         sp,
         "_fetch",
-        lambda session, url, *, timeout=15.0: doc,
+        lambda session, url, *, timeout=15.0, public_only=False: doc,
     )
     result = sp.probe_site(
         "https://acme.test/team",
@@ -190,7 +190,7 @@ def test_people_priority_follows_profile_link_from_team_page(monkeypatch):
         })(),
     }
 
-    def fake_fetch(session, url, *, timeout=15.0):
+    def fake_fetch(session, url, *, timeout=15.0, public_only=False):
         return docs.get(url)
 
     monkeypatch.setattr(sp, "_fetch", fake_fetch)
@@ -292,7 +292,7 @@ def test_sitemap_people_candidates_find_hidden_team_pages(monkeypatch):
         def __init__(self, text):
             self.text = text
 
-    def fake_fetch(session, url, timeout):
+    def fake_fetch(session, url, timeout, public_only=False):
         if url.endswith("/sitemap.xml"):
             return Doc(
                 "<urlset>"
