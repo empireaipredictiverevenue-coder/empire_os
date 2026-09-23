@@ -191,6 +191,8 @@ def test_source_review_exact_subset_is_intersected_with_hot_source_ids(monkeypat
     )
 
     class Result:
+        outcomes = ()
+
         def as_dict(self):
             return {
                 "errors": [],
