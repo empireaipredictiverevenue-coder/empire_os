@@ -66,6 +66,7 @@ Historical Empire code contains useful media predecessors, but they are **not ca
 | 5 | Channel Spawning Engine | NEW | Candidate evaluator only; 30–50 credible ideas and evidence required; public launch is founder gate. |
 | 6 | YouTube Intelligence Node | NEW | Authorised/public YouTube adapter emitting canonical observations into Intelligence Fabric. |
 | 7 | Outlier Engine | NEW | Media-specific baseline/outlier detector; observations feed Quant/Opportunity, not automatic content copying. |
+| 7A | Algorithm Intelligence Engine | NEW + MERGE | Learn observed distribution by Search/Browse/Suggested/Shorts surfaces, recommendation chains and rolling drift. Feed hypotheses to Experiment Intelligence and Quant Brain. Never claim private platform weights or manipulate engagement. |
 | 8 | Trend Fusion Engine | MERGE + ENHANCE | Fuse existing Search, Community, Competitor, CRM, buyer conversation and market signals; no new crawlers by default. |
 | 9 | Voice-of-Buyer connection | REUSE + ENHANCE | Conversation OS, CRM, Community Intent, reviews/search/comments adapters. |
 | 10 | Video Idea Factory | NEW + ENHANCE | Media-specific idea object; use Opportunity/Quant scoring rather than parallel economics. |
