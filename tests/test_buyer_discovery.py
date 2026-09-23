@@ -1012,4 +1012,20 @@ def test_solar_candidate_uses_solar_opportunity_map_offer():
         "contact_title": "Managing Director",
     })
 
-    assert candidate.offer_key == "solar_opportunity_map"
+    assert candidate.offer_key == "solar_opportunity_map_gb"
+
+
+def test_solar_offer_uses_acquisition_source_market_before_location_guess():
+    candidate = build_candidate({
+        "id": "00000000-0000-0000-0000-000000000992",
+        "business_name": "Example Solar GmbH",
+        "niche": "solar",
+        "metro": "",
+        "website": "https://solar-de.example",
+        "buy_signal_score": 95,
+        "contact_name": "Jane Smith",
+        "contact_title": "Managing Director",
+        "_acquisition_source": "de_mastr",
+    })
+
+    assert candidate.offer_key == "solar_opportunity_map_de"
