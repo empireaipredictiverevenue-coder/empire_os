@@ -1741,3 +1741,37 @@ def test_dashboard_exposes_buyer_scout_review_readiness(tmp_path):
     assert runtime["canonical_promotion_performed"] is False
     assert runtime["outbound_sent"] is False
     assert runtime["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_non_mutating_buyer_promotion_plan(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/buyer_acquisition/promotion_plan_latest.json",
+        {
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T08:45:00+00:00",
+            "proposal_count": 6,
+            "blocked_count": 2,
+            "blocked_reason_counts": {
+                "identity_incomplete": 2,
+            },
+            "database_write_performed": False,
+            "canonical_promotion_performed": False,
+            "buy_signal_score_policy": "UNKNOWN_NULL",
+            "outbound_sent": False,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+
+    runtime = build_founder_dashboard(root)[
+        "buyer_scout_promotion_plan"
+    ]
+
+    assert runtime["available"] is True
+    assert runtime["proposal_count"] == 6
+    assert runtime["database_write_performed"] is False
+    assert runtime["canonical_promotion_performed"] is False
+    assert runtime["buy_signal_score_policy"] == "UNKNOWN_NULL"
+    assert runtime["outbound_sent"] is False
+    assert runtime["execution_authority"] == "none"
