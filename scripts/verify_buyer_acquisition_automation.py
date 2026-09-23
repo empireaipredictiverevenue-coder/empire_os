@@ -35,6 +35,7 @@ REQUIRED_ARTIFACTS = (
     "runtime/buyer_acquisition/reconciliation_latest.json",
     "runtime/buyer_acquisition/persistence_latest.json",
     "runtime/buyer_acquisition/review_readiness_latest.json",
+    "runtime/buyer_acquisition/promotion_plan_latest.json",
     "runtime/commercial_catalog/pricing_verification_latest.json",
 )
 
@@ -96,6 +97,9 @@ def main() -> int:
     review_readiness = _read_json(
         root / "runtime/buyer_acquisition/review_readiness_latest.json"
     )
+    promotion_plan = _read_json(
+        root / "runtime/buyer_acquisition/promotion_plan_latest.json"
+    )
     pricing = _read_json(
         root / "runtime/commercial_catalog/pricing_verification_latest.json"
     )
@@ -146,6 +150,14 @@ def main() -> int:
         and review_readiness.get("outbound_sent") is False
         and review_readiness.get("execution_authority") == "none"
     )
+    promotion_plan_safe = (
+        promotion_plan.get("mode") == "OBSERVE"
+        and promotion_plan.get("database_write_performed") is False
+        and promotion_plan.get("canonical_promotion_performed") is False
+        and promotion_plan.get("buy_signal_score_policy") == "UNKNOWN_NULL"
+        and promotion_plan.get("outbound_sent") is False
+        and promotion_plan.get("execution_authority") == "none"
+    )
     pricing_safe = (
         pricing.get("pricing_matches_approved_policy") is True
         and int(pricing.get("drift_count") or 0) == 0
@@ -165,6 +177,7 @@ def main() -> int:
         reconciliation_safe,
         persistence_safe,
         review_readiness_safe,
+        promotion_plan_safe,
         pricing_safe,
         exchange_safe,
         not live_external_automation_detected,
@@ -180,6 +193,7 @@ def main() -> int:
         "buyer_scout_reconciliation_safe": reconciliation_safe,
         "buyer_scout_persistence_safe": persistence_safe,
         "buyer_scout_review_readiness_safe": review_readiness_safe,
+        "buyer_scout_promotion_plan_safe": promotion_plan_safe,
         "pricing_policy_safe": pricing_safe,
         "commercial_exchange_safe": exchange_safe,
         "live_external_automation_detected": (
@@ -218,6 +232,9 @@ def main() -> int:
         ),
         "review_ready_candidate_count": int(
             review_readiness.get("review_ready_count") or 0
+        ),
+        "promotion_proposal_count": int(
+            promotion_plan.get("proposal_count") or 0
         ),
         "market_validate_product_count": int(
             buyer_plan.get("market_validate_product_count") or 0
