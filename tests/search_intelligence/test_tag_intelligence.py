@@ -1,4 +1,4 @@
-from empire_os.tag_intelligence import review_tag_intelligence
+from empire_os.tag_intelligence import compare_tag_snapshots, review_tag_intelligence
 
 
 def test_search_and_social_tags_are_reviewed_together():
@@ -159,3 +159,54 @@ def test_clean_observed_stack_does_not_invent_problems():
 
     assert result.issues == ()
     assert result.repair_priority_score == 0
+
+
+
+def test_tag_change_monitor_flags_removed_pixel_and_noindex_change():
+    result = compare_tag_snapshots(
+        previous_page_tags={
+            "canonical_url": "https://example.com/",
+            "robots": "index,follow",
+        },
+        current_page_tags={
+            "canonical_url": "https://example.com/",
+            "robots": "noindex,follow",
+        },
+        previous_measurement_tags={
+            "meta_pixel_ids": ["123"],
+            "ga4_measurement_ids": ["G-AAA"],
+        },
+        current_measurement_tags={
+            "meta_pixel_ids": [],
+            "ga4_measurement_ids": ["G-AAA"],
+        },
+    )
+
+    assert result["change_count"] == 2
+    assert result["critical_change_count"] == 2
+    fields = {row["field"] for row in result["changes"]}
+    assert fields == {"robots", "meta_pixel_ids"}
+    assert result["automatic_repair"] is False
+    assert result["execution_authority"] == "none"
+
+
+def test_tag_change_monitor_has_no_fake_changes():
+    page = {
+        "title": "Example",
+        "canonical_url": "https://example.com/",
+        "robots": "index,follow",
+    }
+    measurement = {
+        "ga4_measurement_ids": ["G-AAA"],
+        "observed_events": ["page_view"],
+    }
+
+    result = compare_tag_snapshots(
+        previous_page_tags=page,
+        current_page_tags=page,
+        previous_measurement_tags=measurement,
+        current_measurement_tags=measurement,
+    )
+
+    assert result["change_count"] == 0
+    assert result["changes"] == []
