@@ -386,6 +386,7 @@ def media_os_architecture_contract() -> dict[str, Any]:
             "content_refresh_and_decay",
             "channel_spawning_candidate",
             "workflow_skill_candidate_compiler",
+            "flagship_media_runtime",
         ],
         "subscriber_strategy": {
             "first_major_scale_milestone": 100_000,
