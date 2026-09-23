@@ -2014,7 +2014,21 @@ def test_dashboard_surfaces_live_media_os_runtime_without_publish_authority(
                 "candidate_count": 9,
                 "pending_quant_review_count": 9,
             },
+            "research_packs": {
+                "candidate_count": 5,
+                "verified_claim_count": 3,
+                "script_ready_count": 2,
+            },
+            "content_pipeline": {
+                "canonical_content_candidate_count": 2,
+                "script_brief_candidate_count": 2,
+                "script_prose_generated": False,
+            },
             "ready_for_research_generation": True,
+            "ready_for_claim_verification": True,
+            "ready_for_script_generation": True,
+            "ready_for_script_prose_generation": True,
+            "ready_for_storyboard_generation": False,
             "public_publish_authorized": False,
             "actual_revenue": False,
             "execution_authority": "none",
@@ -2036,7 +2050,17 @@ def test_dashboard_surfaces_live_media_os_runtime_without_publish_authority(
     assert media["build_journal_opportunity_count"] == 2
     assert media["idea_candidate_count"] == 9
     assert media["pending_quant_review_count"] == 9
+    assert media["research_pack_candidate_count"] == 5
+    assert media["research_verified_claim_count"] == 3
+    assert media["research_script_ready_count"] == 2
+    assert media["canonical_content_candidate_count"] == 2
+    assert media["script_brief_candidate_count"] == 2
+    assert media["script_prose_generated"] is False
     assert media["ready_for_research_generation"] is True
+    assert media["ready_for_claim_verification"] is True
+    assert media["ready_for_script_generation"] is True
+    assert media["ready_for_script_prose_generation"] is True
+    assert media["ready_for_storyboard_generation"] is False
     assert media["public_publish_authorized"] is False
     assert media["actual_revenue"] is False
     assert media["execution_authority"] == "none"
