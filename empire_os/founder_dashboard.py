@@ -29,6 +29,9 @@ from empire_os.phase_3f_closeout import (
 from empire_os.commercial_exchange_contract import (
     build_commercial_exchange_contract,
 )
+from empire_os.buyer_acquisition_team import (
+    refresh_buyer_acquisition_plan,
+)
 from empire_os.competitor_audience_runtime import (
     build_competitor_audience_runtime,
 )
@@ -534,6 +537,61 @@ def _commercial_exchange_runtime(
     }
 
 
+def _buyer_acquisition_runtime(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "mode": "unknown",
+            "execution_authority": "none",
+        }
+    automation = (
+        raw.get("automation")
+        if isinstance(raw.get("automation"), dict)
+        else {}
+    )
+    return {
+        "available": True,
+        "observed_at": raw.get("generated_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "team_role_count": int(raw.get("team_role_count") or 0),
+        "buyer_pool_count": len(raw.get("buyer_pools") or []),
+        "demand_gap_count": int(raw.get("demand_gap_count") or 0),
+        "priority_target_count": len(raw.get("priority_targets") or []),
+        "target_buyer_types": list(raw.get("target_buyer_types") or []),
+        "buyer_pools": list(raw.get("buyer_pools") or []),
+        "supply_gate_diagnostics": (
+            raw.get("supply_gate_diagnostics")
+            if isinstance(raw.get("supply_gate_diagnostics"), dict)
+            else {}
+        ),
+        "seat_activation_blocker_counts": (
+            raw.get("seat_activation_blocker_counts")
+            if isinstance(
+                raw.get("seat_activation_blocker_counts"), dict
+            )
+            else {}
+        ),
+        "live_outbound_send": (
+            automation.get("live_outbound_send") is True
+        ),
+        "buyer_capacity_never_gates_acquisition": (
+            raw.get("buyer_capacity_never_gates_acquisition") is True
+        ),
+        "overflow_remains_empire_owned": (
+            raw.get("overflow_remains_empire_owned") is True
+        ),
+        "canonical_settlement_rail": raw.get(
+            "canonical_settlement_rail"
+        ),
+        "actual_revenue": False,
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
 def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     loop_path = runtime / "commercial_loop" / "latest.json"
@@ -551,6 +609,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     economic_memory_path = runtime / "economic_memory" / "latest.json"
     commercial_exchange_runtime_path = (
         runtime / "commercial_exchange" / "latest.json"
+    )
+    buyer_acquisition_runtime_path = (
+        runtime / "buyer_acquisition" / "latest.json"
     )
 
     raw_loop = _read_json(loop_path)
@@ -666,6 +727,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "commercial_exchange_runtime": _commercial_exchange_runtime(
             _read_json(commercial_exchange_runtime_path),
             commercial_exchange_runtime_path,
+        ),
+        "buyer_acquisition_team": _buyer_acquisition_runtime(
+            _read_json(buyer_acquisition_runtime_path),
+            buyer_acquisition_runtime_path,
         ),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
