@@ -7,7 +7,7 @@ country packs, ranking, and quarantine decisions for acquisition planning.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Iterable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -117,10 +117,24 @@ SOURCES: dict[str, SourceContract] = {
         ("all",), ("identity", "activity", "location"),
         "daily", "reuse_terms_apply", "verified", 100, False,
     ),
+    "it_registro_imprese": SourceContract(
+        "it_registro_imprese", "Registro Imprese / Camere di Commercio", "IT",
+        "official_registry", "api",
+        "https://accessoallebanchedati.registroimprese.it/abdo/en/api?lang=en",
+        ("all",), ("identity", "director", "company_status", "accounts"),
+        "real_time", "commercial_api_terms", "verified", 100, False,
+    ),
+    "pt_registo_comercial": SourceContract(
+        "pt_registo_comercial", "Instituto dos Registos e do Notariado", "PT",
+        "official_registry", "public_search",
+        "https://registo.justica.gov.pt/Empresas/Publicacoes",
+        ("all",), ("identity", "company_status", "filings"),
+        "current", "official_public_search", "verified", 95, False,
+    ),
 }
 
 
-UNLOCKED_COUNTRIES = ("GB", "CA", "AU", "IE", "NZ", "DE", "FR", "ES", "IT", "NL", "BE", "PT")
+UNLOCKED_COUNTRIES = ("GB", "CA", "AU", "IE", "NZ", "DE", "FR", "ES", "IT", "NL", "BE", "PT")\n\nPRIORITY_NICHES = ("solar", "roofing", "hvac", "restoration", "property", "permits", "private_capital", "logistics", "warehouse")
 
 
 PACKS: dict[str, CountrySourcePack] = {
@@ -165,8 +179,8 @@ PACKS: dict[str, CountrySourcePack] = {
     ),
     "DE": CountrySourcePack("DE", (), {}, {}, "jurisdiction_pack_required", "source_research_required"),
     "ES": CountrySourcePack("ES", (), {}, {}, "jurisdiction_pack_required", "source_research_required"),
-    "IT": CountrySourcePack("IT", (), {}, {}, "jurisdiction_pack_required", "source_research_required"),
-    "PT": CountrySourcePack("PT", (), {}, {}, "jurisdiction_pack_required", "source_research_required"),
+    "IT": CountrySourcePack("IT", ("it_registro_imprese",), {}, {}, "jurisdiction_pack_required", "identity_ready_niche_research"),
+    "PT": CountrySourcePack("PT", ("pt_registo_comercial",), {}, {}, "jurisdiction_pack_required", "identity_ready_niche_research"),
 }
 
 
@@ -233,17 +247,24 @@ def choose_pack_source(
 
 
 def research_backlog() -> tuple[dict[str, Any], ...]:
-    rows = []
+    rows: list[dict[str, Any]] = []
     for country in UNLOCKED_COUNTRIES:
         pack = PACKS[country]
-        if pack.status in {"source_research_required", "identity_ready_niche_research"}:
+        if not pack.identity_sources:
             rows.append({
                 "country_code": country,
-                "status": pack.status,
-                "next_task": (
-                    "verify official identity source"
-                    if not pack.identity_sources
-                    else "verify niche-specific certification/demand sources"
-                ),
+                "niche": "all",
+                "status": "source_research_required",
+                "next_task": "verify official business identity source",
             })
+        for niche in PRIORITY_NICHES:
+            if niche not in pack.niche_sources:
+                rows.append({
+                    "country_code": country,
+                    "niche": niche,
+                    "status": "niche_source_research_required",
+                    "next_task": (
+                        "verify official/certified niche source plus demand/event sources"
+                    ),
+                })
     return tuple(rows)
