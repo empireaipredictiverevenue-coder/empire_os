@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 from empire_os.buyer_acquisition_team import direct_buyer_profile
 
 
-OUTPUT = Path("runtime/buyer_acquisition/scout_latest.json")
+OUTPUT = Path("runtime/buyer_acquisition/scout_observations_latest.json")
 
 SearchFn = Callable[..., Mapping[str, Any]]
 
