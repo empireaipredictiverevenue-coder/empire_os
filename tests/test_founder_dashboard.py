@@ -1589,3 +1589,30 @@ def test_dashboard_exposes_non_binding_pricing_proposal(tmp_path):
     assert pricing["existing_verified_product_unchanged"][
         "amount_cents"
     ] == 150000
+
+
+def test_dashboard_exposes_bounded_buyer_scout_runtime(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/buyer_acquisition/scout_latest.json",
+        {
+            "mode": "INTERNAL_RESEARCH",
+            "observed_at": "2026-09-23T00:30:00+00:00",
+            "query_count": 12,
+            "observation_count": 31,
+            "error_count": 2,
+            "automatic_external_execution": False,
+            "outbound_sent": False,
+            "execution_authority": "none",
+        },
+    )
+
+    scout = build_founder_dashboard(root)["buyer_scout"]
+
+    assert scout["available"] is True
+    assert scout["query_count"] == 12
+    assert scout["observation_count"] == 31
+    assert scout["error_count"] == 2
+    assert scout["outbound_sent"] is False
+    assert scout["automatic_external_execution"] is False
+    assert scout["execution_authority"] == "none"
