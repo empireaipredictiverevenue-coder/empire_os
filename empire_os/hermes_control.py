@@ -513,6 +513,62 @@ TASK
 """
 
 
+def _write_isolated_hermes_config(
+    *,
+    production_repo: Path,
+    env: Mapping[str, str],
+) -> Path | None:
+    """Create a worker-only Hermes home for the local OmniRoute endpoint.
+
+    Hermes' global user config may point at an unrelated provider. The resident
+    worker must be deterministic, so when the systemd service supplies the local
+    OpenAI-compatible endpoint we write a minimal config under protected runtime
+    storage and set HERMES_HOME to it. The API key never enters Git.
+    """
+    base_url = str(env.get("OPENAI_BASE_URL") or "").strip()
+    api_key = str(env.get("OPENAI_API_KEY") or "").strip()
+    if not base_url:
+        return None
+
+    hermes_home = production_repo / "runtime/hermes_control/hermes_home"
+    hermes_home.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(hermes_home, 0o700)
+    except OSError:
+        pass
+
+    config_path = hermes_home / "config.yaml"
+    payload = {
+        "model": {
+            "provider": "custom",
+            "default": "auto/coding",
+            "base_url": base_url,
+            "api_mode": "chat_completions",
+        }
+    }
+    if api_key:
+        payload["model"]["api_key"] = api_key
+
+    config_path.write_text(
+        json.dumps(payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    try:
+        os.chmod(config_path, 0o600)
+    except OSError:
+        pass
+    return hermes_home
+
+
+def _redact_hermes_output(text: str, env: Mapping[str, str]) -> str:
+    clean = str(text or "")
+    for key in ("OPENAI_API_KEY",):
+        secret = str(env.get(key) or "")
+        if secret:
+            clean = clean.replace(secret, "[REDACTED]")
+    return clean
+
+
 def run_hermes(
     job: HermesJob,
     *,
@@ -526,15 +582,47 @@ def run_hermes(
     if not hermes_bin:
         raise HermesControlError("hermes executable not found")
 
+    env = _hermes_environment()
+    env["PYTHONUNBUFFERED"] = "1"
+
+    isolated_home = _write_isolated_hermes_config(
+        production_repo=production_repo,
+        env=env,
+    )
+    if isolated_home is not None:
+        env["HERMES_HOME"] = str(isolated_home)
+        provider = "custom"
+        model = "auto/coding"
+        endpoint_mode = "isolated_omniroute"
+    else:
+        provider = str(
+            os.environ.get("EMPIRE_HERMES_PROVIDER")
+            or "openai-api"
+        ).strip()
+        model = str(
+            os.environ.get("EMPIRE_HERMES_MODEL")
+            or "auto"
+        ).strip()
+        endpoint_mode = "ambient_provider"
+
+        if (
+            provider == "custom"
+            and str(os.environ.get("OPENAI_BASE_URL") or "").strip()
+        ):
+            provider = "openai-api"
+
     args = [
         hermes_bin,
         "chat",
+        "--provider",
+        provider,
+        "--model",
+        model,
         "--oneshot",
         "--source",
         "tool",
         "--toolsets",
         "terminal,skills",
-        "-Q",
         "-q",
         build_hermes_prompt(
             job,
@@ -542,62 +630,43 @@ def run_hermes(
             worktree=worktree,
         ),
     ]
-    provider = str(
-        os.environ.get("EMPIRE_HERMES_PROVIDER")
-        or "openai-api"
-    ).strip()
-    model = str(
-        os.environ.get("EMPIRE_HERMES_MODEL")
-        or "auto"
-    ).strip()
-
-    # Backward-compatibility for the first OmniRoute bootstrap, which wrote
-    # EMPIRE_HERMES_PROVIDER=custom into /etc/empire_os/omniroute-hermes.env.
-    # Hermes' documented provider for arbitrary OpenAI-compatible endpoints is
-    # openai-api; keep accepting the stale value so a repo deploy heals it.
-    if (
-        provider == "custom"
-        and str(os.environ.get("OPENAI_BASE_URL") or "").strip()
-    ):
-        provider = "openai-api"
-
-    if provider:
-        args[2:2] = ["--provider", provider]
-    if model:
-        args[2:2] = ["--model", model]
 
     started = _utc_now()
-    env = _hermes_environment()
-    env["PYTHONUNBUFFERED"] = "1"
-
     process = subprocess.Popen(
         args,
         cwd=str(worktree),
         env=env,
         text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
     try:
-        returncode = process.wait(timeout=job.max_runtime_seconds)
+        output, _ = process.communicate(
+            timeout=job.max_runtime_seconds
+        )
     except subprocess.TimeoutExpired as exc:
         process.terminate()
         try:
-            process.wait(timeout=10)
+            output, _ = process.communicate(timeout=10)
         except subprocess.TimeoutExpired:
             process.kill()
-            process.wait(timeout=10)
+            output, _ = process.communicate(timeout=10)
         raise HermesControlError(
-            f"Hermes timed out after {job.max_runtime_seconds}s"
+            f"Hermes timed out after {job.max_runtime_seconds}s; "
+            f"output_tail={_redact_hermes_output(output, env)[-4000:]}"
         ) from exc
 
+    clean_output = _redact_hermes_output(output, env)
     return {
         "started_at": started,
         "completed_at": _utc_now(),
-        "returncode": returncode,
-        "stdout": "",
-        "stderr": "",
-        "journal_streamed": True,
+        "returncode": process.returncode,
+        "output_tail": clean_output[-12000:],
+        "endpoint_mode": endpoint_mode,
+        "provider": provider,
+        "model": model,
+        "hermes_home_isolated": isolated_home is not None,
     }
-
 
 def run_verification(
     job: HermesJob,
