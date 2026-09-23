@@ -509,3 +509,65 @@ export function getFounderDailyResultsHistory(limit = 14) {
     `/v1/founder-daily-results/history?limit=${limit}`,
   );
 }
+
+
+export type FounderSolarIntelligence = {
+  schema_version?: string;
+  mode?: string;
+  country_code?: string;
+  niche?: string;
+  market_anchor_count?: number;
+  source_plan?: {
+    country_code?: string;
+    niche?: string;
+    pack_status?: string;
+    jurisdiction_state?: string;
+    selected_source?: string | null;
+    waterfall?: Array<{
+      source_id?: string;
+      authority?: string;
+      source_type?: string;
+      freshness?: string;
+      production_status?: string;
+      provenance_strength?: number;
+    }>;
+  };
+  latest_proof?: {
+    available?: boolean;
+    source?: string;
+    niche?: string;
+    started_at?: string | null;
+    dry_run?: boolean;
+    canonical_store?: string | null;
+    max_candidates?: number | null;
+    candidate_count?: number;
+    candidates?: Array<{
+      name?: string;
+      source?: string;
+      niche?: string;
+      metro?: string;
+      quality_confidence?: number | null;
+      entity_kind?: string | null;
+      observed_at?: string | null;
+    }>;
+    run_result?: {
+      candidates?: number | null;
+      accepted?: number | null;
+      errors?: number | null;
+    };
+  };
+  truth?: {
+    verified_source_proof?: boolean;
+    canonical_write_observed?: boolean;
+    commercial_outcome_observed?: boolean;
+    recognized_revenue_observed?: boolean;
+  };
+  execution_authority?: string;
+  actual_revenue?: boolean;
+};
+
+export function getFounderSolarIntelligence(country = "GB") {
+  return getFounderRead<FounderSolarIntelligence>(
+    `/v1/founder-source-intelligence/solar?country=${encodeURIComponent(country)}`,
+  );
+}
