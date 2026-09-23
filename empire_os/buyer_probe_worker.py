@@ -163,8 +163,14 @@ def _promote_confirmed_first_party_buyer(
     return result
 
 
-def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
-        time_budget_seconds: float = 22.0) -> dict:
+def run(
+    row: dict,
+    *,
+    max_pages: int = 9,
+    request_timeout: float = 4.0,
+    time_budget_seconds: float = 22.0,
+    allow_company_routed: bool = False,
+) -> dict:
     candidate = build_candidate(
         row,
         entity_id=row.get("entity_id") or None,
@@ -285,6 +291,7 @@ def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
     contact = verify_contact_plan(
         enriched,
         validator=MxValidator(do_smtp_probe=False),
+        allow_company_routed=allow_company_routed,
     )
 
     return {
@@ -299,6 +306,10 @@ def run(row: dict, *, max_pages: int = 9, request_timeout: float = 4.0,
         "review_ready": bool(contact.get("review_ready")),
         "outreach_ready": bool(contact.get("outreach_ready")),
         "preferred_email": contact.get("preferred_email"),
+        "contact_route": contact.get("contact_route"),
+        "person_bound": bool(contact.get("person_bound")),
+        "routing_name": contact.get("routing_name"),
+        "routing_title": contact.get("routing_title"),
         "hunter_domain_pattern": hunter.pattern.as_dict(),
         "hunter_confirmed_contacts": [
             item.as_dict() for item in hunter.confirmed_contacts
@@ -359,6 +370,7 @@ def _probe_options_from_row(row: dict) -> dict:
         "max_pages": max_pages,
         "request_timeout": request_timeout,
         "time_budget_seconds": time_budget,
+        "allow_company_routed": bool(raw.get("allow_company_routed", False)),
     }
 
 
