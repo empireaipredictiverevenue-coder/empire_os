@@ -3,12 +3,37 @@ from types import SimpleNamespace
 import empire_os.identity_recovery as ir
 
 
+def _serp_payload(query, num, rows):
+    organic = []
+    for position, row in enumerate(rows, 1):
+        organic.append({
+            "title": row["title"],
+            "link": row["link"],
+            "snippet": row.get("snippet", ""),
+            "position": position,
+            "relevance_score": row.get("relevance_score", 1.0),
+        })
+    return {
+        "organic": organic,
+        "searchParameters": {
+            "q": query,
+            "num": num,
+            "engine": "empire_test",
+            "quality_gate": "lexical_v1",
+            "cache": False,
+        },
+    }
+
+
+
 def test_identity_recovery_uses_same_domain_people(monkeypatch):
     monkeypatch.setattr(
         ir,
         "search",
-        lambda query, num=8: {
-            "organic": [
+        lambda query, num=8: _serp_payload(
+            query,
+            num,
+            [
                 {
                     "title": "About Alpha Roofing",
                     "link": "https://alpha.example/about/team",
@@ -19,8 +44,8 @@ def test_identity_recovery_uses_same_domain_people(monkeypatch):
                     "link": "https://directory.example/alpha",
                     "snippet": "Owner",
                 },
-            ]
-        },
+            ],
+        ),
     )
     monkeypatch.setattr(
         ir,
@@ -87,13 +112,25 @@ def test_license_seed_requires_first_party_decision_role(monkeypatch):
 
     def fake_search(query, num=8):
         if '"Jane Doe"' in query:
-            return {
-                "organic": [{
+            return _serp_payload(
+                query,
+                num,
+                [{
                     "link": "https://patriot.example/about/jane-doe",
                     "title": "Jane Doe | Patriot Plumbing",
-                }]
-            }
-        return {"organic": []}
+                    "snippet": "Owner",
+                }],
+            )
+        return {
+            "organic": [],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": "empire_test",
+                "quality_gate": "lexical_v1",
+                "cache": False,
+            },
+        }
 
     monkeypatch.setattr(ir, "search", fake_search)
     monkeypatch.setattr(
@@ -202,13 +239,25 @@ def test_uk_companies_house_seed_requires_first_party_buyer_role(monkeypatch):
 
     def fake_search(query, num=8):
         if '"Jane Smith"' in query:
-            return {
-                "organic": [{
+            return _serp_payload(
+                query,
+                num,
+                [{
                     "link": "https://example-solar.co.uk/about",
                     "title": "Jane Smith - Managing Director",
-                }]
-            }
-        return {"organic": []}
+                    "snippet": "Managing Director",
+                }],
+            )
+        return {
+            "organic": [],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": "empire_test",
+                "quality_gate": "lexical_v1",
+                "cache": False,
+            },
+        }
 
     monkeypatch.setattr(ir, "search", fake_search)
     monkeypatch.setattr(
