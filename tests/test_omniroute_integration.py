@@ -4,62 +4,61 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE = ROOT / "deploy/systemd/empire-omniroute.service"
 BOOTSTRAP = ROOT / "scripts/bootstrap_omniroute.sh"
-RUNNER = ROOT / "scripts/run_omniroute.sh"
-IMPORTER = ROOT / "scripts/import_omniroute_provider_keys.py"
+EXPORTER = ROOT / "scripts/export_omniroute_provider_env.py"
 HERMES_SERVICE = ROOT / "deploy/systemd/empire-hermes-control.service"
 
 
-def test_omniroute_service_is_loopback_only_and_unprivileged():
+def test_omniroute_service_is_docker_pinned_and_loopback_only():
     text = SERVICE.read_text()
 
-    assert "User=ubuntu" in text
-    assert "Group=ubuntu" in text
-    assert "OMNIROUTE_SERVER_HOST=127.0.0.1" in text
-    assert "HOSTNAME=127.0.0.1" in text
-    assert "PORT=20128" in text
-    assert "NoNewPrivileges=true" in text
-    assert "ProtectSystem=strict" in text
+    assert "Requires=docker.service" in text
+    assert "diegosouzapw/omniroute:3.8.50" in text
+    assert "-p 127.0.0.1:20128:20128" in text
+    assert "-v empire-omniroute-data:/app/data" in text
+    assert "--stop-timeout 40" in text
     assert "ProtectHome=read-only" in text
-    assert "ReadWritePaths=/home/ubuntu/.omniroute" in text
-    assert "Restart=on-failure" in text
+    assert "NoNewPrivileges=true" in text
 
-    assert "0.0.0.0" not in text
-    assert "Cloudflare" not in text
-    assert "REQUIRE_API_KEY=false" in text
+    assert "diegosouzapw/omniroute:latest" not in text
+    assert "npm install" not in text
+    assert "0.0.0.0:20128:20128" not in text
 
 
-def test_bootstrap_generates_secrets_and_never_commits_them():
+def test_bootstrap_uses_docker_not_broken_npm_package():
     text = BOOTSTRAP.read_text()
 
-    assert "openssl rand -base64 48" in text
-    assert "openssl rand -hex 32" in text
-    assert "/home/ubuntu" not in text
-    assert "omniroute@3.8.50" in text
-    assert "/etc/empire_os/omniroute-hermes.env" in text
+    assert "docker.io" in text
+    assert "systemctl enable --now docker" in text
+    assert "empire-omniroute.service" in text
+    assert "export_omniroute_provider_env.py" in text
     assert "OPENAI_BASE_URL=http://127.0.0.1:20128/v1" in text
     assert "EMPIRE_HERMES_PROVIDER=custom" in text
     assert "EMPIRE_HERMES_MODEL=auto" in text
-    assert "empire-hermes-control.timer" in text
     assert "enable --now empire-hermes-control.timer" in text
+    assert "VERIFY LISTEN IS LOOPBACK-ONLY" in text
+    assert "npm install -g omniroute" not in text
 
 
-def test_runner_uses_documented_noninteractive_entrypoint():
-    text = RUNNER.read_text()
+def test_bootstrap_normalizes_old_native_env_for_container():
+    text = BOOTSTRAP.read_text()
 
-    assert "omniroute --no-open" in text
-    assert "NVM_DIR" in text
-    assert "sudo" not in text
+    assert "set_env DATA_DIR /app/data" in text
+    assert "set_env HOSTNAME 0.0.0.0" in text
+    assert "set_env OMNIROUTE_SERVER_HOST 0.0.0.0" in text
+    assert "set_env STORAGE_ENCRYPTION_KEY_VERSION v1" in text
+    assert "OMNIROUTE_WS_BRIDGE_SECRET" in text
 
 
-def test_provider_importer_is_allowlisted_and_does_not_print_secrets():
-    text = IMPORTER.read_text()
+def test_exporter_is_allowlisted_and_never_prints_secrets():
+    text = EXPORTER.read_text()
 
-    assert "KEY_TO_PROVIDER" in text
+    assert "ALLOWED_KEYS" in text
     assert "GEMINI_API_KEY" in text
     assert "NVIDIA_API_KEY" in text
     assert "GROQ_API_KEY" in text
     assert "OPENROUTER_API_KEY" in text
     assert '"secrets_printed": False' in text
+    assert "print(value" not in text
     assert "print(secret" not in text
 
 
