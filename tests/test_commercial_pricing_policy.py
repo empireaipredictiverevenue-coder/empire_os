@@ -61,3 +61,32 @@ def test_serp_api_has_bounded_launch_usage_policy():
     assert row.amount_cents == 9900
     assert row.included_units == 10000
     assert row.overage_amount_cents == 1
+
+
+def test_approved_basis_requires_explicit_founder_reference():
+    row = LAUNCH_PRICING[0]
+
+    try:
+        row.as_approved_dict("")
+    except ValueError as exc:
+        assert "approval reference" in str(exc)
+    else:
+        raise AssertionError("blank founder approval reference accepted")
+
+    approved = row.as_approved_dict(
+        "founder_approval:pricing_ladder:2026-09-23"
+    )
+    assert approved["price_basis"]["state"] == "VERIFIED"
+    assert approved["price_basis"]["source_type"] == "founder_approved"
+    assert approved["price_basis"]["approval_reference"] == (
+        "founder_approval:pricing_ladder:2026-09-23"
+    )
+    assert approved["founder_approval_required"] is False
+
+
+def test_unapproved_basis_is_proposed_not_verified():
+    proposed = LAUNCH_PRICING[0].as_dict()
+    assert proposed["price_basis"]["state"] == "PROPOSED"
+    assert proposed["acquisition_cost_basis"]["state"] == "PROPOSED"
+    assert proposed["fulfilment_cost_basis"]["state"] == "PROPOSED"
+    assert proposed["margin_policy"]["state"] == "PROPOSED"
