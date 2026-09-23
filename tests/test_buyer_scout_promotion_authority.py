@@ -11,6 +11,10 @@ def test_buyer_scout_has_no_standing_canonical_promotion_authority():
 
     assert "promote_buyer_scout_raw_prospects.py" not in service
     assert "promote_buyer_scout_candidate_to_prospect" not in service
+    assert "refresh_buyer_acquisition_team.py" in service
+    assert service.index("refresh_buyer_acquisition_team.py") < service.index(
+        "run_buyer_acquisition_scout.py"
+    )
     assert "run_buyer_acquisition_scout.py" in service
     assert "build_buyer_scout_promotion_plan.py" in service
 
