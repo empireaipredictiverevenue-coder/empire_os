@@ -13,6 +13,7 @@ def test_omniroute_service_is_docker_pinned_and_loopback_only():
 
     assert "Requires=docker.service" in text
     assert "diegosouzapw/omniroute:3.8.50" in text
+    assert "ExecStartPre=/usr/bin/docker pull" not in text
     assert "-p 127.0.0.1:20128:20128" in text
     assert "-v empire-omniroute-data:/app/data" in text
     assert "--stop-timeout 40" in text
@@ -28,6 +29,7 @@ def test_bootstrap_uses_docker_not_broken_npm_package():
     text = BOOTSTRAP.read_text()
 
     assert "docker.io" in text
+    assert "docker pull diegosouzapw/omniroute:3.8.50" in text
     assert "systemctl enable --now docker" in text
     assert "empire-omniroute.service" in text
     assert "export_omniroute_provider_env.py" in text
