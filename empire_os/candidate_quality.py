@@ -37,6 +37,7 @@ SIGNAL_ONLY_SOURCES = frozenset({
 IDENTITY_OR_DIRECT_SOURCES = frozenset({
     "overpass_osm",
     "biz_search",
+    "recc_solar",
     "aeo_form",
     "manual_import",
     "permits_nyc_resolved",
