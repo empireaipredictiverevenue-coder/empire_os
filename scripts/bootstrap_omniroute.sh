@@ -91,9 +91,37 @@ EOF
   chmod 600 "$ENV_FILE"
 else
   echo "Preserving existing $ENV_FILE"
-  grep -q '^OMNIROUTE_WS_BRIDGE_SECRET=' "$ENV_FILE" ||     echo "OMNIROUTE_WS_BRIDGE_SECRET=$(openssl rand -hex 32)" >>"$ENV_FILE"
-  grep -q '^STORAGE_ENCRYPTION_KEY_VERSION=' "$ENV_FILE" ||     echo "STORAGE_ENCRYPTION_KEY_VERSION=v1" >>"$ENV_FILE"
 fi
+
+echo "=== NORMALIZE DOCKER RUNTIME ENV ==="
+set_env() {
+  local key="$1"
+  local value="$2"
+  if grep -q "^$key=" "$ENV_FILE"; then
+    sed -i "s|^$key=.*|$key=$value|" "$ENV_FILE"
+  else
+    printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
+  fi
+}
+
+set_env DATA_DIR /app/data
+set_env PORT 20128
+set_env HOSTNAME 0.0.0.0
+set_env OMNIROUTE_SERVER_HOST 0.0.0.0
+set_env BASE_URL http://127.0.0.1:20128
+set_env NEXT_PUBLIC_BASE_URL http://127.0.0.1:20128
+set_env NODE_ENV production
+set_env REQUIRE_API_KEY false
+set_env ALLOW_API_KEY_REVEAL false
+set_env APP_LOG_TO_FILE true
+set_env OMNIROUTE_MEMORY_MB 512
+set_env STORAGE_ENCRYPTION_KEY_VERSION v1
+
+if ! grep -q '^OMNIROUTE_WS_BRIDGE_SECRET=' "$ENV_FILE"; then
+  echo "OMNIROUTE_WS_BRIDGE_SECRET=$(openssl rand -hex 32)" >>"$ENV_FILE"
+fi
+chown "$TARGET_USER:$TARGET_USER" "$ENV_FILE"
+chmod 600 "$ENV_FILE"
 
 echo "=== RECOVER EXISTING HERMES / EMPIRE KEYS INTO PRIVATE ENV ==="
 PYTHONPATH="$REPO_ROOT"   "$REPO_ROOT/.venv/bin/python"   "$REPO_ROOT/scripts/export_omniroute_provider_env.py"   --home "$TARGET_HOME"   --output "$PROVIDER_ENV"
