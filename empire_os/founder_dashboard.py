@@ -97,6 +97,9 @@ from empire_os.revenue_pulse import (
 from empire_os.market_sweep_revenue_gps import (
     build_market_sweep_runtime,
 )
+from empire_os.media_os_foundation import (
+    media_os_founder_status,
+)
 
 PHASE_RE = re.compile(
     r"^### Phase\s+(\d+)\s+—\s+(.+?)(?:\s+←\s+CURRENT)?$",
@@ -1155,5 +1158,6 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             buyer_scout_observation_runtime_path,
         ),
         "commercial_pricing_proposal": build_launch_pricing_proposal(),
+        "media_os": media_os_founder_status(),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
