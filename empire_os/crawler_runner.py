@@ -119,7 +119,7 @@ def _required_env_available(src) -> bool:
     return True
 
 
-def run_source_safe(src, metro, dry_run, max_candidates=None):
+def run_source_safe(src, metro, dry_run, max_candidates=None, niche=None):
     """Run one real source with candidate-level failure isolation."""
     if src.tier != "real":
         log("SKIP", "source_not_real", source=src.name, tier=src.tier)
@@ -140,6 +140,8 @@ def run_source_safe(src, metro, dry_run, max_candidates=None):
     try:
         iterator = src.run_fn(metro=metro)
         for cand in iterator:
+            if niche and str(cand.niche or "").strip().casefold() != niche.casefold():
+                continue
             if max_candidates is not None and candidates >= max_candidates:
                 break
             candidates += 1
@@ -278,6 +280,11 @@ def main():
     )
     parser.add_argument("--source", default=None, help="Run one source by name")
     parser.add_argument(
+        "--niche",
+        default=None,
+        help="Keep only candidates matching this canonical niche",
+    )
+    parser.add_argument(
         "--max-candidates",
         type=int,
         default=None,
@@ -324,6 +331,7 @@ def main():
             args.metro,
             args.dry_run,
             max_candidates=remaining,
+            niche=args.niche,
         )
         candidates_total += c
 
