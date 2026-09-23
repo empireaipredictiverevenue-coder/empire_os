@@ -496,6 +496,31 @@ def enrich_prospect_for_scoring(
             )
             source_names.append(source)
 
+        # Acquisition evidence is a candidate, not a terminal answer.
+        # If the supplied site fails the identity firewall or cannot be
+        # probed, retry once through Search Fabric with that acquisition
+        # candidate removed. This prevents a bad source URL from permanently
+        # stranding an otherwise real prospect at insufficient_evidence.
+        elif discovery.get("source") == "acquisition_evidence":
+            fallback_prospect = dict(prospect)
+            fallback_prospect.pop("_acquisition_website", None)
+            fallback = enrich_prospect_for_scoring(
+                fallback_prospect
+            )
+            return {
+                **fallback,
+                "evidence": (
+                    evidence
+                    + [{
+                        "source": "enrichment_fallback",
+                        "reason": "acquisition_website_rejected",
+                        "rejected_url": discovery.get("url"),
+                        "fallback": "search_fabric",
+                    }]
+                    + list(fallback.get("evidence") or [])
+                ),
+            }
+
     # Use the verified/discovered first-party site for RDAP rather than
     # falling back to a known directory profile.
     # RDAP is supporting evidence for an identity-accepted domain only.
