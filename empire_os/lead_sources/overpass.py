@@ -78,6 +78,14 @@ CRAFT_TO_NICHE = {
     "gardener": "landscaping",
     "carpenter": "carpentry",
     "pest_control": "pest_control",
+    "solar_panel_installer": "solar",
+    "solar_installer": "solar",
+    "photovoltaic_installer": "solar",
+}
+
+SHOP_TO_NICHE = {
+    "solar": "solar",
+    "solar_panel": "solar",
 }
 
 OVERPASS_ENDPOINTS = (
@@ -93,18 +101,26 @@ NETWORK_TIMEOUT_SECONDS = 35
 
 
 def _query(lat: float, lon: float, radius: int = RADIUS_M) -> str:
-    values = "|".join(
+    craft_values = "|".join(
         re.escape(value)
         for value in CRAFT_TO_NICHE
     )
-    selector = f'["craft"~"^({values})$"]'
+    shop_values = "|".join(
+        re.escape(value)
+        for value in SHOP_TO_NICHE
+    )
+    craft_selector = f'["craft"~"^({craft_values})$"]'
+    shop_selector = f'["shop"~"^({shop_values})$"]'
 
     return f"""
 [out:json][timeout:{QUERY_TIMEOUT_SECONDS}];
 (
-  node{selector}(around:{radius},{lat},{lon});
-  way{selector}(around:{radius},{lat},{lon});
-  relation{selector}(around:{radius},{lat},{lon});
+  node{craft_selector}(around:{radius},{lat},{lon});
+  way{craft_selector}(around:{radius},{lat},{lon});
+  relation{craft_selector}(around:{radius},{lat},{lon});
+  node{shop_selector}(around:{radius},{lat},{lon});
+  way{shop_selector}(around:{radius},{lat},{lon});
+  relation{shop_selector}(around:{radius},{lat},{lon});
 );
 out center {MAX_RESULTS};
 """.strip()
@@ -166,8 +182,11 @@ def _element_to_candidate(element: dict) -> LeadCandidate | None:
     craft = str(
         tags.get("craft") or ""
     ).strip().casefold()
+    shop = str(
+        tags.get("shop") or ""
+    ).strip().casefold()
 
-    niche = CRAFT_TO_NICHE.get(craft)
+    niche = CRAFT_TO_NICHE.get(craft) or SHOP_TO_NICHE.get(shop)
     if not niche:
         return None
 
@@ -258,8 +277,11 @@ def _element_to_candidate(element: dict) -> LeadCandidate | None:
     score += 5 if address else 0
     score = min(score, 100)
 
+    primary_tag = (
+        f"craft={craft}" if craft else f"shop={shop}"
+    )
     details = [
-        f"OSM verified trade tag craft={craft}",
+        f"OSM verified trade tag {primary_tag}",
         f"OSM object {osm_type}/{osm_id}",
     ]
 
@@ -291,6 +313,7 @@ def _element_to_candidate(element: dict) -> LeadCandidate | None:
             "lat": lat,
             "lon": lon,
             "craft": craft,
+            "shop": shop,
             "business_website": website,
             "osm_tags": tags,
         },
