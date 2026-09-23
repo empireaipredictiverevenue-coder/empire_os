@@ -126,6 +126,7 @@ def test_source_probe_reprobes_only_buyer_level_recovered_identity(monkeypatch):
         "max_pages": 12,
         "request_timeout": 5.0,
         "time_budget_seconds": 35.0,
+        "allow_company_routed": True,
     }
     assert result["review_ready"] is True
     assert result["identity_recovery"]["promoted"] is True
