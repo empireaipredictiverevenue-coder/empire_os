@@ -998,3 +998,18 @@ def test_company_routed_aliases_include_enquiries_and_office():
     assert _is_company_routing_email("info@3asconsultants.com") is True
     assert _is_company_routing_email("office@example.co.uk") is True
     assert _is_company_routing_email("peter@2020solarpv.com") is False
+
+
+def test_solar_candidate_uses_solar_opportunity_map_offer():
+    candidate = build_candidate({
+        "id": "00000000-0000-0000-0000-000000000991",
+        "business_name": "Example Solar Ltd",
+        "niche": "solar",
+        "metro": "United Kingdom",
+        "website": "https://solar.example",
+        "buy_signal_score": 95,
+        "contact_name": "Jane Smith",
+        "contact_title": "Managing Director",
+    })
+
+    assert candidate.offer_key == "solar_opportunity_map"
