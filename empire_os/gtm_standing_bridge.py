@@ -34,6 +34,8 @@ class StandingBridgeResult:
     approved_ready: int
     outbound_proposed: int
     skipped_invalid_person: int
+    skipped_company_routed_pending: int
+    skipped_company_routed_outbound: int
     outbound_errors: tuple[str, ...]
 
     def as_dict(self) -> dict[str, Any]:
@@ -44,6 +46,8 @@ class StandingBridgeResult:
             "approved_ready": self.approved_ready,
             "outbound_proposed": self.outbound_proposed,
             "skipped_invalid_person": self.skipped_invalid_person,
+            "skipped_company_routed_pending": self.skipped_company_routed_pending,
+            "skipped_company_routed_outbound": self.skipped_company_routed_outbound,
             "outbound_errors": list(self.outbound_errors),
             "outbound_sent": False,
             "payment_mutation": False,
@@ -58,7 +62,7 @@ def _pending_reviews(
 ) -> list[dict[str, Any]]:
     bounded = max(1, min(int(limit), 50))
     params = urllib.parse.urlencode({
-        "select": "id,status,offer_key,proposed_at",
+        "select": "id,status,offer_key,proposed_at,evidence",
         "status": "eq.pending",
         "offer_key": "eq.managed_service",
         "order": "proposed_at.asc",
@@ -84,6 +88,14 @@ def _approved_for_outbound(
     if isinstance(value, Mapping):
         value = value.get("result") or value.get("reviews") or []
     return [row for row in value if isinstance(row, dict)]
+
+
+
+def _is_company_routed(review: Mapping[str, Any]) -> bool:
+    evidence = review.get("evidence")
+    if not isinstance(evidence, Mapping):
+        return False
+    return str(evidence.get("contact_route") or "").strip().lower() == "company_routed"
 
 
 def _first_name(value: Any) -> str:
@@ -173,9 +185,13 @@ def run_standing_bridge(
 
     pending = _pending_reviews(request, limit=review_limit)
     auto_reviewed = 0
+    skipped_company_routed_pending = 0
     review_errors: list[str] = []
 
     for row in pending:
+        if _is_company_routed(row):
+            skipped_company_routed_pending += 1
+            continue
         review_id = str(row.get("id") or "").strip()
         if not review_id:
             continue
@@ -204,9 +220,13 @@ def run_standing_bridge(
     )
     outbound_proposed = 0
     skipped_invalid_person = 0
+    skipped_company_routed_outbound = 0
     outbound_errors: list[str] = []
 
     for review in ready:
+        if _is_company_routed(review):
+            skipped_company_routed_outbound += 1
+            continue
         review_id = str(review.get("id") or "").strip()
         contact_name = str(
             review.get("contact_name") or ""
@@ -264,5 +284,7 @@ def run_standing_bridge(
         approved_ready=len(ready),
         outbound_proposed=outbound_proposed,
         skipped_invalid_person=skipped_invalid_person,
+        skipped_company_routed_pending=skipped_company_routed_pending,
+        skipped_company_routed_outbound=skipped_company_routed_outbound,
         outbound_errors=tuple(outbound_errors),
     )
