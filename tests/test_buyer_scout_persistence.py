@@ -30,6 +30,19 @@ def test_only_new_external_candidates_are_persisted():
                 "target_buyer_pools": ["direct_demand_buyers"],
                 "target_product_codes": ["managed_service"],
                 "target_corridor_keys": [],
+                "target_icp_profile_keys": [
+                    "direct_demand_buyer"
+                ],
+                "icp_intelligence": {
+                    "best_profile_key": "direct_demand_buyer",
+                    "score_classification": "MODEL_HEURISTIC",
+                    "model_fit_score": 88,
+                    "budget_verified": False,
+                },
+                "observed_buying_triggers": ["buy leads"],
+                "why_now_state": "OBSERVED_TRIGGER",
+                "decision_maker_state": "OBSERVED_ROLE_MATCH",
+                "economic_capacity_state": "UNKNOWN",
                 "query_evidence": [{"query": "buy leads"}],
                 "query_evidence_count": 1,
                 "site_evidence_score": 0.9,
@@ -94,6 +107,16 @@ def test_only_new_external_candidates_are_persisted():
     ]
     assert payload["p_site_evidence"]["first_party_people"][0]["name"] == (
         "Jane Smith"
+    )
+    assert payload["p_site_evidence"]["icp_intelligence"][
+        "best_profile_key"
+    ] == "direct_demand_buyer"
+    assert payload["p_site_evidence"]["budget_verified"] is False
+    assert payload["p_provenance"]["target_icp_profile_keys"] == [
+        "direct_demand_buyer"
+    ]
+    assert payload["p_provenance"]["icp_score_classification"] == (
+        "MODEL_HEURISTIC"
     )
     assert payload["p_provenance"]["canonical_identity_verified"] is False
     assert payload["p_provenance"]["outreach_authorized"] is False
