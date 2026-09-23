@@ -191,6 +191,8 @@ Foundation routes:
 - `POST /v1/search/page/validate`
 - `POST /v1/search/schema/preview`
 - `POST /v1/search/metadata/preview`
+- `POST /v1/search/tag-intelligence/preview`
+- `POST /v1/search/tag-intelligence/change-preview`
 - `POST /v1/search/competitor-gap/preview`
 - `GET /v1/search/search-console/status`
 
@@ -295,3 +297,20 @@ API foundation:
 The product is designed to combine with Search Console, SERP Intelligence,
 AEO/GEO visibility, citation gaps, competitor gaps and Search-to-Revenue
 Attribution as those real evidence adapters become available.
+
+
+## Tag Intelligence
+
+Tag Intelligence is a recurring Search + Revenue Measurement product, not a
+one-off SEO checklist. It joins page metadata/search controls with paid-media
+measurement integrity and change monitoring.
+
+Runtime:
+- `runtime/tag_intelligence/latest.json`
+- `empire-tag-intelligence.service`
+- `empire-tag-intelligence.timer`
+- six-hour recurring refresh
+- Founder Console + Predictive Cloud visibility
+- OBSERVE only
+
+Full product contract: `docs/TAG_INTELLIGENCE.md`.
