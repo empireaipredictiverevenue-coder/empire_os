@@ -1,0 +1,32 @@
+{
+  "targets": [
+    {
+      "id": "empire-home",
+      "url": "https://empire-ai.co.uk",
+      "enabled": true,
+      "expectations": {
+        "intended_public": true,
+        "schema_expected": true,
+        "site_verification_expected": false,
+        "google_analytics_expected": false,
+        "google_ads_expected": false,
+        "meta_ads_expected": false,
+        "linkedin_ads_expected": false,
+        "tiktok_ads_expected": false,
+        "microsoft_ads_expected": false,
+        "reddit_ads_expected": false,
+        "pinterest_ads_expected": false,
+        "consent_review_required": false,
+        "server_side_tagging_expected": false,
+        "revenue_attribution_expected": false,
+        "required_events": []
+      },
+      "measurement_evidence": {
+        "meta_capi_enabled": null,
+        "meta_event_id_dedup": null,
+        "server_side_tagging": null,
+        "revenue_truth_linked": null
+      }
+    }
+  ]
+}
