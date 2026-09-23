@@ -537,6 +537,11 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(payload.get("research_packs"), Mapping)
             else {}
         )
+        content_pipeline = (
+            payload.get("content_pipeline")
+            if isinstance(payload.get("content_pipeline"), Mapping)
+            else {}
+        )
         return {
             "runtime_active": payload.get("runtime_active"),
             "real_evidence_present": payload.get(
@@ -590,6 +595,15 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "research_script_ready_count": research.get(
                 "script_ready_count"
             ),
+            "canonical_content_candidate_count": content_pipeline.get(
+                "canonical_content_candidate_count"
+            ),
+            "script_brief_candidate_count": content_pipeline.get(
+                "script_brief_candidate_count"
+            ),
+            "script_prose_generated": content_pipeline.get(
+                "script_prose_generated"
+            ),
             "ready_for_research_generation": payload.get(
                 "ready_for_research_generation"
             ),
@@ -598,6 +612,12 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             ),
             "ready_for_script_generation": payload.get(
                 "ready_for_script_generation"
+            ),
+            "ready_for_script_prose_generation": payload.get(
+                "ready_for_script_prose_generation"
+            ),
+            "ready_for_storyboard_generation": payload.get(
+                "ready_for_storyboard_generation"
             ),
             "public_publish_authorized": payload.get(
                 "public_publish_authorized"
