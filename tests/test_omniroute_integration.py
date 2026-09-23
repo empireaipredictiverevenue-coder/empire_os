@@ -65,6 +65,8 @@ def test_exporter_is_allowlisted_and_never_prints_secrets():
     assert "NVIDIA_API_KEY" in text
     assert "GROQ_API_KEY" in text
     assert "OPENROUTER_API_KEY" in text
+    assert "GLM_API_KEY" in text
+    assert "ZAI_API_KEY" in text
     assert '"secrets_printed": False' in text
     assert "print(value" not in text
     assert "print(secret" not in text
@@ -74,6 +76,8 @@ def test_configurer_imports_existing_provider_keys_without_printing_them():
     text = CONFIGURER.read_text()
 
     assert "KEY_TO_PROVIDER" in text
+    assert '"GLM_API_KEY": "glm"' in text
+    assert '"ZAI_API_KEY": "zai"' in text
     assert "/api/auth/login" in text
     assert "/api/providers/import" in text
     assert "validateKeys" in text
