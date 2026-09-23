@@ -1920,3 +1920,39 @@ def test_dashboard_exposes_icp_buyer_trigger_intelligence(tmp_path):
     assert buyer["icp_intelligence"]["execution_authority"] == "none"
     assert buyer["live_outbound_send"] is False
     assert buyer["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_buyer_scout_icp_evidence_counts(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/buyer_acquisition/scout_latest.json",
+        {
+            "generated_at": "2026-09-23T12:10:00+00:00",
+            "mode": "OBSERVE",
+            "query_count": 12,
+            "domain_count": 8,
+            "probed_domain_count": 6,
+            "candidate_count": 4,
+            "explicit_direct_buyer_candidate_count": 1,
+            "icp_assessed_candidate_count": 4,
+            "observed_trigger_candidate_count": 2,
+            "decision_maker_role_match_count": 2,
+            "economic_capacity_proxy_count": 1,
+            "verified_budget_candidate_count": 0,
+            "probe_failure_counts": {},
+            "database_write_performed": False,
+            "outbound_sent": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    scout = result["buyer_acquisition_scout"]
+
+    assert scout["icp_assessed_candidate_count"] == 4
+    assert scout["observed_trigger_candidate_count"] == 2
+    assert scout["decision_maker_role_match_count"] == 2
+    assert scout["economic_capacity_proxy_count"] == 1
+    assert scout["verified_budget_candidate_count"] == 0
+    assert scout["outbound_sent"] is False
+    assert scout["execution_authority"] == "none"
