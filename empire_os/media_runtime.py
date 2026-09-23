@@ -55,6 +55,9 @@ INPUTS = {
     "empire_build_journal": (
         INPUT_DIR / "empire_build_journal.json"
     ),
+    "research_pack_candidates": (
+        INPUT_DIR / "research_pack_candidates.json"
+    ),
 }
 
 
@@ -637,6 +640,14 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
         ],
         keys=("idea_id",),
     )
+    research_pack_rows = _dedupe_records(
+        _records(
+            _read_json(
+                repo_root / INPUTS["research_pack_candidates"]
+            )
+        ),
+        keys=("research_id",),
+    )
 
     youtube_public = _youtube_public_runtime(public_rows)
     owned_video_metrics = _owned_video_metrics_runtime(
@@ -646,6 +657,24 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
     trends = _trend_runtime(trend_rows)
     journal = _build_journal_runtime(journal_rows)
     ideas = _idea_runtime(idea_rows)
+    research_packs = {
+        "candidate_count": len(research_pack_rows),
+        "verified_claim_count": sum(
+            int(row.get("verified_claim_count") or 0)
+            for row in research_pack_rows
+        ),
+        "script_ready_count": sum(
+            row.get("script_ready") is True
+            for row in research_pack_rows
+        ),
+        "claim_verification_required_count": sum(
+            row.get("claim_verification_required") is True
+            for row in research_pack_rows
+        ),
+        "candidates": research_pack_rows,
+        "automatic_script_generation_authorized": False,
+        "execution_authority": "none",
+    }
 
     observed_source_count = sum(
         row["available"] and row["record_count"] > 0
@@ -671,6 +700,7 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
         "trend_fusion": trends,
         "build_journal": journal,
         "idea_backlog": ideas,
+        "research_packs": research_packs,
         "runtime_active": True,
         "real_evidence_present": observed_source_count > 0,
         "ready_for_research_generation": (
@@ -678,6 +708,13 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
             or journal["opportunity_candidate_count"] > 0
             or trends["topic_count"] > 0
             or youtube_public["outliers"]["candidate_count"] > 0
+        ),
+        "ready_for_claim_verification": (
+            research_packs["candidate_count"] > 0
+            and research_packs["claim_verification_required_count"] > 0
+        ),
+        "ready_for_script_generation": (
+            research_packs["script_ready_count"] > 0
         ),
         "public_publish_authorized": False,
         "comment_publish_authorized": False,
