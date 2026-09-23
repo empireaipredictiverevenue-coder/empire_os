@@ -331,3 +331,40 @@ def test_status_exposes_buyer_acquisition_team_without_live_send(tmp_path):
     assert component["summary"]["live_outbound_send"] is False
     assert component["summary"]["canonical_settlement_rail"] == "USDT_BSC"
     assert component["execution_authority"] == "none"
+
+
+
+def test_status_exposes_tag_intelligence_without_mutation_authority(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/tag_intelligence/latest.json",
+        {
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T09:00:00+00:00",
+            "target_count": 4,
+            "available_target_count": 4,
+            "failed_target_count": 0,
+            "critical_issue_count": 1,
+            "high_issue_count": 3,
+            "critical_change_count": 2,
+            "automatic_tag_mutation": False,
+            "measurement_platform_write": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime(
+            2026, 9, 23, 10, 0, tzinfo=timezone.utc
+        ),
+    )
+    component = result["components"]["tag_intelligence"]
+
+    assert component["available"] is True
+    assert component["summary"]["target_count"] == 4
+    assert component["summary"]["critical_issue_count"] == 1
+    assert component["summary"]["critical_change_count"] == 2
+    assert component["summary"]["automatic_tag_mutation"] is False
+    assert component["summary"]["measurement_platform_write"] is False
+    assert component["execution_authority"] == "none"
