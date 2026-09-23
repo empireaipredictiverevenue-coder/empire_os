@@ -16,6 +16,9 @@ from typing import Any
 
 
 POLICY_REFERENCE = "founder_pricing_proposal:2026-09-23:v1"
+APPROVAL_REFERENCE = (
+    "founder_approval:2026-09-23:commercial_pricing_ladder_v1"
+)
 
 
 @dataclass(frozen=True)
@@ -156,6 +159,7 @@ def build_launch_pricing_proposal() -> dict[str, Any]:
         ),
         "binding": False,
         "founder_approval_required": True,
+        "approved_live_reference": APPROVAL_REFERENCE,
         "database_mutation_authorized": False,
         "actual_revenue": False,
         "execution_authority": "none",
