@@ -1,0 +1,43 @@
+{
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "changed_paths": [],
+  "completed_at": "2026-09-23T16:54:44.327738+00:00",
+  "database_mutation_performed": false,
+  "execution_authority": "none",
+  "external_commercial_action_performed": false,
+  "founder_gate_required": false,
+  "git_remote_io_performed": true,
+  "hermes": {
+    "completed_at": "2026-09-23T16:54:44.305170+00:00",
+    "endpoint_mode": "isolated_omniroute",
+    "hermes_home_isolated": true,
+    "model": "gemini/gemini-3.1-flash-lite",
+    "model_probe_attempts": [
+      {
+        "model": "gemini/gemini-3.5-flash-lite",
+        "ok": "false",
+        "reason": "http_504:{\"error\":{\"message\":\"[504]: Request exceeded OmniRoute's local rate-limit execution expiration (legacy resilienceSettings.requestQueue.maxWaitMs=15000ms) for gemini/gemini-3.5-flash-lite. Bottleneck applies this deadline only after dispatch"
+      },
+      {
+        "model": "gemini/gemini-3.1-flash-lite",
+        "ok": "true",
+        "reason": "ok"
+      }
+    ],
+    "output_tail": "Query: You are Empire Coder running through Hermes in a governed isolated \nworktree.\n\nJOB\nid: revp0-06-command-queue\nauthority: internal_write\nbase branch: feature/revenue-intelligence-v2\n\nWORKSPACE\nEditable isolated worktree: \n/srv/empire_os/runtime/hermes_control/jobs/revp0-06-command-queue/worktree\nProduction repo is READ-ONLY context: /srv/empire_os\nProduction runtime is READ-ONLY context: /srv/empire_os/runtime\n\nMANDATORY RULES\n- Work only inside the isolated worktree.\n- Do not use sudo.\n- Do not run systemctl start/stop/restart/enable/disable.\n- Do not send email, SMS, voice calls, webhooks, messages, or public posts.\n- Do not create payment requests, move funds, sign agreements, recognize \nrevenue, or change accounting truth.\n- Do not apply database migrations or execute mutating SQL against production.\n- Do not change execution authority or autonomous mode.\n- Do not touch recovery/, toop/, runtime/, .git/, .env, credentials, secrets, \nSSH config, or Hermes auth/config.\n- Do not push, merge, rebase, tag, or alter remote git refs. The worker handles \ngit publication after verification.\n- Unknown remains unknown. Do not fabricate production data, customers, revenue,\ntest results, or external evidence.\n- You may inspect read-only production runtime evidence when useful.\n- Make the smallest production-quality implementation that satisfies the task.\n- Run relevant local tests when possible. If a test fails, diagnose and fix \nwithin the allowed scope.\n- Finish with a concise summary of changed files, tests run, unresolved risks, \nand any founder gate that remains.\n\nALLOWED EDIT PATHS\n- empire_os/\n- tests/\n- docs/\n\nPYTHON / TEST ENVIRONMENT\nUse /srv/empire_os/.venv/bin/python for Python/pytest.\nUse \nPYTHONPATH=/srv/empire_os/runtime/hermes_control/jobs/revp0-06-command-queue/wor\nktree when running EmpireOS code from this worktree.\n\nWORKER VERIFICATION TARGETS\n- tests/test_revenue_command_queue.py\n- tests/test_founder_dashboard.py\n\nTASK\nVerify the existing Revenue Command Queue against canonical live evidence and \nfix only concrete correctness gaps. Reuse existing CRM, buyer-state, product \ncatalog, opportunity, funnel and Revenue Pulse modules; create no shadow stores \nor ledgers. Ensure the queue exposes who/what can move toward revenue now, \nproduct/offer only when known, factual commercial state, exact blocker, next \nreversible internal action, evidence refs and founder/external gates. Unknown \nstays unknown; forecast/model score/proposal/send/payment request/unverified \npayment is not revenue. Keep outbound/payment/DB/accounting/revenue-recognition \nauthority false. Ensure Founder Console exposure and update \ndocs/REVENUE_SPRINT_72H.md with the evidence-based next sequence. Add focused \ntests.\n\nInitializing agent...\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n\u26a0 Auxiliary title generation failed: HTTP 429: All credentials for model gemini-3.1-flash-lite are cooling down\n\u26a0\ufe0f  Attempt 1/3 failed: [gemini/gemini-3.1-flash-lite] [503]: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. (reset after 48s)\n\u23f3 Retrying in 2.3s (attempt 1/3)...\n\u26a0\ufe0f  Attempt 2/3 failed: HTTP 429: All credentials for model gemini-3.1-flash-lite are cooling down\n\u23f1\ufe0f Rate limited. Waiting 46.0s (attempt 3/3)...\n\u26a0\ufe0f  Attempt 3/3 failed: HTTP 429: All credentials for model gemini-3.1-flash-lite are cooling down\n\u274c Rate limited after 3 retries \u2014 HTTP 429: All credentials for model gemini-3.1-flash-lite are cooling down\n   \ud83d\udc80 Final error: HTTP 429: All credentials for model gemini-3.1-flash-lite are cooling down\n \u2500  \u2624 Hermes  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 \n                                                                                \n Custom endpoint rate-limited every one of 3 attempts \u2014 it looks temporarily    \n unavailable. Wait a minute and send /retry, or switch models with /model. To   \n avoid this in future, add a backup provider with hermes fallback add.          \n                                                                                \n Provider said: HTTP 429: All credentials for model gemini-3.1-flash-lite are   \n cooling down                                                                   \n                                                                                \n \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 \n\nResume this session with:\n  hermes --resume 20260923_165311_9fbcbd\n  hermes -c \"You are Empire Coder running through Hermes in\u2026 #3\"\n\nSession:        20260923_165311_9fbcbd\nTitle:          You are Empire Coder running through Hermes in\u2026 #3\nDuration:       1m 32s\nMessages:       1 (1 user, 0 tool calls)\n",
+    "provider": "custom",
+    "returncode": 1,
+    "started_at": "2026-09-23T16:53:09.660168+00:00"
+  },
+  "job_id": "revp0-06-command-queue",
+  "job_path": "jobs/inbox/revp0-06-command-queue.json",
+  "kind": "code_task",
+  "payment_action_performed": false,
+  "proposal_branch": null,
+  "proposal_commit": null,
+  "schema_version": "empire.hermes.control_result.v1",
+  "started_at": "2026-09-23T16:52:25.153543+00:00",
+  "status": "HERMES_FAILED",
+  "verification": null
+}
