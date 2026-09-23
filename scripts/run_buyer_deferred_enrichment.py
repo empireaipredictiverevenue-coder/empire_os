@@ -17,6 +17,7 @@ from empire_os.buyer_discovery import (
     accepted_acquisition_website,
     build_candidate,
     build_candidate_review_plan,
+    classify_decision_role,
 )
 from empire_os.buyer_probe_worker import rejection_reason
 from empire_os.buyer_review_materializer import run_buyer_probe_isolated
@@ -398,12 +399,23 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                     )
                     if not result.get("decision_maker"):
                         result = dict(result)
+                        recovered_title = str(
+                            recovered.get("title") or ""
+                        ).strip()
+                        recovered_role, recovered_authority = (
+                            classify_decision_role(recovered_title)
+                        )
                         result["decision_maker"] = {
                             "name": recovered.get("name"),
-                            "title": recovered.get("title"),
+                            "title": recovered_title,
                             "url": recovered.get("source_url"),
                             "source": recovered.get("source"),
-                            "decision_score": recovered.get("confidence"),
+                            "decision_role": recovered_role,
+                            # Identity confidence answers "is this the person";
+                            # buyer authority answers "is this a commercial
+                            # decision role". Never substitute one for the other.
+                            "decision_score": recovered_authority,
+                            "identity_confidence": recovered.get("confidence"),
                         }
 
             identity_recovered = _persist_recovered_identity(
