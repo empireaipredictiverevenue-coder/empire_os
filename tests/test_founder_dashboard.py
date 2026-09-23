@@ -1969,6 +1969,7 @@ def test_dashboard_exposes_media_os_foundation_without_publish_authority(
     assert media["phase"] == "A"
     assert media["mode"] == "OBSERVE"
     assert media["department"] == "marketing_growth"
+    assert media["media_contract_count"] >= 20
     assert media["first_major_scale_milestone"] == 100_000
     assert media["long_term_network_objective"] == 1_000_000
     assert media["subscriber_targets_are_guarantees"] is False
