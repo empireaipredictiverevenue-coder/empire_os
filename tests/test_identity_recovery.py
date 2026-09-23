@@ -368,3 +368,59 @@ def test_identity_recovery_serp_adapter_preserves_provenance(monkeypatch):
     assert "search_fabric" in rows[0]["provenance"]
     assert "engine:bing_html" in rows[0]["provenance"]
     assert "quality_gate:lexical_v1" in rows[0]["provenance"]
+
+
+def test_direct_first_party_probe_precedes_serp(monkeypatch):
+    monkeypatch.setattr(
+        ir,
+        "probe_site",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "people": [{
+                "name": "Jane Smith",
+                "title": "Managing Director",
+                "url": "https://solar.example/about",
+            }],
+            "pages_checked": [{
+                "url": "https://solar.example/about",
+            }],
+        },
+    )
+    monkeypatch.setattr(
+        ir,
+        "rank_site_people",
+        lambda people: [{**people[0], "decision_score": 1.0}],
+    )
+
+    def fail_search(*args, **kwargs):
+        raise AssertionError("SERP should not be needed")
+
+    monkeypatch.setattr(ir, "search", fail_search)
+    monkeypatch.setattr(
+        ir,
+        "find_official_license_principals",
+        lambda **kwargs: [],
+    )
+    monkeypatch.setattr(
+        ir,
+        "find_companies_house_principals",
+        lambda **kwargs: [],
+    )
+    monkeypatch.setattr(
+        ir,
+        "RegistryScraper",
+        lambda *args, **kwargs: SimpleNamespace(
+            search=lambda *a, **k: SimpleNamespace(records=[])
+        ),
+    )
+
+    result = ir.recover_identity(
+        business_name="Solar Example Ltd",
+        website="https://solar.example",
+        metro="United Kingdom",
+    )
+
+    assert result["recovered"] is True
+    assert result["identity"]["name"] == "Jane Smith"
+    assert "first_party_site_probe" in result["sources_tried"]
+    assert "empire_serp" not in result["sources_tried"]
