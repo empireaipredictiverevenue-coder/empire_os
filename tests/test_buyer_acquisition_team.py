@@ -128,3 +128,32 @@ def test_buyer_acquisition_covers_end_buyers_enterprise_and_saas():
     assert "saas_subscriptions" in pools[
         "software_and_advisory_buyers"
     ]["purchases"]
+
+
+def test_priority_targets_include_direct_and_end_buyer_research():
+    corridor = (
+        "corridor:v1:roofing:austin_tx:qualified_lead:lead"
+    )
+    plan = build_buyer_acquisition_plan(
+        {
+            "inventory": [
+                {
+                    "corridor_key": corridor,
+                    "state": "overflow_no_capacity",
+                }
+            ],
+            "buyer_seats": [],
+        },
+        generated_at=datetime(
+            2026, 9, 23, 0, 0, tzinfo=timezone.utc
+        ),
+    )
+
+    queries = plan["priority_targets"][0]["research_queries"]
+    assert "direct_demand_buyers" in queries
+    assert "end_service_buyers" in queries
+    assert "agency_and_reseller_buyers" in queries
+    assert "enterprise_and_data_buyers" in queries
+    assert "software_and_advisory_buyers" in queries
+    assert any("roofing company" in q for q in queries["end_service_buyers"])
+    assert any("buy roofing leads" in q for q in queries["direct_demand_buyers"])
