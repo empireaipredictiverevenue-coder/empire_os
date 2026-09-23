@@ -97,6 +97,7 @@ def test_missing_map_backlog_skips_existing_and_retries_missing(monkeypatch, tmp
 
     def request(method, path, payload=None, prefer=None):
         if path.startswith("/rest/v1/buyer_candidate_reviews?"):
+            assert "evidence-%3E%3Eniche=eq.solar" in path
             return [
                 {"id": "r1", "prospect_id": existing, "status": "pending"},
                 {"id": "r2", "prospect_id": missing, "status": "pending"},
