@@ -34,7 +34,7 @@ def test_bootstrap_generates_secrets_and_never_commits_them():
     assert "openssl rand -base64 48" in text
     assert "openssl rand -hex 32" in text
     assert "/home/ubuntu" not in text
-    assert "omniroute@latest" in text
+    assert "omniroute@3.8.51" in text
     assert "/etc/empire_os/omniroute-hermes.env" in text
     assert "OPENAI_BASE_URL=http://127.0.0.1:20128/v1" in text
     assert "EMPIRE_HERMES_PROVIDER=custom" in text
@@ -65,5 +65,6 @@ def test_hermes_service_depends_on_omniroute_and_loads_local_env():
     text = HERMES_SERVICE.read_text()
 
     assert "After=network-online.target empire-omniroute.service" in text
-    assert "Wants=network-online.target empire-omniroute.service" in text
+    assert "Wants=network-online.target" in text
+    assert "Requires=empire-omniroute.service" in text
     assert "EnvironmentFile=-/etc/empire_os/omniroute-hermes.env" in text
