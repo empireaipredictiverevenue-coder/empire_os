@@ -226,7 +226,8 @@ content = ((payload.get("choices") or [{}])[0].get("message") or {}).get("conten
 print("HTTP:", code)
 print("response:", content or payload.get("error") or "<no response>")
 if code != "200" or not content:
-    print("NOTE: gateway is healthy but no usable provider is active yet.")
+    print("ERROR: gateway is healthy but no usable provider is active.")
+    raise SystemExit(6)
 PY
 rm -f "$AUTO_TMP"
 
