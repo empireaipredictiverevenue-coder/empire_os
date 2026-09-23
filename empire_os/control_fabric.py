@@ -237,9 +237,13 @@ def default_registry() -> tuple[ComponentSpec, ...]:
                 "community_pain_observed",
                 "revenue_pulse_refreshed",
                 "media_analytics_refreshed",
+                "youtube_observation_ingested",
+                "media_trend_fusion_requested",
                 "build_journal_event_recorded",
             ),
             (
+                "youtube_intelligence_refreshed",
+                "media_trend_fusion_ready",
                 "media_opportunity_features_ready",
                 "media_research_pack_requested",
                 "media_draft_ready",
