@@ -49,6 +49,12 @@ INPUTS = {
     "trend_signals": INPUT_DIR / "trend_signals.json",
     "build_journal": INPUT_DIR / "build_journal.json",
     "idea_candidates": INPUT_DIR / "idea_candidates.json",
+    "empire_opportunity_ideas": (
+        INPUT_DIR / "empire_opportunity_ideas.json"
+    ),
+    "empire_build_journal": (
+        INPUT_DIR / "empire_build_journal.json"
+    ),
 }
 
 
@@ -72,6 +78,32 @@ def _records(value: Any) -> list[dict[str, Any]]:
                     if isinstance(row, Mapping)
                 ]
     return []
+
+
+def _dedupe_records(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    keys: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for raw in rows:
+        row = dict(raw)
+        identity = ""
+        for key in keys:
+            value = str(row.get(key) or "").strip()
+            if value:
+                identity = f"{key}:{value}"
+                break
+        if not identity:
+            identity = json.dumps(row, sort_keys=True, default=str)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        output.append(row)
+
+    return output
 
 
 def _refs(row: Mapping[str, Any]) -> tuple[str, ...]:
@@ -518,6 +550,18 @@ def _idea_runtime(
         candidate["quant_packet_ref"] = (
             str(row.get("quant_packet_ref") or "").strip() or None
         )
+        candidate["quant_packet_status"] = (
+            str(row.get("quant_packet_status") or "").strip()
+            or "UNAVAILABLE"
+        )
+        candidate["commercial_quant_is_media_score"] = (
+            row.get("commercial_quant_is_media_score") is True
+        )
+        candidate["source_context"] = (
+            dict(row.get("source_context"))
+            if isinstance(row.get("source_context"), Mapping)
+            else {}
+        )
         candidates.append(candidate)
 
     candidates.sort(
@@ -537,6 +581,10 @@ def _idea_runtime(
         "rejected": rejected,
         "pending_quant_review_count": sum(
             row.get("decision") == "PENDING_QUANT_REVIEW"
+            for row in candidates
+        ),
+        "commercial_quant_available_count": sum(
+            row.get("quant_packet_status") == "AVAILABLE"
             for row in candidates
         ),
         "scored_candidate_count": 0,
@@ -563,11 +611,31 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
     trend_rows = _records(
         _read_json(repo_root / INPUTS["trend_signals"])
     )
-    journal_rows = _records(
-        _read_json(repo_root / INPUTS["build_journal"])
+    journal_rows = _dedupe_records(
+        [
+            *_records(
+                _read_json(repo_root / INPUTS["build_journal"])
+            ),
+            *_records(
+                _read_json(
+                    repo_root / INPUTS["empire_build_journal"]
+                )
+            ),
+        ],
+        keys=("entry_id",),
     )
-    idea_rows = _records(
-        _read_json(repo_root / INPUTS["idea_candidates"])
+    idea_rows = _dedupe_records(
+        [
+            *_records(
+                _read_json(repo_root / INPUTS["idea_candidates"])
+            ),
+            *_records(
+                _read_json(
+                    repo_root / INPUTS["empire_opportunity_ideas"]
+                )
+            ),
+        ],
+        keys=("idea_id",),
     )
 
     youtube_public = _youtube_public_runtime(public_rows)
