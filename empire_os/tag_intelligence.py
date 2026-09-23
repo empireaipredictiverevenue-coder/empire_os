@@ -411,3 +411,142 @@ def review_tag_intelligence(
             item.surface not in search_surfaces for item in issues
         ),
     )
+
+
+
+@dataclass(frozen=True)
+class TagChange:
+    field: str
+    surface: str
+    previous: Any
+    current: Any
+    severity: str
+    reason: str
+    execution_allowed: bool = False
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _normalized_snapshot(
+    page_tags: Mapping[str, Any] | None,
+    measurement_tags: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    page = dict(page_tags or {})
+    measurement = dict(measurement_tags or {})
+    return {
+        "title": page.get("title"),
+        "meta_description": page.get("meta_description"),
+        "canonical_url": page.get("canonical_url"),
+        "robots": page.get("robots"),
+        "x_robots_tag": page.get("x_robots_tag"),
+        "open_graph": dict(page.get("open_graph") or {}),
+        "twitter": dict(page.get("twitter") or {}),
+        "json_ld_types": sorted(_values(page.get("json_ld_types"))),
+        "hreflang": sorted(_values(page.get("hreflang"))),
+        "google_tag_ids": sorted(_values(measurement.get("google_tag_ids"))),
+        "gtm_container_ids": sorted(_values(measurement.get("gtm_container_ids"))),
+        "ga4_measurement_ids": sorted(_values(measurement.get("ga4_measurement_ids"))),
+        "google_ads_conversion_ids": sorted(
+            _values(measurement.get("google_ads_conversion_ids"))
+        ),
+        "meta_pixel_ids": sorted(_values(measurement.get("meta_pixel_ids"))),
+        "meta_capi_enabled": measurement.get("meta_capi_enabled"),
+        "meta_event_id_dedup": measurement.get("meta_event_id_dedup"),
+        "consent_mode_enabled": measurement.get("consent_mode_enabled"),
+        "server_side_tagging": measurement.get("server_side_tagging"),
+        "observed_events": sorted(_values(measurement.get("observed_events"))),
+    }
+
+
+def compare_tag_snapshots(
+    *,
+    previous_page_tags: Mapping[str, Any] | None = None,
+    current_page_tags: Mapping[str, Any] | None = None,
+    previous_measurement_tags: Mapping[str, Any] | None = None,
+    current_measurement_tags: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    previous = _normalized_snapshot(
+        previous_page_tags,
+        previous_measurement_tags,
+    )
+    current = _normalized_snapshot(
+        current_page_tags,
+        current_measurement_tags,
+    )
+
+    critical_fields = {
+        "robots",
+        "x_robots_tag",
+        "canonical_url",
+        "meta_pixel_ids",
+        "ga4_measurement_ids",
+        "google_ads_conversion_ids",
+        "meta_event_id_dedup",
+    }
+    high_fields = {
+        "title",
+        "google_tag_ids",
+        "gtm_container_ids",
+        "observed_events",
+        "consent_mode_enabled",
+    }
+    measurement_fields = {
+        "google_tag_ids",
+        "gtm_container_ids",
+        "ga4_measurement_ids",
+        "google_ads_conversion_ids",
+        "meta_pixel_ids",
+        "meta_capi_enabled",
+        "meta_event_id_dedup",
+        "consent_mode_enabled",
+        "server_side_tagging",
+        "observed_events",
+    }
+
+    changes: list[TagChange] = []
+    for field in sorted(previous):
+        before = previous[field]
+        after = current[field]
+        if before == after:
+            continue
+
+        severity = (
+            "critical"
+            if field in critical_fields
+            else "high"
+            if field in high_fields
+            else "medium"
+        )
+        surface = "measurement" if field in measurement_fields else "search"
+        reason = "tag_or_configuration_changed"
+        if before not in (None, "", [], {}) and after in (None, "", [], {}):
+            reason = "previously_observed_tag_missing"
+        elif before in (None, "", [], {}) and after not in (None, "", [], {}):
+            reason = "new_tag_or_configuration_observed"
+
+        changes.append(
+            TagChange(
+                field=field,
+                surface=surface,
+                previous=before,
+                current=after,
+                severity=severity,
+                reason=reason,
+            )
+        )
+
+    return {
+        "schema_version": "empire.tag_change_monitor.v1",
+        "mode": "OBSERVE",
+        "change_count": len(changes),
+        "critical_change_count": sum(
+            item.severity == "critical" for item in changes
+        ),
+        "high_change_count": sum(
+            item.severity == "high" for item in changes
+        ),
+        "changes": [item.as_dict() for item in changes],
+        "automatic_repair": False,
+        "execution_authority": "none",
+    }
