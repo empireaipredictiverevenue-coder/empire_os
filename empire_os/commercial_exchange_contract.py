@@ -49,6 +49,11 @@ AUTOMATED_INTERNAL_LOOPS = (
     "corridor_readiness_refresh",
     "allocation_proposal_refresh",
     "overflow_inventory_refresh",
+    "buyer_acquisition_team_refresh",
+    "commercial_product_catalog_refresh",
+    "buyer_review_materialization",
+    "buyer_deferred_enrichment",
+    "commercial_evidence_verification",
 )
 
 
@@ -124,6 +129,16 @@ def build_commercial_exchange_contract() -> dict[str, Any]:
             "automatic_fund_movement": False,
             "automatic_revenue_recognition": False,
         },
+        "buyer_acquisition_scope": {
+            "local_and_smb_buyers": True,
+            "end_service_buyers": True,
+            "direct_lead_and_call_buyers": True,
+            "agencies_and_resellers": True,
+            "enterprise_and_data_buyers": True,
+            "software_and_advisory_buyers": True,
+            "lead_products_only": False,
+            "live_outbound_send": False,
+        },
         "revenue_features": (
             "buyer_seat_subscriptions",
             "corridor_subscriptions",
@@ -134,6 +149,14 @@ def build_commercial_exchange_contract() -> dict[str, Any]:
             "demand_pre_selling",
             "reserved_future_capacity",
             "territory_and_exclusivity_premiums",
+            "local_smb_leads_calls_and_appointments",
+            "local_search_and_seo_intelligence",
+            "commercial_diagnostics",
+            "managed_growth",
+            "saas_subscriptions",
+            "vertical_intelligence_and_private_feeds",
+            "enterprise_api_and_data_products",
+            "white_label_and_reseller_products",
         ),
         "production_schema_applied": False,
         "external_execution_performed": False,
