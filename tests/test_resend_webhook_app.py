@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from empire_os.resend_webhook_app import create_app
+from empire_os.resend_webhook_app import _receiving_api_key, create_app
 
 INTENT = "00000000-0000-0000-0000-000000000001"
 HEADERS = {
@@ -48,6 +48,16 @@ def provider_event(event_type="email.delivered", *, permanent_bounce=False):
             "subType": "General",
         }
     return {"type": event_type, "data": data}
+
+
+
+def test_receiving_api_key_prefers_dedicated_credential(monkeypatch):
+    monkeypatch.setenv("RESEND_API_KEY", "send-only")
+    monkeypatch.setenv("RESEND_RECEIVING_API_KEY", "receiving-capable")
+    assert _receiving_api_key() == "receiving-capable"
+
+    monkeypatch.delenv("RESEND_RECEIVING_API_KEY")
+    assert _receiving_api_key() == "send-only"
 
 
 def test_valid_signed_reply_ingests_only_inert_reply_record():
