@@ -48,7 +48,10 @@ from empire_os.search_traffic_forecast import (
     aggregate_search_console_daily,
     forecast_search_traffic,
 )
-from empire_os.tag_intelligence import review_tag_intelligence
+from empire_os.tag_intelligence import (
+    compare_tag_snapshots,
+    review_tag_intelligence,
+)
 from empire_os.timesfm_shadow import configured_timesfm_provider
 
 
@@ -192,6 +195,13 @@ class TagIntelligencePreviewRequest(BaseModel):
     page_tags: dict[str, Any] = Field(default_factory=dict)
     measurement_tags: dict[str, Any] = Field(default_factory=dict)
     expectations: dict[str, Any] = Field(default_factory=dict)
+
+
+class TagChangePreviewRequest(BaseModel):
+    previous_page_tags: dict[str, Any] = Field(default_factory=dict)
+    current_page_tags: dict[str, Any] = Field(default_factory=dict)
+    previous_measurement_tags: dict[str, Any] = Field(default_factory=dict)
+    current_measurement_tags: dict[str, Any] = Field(default_factory=dict)
 
 
 class SerpQueryRequest(BaseModel):
@@ -922,6 +932,21 @@ def create_search_router(
                 measurement_tags=req.measurement_tags,
                 expectations=req.expectations,
             ).as_dict(),
+        }
+
+    @router.post("/tag-intelligence/change-preview")
+    def tag_change_preview(req: TagChangePreviewRequest):
+        return {
+            "schema_version": "empire.tag_change_preview.v1",
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_allowed": False,
+            "change_monitor": compare_tag_snapshots(
+                previous_page_tags=req.previous_page_tags,
+                current_page_tags=req.current_page_tags,
+                previous_measurement_tags=req.previous_measurement_tags,
+                current_measurement_tags=req.current_measurement_tags,
+            ),
         }
 
     return router
