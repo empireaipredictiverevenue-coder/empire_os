@@ -72,6 +72,87 @@ TARGET_BUYER_TYPES = (
     "white_label_agency",
     "data_or_intent_buyer",
     "qualified_end_buyer",
+    "enterprise_data_buyer",
+    "saas_buyer",
+    "managed_growth_buyer",
+    "commercial_diagnostics_buyer",
+    "vertical_intelligence_buyer",
+)
+
+BUYER_POOLS = (
+    {
+        "pool": "end_service_buyers",
+        "examples": (
+            "roofing", "hvac", "plumbing", "solar", "restoration",
+            "legal", "insurance", "mortgage", "debt", "medicare",
+            "landscaping", "cleaning", "gutter", "general contractor",
+        ),
+        "purchases": (
+            "qualified_leads",
+            "exclusive_leads",
+            "calls",
+            "booked_appointments",
+        ),
+    },
+    {
+        "pool": "direct_demand_buyers",
+        "examples": (
+            "lead buyers", "lead aggregators", "call buyers",
+            "performance marketing firms", "affiliate networks",
+            "lead marketplaces",
+        ),
+        "purchases": (
+            "leads",
+            "calls",
+            "appointments",
+            "overflow_inventory",
+            "data_feeds",
+        ),
+    },
+    {
+        "pool": "agency_and_reseller_buyers",
+        "examples": (
+            "marketing agencies", "lead generation agencies",
+            "growth agencies", "white-label resellers",
+        ),
+        "purchases": (
+            "white_label",
+            "managed_growth",
+            "lead_supply",
+            "content_and_campaign_services",
+            "api_access",
+        ),
+    },
+    {
+        "pool": "enterprise_and_data_buyers",
+        "examples": (
+            "private equity", "property groups", "logistics",
+            "warehouse operators", "financial services",
+            "enterprise sales teams",
+        ),
+        "purchases": (
+            "vertical_intelligence",
+            "private_feeds",
+            "market_intelligence",
+            "intent_data",
+            "api_access",
+            "benchmark_products",
+        ),
+    },
+    {
+        "pool": "software_and_advisory_buyers",
+        "examples": (
+            "sales teams", "marketing teams", "operators",
+            "agencies", "multi-location businesses",
+        ),
+        "purchases": (
+            "saas_subscriptions",
+            "commercial_diagnostics",
+            "revenue_leak_audits",
+            "managed_growth",
+            "predictive_intelligence",
+        ),
+    },
 )
 
 TEAM_ROLES = (
@@ -428,6 +509,14 @@ def build_buyer_acquisition_plan(
         "team_roles": [dict(row) for row in TEAM_ROLES],
         "team_role_count": len(TEAM_ROLES),
         "target_buyer_types": list(TARGET_BUYER_TYPES),
+        "buyer_pools": [
+            {
+                "pool": row["pool"],
+                "examples": list(row["examples"]),
+                "purchases": list(row["purchases"]),
+            }
+            for row in BUYER_POOLS
+        ],
         "demand_gap_queue": queue,
         "demand_gap_count": len(queue),
         "priority_targets": targets,
