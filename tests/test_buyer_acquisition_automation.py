@@ -57,3 +57,13 @@ def test_buyer_acquisition_verifier_requires_scout_artifact():
     assert "runtime/buyer_acquisition/scout_latest.json" in text
     assert "buyer_scout_safe" in text
     assert "database_write_performed" in text
+
+
+def test_buyer_acquisition_verifier_requires_reconciliation_artifact():
+    text = (
+        ROOT / "scripts/verify_buyer_acquisition_automation.py"
+    ).read_text()
+
+    assert "runtime/buyer_acquisition/reconciliation_latest.json" in text
+    assert "buyer_scout_reconciliation_safe" in text
+    assert "automatic_ingest_authorized" in text
