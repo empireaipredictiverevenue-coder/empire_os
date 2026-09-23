@@ -246,6 +246,8 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     assert '"default": "openrouter/z-ai/glm-5.3-flash:free"' in config
     assert "http://127.0.0.1:20128/v1" in config
     assert "local-test-key" in config
+    assert '"context_length": 32768' in config
+    assert '"max_tokens": 4096' in config
 
 
 def test_omniroute_model_selector_uses_live_catalog_and_skips_failed_candidates(monkeypatch):
@@ -312,6 +314,33 @@ def test_omniroute_catalog_ranking_excludes_stale_and_paid_discovery():
 
     assert ranked[0] == "openrouter/openrouter/free"
     assert "openrouter/nvidia/nemotron-3-ultra:free" in ranked
-    assert "gemini/gemini-3.5-flash-lite" in ranked
+    assert "gemini/gemini-3.5-flash-lite" not in ranked
     assert "openrouter/deepseek/deepseek-v4-flash-0731:free" not in ranked
     assert "openrouter/z-ai/glm-5.3-flash" not in ranked
+
+
+def test_omniroute_catalog_ranking_requires_opt_in_for_paid_models():
+    from empire_os import hermes_control
+
+    catalog = (
+        "openrouter/openrouter/free",
+        "openrouter/z-ai/glm-5.3-flash",
+    )
+    preferred = (
+        "openrouter/z-ai/glm-5.3-flash",
+        "openrouter/openrouter/free",
+    )
+
+    free_only = hermes_control._rank_catalog_candidates(
+        catalog,
+        preferred,
+    )
+    paid_allowed = hermes_control._rank_catalog_candidates(
+        catalog,
+        preferred,
+        allow_paid=True,
+    )
+
+    assert free_only == ("openrouter/openrouter/free",)
+    assert paid_allowed[0] == "openrouter/z-ai/glm-5.3-flash"
+    assert "openrouter/openrouter/free" in paid_allowed
