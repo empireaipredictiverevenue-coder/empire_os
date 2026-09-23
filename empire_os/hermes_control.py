@@ -515,7 +515,7 @@ def run_hermes(
     ).strip()
     model = str(
         os.environ.get("EMPIRE_HERMES_MODEL")
-        or "moonshotai/kimi-k2.6:free"
+        or "qwen/qwen3-coder:free"
     ).strip()
 
     if provider:
