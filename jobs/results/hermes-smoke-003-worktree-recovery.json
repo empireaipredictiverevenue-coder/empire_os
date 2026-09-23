@@ -1,0 +1,29 @@
+{
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "changed_paths": [],
+  "completed_at": "2026-09-23T15:53:06.853838+00:00",
+  "database_mutation_performed": false,
+  "execution_authority": "none",
+  "external_commercial_action_performed": false,
+  "founder_gate_required": false,
+  "git_remote_io_performed": true,
+  "hermes": {
+    "completed_at": "2026-09-23T15:53:06.837852+00:00",
+    "journal_streamed": true,
+    "returncode": 1,
+    "started_at": "2026-09-23T15:53:00.838257+00:00",
+    "stderr": "",
+    "stdout": ""
+  },
+  "job_id": "hermes-smoke-003-worktree-recovery",
+  "job_path": "jobs/inbox/hermes-smoke-003-worktree-recovery.json",
+  "kind": "code_task",
+  "payment_action_performed": false,
+  "proposal_branch": null,
+  "proposal_commit": null,
+  "schema_version": "empire.hermes.control_result.v1",
+  "started_at": "2026-09-23T15:52:58.955116+00:00",
+  "status": "HERMES_FAILED",
+  "verification": null
+}
