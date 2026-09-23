@@ -1,0 +1,32 @@
+{
+  "authority": "observe",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "changed_paths": [],
+  "completed_at": "2026-09-23T18:05:51.889923+00:00",
+  "database_mutation_performed": false,
+  "execution_authority": "none",
+  "external_commercial_action_performed": false,
+  "founder_gate_required": false,
+  "git_remote_io_performed": true,
+  "hermes": {
+    "completed_at": "2026-09-23T18:05:51.656051+00:00",
+    "endpoint_mode": "isolated_omniroute_auto",
+    "hermes_home_isolated": true,
+    "model": "auto",
+    "model_probe_attempts": [],
+    "output_tail": "Query: You are Empire Coder running through Hermes in a governed isolated \nworktree.\n\nJOB\nid: revp0-12-omniroute-auto-smoke\nauthority: observe\nbase branch: feature/revenue-intelligence-v2\n\nWORKSPACE\nEditable isolated worktree: \n/srv/empire_os/runtime/hermes_control/jobs/revp0-12-omniroute-auto-smoke/worktre\ne\nProduction repo is READ-ONLY context: /srv/empire_os\nProduction runtime is READ-ONLY context: /srv/empire_os/runtime\n\nMANDATORY RULES\n- Work only inside the isolated worktree.\n- Do not use sudo.\n- Do not run systemctl start/stop/restart/enable/disable.\n- Do not send email, SMS, voice calls, webhooks, messages, or public posts.\n- Do not create payment requests, move funds, sign agreements, recognize \nrevenue, or change accounting truth.\n- Do not apply database migrations or execute mutating SQL against production.\n- Do not change execution authority or autonomous mode.\n- Do not touch recovery/, toop/, runtime/, .git/, .env, credentials, secrets, \nSSH config, or Hermes auth/config.\n- Do not push, merge, rebase, tag, or alter remote git refs. The worker handles \ngit publication after verification.\n- Unknown remains unknown. Do not fabricate production data, customers, revenue,\ntest results, or external evidence.\n- You may inspect read-only production runtime evidence when useful.\n- Make the smallest production-quality implementation that satisfies the task.\n- Run relevant local tests when possible. If a test fails, diagnose and fix \nwithin the allowed scope.\n- Finish with a concise summary of changed files, tests run, unresolved risks, \nand any founder gate that remains.\n\nALLOWED EDIT PATHS\n- empire_os/\n- docs/\n\nPYTHON / TEST ENVIRONMENT\nUse /srv/empire_os/.venv/bin/python for Python/pytest.\nUse \nPYTHONPATH=/srv/empire_os/runtime/hermes_control/jobs/revp0-12-omniroute-auto-sm\noke/worktree when running EmpireOS code from this worktree.\n\nWORKER VERIFICATION TARGETS\n- worker will run compile checks; no explicit pytest target supplied\n\nTASK\nPerform a single governed smoke check of the current Hermes resident worker \nusing OmniRoute model=auto. Do not modify files. Confirm the worker can complete\none read-only invocation from the current branch and report the active endpoint \nmode/model plus any provider/runtime error. Do not run pytest. Do not send \noutbound, mutate production data, move funds, touch recovery/ or toop/, or infer\nrevenue.\n\nInitializing agent...\nHermes couldn't start the model connection: Model auto has a context window of \n32,768 tokens, which is below the minimum 64,000 required by Hermes Agent.  \nChoose a\u2026. Your message was not sent. Run `hermes doctor` to check the setup, or\n/model to pick a different provider.\n\nGoodbye! \u2624\n",
+    "provider": "custom",
+    "returncode": 1,
+    "started_at": "2026-09-23T18:05:48.980624+00:00"
+  },
+  "job_id": "revp0-12-omniroute-auto-smoke",
+  "job_path": "jobs/inbox/revp0-12-omniroute-auto-smoke.json",
+  "kind": "code_task",
+  "payment_action_performed": false,
+  "proposal_branch": null,
+  "proposal_commit": null,
+  "schema_version": "empire.hermes.control_result.v1",
+  "started_at": "2026-09-23T18:05:47.133046+00:00",
+  "status": "HERMES_FAILED",
+  "verification": null
+}
