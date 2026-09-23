@@ -1616,3 +1616,34 @@ def test_dashboard_exposes_bounded_buyer_scout_runtime(tmp_path):
     assert scout["outbound_sent"] is False
     assert scout["automatic_external_execution"] is False
     assert scout["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_buyer_acquisition_scout(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/buyer_acquisition/scout_latest.json",
+        {
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T00:30:00+00:00",
+            "query_count": 12,
+            "domain_count": 40,
+            "probed_domain_count": 20,
+            "candidate_count": 9,
+            "explicit_direct_buyer_candidate_count": 4,
+            "probe_failure_counts": {"homepage_fetch_failed": 2},
+            "database_write_performed": False,
+            "outbound_sent": False,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+
+    scout = build_founder_dashboard(root)["buyer_acquisition_scout"]
+
+    assert scout["available"] is True
+    assert scout["query_count"] == 12
+    assert scout["candidate_count"] == 9
+    assert scout["explicit_direct_buyer_candidate_count"] == 4
+    assert scout["database_write_performed"] is False
+    assert scout["outbound_sent"] is False
+    assert scout["execution_authority"] == "none"
