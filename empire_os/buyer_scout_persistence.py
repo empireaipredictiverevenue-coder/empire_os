@@ -143,6 +143,11 @@ def persist_new_external_candidates(
             "canonical_identity_verified": False,
             "commercial_terms_verified": False,
             "outreach_authorized": False,
+            "icp_profile_keys": list(
+                candidate.get("target_icp_profile_keys") or []
+            ),
+            "why_now_state": candidate.get("why_now_state"),
+            "personalization_requires_verified_evidence": True,
         }
 
         payload = {
