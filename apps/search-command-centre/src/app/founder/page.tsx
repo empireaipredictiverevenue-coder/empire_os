@@ -329,6 +329,7 @@ export default async function FounderPage() {
                   <Drill href="/revenue" title="Organic revenue evidence" />
                   <Drill href="/competitors" title="Competitor gaps" />
                   <Drill href="/evidence" title="Evidence timeline" />
+                  <Drill href="/founder/solar" title="UK Solar Intelligence" />
                 </div>
               </section>
             </div>
