@@ -31,6 +31,14 @@ Probe = Callable[[dict[str, Any]], dict[str, Any]]
 Defer = Callable[[Mapping[str, Any]], bool]
 
 
+REVIEWABLE_OFFER_KEYS = frozenset({
+    "managed_service",
+    "software_mrr",
+    "white_label",
+    "high_ticket",
+})
+
+
 def run_buyer_probe_isolated(
     row: dict[str, Any],
     *,
@@ -145,13 +153,7 @@ def fetch_candidate_rows(
                 "status,notes,contact_name,contact_title,contact_source,"
                 "contacted_status,created_at"
             ),
-            "buy_signal_score": "gte.70",
             "website": "not.is.null",
-            "or": (
-                "(niche.ilike.*roof*,niche.ilike.*hvac*,"
-                "niche.ilike.*plumb*,niche.ilike.*solar*,"
-                "niche.ilike.*contractor*,niche.ilike.*restoration*)"
-            ),
             "order": (
                 "buy_signal_score.desc.nullslast,created_at.desc"
             ),
@@ -225,7 +227,7 @@ def _eligible_candidate(row: Mapping[str, Any]):
     )
     if not candidate.website:
         return None
-    if candidate.offer_key != "managed_service":
+    if candidate.offer_key not in REVIEWABLE_OFFER_KEYS:
         return None
     if candidate.company_score < 70:
         return None
