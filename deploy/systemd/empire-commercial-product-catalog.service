@@ -17,4 +17,5 @@ PrivateTmp=true
 ProtectSystem=strict
 ReadOnlyPaths=/srv/empire_os/runtime/secrets/intelligence_materializer.env
 ReadWritePaths=/srv/empire_os/runtime/commercial_catalog
+ReadWritePaths=/srv/empire_os/runtime/solar_opportunity_maps
 TimeoutStartSec=120
