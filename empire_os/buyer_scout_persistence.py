@@ -80,6 +80,19 @@ def persist_new_external_candidates(
                 "first_party_phone_count"
             ),
             "people_count": candidate.get("people_count"),
+            "first_party_emails": list(
+                candidate.get("first_party_emails") or []
+            )[:10],
+            "first_party_phones": list(
+                candidate.get("first_party_phones") or []
+            )[:10],
+            "first_party_people": [
+                dict(person)
+                for person in (
+                    candidate.get("first_party_people") or []
+                )[:10]
+                if isinstance(person, Mapping)
+            ],
             "direct_signal_hits": list(
                 candidate.get("direct_signal_hits") or []
             ),
