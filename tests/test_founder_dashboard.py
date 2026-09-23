@@ -1868,3 +1868,55 @@ def test_dashboard_exposes_tag_intelligence_monitor(tmp_path):
     assert runtime["automatic_tag_mutation"] is False
     assert runtime["measurement_platform_write"] is False
     assert runtime["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_icp_buyer_trigger_intelligence(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/buyer_acquisition/latest.json",
+        {
+            "generated_at": "2026-09-23T12:00:00+00:00",
+            "mode": "OBSERVE",
+            "team_role_count": 11,
+            "buyer_pools": [{"pool": "enterprise_and_data_buyers"}],
+            "demand_gap_count": 1,
+            "priority_targets": [{}],
+            "product_demand_count": 4,
+            "sellable_product_demand_count": 1,
+            "market_validate_product_count": 3,
+            "product_priority_targets": [{}],
+            "icp_priority_target_count": 6,
+            "icp_buyer_trigger_intelligence": {
+                "enabled": True,
+                "profile_count": 6,
+                "research_stages": [
+                    {"stage": "define_icp"},
+                    {"stage": "find_matching_companies"},
+                    {"stage": "resolve_decision_maker"},
+                    {"stage": "find_evidence_backed_pain"},
+                    {"stage": "prepare_one_to_one_message"},
+                    {"stage": "prepare_batch_personalization"},
+                ],
+                "budget_estimates_are_verified": False,
+                "outreach_authorized": False,
+                "execution_authority": "none",
+            },
+            "automation": {"live_outbound_send": False},
+            "canonical_settlement_rail": "USDT_BSC",
+            "buyer_capacity_never_gates_acquisition": True,
+            "overflow_remains_empire_owned": True,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    buyer = result["buyer_acquisition_team"]
+
+    assert buyer["available"] is True
+    assert buyer["icp_priority_target_count"] == 6
+    assert buyer["icp_intelligence"]["profile_count"] == 6
+    assert buyer["icp_intelligence"]["budget_estimates_are_verified"] is False
+    assert buyer["icp_intelligence"]["outreach_authorized"] is False
+    assert buyer["icp_intelligence"]["execution_authority"] == "none"
+    assert buyer["live_outbound_send"] is False
+    assert buyer["execution_authority"] == "none"
