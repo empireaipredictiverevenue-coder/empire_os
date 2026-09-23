@@ -359,3 +359,41 @@ def test_runtime_merges_empire_bridge_inputs_without_overwriting_manual_inputs(
     )
     assert result["public_publish_authorized"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_runtime_surfaces_research_pack_claim_verification_gate(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/media_os/input/research_pack_candidates.json",
+        {
+            "candidates": [
+                {
+                    "research_id": "media-research:1",
+                    "topic": "Search Visibility",
+                    "claims": [],
+                    "sources": [
+                        {
+                            "source_ref": "source:1",
+                            "source_type": "public_search_result",
+                        }
+                    ],
+                    "verified_claim_count": 0,
+                    "claim_verification_required": True,
+                    "script_ready": False,
+                    "execution_authority": "none",
+                }
+            ]
+        },
+    )
+
+    result = build_media_os_runtime(tmp_path)
+
+    research = result["research_packs"]
+    assert research["candidate_count"] == 1
+    assert research["verified_claim_count"] == 0
+    assert research["script_ready_count"] == 0
+    assert research["claim_verification_required_count"] == 1
+    assert result["ready_for_claim_verification"] is True
+    assert result["ready_for_script_generation"] is False
+    assert result["public_publish_authorized"] is False
+    assert result["execution_authority"] == "none"
