@@ -7,6 +7,20 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 REPO_ROOT=/srv/empire_os
+
+on_error() {
+  rc=$?
+  line="$1"
+  echo
+  echo "=== OMNIROUTE BOOTSTRAP FAILURE ===" >&2
+  echo "line=$line rc=$rc" >&2
+  systemctl status empire-omniroute.service --no-pager -l 2>/dev/null || true
+  docker ps -a --filter name=empire-omniroute 2>/dev/null || true
+  docker logs --tail 120 empire-omniroute 2>/dev/null || true
+  echo "=== END FAILURE DIAGNOSTICS ===" >&2
+  exit "$rc"
+}
+trap 'on_error $LINENO' ERR
 TARGET_USER="${SUDO_USER:-ubuntu}"
 if [[ "$TARGET_USER" == "root" ]]; then
   TARGET_USER="ubuntu"
