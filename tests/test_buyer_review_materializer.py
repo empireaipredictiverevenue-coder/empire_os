@@ -397,3 +397,46 @@ def test_targeted_materializer_can_use_bounded_source_floor():
 
     assert result.eligible == 1
     assert result.proposed == 1
+
+
+def test_isolated_probe_accepts_bounded_override_options(monkeypatch):
+    import json
+    from types import SimpleNamespace
+
+    seen = {}
+
+    def fake_run(*args, **kwargs):
+        seen["payload"] = json.loads(kwargs["input"])
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps({
+                "review_ready": False,
+                "outreach_ready": False,
+                "rejection_reason": "no_decision_maker",
+            }),
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "empire_os.buyer_review_materializer.subprocess.run",
+        fake_run,
+    )
+
+    run_buyer_probe_isolated(
+        {
+            "id": PROSPECT_ID,
+            "business_name": "Acme Roofing",
+        },
+        hard_timeout_seconds=55,
+        probe_options={
+            "max_pages": 12,
+            "request_timeout": 5.0,
+            "time_budget_seconds": 35.0,
+        },
+    )
+
+    assert seen["payload"]["_probe_options"] == {
+        "max_pages": 12,
+        "request_timeout": 5.0,
+        "time_budget_seconds": 35.0,
+    }
