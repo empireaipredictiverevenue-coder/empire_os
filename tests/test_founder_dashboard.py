@@ -2064,3 +2064,42 @@ def test_dashboard_surfaces_live_media_os_runtime_without_publish_authority(
     assert media["public_publish_authorized"] is False
     assert media["actual_revenue"] is False
     assert media["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_revenue_command_queue(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/next_best_action/next_best_action_latest.json",
+        {
+            "schema_version": "empire.next_best_action_snapshot.v1",
+            "mode": "OBSERVE",
+            "actions": [
+                {
+                    "entity_id": "entity-1",
+                    "company_name": "Buyer One",
+                    "prospect_id": "prospect-1",
+                    "current_factual_state": "READY",
+                    "recommended_action": "verify_decision_maker",
+                    "reason": "decision-maker identity is not verified",
+                    "authority": "internal_write",
+                    "founder_gate_required": False,
+                    "waiting_external": False,
+                    "evidence": {},
+                }
+            ],
+            "execution_authority": "none",
+        },
+    )
+
+    queue = build_founder_dashboard(root)["revenue_command_queue"]
+
+    assert queue["available"] is True
+    assert queue["item_count"] == 1
+    assert queue["items"][0]["company_name"] == "Buyer One"
+    assert queue["items"][0]["next_reversible_internal_action"] == (
+        "verify_decision_maker"
+    )
+    assert queue["items"][0]["product_code"] is None
+    assert queue["external_execution_authorized"] is False
+    assert queue["payment_authorized"] is False
+    assert queue["unknown_stays_unknown"] is True
