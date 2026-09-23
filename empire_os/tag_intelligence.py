@@ -300,6 +300,13 @@ def _measurement_tag_issues(
             "Review whether server-side event delivery is appropriate for this account.",
             manual_review=True,
         )
+    elif meta_expected and pixel_ids and capi is None:
+        _issue(
+            issues, "meta_capi_status_unverified", "measurement", "medium",
+            "Meta Pixel was observed but server-side Conversions API delivery was not verified.",
+            "Verify server-side event delivery in the connected Meta evidence source.",
+            manual_review=True,
+        )
 
     if pixel_ids and capi is True:
         dedup = tags.get("meta_event_id_dedup")
@@ -331,6 +338,55 @@ def _measurement_tag_issues(
                 "Inspect triggers/data layer and remove unintended duplicate firing.",
                 manual_review=True,
             )
+
+    channel_checks = (
+        (
+            "linkedin_ads_expected",
+            "linkedin_insight_partner_ids",
+            "linkedin_insight_tag_missing",
+            "LinkedIn Insight Tag",
+        ),
+        (
+            "tiktok_ads_expected",
+            "tiktok_pixel_ids",
+            "tiktok_pixel_missing",
+            "TikTok Pixel",
+        ),
+        (
+            "reddit_ads_expected",
+            "reddit_pixel_ids",
+            "reddit_pixel_missing",
+            "Reddit Pixel",
+        ),
+        (
+            "pinterest_ads_expected",
+            "pinterest_tag_ids",
+            "pinterest_tag_missing",
+            "Pinterest Tag",
+        ),
+    )
+    for expectation_key, tag_key, code, label in channel_checks:
+        if (
+            expectations.get(expectation_key) is True
+            and not _values(tags.get(tag_key))
+        ):
+            _issue(
+                issues, code, "measurement", "high",
+                f"{label} was expected but no identifier was observed.",
+                f"Verify the governed {label} implementation.",
+                manual_review=True,
+            )
+
+    if (
+        expectations.get("microsoft_ads_expected") is True
+        and tags.get("microsoft_uet_present") is not True
+    ):
+        _issue(
+            issues, "microsoft_uet_missing", "measurement", "high",
+            "Microsoft Ads UET was expected but was not observed.",
+            "Verify the governed Microsoft UET implementation.",
+            manual_review=True,
+        )
 
     if expectations.get("consent_review_required") is True:
         consent = tags.get("consent_mode_enabled")
@@ -451,6 +507,21 @@ def _normalized_snapshot(
             _values(measurement.get("google_ads_conversion_ids"))
         ),
         "meta_pixel_ids": sorted(_values(measurement.get("meta_pixel_ids"))),
+        "linkedin_insight_partner_ids": sorted(
+            _values(measurement.get("linkedin_insight_partner_ids"))
+        ),
+        "tiktok_pixel_ids": sorted(
+            _values(measurement.get("tiktok_pixel_ids"))
+        ),
+        "reddit_pixel_ids": sorted(
+            _values(measurement.get("reddit_pixel_ids"))
+        ),
+        "pinterest_tag_ids": sorted(
+            _values(measurement.get("pinterest_tag_ids"))
+        ),
+        "microsoft_uet_present": measurement.get(
+            "microsoft_uet_present"
+        ),
         "meta_capi_enabled": measurement.get("meta_capi_enabled"),
         "meta_event_id_dedup": measurement.get("meta_event_id_dedup"),
         "consent_mode_enabled": measurement.get("consent_mode_enabled"),
@@ -480,6 +551,11 @@ def compare_tag_snapshots(
         "x_robots_tag",
         "canonical_url",
         "meta_pixel_ids",
+        "linkedin_insight_partner_ids",
+        "tiktok_pixel_ids",
+        "reddit_pixel_ids",
+        "pinterest_tag_ids",
+        "microsoft_uet_present",
         "ga4_measurement_ids",
         "google_ads_conversion_ids",
         "meta_event_id_dedup",
@@ -497,6 +573,11 @@ def compare_tag_snapshots(
         "ga4_measurement_ids",
         "google_ads_conversion_ids",
         "meta_pixel_ids",
+        "linkedin_insight_partner_ids",
+        "tiktok_pixel_ids",
+        "reddit_pixel_ids",
+        "pinterest_tag_ids",
+        "microsoft_uet_present",
         "meta_capi_enabled",
         "meta_event_id_dedup",
         "consent_mode_enabled",
