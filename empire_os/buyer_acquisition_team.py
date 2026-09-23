@@ -72,6 +72,7 @@ TARGET_BUYER_TYPES = (
     "white_label_agency",
     "data_or_intent_buyer",
     "qualified_end_buyer",
+    "local_smb_buyer",
     "enterprise_data_buyer",
     "saas_buyer",
     "managed_growth_buyer",
@@ -80,6 +81,25 @@ TARGET_BUYER_TYPES = (
 )
 
 BUYER_POOLS = (
+    {
+        "pool": "local_and_smb_buyers",
+        "examples": (
+            "local contractors", "dentists", "clinics", "accountants",
+            "estate agents", "garages", "cleaners", "landscapers",
+            "gyms", "salons", "local legal firms", "independent retailers",
+            "home services", "professional services",
+        ),
+        "purchases": (
+            "local_leads",
+            "exclusive_leads",
+            "calls",
+            "booked_appointments",
+            "seo_and_search_intelligence",
+            "commercial_diagnostics",
+            "managed_growth",
+            "lightweight_saas",
+        ),
+    },
     {
         "pool": "end_service_buyers",
         "examples": (
@@ -470,6 +490,14 @@ def buyer_research_queries(
             f'"{niche}" "affiliate network"{suffix}',
             f'"{niche}" "lead marketplace"{suffix}',
             f'"{niche}" "booked appointments"{suffix}',
+        ],
+        "local_and_smb_buyers": [
+            f'"{niche}" "near me"{suffix}',
+            f'"{niche}" "local business"{suffix}',
+            f'"{niche}" "small business"{suffix}',
+            f'"{niche}" "family owned"{suffix}',
+            f'"{niche}" "book online"{suffix}',
+            f'"{niche}" "free quote"{suffix}',
         ],
         "end_service_buyers": [
             f'"{niche} company"{suffix}',
