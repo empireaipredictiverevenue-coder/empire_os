@@ -1,0 +1,16 @@
+[Unit]
+Description=Scout evidence-backed buyer candidates for Phase 4
+After=network-online.target empire-buyer-acquisition-team.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=-/etc/empire_os.env
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_acquisition_scout.py --repo-root /srv/empire_os --max-queries 20 --results-per-query 8 --max-domains 40 --max-probes 20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=600
