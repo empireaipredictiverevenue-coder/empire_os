@@ -144,14 +144,62 @@ US_SECONDARY_MARKETS = (
     _market("US-AZ-TUS","US","AZ","Tucson, AZ",32.222607,-110.974711,"America/Phoenix","en-US",1.00),
 )
 
+UK_MARKETS = (
+    # England
+    _market("GB-LON","GB","England","London",51.5074,-0.1278,"Europe/London","en-GB",1.30),
+    _market("GB-MAN","GB","England","Manchester",53.4808,-2.2426,"Europe/London","en-GB",1.20),
+    _market("GB-BHM","GB","England","Birmingham",52.4862,-1.8904,"Europe/London","en-GB",1.20),
+    _market("GB-LIV","GB","England","Liverpool",53.4084,-2.9916,"Europe/London","en-GB",1.10),
+    _market("GB-LDS","GB","England","Leeds",53.8008,-1.5491,"Europe/London","en-GB",1.10),
+    _market("GB-SHF","GB","England","Sheffield",53.3811,-1.4701,"Europe/London","en-GB",1.05),
+    _market("GB-NCL","GB","England","Newcastle upon Tyne",54.9783,-1.6178,"Europe/London","en-GB",1.05),
+    _market("GB-BRS","GB","England","Bristol",51.4545,-2.5879,"Europe/London","en-GB",1.10),
+    _market("GB-NOT","GB","England","Nottingham",52.9548,-1.1581,"Europe/London","en-GB",1.00),
+    _market("GB-LEI","GB","England","Leicester",52.6369,-1.1398,"Europe/London","en-GB",1.00),
+    _market("GB-COV","GB","England","Coventry",52.4068,-1.5197,"Europe/London","en-GB",1.00),
+    _market("GB-SOU","GB","England","Southampton",50.9097,-1.4044,"Europe/London","en-GB",1.00),
+    _market("GB-POR","GB","England","Portsmouth",50.8198,-1.0880,"Europe/London","en-GB",0.95),
+    _market("GB-BTN","GB","England","Brighton",50.8225,-0.1372,"Europe/London","en-GB",1.00),
+    _market("GB-RDG","GB","England","Reading",51.4543,-0.9781,"Europe/London","en-GB",1.00),
+    _market("GB-OXF","GB","England","Oxford",51.7520,-1.2577,"Europe/London","en-GB",0.95),
+    _market("GB-CAM","GB","England","Cambridge",52.2053,0.1218,"Europe/London","en-GB",0.95),
+    _market("GB-MKD","GB","England","Milton Keynes",52.0406,-0.7594,"Europe/London","en-GB",1.00),
+    _market("GB-NRW","GB","England","Norwich",52.6309,1.2974,"Europe/London","en-GB",0.95),
+    _market("GB-PLY","GB","England","Plymouth",50.3755,-4.1427,"Europe/London","en-GB",0.95),
+    _market("GB-EXE","GB","England","Exeter",50.7184,-3.5339,"Europe/London","en-GB",0.90),
+    _market("GB-BOH","GB","England","Bournemouth",50.7192,-1.8808,"Europe/London","en-GB",0.95),
+    _market("GB-YRK","GB","England","York",53.9590,-1.0815,"Europe/London","en-GB",0.90),
+    _market("GB-HUL","GB","England","Hull",53.7676,-0.3274,"Europe/London","en-GB",0.90),
+    _market("GB-STK","GB","England","Stoke-on-Trent",53.0027,-2.1794,"Europe/London","en-GB",0.90),
+    _market("GB-DRB","GB","England","Derby",52.9225,-1.4746,"Europe/London","en-GB",0.90),
+    _market("GB-WLV","GB","England","Wolverhampton",52.5862,-2.1287,"Europe/London","en-GB",0.90),
+    _market("GB-SUN","GB","England","Sunderland",54.9069,-1.3838,"Europe/London","en-GB",0.90),
+    _market("GB-MDB","GB","England","Middlesbrough",54.5742,-1.2350,"Europe/London","en-GB",0.90),
+    _market("GB-BPL","GB","England","Blackpool",53.8175,-3.0357,"Europe/London","en-GB",0.85),
+    _market("GB-BOL","GB","England","Bolton",53.5769,-2.4282,"Europe/London","en-GB",1.00),
+
+    # Scotland
+    _market("GB-GLA","GB","Scotland","Glasgow",55.8642,-4.2518,"Europe/London","en-GB",1.10),
+    _market("GB-EDI","GB","Scotland","Edinburgh",55.9533,-3.1883,"Europe/London","en-GB",1.10),
+    _market("GB-ABD","GB","Scotland","Aberdeen",57.1497,-2.0943,"Europe/London","en-GB",0.95),
+    _market("GB-DND","GB","Scotland","Dundee",56.4620,-2.9707,"Europe/London","en-GB",0.90),
+    _market("GB-INV","GB","Scotland","Inverness",57.4778,-4.2247,"Europe/London","en-GB",0.85),
+    _market("GB-STG","GB","Scotland","Stirling",56.1165,-3.9369,"Europe/London","en-GB",0.85),
+
+    # Wales
+    _market("GB-CDF","GB","Wales","Cardiff",51.4816,-3.1791,"Europe/London","en-GB",1.05),
+    _market("GB-SWA","GB","Wales","Swansea",51.6214,-3.9436,"Europe/London","en-GB",0.95),
+    _market("GB-NWP","GB","Wales","Newport",51.5842,-2.9977,"Europe/London","en-GB",0.90),
+    _market("GB-WRX","GB","Wales","Wrexham",53.0465,-2.9938,"Europe/London","en-GB",0.85),
+
+    # Northern Ireland
+    _market("GB-BFS","GB","Northern Ireland","Belfast",54.5973,-5.9301,"Europe/London","en-GB",1.00),
+    _market("GB-DRY","GB","Northern Ireland","Derry",54.9966,-7.3086,"Europe/London","en-GB",0.85),
+    _market("GB-LSB","GB","Northern Ireland","Lisburn",54.5162,-6.0580,"Europe/London","en-GB",0.80),
+    _market("GB-NRY","GB","Northern Ireland","Newry",54.1751,-6.3402,"Europe/London","en-GB",0.80),
+)
+
 INTERNATIONAL_MARKETS = (
-    _market("GB-LON","GB","England","London",51.5074,-0.1278,"Europe/London","en-GB",1.20),
-    _market("GB-MAN","GB","England","Manchester",53.4808,-2.2426,"Europe/London","en-GB",1.10),
-    _market("GB-BHM","GB","England","Birmingham",52.4862,-1.8904,"Europe/London","en-GB",1.05),
-    _market("GB-GLA","GB","Scotland","Glasgow",55.8642,-4.2518,"Europe/London","en-GB",1.00),
-    _market("GB-EDI","GB","Scotland","Edinburgh",55.9533,-3.1883,"Europe/London","en-GB",1.00),
-    _market("GB-CDF","GB","Wales","Cardiff",51.4816,-3.1791,"Europe/London","en-GB",1.00),
-    _market("GB-BFS","GB","Northern Ireland","Belfast",54.5973,-5.9301,"Europe/London","en-GB",0.95),
     _market("CA-TOR","CA","ON","Toronto, ON",43.6532,-79.3832,"America/Toronto","en-CA",1.15),
     _market("CA-VAN","CA","BC","Vancouver, BC",49.2827,-123.1207,"America/Vancouver","en-CA",1.10),
     _market("CA-MTL","CA","QC","Montreal, QC",45.5017,-73.5673,"America/Toronto","fr-CA",1.05),
@@ -187,7 +235,7 @@ INTERNATIONAL_MARKETS = (
     _market("PT-OPO","PT","POR","Porto",41.1579,-8.6291,"Europe/Lisbon","pt-PT",0.95),
 )
 
-MARKETS = US_MARKETS + US_SECONDARY_MARKETS + INTERNATIONAL_MARKETS
+MARKETS = US_MARKETS + US_SECONDARY_MARKETS + UK_MARKETS + INTERNATIONAL_MARKETS
 
 
 def acquisition_markets(*, countries: Iterable[str] | None = None) -> tuple[GeoMarket, ...]:
