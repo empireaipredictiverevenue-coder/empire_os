@@ -283,3 +283,39 @@ def test_companies_house_seed_alone_does_not_prove_buyer_authority(monkeypatch):
     assert result["recovered"] is False
     assert result["identity"] is None
     assert result["companies_house_seeds"][0]["person_name"] == "John Director"
+
+
+def test_identity_recovery_serp_adapter_preserves_provenance(monkeypatch):
+    monkeypatch.setattr(
+        ir,
+        "search",
+        lambda query, num=8, engine=None: {
+            "organic": [{
+                "title": "Jane Smith - Managing Director",
+                "link": "https://example-solar.co.uk/about",
+                "snippet": "Jane Smith is Managing Director.",
+                "position": 1,
+                "relevance_score": 0.95,
+            }],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": "bing_html",
+                "quality_gate": "lexical_v1",
+                "cache": False,
+            },
+        },
+    )
+
+    rows = ir._serp_results(
+        'site:example-solar.co.uk "Jane Smith"',
+        num=5,
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["link"] == "https://example-solar.co.uk/about"
+    assert rows[0]["position"] == 1
+    assert rows[0]["engine"] == "bing_html"
+    assert "search_fabric" in rows[0]["provenance"]
+    assert "engine:bing_html" in rows[0]["provenance"]
+    assert "quality_gate:lexical_v1" in rows[0]["provenance"]
