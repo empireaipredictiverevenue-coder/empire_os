@@ -569,6 +569,21 @@ def _buyer_scout_runtime(
         "explicit_direct_buyer_candidate_count": int(
             raw.get("explicit_direct_buyer_candidate_count") or 0
         ),
+        "icp_assessed_candidate_count": int(
+            raw.get("icp_assessed_candidate_count") or 0
+        ),
+        "observed_trigger_candidate_count": int(
+            raw.get("observed_trigger_candidate_count") or 0
+        ),
+        "decision_maker_role_match_count": int(
+            raw.get("decision_maker_role_match_count") or 0
+        ),
+        "economic_capacity_proxy_count": int(
+            raw.get("economic_capacity_proxy_count") or 0
+        ),
+        "verified_budget_candidate_count": int(
+            raw.get("verified_budget_candidate_count") or 0
+        ),
         "probe_failure_counts": (
             raw.get("probe_failure_counts")
             if isinstance(raw.get("probe_failure_counts"), dict)
