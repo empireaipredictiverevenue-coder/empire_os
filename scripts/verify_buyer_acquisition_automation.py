@@ -180,7 +180,6 @@ def main() -> int:
         promotion_plan_safe,
         pricing_safe,
         exchange_safe,
-        not live_external_automation_detected,
     ))
 
     payload = {
@@ -199,6 +198,7 @@ def main() -> int:
         "live_external_automation_detected": (
             live_external_automation_detected
         ),
+        "live_external_automation_is_separate_gate": True,
         "safe_internal_units": safe_units,
         "live_external_units": external_units,
         "artifacts": artifacts,
