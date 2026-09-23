@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll Empire Hermes governed control queue
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=empire-hermes-control.service
+
+[Install]
+WantedBy=timers.target
