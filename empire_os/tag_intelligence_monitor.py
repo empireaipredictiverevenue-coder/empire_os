@@ -202,8 +202,14 @@ def refresh_tag_intelligence_monitor(
         ).as_dict()
 
         previous_row = previous_rows.get(target_id) or {}
+        # Backward compatibility: early monitor snapshots did not
+        # persist an explicit `available` field. Treat those as comparable
+        # when both tag surfaces are present. Only an explicit False means
+        # the prior observation was unavailable and must not become a
+        # comparison baseline.
+        previous_available = previous_row.get("available")
         has_previous_snapshot = (
-            previous_row.get("available") is True
+            previous_available is not False
             and isinstance(previous_row.get("page_tags"), Mapping)
             and isinstance(
                 previous_row.get("measurement_tags"),
