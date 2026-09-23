@@ -707,26 +707,49 @@ def refresh_media_claim_verification(
 ) -> dict[str, Any]:
     source = _read_json(repo_root / INPUT)
     packs = _records(source)
-    selected = packs[: max(1, min(int(max_packs), 5))]
-    input_fingerprint = _fingerprint(selected)
+    pack_by_id = {
+        _clean(row.get("research_id")): row
+        for row in packs
+        if _clean(row.get("research_id"))
+    }
+    pack_fingerprints = {
+        research_id: _fingerprint(pack)
+        for research_id, pack in pack_by_id.items()
+    }
+    input_fingerprint = _fingerprint(packs)
 
-    previous = _read_json(repo_root / OUTPUT)
-    if (
-        not force
-        and isinstance(previous, Mapping)
-        and previous.get("ok") is True
-        and previous.get("input_fingerprint") == input_fingerprint
-    ):
-        return {
-            **dict(previous),
-            "skipped_unchanged": True,
-        }
+    previous_verified_payload = _read_json(
+        repo_root / VERIFIED_OUTPUT
+    )
+    previous_verified = {
+        _clean(row.get("research_id")): row
+        for row in _records(previous_verified_payload)
+        if _clean(row.get("research_id"))
+    }
 
-    llm = gateway or LLMGateway()
+    pending: list[dict[str, Any]] = []
+    preserved: dict[str, dict[str, Any]] = {}
+    for research_id, pack in pack_by_id.items():
+        prior = previous_verified.get(research_id)
+        unchanged = (
+            isinstance(prior, Mapping)
+            and prior.get("source_input_fingerprint")
+            == pack_fingerprints[research_id]
+        )
+        if unchanged and not force:
+            preserved[research_id] = dict(prior)
+        else:
+            pending.append(pack)
+
+    limit = max(1, min(int(max_packs), 5))
+    selected = pending[:limit]
+
+    llm = gateway or (LLMGateway() if selected else None)
     results = []
-    verified_packs = []
+    processed: dict[str, dict[str, Any]] = {}
 
     for pack in selected:
+        research_id = _clean(pack.get("research_id"))
         observations = observe_research_sources(
             pack,
             probe=probe,
@@ -750,9 +773,17 @@ def refresh_media_claim_verification(
             reviews=verification.get("reviews") or [],
             source_observations=observations,
         )
-        verified_packs.append(verified)
+        verified["source_input_fingerprint"] = (
+            pack_fingerprints[research_id]
+        )
+        verified["verification_attempted_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+        verified["verification_attempt_complete"] = True
+        processed[research_id] = verified
+
         results.append({
-            "research_id": pack.get("research_id"),
+            "research_id": research_id,
             "topic": pack.get("topic"),
             "observed_source_count": observations.get(
                 "observed_source_count"
@@ -769,16 +800,27 @@ def refresh_media_claim_verification(
             "source_failures": observations.get("failures") or [],
         })
 
+    current_verified: list[dict[str, Any]] = []
+    for research_id in pack_by_id:
+        row = processed.get(research_id) or preserved.get(research_id)
+        if row is not None:
+            current_verified.append(row)
+
+    generated_at = datetime.now(timezone.utc).isoformat()
+    remaining = max(0, len(pending) - len(selected))
     payload = {
-        "schema_version": "empire.media.claim_verification_runtime.v1",
+        "schema_version": "empire.media.claim_verification_runtime.v2",
         "mode": "OBSERVE",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": generated_at,
         "ok": True,
         "input_fingerprint": input_fingerprint,
         "research_pack_count": len(packs),
+        "already_current_pack_count": len(preserved),
+        "pending_pack_count_before_run": len(pending),
         "processed_pack_count": len(selected),
+        "remaining_pack_count": remaining,
         "limits": {
-            "max_packs": max(1, min(int(max_packs), 5)),
+            "max_packs": limit,
             "max_claims_per_pack": max(
                 1, min(int(max_claims_per_pack), 6)
             ),
@@ -794,16 +836,17 @@ def refresh_media_claim_verification(
                 min(float(source_time_budget_seconds), 20.0),
             ),
         },
+        "verified_pack_count": len(current_verified),
         "verified_claim_count": sum(
             int(row.get("verified_claim_count") or 0)
-            for row in verified_packs
+            for row in current_verified
         ),
         "script_ready_count": sum(
             row.get("script_ready") is True
-            for row in verified_packs
+            for row in current_verified
         ),
         "results": results,
-        "skipped_unchanged": False,
+        "skipped_unchanged": not selected and not force,
         "external_reads_performed": any(
             int(row.get("observed_source_count") or 0) > 0
             for row in results
@@ -818,12 +861,13 @@ def refresh_media_claim_verification(
     _write_json(
         repo_root / VERIFIED_OUTPUT,
         {
-            "schema_version": "empire.media.verified_research_packs.v1",
-            "generated_at": payload["generated_at"],
-            "candidate_count": len(verified_packs),
+            "schema_version": "empire.media.verified_research_packs.v2",
+            "generated_at": generated_at,
+            "candidate_count": len(current_verified),
             "verified_claim_count": payload["verified_claim_count"],
             "script_ready_count": payload["script_ready_count"],
-            "candidates": verified_packs,
+            "remaining_pack_count": remaining,
+            "candidates": current_verified,
             "public_publish_authorized": False,
             "execution_authority": "none",
         },
