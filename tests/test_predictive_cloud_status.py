@@ -393,3 +393,40 @@ def test_status_exposes_tag_intelligence_without_mutation_authority(tmp_path):
     assert component["summary"]["automatic_tag_mutation"] is False
     assert component["summary"]["measurement_platform_write"] is False
     assert component["execution_authority"] == "none"
+
+
+def test_status_exposes_icp_buyer_trigger_intelligence(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/buyer_acquisition/latest.json",
+        {
+            "generated_at": "2026-09-23T12:00:00+00:00",
+            "team_role_count": 11,
+            "buyer_pools": [{"pool": "enterprise_and_data_buyers"}],
+            "demand_gap_count": 1,
+            "priority_targets": [{}],
+            "product_demand_count": 4,
+            "sellable_product_demand_count": 1,
+            "market_validate_product_count": 3,
+            "icp_priority_target_count": 6,
+            "icp_buyer_trigger_intelligence": {
+                "profile_count": 6,
+                "execution_authority": "none",
+            },
+            "automation": {"live_outbound_send": False},
+            "canonical_settlement_rail": "USDT_BSC",
+            "buyer_capacity_never_gates_acquisition": True,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime.fromisoformat("2026-09-23T12:05:00+00:00"),
+    )
+    summary = result["components"]["buyer_acquisition_team"]["summary"]
+
+    assert summary["icp_priority_target_count"] == 6
+    assert summary["icp_profile_count"] == 6
+    assert summary["icp_execution_authority"] == "none"
+    assert summary["live_outbound_send"] is False
