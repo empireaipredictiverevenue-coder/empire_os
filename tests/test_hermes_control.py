@@ -1,7 +1,10 @@
+import subprocess
+
 import pytest
 
 from empire_os.hermes_control import (
     DEFAULT_BASE_BRANCH,
+    _prepare_worktree_slot,
     HermesControlError,
     HermesJob,
     build_hermes_prompt,
@@ -138,3 +141,39 @@ def test_prompt_points_hermes_at_isolated_worktree(tmp_path):
     assert f"Editable isolated worktree: {worktree}" in prompt
     assert "Production runtime is READ-ONLY context" in prompt
     assert "EMPIRE_AUTONOMOUS_MODE" not in prompt
+
+
+def test_prepare_worktree_slot_recovers_missing_registered_worktree(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "test@example.com"],
+        check=True,
+    )
+    (repo / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "README.md"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "base"], check=True)
+
+    worktree = tmp_path / "stale-worktree"
+    subprocess.run(
+        ["git", "-C", str(repo), "worktree", "add", "--detach", str(worktree), "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    # Simulate an interrupted worker: directory disappears but Git metadata remains.
+    import shutil
+    shutil.rmtree(worktree)
+
+    _prepare_worktree_slot(repo, worktree)
+
+    subprocess.run(
+        ["git", "-C", str(repo), "worktree", "add", "--detach", str(worktree), "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert (worktree / "README.md").exists()
