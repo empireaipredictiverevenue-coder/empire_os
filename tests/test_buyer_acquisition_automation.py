@@ -47,3 +47,13 @@ def test_buyer_acquisition_verifier_requires_catalog_and_scout_artifacts():
     assert "runtime/commercial_exchange/latest.json" in text
     assert "runtime/buyer_acquisition/latest.json" in text
     assert "runtime/buyer_acquisition/scout_latest.json" in text
+
+
+def test_buyer_acquisition_verifier_requires_scout_artifact():
+    text = (
+        ROOT / "scripts/verify_buyer_acquisition_automation.py"
+    ).read_text()
+
+    assert "runtime/buyer_acquisition/scout_latest.json" in text
+    assert "buyer_scout_safe" in text
+    assert "database_write_performed" in text
