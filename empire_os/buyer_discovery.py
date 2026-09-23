@@ -179,6 +179,8 @@ def choose_offer(record: Mapping[str, Any], decision_role: str) -> str:
     niche = _text(record.get("niche")).lower()
     name = _text(record.get("business_name")).lower()
     text = f"{niche} {name} {_text(record.get('notes')).lower()}"
+    if "solar" in niche:
+        return "solar_opportunity_map"
     if any(term in text for term in ("agency", "marketing", "seo", "advertising", "lead gen")):
         return "white_label"
     if decision_role == "economic_buyer" and any(
