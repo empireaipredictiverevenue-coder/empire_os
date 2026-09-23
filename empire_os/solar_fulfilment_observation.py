@@ -148,3 +148,58 @@ def write_resource_observation(
     tmp.replace(target)
     os.chmod(target, 0o600)
     return target
+
+
+def materialize_with_resource_observation(
+    prospect_id: str,
+    *,
+    build: Callable[[str], Mapping[str, Any]],
+    write: Callable[[Mapping[str, Any]], Mapping[str, Any]],
+    observation_root: str | Path | None = None,
+) -> dict[str, Any]:
+    """Build/write one map and persist non-monetary resource evidence."""
+    started = begin_resource_observation()
+    try:
+        payload = dict(build(prospect_id))
+        paths = dict(write(payload))
+    except Exception as exc:
+        failed = finish_resource_observation(
+            started,
+            prospect_id=prospect_id,
+            product_code=None,
+            currency=None,
+            artifact_paths=None,
+        )
+        failed["status"] = "failed"
+        failed["error"] = f"{type(exc).__name__}:{str(exc)[:260]}"
+        evidence_path = write_resource_observation(
+            failed,
+            root=observation_root,
+        )
+        raise
+
+    offer = payload.get("offer")
+    offer = offer if isinstance(offer, Mapping) else {}
+    report = payload.get("search_opportunity_report")
+    report = report if isinstance(report, Mapping) else {}
+    observation = finish_resource_observation(
+        started,
+        prospect_id=prospect_id,
+        product_code=offer.get("product_code"),
+        currency=offer.get("currency"),
+        artifact_paths=paths,
+        priority_actions=len(payload.get("priority_backlog") or []),
+        observed_sections=report.get("observed_sections"),
+        unavailable_sections=report.get("unavailable_sections"),
+    )
+    observation["status"] = "success"
+    evidence_path = write_resource_observation(
+        observation,
+        root=observation_root,
+    )
+    return {
+        "payload": payload,
+        "artifacts": paths,
+        "resource_observation": observation,
+        "resource_observation_path": str(evidence_path),
+    }
