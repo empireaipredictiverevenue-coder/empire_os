@@ -24,10 +24,6 @@ from empire_os.icp_buyer_trigger_intelligence import (
     build_icp_priority_targets,
     icp_learning_contract,
 )
-from empire_os.icp_buyer_trigger_intelligence import (
-    build_icp_priority_targets,
-    icp_learning_contract,
-)
 
 
 OUTPUT = Path("runtime/buyer_acquisition/latest.json")
@@ -787,10 +783,6 @@ def build_buyer_acquisition_plan(
         }
         for row in product_queue[:25]
     ]
-    icp_targets = build_icp_priority_targets(
-        corridor_targets=targets,
-        product_targets=product_targets,
-    )
     icp_targets = build_icp_priority_targets(
         corridor_targets=targets,
         product_targets=product_targets,
