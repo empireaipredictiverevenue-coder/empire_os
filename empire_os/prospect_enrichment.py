@@ -521,6 +521,35 @@ def enrich_prospect_for_scoring(
                 ),
             }
 
+    # A legacy canonical website may also be stale or mis-associated.
+    # If it failed the identity firewall, clear it only in the in-memory
+    # fallback candidate and perform one bounded Search Fabric discovery.
+    # The stored canonical row is not mutated here.
+    if (
+        not website
+        and discovery is None
+        and _normalise_url(str(prospect.get("website") or ""))
+    ):
+        fallback_prospect = dict(prospect)
+        fallback_prospect["website"] = ""
+        fallback_prospect.pop("_acquisition_website", None)
+        fallback = enrich_prospect_for_scoring(
+            fallback_prospect
+        )
+        return {
+            **fallback,
+            "evidence": (
+                evidence
+                + [{
+                    "source": "enrichment_fallback",
+                    "reason": "canonical_website_rejected",
+                    "rejected_url": prospect.get("website"),
+                    "fallback": "search_fabric",
+                }]
+                + list(fallback.get("evidence") or [])
+            ),
+        }
+
     # Use the verified/discovered first-party site for RDAP rather than
     # falling back to a known directory profile.
     # RDAP is supporting evidence for an identity-accepted domain only.
