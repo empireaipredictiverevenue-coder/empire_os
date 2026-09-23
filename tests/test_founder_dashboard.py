@@ -1789,3 +1789,19 @@ def test_dashboard_exposes_historical_mrr_product_recovery(tmp_path):
     assert rows["synthetic_agent"]["disposition"] == "RETIRE"
     assert mrr["summary"]["canonical_settlement_rail"] == "USDT_BSC"
     assert mrr["summary"]["legacy_pricing_approved_current_count"] == 0
+
+
+def test_dashboard_exposes_modern_phase4_exchange_mrr_products(tmp_path):
+    result = build_founder_dashboard(make_root(tmp_path))
+    mrr = result["commercial_exchange_mrr_products"]
+    rows = {row["product_code"]: row for row in mrr["products"]}
+
+    assert mrr["phase"] == "4"
+    assert mrr["product_count"] == 4
+    assert rows["exchange_seat_starter"]["corridor_limit"] == 1
+    assert rows["exchange_seat_growth"]["corridor_limit"] == 5
+    assert rows["exchange_seat_pro"]["corridor_limit"] == 25
+    assert rows["exchange_seat_enterprise"]["corridor_limit"] is None
+    assert mrr["pricing_authority"] == "none"
+    assert mrr["binding_terms_ready"] is False
+    assert mrr["canonical_settlement_rail"] == "USDT_BSC"
