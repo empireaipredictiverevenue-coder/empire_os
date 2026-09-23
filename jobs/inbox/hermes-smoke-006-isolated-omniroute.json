@@ -1,0 +1,12 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "hermes-smoke-006-isolated-omniroute",
+  "kind": "code_task",
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "prompt": "Prove the resident Hermes worker using its isolated runtime-only Hermes config and the local OmniRoute OpenAI-compatible endpoint. Create docs/HERMES_ISOLATED_OMNIROUTE_SMOKE.md and only that file. Record that this run was isolated, proposal-only, and that no live outbound, payment/fund movement, database mutation, revenue recognition, production merge, recovery/ access, or toop/ access occurred. Do not alter any other file.",
+  "allowed_paths": ["docs/"],
+  "pytest_targets": ["tests/test_hermes_control.py","tests/test_hermes_control_systemd.py"],
+  "max_runtime_seconds": 600,
+  "created_at": "2026-09-23T16:15:00Z"
+}
