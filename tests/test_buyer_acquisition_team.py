@@ -201,3 +201,60 @@ def test_priority_targets_include_local_smb_research_queries():
     assert "local_and_smb_buyers" in queries
     assert any("local business" in q for q in queries["local_and_smb_buyers"])
     assert any("free quote" in q for q in queries["local_and_smb_buyers"])
+
+
+def test_product_demand_separates_sellable_from_market_validation():
+    plan = build_buyer_acquisition_plan(
+        {"inventory": [], "buyer_seats": []},
+        catalog_snapshot={
+            "products": [
+                {
+                    "active": True,
+                    "product_code": "managed_service",
+                    "product_name": "Opportunity Intelligence Pilot",
+                    "product_family": "opportunity_intelligence",
+                    "billing_model": "flat_pilot",
+                    "catalog_state": "VERIFIED",
+                    "version_state": "VERIFIED",
+                    "binding_terms_ready": True,
+                },
+                {
+                    "active": True,
+                    "product_code": "local_search_grid",
+                    "product_name": "Local Search Grid Intelligence",
+                    "product_family": "search_intelligence",
+                    "billing_model": "terms_required",
+                    "catalog_state": "UNKNOWN",
+                    "version_state": "UNKNOWN",
+                    "binding_terms_ready": False,
+                },
+            ]
+        },
+        generated_at=datetime(
+            2026, 9, 23, 0, 0, tzinfo=timezone.utc
+        ),
+    )
+
+    assert plan["product_demand_count"] == 2
+    assert plan["sellable_product_demand_count"] == 1
+    assert plan["market_validate_product_count"] == 1
+
+    managed = next(
+        row for row in plan["product_demand_queue"]
+        if row["product_code"] == "managed_service"
+    )
+    search = next(
+        row for row in plan["product_demand_queue"]
+        if row["product_code"] == "local_search_grid"
+    )
+
+    assert managed["commercial_state"] == "SELLABLE_TERMS_READY"
+    assert managed["price_claim_allowed"] is True
+    assert "local_and_smb_buyers" in managed["target_buyer_pools"]
+
+    assert search["commercial_state"] == (
+        "MARKET_VALIDATE_TERMS_REQUIRED"
+    )
+    assert search["price_claim_allowed"] is False
+    assert "local_and_smb_buyers" in search["target_buyer_pools"]
+    assert "agency_and_reseller_buyers" in search["target_buyer_pools"]
