@@ -137,7 +137,11 @@ def test_media_os_is_control_fabric_component_owned_by_marketing_growth():
     assert "intelligence_fabric" in media.dependencies
     assert "quant_brain" in media.dependencies
     assert "revenue_pulse" in media.dependencies
+    assert "conversion_intelligence" in media.dependencies
+    assert "revenue_crm" in media.dependencies
     assert all("publish" not in event for event in media.outputs)
+    assert "quant_review_requested" in media.outputs
+    assert "experiment_review_requested" in media.outputs
 
     routes = route_event({
         "event_type": "media_opportunity_scan_requested",
@@ -150,3 +154,21 @@ def test_media_os_is_control_fabric_component_owned_by_marketing_growth():
     departments = {row.key: row for row in default_departments()}
     assert "media_os" in departments["marketing_growth"].components
     assert "media_os" not in departments
+
+
+def test_media_review_events_route_to_existing_quant_and_experiment_systems():
+    quant = route_event({
+        "event_type": "quant_review_requested",
+        "commercial_priority": 80,
+    })
+    assert quant
+    assert quant[0]["component"] == "quant_brain"
+    assert quant[0]["authority"] == "observe"
+
+    experiment = route_event({
+        "event_type": "experiment_review_requested",
+        "commercial_priority": 80,
+    })
+    assert experiment
+    assert experiment[0]["component"] == "experiment_intelligence"
+    assert experiment[0]["authority"] == "observe"
