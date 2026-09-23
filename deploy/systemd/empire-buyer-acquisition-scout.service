@@ -8,10 +8,15 @@ Type=oneshot
 WorkingDirectory=/srv/empire_os
 EnvironmentFile=-/etc/empire_os.env
 Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/bin/echo === BUYER SCOUT: DISCOVER + PROBE ===
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_acquisition_scout.py --repo-root /srv/empire_os --max-queries 20 --results-per-query 8 --max-domains 40 --max-probes 20
+ExecStart=/bin/echo === BUYER SCOUT: RECONCILE ===
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/reconcile_buyer_acquisition_scout.py --repo-root /srv/empire_os --limit 2000
+ExecStart=/bin/echo === BUYER SCOUT: PERSIST HOLDING AREA ===
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/persist_buyer_scout_candidates.py --repo-root /srv/empire_os
+ExecStart=/bin/echo === BUYER SCOUT: REVIEW READINESS ===
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/materialize_buyer_scout_review_readiness.py --repo-root /srv/empire_os --limit 200
+ExecStart=/bin/echo === BUYER SCOUT: PROMOTION PLAN ===
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_buyer_scout_promotion_plan.py --repo-root /srv/empire_os --limit 200
 NoNewPrivileges=true
 PrivateTmp=true
