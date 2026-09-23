@@ -914,3 +914,78 @@ def test_placeholder_referral_program_is_not_a_person_name():
 
     assert looks_like_person_name("Your Referral Program") is False
     assert looks_like_person_name("Kathy Thomas") is True
+
+
+def test_company_routed_contact_requires_explicit_opt_in_and_economic_buyer():
+    from types import SimpleNamespace
+    from empire_os.buyer_discovery import verify_contact_plan
+
+    class Validator:
+        def validate(self, email):
+            return SimpleNamespace(
+                email=email,
+                is_valid=False,
+                confidence=0.0,
+                is_role_address=True,
+                is_disposable=False,
+                has_mx=False,
+                smtp_accepts=False,
+            )
+
+    enriched = {
+        "decision_maker": {
+            "name": "Peter Read",
+            "title": "Managing Director",
+            "decision_role": "economic_buyer",
+            "decision_score": 1.0,
+        },
+        "decision_reconciliation": {"review_required": False},
+        "site_evidence": {
+            "domain_match": True,
+            "domain": "2020solarpv.com",
+            "expected_domain": "2020solarpv.com",
+        },
+        "contact_candidates": [{
+            "email": "enquiries@2020solarpv.com",
+            "source": "site_observed",
+            "bound_to_decision_maker": False,
+        }],
+    }
+
+    default = verify_contact_plan(
+        enriched,
+        validator=Validator(),
+    )
+    assert default["review_ready"] is False
+    assert default["outreach_ready"] is False
+    assert default["preferred_email"] is None
+
+    routed = verify_contact_plan(
+        enriched,
+        validator=Validator(),
+        allow_company_routed=True,
+    )
+    assert routed["review_ready"] is True
+    assert routed["outreach_ready"] is True
+    assert routed["preferred_email"] == "enquiries@2020solarpv.com"
+    assert routed["contact_route"] == "company_routed"
+    assert routed["person_bound"] is False
+    assert routed["routing_name"] == "Peter Read"
+    assert routed["routing_title"] == "Managing Director"
+
+    weak = {
+        **enriched,
+        "decision_maker": {
+            "name": "Pat Manager",
+            "title": "Marketing Manager",
+            "decision_role": "influencer",
+            "decision_score": 0.5,
+        },
+    }
+    blocked = verify_contact_plan(
+        weak,
+        validator=Validator(),
+        allow_company_routed=True,
+    )
+    assert blocked["review_ready"] is False
+    assert blocked["contact_route"] is None
