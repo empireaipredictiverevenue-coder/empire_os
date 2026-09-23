@@ -1517,3 +1517,59 @@ def test_dashboard_exposes_live_phase4_exchange_runtime(tmp_path):
     assert runtime["automatic_external_delivery"] is False
     assert runtime["production_schema_applied"] is False
     assert runtime["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_buyer_acquisition_team_runtime(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/buyer_acquisition/latest.json",
+        {
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T00:10:00+00:00",
+            "team_role_count": 10,
+            "buyer_pools": [
+                {"pool": "local_and_smb_buyers"},
+                {"pool": "direct_demand_buyers"},
+                {"pool": "enterprise_and_data_buyers"},
+            ],
+            "demand_gap_count": 4,
+            "priority_targets": [{}, {}],
+            "product_demand_count": 7,
+            "sellable_product_demand_count": 1,
+            "market_validate_product_count": 6,
+            "product_priority_targets": [{}, {}, {}],
+            "target_buyer_types": [
+                "local_smb_buyer",
+                "direct_lead_buyer",
+                "enterprise_data_buyer",
+            ],
+            "supply_gate_diagnostics": {
+                "prospects_seen": 200,
+                "qualification_ready_count": 0,
+            },
+            "seat_activation_blocker_counts": {
+                "buyer_not_commercially_activated": 168,
+            },
+            "automation": {
+                "live_outbound_send": False,
+            },
+            "buyer_capacity_never_gates_acquisition": True,
+            "overflow_remains_empire_owned": True,
+            "canonical_settlement_rail": "USDT_BSC",
+            "execution_authority": "none",
+        },
+    )
+
+    runtime = build_founder_dashboard(root)["buyer_acquisition_team"]
+
+    assert runtime["available"] is True
+    assert runtime["team_role_count"] == 10
+    assert runtime["buyer_pool_count"] == 3
+    assert runtime["demand_gap_count"] == 4
+    assert runtime["product_demand_count"] == 7
+    assert runtime["sellable_product_demand_count"] == 1
+    assert runtime["market_validate_product_count"] == 6
+    assert runtime["live_outbound_send"] is False
+    assert runtime["canonical_settlement_rail"] == "USDT_BSC"
+    assert runtime["buyer_capacity_never_gates_acquisition"] is True
+    assert runtime["execution_authority"] == "none"
