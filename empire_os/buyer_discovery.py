@@ -14,6 +14,10 @@ from urllib.parse import urlparse
 
 from empire_os.buyer_allocation import buyer_activation_decision
 from empire_os.locale_intelligence import resolve_locale
+from empire_os.market_pricing import (
+    infer_country_code,
+    market_price,
+)
 from empire_os.search_fabric.verification import is_directory_url
 
 ECONOMIC_BUYER_TERMS = (
@@ -180,6 +184,17 @@ def choose_offer(record: Mapping[str, Any], decision_role: str) -> str:
     name = _text(record.get("business_name")).lower()
     text = f"{niche} {name} {_text(record.get('notes')).lower()}"
     if "solar" in niche:
+        country_code = infer_country_code(
+            country_code=record.get("country_code"),
+            source=record.get("_acquisition_source"),
+            metro=record.get("metro"),
+            address=record.get("address"),
+        )
+        if country_code:
+            try:
+                return market_price(country_code).product_code
+            except KeyError:
+                pass
         return "solar_opportunity_map"
     if any(term in text for term in ("agency", "marketing", "seo", "advertising", "lead gen")):
         return "white_label"
