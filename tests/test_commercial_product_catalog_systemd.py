@@ -22,3 +22,11 @@ def test_catalog_refresh_timer_is_persistent():
 
     assert "OnUnitInactiveSec=5min" in text
     assert "Persistent=true" in text
+
+
+def test_catalog_refresh_runs_pricing_drift_verifier():
+    text = (
+        ROOT / "deploy/systemd/empire-commercial-product-catalog.service"
+    ).read_text()
+
+    assert "verify_commercial_pricing_snapshot.py" in text
