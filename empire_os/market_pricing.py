@@ -43,9 +43,10 @@ class MarketPrice:
         }
 
 
-# GB is the only founder-approved localized price at present.
-# All other values are deliberate local-market price proposals, not live FX
-# conversions and not binding commercial terms.
+# All localized prices below are founder-approved as of 2026-09-23.
+# They are deliberate native-market price points, not live FX conversions.
+# Founder approval verifies price evidence only; acquisition cost, fulfilment
+# cost and margin policy remain separate gates before binding terms.
 SOLAR_OPPORTUNITY_MAP_PRICES: dict[str, MarketPrice] = {
     "GB": MarketPrice(
         "GB", "GBP", 24900, "£249", "en-GB",
@@ -54,63 +55,63 @@ SOLAR_OPPORTUNITY_MAP_PRICES: dict[str, MarketPrice] = {
     ),
     "US": MarketPrice(
         "US", "USD", 29900, "$299", "en-US",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized US price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized US price approved by founder.",
     ),
     "CA": MarketPrice(
         "CA", "CAD", 39900, "C$399", "en-CA",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized Canadian price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized Canadian price approved by founder.",
     ),
     "AU": MarketPrice(
         "AU", "AUD", 49900, "A$499", "en-AU",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized Australian price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized Australian price approved by founder.",
     ),
     "NZ": MarketPrice(
         "NZ", "NZD", 49900, "NZ$499", "en-NZ",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized New Zealand price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized New Zealand price approved by founder.",
     ),
     "IE": MarketPrice(
         "IE", "EUR", 29900, "€299", "en-IE",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized Irish euro price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized Irish euro price approved by founder.",
     ),
     "DE": MarketPrice(
         "DE", "EUR", 29900, "€299", "de-DE",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized German euro price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized German euro price approved by founder.",
     ),
     "FR": MarketPrice(
         "FR", "EUR", 29900, "€299", "fr-FR",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized French euro price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized French euro price approved by founder.",
     ),
     "ES": MarketPrice(
         "ES", "EUR", 24900, "€249", "es-ES",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized Spanish euro price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized Spanish euro price approved by founder.",
     ),
     "IT": MarketPrice(
         "IT", "EUR", 24900, "€249", "it-IT",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized Italian euro price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized Italian euro price approved by founder.",
     ),
     "NL": MarketPrice(
         "NL", "EUR", 29900, "€299", "nl-NL",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized Dutch euro price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized Dutch euro price approved by founder.",
     ),
     "BE": MarketPrice(
         "BE", "EUR", 29900, "€299", "nl-BE",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized Belgian euro price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized Belgian euro price approved by founder.",
     ),
     "PT": MarketPrice(
         "PT", "EUR", 24900, "€249", "pt-PT",
-        "PROPOSED", "empire_pricing_draft",
-        "Localized Portuguese euro price-point proposal; founder ratification required.",
+        "FOUNDER_APPROVED", "founder_approved",
+        "Localized Portuguese euro price approved by founder.",
     ),
 }
 
