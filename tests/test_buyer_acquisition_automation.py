@@ -36,3 +36,14 @@ def test_buyer_acquisition_verifier_treats_live_send_units_as_external_gate():
     assert "empire-voice-outbound.timer" in text
     assert "live_external_automation_detected" in text
     assert "not live_external_automation_detected" in text
+
+
+def test_buyer_acquisition_verifier_requires_catalog_and_scout_artifacts():
+    text = (
+        ROOT / "scripts/verify_buyer_acquisition_automation.py"
+    ).read_text()
+
+    assert "runtime/commercial_catalog/latest.json" in text
+    assert "runtime/commercial_exchange/latest.json" in text
+    assert "runtime/buyer_acquisition/latest.json" in text
+    assert "runtime/buyer_acquisition/scout_latest.json" in text
