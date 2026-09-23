@@ -329,6 +329,27 @@ def run_buyer_scout(
             row["explicit_direct_buyer_evidence"]
             for row in candidates
         ),
+        "icp_assessed_candidate_count": sum(
+            bool(
+                (row.get("icp_intelligence") or {}).get(
+                    "best_profile_key"
+                )
+            )
+            for row in candidates
+        ),
+        "observed_trigger_candidate_count": sum(
+            row.get("why_now_state") == "OBSERVED_TRIGGER"
+            for row in candidates
+        ),
+        "decision_maker_role_match_count": sum(
+            row.get("decision_maker_state") == "OBSERVED_ROLE_MATCH"
+            for row in candidates
+        ),
+        "economic_capacity_proxy_count": sum(
+            row.get("economic_capacity_state") == "OBSERVED_PROXY"
+            for row in candidates
+        ),
+        "verified_budget_candidate_count": 0,
         "probe_failure_counts": dict(sorted(probe_failures.items())),
         "queries": queries,
         "candidates": candidates,
