@@ -177,3 +177,37 @@ def test_prepare_worktree_slot_recovers_missing_registered_worktree(tmp_path):
         text=True,
     )
     assert (worktree / "README.md").exists()
+
+
+def test_stale_custom_provider_is_healed_for_openai_compatible_endpoint(monkeypatch, tmp_path):
+    from empire_os import hermes_control
+
+    monkeypatch.setenv("EMPIRE_HERMES_PROVIDER", "custom")
+    monkeypatch.setenv("EMPIRE_HERMES_MODEL", "auto")
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://127.0.0.1:20128/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "local-test-key")
+    monkeypatch.setenv("EMPIRE_HERMES_BIN", "/bin/echo")
+
+    captured = {}
+
+    class DummyProcess:
+        def __init__(self, args, **kwargs):
+            captured["args"] = list(args)
+            self.returncode = 0
+
+        def wait(self, timeout=None):
+            return 0
+
+    monkeypatch.setattr(hermes_control.subprocess, "Popen", DummyProcess)
+
+    job = HermesJob.from_mapping(base_job())
+    result = hermes_control.run_hermes(
+        job,
+        production_repo=tmp_path / "repo",
+        worktree=tmp_path / "worktree",
+    )
+
+    assert result["returncode"] == 0
+    args = captured["args"]
+    provider_index = args.index("--provider")
+    assert args[provider_index + 1] == "openai-api"
