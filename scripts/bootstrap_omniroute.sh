@@ -188,7 +188,7 @@ fi
 
 echo "=== HERMES -> OMNIROUTE ENV ==="
 cat >/etc/empire_os/omniroute-hermes.env <<EOF
-EMPIRE_HERMES_PROVIDER=custom
+EMPIRE_HERMES_PROVIDER=openai-api
 EMPIRE_HERMES_MODEL=auto
 OPENAI_BASE_URL=http://127.0.0.1:20128/v1
 OPENAI_API_KEY=$OMNIROUTE_API_KEY_VALUE
