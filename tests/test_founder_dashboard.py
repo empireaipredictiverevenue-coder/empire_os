@@ -1594,7 +1594,7 @@ def test_dashboard_exposes_non_binding_pricing_proposal(tmp_path):
 def test_dashboard_exposes_bounded_buyer_scout_runtime(tmp_path):
     root = make_root(tmp_path)
     write_json(
-        root / "runtime/buyer_acquisition/scout_latest.json",
+        root / "runtime/buyer_acquisition/scout_observations_latest.json",
         {
             "mode": "INTERNAL_RESEARCH",
             "observed_at": "2026-09-23T00:30:00+00:00",
