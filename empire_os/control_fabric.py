@@ -246,6 +246,8 @@ def default_registry() -> tuple[ComponentSpec, ...]:
                 "media_distribution_observed",
                 "media_algorithm_review_requested",
                 "media_runtime_refresh_requested",
+                "media_claim_verification_requested",
+                "media_content_pipeline_requested",
             ),
             (
                 "media_runtime_refreshed",
@@ -256,6 +258,9 @@ def default_registry() -> tuple[ComponentSpec, ...]:
                 "media_trend_fusion_ready",
                 "media_opportunity_features_ready",
                 "media_research_pack_requested",
+                "media_claim_verification_ready",
+                "media_canonical_content_ready",
+                "media_script_brief_ready",
                 "media_draft_ready",
                 "media_calendar_ready",
                 "media_retention_analysis_ready",
