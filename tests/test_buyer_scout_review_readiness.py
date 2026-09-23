@@ -74,3 +74,39 @@ def test_materializer_only_updates_holding_review_state():
     assert "buyer_scout_candidates" in path
     assert body["review_state"] == "review_ready"
     assert body["reconciliation_state"] == "REVIEW_READY"
+
+
+def test_generic_about_us_business_name_is_rejected():
+    row = candidate(
+        business_name="About us",
+        site_evidence={
+            "business_name_source": "first_party_business_name",
+            "site_evidence_score": 0.9,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        },
+    )
+
+    assert review_readiness(row) == (
+        False,
+        "business_name_not_verified",
+    )
+
+
+def test_home_title_fallback_is_rejected():
+    row = candidate(
+        business_name="Home - Acme Roofing",
+        site_evidence={
+            "business_name_source": "page_title_fallback",
+            "site_evidence_score": 0.9,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        },
+    )
+
+    assert review_readiness(row) == (
+        False,
+        "business_name_not_verified",
+    )
