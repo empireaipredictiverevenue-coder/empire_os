@@ -119,7 +119,7 @@ def test_run_promotes_only_native_confirmed_first_party_contact(monkeypatch):
     monkeypatch.setattr(
         worker,
         "verify_contact_plan",
-        lambda enriched, *, validator: {
+        lambda enriched, *, validator, allow_company_routed=False: {
             "verified_contacts": enriched["contact_candidates"],
             "review_ready": True,
             "outreach_ready": True,
@@ -243,6 +243,7 @@ def test_probe_options_are_bounded_and_removed_from_row():
         "max_pages": 15,
         "request_timeout": 1.0,
         "time_budget_seconds": 45.0,
+        "allow_company_routed": False,
     }
     assert "_probe_options" not in row
 
@@ -326,3 +327,16 @@ def test_placeholder_person_cannot_be_promoted_from_first_party_contact():
         }],
     )
     assert result["decision_maker"] is None
+
+
+def test_probe_options_can_enable_company_routed_contact():
+    import empire_os.buyer_probe_worker as worker
+
+    row = {
+        "id": "p1",
+        "_probe_options": {
+            "allow_company_routed": True,
+        },
+    }
+    options = worker._probe_options_from_row(row)
+    assert options["allow_company_routed"] is True
