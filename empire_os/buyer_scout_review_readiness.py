@@ -23,10 +23,17 @@ GENERIC_BUSINESS_NAMES = frozenset({
     "welcome",
     "homepage",
     "index",
+    "learn more",
+    "read more",
+    "click here",
+    "get started",
+    "step 1",
+    "step 2",
+    "step 3",
 })
 
 
-def _reliable_business_name(
+def reliable_business_name(
     name: str,
     *,
     source: str | None = None,
@@ -40,9 +47,11 @@ def _reliable_business_name(
         return False
 
     if re.match(
-        r"^(home|about(?: us)?|contact(?: us)?|services?)\s*[-|:]",
+        r"^(home|about(?: us)?|contact(?: us)?|services?|step\s+\d+)\s*[-|:]",
         lowered,
     ):
+        return False
+    if re.fullmatch(r"step\s+\d+", lowered):
         return False
 
     return True
@@ -66,7 +75,7 @@ def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
         if isinstance(row.get("site_evidence"), Mapping)
         else {}
     )
-    if not _reliable_business_name(
+    if not reliable_business_name(
         business_name,
         source=site.get("business_name_source"),
     ):
