@@ -104,3 +104,54 @@ def test_failed_search_is_explicitly_unavailable_not_fake_empty_success():
 def test_serp_query_is_required():
     with pytest.raises(SerpSnapshotError, match="query required"):
         SearchFabricSerpAdapter(lambda *args, **kwargs: {}).snapshot("  ")
+
+
+def test_serp_adapter_supports_search_callable_without_engine_kwarg():
+    def simple_search(query, num):
+        return {
+            "organic": [{
+                "title": "Simple result",
+                "link": "https://example.test/",
+                "snippet": "Evidence.",
+                "position": 1,
+                "relevance_score": 1.0,
+            }],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": "empire_test",
+                "quality_gate": "lexical_v1",
+                "cache": False,
+            },
+        }
+
+    snapshot = SearchFabricSerpAdapter(
+        simple_search,
+        clock=lambda: FIXED_TIME,
+    ).snapshot("simple query", num=3)
+
+    assert snapshot.available is True
+    assert snapshot.engine == "empire_test"
+    assert snapshot.results[0].position == 1
+
+
+def test_serp_adapter_passes_explicit_engine_when_requested():
+    seen = {}
+
+    def engine_search(query, num, engine=None):
+        seen["engine"] = engine
+        return {
+            "organic": [],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": engine or "none",
+            },
+        }
+
+    SearchFabricSerpAdapter(
+        engine_search,
+        clock=lambda: FIXED_TIME,
+    ).snapshot("test", engine="bing_html")
+
+    assert seen["engine"] == "bing_html"
