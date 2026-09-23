@@ -38,6 +38,7 @@ from empire_os.prospect_ingest import (
     prepare_candidate,
 )
 from empire_os.signal_inbox import enqueue_signal
+from empire_os.runtime_env import load_runtime_env
 
 LOG_PATH = Path(
     os.environ.get(
@@ -48,6 +49,46 @@ LOG_PATH = Path(
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 MAX_RUN_SEC = int(os.environ.get("CRAWLER_TIMEOUT", "1800"))
+
+
+def _bootstrap_runtime_env() -> None:
+    """Load canonical worker credentials for one-off CLI runs.
+
+    Exported shell variables win. The canonical host env is tried first, then
+    the protected outbound worker env used by other production services.
+    Nothing is printed or persisted.
+    """
+    required = ("SUPABASE_URL", "SUPABASE_SERVICE_KEY")
+    if all(os.environ.get(key) for key in required):
+        return
+
+    candidates = [
+        Path(os.environ.get("EMPIRE_ENV_PATH", "/etc/empire_os.env")),
+        Path("/srv/empire_os/runtime/secrets/outbound.env"),
+    ]
+    merged: dict[str, str] = {
+        key: value
+        for key, value in os.environ.items()
+        if value not in (None, "")
+    }
+    for path in candidates:
+        try:
+            loaded = load_runtime_env(path)
+        except Exception:
+            continue
+        for key, value in loaded.items():
+            if value and key not in merged:
+                merged[key] = value
+        if all(merged.get(key) for key in required):
+            break
+
+    for key in required:
+        value = merged.get(key)
+        if value and not os.environ.get(key):
+            os.environ[key] = value
+
+
+_bootstrap_runtime_env()
 
 
 def _die_on_hang(signum, frame):
