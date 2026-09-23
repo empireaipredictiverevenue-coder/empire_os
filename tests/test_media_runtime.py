@@ -85,6 +85,28 @@ def seed_real_media_inputs(root: Path) -> None:
     )
     write_json(
         root,
+        "runtime/media_os/input/youtube_owned_video_metrics.json",
+        {
+            "records": [
+                {
+                    "channel_id": "owned-channel",
+                    "video_id": "owned-v1",
+                    "views": 1400,
+                    "engaged_views": 1110,
+                    "watch_time_minutes": 6300,
+                    "average_view_duration_seconds": 270,
+                    "average_view_percentage": 0.60,
+                    "subscribers_gained": 52,
+                    "subscribers_lost": 3,
+                    "evidence_refs": [
+                        "youtube:analytics:owned-v1:summary"
+                    ],
+                }
+            ]
+        },
+    )
+    write_json(
+        root,
         "runtime/media_os/input/trend_signals.json",
         {
             "signals": [
@@ -184,7 +206,7 @@ def test_runtime_ingests_real_evidence_and_builds_internal_backlog(tmp_path):
     seed_real_media_inputs(tmp_path)
     result = build_media_os_runtime(tmp_path)
 
-    assert result["observed_source_count"] == 5
+    assert result["observed_source_count"] == 6
     assert result["real_evidence_present"] is True
 
     youtube = result["youtube_public"]
@@ -192,6 +214,12 @@ def test_runtime_ingests_real_evidence_and_builds_internal_backlog(tmp_path):
     assert youtube["channel_baseline_count"] == 1
     assert youtube["outliers"]["candidate_count"] == 1
     assert youtube["outliers"]["candidates"][0]["video_id"] == "v4"
+
+    owned = result["owned_video_metrics"]
+    assert owned["record_count"] == 1
+    assert owned["observed_totals"]["views"] == 1400.0
+    assert owned["observed_totals"]["subscribers_gained"] == 52.0
+    assert owned["actual_revenue"] is False
 
     algorithm = result["algorithm_intelligence"]
     assert algorithm["observation_count"] == 2
