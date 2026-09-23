@@ -40,3 +40,12 @@ def test_catalog_cycle_owns_country_native_pricing_sync():
     assert "sync_market_pricing.py" in text
     assert "refresh_solar_economics.py" in text
     assert "EnvironmentFile=/etc/empire_os.env" in text
+
+
+def test_catalog_service_can_write_solar_economics_runtime():
+    text = (
+        ROOT / "deploy/systemd/empire-commercial-product-catalog.service"
+    ).read_text()
+
+    assert "ProtectSystem=strict" in text
+    assert "ReadWritePaths=/srv/empire_os/runtime/solar_opportunity_maps" in text
