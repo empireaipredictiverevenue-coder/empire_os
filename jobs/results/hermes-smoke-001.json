@@ -1,0 +1,23 @@
+{
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "changed_paths": [],
+  "completed_at": "2026-09-23T15:48:36.662444+00:00",
+  "database_mutation_performed": false,
+  "error": "HermesControlError: command failed: git -C /srv/empire_os worktree\nstdout:\n\nstderr:\nPreparing worktree (detached HEAD d1a14ce0)\nfatal: '/srv/empire_os/runtime/hermes_control/jobs/hermes-smoke-001/worktree' is a missing but already registered worktree;\nuse 'add -f' to override, or 'prune' or 'remove' to clear\n",
+  "execution_authority": "none",
+  "external_commercial_action_performed": false,
+  "founder_gate_required": false,
+  "git_remote_io_performed": true,
+  "hermes": null,
+  "job_id": "hermes-smoke-001",
+  "job_path": "jobs/inbox/hermes-smoke-001.json",
+  "kind": "code_task",
+  "payment_action_performed": false,
+  "proposal_branch": null,
+  "proposal_commit": null,
+  "schema_version": "empire.hermes.control_result.v1",
+  "started_at": "2026-09-23T15:48:35.354850+00:00",
+  "status": "FAILED",
+  "verification": null
+}
