@@ -454,21 +454,49 @@ def buyer_research_queries(
     *,
     niche_family: str | None,
     territory: str | None,
-) -> list[str]:
+) -> dict[str, list[str]]:
     niche = _text(niche_family).replace("_", " ") or "B2B"
     place = _text(territory).replace("_", " ") or ""
     suffix = f" {place}".rstrip()
-    return [
-        f'"buy {niche} leads"{suffix}',
-        f'"{niche} lead buyer"{suffix}',
-        f'"pay per lead" {niche}{suffix}',
-        f'"pay per call" {niche}{suffix}',
-        f'"{niche}" "lead generation agency"{suffix}',
-        f'"{niche}" "performance marketing"{suffix}',
-        f'"{niche}" "affiliate network"{suffix}',
-        f'"{niche}" "lead marketplace"{suffix}',
-        f'"{niche}" "booked appointments"{suffix}',
-    ]
+
+    return {
+        "direct_demand_buyers": [
+            f'"buy {niche} leads"{suffix}',
+            f'"{niche} lead buyer"{suffix}',
+            f'"pay per lead" {niche}{suffix}',
+            f'"pay per call" {niche}{suffix}',
+            f'"{niche}" "lead generation agency"{suffix}',
+            f'"{niche}" "performance marketing"{suffix}',
+            f'"{niche}" "affiliate network"{suffix}',
+            f'"{niche}" "lead marketplace"{suffix}',
+            f'"{niche}" "booked appointments"{suffix}',
+        ],
+        "end_service_buyers": [
+            f'"{niche} company"{suffix}',
+            f'"{niche} contractor"{suffix}',
+            f'"{niche}" "service area"{suffix}',
+            f'"{niche}" "free estimate"{suffix}',
+            f'"{niche}" "schedule service"{suffix}',
+        ],
+        "agency_and_reseller_buyers": [
+            f'"{niche}" "marketing agency"{suffix}',
+            f'"{niche}" "growth agency"{suffix}',
+            f'"{niche}" "white label"{suffix}',
+            f'"{niche}" reseller{suffix}',
+        ],
+        "enterprise_and_data_buyers": [
+            f'"{niche}" "market intelligence"{suffix}',
+            f'"{niche}" "intent data"{suffix}',
+            f'"{niche}" "data provider"{suffix}',
+            f'"{niche}" enterprise{suffix}',
+        ],
+        "software_and_advisory_buyers": [
+            f'"{niche}" "sales software"{suffix}',
+            f'"{niche}" "revenue operations"{suffix}',
+            f'"{niche}" "growth platform"{suffix}',
+            f'"{niche}" "revenue audit"{suffix}',
+        ],
+    }
 
 
 def build_buyer_acquisition_plan(
