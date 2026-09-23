@@ -275,6 +275,29 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "market_validate_product_count": payload.get(
                 "market_validate_product_count"
             ),
+            "icp_priority_target_count": payload.get(
+                "icp_priority_target_count"
+            ),
+            "icp_profile_count": (
+                (payload.get("icp_buyer_trigger_intelligence") or {}).get(
+                    "profile_count"
+                )
+                if isinstance(
+                    payload.get("icp_buyer_trigger_intelligence"),
+                    Mapping,
+                )
+                else None
+            ),
+            "icp_execution_authority": (
+                (payload.get("icp_buyer_trigger_intelligence") or {}).get(
+                    "execution_authority"
+                )
+                if isinstance(
+                    payload.get("icp_buyer_trigger_intelligence"),
+                    Mapping,
+                )
+                else "none"
+            ),
             "live_outbound_send": automation.get(
                 "live_outbound_send"
             ),
