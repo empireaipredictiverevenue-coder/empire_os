@@ -346,7 +346,21 @@ def test_status_exposes_tag_intelligence_without_mutation_authority(tmp_path):
             "failed_target_count": 0,
             "critical_issue_count": 1,
             "high_issue_count": 3,
+            "search_issue_count": 5,
+            "measurement_issue_count": 4,
+            "change_count": 6,
             "critical_change_count": 2,
+            "monitored_site_count": 3,
+            "monitored_page_count": 4,
+            "pages_with_public_noindex": 1,
+            "pages_missing_canonical": 1,
+            "pages_missing_schema": 2,
+            "missing_conversion_event_count": 1,
+            "duplicate_conversion_event_count": 1,
+            "measurement_observation": {
+                "ga4": "OBSERVED_IN_STATIC_MARKUP",
+                "revenue_truth_linkage": "UNKNOWN",
+            },
             "automatic_tag_mutation": False,
             "measurement_platform_write": False,
             "execution_authority": "none",
@@ -364,7 +378,18 @@ def test_status_exposes_tag_intelligence_without_mutation_authority(tmp_path):
     assert component["available"] is True
     assert component["summary"]["target_count"] == 4
     assert component["summary"]["critical_issue_count"] == 1
+    assert component["summary"]["search_issue_count"] == 5
+    assert component["summary"]["measurement_issue_count"] == 4
+    assert component["summary"]["change_count"] == 6
     assert component["summary"]["critical_change_count"] == 2
+    assert component["summary"]["monitored_site_count"] == 3
+    assert component["summary"]["monitored_page_count"] == 4
+    assert component["summary"]["pages_with_public_noindex"] == 1
+    assert component["summary"]["pages_missing_canonical"] == 1
+    assert component["summary"]["pages_missing_schema"] == 2
+    assert component["summary"]["measurement_observation"]["ga4"] == (
+        "OBSERVED_IN_STATIC_MARKUP"
+    )
     assert component["summary"]["automatic_tag_mutation"] is False
     assert component["summary"]["measurement_platform_write"] is False
     assert component["execution_authority"] == "none"
