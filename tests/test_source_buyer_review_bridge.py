@@ -186,9 +186,22 @@ def test_source_review_exact_subset_is_intersected_with_hot_source_ids(monkeypat
 
     monkeypatch.setattr(
         bridge,
-        "sync_solar_opportunity_map_product",
-        lambda: {
-            "product_code": "solar_opportunity_map",
+        "infer_country_code",
+        lambda **kwargs: "GB",
+    )
+    monkeypatch.setattr(
+        bridge,
+        "market_price",
+        lambda code: type("Price", (), {
+            "country_code": code,
+        })(),
+    )
+    monkeypatch.setattr(
+        bridge,
+        "sync_market_price",
+        lambda price: {
+            "product_code": "solar_opportunity_map_gb",
+            "country_code": "GB",
             "binding_terms_ready": False,
         },
     )
