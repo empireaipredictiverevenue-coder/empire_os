@@ -20,6 +20,30 @@ echo "=== PREPARE OMNIROUTE STATE ==="
 install -d -m 700 -o "$TARGET_USER" -g "$TARGET_USER" "$TARGET_HOME/.omniroute"
 install -d -m 755 /etc/empire_os
 
+PROVIDER_ENV=/etc/empire_os/omniroute-providers.env
+if [[ ! -f "$PROVIDER_ENV" ]]; then
+  cat >"$PROVIDER_ENV" <<'EOF'
+# Optional EmpireOS provider keys. Values stay on the server and are never committed.
+# Uncomment only providers/accounts you are authorised to use.
+# GEMINI_API_KEY=
+# NVIDIA_API_KEY=
+# GROQ_API_KEY=
+# CEREBRAS_API_KEY=
+# OPENROUTER_API_KEY=
+# DEEPSEEK_API_KEY=
+# SILICONFLOW_API_KEY=
+# GLM_API_KEY=
+# HF_TOKEN=
+# MISTRAL_API_KEY=
+# TOGETHER_API_KEY=
+# FIREWORKS_API_KEY=
+# COHERE_API_KEY=
+# XAI_API_KEY=
+EOF
+  chmod 600 "$PROVIDER_ENV"
+  chown root:root "$PROVIDER_ENV"
+fi
+
 ENV_FILE="$TARGET_HOME/.omniroute/.env"
 if [[ ! -f "$ENV_FILE" ]]; then
   JWT_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
@@ -61,7 +85,7 @@ runuser -u "$TARGET_USER" -- bash -lc '
   if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi
   node --version
   npm --version
-  npm install -g omniroute@latest
+  npm install -g omniroute@3.8.51
   command -v omniroute
   omniroute --version || true
 '
