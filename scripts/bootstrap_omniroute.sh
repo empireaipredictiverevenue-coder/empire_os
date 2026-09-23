@@ -88,7 +88,7 @@ runuser -u "$TARGET_USER" -- bash -lc '
   if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi
   node --version
   npm --version
-  npm install -g omniroute@3.8.51
+  npm install -g omniroute@3.8.50
   command -v omniroute
   omniroute --version || true
 '
