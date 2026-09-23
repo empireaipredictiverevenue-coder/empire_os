@@ -1,0 +1,12 @@
+{
+  "schema_version":"empire.hermes.control_job.v1",
+  "job_id":"hermes-smoke-009-self-updating-worker",
+  "kind":"code_task",
+  "authority":"internal_write",
+  "base_branch":"feature/revenue-intelligence-v2",
+  "prompt":"Prove the self-updating resident Hermes worker. Create docs/HERMES_SELF_UPDATING_WORKER_SMOKE.md and only that file. Record the worker code SHA visible to the job if available, that execution occurred in an isolated worktree, remained proposal-only, and performed no live outbound, payment/fund movement, database mutation, revenue recognition, production merge, recovery/ access, or toop/ access.",
+  "allowed_paths":["docs/"],
+  "pytest_targets":["tests/test_hermes_control.py","tests/test_hermes_control_systemd.py"],
+  "max_runtime_seconds":600,
+  "created_at":"2026-09-23T16:30:00Z"
+}
