@@ -140,6 +140,9 @@ def test_media_os_is_control_fabric_component_owned_by_marketing_growth():
     assert "conversion_intelligence" in media.dependencies
     assert "revenue_crm" in media.dependencies
     assert all("publish" not in event for event in media.produces)
+    assert "media_claim_verification_ready" in media.produces
+    assert "media_canonical_content_ready" in media.produces
+    assert "media_script_brief_ready" in media.produces
     assert "quant_review_requested" in media.produces
     assert "experiment_review_requested" in media.produces
 
