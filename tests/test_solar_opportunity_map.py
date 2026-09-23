@@ -97,7 +97,11 @@ def test_solar_map_reuses_search_report_and_keeps_serp_unknown():
         },
     )
 
+    assert payload["offer"]["product_code"] == "solar_opportunity_map_gb"
+    assert payload["offer"]["country_code"] == "GB"
+    assert payload["offer"]["currency"] == "GBP"
     assert payload["offer"]["price_display"] == "£249"
+    assert payload["offer"]["approval_state"] == "FOUNDER_APPROVED"
     assert payload["buyer_review"]["contact_route"] == "company_routed"
     assert payload["actual_revenue"] is False
     report = payload["search_opportunity_report"]
@@ -249,3 +253,62 @@ def test_market_context_labels_niche_portfolio_as_not_local():
     assert context["match_basis"] == "niche_portfolio_not_local"
     assert context["local_match"] is False
     assert len(context["markets"]) == 2
+
+
+def test_non_uk_solar_map_uses_native_proposed_price():
+    def us_request(method, path, payload=None, prefer=None):
+        if path.startswith("/rest/v1/prospects?"):
+            return [{
+                "id": PID,
+                "business_name": "Example US Solar",
+                "niche": "solar",
+                "metro": "Austin, United States",
+                "website": "https://us-solar.example",
+                "phone": "+15125550100",
+                "address": "Austin, TX, United States",
+                "status": "qualified",
+            }]
+        if path.startswith("/rest/v1/prospect_qualifications?"):
+            return []
+        if path.startswith("/rest/v1/prospect_acquisitions?"):
+            return [{
+                "source": "manual_verified",
+                "source_url": "https://example.test",
+                "evidence": {},
+                "created_at": "2026-09-23T19:00:00Z",
+            }]
+        if path.startswith("/rest/v1/buyer_candidate_reviews?"):
+            return [{
+                "id": "review-us",
+                "prospect_id": PID,
+                "contact_name": "John Smith",
+                "contact_title": "Owner",
+                "contact_email": "info@us-solar.example",
+                "offer_key": "solar_opportunity_map",
+                "company_score": 80,
+                "decision_score": 1.0,
+                "evidence": {"contact_route": "company_routed"},
+                "status": "pending",
+                "proposed_at": "2026-09-23T21:00:00Z",
+            }]
+        raise AssertionError(path)
+
+    payload = som.build_solar_opportunity_map(
+        PID,
+        request=us_request,
+        market_gps={},
+        competitor_market={},
+        crawl=lambda *args, **kwargs: {
+            "audit": {"available": True, "findings": []},
+        },
+        observe_tags=lambda *args, **kwargs: {
+            "ok": False,
+            "error": "timeout",
+        },
+    )
+
+    assert payload["offer"]["product_code"] == "solar_opportunity_map_us"
+    assert payload["offer"]["currency"] == "USD"
+    assert payload["offer"]["price_display"] == "$299"
+    assert payload["offer"]["approval_state"] == "PROPOSED"
+    assert payload["offer"]["catalog_binding"] is False
