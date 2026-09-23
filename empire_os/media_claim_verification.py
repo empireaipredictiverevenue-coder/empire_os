@@ -698,8 +698,11 @@ def refresh_media_claim_verification(
     *,
     gateway: LLMGateway | None = None,
     probe: ProbeFn = probe_site,
-    max_packs: int = 3,
+    max_packs: int = 2,
     max_claims_per_pack: int = 4,
+    max_sources_per_pack: int = 3,
+    source_request_timeout_seconds: float = 6.0,
+    source_time_budget_seconds: float = 8.0,
     force: bool = False,
 ) -> dict[str, Any]:
     source = _read_json(repo_root / INPUT)
@@ -727,6 +730,9 @@ def refresh_media_claim_verification(
         observations = observe_research_sources(
             pack,
             probe=probe,
+            max_sources=max_sources_per_pack,
+            request_timeout_seconds=source_request_timeout_seconds,
+            per_source_time_budget_seconds=source_time_budget_seconds,
         )
         proposals = propose_claims(
             pack,
@@ -771,6 +777,23 @@ def refresh_media_claim_verification(
         "input_fingerprint": input_fingerprint,
         "research_pack_count": len(packs),
         "processed_pack_count": len(selected),
+        "limits": {
+            "max_packs": max(1, min(int(max_packs), 5)),
+            "max_claims_per_pack": max(
+                1, min(int(max_claims_per_pack), 6)
+            ),
+            "max_sources_per_pack": max(
+                1, min(int(max_sources_per_pack), 8)
+            ),
+            "source_request_timeout_seconds": max(
+                1.0,
+                min(float(source_request_timeout_seconds), 15.0),
+            ),
+            "source_time_budget_seconds": max(
+                2.0,
+                min(float(source_time_budget_seconds), 20.0),
+            ),
+        },
         "verified_claim_count": sum(
             int(row.get("verified_claim_count") or 0)
             for row in verified_packs
