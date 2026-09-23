@@ -245,8 +245,10 @@ def default_registry() -> tuple[ComponentSpec, ...]:
                 "media_workflow_execution_observed",
                 "media_distribution_observed",
                 "media_algorithm_review_requested",
+                "media_runtime_refresh_requested",
             ),
             (
+                "media_runtime_refreshed",
                 "youtube_intelligence_refreshed",
                 "media_algorithm_intelligence_ready",
                 "media_recommendation_chain_ready",
