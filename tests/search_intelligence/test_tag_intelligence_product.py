@@ -23,6 +23,11 @@ def test_tag_intelligence_monitor_covers_search_and_measurement_surfaces():
     deliverables = set(product.deliverables)
     assert "title_meta_canonical_robots_health" in deliverables
     assert "meta_pixel_and_capi_health" in deliverables
+    assert "linkedin_insight_tag_health" in deliverables
+    assert "tiktok_pixel_health" in deliverables
+    assert "microsoft_uet_health" in deliverables
+    assert "reddit_pixel_health" in deliverables
+    assert "pinterest_tag_health" in deliverables
     assert "google_tag_gtm_ga4_health" in deliverables
     assert "conversion_event_integrity" in deliverables
     assert "consent_configuration_review" in deliverables
