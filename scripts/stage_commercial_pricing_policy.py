@@ -13,34 +13,13 @@ from __future__ import annotations
 
 import argparse
 import json
-from copy import deepcopy
 from typing import Any
 
 from empire_os.commercial_pricing_policy import (
+    LAUNCH_PRICING,
     build_launch_pricing_proposal,
 )
 from empire_os.qualification_worker_v2 import request_json
-
-
-def _approved_payload(
-    row: dict[str, Any],
-    approval_reference: str,
-) -> dict[str, Any]:
-    value = deepcopy(row)
-
-    for key in (
-        "price_basis",
-        "acquisition_cost_basis",
-        "fulfilment_cost_basis",
-    ):
-        basis = value[key]
-        basis["source_type"] = "founder_approved"
-        basis["approval_reference"] = approval_reference
-
-    value["margin_policy"]["approval_reference"] = approval_reference
-    value["binding"] = False
-    value["founder_approval_required"] = False
-    return value
 
 
 def _rpc_payload(
@@ -119,8 +98,11 @@ def main() -> int:
         )
 
     results = []
-    for source in products:
-        approved = _approved_payload(source, approval)
+    approved_rows = [
+        policy.as_approved_dict(approval)
+        for policy in LAUNCH_PRICING
+    ]
+    for approved in approved_rows:
         response = request_json(
             "POST",
             "/rest/v1/rpc/propose_commercial_product_version",
