@@ -19,6 +19,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+import urllib.error
+import urllib.request
 from typing import Any, Iterable, Mapping
 
 
@@ -513,10 +515,114 @@ TASK
 """
 
 
+DEFAULT_OMNIROUTE_MODEL_CANDIDATES = (
+    "gemini/gemini-3.5-flash-lite",
+    "gemini/gemini-3.1-flash-lite",
+    "gemini/gemini-3.1-pro-preview",
+    "openrouter/openrouter/free",
+)
+
+
+def _probe_omniroute_model(
+    *,
+    base_url: str,
+    api_key: str,
+    model: str,
+    timeout: int = 25,
+) -> tuple[bool, str]:
+    url = base_url.rstrip("/") + "/chat/completions"
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Reply exactly OK.",
+                }
+            ],
+            "max_tokens": 8,
+        }
+    ).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    request = urllib.request.Request(
+        url,
+        data=payload,
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read().decode("utf-8", "replace")
+            if response.status != 200:
+                return False, f"http_{response.status}"
+            try:
+                body = json.loads(raw or "{}")
+            except json.JSONDecodeError:
+                return False, "invalid_json"
+            choices = body.get("choices")
+            if not isinstance(choices, list) or not choices:
+                return False, "missing_choices"
+            return True, "ok"
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", "replace")
+        safe = re.sub(
+            r"(?i)(api[_-]?key|token|secret)[^\s,;]*",
+            "[REDACTED]",
+            raw,
+        )
+        return False, f"http_{exc.code}:{safe[:240]}"
+    except (urllib.error.URLError, TimeoutError) as exc:
+        return False, f"network:{type(exc).__name__}"
+
+
+def _select_omniroute_model(
+    env: Mapping[str, str],
+) -> tuple[str, list[dict[str, str]]]:
+    base_url = str(env.get("OPENAI_BASE_URL") or "").strip()
+    api_key = str(env.get("OPENAI_API_KEY") or "").strip()
+    configured = str(
+        os.environ.get("EMPIRE_HERMES_MODEL_CANDIDATES") or ""
+    ).strip()
+    candidates = tuple(
+        item.strip()
+        for item in configured.split(",")
+        if item.strip()
+    ) or DEFAULT_OMNIROUTE_MODEL_CANDIDATES
+
+    attempts: list[dict[str, str]] = []
+    for model in candidates:
+        ok, reason = _probe_omniroute_model(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+        )
+        attempts.append(
+            {
+                "model": model,
+                "ok": "true" if ok else "false",
+                "reason": reason,
+            }
+        )
+        if ok:
+            return model, attempts
+
+    raise HermesControlError(
+        "no healthy OmniRoute model candidate; "
+        + "; ".join(
+            f"{row['model']}={row['reason']}"
+            for row in attempts
+        )
+    )
+
+
 def _write_isolated_hermes_config(
     *,
     production_repo: Path,
     env: Mapping[str, str],
+    model: str,
 ) -> Path | None:
     """Create a worker-only Hermes home for the local OmniRoute endpoint.
 
@@ -541,7 +647,7 @@ def _write_isolated_hermes_config(
     payload = {
         "model": {
             "provider": "custom",
-            "default": "openrouter/openrouter/free",
+            "default": model,
             "base_url": base_url,
             "api_mode": "chat_completions",
         }
@@ -585,14 +691,21 @@ def run_hermes(
     env = _hermes_environment()
     env["PYTHONUNBUFFERED"] = "1"
 
+    base_url = str(env.get("OPENAI_BASE_URL") or "").strip()
+    model_attempts: list[dict[str, str]] = []
+    selected_model: str | None = None
+    if base_url:
+        selected_model, model_attempts = _select_omniroute_model(env)
+
     isolated_home = _write_isolated_hermes_config(
         production_repo=production_repo,
         env=env,
+        model=selected_model or "auto",
     )
     if isolated_home is not None:
         env["HERMES_HOME"] = str(isolated_home)
         provider = "custom"
-        model = "openrouter/openrouter/free"
+        model = selected_model or "auto"
         endpoint_mode = "isolated_omniroute"
     else:
         provider = str(
@@ -666,6 +779,7 @@ def run_hermes(
         "provider": provider,
         "model": model,
         "hermes_home_isolated": isolated_home is not None,
+        "model_probe_attempts": model_attempts,
     }
 
 def run_verification(
