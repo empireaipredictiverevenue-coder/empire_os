@@ -999,6 +999,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     buyer_scout_observation_runtime_path = (
         runtime / "buyer_acquisition" / "scout_observations_latest.json"
     )
+    media_os_runtime_path = (
+        runtime / "media_os" / "latest.json"
+    )
 
     raw_loop = _read_json(loop_path)
     conveyor = build_conveyor(raw_loop or {"stages": []})
@@ -1158,6 +1161,8 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             buyer_scout_observation_runtime_path,
         ),
         "commercial_pricing_proposal": build_launch_pricing_proposal(),
-        "media_os": media_os_founder_status(),
+        "media_os": media_os_founder_status(
+            _read_json(media_os_runtime_path)
+        ),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
