@@ -48,6 +48,7 @@ from empire_os.search_traffic_forecast import (
     aggregate_search_console_daily,
     forecast_search_traffic,
 )
+from empire_os.tag_intelligence import review_tag_intelligence
 from empire_os.timesfm_shadow import configured_timesfm_provider
 
 
@@ -185,6 +186,12 @@ class SchemaPreviewRequest(BaseModel):
 class MetadataPreviewRequest(BaseModel):
     page: dict[str, Any]
     quality_factors: dict[str, float | None] = Field(default_factory=dict)
+
+
+class TagIntelligencePreviewRequest(BaseModel):
+    page_tags: dict[str, Any] = Field(default_factory=dict)
+    measurement_tags: dict[str, Any] = Field(default_factory=dict)
+    expectations: dict[str, Any] = Field(default_factory=dict)
 
 
 class SerpQueryRequest(BaseModel):
@@ -433,6 +440,8 @@ def create_search_router(
             "competitor_gap": True,
             "citation_gap": True,
             "recommendation_visibility": True,
+            "tag_intelligence": True,
+            "conversion_intelligence": True,
             "traffic_forecast": True,
             "timesfm_shadow": bool(
                 configured_timesfm_provider().status().get("available")
@@ -900,6 +909,20 @@ def create_search_router(
         return asdict(
             generate_metadata(page, quality=quality)
         )
+
+    @router.post("/tag-intelligence/preview")
+    def tag_intelligence_preview(req: TagIntelligencePreviewRequest):
+        return {
+            "schema_version": "empire.tag_intelligence.v1",
+            "mode": "OBSERVE",
+            "recommendation_only": True,
+            "execution_allowed": False,
+            "analysis": review_tag_intelligence(
+                page_tags=req.page_tags,
+                measurement_tags=req.measurement_tags,
+                expectations=req.expectations,
+            ).as_dict(),
+        }
 
     return router
 
