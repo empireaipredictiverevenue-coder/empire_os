@@ -48,8 +48,8 @@ def main() -> int:
     buyers = _get(
         "/rest/v1/buyers",
         {
-            "select": "id,buyer_name,website,status,is_active",
-            "website": "not.is.null",
+            "select": "id,buyer_name,email,status,is_active",
+            "email": "not.is.null",
             "limit": str(limit),
         },
     )
