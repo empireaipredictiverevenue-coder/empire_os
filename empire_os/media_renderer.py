@@ -85,6 +85,7 @@ class MediaRenderJob:
 def build_render_plan(
     job: MediaRenderJob,
     *,
+    renderer_license_ref: str | None = None,
     ffmpeg_build_ref: str | None = None,
     codec_policy_ref: str | None = None,
     material_spend_threshold_usd: float = 50.0,
@@ -93,10 +94,14 @@ def build_render_plan(
     provider = dict(RENDER_PROVIDERS[job.renderer])
 
     licence_ready = True
-    if provider["licence_profile_required"]:
+    if job.renderer == "ffmpeg":
         licence_ready = bool(
             str(ffmpeg_build_ref or "").strip()
             and str(codec_policy_ref or "").strip()
+        )
+    elif provider["licence_profile_required"]:
+        licence_ready = bool(
+            str(renderer_license_ref or "").strip()
         )
 
     cost = (
@@ -124,6 +129,7 @@ def build_render_plan(
         "job": job.as_dict(),
         "provider": provider,
         "priority_label": RENDER_PRIORITIES[job.priority],
+        "renderer_license_ref": renderer_license_ref,
         "ffmpeg_build_ref": ffmpeg_build_ref,
         "codec_policy_ref": codec_policy_ref,
         "licence_ready": licence_ready,
