@@ -200,6 +200,20 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
             return ("completed with local-test-key", None)
 
     monkeypatch.setattr(hermes_control.subprocess, "Popen", DummyProcess)
+    monkeypatch.setattr(
+        hermes_control,
+        "_select_omniroute_model",
+        lambda env: (
+            "gemini/gemini-3.5-flash-lite",
+            [
+                {
+                    "model": "gemini/gemini-3.5-flash-lite",
+                    "ok": "true",
+                    "reason": "ok",
+                }
+            ],
+        ),
+    )
 
     repo = tmp_path / "repo"
     worktree = tmp_path / "worktree"
@@ -214,7 +228,7 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     assert result["returncode"] == 0
     assert result["endpoint_mode"] == "isolated_omniroute"
     assert result["provider"] == "custom"
-    assert result["model"] == "openrouter/openrouter/free"
+    assert result["model"] == "gemini/gemini-3.5-flash-lite"
     assert result["hermes_home_isolated"] is True
     assert "local-test-key" not in result["output_tail"]
     assert "[REDACTED]" in result["output_tail"]
@@ -223,12 +237,42 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     provider_index = args.index("--provider")
     model_index = args.index("--model")
     assert args[provider_index + 1] == "custom"
-    assert args[model_index + 1] == "openrouter/openrouter/free"
+    assert args[model_index + 1] == "gemini/gemini-3.5-flash-lite"
 
     hermes_home = repo / "runtime/hermes_control/hermes_home"
     assert captured["env"]["HERMES_HOME"] == str(hermes_home)
     config = (hermes_home / "config.yaml").read_text()
     assert '"provider": "custom"' in config
-    assert '"default": "openrouter/openrouter/free"' in config
+    assert '"default": "gemini/gemini-3.5-flash-lite"' in config
     assert "http://127.0.0.1:20128/v1" in config
     assert "local-test-key" in config
+
+
+def test_omniroute_model_selector_skips_failed_candidates(monkeypatch):
+    from empire_os import hermes_control
+
+    outcomes = {
+        "gemini/gemini-3.5-flash-lite": (False, "http_429"),
+        "gemini/gemini-3.1-flash-lite": (True, "ok"),
+    }
+
+    def fake_probe(*, base_url, api_key, model, timeout=25):
+        return outcomes.get(model, (False, "not_tested"))
+
+    monkeypatch.setattr(
+        hermes_control,
+        "_probe_omniroute_model",
+        fake_probe,
+    )
+    monkeypatch.delenv("EMPIRE_HERMES_MODEL_CANDIDATES", raising=False)
+
+    model, attempts = hermes_control._select_omniroute_model(
+        {
+            "OPENAI_BASE_URL": "http://127.0.0.1:20128/v1",
+            "OPENAI_API_KEY": "local-key",
+        }
+    )
+
+    assert model == "gemini/gemini-3.1-flash-lite"
+    assert attempts[0]["ok"] == "false"
+    assert attempts[1]["ok"] == "true"
