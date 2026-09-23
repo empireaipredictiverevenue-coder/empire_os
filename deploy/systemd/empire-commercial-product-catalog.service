@@ -8,6 +8,7 @@ Type=oneshot
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_commercial_product_catalog.py --limit 100
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/verify_commercial_pricing_snapshot.py --repo-root /srv/empire_os
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
