@@ -27,8 +27,9 @@ import time
 import random
 import hashlib
 import urllib.parse
+import threading
 from pathlib import Path
-from typing import Iterator, Optional, List, Dict, Any
+from typing import Iterator, Optional, List, Dict, Any, Mapping
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -65,6 +66,18 @@ SEARCH_KEYED_TIMEOUT = max(
 SEARCH_KEYED_ATTEMPTS = max(
     1,
     min(int(os.environ.get("EMPIRE_SEARCH_KEYED_ATTEMPTS", "2")), 3),
+)
+
+SEARCH_ENGINE_FAILURE_THRESHOLD = max(
+    1,
+    min(int(os.environ.get("EMPIRE_SEARCH_ENGINE_FAILURE_THRESHOLD", "2")), 5),
+)
+SEARCH_ENGINE_COOLDOWN_SECONDS = max(
+    30.0,
+    min(
+        float(os.environ.get("EMPIRE_SEARCH_ENGINE_COOLDOWN_SECONDS", "300")),
+        1800.0,
+    ),
 )
 
 # Rate limits per engine (seconds between requests)
@@ -153,6 +166,44 @@ BAD_DOMAINS = (
 # Rate Limiting
 # ──────────────────────────────────────────────────────────────────────
 _last_req: Dict[str, float] = {}
+_engine_health_lock = threading.Lock()
+_engine_health: Dict[str, dict] = {}
+
+
+def _engine_available(engine: str) -> bool:
+    now = time.time()
+    with _engine_health_lock:
+        state = _engine_health.get(engine) or {}
+        return float(state.get("disabled_until") or 0.0) <= now
+
+
+def _record_engine_success(engine: str) -> None:
+    with _engine_health_lock:
+        _engine_health[engine] = {
+            "failures": 0,
+            "disabled_until": 0.0,
+            "last_failure": None,
+        }
+
+
+def _record_engine_failure(engine: str, reason: str) -> None:
+    now = time.time()
+    with _engine_health_lock:
+        state = dict(_engine_health.get(engine) or {})
+        failures = int(state.get("failures") or 0) + 1
+        disabled_until = float(state.get("disabled_until") or 0.0)
+        if failures >= SEARCH_ENGINE_FAILURE_THRESHOLD:
+            disabled_until = max(
+                disabled_until,
+                now + SEARCH_ENGINE_COOLDOWN_SECONDS,
+            )
+        _engine_health[engine] = {
+            "failures": failures,
+            "disabled_until": disabled_until,
+            "last_failure": reason,
+        }
+
+
 
 def _polite(engine: str):
     rate = RATE_LIMIT.get(engine, 2.0)
@@ -253,6 +304,13 @@ def _decode_http_response(response) -> str:
 
 def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
     """Fetch raw HTML/JSON from engine. Returns text or None on failure."""
+    if not _engine_available(engine["name"]):
+        print(
+            f"[search_api] {engine['name']} circuit-open; skipping",
+            file=sys.stderr,
+        )
+        return None
+
     _polite(engine["name"])
     proxy = _next_proxy()
     headers = _headers(engine["name"])
@@ -321,8 +379,13 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                 )
 
             if r.status_code == 200:
+                _record_engine_success(engine["name"])
                 return _decode_http_response(r)
             elif r.status_code in (403, 429, 503):
+                _record_engine_failure(
+                    engine["name"],
+                    f"http_{r.status_code}",
+                )
                 print(f"[search_api] {engine['name']} HTTP {r.status_code} (attempt {attempt+1}/{attempts})", file=sys.stderr)
                 if attempt + 1 < attempts:
                     time.sleep(2 ** attempt + random.uniform(0, 1))
@@ -330,12 +393,21 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                         proxy = _next_proxy()  # rotate on block
                 continue
             else:
+                _record_engine_failure(
+                    engine["name"],
+                    f"http_{r.status_code}",
+                )
                 print(f"[search_api] {engine['name']} HTTP {r.status_code}", file=sys.stderr)
                 return None
 
         except requests.exceptions.Timeout:
+            _record_engine_failure(engine["name"], "timeout")
             print(f"[search_api] {engine['name']} timeout (attempt {attempt+1}/{attempts})", file=sys.stderr)
         except Exception as e:
+            _record_engine_failure(
+                engine["name"],
+                type(e).__name__,
+            )
             print(f"[search_api] {engine['name']} error: {e}", file=sys.stderr)
             if attempt + 1 >= attempts:
                 return None
@@ -797,17 +869,42 @@ def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
 # ──────────────────────────────────────────────────────────────────────
 # Domain Extraction & Email Scraping
 # ──────────────────────────────────────────────────────────────────────
-def search_domains(query: str, num: int = 20) -> List[str]:
-    """Extract clean domains from search results."""
-    res = search(query, num=num)
+def _domains_from_response(res: Mapping[str, Any]) -> List[str]:
     domains = []
-    for r in res.get("organic", []):
-        m = DOM_RE.search(r.get("link", ""))
+    for row in res.get("organic", []):
+        m = DOM_RE.search(row.get("link", ""))
         if m:
-            d = m.group(1).lower().replace("www.", "")
-            if d and not any(bad in d for bad in BAD_DOMAINS):
-                domains.append(d)
-    return list(dict.fromkeys(domains))  # preserve order, dedupe
+            domain = m.group(1).lower().replace("www.", "")
+            if domain and not any(
+                bad in domain for bad in BAD_DOMAINS
+            ):
+                domains.append(domain)
+    return list(dict.fromkeys(domains))
+
+
+def _broaden_query(query: str) -> str:
+    broadened = re.sub(r'["“”]', " ", query)
+    broadened = re.sub(r"\s+", " ", broadened).strip()
+    return broadened
+
+
+def search_domains(query: str, num: int = 20) -> List[str]:
+    """Extract clean domains with a bounded quote-relaxation fallback."""
+    res = search(query, num=num)
+    domains = _domains_from_response(res)
+    if domains:
+        return domains
+
+    broadened = _broaden_query(query)
+    if broadened and broadened != query.strip():
+        print(
+            "[search_fabric] no domains; retrying without exact-match quotes",
+            file=sys.stderr,
+        )
+        domains = _domains_from_response(
+            search(broadened, num=num)
+        )
+    return domains
 
 def search_domains_parallel(queries: List[str], num: int = 15) -> Dict[str, List[str]]:
     """Search multiple queries in parallel (threaded)."""
