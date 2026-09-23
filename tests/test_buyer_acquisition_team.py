@@ -258,3 +258,35 @@ def test_product_demand_separates_sellable_from_market_validation():
     assert search["price_claim_allowed"] is False
     assert "local_and_smb_buyers" in search["target_buyer_pools"]
     assert "agency_and_reseller_buyers" in search["target_buyer_pools"]
+
+
+def test_phase4_exchange_mrr_products_enter_buyer_demand_queue():
+    plan = build_buyer_acquisition_plan(
+        {"inventory": [], "buyer_seats": []},
+        catalog_snapshot={"products": []},
+        generated_at=datetime(
+            2026, 9, 23, 0, 0, tzinfo=timezone.utc
+        ),
+    )
+
+    rows = {
+        row["product_code"]: row
+        for row in plan["product_demand_queue"]
+    }
+    expected = {
+        "exchange_seat_starter",
+        "exchange_seat_growth",
+        "exchange_seat_pro",
+        "exchange_seat_enterprise",
+    }
+
+    assert expected.issubset(rows)
+    for code in expected:
+        row = rows[code]
+        assert row["commercial_state"] == (
+            "MARKET_VALIDATE_TERMS_REQUIRED"
+        )
+        assert row["binding_terms_ready"] is False
+        assert row["price_claim_allowed"] is False
+        assert row["recovered_mrr_product"] is True
+        assert "local_and_smb_buyers" in row["target_buyer_pools"]
