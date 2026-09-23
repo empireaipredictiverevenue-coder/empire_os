@@ -151,3 +151,55 @@ def test_bridge_rejects_business_name_prefix_as_person():
         path.endswith("/propose_reviewed_outbound_intent")
         for _method, path, _payload in request.calls
     )
+
+
+def test_company_routed_review_is_not_auto_reviewed_or_outbound_proposed():
+    class CompanyRoutedRequest(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if method == "GET" and path.startswith(
+                "/rest/v1/buyer_candidate_reviews?"
+            ):
+                self.calls.append((method, path, payload))
+                return [{
+                    "id": REVIEW_ID,
+                    "status": "pending",
+                    "offer_key": "managed_service",
+                    "evidence": {
+                        "business_name": "Example Solar Ltd",
+                        "contact_route": "company_routed",
+                    },
+                }]
+            if path.endswith("/list_buyer_reviews_for_outbound"):
+                self.calls.append((method, path, payload))
+                return [{
+                    "id": REVIEW_ID,
+                    "contact_name": "Jane Smith",
+                    "contact_title": "Managing Director",
+                    "contact_email": "info@example-solar.test",
+                    "evidence": {
+                        "business_name": "Example Solar Ltd",
+                        "contact_route": "company_routed",
+                    },
+                }]
+            return super().__call__(
+                method,
+                path,
+                payload=payload,
+                **kwargs,
+            )
+
+    request = CompanyRoutedRequest()
+    result = run_standing_bridge(request)
+
+    assert result.auto_reviewed == 0
+    assert result.outbound_proposed == 0
+    assert result.skipped_company_routed_pending == 1
+    assert result.skipped_company_routed_outbound == 1
+    assert not any(
+        path.endswith("/auto_review_buyer_candidate")
+        for _method, path, _payload in request.calls
+    )
+    assert not any(
+        path.endswith("/propose_reviewed_outbound_intent")
+        for _method, path, _payload in request.calls
+    )
