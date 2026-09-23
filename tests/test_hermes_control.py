@@ -344,3 +344,75 @@ def test_omniroute_catalog_ranking_requires_opt_in_for_paid_models():
     assert free_only == ("openrouter/openrouter/free",)
     assert paid_allowed[0] == "openrouter/z-ai/glm-5.3-flash"
     assert "openrouter/openrouter/free" in paid_allowed
+
+
+def test_omniroute_model_selector_retries_free_router_cooldown_once(monkeypatch):
+    from empire_os import hermes_control
+
+    catalog = (
+        "openrouter/openrouter/free",
+        "openrouter/cohere/north-mini-code:free",
+        "openrouter/nvidia/nemotron-3.5-lightning:free",
+    )
+    probed = []
+    sleeps = []
+
+    def fake_probe(*, base_url, api_key, model, timeout=15):
+        probed.append(model)
+        return (
+            False,
+            'http_429:{"error":{"code":"model_cooldown","reset_seconds":24}}',
+        )
+
+    monkeypatch.setattr(
+        hermes_control,
+        "_fetch_omniroute_catalog",
+        lambda **kwargs: catalog,
+    )
+    monkeypatch.setattr(
+        hermes_control,
+        "_probe_omniroute_model",
+        fake_probe,
+    )
+    monkeypatch.setattr(
+        hermes_control.time,
+        "sleep",
+        lambda seconds: sleeps.append(seconds),
+    )
+    monkeypatch.delenv("EMPIRE_HERMES_MODEL_CANDIDATES", raising=False)
+
+    with pytest.raises(
+        HermesControlError,
+        match="skipped free-model fan-out",
+    ):
+        hermes_control._select_omniroute_model(
+            {
+                "OPENAI_BASE_URL": "http://127.0.0.1:20128/v1",
+                "OPENAI_API_KEY": "local-key",
+            }
+        )
+
+    assert probed == [
+        "openrouter/openrouter/free",
+        "openrouter/openrouter/free",
+    ]
+    assert sleeps == [25]
+
+
+def test_omniroute_catalog_fanout_is_bounded():
+    from empire_os import hermes_control
+
+    ranked = hermes_control._rank_catalog_candidates(
+        (
+            "openrouter/openrouter/free",
+            "openrouter/cohere/north-mini-code:free",
+            "openrouter/nvidia/nemotron-3.5-lightning:free",
+            "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+            "openrouter/poolside/laguna-s-2.1:free",
+            "openrouter/poolside/laguna-xs-2.1:free",
+        ),
+        ("openrouter/openrouter/free",),
+    )
+
+    assert len(ranked) == hermes_control.MAX_DISCOVERED_MODEL_CANDIDATES
+    assert len(ranked) == 4
