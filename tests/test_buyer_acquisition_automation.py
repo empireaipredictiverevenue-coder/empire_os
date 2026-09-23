@@ -67,3 +67,14 @@ def test_buyer_acquisition_verifier_requires_reconciliation_artifact():
     assert "runtime/buyer_acquisition/reconciliation_latest.json" in text
     assert "buyer_scout_reconciliation_safe" in text
     assert "automatic_ingest_authorized" in text
+
+
+def test_buyer_acquisition_verifier_requires_holding_persistence():
+    text = (
+        ROOT / "scripts/verify_buyer_acquisition_automation.py"
+    ).read_text()
+
+    assert "runtime/buyer_acquisition/persistence_latest.json" in text
+    assert "buyer_scout_persistence_safe" in text
+    assert "holding_area_only" in text
+    assert "canonical_promotion_performed" in text
