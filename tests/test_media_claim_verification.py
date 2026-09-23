@@ -36,6 +36,21 @@ def pack():
     }
 
 
+
+
+
+def fake_resolver(host, port, **kwargs):
+    return [
+        (
+            2,
+            1,
+            6,
+            "",
+            ("93.184.216.34", port),
+        )
+    ]
+
+
 def fake_probe(url, **kwargs):
     assert url == "https://example.test/article"
     assert kwargs["max_pages"] == 1
@@ -72,6 +87,7 @@ def test_direct_source_observation_reuses_search_fabric_probe():
         pack(),
         probe=fake_probe,
         max_sources=3,
+        resolver=fake_resolver,
     )
 
     assert result["observed_source_count"] == 1
@@ -86,6 +102,7 @@ def test_claim_proposal_requires_literal_quote_from_observed_source():
     observations = observe_research_sources(
         pack(),
         probe=fake_probe,
+        resolver=fake_resolver,
     )
     gateway = FakeGateway([
         {
@@ -279,6 +296,7 @@ def test_refresh_claim_verification_is_bounded_and_idempotent(tmp_path):
         probe=fake_probe,
         max_packs=1,
         max_sources_per_pack=1,
+        resolver=fake_resolver,
     )
 
     assert first["processed_pack_count"] == 1
@@ -301,3 +319,51 @@ def test_refresh_claim_verification_is_bounded_and_idempotent(tmp_path):
         max_sources_per_pack=1,
     )
     assert second["skipped_unchanged"] is True
+
+
+def test_source_observation_blocks_private_and_local_urls():
+    private = pack()
+    private["sources"][0]["lineage_ref"] = "http://127.0.0.1/admin"
+
+    result = observe_research_sources(
+        private,
+        probe=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("probe must not be called")
+        ),
+        resolver=fake_resolver,
+    )
+
+    assert result["observed_source_count"] == 0
+    assert result["failure_count"] == 1
+    assert (
+        result["failures"][0]["reason"]
+        == "nonpublic_ip_not_allowed"
+    )
+
+    rebinding = pack()
+    rebinding["sources"][0]["lineage_ref"] = "https://public.example/"
+
+    def private_resolver(host, port, **kwargs):
+        return [
+            (
+                2,
+                1,
+                6,
+                "",
+                ("10.0.0.8", port),
+            )
+        ]
+
+    result = observe_research_sources(
+        rebinding,
+        probe=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("probe must not be called")
+        ),
+        resolver=private_resolver,
+    )
+
+    assert result["observed_source_count"] == 0
+    assert (
+        result["failures"][0]["reason"]
+        == "dns_resolved_nonpublic_ip"
+    )
