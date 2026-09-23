@@ -48,7 +48,6 @@ def _price_matches(row: Mapping[str, Any]) -> bool:
         and str(basis.get("currency") or "").upper() == CURRENCY
         and amount == PRICE_CENTS
         and str(basis.get("unit") or "") == "per_map"
-        and str(row.get("currency") or "").upper() == CURRENCY
         and str(row.get("billing_model") or "") == "one_time"
         and str(row.get("version_state") or "").upper()
         in {"PENDING", "VERIFIED"}
@@ -58,36 +57,15 @@ def _price_matches(row: Mapping[str, Any]) -> bool:
 def sync_solar_opportunity_map_product(
     request: Request = request_json,
 ) -> dict[str, Any]:
-    identity = request(
-        "POST",
-        "/rest/v1/rpc/register_commercial_product_identity",
-        payload={
-            "p_product_code": PRODUCT_CODE,
-            "p_product_name": "Solar Opportunity Map",
-            "p_product_family": "search_intelligence",
-            "p_billing_model": "one_time",
-            "p_configuration": {
-                "niche": "solar",
-                "delivery": "evidence_backed_opportunity_map",
-                "artifact_schema": "empire.solar-opportunity-map.v1",
-                "execution_authority": "internal_artifact_only",
-            },
-            "p_provenance": {
-                "source": "empire_os.solar_opportunity_map",
-                "pricing_observed": True,
-                "price_approval": "founder_approved",
-                "economics_state": "PARTIAL",
-            },
-            "p_actor": "solar-opportunity-map-product-sync",
-        },
-    ) or {}
-
     rows = _catalog_rows(request)
     if rows and _price_matches(rows[0]):
         return {
             "schema_version": "empire.solar-product-sync.v1",
             "product_code": PRODUCT_CODE,
-            "identity": identity,
+            "identity": {
+                "decision": "existing",
+                "product_id": rows[0].get("product_id"),
+            },
             "price_version": {
                 "decision": "existing",
                 "version_id": rows[0].get("version_id"),
@@ -106,6 +84,31 @@ def sync_solar_opportunity_map_product(
             "recognized_revenue": False,
             "actual_revenue": False,
         }
+
+    identity = request(
+        "POST",
+        "/rest/v1/rpc/register_commercial_product_identity",
+        payload={
+            "p_product_code": PRODUCT_CODE,
+            "p_product_name": "Solar Opportunity Map",
+            "p_product_family": "search_intelligence",
+            "p_billing_model": "one_time",
+            "p_configuration": {
+                "niche": "solar",
+                "delivery": "evidence_backed_opportunity_map",
+                "artifact_schema": "empire.solar-opportunity-map.v2",
+                "execution_authority": "internal_artifact_only",
+            },
+            "p_provenance": {
+                "source": "empire_os.solar_opportunity_map",
+                "pricing_observed": True,
+                "price_approval": "founder_approved",
+                "economics_state": "PARTIAL",
+            },
+            "p_actor": "solar-opportunity-map-product-sync",
+        },
+    ) or {}
+
 
     proposed = request(
         "POST",
