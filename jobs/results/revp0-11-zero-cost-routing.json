@@ -1,0 +1,23 @@
+{
+  "authority": "observe",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "changed_paths": [],
+  "completed_at": "2026-09-23T17:43:52.326219+00:00",
+  "database_mutation_performed": false,
+  "error": "HermesControlError: no healthy OmniRoute model candidate; openrouter/openrouter/free=http_429:{\"error\":{\"message\":\"All credentials for model openrouter/free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"openrouter/free\",\"reset_seconds\":24,\"retry_after\":\"2026-09-23T17:37:19.279Z\",\"credentials_cooling\":1; openrouter/cohere/north-mini-code:free=http_429:{\"error\":{\"message\":\"All credentials for model cohere/north-mini-code:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"cohere/north-mini-code:free\",\"reset_seconds\":24,\"retry_after\":\"2026-09-23T17:37:57.078Z\"; openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free=http_429:{\"error\":{\"message\":\"All credentials for model nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free\",\"reset_second; openrouter/nvidia/nemotron-3-super-120b-a12b:free=http_429:{\"error\":{\"message\":\"All credentials for model nvidia/nemotron-3-super-120b-a12b:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"nvidia/nemotron-3-super-120b-a12b:free\",\"reset_seconds\":24,\"retry_after\":\"202; openrouter/nvidia/nemotron-3-ultra-550b-a55b:free=http_429:{\"error\":{\"message\":\"All credentials for model nvidia/nemotron-3-ultra-550b-a55b:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"nvidia/nemotron-3-ultra-550b-a55b:free\",\"reset_seconds\":24,\"retry_after\":\"202; openrouter/nvidia/nemotron-3.5-content-safety:free=http_429:{\"error\":{\"message\":\"All credentials for model nvidia/nemotron-3.5-content-safety:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"nvidia/nemotron-3.5-content-safety:free\",\"reset_seconds\":24,\"retry_after\":\"2; openrouter/nvidia/nemotron-3.5-lightning:free=http_429:{\"error\":{\"message\":\"All credentials for model nvidia/nemotron-3.5-lightning:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"nvidia/nemotron-3.5-lightning:free\",\"reset_seconds\":24,\"retry_after\":\"2026-09-23T; openrouter/poolside/laguna-s-2.1:free=http_429:{\"error\":{\"message\":\"All credentials for model poolside/laguna-s-2.1:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"poolside/laguna-s-2.1:free\",\"reset_seconds\":24,\"retry_after\":\"2026-09-23T17:41:44.723Z\",\"; openrouter/poolside/laguna-xs-2.1:free=http_429:{\"error\":{\"message\":\"All credentials for model poolside/laguna-xs-2.1:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"poolside/laguna-xs-2.1:free\",\"reset_seconds\":24,\"retry_after\":\"2026-09-23T17:42:22.625Z\"; openrouter/dots-studio/dots-3-note-preview:free=http_429:{\"error\":{\"message\":\"All credentials for model dots-studio/dots-3-note-preview:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"dots-studio/dots-3-note-preview:free\",\"reset_seconds\":24,\"retry_after\":\"2026-09; openrouter/google/gemma-4-26b-a4b-it:free=http_429:{\"error\":{\"message\":\"All credentials for model google/gemma-4-26b-a4b-it:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"google/gemma-4-26b-a4b-it:free\",\"reset_seconds\":24,\"retry_after\":\"2026-09-23T17:43:38; openrouter/google/gemma-4-31b-it:free=http_429:{\"error\":{\"message\":\"All credentials for model google/gemma-4-31b-it:free are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"google/gemma-4-31b-it:free\",\"reset_seconds\":24,\"retry_after\":\"2026-09-23T17:44:16.313Z\",\"",
+  "execution_authority": "none",
+  "external_commercial_action_performed": false,
+  "founder_gate_required": false,
+  "git_remote_io_performed": true,
+  "hermes": null,
+  "job_id": "revp0-11-zero-cost-routing",
+  "job_path": "jobs/inbox/revp0-11-zero-cost-routing.json",
+  "kind": "code_task",
+  "payment_action_performed": false,
+  "proposal_branch": null,
+  "proposal_commit": null,
+  "schema_version": "empire.hermes.control_result.v1",
+  "started_at": "2026-09-23T17:36:13.972703+00:00",
+  "status": "FAILED",
+  "verification": null
+}
