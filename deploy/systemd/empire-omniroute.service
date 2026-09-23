@@ -19,7 +19,7 @@ Environment=NODE_ENV=production
 Environment=REQUIRE_API_KEY=false
 Environment=ALLOW_API_KEY_REVEAL=false
 EnvironmentFile=-/home/ubuntu/.omniroute/.env
-ExecStart=/srv/empire_os/scripts/run_omniroute.sh
+ExecStart=/bin/bash /srv/empire_os/scripts/run_omniroute.sh
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=120
