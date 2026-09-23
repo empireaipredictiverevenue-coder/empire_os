@@ -7,10 +7,18 @@ revenue.
 from __future__ import annotations
 
 from typing import Any, Callable
+import json
+import subprocess
+import sys
 import urllib.parse
 
 from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
-from empire_os.buyer_review_materializer import run_buyer_review_materializer
+from empire_os.buyer_discovery import classify_decision_role
+from empire_os.buyer_probe_worker import rejection_reason
+from empire_os.buyer_review_materializer import (
+    run_buyer_probe_isolated,
+    run_buyer_review_materializer,
+)
 from empire_os.qualification_worker_v2 import (
     SCORING_ENGINE,
     SCORING_VERSION,
@@ -122,6 +130,126 @@ def fetch_hot_source_prospect_ids(
     ][:bounded]
 
 
+def _recover_identity_isolated(
+    row: dict[str, Any],
+    *,
+    hard_timeout_seconds: float = 55.0,
+) -> dict[str, Any]:
+    timeout = max(15.0, min(float(hard_timeout_seconds), 60.0))
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-m", "empire_os.identity_recovery_worker"],
+            input=json.dumps({
+                "business_name": row.get("business_name"),
+                "website": row.get("website"),
+                "metro": row.get("metro"),
+            }),
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+            cwd="/srv/empire_os",
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "recovered": False,
+            "identity": None,
+            "reason": "identity_recovery_timeout",
+        }
+    if completed.returncode != 0:
+        return {
+            "recovered": False,
+            "identity": None,
+            "reason": "identity_recovery_worker_failed",
+        }
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return {
+            "recovered": False,
+            "identity": None,
+            "reason": "identity_recovery_invalid_json",
+        }
+    return payload if isinstance(payload, dict) else {
+        "recovered": False,
+        "identity": None,
+        "reason": "identity_recovery_invalid_shape",
+    }
+
+
+def _source_probe(row: dict[str, Any]) -> dict[str, Any]:
+    """Probe once, then make one bounded identity-recovery attempt if useful."""
+    first = run_buyer_probe_isolated(
+        row,
+        hard_timeout_seconds=55.0,
+    )
+    if (
+        first.get("review_ready") is True
+        and first.get("outreach_ready") is True
+    ):
+        return first
+
+    reason = str(
+        first.get("rejection_reason")
+        or rejection_reason(first)
+        or ""
+    )
+    if reason not in {"no_decision_maker", "no_bound_contact"}:
+        return first
+
+    recovery = _recover_identity_isolated(row)
+    identity = recovery.get("identity")
+    if not isinstance(identity, dict):
+        result = dict(first)
+        result["identity_recovery"] = {
+            "attempted": True,
+            "recovered": False,
+            "reason": recovery.get("reason") or "no_identity_recovered",
+        }
+        return result
+
+    title = str(identity.get("title") or "").strip()
+    decision_role, decision_score = classify_decision_role(title)
+    if decision_score < 0.70:
+        result = dict(first)
+        result["identity_recovery"] = {
+            "attempted": True,
+            "recovered": True,
+            "promoted": False,
+            "name": identity.get("name"),
+            "title": title,
+            "decision_role": decision_role,
+            "decision_score": decision_score,
+            "identity_confidence": identity.get("confidence"),
+            "reason": "recovered_identity_not_buyer_role",
+        }
+        return result
+
+    retry_row = dict(row)
+    retry_row["contact_name"] = identity.get("name")
+    retry_row["contact_title"] = title
+    retry_row["contact_source"] = identity.get("source")
+
+    second = run_buyer_probe_isolated(
+        retry_row,
+        hard_timeout_seconds=55.0,
+    )
+    second = dict(second)
+    second["identity_recovery"] = {
+        "attempted": True,
+        "recovered": True,
+        "promoted": True,
+        "name": identity.get("name"),
+        "title": title,
+        "decision_role": decision_role,
+        "decision_score": decision_score,
+        "identity_confidence": identity.get("confidence"),
+        "source": identity.get("source"),
+        "source_url": identity.get("source_url"),
+    }
+    return second
+
+
 def run_source_buyer_review(
     *,
     source: str,
@@ -139,6 +267,7 @@ def run_source_buyer_review(
 
     materialized = run_buyer_review_materializer(
         request_json,
+        probe=_source_probe,
         defer=queue.enqueue,
         scan_limit=max(1, len(prospect_ids)),
         proposal_limit=max(1, min(int(proposal_limit), 20)),
