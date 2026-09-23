@@ -31,13 +31,32 @@ def plan():
                 },
             }
         ],
+        "icp_priority_targets": [
+            {
+                "priority_score": 95,
+                "icp_profile_key": "high_ticket_home_service",
+                "buying_triggers": [
+                    "new service area",
+                    "expansion",
+                ],
+                "decision_maker_roles": [
+                    "owner",
+                    "marketing director",
+                ],
+                "research_queries": {
+                    "end_service_buyers": [
+                        '"roofing" "new service area" austin tx'
+                    ],
+                },
+            }
+        ],
     }
 
 
 def test_collect_queries_preserves_pool_and_target_provenance():
     rows = collect_research_queries(plan(), max_queries=10)
 
-    assert len(rows) == 3
+    assert len(rows) == 4
     assert any(
         row["buyer_pool"] == "direct_demand_buyers"
         and row["corridor_key"]
@@ -46,6 +65,11 @@ def test_collect_queries_preserves_pool_and_target_provenance():
     assert any(
         row["target_kind"] == "product"
         and row["product_code"] == "local_search_grid"
+        for row in rows
+    )
+    assert any(
+        row["target_kind"] == "icp"
+        and row["icp_profile_key"] == "high_ticket_home_service"
         for row in rows
     )
 
@@ -89,6 +113,14 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
     assert row["first_party_emails"] == ["jane@buyer.example"]
     assert row["first_party_phones"] == ["+15125550123"]
     assert row["first_party_people"][0]["name"] == "Jane Smith"
+    assert row["target_icp_profile_keys"] == [
+        "high_ticket_home_service"
+    ]
+    assert row["icp_intelligence"]["score_classification"] == (
+        "MODEL_HEURISTIC"
+    )
+    assert row["icp_intelligence"]["budget_verified"] is False
+    assert row["budget_verified"] is False
     assert row["candidate_state"] == "RESEARCH_EVIDENCE_ONLY"
     assert row["canonical_identity_verified"] is False
     assert row["commercial_terms_verified"] is False
