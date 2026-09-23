@@ -1,7 +1,7 @@
 [Unit]
 Description=Empire Hermes governed resident worker
-After=network-online.target
-Wants=network-online.target
+After=network-online.target empire-omniroute.service
+Wants=network-online.target empire-omniroute.service
 
 [Service]
 Type=oneshot
@@ -14,6 +14,7 @@ Environment=EMPIRE_HERMES_BIN=/home/ubuntu/.local/bin/hermes
 Environment=PYTHONPATH=/srv/empire_os
 Environment=EMPIRE_AUTONOMOUS_MODE=OBSERVE
 Environment=EMPIRE_HERMES_GOVERNED_WORKER=1
+EnvironmentFile=-/etc/empire_os/omniroute-hermes.env
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_hermes_control_worker.py --repo-root /srv/empire_os --control-branch ops/hermes-control --max-jobs 1
 NoNewPrivileges=true
 PrivateTmp=true
