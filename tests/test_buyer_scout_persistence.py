@@ -34,6 +34,11 @@ def test_only_new_external_candidates_are_persisted():
                 "first_party_email_count": 1,
                 "first_party_phone_count": 1,
                 "people_count": 1,
+                "first_party_emails": ["sales@new.example"],
+                "first_party_phones": ["+15125550123"],
+                "first_party_people": [
+                    {"name": "Jane Smith", "title": "CEO"}
+                ],
                 "direct_signal_hits": ["buy leads"],
                 "reseller_signal_hits": [],
                 "candidate_state": "RESEARCH_EVIDENCE_ONLY",
@@ -76,6 +81,12 @@ def test_only_new_external_candidates_are_persisted():
     assert payload["p_domain"] == "new.example"
     assert payload["p_direct_buyer_score"] == 90
     assert payload["p_explicit_direct_buyer_evidence"] is True
+    assert payload["p_site_evidence"]["first_party_emails"] == [
+        "sales@new.example"
+    ]
+    assert payload["p_site_evidence"]["first_party_people"][0]["name"] == (
+        "Jane Smith"
+    )
     assert payload["p_provenance"]["canonical_identity_verified"] is False
     assert payload["p_provenance"]["outreach_authorized"] is False
 
