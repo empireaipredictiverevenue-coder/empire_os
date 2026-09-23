@@ -332,3 +332,68 @@ def test_cross_pool_review_still_requires_company_score_floor():
     assert result.proposed == 0
     assert result.skipped_ineligible == 1
     assert called == []
+
+
+def test_targeted_fetch_scopes_prospect_ids():
+    paths = []
+
+    class InspectRequest(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if method == "GET":
+                paths.append(path)
+            return super().__call__(
+                method,
+                path,
+                payload=payload,
+                **kwargs,
+            )
+
+    rows, skipped = fetch_candidate_rows(
+        InspectRequest(),
+        scan_limit=10,
+        prospect_ids=[PROSPECT_ID],
+    )
+
+    assert len(rows) == 1
+    assert skipped == 0
+    prospect_path = next(
+        path for path in paths
+        if path.startswith("/rest/v1/prospects?")
+    )
+    assert "id=in." in prospect_path
+    assert PROSPECT_ID in prospect_path
+
+
+def test_targeted_materializer_can_use_bounded_source_floor():
+    request = FakeRequest()
+
+    class Score69Request(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if method == "GET" and path.startswith("/rest/v1/prospects?"):
+                row = prospect()
+                row["buy_signal_score"] = 95
+                row["contact_name"] = None
+                row["contact_title"] = None
+                return [row]
+            if method == "GET" and path.startswith(
+                "/rest/v1/prospect_entity_links?"
+            ):
+                return []
+            return super().__call__(
+                method,
+                path,
+                payload=payload,
+                **kwargs,
+            )
+
+    request = Score69Request()
+    result = run_buyer_review_materializer(
+        request,
+        probe=strong_probe,
+        prospect_ids=[PROSPECT_ID],
+        min_company_score=65.0,
+        proposal_limit=1,
+    )
+
+    assert result.eligible == 1
+    assert result.proposed == 1
