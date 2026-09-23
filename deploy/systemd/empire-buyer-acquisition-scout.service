@@ -10,6 +10,7 @@ EnvironmentFile=-/etc/empire_os.env
 Environment=PYTHONPATH=/srv/empire_os
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_acquisition_scout.py --repo-root /srv/empire_os --max-queries 20 --results-per-query 8 --max-domains 40 --max-probes 20
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/reconcile_buyer_acquisition_scout.py --repo-root /srv/empire_os --limit 2000
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/persist_buyer_scout_candidates.py --repo-root /srv/empire_os
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
