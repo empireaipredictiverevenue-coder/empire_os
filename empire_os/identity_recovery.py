@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from empire_os.buyer_discovery import rank_site_people
+from empire_os.companies_house_identity import find_companies_house_principals
 from empire_os.registry_scraper import RegistryScraper
 from empire_os.official_license_identity import find_official_license_principals
 from empire_os.search_fabric.search import search
@@ -51,6 +52,18 @@ def _host(value: str) -> str:
 
 def _same_host(left: str, right: str) -> bool:
     return bool(_host(left)) and _host(left) == _host(right)
+
+
+def _is_uk_context(metro: str, website: str) -> bool:
+    location = str(metro or "").strip().casefold()
+    host = _host(website)
+    return (
+        any(term in location for term in (
+            "united kingdom", "great britain", "england",
+            "scotland", "wales", "northern ireland",
+        ))
+        or host.endswith(".uk")
+    )
 
 
 def _state_hint(metro: str) -> str:
@@ -189,7 +202,53 @@ def recover_identity(
                     if row.name.casefold() == person_name.casefold():
                         evidence_rows.append(row)
 
-    # 3. Public registry lookup contributes only when the scraper itself
+    # 3. UK Companies House provides authoritative company/officer
+    # association. Officers are search seeds only: a Companies House
+    # directorship does not by itself prove commercial buyer authority.
+    companies_house_seeds: list[dict[str, Any]] = []
+    if _is_uk_context(metro, website):
+        sources_tried.append("companies_house")
+        try:
+            companies_house_seeds = find_companies_house_principals(
+                company_name=business_name,
+            )
+        except Exception:
+            companies_house_seeds = []
+
+        for seed in companies_house_seeds:
+            person_name = str(seed.get("person_name") or "").strip()
+            if not person_name:
+                continue
+            sources_tried.append("search_fabric")
+            result = search(
+                f'site:{domain} "{person_name}"',
+                num=max(1, min(max_search_results, 10)),
+            )
+            for organic in result.get("organic") or []:
+                if not isinstance(organic, dict):
+                    continue
+                link = str(organic.get("link") or "").strip()
+                if (
+                    not link
+                    or link in seen_urls
+                    or not _same_host(link, website)
+                ):
+                    continue
+                seen_urls.add(link)
+                probe = probe_site(
+                    link,
+                    max_pages=3,
+                    request_timeout=5.0,
+                    time_budget_seconds=15.0,
+                    page_priority="people",
+                )
+                if not isinstance(probe, dict) or probe.get("ok") is not True:
+                    continue
+                for row in _rank_people(probe, website):
+                    if row.name.casefold() == person_name.casefold():
+                        evidence_rows.append(row)
+
+    # 4. Public registry lookup contributes only when the scraper itself
     # returns an explicit owner name. No inference from company names.
     sources_tried.append("registry_scraper")
     try:
@@ -238,6 +297,7 @@ def recover_identity(
         "sources_tried": sorted(set(sources_tried)),
         "evidence": [row.as_dict() for row in ranked[:10]],
         "license_seeds": license_seeds,
+        "companies_house_seeds": companies_house_seeds,
         "outbound_actions": False,
         "guessed_identity": False,
         "guessed_email": False,
