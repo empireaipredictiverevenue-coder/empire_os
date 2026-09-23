@@ -607,6 +607,32 @@ def _buyer_acquisition_runtime(
     }
 
 
+def _buyer_scout_runtime(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "mode": "unknown",
+            "execution_authority": "none",
+        }
+    return {
+        "available": True,
+        "observed_at": raw.get("observed_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "query_count": int(raw.get("query_count") or 0),
+        "observation_count": int(raw.get("observation_count") or 0),
+        "error_count": int(raw.get("error_count") or 0),
+        "outbound_sent": raw.get("outbound_sent") is True,
+        "automatic_external_execution": (
+            raw.get("automatic_external_execution") is True
+        ),
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
 def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     loop_path = runtime / "commercial_loop" / "latest.json"
@@ -627,6 +653,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     )
     buyer_acquisition_runtime_path = (
         runtime / "buyer_acquisition" / "latest.json"
+    )
+    buyer_scout_runtime_path = (
+        runtime / "buyer_acquisition" / "scout_latest.json"
     )
 
     raw_loop = _read_json(loop_path)
@@ -746,6 +775,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "buyer_acquisition_team": _buyer_acquisition_runtime(
             _read_json(buyer_acquisition_runtime_path),
             buyer_acquisition_runtime_path,
+        ),
+        "buyer_scout": _buyer_scout_runtime(
+            _read_json(buyer_scout_runtime_path),
+            buyer_scout_runtime_path,
         ),
         "commercial_pricing_proposal": build_launch_pricing_proposal(),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
