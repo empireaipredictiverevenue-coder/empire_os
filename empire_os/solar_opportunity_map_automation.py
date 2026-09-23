@@ -98,3 +98,52 @@ def materialize_solar_maps_for_review_outcomes(
         "recognized_revenue": False,
         "execution_authority": "internal_artifact_only",
     }
+
+
+def materialize_missing_solar_map_backlog(
+    *,
+    request=request_json,
+    root: str | Path | None = None,
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Retry only missing artifacts for pending/approved solar reviews."""
+    target_root = Path(root or ARTIFACT_ROOT)
+    bounded = max(1, min(int(limit), 50))
+    reviews = request(
+        "GET",
+        "/rest/v1/buyer_candidate_reviews?"
+        "select=id,prospect_id,status,evidence,proposed_at"
+        "&status=in.(pending,approved)"
+        "&order=proposed_at.desc"
+        f"&limit={bounded}",
+    ) or []
+    reviews = [
+        row for row in reviews
+        if isinstance(row, Mapping)
+        and str(row.get("prospect_id") or "").strip()
+    ]
+
+    candidates = []
+    skipped_existing = 0
+    for row in reviews:
+        pid = str(row.get("prospect_id") or "").strip()
+        json_path = target_root / f"{pid}.json"
+        md_path = target_root / f"{pid}.md"
+        if json_path.exists() and md_path.exists():
+            skipped_existing += 1
+            continue
+        candidates.append({
+            "prospect_id": pid,
+            "status": "proposed",
+        })
+
+    result = materialize_solar_maps_for_review_outcomes(
+        candidates,
+        request=request,
+        root=target_root,
+    )
+    result = dict(result)
+    result["trigger"] = "missing_artifact_repair"
+    result["reviews_scanned"] = len(reviews)
+    result["skipped_existing"] = skipped_existing
+    return result
