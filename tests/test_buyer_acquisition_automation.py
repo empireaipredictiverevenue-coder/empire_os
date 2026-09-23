@@ -78,3 +78,13 @@ def test_buyer_acquisition_verifier_requires_holding_persistence():
     assert "buyer_scout_persistence_safe" in text
     assert "holding_area_only" in text
     assert "canonical_promotion_performed" in text
+
+
+def test_buyer_acquisition_verifier_requires_pricing_drift_artifact():
+    text = (
+        ROOT / "scripts/verify_buyer_acquisition_automation.py"
+    ).read_text()
+
+    assert "pricing_verification_latest.json" in text
+    assert "pricing_policy_safe" in text
+    assert "pricing_matches_approved_policy" in text
