@@ -414,8 +414,37 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
                 "critical_issue_count"
             ),
             "high_issue_count": payload.get("high_issue_count"),
+            "search_issue_count": payload.get("search_issue_count"),
+            "measurement_issue_count": payload.get(
+                "measurement_issue_count"
+            ),
+            "change_count": payload.get("change_count"),
             "critical_change_count": payload.get(
                 "critical_change_count"
+            ),
+            "monitored_site_count": payload.get(
+                "monitored_site_count"
+            ),
+            "monitored_page_count": payload.get(
+                "monitored_page_count"
+            ),
+            "pages_with_public_noindex": payload.get(
+                "pages_with_public_noindex"
+            ),
+            "pages_missing_canonical": payload.get(
+                "pages_missing_canonical"
+            ),
+            "pages_missing_schema": payload.get(
+                "pages_missing_schema"
+            ),
+            "missing_conversion_event_count": payload.get(
+                "missing_conversion_event_count"
+            ),
+            "duplicate_conversion_event_count": payload.get(
+                "duplicate_conversion_event_count"
+            ),
+            "measurement_observation": payload.get(
+                "measurement_observation"
             ),
             "automatic_tag_mutation": payload.get(
                 "automatic_tag_mutation"
