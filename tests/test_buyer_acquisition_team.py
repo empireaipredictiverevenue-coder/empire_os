@@ -336,6 +336,9 @@ def test_icp_intelligence_precedes_scout_and_covers_full_research_loop():
 
     assert icp["enabled"] is True
     assert icp["profile_count"] >= 6
+    assert icp["target_company_count_per_campaign"] == 100
+    assert icp["bounded_incremental_discovery"] is True
+    assert icp["single_run_100_company_scrape"] is False
     assert "define_icp" in stages
     assert "find_matching_companies" in stages
     assert "resolve_decision_maker" in stages
