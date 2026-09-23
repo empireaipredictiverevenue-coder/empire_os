@@ -92,6 +92,97 @@ class YouTubeDataReadAdapter:
         self._timeout = max(1.0, float(timeout_seconds))
         self._transport = transport
 
+    def channel_video_ids(
+        self,
+        channel_id: str,
+        *,
+        max_videos: int = 100,
+    ) -> list[str]:
+        channel = str(channel_id or "").strip()
+        if not channel:
+            raise ValueError("channel_id is required")
+        limit = max(1, int(max_videos))
+
+        channel_query = urlencode({
+            "part": "contentDetails",
+            "id": channel,
+            "key": self._api_key,
+        })
+        payload = self._transport(
+            f"{DATA_API}/channels?{channel_query}",
+            {"Accept": "application/json"},
+            self._timeout,
+        )
+        items = payload.get("items")
+        if not isinstance(items, list) or not items:
+            return []
+
+        first = items[0] if isinstance(items[0], Mapping) else {}
+        uploads = (
+            (first.get("contentDetails") or {})
+            .get("relatedPlaylists", {})
+            .get("uploads")
+        )
+        playlist_id = str(uploads or "").strip()
+        if not playlist_id:
+            return []
+
+        output: list[str] = []
+        page_token: str | None = None
+
+        while len(output) < limit:
+            remaining = limit - len(output)
+            params: dict[str, Any] = {
+                "part": "contentDetails",
+                "playlistId": playlist_id,
+                "maxResults": min(50, remaining),
+                "key": self._api_key,
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            playlist_payload = self._transport(
+                f"{DATA_API}/playlistItems?{urlencode(params)}",
+                {"Accept": "application/json"},
+                self._timeout,
+            )
+            rows = playlist_payload.get("items")
+            if not isinstance(rows, list):
+                break
+
+            for row in rows:
+                if not isinstance(row, Mapping):
+                    continue
+                video_id = str(
+                    (row.get("contentDetails") or {}).get("videoId")
+                    or ""
+                ).strip()
+                if video_id and video_id not in output:
+                    output.append(video_id)
+                    if len(output) >= limit:
+                        break
+
+            next_token = str(
+                playlist_payload.get("nextPageToken") or ""
+            ).strip()
+            if not next_token or not rows:
+                break
+            page_token = next_token
+
+        return output
+
+    def channel_videos(
+        self,
+        channel_id: str,
+        *,
+        max_videos: int = 100,
+    ) -> list[dict[str, Any]]:
+        video_ids = self.channel_video_ids(
+            channel_id,
+            max_videos=max_videos,
+        )
+        return self.videos(video_ids)
+
     def videos(
         self,
         video_ids: Iterable[str],
@@ -294,7 +385,11 @@ class YouTubeAnalyticsReadAdapter:
 def youtube_read_adapter_contract() -> dict[str, Any]:
     return {
         "schema_version": "empire.media.youtube_read_adapter.v1",
-        "data_api_actions": ["videos.list"],
+        "data_api_actions": [
+            "channels.list",
+            "playlistItems.list",
+            "videos.list",
+        ],
         "analytics_actions": [
             "owned_channel_top_video_report",
             "owned_channel_traffic_source_report",
