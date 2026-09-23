@@ -9,6 +9,7 @@ from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
 from empire_os.buyer_review_materializer import run_buyer_review_materializer
 from empire_os.gtm_standing_bridge import run_standing_bridge
 from empire_os.solar_opportunity_map_automation import (
+    materialize_missing_solar_map_backlog,
     materialize_solar_maps_for_review_outcomes,
 )
 
@@ -67,6 +68,9 @@ def main() -> int:
         materialize_solar_maps_for_review_outcomes(
             result.outcomes,
         )
+    )
+    payload["artifact_repair"] = (
+        materialize_missing_solar_map_backlog(limit=20)
     )
 
     bridge = run_standing_bridge(
