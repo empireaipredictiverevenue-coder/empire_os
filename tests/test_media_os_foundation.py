@@ -139,9 +139,9 @@ def test_media_os_is_control_fabric_component_owned_by_marketing_growth():
     assert "revenue_pulse" in media.dependencies
     assert "conversion_intelligence" in media.dependencies
     assert "revenue_crm" in media.dependencies
-    assert all("publish" not in event for event in media.outputs)
-    assert "quant_review_requested" in media.outputs
-    assert "experiment_review_requested" in media.outputs
+    assert all("publish" not in event for event in media.produces)
+    assert "quant_review_requested" in media.produces
+    assert "experiment_review_requested" in media.produces
 
     routes = route_event({
         "event_type": "media_opportunity_scan_requested",
