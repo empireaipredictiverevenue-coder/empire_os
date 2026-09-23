@@ -6,6 +6,9 @@ export const metadata: Metadata = {
   title: "Industry Intelligence | Empire AI",
   description:
     "Evidence-backed market intelligence across property, private capital, solar, HVAC, roofing and legal markets.",
+  alternates: {
+    canonical: "/industries",
+  },
 };
 
 export default function IndustriesPage() {
