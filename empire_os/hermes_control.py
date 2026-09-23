@@ -877,21 +877,25 @@ def run_hermes(
     env["PYTHONUNBUFFERED"] = "1"
 
     base_url = str(env.get("OPENAI_BASE_URL") or "").strip()
+    # OmniRoute is itself the quota-aware routing layer. Do not pre-probe
+    # provider models here: that duplicates routing, consumes free-tier quota,
+    # and can extend provider cooldowns. One governed Hermes request goes to
+    # OmniRoute model=auto and OmniRoute owns provider/model fallback.
     model_attempts: list[dict[str, str]] = []
-    selected_model: str | None = None
-    if base_url:
-        selected_model, model_attempts = _select_omniroute_model(env)
+    selected_model = str(
+        os.environ.get("EMPIRE_HERMES_MODEL") or "auto"
+    ).strip() or "auto"
 
     isolated_home = _write_isolated_hermes_config(
         production_repo=production_repo,
         env=env,
-        model=selected_model or "auto",
+        model=selected_model,
     )
     if isolated_home is not None:
         env["HERMES_HOME"] = str(isolated_home)
         provider = "custom"
-        model = selected_model or "auto"
-        endpoint_mode = "isolated_omniroute"
+        model = selected_model
+        endpoint_mode = "isolated_omniroute_auto"
     else:
         provider = str(
             os.environ.get("EMPIRE_HERMES_PROVIDER")
