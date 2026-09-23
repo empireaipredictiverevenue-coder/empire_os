@@ -157,3 +157,47 @@ def test_priority_targets_include_direct_and_end_buyer_research():
     assert "software_and_advisory_buyers" in queries
     assert any("roofing company" in q for q in queries["end_service_buyers"])
     assert any("buy roofing leads" in q for q in queries["direct_demand_buyers"])
+
+
+def test_buyer_acquisition_includes_local_and_small_business_market():
+    plan = build_buyer_acquisition_plan(
+        {"inventory": [], "buyer_seats": []},
+        generated_at=datetime(
+            2026, 9, 23, 0, 0, tzinfo=timezone.utc
+        ),
+    )
+    pools = {row["pool"]: row for row in plan["buyer_pools"]}
+
+    assert "local_and_smb_buyers" in pools
+    local = pools["local_and_smb_buyers"]
+    assert "local_leads" in local["purchases"]
+    assert "booked_appointments" in local["purchases"]
+    assert "seo_and_search_intelligence" in local["purchases"]
+    assert "commercial_diagnostics" in local["purchases"]
+    assert "managed_growth" in local["purchases"]
+    assert "lightweight_saas" in local["purchases"]
+
+
+def test_priority_targets_include_local_smb_research_queries():
+    corridor = (
+        "corridor:v1:roofing:austin_tx:qualified_lead:lead"
+    )
+    plan = build_buyer_acquisition_plan(
+        {
+            "inventory": [
+                {
+                    "corridor_key": corridor,
+                    "state": "overflow_no_capacity",
+                }
+            ],
+            "buyer_seats": [],
+        },
+        generated_at=datetime(
+            2026, 9, 23, 0, 0, tzinfo=timezone.utc
+        ),
+    )
+
+    queries = plan["priority_targets"][0]["research_queries"]
+    assert "local_and_smb_buyers" in queries
+    assert any("local business" in q for q in queries["local_and_smb_buyers"])
+    assert any("free quote" in q for q in queries["local_and_smb_buyers"])
