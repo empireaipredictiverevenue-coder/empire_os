@@ -21,6 +21,13 @@ def main() -> int:
         "phase": payload["phase"],
         "demand_gap_count": payload["demand_gap_count"],
         "priority_target_count": len(payload["priority_targets"]),
+        "product_demand_count": payload["product_demand_count"],
+        "sellable_product_demand_count": payload[
+            "sellable_product_demand_count"
+        ],
+        "market_validate_product_count": payload[
+            "market_validate_product_count"
+        ],
         "team_role_count": payload["team_role_count"],
         "buyer_pool_count": len(payload["buyer_pools"]),
         "live_outbound_send": payload["automation"]["live_outbound_send"],
