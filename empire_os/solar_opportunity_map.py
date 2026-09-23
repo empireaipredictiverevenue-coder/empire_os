@@ -1,4 +1,4 @@
-"""Evidence-backed £249 Solar Opportunity Map artifact.
+"""Evidence-backed localized Solar Opportunity Map artifact.
 
 This is an internal materialization step. It reuses Empire Search Intelligence,
 Tag Intelligence and canonical buyer-review evidence. Missing search-query,
