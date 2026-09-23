@@ -1805,3 +1805,35 @@ def test_dashboard_exposes_modern_phase4_exchange_mrr_products(tmp_path):
     assert mrr["pricing_authority"] == "none"
     assert mrr["binding_terms_ready"] is False
     assert mrr["canonical_settlement_rail"] == "USDT_BSC"
+
+
+
+def test_dashboard_exposes_tag_intelligence_monitor(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/tag_intelligence/latest.json",
+        {
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T09:00:00+00:00",
+            "target_count": 3,
+            "available_target_count": 2,
+            "failed_target_count": 1,
+            "critical_issue_count": 2,
+            "high_issue_count": 5,
+            "critical_change_count": 1,
+            "automatic_tag_mutation": False,
+            "measurement_platform_write": False,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+
+    runtime = build_founder_dashboard(root)["tag_intelligence"]
+
+    assert runtime["available"] is True
+    assert runtime["target_count"] == 3
+    assert runtime["critical_issue_count"] == 2
+    assert runtime["critical_change_count"] == 1
+    assert runtime["automatic_tag_mutation"] is False
+    assert runtime["measurement_platform_write"] is False
+    assert runtime["execution_authority"] == "none"
