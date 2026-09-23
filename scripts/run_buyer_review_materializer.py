@@ -12,6 +12,9 @@ from empire_os.solar_opportunity_map_automation import (
     materialize_missing_solar_map_backlog,
     materialize_solar_maps_for_review_outcomes,
 )
+from empire_os.solar_product_catalog import (
+    sync_solar_opportunity_map_product,
+)
 
 STATE = Path("/srv/empire_os/runtime/buyer_review_materializer/state.json")
 LATEST = Path("/srv/empire_os/runtime/buyer_review_materializer/latest.json")
@@ -40,6 +43,8 @@ def main() -> int:
     parser.add_argument("--probe-workers", type=int, default=8)
     args = parser.parse_args()
 
+    solar_product_catalog = sync_solar_opportunity_map_product()
+
     state = _state()
     scan_fresh = bool(state.get("scan_fresh_next", True))
     backlog_offset = max(
@@ -63,6 +68,7 @@ def main() -> int:
     payload["scan_offset"] = offset
     payload["mode"] = "INTERNAL_MATERIALIZE"
     payload["owner"] = "astra"
+    payload["solar_product_catalog"] = solar_product_catalog
 
     payload["artifact_materialization"] = (
         materialize_solar_maps_for_review_outcomes(
