@@ -6,6 +6,9 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
+echo "=== QUIESCE HERMES WORKER DURING ROUTER CUTOVER ==="
+systemctl stop empire-hermes-control.timer empire-hermes-control.service 2>/dev/null || true
+
 TARGET_USER="${SUDO_USER:-ubuntu}"
 if [[ "$TARGET_USER" == "root" ]]; then
   TARGET_USER="ubuntu"
@@ -103,6 +106,7 @@ chown root:ubuntu /etc/empire_os/omniroute-hermes.env
 echo "=== INSTALL SERVICES ==="
 install -m 0644 /srv/empire_os/deploy/systemd/empire-omniroute.service /etc/systemd/system/empire-omniroute.service
 install -m 0644 /srv/empire_os/deploy/systemd/empire-hermes-control.service /etc/systemd/system/empire-hermes-control.service
+install -m 0644 /srv/empire_os/deploy/systemd/empire-hermes-control.timer /etc/systemd/system/empire-hermes-control.timer
 systemctl daemon-reload
 systemctl enable --now empire-omniroute.service
 
@@ -146,9 +150,12 @@ curl -fsS --max-time 90   -H 'Content-Type: application/json'   http://127.0.0.1
 
 echo "=== RESTART HERMES WORKER WITH OMNIROUTE ==="
 systemctl reset-failed empire-hermes-control.service || true
+systemctl enable --now empire-hermes-control.timer
 systemctl start --no-block empire-hermes-control.service
 
 echo "=== COMPLETE ==="
 systemctl is-active empire-omniroute.service
+systemctl is-enabled empire-hermes-control.timer
+systemctl is-active empire-hermes-control.timer
 systemctl show empire-hermes-control.service -p ActiveState -p SubState -p Result
 echo "OmniRoute is bound to loopback only: http://127.0.0.1:20128"
