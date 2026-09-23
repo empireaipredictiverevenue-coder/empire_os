@@ -39,6 +39,8 @@ def test_bootstrap_generates_secrets_and_never_commits_them():
     assert "OPENAI_BASE_URL=http://127.0.0.1:20128/v1" in text
     assert "EMPIRE_HERMES_PROVIDER=custom" in text
     assert "EMPIRE_HERMES_MODEL=auto" in text
+    assert "empire-hermes-control.timer" in text
+    assert "enable --now empire-hermes-control.timer" in text
 
 
 def test_runner_uses_documented_noninteractive_entrypoint():
