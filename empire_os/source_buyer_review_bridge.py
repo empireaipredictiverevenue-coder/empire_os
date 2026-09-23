@@ -269,22 +269,37 @@ def run_source_buyer_review(
     limit: int = 20,
     proposal_limit: int = 10,
     min_company_score: float = 70.0,
+    prospect_ids: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
-    prospect_ids = fetch_hot_source_prospect_ids(
+    eligible_ids = fetch_hot_source_prospect_ids(
         source=source,
         niche=niche,
         limit=limit,
     )
+    if prospect_ids:
+        requested = [
+            str(value or "").strip()
+            for value in prospect_ids
+            if str(value or "").strip()
+        ]
+        allowed = set(eligible_ids)
+        selected_ids = [
+            pid for pid in requested
+            if pid in allowed
+        ]
+        selected_ids = list(dict.fromkeys(selected_ids))
+    else:
+        selected_ids = eligible_ids
     queue = BuyerDeferredEnrichmentQueue()
 
     materialized = run_buyer_review_materializer(
         request_json,
         probe=_source_probe,
         defer=queue.enqueue,
-        scan_limit=max(1, len(prospect_ids)),
+        scan_limit=max(1, len(selected_ids)),
         proposal_limit=max(1, min(int(proposal_limit), 20)),
-        probe_workers=min(6, max(1, len(prospect_ids))),
-        prospect_ids=prospect_ids,
+        probe_workers=min(6, max(1, len(selected_ids))),
+        prospect_ids=selected_ids,
         min_company_score=float(min_company_score),
     )
 
@@ -293,8 +308,8 @@ def run_source_buyer_review(
         "mode": "GOVERNED_REVIEW_PREPARATION",
         "source": source,
         "niche": niche,
-        "selected_hot_prospects": len(prospect_ids),
-        "prospect_ids": prospect_ids,
+        "selected_hot_prospects": len(selected_ids),
+        "prospect_ids": selected_ids,
         "materializer": materialized.as_dict(),
         "deferred_queue": queue.snapshot(),
         "review_approval_granted": False,
