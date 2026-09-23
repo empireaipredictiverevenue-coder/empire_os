@@ -518,13 +518,20 @@ TASK
 DEFAULT_OMNIROUTE_MODEL_CANDIDATES = (
     "openrouter/openrouter/free",
     "openrouter/deepseek/deepseek-v4-flash-0731:free",
-    "openrouter/z-ai/glm-5.3-flash",
-    "gemini/gemini-3.5-flash-lite",
-    "gemini/gemini-3.1-flash-lite",
-    "gemini/gemini-3.1-pro-preview",
 )
 
 MAX_DISCOVERED_MODEL_CANDIDATES = 12
+
+
+def _is_zero_cost_model(model: str) -> bool:
+    lower = str(model or "").strip().lower()
+    return (
+        lower == "openrouter/openrouter/free"
+        or (
+            lower.startswith("openrouter/")
+            and lower.endswith(":free")
+        )
+    )
 
 
 def _fetch_omniroute_catalog(
@@ -568,22 +575,28 @@ def _fetch_omniroute_catalog(
 def _rank_catalog_candidates(
     catalog: Iterable[str],
     preferred: Iterable[str],
+    *,
+    allow_paid: bool = False,
 ) -> tuple[str, ...]:
-    """Choose only live catalog IDs, preferring free and coding-capable routes."""
-    live = tuple(dict.fromkeys(str(model).strip() for model in catalog if str(model).strip()))
+    """Rank live OmniRoute IDs; paid models require explicit opt-in."""
+    live = tuple(
+        dict.fromkeys(
+            str(model).strip()
+            for model in catalog
+            if str(model).strip()
+        )
+    )
     live_set = set(live)
     ordered: list[str] = []
 
-    for model in preferred:
-        model = str(model).strip()
-        if model and model in live_set and model not in ordered:
-            ordered.append(model)
+    def eligible(model: str) -> bool:
+        return _is_zero_cost_model(model) or allow_paid
 
     def priority(model: str) -> tuple[int, str]:
         lower = model.lower()
         if lower == "openrouter/openrouter/free":
             return (0, lower)
-        if lower.startswith("openrouter/") and ":free" in lower:
+        if _is_zero_cost_model(model):
             coding_markers = (
                 "nemotron",
                 "north-mini-code",
@@ -591,15 +604,26 @@ def _rank_catalog_candidates(
                 "deepseek",
                 "gpt-oss",
             )
-            return (1 if any(marker in lower for marker in coding_markers) else 2, lower)
-        if lower.startswith("gemini/") and "flash-lite" in lower:
-            return (3, lower)
-        return (9, lower)
+            return (
+                1 if any(marker in lower for marker in coding_markers) else 2,
+                lower,
+            )
+        return (8, lower)
+
+    for model in preferred:
+        model = str(model).strip()
+        if (
+            model
+            and model in live_set
+            and model not in ordered
+            and eligible(model)
+        ):
+            ordered.append(model)
 
     discovered = [
         model
         for model in live
-        if model not in ordered and priority(model)[0] < 9
+        if model not in ordered and eligible(model)
     ]
     discovered.sort(key=priority)
     ordered.extend(discovered)
@@ -612,7 +636,7 @@ def _probe_omniroute_model(
     base_url: str,
     api_key: str,
     model: str,
-    timeout: int = 25,
+    timeout: int = 40,
 ) -> tuple[bool, str]:
     url = base_url.rstrip("/") + "/chat/completions"
     payload = json.dumps(
@@ -676,14 +700,31 @@ def _select_omniroute_model(
         if item.strip()
     ) or DEFAULT_OMNIROUTE_MODEL_CANDIDATES
 
+    allow_paid = str(
+        os.environ.get("EMPIRE_HERMES_ALLOW_PAID_MODELS") or ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
     catalog = _fetch_omniroute_catalog(
         base_url=base_url,
         api_key=api_key,
     )
-    candidates = _rank_catalog_candidates(catalog, preferred) if catalog else preferred
+    if catalog:
+        candidates = _rank_catalog_candidates(
+            catalog,
+            preferred,
+            allow_paid=allow_paid,
+        )
+    else:
+        candidates = tuple(
+            model
+            for model in preferred
+            if allow_paid or _is_zero_cost_model(model)
+        )
+
     if not candidates:
         raise HermesControlError(
-            "OmniRoute live catalog has no eligible Hermes model candidates"
+            "OmniRoute has no eligible zero-cost Hermes model candidates; "
+            "paid inference remains disabled"
         )
 
     attempts: list[dict[str, str]] = []
@@ -744,6 +785,11 @@ def _write_isolated_hermes_config(
             "default": model,
             "base_url": base_url,
             "api_mode": "chat_completions",
+            # Bound governed worker generations. Older Hermes builds honor
+            # max_tokens directly; context_length also prevents an accidental
+            # 131k output ceiling from being inferred through custom gateways.
+            "context_length": 32768,
+            "max_tokens": 4096,
         }
     }
     if api_key:
