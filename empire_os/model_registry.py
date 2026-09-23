@@ -49,6 +49,18 @@ class ModelSpec:
     available: bool = True
     health: str = "unknown"
 
+    # Media/licensing metadata. Unknown values fail closed for commercial
+    # asset generation; "open weights" does not imply commercial permission.
+    license_id: str | None = None
+    commercial_permission: bool | None = None
+    attribution_required: bool | None = None
+    deployment: str = "unknown"
+    vram_gb: float | None = None
+    latency_ms: float | None = None
+    last_benchmark: str | None = None
+    last_reviewed: str | None = None
+    media_tasks: frozenset[str] = frozenset()
+
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def quality_for(self, task: str) -> float:
@@ -71,6 +83,20 @@ class ModelSpec:
             self.pricing_known
             and self.cost_per_1k_input is not None
             and self.cost_per_1k_output is not None
+        )
+
+    def commercial_media_eligible(self, task: str) -> bool:
+        requested = str(task or "").strip().lower()
+        return (
+            bool(requested)
+            and self.enabled
+            and self.available
+            and self.commercial_permission is True
+            and bool(self.license_id)
+            and (
+                requested in self.media_tasks
+                or requested in self.capabilities
+            )
         )
 
 
@@ -142,6 +168,49 @@ class ModelRegistry:
                     pricing_known=bool(item.get("pricing_known", False)),
                     available=bool(item.get("available", True)),
                     health=str(item.get("health", "unknown")),
+                    license_id=(
+                        str(item.get("license_id")).strip()
+                        if item.get("license_id")
+                        else None
+                    ),
+                    commercial_permission=(
+                        bool(item["commercial_permission"])
+                        if item.get("commercial_permission") is not None
+                        else None
+                    ),
+                    attribution_required=(
+                        bool(item["attribution_required"])
+                        if item.get("attribution_required") is not None
+                        else None
+                    ),
+                    deployment=str(
+                        item.get("deployment") or "unknown"
+                    ),
+                    vram_gb=(
+                        float(item["vram_gb"])
+                        if item.get("vram_gb") is not None
+                        else None
+                    ),
+                    latency_ms=(
+                        float(item["latency_ms"])
+                        if item.get("latency_ms") is not None
+                        else None
+                    ),
+                    last_benchmark=(
+                        str(item.get("last_benchmark"))
+                        if item.get("last_benchmark")
+                        else None
+                    ),
+                    last_reviewed=(
+                        str(item.get("last_reviewed"))
+                        if item.get("last_reviewed")
+                        else None
+                    ),
+                    media_tasks=frozenset(
+                        str(value).strip().lower()
+                        for value in (item.get("media_tasks") or [])
+                        if str(value).strip()
+                    ),
                     metadata=dict(item.get("metadata", {})),
                 )
                 models[spec.model_id] = spec
@@ -291,6 +360,14 @@ class ModelRegistry:
                 1 for m in models
                 if m.metadata.get("discovered")
             ),
+            "commercial_media_permission_verified": sum(
+                1 for m in models
+                if m.commercial_permission is True and m.license_id
+            ),
+            "commercial_media_permission_unknown": sum(
+                1 for m in models
+                if m.commercial_permission is None
+            ),
         }
 
     def describe(self) -> list[dict[str, Any]]:
@@ -311,6 +388,15 @@ class ModelRegistry:
                 "pricing_known": m.pricing_known,
                 "available": m.available,
                 "health": m.health,
+                "license_id": m.license_id,
+                "commercial_permission": m.commercial_permission,
+                "attribution_required": m.attribution_required,
+                "deployment": m.deployment,
+                "vram_gb": m.vram_gb,
+                "latency_ms": m.latency_ms,
+                "last_benchmark": m.last_benchmark,
+                "last_reviewed": m.last_reviewed,
+                "media_tasks": sorted(m.media_tasks),
                 "discovered": bool(m.metadata.get("discovered")),
             }
             for m in self.all()
