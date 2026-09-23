@@ -1,0 +1,29 @@
+{
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "changed_paths": [],
+  "completed_at": "2026-09-23T16:10:14.267105+00:00",
+  "database_mutation_performed": false,
+  "execution_authority": "none",
+  "external_commercial_action_performed": false,
+  "founder_gate_required": false,
+  "git_remote_io_performed": true,
+  "hermes": {
+    "completed_at": "2026-09-23T16:10:14.216476+00:00",
+    "journal_streamed": true,
+    "returncode": 1,
+    "started_at": "2026-09-23T16:10:06.981117+00:00",
+    "stderr": "",
+    "stdout": ""
+  },
+  "job_id": "hermes-smoke-004-omniroute-openai-api",
+  "job_path": "jobs/inbox/hermes-smoke-004-omniroute-openai-api.json",
+  "kind": "code_task",
+  "payment_action_performed": false,
+  "proposal_branch": null,
+  "proposal_commit": null,
+  "schema_version": "empire.hermes.control_result.v1",
+  "started_at": "2026-09-23T16:10:05.182234+00:00",
+  "status": "HERMES_FAILED",
+  "verification": null
+}
