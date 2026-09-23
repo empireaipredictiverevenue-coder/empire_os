@@ -190,6 +190,17 @@ def run_buyer_scout(
             "business_name": record["business_name"],
             "website": record["website"],
             "description": record["description"],
+            "first_party_emails": list(
+                evidence.get("emails") or []
+            )[:10],
+            "first_party_phones": list(
+                evidence.get("phones") or []
+            )[:10],
+            "first_party_people": [
+                dict(person)
+                for person in (evidence.get("people") or [])[:10]
+                if isinstance(person, Mapping)
+            ],
             "buyer_type": profile["buyer_type"],
             "direct_buyer_score": profile["direct_buyer_score"],
             "explicit_direct_buyer_evidence": profile[
