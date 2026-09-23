@@ -1707,3 +1707,37 @@ def test_dashboard_exposes_commercial_pricing_verification(tmp_path):
     assert pricing["drift_count"] == 0
     assert pricing["pricing_matches_approved_policy"] is True
     assert pricing["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_buyer_scout_review_readiness(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/buyer_acquisition/review_readiness_latest.json",
+        {
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T08:40:00+00:00",
+            "candidate_count": 12,
+            "review_ready_count": 5,
+            "blocked_count": 7,
+            "blocked_reason_counts": {
+                "first_party_contact_path_missing": 4,
+                "site_evidence_below_floor": 3,
+            },
+            "canonical_promotion_performed": False,
+            "outbound_sent": False,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+
+    runtime = build_founder_dashboard(root)[
+        "buyer_scout_review_readiness"
+    ]
+
+    assert runtime["available"] is True
+    assert runtime["candidate_count"] == 12
+    assert runtime["review_ready_count"] == 5
+    assert runtime["blocked_count"] == 7
+    assert runtime["canonical_promotion_performed"] is False
+    assert runtime["outbound_sent"] is False
+    assert runtime["execution_authority"] == "none"
