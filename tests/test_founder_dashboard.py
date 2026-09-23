@@ -1573,3 +1573,19 @@ def test_dashboard_exposes_buyer_acquisition_team_runtime(tmp_path):
     assert runtime["canonical_settlement_rail"] == "USDT_BSC"
     assert runtime["buyer_capacity_never_gates_acquisition"] is True
     assert runtime["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_non_binding_pricing_proposal(tmp_path):
+    result = build_founder_dashboard(make_root(tmp_path))
+    pricing = result["commercial_pricing_proposal"]
+
+    assert pricing["product_count"] == 12
+    assert pricing["binding"] is False
+    assert pricing["founder_approval_required"] is True
+    assert pricing["database_mutation_authorized"] is False
+    codes = {row["product_code"] for row in pricing["products"]}
+    assert "local_search_grid" in codes
+    assert "private_capital_rollup" in codes
+    assert pricing["existing_verified_product_unchanged"][
+        "amount_cents"
+    ] == 150000
