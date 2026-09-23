@@ -228,14 +228,17 @@ def _entry_offer_for_followup(
     review_count = int(_number(evidence.get("review_count")))
     buy_signal_score = _number(evidence.get("buy_signal_score"))
 
-    if company_score >= 90 or review_count >= 1000 or buy_signal_score >= 95:
+    # High intent alone does not justify a high-friction offer. Preserve
+    # the $1,500 pilot for accounts with stronger scale evidence; otherwise
+    # start with a verified one-off entry product and earn the upsell.
+    if company_score >= 90 or review_count >= 1000:
         return {
             "product_code": "managed_service",
             "name": "Empire Opportunity Intelligence Pilot",
             "price_text": "$1,500 flat pilot",
             "cta": "pilot",
         }
-    if company_score >= 80 or review_count >= 300 or buy_signal_score >= 80:
+    if company_score >= 80 or review_count >= 300 or buy_signal_score >= 90:
         return {
             "product_code": "search_opportunity_map",
             "name": "Search Opportunity Map",
