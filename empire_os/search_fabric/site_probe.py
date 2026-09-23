@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import html as html_lib
+import ipaddress
 import re
+import socket
 import time
 from typing import Any, Dict, Iterable, List
 from urllib.error import HTTPError, URLError
@@ -65,6 +67,56 @@ COMMON_PEOPLE_PATHS = (
 )
 
 MAX_RESPONSE_BYTES = 2_000_000
+
+
+def _public_url_allowed(url: str) -> bool:
+    try:
+        parsed = urlparse(str(url or "").strip())
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    if parsed.username or parsed.password:
+        return False
+    try:
+        port = parsed.port
+    except ValueError:
+        return False
+    if port not in {None, 80, 443}:
+        return False
+
+    host = parsed.hostname.strip().lower().rstrip(".")
+    if (
+        host == "localhost"
+        or host.endswith(".localhost")
+        or host.endswith(".local")
+        or host.endswith(".internal")
+    ):
+        return False
+
+    try:
+        literal = ipaddress.ip_address(host)
+    except ValueError:
+        literal = None
+    if literal is not None:
+        return literal.is_global
+
+    try:
+        answers = socket.getaddrinfo(
+            host,
+            port or (443 if parsed.scheme == "https" else 80),
+            type=socket.SOCK_STREAM,
+        )
+    except OSError:
+        return False
+
+    addresses = []
+    for answer in answers:
+        try:
+            addresses.append(ipaddress.ip_address(answer[4][0]))
+        except (IndexError, TypeError, ValueError):
+            continue
+    return bool(addresses) and all(address.is_global for address in addresses)
 
 
 _PLACEHOLDER_EMAILS = {
@@ -619,39 +671,55 @@ def _fetch_with_urllib(url: str, *, timeout: float):
         return None
 
 
-def _fetch(session: requests.Session, url: str, *, timeout: float = 15.0):
-    response = None
-    try:
-        response = session.get(
-            url,
-            timeout=max(1.0, float(timeout)),
-            allow_redirects=True,
+def _fetch(
+    session: requests.Session,
+    url: str,
+    *,
+    timeout: float = 15.0,
+    public_only: bool = False,
+):
+    current = url
+    for _ in range(5):
+        if public_only and not _public_url_allowed(current):
+            return None
+        try:
+            response = session.get(
+                current,
+                timeout=max(1.0, float(timeout)),
+                allow_redirects=not public_only,
+            )
+        except requests.RequestException:
+            return None
+
+        if public_only and response.status_code in {301, 302, 303, 307, 308}:
+            location = response.headers.get("Location", "")
+            if not location:
+                return None
+            current = urljoin(current, location)
+            continue
+
+        if response.status_code != 200:
+            if response.status_code == 403 and not public_only:
+                return _fetch_with_urllib(current, timeout=timeout)
+            return None
+
+        content_type = response.headers.get("Content-Type", "")
+        if not any(
+            kind in content_type.lower()
+            for kind in ("html", "json", "xml", "text")
+        ):
+            return None
+
+        data = response.content[:MAX_RESPONSE_BYTES]
+        return decode_document(
+            url=str(response.url),
+            data=data,
+            content_type=content_type,
+            content_encoding="",
+            charset=response.encoding,
         )
-    except requests.RequestException:
-        return None
 
-    if response.status_code != 200:
-        if response.status_code == 403:
-            return _fetch_with_urllib(url, timeout=timeout)
-        return None
-
-    content_type = response.headers.get("Content-Type", "")
-
-    if not any(
-        kind in content_type.lower()
-        for kind in ("html", "json", "xml", "text")
-    ):
-        return None
-
-    data = response.content[:MAX_RESPONSE_BYTES]
-
-    return decode_document(
-        url=str(response.url),
-        data=data,
-        content_type=content_type,
-        content_encoding="",
-        charset=response.encoding,
-    )
+    return None
 
 
 def probe_site(
@@ -661,6 +729,7 @@ def probe_site(
     request_timeout: float = 8.0,
     time_budget_seconds: float = 24.0,
     page_priority: str = "default",
+    public_only: bool = False,
 ) -> dict:
     """
     Inspect a public business site and return normalized evidence.
@@ -686,7 +755,12 @@ def probe_site(
     time_budget_seconds = max(request_timeout, min(float(time_budget_seconds), 120.0))
     deadline = time.monotonic() + time_budget_seconds
 
-    homepage = _fetch(session, url, timeout=request_timeout)
+    homepage = _fetch(
+        session,
+        url,
+        timeout=request_timeout,
+        public_only=public_only,
+    )
 
     if homepage is None:
         fallback_url = (
@@ -703,6 +777,7 @@ def probe_site(
                 session,
                 fallback_url,
                 timeout=request_timeout,
+                public_only=public_only,
             )
 
     if homepage is None:
@@ -773,8 +848,10 @@ def probe_site(
             time.sleep(min(0.25, max(0.0, deadline - time.monotonic())))
             remaining = max(1.0, deadline - time.monotonic())
             document = _fetch(
-                session, page_url,
+                session,
+                page_url,
                 timeout=min(request_timeout, remaining),
+                public_only=public_only,
             )
 
             if document is None:
