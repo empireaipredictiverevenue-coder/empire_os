@@ -541,7 +541,7 @@ def _write_isolated_hermes_config(
     payload = {
         "model": {
             "provider": "custom",
-            "default": "auto/coding",
+            "default": "openrouter/openrouter/free",
             "base_url": base_url,
             "api_mode": "chat_completions",
         }
@@ -592,7 +592,7 @@ def run_hermes(
     if isolated_home is not None:
         env["HERMES_HOME"] = str(isolated_home)
         provider = "custom"
-        model = "auto/coding"
+        model = "openrouter/openrouter/free"
         endpoint_mode = "isolated_omniroute"
     else:
         provider = str(
