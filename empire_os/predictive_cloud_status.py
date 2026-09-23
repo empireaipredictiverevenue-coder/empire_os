@@ -96,6 +96,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("observed_at", "generated_at"),
         "fresh_seconds": 600,
     },
+    "buyer_acquisition_team": {
+        "path": Path("runtime/buyer_acquisition/latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 600,
+    },
     "astra": {
         "path": Path("runtime/astra/latest.json"),
         "time_keys": ("observed_at", "generated_at"),
@@ -236,6 +241,38 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             ),
             "supply_gate_diagnostics": payload.get(
                 "supply_gate_diagnostics"
+            ),
+        }
+    if name == "buyer_acquisition_team":
+        automation = (
+            payload.get("automation")
+            if isinstance(payload.get("automation"), Mapping)
+            else {}
+        )
+        return {
+            "team_role_count": payload.get("team_role_count"),
+            "buyer_pool_count": len(payload.get("buyer_pools") or []),
+            "demand_gap_count": payload.get("demand_gap_count"),
+            "priority_target_count": len(
+                payload.get("priority_targets") or []
+            ),
+            "product_demand_count": payload.get(
+                "product_demand_count"
+            ),
+            "sellable_product_demand_count": payload.get(
+                "sellable_product_demand_count"
+            ),
+            "market_validate_product_count": payload.get(
+                "market_validate_product_count"
+            ),
+            "live_outbound_send": automation.get(
+                "live_outbound_send"
+            ),
+            "canonical_settlement_rail": payload.get(
+                "canonical_settlement_rail"
+            ),
+            "buyer_capacity_never_gates_acquisition": payload.get(
+                "buyer_capacity_never_gates_acquisition"
             ),
         }
     if name == "opportunity_radar":
