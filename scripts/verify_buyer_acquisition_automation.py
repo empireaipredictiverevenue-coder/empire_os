@@ -80,6 +80,9 @@ def main() -> int:
         for relative in REQUIRED_ARTIFACTS
     }
     buyer_plan = _read_json(root / "runtime/buyer_acquisition/latest.json")
+    scout = _read_json(
+        root / "runtime/buyer_acquisition/scout_latest.json"
+    )
     exchange = _read_json(root / "runtime/commercial_exchange/latest.json")
 
     safe_automation_ready = all(
@@ -100,6 +103,12 @@ def main() -> int:
             buyer_plan.get("automation") or {}
         ).get("live_outbound_send") is False
     )
+    scout_safe = (
+        scout.get("mode") == "OBSERVE"
+        and scout.get("database_write_performed") is False
+        and scout.get("outbound_sent") is False
+        and scout.get("execution_authority") == "none"
+    )
     exchange_safe = (
         exchange.get("mode") == "OBSERVE"
         and exchange.get("automatic_external_delivery") is False
@@ -110,6 +119,7 @@ def main() -> int:
         safe_automation_ready,
         artifacts_ready,
         plan_safe,
+        scout_safe,
         exchange_safe,
         not live_external_automation_detected,
     ))
@@ -120,6 +130,7 @@ def main() -> int:
         "safe_internal_automation_ready": safe_automation_ready,
         "required_artifacts_present": artifacts_ready,
         "buyer_plan_safe": plan_safe,
+        "buyer_scout_safe": scout_safe,
         "commercial_exchange_safe": exchange_safe,
         "live_external_automation_detected": (
             live_external_automation_detected
@@ -136,6 +147,12 @@ def main() -> int:
         ),
         "sellable_product_demand_count": int(
             buyer_plan.get("sellable_product_demand_count") or 0
+        ),
+        "scout_candidate_count": int(
+            scout.get("candidate_count") or 0
+        ),
+        "explicit_direct_buyer_candidate_count": int(
+            scout.get("explicit_direct_buyer_candidate_count") or 0
         ),
         "market_validate_product_count": int(
             buyer_plan.get("market_validate_product_count") or 0
