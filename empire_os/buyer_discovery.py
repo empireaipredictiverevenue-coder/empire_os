@@ -722,7 +722,12 @@ def merge_generated_contact_evidence(enriched: Mapping[str, Any], validated: Ite
     return result
 
 
-def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[str, Any]:
+def verify_contact_plan(
+    enriched: Mapping[str, Any],
+    *,
+    validator: Any,
+    allow_company_routed: bool = False,
+) -> dict[str, Any]:
     decision = enriched.get("decision_maker") if isinstance(enriched, Mapping) else None
     reconciliation = enriched.get("decision_reconciliation") if isinstance(enriched, Mapping) else None
     raw_contacts = list(enriched.get("contact_candidates") or []) if isinstance(enriched, Mapping) else []
@@ -731,6 +736,17 @@ def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[
             {"email": email, "source": "legacy_unbound", "bound_to_decision_maker": False}
             for email in (enriched.get("contact_email_candidates") or [])
         ]
+
+    site_evidence = (
+        enriched.get("site_evidence")
+        if isinstance(enriched, Mapping)
+        else None
+    )
+    site_domain_match = bool(
+        isinstance(site_evidence, Mapping)
+        and site_evidence.get("domain_match") is True
+    )
+
     verified = []
     for contact in raw_contacts:
         email = _text(contact.get("email")).lower()
@@ -765,30 +781,104 @@ def verify_contact_plan(enriched: Mapping[str, Any], *, validator: Any) -> dict[
             "source": contact.get("source") or "unknown",
             "bound_to_decision_maker": bool(contact.get("bound_to_decision_maker")),
         })
-    review_eligible = [
+
+    person_bound_eligible = [
         item for item in verified
-        if item["is_valid"] and not item["is_role_address"] and not item["is_disposable"]
+        if item["is_valid"]
+        and not item["is_role_address"]
+        and not item["is_disposable"]
         and item["bound_to_decision_maker"]
     ]
     strong_public_sources = {
         "person_structured_data", "official_site",
         "public_government_record", "company_press_release",
     }
-    outreach_eligible = [
-        item for item in review_eligible
+    person_bound_outreach = [
+        item for item in person_bound_eligible
         if item["smtp_accepts"] or item["source"] in strong_public_sources
     ]
+
     decision_score = float((decision or {}).get("decision_score") or 0.0)
+    decision_role = _text((decision or {}).get("decision_role"))
+    if not decision_role and decision:
+        decision_role, _ = classify_decision_role(
+            (decision or {}).get("title")
+        )
     reconciliation_clear = not bool((reconciliation or {}).get("review_required"))
+
+    # A company-routed address is not person-bound. It may only be used when
+    # explicitly enabled by the caller, the verified decision maker is an
+    # economic buyer, and the role inbox was directly observed on the matched
+    # first-party domain. This preserves the distinction between "email belongs
+    # to the buyer" and "company inbox can route a message to the buyer".
+    company_routed_eligible = []
+    if (
+        allow_company_routed
+        and decision
+        and decision_role == "economic_buyer"
+        and decision_score >= 0.70
+        and reconciliation_clear
+        and site_domain_match
+    ):
+        company_routed_eligible = [
+            item for item in verified
+            if item["is_role_address"]
+            and not item["is_disposable"]
+            and item["source"] in {"site_observed", "official_site"}
+            and not item["bound_to_decision_maker"]
+        ]
+
+    if person_bound_eligible:
+        preferred = person_bound_eligible[0]
+        contact_route = "person_bound"
+    elif company_routed_eligible:
+        preferred = company_routed_eligible[0]
+        contact_route = "company_routed"
+    else:
+        preferred = None
+        contact_route = None
+
+    review_ready = bool(
+        decision
+        and decision_score >= 0.5
+        and preferred
+        and reconciliation_clear
+    )
+    if contact_route == "person_bound":
+        outreach_ready = bool(
+            decision
+            and decision_score >= 0.5
+            and person_bound_outreach
+            and reconciliation_clear
+        )
+    elif contact_route == "company_routed":
+        # Publication on the verified first-party site is the routing evidence.
+        # Human review still remains mandatory before any outbound intent.
+        outreach_ready = review_ready
+    else:
+        outreach_ready = False
+
     return {
         "mode": "OBSERVE",
         "write_authorized": False,
         "decision_maker": decision,
         "decision_reconciliation": reconciliation,
         "verified_contacts": verified,
-        "preferred_email": review_eligible[0]["email"] if review_eligible else None,
-        "review_ready": bool(decision and decision_score >= 0.5 and review_eligible and reconciliation_clear),
-        "outreach_ready": bool(decision and decision_score >= 0.5 and outreach_eligible and reconciliation_clear),
+        "preferred_email": preferred["email"] if preferred else None,
+        "contact_route": contact_route,
+        "person_bound": contact_route == "person_bound",
+        "routing_name": (
+            _text((decision or {}).get("name"))
+            if contact_route == "company_routed"
+            else None
+        ),
+        "routing_title": (
+            _text((decision or {}).get("title"))
+            if contact_route == "company_routed"
+            else None
+        ),
+        "review_ready": review_ready,
+        "outreach_ready": outreach_ready,
     }
 
 
@@ -920,6 +1010,10 @@ def build_candidate_review_plan(candidate: BuyerCandidate, contact_plan: Mapping
         "decision_role": decision.get("decision_role") or candidate.decision_role,
         "decision_source": decision_source or None,
         "contact_source": contact_source or None,
+        "contact_route": _text(contact_plan.get("contact_route")) or None,
+        "person_bound": bool(contact_plan.get("person_bound")),
+        "routing_name": _text(contact_plan.get("routing_name")) or None,
+        "routing_title": _text(contact_plan.get("routing_title")) or None,
         "verified_contacts": verified_contacts,
         "review_ready": bool(contact_plan.get("review_ready")),
         "outreach_ready": bool(contact_plan.get("outreach_ready")),
