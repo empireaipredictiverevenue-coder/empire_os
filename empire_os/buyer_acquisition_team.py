@@ -16,6 +16,10 @@ from pathlib import Path
 import re
 from typing import Any, Iterable, Mapping
 
+from empire_os.phase4_exchange_mrr_products import (
+    build_exchange_mrr_product_plan,
+)
+
 
 OUTPUT = Path("runtime/buyer_acquisition/latest.json")
 
@@ -566,6 +570,42 @@ def _product_buyer_pools(
     ]
 
 
+def _phase4_exchange_mrr_demand_rows() -> list[dict[str, Any]]:
+    plan = build_exchange_mrr_product_plan()
+    rows: list[dict[str, Any]] = []
+    for raw in plan.get("products") or []:
+        if not isinstance(raw, Mapping):
+            continue
+        row = dict(raw)
+        code = _text(row.get("product_code"))
+        if not code:
+            continue
+        rows.append({
+            "product_code": code,
+            "product_name": _text(row.get("name")) or code,
+            "product_family": "commercial_exchange",
+            "billing_model": "monthly_subscription",
+            "commercial_state": "MARKET_VALIDATE_TERMS_REQUIRED",
+            "binding_terms_ready": False,
+            "catalog_verified": False,
+            "target_buyer_pools": [
+                "local_and_smb_buyers",
+                "end_service_buyers",
+                "direct_demand_buyers",
+                "agency_and_reseller_buyers",
+                "enterprise_and_data_buyers",
+            ],
+            "priority_score": 70,
+            "price_claim_allowed": False,
+            "actual_revenue": False,
+            "recovered_mrr_product": True,
+            "corridor_limit": row.get("corridor_limit"),
+            "capacity_model": row.get("capacity_model"),
+            "monetization": list(row.get("monetization") or []),
+        })
+    return rows
+
+
 def build_product_demand_queue(
     catalog_snapshot: Mapping[str, Any] | None,
 ) -> list[dict[str, Any]]:
@@ -615,6 +655,14 @@ def build_product_demand_queue(
             "price_claim_allowed": terms_ready and catalog_verified,
             "actual_revenue": False,
         })
+
+    known_codes = {
+        str(row.get("product_code") or "")
+        for row in queue
+    }
+    for row in _phase4_exchange_mrr_demand_rows():
+        if row["product_code"] not in known_codes:
+            queue.append(row)
 
     queue.sort(
         key=lambda row: (
