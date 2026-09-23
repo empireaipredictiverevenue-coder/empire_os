@@ -49,3 +49,23 @@ def test_phase4_pricing_and_exclusivity_fail_closed():
     assert rules["seat_activation_requires_verified_capacity"] is True
     assert rules["territory_requires_evidence"] is True
     assert rules["exclusivity_requires_evidence"] is True
+
+
+def test_exchange_buyer_acquisition_is_broader_than_lead_buyers():
+    result = build_commercial_exchange_contract()
+    scope = result["buyer_acquisition_scope"]
+
+    assert scope["local_and_smb_buyers"] is True
+    assert scope["end_service_buyers"] is True
+    assert scope["direct_lead_and_call_buyers"] is True
+    assert scope["agencies_and_resellers"] is True
+    assert scope["enterprise_and_data_buyers"] is True
+    assert scope["software_and_advisory_buyers"] is True
+    assert scope["lead_products_only"] is False
+    assert scope["live_outbound_send"] is False
+
+    revenue = result["revenue_features"]
+    assert "local_search_and_seo_intelligence" in revenue
+    assert "commercial_diagnostics" in revenue
+    assert "saas_subscriptions" in revenue
+    assert "vertical_intelligence_and_private_feeds" in revenue
