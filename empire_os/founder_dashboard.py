@@ -33,6 +33,9 @@ from empire_os.phase_3f_closeout import (
 from empire_os.commercial_exchange_contract import (
     build_commercial_exchange_contract,
 )
+from empire_os.phase4_exchange_mrr_products import (
+    build_exchange_mrr_product_plan,
+)
 from empire_os.buyer_acquisition_team import (
     refresh_buyer_acquisition_plan,
 )
@@ -1009,6 +1012,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "canonical_execution_plan": build_canonical_phase_plan(),
         "phase_3f_closeout": build_phase_3f_closeout(repo_root),
         "commercial_exchange": build_commercial_exchange_contract(),
+        "commercial_exchange_mrr_products": (
+            build_exchange_mrr_product_plan()
+        ),
         "commercial_exchange_runtime": _commercial_exchange_runtime(
             _read_json(commercial_exchange_runtime_path),
             commercial_exchange_runtime_path,
