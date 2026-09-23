@@ -293,6 +293,36 @@ def _git(
     )
 
 
+def _prepare_worktree_slot(
+    repo_root: Path,
+    worktree: Path,
+) -> None:
+    """Clear only the target slot plus stale Git worktree metadata.
+
+    Interrupted workers can leave a registered worktree whose directory was
+    already removed. A later job with the same id then fails before Hermes
+    starts. Remove the target if it still exists, prune stale registrations,
+    and recreate from a clean path.
+    """
+    _git(
+        repo_root,
+        "worktree",
+        "remove",
+        "--force",
+        str(worktree),
+        check=False,
+    )
+    shutil.rmtree(worktree, ignore_errors=True)
+    _git(
+        repo_root,
+        "worktree",
+        "prune",
+        "--expire",
+        "now",
+        check=False,
+    )
+
+
 def fetch_control_refs(
     repo_root: Path,
     *,
@@ -818,6 +848,7 @@ def process_job(
 
     job_root = runtime_root / "jobs" / job.job_id
     worktree = job_root / "worktree"
+    _prepare_worktree_slot(repo_root, worktree)
     shutil.rmtree(job_root, ignore_errors=True)
     job_root.mkdir(parents=True, exist_ok=True)
 
