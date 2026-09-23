@@ -406,3 +406,31 @@ def test_tag_intelligence_product_is_in_catalog_and_ready():
     assert body["product"]["publishing_authority"] is False
     assert body["readiness"]["status"] == "READY"
     assert body["readiness"]["required"]["tag_intelligence"] is True
+
+
+
+def test_tag_change_preview_detects_measurement_regression():
+    response = _client().post(
+        "/v1/search/tag-intelligence/change-preview",
+        json={
+            "previous_page_tags": {
+                "robots": "index,follow",
+            },
+            "current_page_tags": {
+                "robots": "noindex,follow",
+            },
+            "previous_measurement_tags": {
+                "meta_pixel_ids": ["123"],
+            },
+            "current_measurement_tags": {
+                "meta_pixel_ids": [],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "OBSERVE"
+    assert body["execution_allowed"] is False
+    assert body["change_monitor"]["critical_change_count"] == 2
+    assert body["change_monitor"]["automatic_repair"] is False
