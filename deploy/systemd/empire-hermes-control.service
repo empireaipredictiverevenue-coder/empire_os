@@ -9,6 +9,8 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/srv/empire_os
 Environment=HOME=/home/ubuntu
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=EMPIRE_HERMES_BIN=/home/ubuntu/.local/bin/hermes
 Environment=PYTHONPATH=/srv/empire_os
 Environment=EMPIRE_AUTONOMOUS_MODE=OBSERVE
 Environment=EMPIRE_HERMES_GOVERNED_WORKER=1
