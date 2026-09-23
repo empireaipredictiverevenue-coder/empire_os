@@ -505,6 +505,7 @@ def run_hermes(
         "--toolsets",
         "terminal,skills",
         "-Q",
+        "-q",
         build_hermes_prompt(
             job,
             production_repo=production_repo,
