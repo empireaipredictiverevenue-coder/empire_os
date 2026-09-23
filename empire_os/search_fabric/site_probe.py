@@ -567,6 +567,7 @@ def _sitemap_people_candidates(
     timeout: float,
     deadline: float,
     max_urls: int = 12,
+    public_only: bool = False,
 ) -> List[str]:
     """Discover hidden first-party people pages from bounded sitemap reads."""
     root = f"{urlparse(origin).scheme}://{urlparse(origin).netloc}"
@@ -591,7 +592,12 @@ def _sitemap_people_candidates(
     for sitemap_url in sitemap_urls:
         if time.monotonic() >= deadline:
             break
-        doc = _fetch(session, sitemap_url, timeout=min(timeout, 4.0))
+        doc = _fetch(
+            session,
+            sitemap_url,
+            timeout=min(timeout, 4.0),
+            public_only=public_only,
+        )
         if doc is None:
             continue
         for value in locs(doc.text):
@@ -613,7 +619,12 @@ def _sitemap_people_candidates(
     for nested_url in list(dict.fromkeys(nested))[:2]:
         if time.monotonic() >= deadline:
             break
-        doc = _fetch(session, nested_url, timeout=min(timeout, 4.0))
+        doc = _fetch(
+            session,
+            nested_url,
+            timeout=min(timeout, 4.0),
+            public_only=public_only,
+        )
         if doc is None:
             continue
         for value in locs(doc.text):
@@ -807,6 +818,7 @@ def probe_site(
                     timeout=request_timeout,
                     deadline=deadline,
                     max_urls=12,
+                    public_only=public_only,
                 )
             )
             queue.extend(internal[6:])
