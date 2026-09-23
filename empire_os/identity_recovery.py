@@ -106,6 +106,37 @@ def _rank_people(evidence: dict[str, Any], website: str) -> list[IdentityEvidenc
     return rows
 
 
+def _direct_first_party_people(
+    website: str,
+) -> tuple[list[IdentityEvidence], dict[str, Any]]:
+    """Probe the verified company site directly before using any SERP.
+
+    The site probe is bounded, same-domain only, and prioritizes team/about/
+    leadership pages plus sitemap-discovered people pages.
+    """
+    try:
+        probe = probe_site(
+            website,
+            max_pages=12,
+            request_timeout=5.0,
+            time_budget_seconds=35.0,
+            page_priority="people",
+        )
+    except Exception:
+        return [], {
+            "ok": False,
+            "error": "direct_first_party_probe_failed",
+        }
+
+    if not isinstance(probe, dict) or probe.get("ok") is not True:
+        return [], probe if isinstance(probe, dict) else {
+            "ok": False,
+            "error": "direct_first_party_probe_invalid",
+        }
+
+    return _rank_people(probe, website), probe
+
+
 def _serp_results(query: str, *, num: int) -> list[dict[str, Any]]:
     """Query Empire SERP and preserve search provenance for identity recovery."""
     try:
@@ -152,41 +183,54 @@ def recover_identity(
     evidence_rows: list[IdentityEvidence] = []
     sources_tried: list[str] = []
 
-    # 1. Search Fabric discovers first-party people pages the crawler may not
-    # have reached from normal navigation.
+    # 1. Direct first-party crawl is the primary recovery path. We already
+    # know the verified business domain, so buyer identity must not depend on
+    # a public SERP being available.
     domain = _host(website)
-    queries = (
-        f'site:{domain} "{business_name}" owner founder president',
-        f'site:{domain} "{business_name}" team leadership',
-    )
     seen_urls: set[str] = set()
-    for query in queries:
-        sources_tried.append("empire_serp")
-        for organic in _serp_results(
-            query,
-            num=max_search_results,
-        ):
-            if not isinstance(organic, dict):
-                continue
-            link = str(organic.get("link") or "").strip()
-            if (
-                not link
-                or link in seen_urls
-                or not _same_host(link, website)
-            ):
-                continue
-            seen_urls.add(link)
-            probe = probe_site(
-                link,
-                max_pages=3,
-                request_timeout=5.0,
-                time_budget_seconds=15.0,
-                page_priority="people",
-            )
-            if isinstance(probe, dict) and probe.get("ok") is True:
-                evidence_rows.extend(_rank_people(probe, website))
+    sources_tried.append("first_party_site_probe")
+    direct_people, direct_probe = _direct_first_party_people(website)
+    evidence_rows.extend(direct_people)
+    for page in direct_probe.get("pages_checked") or []:
+        if isinstance(page, dict):
+            page_url = str(page.get("url") or "").strip()
+            if page_url:
+                seen_urls.add(page_url)
 
-    # 2. Official license records can provide a named professional tied to the
+    # 2. Empire SERP is a fallback for first-party people pages that are not
+    # linked from the site or exposed through its sitemap.
+    if not direct_people:
+        queries = (
+            f'site:{domain} "{business_name}" owner founder president',
+            f'site:{domain} "{business_name}" team leadership',
+        )
+        for query in queries:
+            sources_tried.append("empire_serp")
+            for organic in _serp_results(
+                query,
+                num=max_search_results,
+            ):
+                if not isinstance(organic, dict):
+                    continue
+                link = str(organic.get("link") or "").strip()
+                if (
+                    not link
+                    or link in seen_urls
+                    or not _same_host(link, website)
+                ):
+                    continue
+                seen_urls.add(link)
+                probe = probe_site(
+                    link,
+                    max_pages=3,
+                    request_timeout=5.0,
+                    time_budget_seconds=15.0,
+                    page_priority="people",
+                )
+                if isinstance(probe, dict) and probe.get("ok") is True:
+                    evidence_rows.extend(_rank_people(probe, website))
+
+    # 3. Official license records can provide a named professional tied to the
     # business. Treat that person as a search seed only; first-party evidence
     # must still show a commercial decision role before promotion.
     state_hint = _state_hint(metro)
@@ -232,7 +276,7 @@ def recover_identity(
                     if row.name.casefold() == person_name.casefold():
                         evidence_rows.append(row)
 
-    # 3. UK Companies House provides authoritative company/officer
+    # 4. UK Companies House provides authoritative company/officer
     # association. Officers are search seeds only: a Companies House
     # directorship does not by itself prove commercial buyer authority.
     companies_house_seeds: list[dict[str, Any]] = []
@@ -277,7 +321,7 @@ def recover_identity(
                     if row.name.casefold() == person_name.casefold():
                         evidence_rows.append(row)
 
-    # 4. Public registry lookup contributes only when the scraper itself
+    # 5. Public registry lookup contributes only when the scraper itself
     # returns an explicit owner name. No inference from company names.
     sources_tried.append("registry_scraper")
     try:
