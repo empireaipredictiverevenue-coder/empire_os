@@ -39,6 +39,7 @@ from empire_os.prospect_ingest import (
 )
 from empire_os.signal_inbox import enqueue_signal
 from empire_os.runtime_env import load_runtime_env
+from empire_os.geo_registry import acquisition_markets
 
 LOG_PATH = Path(
     os.environ.get(
@@ -315,6 +316,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--metro", default=None, help="Filter sources to one metro")
     parser.add_argument(
+        "--country",
+        default=None,
+        help="Run across all enabled acquisition markets for one ISO country code",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Discover candidates without writing canonical prospects",
@@ -335,6 +341,8 @@ def main():
 
     if args.max_candidates is not None and args.max_candidates < 1:
         parser.error("--max-candidates must be >= 1")
+    if args.metro and args.country:
+        parser.error("--metro and --country are mutually exclusive")
 
     signal.signal(signal.SIGALRM, _die_on_hang)
     signal.alarm(MAX_RUN_SEC)
@@ -363,27 +371,41 @@ def main():
 
     remaining = args.max_candidates
 
+    if args.country:
+        target_metros = [
+            market.metro
+            for market in acquisition_markets(countries=[args.country])
+        ]
+        if not target_metros:
+            parser.error(f"no enabled acquisition markets for country {args.country}")
+    else:
+        target_metros = [args.metro]
+
     for src in sources:
         if remaining is not None and remaining <= 0:
             break
 
-        c, accepted, errors = run_source_safe(
-            src,
-            args.metro,
-            args.dry_run,
-            max_candidates=remaining,
-            niche=args.niche,
-        )
-        candidates_total += c
+        for target_metro in target_metros:
+            if remaining is not None and remaining <= 0:
+                break
 
-        if remaining is not None:
-            remaining -= c
-        accepted_total += accepted
-        errored_total += errors
-        if errors:
-            sources_err += 1
-        else:
-            sources_ok += 1
+            c, accepted, errors = run_source_safe(
+                src,
+                target_metro,
+                args.dry_run,
+                max_candidates=remaining,
+                niche=args.niche,
+            )
+            candidates_total += c
+
+            if remaining is not None:
+                remaining -= c
+            accepted_total += accepted
+            errored_total += errors
+            if errors:
+                sources_err += 1
+            else:
+                sources_ok += 1
 
     signal.alarm(0)
 
