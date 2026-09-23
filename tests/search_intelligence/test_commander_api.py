@@ -355,3 +355,54 @@ def test_backlinks_preview_keeps_missing_evidence_unknown():
     assert analysis["observed_backlinks"] == 0
     assert analysis["authority_score"] is None
     assert analysis["reason"] == "no_observed_backlink_evidence"
+
+
+
+def test_tag_intelligence_preview_is_observe_only():
+    response = _client().post(
+        "/v1/search/tag-intelligence/preview",
+        json={
+            "page_tags": {
+                "url": "https://example.com/landing",
+                "title": "",
+                "meta_description": "",
+                "canonical_url": "",
+                "robots": "noindex,follow",
+                "open_graph": {},
+                "twitter": {},
+                "meta_keywords_present": True,
+            },
+            "measurement_tags": {
+                "meta_pixel_ids": ["123"],
+                "meta_capi_enabled": True,
+                "meta_event_id_dedup": False,
+            },
+            "expectations": {
+                "intended_public": True,
+                "meta_ads_expected": True,
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["schema_version"] == "empire.tag_intelligence.v1"
+    assert body["mode"] == "OBSERVE"
+    assert body["recommendation_only"] is True
+    assert body["execution_allowed"] is False
+    assert body["analysis"]["critical_count"] >= 2
+    assert body["analysis"]["execution_authority"] == "none"
+    assert body["analysis"]["estimated_revenue_loss_cents"] is None
+
+
+def test_tag_intelligence_product_is_in_catalog_and_ready():
+    response = _client().get(
+        "/v1/search/products/tag_intelligence_monitor"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["product"]["commercial_model"] == "monthly_subscription"
+    assert body["product"]["publishing_authority"] is False
+    assert body["readiness"]["status"] == "READY"
+    assert body["readiness"]["required"]["tag_intelligence"] is True
