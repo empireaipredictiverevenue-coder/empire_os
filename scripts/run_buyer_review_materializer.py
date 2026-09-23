@@ -12,8 +12,8 @@ from empire_os.solar_opportunity_map_automation import (
     materialize_missing_solar_map_backlog,
     materialize_solar_maps_for_review_outcomes,
 )
-from empire_os.solar_product_catalog import (
-    sync_solar_opportunity_map_product,
+from empire_os.market_pricing import (
+    sync_solar_market_pricing,
 )
 
 STATE = Path("/srv/empire_os/runtime/buyer_review_materializer/state.json")
@@ -43,7 +43,7 @@ def main() -> int:
     parser.add_argument("--probe-workers", type=int, default=8)
     args = parser.parse_args()
 
-    solar_product_catalog = sync_solar_opportunity_map_product()
+    solar_product_catalog = sync_solar_market_pricing()
 
     state = _state()
     scan_fresh = bool(state.get("scan_fresh_next", True))
