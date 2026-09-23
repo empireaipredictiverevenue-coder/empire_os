@@ -494,7 +494,21 @@ def test_status_exposes_media_os_runtime_without_external_authority(tmp_path):
                 "candidate_count": 9,
                 "pending_quant_review_count": 9,
             },
+            "research_packs": {
+                "candidate_count": 5,
+                "verified_claim_count": 3,
+                "script_ready_count": 2,
+            },
+            "content_pipeline": {
+                "canonical_content_candidate_count": 2,
+                "script_brief_candidate_count": 2,
+                "script_prose_generated": False,
+            },
             "ready_for_research_generation": True,
+            "ready_for_claim_verification": True,
+            "ready_for_script_generation": True,
+            "ready_for_script_prose_generation": True,
+            "ready_for_storyboard_generation": False,
             "public_publish_authorized": False,
             "external_action_performed": False,
             "execution_authority": "none",
@@ -521,7 +535,17 @@ def test_status_exposes_media_os_runtime_without_external_authority(tmp_path):
     assert summary["trend_topic_count"] == 5
     assert summary["idea_candidate_count"] == 9
     assert summary["pending_quant_review_count"] == 9
+    assert summary["research_pack_candidate_count"] == 5
+    assert summary["research_verified_claim_count"] == 3
+    assert summary["research_script_ready_count"] == 2
+    assert summary["canonical_content_candidate_count"] == 2
+    assert summary["script_brief_candidate_count"] == 2
+    assert summary["script_prose_generated"] is False
     assert summary["ready_for_research_generation"] is True
+    assert summary["ready_for_claim_verification"] is True
+    assert summary["ready_for_script_generation"] is True
+    assert summary["ready_for_script_prose_generation"] is True
+    assert summary["ready_for_storyboard_generation"] is False
     assert summary["public_publish_authorized"] is False
     assert summary["external_action_performed"] is False
     assert row["execution_authority"] == "none"
