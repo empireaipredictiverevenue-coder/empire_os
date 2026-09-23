@@ -989,3 +989,12 @@ def test_company_routed_contact_requires_explicit_opt_in_and_economic_buyer():
     )
     assert blocked["review_ready"] is False
     assert blocked["contact_route"] is None
+
+
+def test_company_routed_aliases_include_enquiries_and_office():
+    from empire_os.buyer_discovery import _is_company_routing_email
+
+    assert _is_company_routing_email("enquiries@2020solarpv.com") is True
+    assert _is_company_routing_email("info@3asconsultants.com") is True
+    assert _is_company_routing_email("office@example.co.uk") is True
+    assert _is_company_routing_email("peter@2020solarpv.com") is False
