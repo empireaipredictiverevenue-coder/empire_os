@@ -387,6 +387,7 @@ def media_os_architecture_contract() -> dict[str, Any]:
             "channel_spawning_candidate",
             "workflow_skill_candidate_compiler",
             "flagship_media_runtime",
+            "empire_intelligence_bridge",
         ],
         "subscriber_strategy": {
             "first_major_scale_milestone": 100_000,
@@ -535,6 +536,9 @@ def media_os_founder_status(
         ),
         "pending_quant_review_count": int(
             ideas.get("pending_quant_review_count") or 0
+        ),
+        "commercial_quant_available_count": int(
+            ideas.get("commercial_quant_available_count") or 0
         ),
         "ready_for_research_generation": (
             runtime.get("ready_for_research_generation") is True
