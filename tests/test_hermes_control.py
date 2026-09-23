@@ -200,21 +200,6 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
             return ("completed with local-test-key", None)
 
     monkeypatch.setattr(hermes_control.subprocess, "Popen", DummyProcess)
-    monkeypatch.setattr(
-        hermes_control,
-        "_select_omniroute_model",
-        lambda env: (
-            "openrouter/z-ai/glm-5.3-flash:free",
-            [
-                {
-                    "model": "openrouter/z-ai/glm-5.3-flash:free",
-                    "ok": "true",
-                    "reason": "ok",
-                }
-            ],
-        ),
-    )
-
     repo = tmp_path / "repo"
     worktree = tmp_path / "worktree"
     worktree.mkdir(parents=True)
@@ -226,9 +211,10 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     )
 
     assert result["returncode"] == 0
-    assert result["endpoint_mode"] == "isolated_omniroute"
+    assert result["endpoint_mode"] == "isolated_omniroute_auto"
     assert result["provider"] == "custom"
-    assert result["model"] == "openrouter/z-ai/glm-5.3-flash:free"
+    assert result["model"] == "auto"
+    assert result["model_probe_attempts"] == []
     assert result["hermes_home_isolated"] is True
     assert "local-test-key" not in result["output_tail"]
     assert "[REDACTED]" in result["output_tail"]
@@ -237,13 +223,13 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     provider_index = args.index("--provider")
     model_index = args.index("--model")
     assert args[provider_index + 1] == "custom"
-    assert args[model_index + 1] == "openrouter/z-ai/glm-5.3-flash:free"
+    assert args[model_index + 1] == "auto"
 
     hermes_home = repo / "runtime/hermes_control/hermes_home"
     assert captured["env"]["HERMES_HOME"] == str(hermes_home)
     config = (hermes_home / "config.yaml").read_text()
     assert '"provider": "custom"' in config
-    assert '"default": "openrouter/z-ai/glm-5.3-flash:free"' in config
+    assert '"default": "auto"' in config
     assert "http://127.0.0.1:20128/v1" in config
     assert "local-test-key" in config
     assert '"context_length": 32768' in config
