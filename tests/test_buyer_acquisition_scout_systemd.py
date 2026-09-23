@@ -50,3 +50,18 @@ def test_buyer_scout_service_builds_non_mutating_promotion_plan():
     ).read_text()
 
     assert "build_buyer_scout_promotion_plan.py" in text
+
+
+def test_buyer_scout_service_labels_pipeline_stages():
+    text = (
+        ROOT / "deploy/systemd/empire-buyer-acquisition-scout.service"
+    ).read_text()
+
+    for stage in (
+        "DISCOVER + PROBE",
+        "RECONCILE",
+        "PERSIST HOLDING AREA",
+        "REVIEW READINESS",
+        "PROMOTION PLAN",
+    ):
+        assert stage in text
