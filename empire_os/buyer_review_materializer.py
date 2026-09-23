@@ -23,6 +23,7 @@ from empire_os.buyer_discovery import (
     build_candidate_review_plan,
 )
 from empire_os.buyer_probe_worker import rejection_reason
+from empire_os.market_pricing import SOLAR_OPPORTUNITY_MAP_PRICES
 from empire_os.qualification_worker_v2 import request_json
 
 
@@ -37,6 +38,10 @@ REVIEWABLE_OFFER_KEYS = frozenset({
     "software_mrr",
     "white_label",
     "high_ticket",
+    *(
+        price.product_code
+        for price in SOLAR_OPPORTUNITY_MAP_PRICES.values()
+    ),
 })
 
 
@@ -179,7 +184,7 @@ def fetch_candidate_rows(
 
     params: dict[str, Any] = {
         "select": (
-            "id,business_name,niche,metro,phone,website,buy_signal_score,"
+            "id,business_name,niche,metro,address,phone,website,buy_signal_score,"
             "status,notes,contact_name,contact_title,contact_source,"
             "contacted_status,created_at"
         ),
@@ -240,13 +245,14 @@ def fetch_candidate_rows(
             request,
             "/rest/v1/prospect_acquisitions",
             {
-                "select": "evidence,created_at",
+                "select": "source,evidence,created_at",
                 "prospect_id": f"eq.{prospect_id}",
                 "order": "created_at.desc",
                 "limit": 1,
             },
         )
         if acquisitions:
+            row["_acquisition_source"] = acquisitions[0].get("source")
             evidence = acquisitions[0].get("evidence")
             if accepted_acquisition_website(evidence):
                 row["_acquisition_evidence"] = evidence
