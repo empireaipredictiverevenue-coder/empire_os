@@ -8,6 +8,9 @@ from pathlib import Path
 from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
 from empire_os.buyer_review_materializer import run_buyer_review_materializer
 from empire_os.gtm_standing_bridge import run_standing_bridge
+from empire_os.solar_opportunity_map_automation import (
+    materialize_solar_maps_for_review_outcomes,
+)
 
 STATE = Path("/srv/empire_os/runtime/buyer_review_materializer/state.json")
 LATEST = Path("/srv/empire_os/runtime/buyer_review_materializer/latest.json")
@@ -59,6 +62,12 @@ def main() -> int:
     payload["scan_offset"] = offset
     payload["mode"] = "INTERNAL_MATERIALIZE"
     payload["owner"] = "astra"
+
+    payload["artifact_materialization"] = (
+        materialize_solar_maps_for_review_outcomes(
+            result.outcomes,
+        )
+    )
 
     bridge = run_standing_bridge(
         review_limit=min(50, max(10, int(args.proposal_limit) * 2)),
