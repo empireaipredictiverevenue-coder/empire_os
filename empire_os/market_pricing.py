@@ -1,9 +1,10 @@
 """Country-native pricing for Empire commercial products.
 
-Localized prices are commercial display/pricing proposals, not FX conversions.
-Only explicitly founder-approved market prices may enter the governed catalog
-with VERIFIED price evidence. Other market prices remain PROPOSED and cannot
-become binding terms through the deterministic catalog verifier.
+Localized prices are deliberate native-market price points, not FX conversions.
+All configured Solar Opportunity Map market prices were founder-approved on
+2026-09-23 and may enter the governed catalog with VERIFIED price evidence.
+Price approval alone does not make terms binding: acquisition cost, fulfilment
+cost and margin policy remain separate fail-closed gates.
 
 No buyer approval, outbound, payment mutation or revenue recognition occurs.
 """
