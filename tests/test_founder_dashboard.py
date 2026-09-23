@@ -1676,3 +1676,34 @@ def test_dashboard_exposes_buyer_scout_holding_persistence(tmp_path):
     assert runtime["automatic_ingest_authorized"] is False
     assert runtime["outbound_sent"] is False
     assert runtime["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_commercial_pricing_verification(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/commercial_catalog/pricing_verification_latest.json",
+        {
+            "observed_at": "2026-09-23T08:35:00+00:00",
+            "approval_reference": (
+                "founder_approval:2026-09-23:"
+                "commercial_pricing_ladder_v1"
+            ),
+            "expected_product_count": 13,
+            "checked_product_count": 13,
+            "missing_product_count": 0,
+            "drift_count": 0,
+            "pricing_matches_approved_policy": True,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+
+    pricing = build_founder_dashboard(root)[
+        "commercial_pricing_verification"
+    ]
+
+    assert pricing["available"] is True
+    assert pricing["expected_product_count"] == 13
+    assert pricing["drift_count"] == 0
+    assert pricing["pricing_matches_approved_policy"] is True
+    assert pricing["execution_authority"] == "none"
