@@ -355,8 +355,8 @@ def _measurement_tag_issues(
         if int(count or 0) > 1:
             _issue(
                 issues, "duplicate_conversion_event", "conversion", "high",
-                f"Event '{event}' was observed firing {int(count)} times.",
-                "Inspect triggers/data layer and remove unintended duplicate firing.",
+                f"Event '{event}' was declared {int(count)} times in the supplied measurement evidence.",
+                "Inspect triggers/data layer and verify whether duplicate delivery actually occurs.",
                 manual_review=True,
             )
 
