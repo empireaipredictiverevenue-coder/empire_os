@@ -617,6 +617,40 @@ def _buyer_reconciliation_runtime(
     }
 
 
+def _buyer_persistence_runtime(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "mode": "unknown",
+            "execution_authority": "none",
+        }
+    return {
+        "available": True,
+        "observed_at": raw.get("generated_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "persisted_candidate_count": int(
+            raw.get("persisted_candidate_count") or 0
+        ),
+        "skipped_candidate_count": int(
+            raw.get("skipped_candidate_count") or 0
+        ),
+        "holding_area_only": raw.get("holding_area_only") is True,
+        "canonical_promotion_performed": (
+            raw.get("canonical_promotion_performed") is True
+        ),
+        "automatic_ingest_authorized": (
+            raw.get("automatic_ingest_authorized") is True
+        ),
+        "outbound_sent": raw.get("outbound_sent") is True,
+        "actual_revenue": False,
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
 def _buyer_acquisition_runtime(
     raw: dict[str, Any] | None,
     path: Path,
@@ -736,6 +770,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     )
     buyer_reconciliation_runtime_path = (
         runtime / "buyer_acquisition" / "reconciliation_latest.json"
+    )
+    buyer_persistence_runtime_path = (
+        runtime / "buyer_acquisition" / "persistence_latest.json"
     )
     buyer_scout_runtime_path = (
         runtime / "buyer_acquisition" / "scout_latest.json"
@@ -866,6 +903,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "buyer_scout_reconciliation": _buyer_reconciliation_runtime(
             _read_json(buyer_reconciliation_runtime_path),
             buyer_reconciliation_runtime_path,
+        ),
+        "buyer_scout_persistence": _buyer_persistence_runtime(
+            _read_json(buyer_persistence_runtime_path),
+            buyer_persistence_runtime_path,
         ),
         "buyer_scout": _buyer_scout_runtime(
             _read_json(buyer_scout_runtime_path),
