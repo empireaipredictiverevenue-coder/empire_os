@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 SOURCE_FAMILIES = {
-    "coverage": ("overpass", "biz_search"),
+    "coverage": ("overpass",),
     "intent": ("reddit", "courtlistener"),
     "property": ("permits", "chicago_311", "nyc_hpd"),
     "event": ("nws_alerts",),
