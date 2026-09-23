@@ -48,6 +48,16 @@ def main() -> int:
         "research_script_ready_count": (
             payload["research_packs"]["script_ready_count"]
         ),
+        "canonical_content_candidate_count": (
+            payload["content_pipeline"][
+                "canonical_content_candidate_count"
+            ]
+        ),
+        "script_brief_candidate_count": (
+            payload["content_pipeline"][
+                "script_brief_candidate_count"
+            ]
+        ),
         "ready_for_research_generation": (
             payload["ready_for_research_generation"]
         ),
@@ -56,6 +66,12 @@ def main() -> int:
         ),
         "ready_for_script_generation": (
             payload["ready_for_script_generation"]
+        ),
+        "ready_for_script_prose_generation": (
+            payload["ready_for_script_prose_generation"]
+        ),
+        "ready_for_storyboard_generation": (
+            payload["ready_for_storyboard_generation"]
         ),
         "public_publish_authorized": False,
         "external_action_performed": False,
