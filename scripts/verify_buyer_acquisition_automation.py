@@ -34,6 +34,7 @@ REQUIRED_ARTIFACTS = (
     "runtime/buyer_acquisition/scout_latest.json",
     "runtime/buyer_acquisition/reconciliation_latest.json",
     "runtime/buyer_acquisition/persistence_latest.json",
+    "runtime/buyer_acquisition/review_readiness_latest.json",
     "runtime/commercial_catalog/pricing_verification_latest.json",
 )
 
@@ -92,6 +93,9 @@ def main() -> int:
     persistence = _read_json(
         root / "runtime/buyer_acquisition/persistence_latest.json"
     )
+    review_readiness = _read_json(
+        root / "runtime/buyer_acquisition/review_readiness_latest.json"
+    )
     pricing = _read_json(
         root / "runtime/commercial_catalog/pricing_verification_latest.json"
     )
@@ -136,6 +140,12 @@ def main() -> int:
         and persistence.get("outbound_sent") is False
         and persistence.get("execution_authority") == "none"
     )
+    review_readiness_safe = (
+        review_readiness.get("mode") == "OBSERVE"
+        and review_readiness.get("canonical_promotion_performed") is False
+        and review_readiness.get("outbound_sent") is False
+        and review_readiness.get("execution_authority") == "none"
+    )
     pricing_safe = (
         pricing.get("pricing_matches_approved_policy") is True
         and int(pricing.get("drift_count") or 0) == 0
@@ -154,6 +164,7 @@ def main() -> int:
         scout_safe,
         reconciliation_safe,
         persistence_safe,
+        review_readiness_safe,
         pricing_safe,
         exchange_safe,
         not live_external_automation_detected,
@@ -168,6 +179,7 @@ def main() -> int:
         "buyer_scout_safe": scout_safe,
         "buyer_scout_reconciliation_safe": reconciliation_safe,
         "buyer_scout_persistence_safe": persistence_safe,
+        "buyer_scout_review_readiness_safe": review_readiness_safe,
         "pricing_policy_safe": pricing_safe,
         "commercial_exchange_safe": exchange_safe,
         "live_external_automation_detected": (
@@ -203,6 +215,9 @@ def main() -> int:
         ),
         "persisted_holding_candidate_count": int(
             persistence.get("persisted_candidate_count") or 0
+        ),
+        "review_ready_candidate_count": int(
+            review_readiness.get("review_ready_count") or 0
         ),
         "market_validate_product_count": int(
             buyer_plan.get("market_validate_product_count") or 0
