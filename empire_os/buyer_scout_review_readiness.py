@@ -39,12 +39,11 @@ def _reliable_business_name(
     if lowered in GENERIC_BUSINESS_NAMES:
         return False
 
-    if str(source or "") == "page_title_fallback":
-        if re.match(
-            r"^(home|about(?: us)?|contact(?: us)?|services?)\s*[-|:]",
-            lowered,
-        ):
-            return False
+    if re.match(
+        r"^(home|about(?: us)?|contact(?: us)?|services?)\s*[-|:]",
+        lowered,
+    ):
+        return False
 
     return True
 
@@ -62,9 +61,14 @@ def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
     domain = str(row.get("domain") or "").strip()
     if not business_name or not website or not domain:
         return False, "business_identity_incomplete"
+    site = (
+        dict(row.get("site_evidence"))
+        if isinstance(row.get("site_evidence"), Mapping)
+        else {}
+    )
     if not _reliable_business_name(
         business_name,
-        source=row.get("business_name_source"),
+        source=site.get("business_name_source"),
     ):
         return False, "business_name_not_verified"
 
