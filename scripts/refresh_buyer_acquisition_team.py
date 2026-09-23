@@ -30,6 +30,12 @@ def main() -> int:
         ],
         "team_role_count": payload["team_role_count"],
         "buyer_pool_count": len(payload["buyer_pools"]),
+        "icp_priority_target_count": payload[
+            "icp_priority_target_count"
+        ],
+        "icp_campaign_target_company_count": payload[
+            "icp_buyer_trigger_intelligence"
+        ]["target_company_count_per_campaign"],
         "live_outbound_send": payload["automation"]["live_outbound_send"],
         "execution_authority": payload["execution_authority"],
     }, indent=2, sort_keys=True))
