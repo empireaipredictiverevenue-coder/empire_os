@@ -36,6 +36,15 @@ def test_all_unlocked_country_packs_exist():
 
 
 def test_research_backlog_preserves_unknowns():
-    rows = {row["country_code"]: row for row in research_backlog()}
-    assert "DE" in rows
-    assert rows["DE"]["status"] == "source_research_required"
+    rows = list(research_backlog())
+    assert any(
+        row["country_code"] == "DE"
+        and row["status"] == "source_research_required"
+        for row in rows
+    )
+    assert any(
+        row["country_code"] == "CA"
+        and row["niche"] == "solar"
+        and row["status"] == "niche_source_research_required"
+        for row in rows
+    )
