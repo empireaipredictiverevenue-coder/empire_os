@@ -38,6 +38,21 @@ def _previous_by_id(previous: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     return rows
 
 
+def _baseline_change_summary() -> dict[str, Any]:
+    return {
+        "schema_version": "empire.tag_change_monitor.v1",
+        "mode": "OBSERVE",
+        "comparison_state": "BASELINE_ESTABLISHED",
+        "previous_snapshot_available": False,
+        "change_count": 0,
+        "critical_change_count": 0,
+        "high_change_count": 0,
+        "changes": [],
+        "automatic_repair": False,
+        "execution_authority": "none",
+    }
+
+
 def refresh_tag_intelligence_monitor(
     repo_root: str | Path,
 ) -> dict[str, Any]:
@@ -124,14 +139,27 @@ def refresh_tag_intelligence_monitor(
         ).as_dict()
 
         previous_row = previous_rows.get(target_id) or {}
-        changes = compare_tag_snapshots(
-            previous_page_tags=previous_row.get("page_tags"),
-            current_page_tags=page_tags,
-            previous_measurement_tags=previous_row.get(
-                "measurement_tags"
-            ),
-            current_measurement_tags=measurement_tags,
+        has_previous_snapshot = (
+            previous_row.get("available") is True
+            and isinstance(previous_row.get("page_tags"), Mapping)
+            and isinstance(
+                previous_row.get("measurement_tags"),
+                Mapping,
+            )
         )
+        if has_previous_snapshot:
+            changes = compare_tag_snapshots(
+                previous_page_tags=previous_row.get("page_tags"),
+                current_page_tags=page_tags,
+                previous_measurement_tags=previous_row.get(
+                    "measurement_tags"
+                ),
+                current_measurement_tags=measurement_tags,
+            )
+            changes["comparison_state"] = "COMPARED"
+            changes["previous_snapshot_available"] = True
+        else:
+            changes = _baseline_change_summary()
 
         critical_issues += int(analysis.get("critical_count") or 0)
         high_issues += int(analysis.get("high_count") or 0)
