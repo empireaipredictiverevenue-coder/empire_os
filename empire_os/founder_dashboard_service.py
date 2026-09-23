@@ -15,6 +15,7 @@ from empire_os.founder_data_products_api import create_founder_data_products_rou
 from empire_os.founder_intelligence_nodes_api import create_founder_intelligence_nodes_router
 from empire_os.founder_objectives_api import create_founder_objectives_router
 from empire_os.founder_ops_api import create_founder_ops_router
+from empire_os.founder_source_intelligence_api import create_founder_source_intelligence_router
 from empire_os.revenue_pulse_api import create_revenue_pulse_router
 from empire_os.predictive_cloud_status_api import create_predictive_cloud_status_router
 from empire_os.spatial_physical_api import create_spatial_physical_router
@@ -36,6 +37,7 @@ app.include_router(create_predictive_cloud_status_router())
 app.include_router(create_spatial_physical_router())
 app.include_router(create_founder_objectives_router())
 app.include_router(create_founder_ops_router())
+app.include_router(create_founder_source_intelligence_router())
 
 
 @app.get("/health")
