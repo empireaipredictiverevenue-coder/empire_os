@@ -497,9 +497,12 @@ def run_hermes(
     args = [
         hermes_bin,
         "chat",
+        "--oneshot",
+        "--source",
+        "tool",
         "--toolsets",
         "terminal,skills",
-        "-q",
+        "-Q",
         build_hermes_prompt(
             job,
             production_repo=production_repo,
