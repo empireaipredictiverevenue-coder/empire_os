@@ -315,3 +315,9 @@ def test_tag_intelligence_enters_buyer_demand_without_price_claim():
     assert row["new_mrr_product"] is True
     assert "local_and_smb_buyers" in row["target_buyer_pools"]
     assert "agency_and_reseller_buyers" in row["target_buyer_pools"]
+    assert "software_and_advisory_buyers" in row["target_buyer_pools"]
+    assert "ecommerce" in row["target_buyer_types"]
+    assert "multi_location" in row["target_buyer_types"]
+    assert "growth_team" in row["target_buyer_types"]
+    assert "enterprise" in row["target_buyer_types"]
+    assert "white_label_partner" in row["target_buyer_types"]
