@@ -532,6 +532,11 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(payload.get("idea_backlog"), Mapping)
             else {}
         )
+        research = (
+            payload.get("research_packs")
+            if isinstance(payload.get("research_packs"), Mapping)
+            else {}
+        )
         return {
             "runtime_active": payload.get("runtime_active"),
             "real_evidence_present": payload.get(
@@ -576,8 +581,23 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "commercial_quant_available_count": ideas.get(
                 "commercial_quant_available_count"
             ),
+            "research_pack_candidate_count": research.get(
+                "candidate_count"
+            ),
+            "research_verified_claim_count": research.get(
+                "verified_claim_count"
+            ),
+            "research_script_ready_count": research.get(
+                "script_ready_count"
+            ),
             "ready_for_research_generation": payload.get(
                 "ready_for_research_generation"
+            ),
+            "ready_for_claim_verification": payload.get(
+                "ready_for_claim_verification"
+            ),
+            "ready_for_script_generation": payload.get(
+                "ready_for_script_generation"
             ),
             "public_publish_authorized": payload.get(
                 "public_publish_authorized"
