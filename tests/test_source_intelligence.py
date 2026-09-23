@@ -1,6 +1,8 @@
 from empire_os.source_intelligence import (
     choose_pack_source,
     classify_runtime_health,
+    commercial_source_score,
+    source_plan,
     country_pack,
     research_backlog,
     source_waterfall,
@@ -48,3 +50,29 @@ def test_research_backlog_preserves_unknowns():
         and row["status"] == "niche_source_research_required"
         for row in rows
     )
+
+
+def test_global_solar_packs_use_verified_specialist_sources():
+    assert choose_pack_source("AU", "solar").source_id == "au_saa_solar"
+    assert choose_pack_source("IE", "solar").source_id == "ie_seai_solar"
+    assert choose_pack_source("DE", "solar").source_id == "de_mastr"
+    assert choose_pack_source("FR", "solar").source_id == "fr_france_renov_rge"
+
+
+def test_source_plan_never_grants_execution_authority():
+    plan = source_plan("GB", "solar")
+    assert plan["selected_source"] == "gb_recc_solar"
+    assert plan["execution_authority"] == "none"
+    assert plan["actual_revenue"] is False
+
+
+def test_commercial_source_score_values_outcomes_over_raw_volume():
+    raw_volume = commercial_source_score(prospects=100, runs=10)
+    revenue_source = commercial_source_score(
+        prospects=5,
+        qualified=3,
+        conversations=2,
+        verified_revenue_cents=50000,
+        runs=2,
+    )
+    assert revenue_source > raw_volume
