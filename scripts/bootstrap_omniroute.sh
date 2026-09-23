@@ -77,7 +77,6 @@ chmod 640 /etc/empire_os/omniroute-hermes.env
 chown root:ubuntu /etc/empire_os/omniroute-hermes.env
 
 echo "=== INSTALL SERVICES ==="
-install -m 0755 /srv/empire_os/scripts/run_omniroute.sh /srv/empire_os/scripts/run_omniroute.sh
 install -m 0644 /srv/empire_os/deploy/systemd/empire-omniroute.service /etc/systemd/system/empire-omniroute.service
 install -m 0644 /srv/empire_os/deploy/systemd/empire-hermes-control.service /etc/systemd/system/empire-hermes-control.service
 systemctl daemon-reload
