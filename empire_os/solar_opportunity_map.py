@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 import urllib.parse
 
+from empire_os.market_pricing import (
+    infer_country_code,
+    market_price,
+)
 from empire_os.qualification_worker_v2 import (
     SCORING_ENGINE,
     SCORING_VERSION,
@@ -423,8 +427,26 @@ def build_solar_opportunity_map(
     review = context["buyer_review"]
     acquisitions = context.get("acquisitions") or []
 
+    source_hint = (
+        str(acquisitions[0].get("source") or "").strip()
+        if acquisitions
+        else ""
+    )
+    country_code = infer_country_code(
+        source=source_hint,
+        metro=prospect.get("metro"),
+        address=prospect.get("address"),
+    )
+    localized_price = None
+    if country_code:
+        try:
+            localized_price = market_price(country_code)
+        except KeyError:
+            localized_price = None
+
     opportunity_evidence = {
         "canonical_prospect_id": prospect.get("id"),
+        "country_code": country_code,
         "business_name": prospect.get("business_name"),
         "niche": prospect.get("niche"),
         "metro": prospect.get("metro"),
@@ -482,12 +504,42 @@ def build_solar_opportunity_map(
         "schema_version": "empire.solar-opportunity-map.v2",
         "mode": "INTERNAL_MATERIALIZE",
         "offer": {
-            "product_code": "solar_opportunity_map",
+            "parent_product_code": "solar_opportunity_map",
+            "product_code": (
+                localized_price.product_code
+                if localized_price
+                else "solar_opportunity_map"
+            ),
             "product_name": "Solar Opportunity Map",
-            "currency": "GBP",
-            "price_minor_units": 24900,
-            "price_display": "£249",
-            "commercial_state": "working_founder_agreed_offer",
+            "country_code": country_code,
+            "currency": (
+                localized_price.currency
+                if localized_price
+                else None
+            ),
+            "price_minor_units": (
+                localized_price.amount_minor
+                if localized_price
+                else None
+            ),
+            "price_display": (
+                localized_price.display_price
+                if localized_price
+                else "Pricing unavailable"
+            ),
+            "approval_state": (
+                localized_price.approval_state
+                if localized_price
+                else "UNKNOWN"
+            ),
+            "commercial_state": (
+                "founder_approved_nonbinding"
+                if localized_price
+                and localized_price.approval_state == "FOUNDER_APPROVED"
+                else "proposed_nonbinding"
+                if localized_price
+                else "unknown"
+            ),
             "catalog_binding": False,
         },
         "prospect": {
@@ -496,6 +548,7 @@ def build_solar_opportunity_map(
             "website": website,
             "niche": prospect.get("niche"),
             "metro": prospect.get("metro"),
+            "country_code": country_code,
         },
         "buyer_review": {
             "id": review.get("id"),
@@ -545,7 +598,9 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         f"# Solar Opportunity Map — {prospect.get('business_name') or 'Unknown business'}",
         "",
         f"**Website:** {prospect.get('website') or 'Unavailable'}",
-        f"**Offer:** {payload.get('offer', {}).get('price_display', '£249')} Solar Opportunity Map",
+        f"**Offer:** {payload.get('offer', {}).get('price_display', 'Pricing unavailable')} Solar Opportunity Map",
+        f"**Market:** {payload.get('offer', {}).get('country_code') or 'Unknown'} / {payload.get('offer', {}).get('currency') or 'Unknown currency'}",
+        f"**Pricing state:** {payload.get('offer', {}).get('approval_state') or 'UNKNOWN'}",
         f"**Buyer route:** {buyer.get('contact_name') or 'Unavailable'} — {buyer.get('contact_title') or 'Unavailable'} ({buyer.get('contact_route') or 'unavailable'})",
         "",
         "## Evidence coverage",
