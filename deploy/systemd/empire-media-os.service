@@ -10,6 +10,7 @@ Group=ubuntu
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_media_empire_bridge.py --repo-root /srv/empire_os --git-limit 30
+ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_media_research_bridge.py --repo-root /srv/empire_os
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_media_os_runtime.py --repo-root /srv/empire_os
 NoNewPrivileges=true
 PrivateTmp=true
