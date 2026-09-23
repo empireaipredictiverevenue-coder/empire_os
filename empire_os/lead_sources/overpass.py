@@ -81,11 +81,13 @@ CRAFT_TO_NICHE = {
     "solar_panel_installer": "solar",
     "solar_installer": "solar",
     "photovoltaic_installer": "solar",
+    "photovoltaic": "solar",
 }
 
 SHOP_TO_NICHE = {
     "solar": "solar",
     "solar_panel": "solar",
+    "photovoltaic": "solar",
 }
 
 OVERPASS_ENDPOINTS = (
