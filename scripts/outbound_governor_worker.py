@@ -51,17 +51,29 @@ def _provider_ready() -> bool:
 def _sender_rpc():
     dsn = os.getenv("EMPIRE_OUTBOUND_SENDER_DSN", "").strip()
     if dsn:
-        return PostgresOutboundRpc(
-            dsn,
-            "empire_outbound_sender",
-        )
+        try:
+            return PostgresOutboundRpc(
+                dsn,
+                "empire_outbound_sender",
+            )
+        except OutboundProviderError as exc:
+            # Dedicated role transport is preferred, but a missing local
+            # psycopg driver must not take the governed sender offline. The
+            # Supabase bridge exposes the same narrow RPC allowlist and keeps
+            # database policy as the authority boundary.
+            if "psycopg is required" not in str(exc):
+                raise
     return SupabaseOutboundRpc("empire_outbound_sender")
 
 
 def _approver_rpc():
     dsn = os.getenv("EMPIRE_OUTBOUND_APPROVER_DSN", "").strip()
     if dsn:
-        return PostgresOutboundRpc(dsn, "empire_outbound_approver")
+        try:
+            return PostgresOutboundRpc(dsn, "empire_outbound_approver")
+        except OutboundProviderError as exc:
+            if "psycopg is required" not in str(exc):
+                raise
     cap = int(os.getenv("EMPIRE_GTM_DAILY_EXTERNAL_CAP", "10"))
     return SupabaseStandingAuthorityApproverRpc(daily_cap=cap)
 
