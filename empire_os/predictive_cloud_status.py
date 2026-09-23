@@ -86,6 +86,11 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 28800,
     },
+    "media_os": {
+        "path": Path("runtime/media_os/latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 3600,
+    },
     "revenue_pulse": {
         "path": Path("runtime/revenue_pulse/latest.json"),
         "time_keys": ("generated_at", "observed_at"),
@@ -489,6 +494,67 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             ),
             "measurement_platform_write": payload.get(
                 "measurement_platform_write"
+            ),
+        }
+    if name == "media_os":
+        youtube = (
+            payload.get("youtube_public")
+            if isinstance(payload.get("youtube_public"), Mapping)
+            else {}
+        )
+        outliers = (
+            youtube.get("outliers")
+            if isinstance(youtube.get("outliers"), Mapping)
+            else {}
+        )
+        algorithm = (
+            payload.get("algorithm_intelligence")
+            if isinstance(payload.get("algorithm_intelligence"), Mapping)
+            else {}
+        )
+        trends = (
+            payload.get("trend_fusion")
+            if isinstance(payload.get("trend_fusion"), Mapping)
+            else {}
+        )
+        ideas = (
+            payload.get("idea_backlog")
+            if isinstance(payload.get("idea_backlog"), Mapping)
+            else {}
+        )
+        return {
+            "runtime_active": payload.get("runtime_active"),
+            "real_evidence_present": payload.get(
+                "real_evidence_present"
+            ),
+            "observed_source_count": payload.get(
+                "observed_source_count"
+            ),
+            "youtube_observation_count": youtube.get(
+                "observation_count"
+            ),
+            "outlier_candidate_count": outliers.get(
+                "candidate_count"
+            ),
+            "algorithm_observation_count": algorithm.get(
+                "observation_count"
+            ),
+            "algorithm_hypothesis_count": algorithm.get(
+                "hypothesis_count"
+            ),
+            "trend_topic_count": trends.get("topic_count"),
+            "idea_candidate_count": ideas.get("candidate_count"),
+            "pending_quant_review_count": ideas.get(
+                "pending_quant_review_count"
+            ),
+            "ready_for_research_generation": payload.get(
+                "ready_for_research_generation"
+            ),
+            "public_publish_authorized": payload.get(
+                "public_publish_authorized"
+            ),
+            "external_action_performed": payload.get(
+                "external_action_performed"
             ),
         }
     if name == "conversion_intelligence":
