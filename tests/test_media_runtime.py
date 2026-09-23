@@ -397,3 +397,96 @@ def test_runtime_surfaces_research_pack_claim_verification_gate(tmp_path):
     assert result["ready_for_script_generation"] is False
     assert result["public_publish_authorized"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_runtime_promotes_verified_research_into_content_pipeline_counts(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/media_os/input/research_pack_candidates.json",
+        {
+            "candidates": [
+                {
+                    "research_id": "research:1",
+                    "topic": "Automation Ops",
+                    "claims": [],
+                    "verified_claim_count": 0,
+                    "claim_verification_required": True,
+                    "script_ready": False,
+                }
+            ]
+        },
+    )
+    write_json(
+        tmp_path,
+        "runtime/media_os/input/verified_research_packs.json",
+        {
+            "candidates": [
+                {
+                    "research_id": "research:1",
+                    "topic": "Automation Ops",
+                    "claims": [
+                        {
+                            "claim_id": "claim:1",
+                            "text": "Observed supported claim.",
+                            "evidence_refs": ["source:1"],
+                            "verification": {
+                                "verdict": "SUPPORTED",
+                            },
+                        }
+                    ],
+                    "verified_claim_count": 1,
+                    "claim_verification_required": False,
+                    "claim_verification_complete": True,
+                    "script_ready": True,
+                    "source_input_fingerprint": "abc",
+                }
+            ]
+        },
+    )
+    write_json(
+        tmp_path,
+        "runtime/media_os/input/canonical_content_candidates.json",
+        {
+            "candidates": [
+                {
+                    "content_id": "content:1",
+                    "topic": "Automation Ops",
+                }
+            ]
+        },
+    )
+    write_json(
+        tmp_path,
+        "runtime/media_os/input/script_brief_candidates.json",
+        {
+            "candidates": [
+                {
+                    "content_id": "content:1",
+                    "content_ref": "content:1",
+                    "script_format": "tutorial",
+                }
+            ]
+        },
+    )
+
+    result = build_media_os_runtime(tmp_path)
+
+    research = result["research_packs"]
+    pipeline = result["content_pipeline"]
+
+    assert research["candidate_count"] == 1
+    assert research["verified_pack_count"] == 1
+    assert research["verified_claim_count"] == 1
+    assert research["script_ready_count"] == 1
+    assert research["claim_verification_required_count"] == 0
+
+    assert pipeline["canonical_content_candidate_count"] == 1
+    assert pipeline["script_brief_candidate_count"] == 1
+    assert pipeline["script_prose_generated"] is False
+
+    assert result["ready_for_claim_verification"] is False
+    assert result["ready_for_script_generation"] is True
+    assert result["ready_for_script_prose_generation"] is True
+    assert result["ready_for_storyboard_generation"] is False
+    assert result["public_publish_authorized"] is False
+    assert result["execution_authority"] == "none"
