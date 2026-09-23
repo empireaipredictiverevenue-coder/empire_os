@@ -69,6 +69,8 @@ def test_solar_map_reuses_search_report_and_keeps_serp_unknown():
                 }],
             },
         },
+        market_gps={},
+        competitor_market={},
         observe_tags=lambda *args, **kwargs: {
             "ok": True,
             "page_tags": {
@@ -114,6 +116,8 @@ def test_solar_map_artifacts_are_written_atomically(tmp_path: Path):
         crawl=lambda *args, **kwargs: {
             "audit": {"available": True, "findings": []},
         },
+        market_gps={},
+        competitor_market={},
         observe_tags=lambda *args, **kwargs: {
             "ok": False,
             "error": "timeout",
@@ -129,3 +133,119 @@ def test_solar_map_artifacts_are_written_atomically(tmp_path: Path):
     assert "Solar Opportunity Map" in md_path.read_text()
     assert json_path.stat().st_mode & 0o777 == 0o600
     assert md_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_solar_map_v2_adds_observed_market_and_competitor_context():
+    market_gps = {
+        "window_days": 7,
+        "demand_signal_semantics": (
+            "only genuine commercial replies, terms and verified payments "
+            "count as observed commercial demand"
+        ),
+        "competitor_pressure_semantics": (
+            "modeled research proxy from observed competitive evidence density"
+        ),
+        "markets": [{
+            "niche": "solar",
+            "metro": "United Kingdom",
+            "canonical_company_count": 20,
+            "acquisition_count": 20,
+            "qualification_count": 20,
+            "approved_buyer_count": 2,
+            "delivered_outreach_count": 0,
+            "commercial_reply_count": 0,
+            "commercial_terms_count": 0,
+            "verified_payment_count": 0,
+            "commercial_demand_state": "not_observed",
+            "commercial_demand_evidence_count": 0,
+            "competitive_entity_count": 4,
+            "competitive_signal_count": 7,
+            "competitor_pressure_proxy": 8.75,
+            "competitor_pressure_basis": "competitive_signal_density",
+            "research_priority_score": 76.0,
+            "evidence_refs": [
+                "canonical:prospect_acquisitions",
+                "canonical:prospect_qualifications",
+            ],
+        }],
+    }
+    competitor = {
+        "niche": "solar",
+        "metro": "United Kingdom",
+        "market_key": "solar:gb",
+        "market_query": "solar installers uk",
+        "resolved_company_count": 20,
+        "observed_company_count": 8,
+        "research_gap_company_count": 12,
+        "territory_heatmap": [{"metro": "United Kingdom"}],
+        "underserved_audience_candidates": [{
+            "entity_id": "entity-1",
+            "company_name": "Competitor One",
+            "company_domain": "competitor.example",
+            "observed_competitor_count": 0,
+            "observed_evidence_count": 0,
+            "reason": "No competitor evidence observed.",
+        }],
+    }
+
+    payload = som.build_solar_opportunity_map(
+        PID,
+        request=fake_request,
+        market_gps=market_gps,
+        competitor_market=competitor,
+        crawl=lambda *args, **kwargs: {
+            "audit": {"available": True, "findings": []},
+        },
+        observe_tags=lambda *args, **kwargs: {
+            "ok": False,
+            "error": "timeout",
+        },
+    )
+
+    assert payload["schema_version"] == "empire.solar-opportunity-map.v2"
+    assert payload["market_context"]["available"] is True
+    assert payload["market_context"]["match_basis"] == "exact_niche_metro"
+    market = payload["market_context"]["markets"][0]
+    assert market["commercial_demand_state"] == "not_observed"
+    assert market["commercial_demand_evidence_count"] == 0
+    assert market["revenue_inferred"] is False
+
+    assert payload["competitor_context"]["available"] is True
+    assert payload["competitor_context"]["research_gap_company_count"] == 12
+    assert payload["competitor_context"]["market_share_inferred"] is False
+    assert payload["competitor_context"]["revenue_opportunity_inferred"] is False
+
+    assert payload["local_visibility"]["available"] is False
+    assert payload["local_visibility"]["synthetic_points"] == 0
+
+    markdown = som.render_markdown(payload)
+    assert "## Market GPS" in markdown
+    assert "## Competitor coverage" in markdown
+    assert "## Local visibility" in markdown
+    assert "Coverage gaps are research gaps only" in markdown
+
+
+def test_market_context_labels_niche_portfolio_as_not_local():
+    context = som._market_gps_context(
+        {"niche": "solar", "metro": "United Kingdom"},
+        {
+            "window_days": 7,
+            "markets": [
+                {
+                    "niche": "solar",
+                    "metro": "London",
+                    "research_priority_score": 90,
+                },
+                {
+                    "niche": "solar",
+                    "metro": "Manchester",
+                    "research_priority_score": 80,
+                },
+            ],
+        },
+    )
+
+    assert context["available"] is True
+    assert context["match_basis"] == "niche_portfolio_not_local"
+    assert context["local_match"] is False
+    assert len(context["markets"]) == 2
