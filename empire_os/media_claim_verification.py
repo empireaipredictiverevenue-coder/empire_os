@@ -19,10 +19,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
+import ipaddress
 import json
 from pathlib import Path
 import re
+import socket
 from typing import Any, Callable, Iterable, Mapping
+from urllib.parse import urlparse
 
 from empire_os.llm_gateway import LLMGateway
 from empire_os.media_research_pack import (
@@ -39,6 +42,7 @@ VERIFIED_OUTPUT = Path(
 )
 
 ProbeFn = Callable[..., Mapping[str, Any]]
+ResolverFn = Callable[..., Any]
 
 VERDICTS = frozenset({
     "SUPPORTED",
@@ -112,6 +116,78 @@ def _quote_in_text(quote: str, visible_text: str) -> bool:
     return bool(needle and len(needle) >= 12 and needle in haystack)
 
 
+def _public_source_url_allowed(
+    url: str,
+    *,
+    resolver: ResolverFn = socket.getaddrinfo,
+) -> tuple[bool, str | None]:
+    """Fail closed for localhost/private/link-local source URLs."""
+    try:
+        parsed = urlparse(str(url or "").strip())
+    except ValueError:
+        return False, "invalid_url"
+
+    if parsed.scheme not in {"http", "https"}:
+        return False, "unsupported_scheme"
+    if not parsed.hostname:
+        return False, "hostname_missing"
+    if parsed.username or parsed.password:
+        return False, "userinfo_not_allowed"
+
+    try:
+        port = parsed.port
+    except ValueError:
+        return False, "invalid_port"
+    if port not in {None, 80, 443}:
+        return False, "nonstandard_port_not_allowed"
+
+    host = parsed.hostname.strip().lower().rstrip(".")
+    if (
+        host == "localhost"
+        or host.endswith(".localhost")
+        or host.endswith(".local")
+        or host.endswith(".internal")
+    ):
+        return False, "local_hostname_not_allowed"
+
+    try:
+        literal = ipaddress.ip_address(host)
+    except ValueError:
+        literal = None
+
+    if literal is not None:
+        return (
+            (True, None)
+            if literal.is_global
+            else (False, "nonpublic_ip_not_allowed")
+        )
+
+    try:
+        answers = resolver(
+            host,
+            port or (443 if parsed.scheme == "https" else 80),
+            type=socket.SOCK_STREAM,
+        )
+    except (OSError, socket.gaierror):
+        return False, "dns_resolution_failed"
+
+    addresses = []
+    for answer in answers:
+        try:
+            address = answer[4][0]
+            ip = ipaddress.ip_address(address)
+        except (IndexError, TypeError, ValueError):
+            continue
+        addresses.append(ip)
+
+    if not addresses:
+        return False, "dns_no_ip_addresses"
+    if any(not address.is_global for address in addresses):
+        return False, "dns_resolved_nonpublic_ip"
+
+    return True, None
+
+
 def _source_catalog(pack: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     output: dict[str, dict[str, Any]] = {}
     for raw in pack.get("sources") or []:
@@ -130,6 +206,7 @@ def observe_research_sources(
     max_sources: int = 5,
     request_timeout_seconds: float = 7.0,
     per_source_time_budget_seconds: float = 10.0,
+    resolver: ResolverFn = socket.getaddrinfo,
 ) -> dict[str, Any]:
     """Directly observe bounded source text for later claim verification."""
     sources = _source_catalog(pack)
@@ -139,10 +216,17 @@ def observe_research_sources(
 
     for source_ref, source in selected:
         url = _clean(source.get("lineage_ref"))
-        if not url.startswith(("http://", "https://")):
+        allowed, rejection_reason = _public_source_url_allowed(
+            url,
+            resolver=resolver,
+        )
+        if not allowed:
             failures.append({
                 "source_ref": source_ref,
-                "reason": "no_observable_public_url",
+                "reason": (
+                    rejection_reason
+                    or "no_observable_public_url"
+                ),
             })
             continue
 
@@ -704,6 +788,7 @@ def refresh_media_claim_verification(
     source_request_timeout_seconds: float = 6.0,
     source_time_budget_seconds: float = 8.0,
     force: bool = False,
+    resolver: ResolverFn = socket.getaddrinfo,
 ) -> dict[str, Any]:
     source = _read_json(repo_root / INPUT)
     packs = _records(source)
@@ -756,6 +841,7 @@ def refresh_media_claim_verification(
             max_sources=max_sources_per_pack,
             request_timeout_seconds=source_request_timeout_seconds,
             per_source_time_budget_seconds=source_time_budget_seconds,
+            resolver=resolver,
         )
         proposals = propose_claims(
             pack,
