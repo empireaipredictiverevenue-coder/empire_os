@@ -18,7 +18,7 @@ def test_buyer_acquisition_verifier_requires_safe_internal_team():
         "empire-commercial-product-catalog.timer",
         "empire-commercial-exchange.timer",
         "empire-buyer-acquisition-team.timer",
-        "empire-buyer-scout.timer",
+        "empire-buyer-acquisition-scout.timer",
     ):
         assert unit in text
 
