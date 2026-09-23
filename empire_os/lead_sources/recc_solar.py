@@ -80,6 +80,33 @@ def _member_links(html: str, limit: int = MAX_DETAILS) -> list[tuple[str, str]]:
     return rows
 
 
+def _label_matches_host(label: str, host: str) -> bool:
+    """Accept links whose visible label identifies the linked domain.
+
+    RECC pages contain global external group-site links before the member
+    details. Those links use labels such as REAL/BCS/CCS, while the actual
+    member website is rendered with the website/domain itself as the label.
+    Requiring label/host agreement prevents navigation links becoming false
+    business websites.
+    """
+    clean_host = str(host or "").strip().casefold().split(":", 1)[0]
+    if clean_host.startswith("www."):
+        clean_host = clean_host[4:]
+    if not clean_host:
+        return False
+
+    clean_label = str(label or "").strip().casefold()
+    clean_label = re.sub(r"^https?://", "", clean_label)
+    clean_label = clean_label.strip("/ ")
+    if clean_label.startswith("www."):
+        clean_label = clean_label[4:]
+
+    # Labels may include a path or trailing punctuation; domain agreement is
+    # enough, but generic navigation labels such as "BCS" will never match.
+    label_host = clean_label.split("/", 1)[0].rstrip(".,;:")
+    return label_host == clean_host
+
+
 def _detail(name: str, url: str) -> LeadCandidate | None:
     html = _get(url)
     text = " ".join(
@@ -97,12 +124,16 @@ def _detail(name: str, url: str) -> LeadCandidate | None:
     parser = _LinkParser()
     parser.feed(html)
     website = ""
-    for href, _label in parser.links:
+    for href, label in parser.links:
         clean = str(href or "").strip()
         if not clean.startswith(("http://", "https://")):
             continue
         host = urllib.parse.urlparse(clean).netloc.casefold()
-        if "recc.org.uk" in host or "realschemes.org.uk" in host:
+        if not host:
+            continue
+        if host.endswith("recc.org.uk") or host.endswith("realschemes.org.uk"):
+            continue
+        if not _label_matches_host(label, host):
             continue
         website = clean
         break
