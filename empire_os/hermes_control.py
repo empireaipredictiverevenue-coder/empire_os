@@ -511,11 +511,11 @@ def run_hermes(
     ]
     provider = str(
         os.environ.get("EMPIRE_HERMES_PROVIDER")
-        or "openrouter"
+        or "custom"
     ).strip()
     model = str(
         os.environ.get("EMPIRE_HERMES_MODEL")
-        or "qwen/qwen3-coder:free"
+        or "auto"
     ).strip()
 
     if provider:
