@@ -24,6 +24,10 @@ from empire_os.icp_buyer_trigger_intelligence import (
     build_icp_priority_targets,
     icp_learning_contract,
 )
+from empire_os.icp_buyer_trigger_intelligence import (
+    build_icp_priority_targets,
+    icp_learning_contract,
+)
 
 
 OUTPUT = Path("runtime/buyer_acquisition/latest.json")
@@ -787,6 +791,10 @@ def build_buyer_acquisition_plan(
         corridor_targets=targets,
         product_targets=product_targets,
     )
+    icp_targets = build_icp_priority_targets(
+        corridor_targets=targets,
+        product_targets=product_targets,
+    )
 
     now = generated_at or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -931,8 +939,11 @@ def build_buyer_acquisition_plan(
             "demand_gap_reprioritization": True,
             "icp_definition": True,
             "buying_trigger_detection": True,
+            "icp_definition_and_trigger_planning": True,
             "buyer_research_planning": True,
             "decision_maker_resolution": True,
+            "evidenced_problem_research": True,
+            "evidence_grounded_personalization": True,
             "evidence_backed_pain_research": True,
             "personalized_outreach_preparation": True,
             "batch_personalization_preparation": True,
