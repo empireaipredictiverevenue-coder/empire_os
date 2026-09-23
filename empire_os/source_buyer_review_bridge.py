@@ -182,6 +182,11 @@ def _source_probe(row: dict[str, Any]) -> dict[str, Any]:
     first = run_buyer_probe_isolated(
         row,
         hard_timeout_seconds=55.0,
+        probe_options={
+            "max_pages": 12,
+            "request_timeout": 5.0,
+            "time_budget_seconds": 35.0,
+        },
     )
     if (
         first.get("review_ready") is True
@@ -233,6 +238,11 @@ def _source_probe(row: dict[str, Any]) -> dict[str, Any]:
     second = run_buyer_probe_isolated(
         retry_row,
         hard_timeout_seconds=55.0,
+        probe_options={
+            "max_pages": 12,
+            "request_timeout": 5.0,
+            "time_budget_seconds": 35.0,
+        },
     )
     second = dict(second)
     second["identity_recovery"] = {
