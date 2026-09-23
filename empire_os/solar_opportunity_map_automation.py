@@ -11,6 +11,9 @@ import urllib.parse
 from typing import Any, Mapping, Sequence
 
 from empire_os.qualification_worker_v2 import request_json
+from empire_os.solar_fulfilment_observation import (
+    materialize_with_resource_observation,
+)
 from empire_os.solar_opportunity_map import (
     ARTIFACT_ROOT,
     build_solar_opportunity_map,
@@ -61,20 +64,31 @@ def materialize_solar_maps_for_review_outcomes(
                 })
                 continue
 
-            payload = build_solar_opportunity_map(
+            observed = materialize_with_resource_observation(
                 prospect_id,
-                request=request,
+                build=lambda pid: build_solar_opportunity_map(
+                    pid,
+                    request=request,
+                ),
+                write=lambda payload: write_solar_opportunity_map(
+                    payload,
+                    root=root or ARTIFACT_ROOT,
+                ),
             )
-            paths = write_solar_opportunity_map(
-                payload,
-                root=root or ARTIFACT_ROOT,
-            )
+            payload = observed["payload"]
+            paths = observed["artifacts"]
             materialized.append({
                 "prospect_id": prospect_id,
                 "business_name": prospect.get("business_name"),
                 "buyer_review_id": payload["buyer_review"]["id"],
                 "buyer_review_status": payload["buyer_review"]["status"],
                 "paths": paths,
+                "resource_observation_path": (
+                    observed["resource_observation_path"]
+                ),
+                "resource_observation": (
+                    observed["resource_observation"]
+                ),
                 "priority_actions": len(payload.get("priority_backlog") or []),
             })
         except Exception as exc:
