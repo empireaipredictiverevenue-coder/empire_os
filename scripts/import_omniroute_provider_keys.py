@@ -71,6 +71,48 @@ def discover(home: Path) -> dict[str, str]:
     return found
 
 
+def discover_hermes_pool(home: Path) -> dict[str, str]:
+    """Read only persisted manual/OAuth API-key values from Hermes auth.json."""
+    path = home / ".hermes/auth.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    pools = raw.get("credential_pool")
+    if not isinstance(pools, dict):
+        return {}
+
+    provider_aliases = {
+        "openrouter": "openrouter",
+        "nvidia": "nvidia",
+        "gemini": "gemini",
+        "deepseek": "deepseek",
+        "groq": "groq",
+        "cerebras": "cerebras",
+        "huggingface": "huggingface",
+        "fireworks": "fireworks",
+    }
+
+    found: dict[str, str] = {}
+    for hermes_provider, omni_provider in provider_aliases.items():
+        rows = pools.get(hermes_provider)
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            token = str(
+                row.get("access_token")
+                or row.get("api_key")
+                or ""
+            ).strip()
+            if token:
+                found.setdefault(omni_provider, token)
+                break
+    return found
+
+
 def run_as_user(user: str, home: Path, args: Iterable[str], env: dict[str, str]):
     uid = pwd.getpwnam(user).pw_uid
     gid = pwd.getpwnam(user).pw_gid
@@ -102,6 +144,45 @@ def run_as_user(user: str, home: Path, args: Iterable[str], env: dict[str, str])
     )
 
 
+def configured_provider_ids(user: str, home: Path) -> set[str]:
+    result = run_as_user(
+        user,
+        home,
+        ["omniroute", "providers", "list", "--json"],
+        {},
+    )
+    if result.returncode != 0:
+        return set()
+    try:
+        raw = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return set()
+
+    rows = raw
+    if isinstance(raw, dict):
+        rows = (
+            raw.get("connections")
+            or raw.get("providers")
+            or raw.get("items")
+            or []
+        )
+    if not isinstance(rows, list):
+        return set()
+
+    providers: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        value = (
+            row.get("provider")
+            or row.get("providerId")
+            or row.get("provider_id")
+        )
+        if value:
+            providers.add(str(value))
+    return providers
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--home", default="/home/ubuntu")
@@ -115,8 +196,25 @@ def main() -> int:
         provider = KEY_TO_PROVIDER[key_name]
         selected.setdefault(provider, (key_name, value))
 
+    for provider, secret in discover_hermes_pool(home).items():
+        selected.setdefault(
+            provider,
+            (f"HERMES_POOL:{provider}", secret),
+        )
+
+    existing = configured_provider_ids(args.user, home)
     outcomes = []
     for provider, (source_key, secret) in sorted(selected.items()):
+        if provider in existing:
+            outcomes.append(
+                {
+                    "provider": provider,
+                    "source_env": source_key,
+                    "ok": True,
+                    "skipped": "already_configured",
+                }
+            )
+            continue
         env_name = "EMPIRE_OMNIROUTE_IMPORT_KEY"
         result = run_as_user(
             args.user,
