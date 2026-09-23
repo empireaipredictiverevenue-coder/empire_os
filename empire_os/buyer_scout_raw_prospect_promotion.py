@@ -42,7 +42,8 @@ def run_raw_prospect_promotion(
     execute: bool = False,
     actor: str | None = None,
 ) -> dict[str, Any]:
-    rows = _eligible(candidates)
+    source_rows = [dict(row) for row in candidates]
+    rows = _eligible(source_rows)
     actor_name = str(actor or "").strip()
 
     if execute and rows and not actor_name:
@@ -103,9 +104,7 @@ def run_raw_prospect_promotion(
         "mode": "GOVERNED" if execute else "OBSERVE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "execute_requested": bool(execute),
-        "candidate_count": len(list(candidates))
-        if isinstance(candidates, list)
-        else len(rows),
+        "candidate_count": len(source_rows),
         "eligible_review_ready_count": len(rows),
         "result_count": len(results),
         "promoted_count": promoted,
