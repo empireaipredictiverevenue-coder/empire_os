@@ -50,6 +50,10 @@ Historical Empire code contains useful media predecessors, but they are **not ca
   - Classification: **MERGE draft/adapter ideas + ARCHIVE implementation**.
 - Historical `creativeAssetLibraryService.ts` inventory proves an asset/versioning system existed in an earlier codebase.
   - Classification: **MERGE schema concepts after source-level recovery review; do not recreate blindly**.
+- Historical July 2026 commits contain `skills_library/`, `*_SKILLS.md`, SOUL files and shared agent guardrails.
+  - Useful: explicit skill procedure contracts, artifact-only/read-only guardrail modes, bounded execution, testable output shapes.
+  - Reject/retire: old `/root/empire_os` paths, PM2-era runtime assumptions, stale provider/model routing and autonomous agent sprawl.
+  - Classification: **MERGE skill-candidate/guardrail concepts + ARCHIVE legacy runtime**. Current Media OS emits skill candidates only; it does not recreate a parallel live skill registry.
 
 ## Requirement classification
 
