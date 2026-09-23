@@ -264,3 +264,98 @@ def test_refresh_writes_only_runtime_status_artifact(tmp_path):
     assert saved["database_write_performed"] is False
     assert saved["external_action_performed"] is False
     assert saved["execution_authority"] == "none"
+
+
+def test_runtime_merges_empire_bridge_inputs_without_overwriting_manual_inputs(
+    tmp_path,
+):
+    write_json(
+        tmp_path,
+        "runtime/media_os/input/idea_candidates.json",
+        {
+            "candidates": [
+                {
+                    "idea_id": "manual:1",
+                    "topic": "Manual media idea",
+                    "angle": "A manually prepared idea",
+                    "audience": "founders",
+                    "evidence_refs": ["manual:evidence:1"],
+                    "source_systems": ["media_os"],
+                    "opportunity_features": {},
+                }
+            ]
+        },
+    )
+    write_json(
+        tmp_path,
+        "runtime/media_os/input/empire_opportunity_ideas.json",
+        {
+            "candidates": [
+                {
+                    "idea_id": "empire:1",
+                    "topic": "Observed community pain",
+                    "angle": "Evidence-led community analysis",
+                    "audience": "founders and operators",
+                    "evidence_refs": ["community:evidence:1"],
+                    "source_systems": [
+                        "opportunity_radar",
+                        "community_intent",
+                    ],
+                    "opportunity_features": {},
+                    "opportunity_refs": ["community_pain:test"],
+                    "quant_packet_ref": (
+                        "opportunity_quant_review:community_pain:test"
+                    ),
+                    "quant_packet_status": "AVAILABLE",
+                    "commercial_quant_is_media_score": False,
+                }
+            ]
+        },
+    )
+    write_json(
+        tmp_path,
+        "runtime/media_os/input/empire_build_journal.json",
+        {
+            "items": [
+                {
+                    "entry_id": "git:abc",
+                    "system": "EmpireOS",
+                    "change": "Observed commit",
+                    "problem": "UNKNOWN_NOT_RECORDED_IN_COMMIT_METADATA",
+                    "solution": "Observed commit",
+                    "evidence_refs": ["git_commit:abc"],
+                    "novelty_observed": False,
+                    "audience_relevance_observed": False,
+                    "demonstration_available": False,
+                    "commercial_relevance_observed": False,
+                }
+            ]
+        },
+    )
+
+    result = build_media_os_runtime(tmp_path)
+
+    assert result["real_evidence_present"] is True
+    assert result["idea_backlog"]["candidate_count"] == 2
+    assert result["idea_backlog"]["commercial_quant_available_count"] == 1
+    assert result["idea_backlog"]["scored_candidate_count"] == 0
+    assert {
+        row["idea_id"]
+        for row in result["idea_backlog"]["candidates"]
+    } == {"manual:1", "empire:1"}
+
+    empire = next(
+        row
+        for row in result["idea_backlog"]["candidates"]
+        if row["idea_id"] == "empire:1"
+    )
+    assert empire["quant_packet_status"] == "AVAILABLE"
+    assert empire["commercial_quant_is_media_score"] is False
+
+    assert result["build_journal"]["entry_count"] == 1
+    assert (
+        result["build_journal"]["opportunity_candidate_count"]
+        == 0
+    )
+    assert result["public_publish_authorized"] is False
+    assert result["execution_authority"] == "none"
