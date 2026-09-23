@@ -1,0 +1,17 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "hermes-smoke-001",
+  "kind": "code_task",
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "prompt": "Prove the governed resident-worker path without changing production behavior. Create docs/HERMES_RESIDENT_WORKER_SMOKE.md. Record that this file was generated from the isolated Hermes worker smoke test, state that the worker is proposal-only, and list the blocked authority classes: live outbound, payments/funds, destructive database work, revenue recognition, production merges, recovery/, and toop/. Do not change any other file unless strictly required to complete the documentation task.",
+  "allowed_paths": [
+    "docs/"
+  ],
+  "pytest_targets": [
+    "tests/test_hermes_control.py",
+    "tests/test_hermes_control_systemd.py"
+  ],
+  "max_runtime_seconds": 600,
+  "created_at": "2026-09-23T00:00:00Z"
+}
