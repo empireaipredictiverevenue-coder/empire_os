@@ -20,12 +20,12 @@ def test_native_currency_pricing_matrix_covers_empire_markets():
     for code in ("IE", "DE", "FR", "ES", "IT", "NL", "BE", "PT"):
         assert rows[code]["currency"] == "EUR"
 
-    assert rows["GB"]["approval_state"] == "FOUNDER_APPROVED"
     assert all(
-        rows[code]["approval_state"] == "PROPOSED"
-        for code in rows
-        if code != "GB"
+        row["approval_state"] == "FOUNDER_APPROVED"
+        for row in rows.values()
     )
+    assert matrix["founder_approved_count"] == 13
+    assert matrix["proposed_count"] == 0
     assert matrix["fx_conversion_used"] is False
     assert matrix["binding_terms_ready"] is False
 
@@ -87,7 +87,7 @@ def test_founder_approved_market_price_enters_verified_price_basis_only():
     assert result["actual_revenue"] is False
 
 
-def test_unapproved_market_price_stays_proposed_and_nonbinding():
+def test_founder_approved_us_price_is_verified_but_nonbinding():
     def request(method, path, payload=None, **kwargs):
         if path.endswith("/get_commercial_product_catalog"):
             return []
@@ -98,8 +98,8 @@ def test_unapproved_market_price_stays_proposed_and_nonbinding():
             }
         if path.endswith("/propose_commercial_product_version"):
             assert payload["p_product_code"] == "solar_opportunity_map_us"
-            assert payload["p_price_basis"]["state"] == "PROPOSED"
-            assert payload["p_price_basis"]["source_type"] == "empire_pricing_draft"
+            assert payload["p_price_basis"]["state"] == "VERIFIED"
+            assert payload["p_price_basis"]["source_type"] == "founder_approved"
             return {
                 "decision": "proposed",
                 "version_id": "us-version",
@@ -111,7 +111,7 @@ def test_unapproved_market_price_stays_proposed_and_nonbinding():
         pricing.market_price("US"),
         request=request,
     )
-    assert result["approval_state"] == "PROPOSED"
+    assert result["approval_state"] == "FOUNDER_APPROVED"
     assert result["binding_terms_ready"] is False
 
 
@@ -128,7 +128,7 @@ def test_matching_market_version_is_idempotent():
                 "version_id": "v1",
                 "version_state": "PENDING",
                 "price_basis": {
-                    "state": "PROPOSED",
+                    "state": "VERIFIED",
                     "amount_cents": price.amount_minor,
                     "currency": price.currency,
                     "unit": "per_map",
