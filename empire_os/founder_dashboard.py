@@ -658,6 +658,46 @@ def _buyer_persistence_runtime(
     }
 
 
+def _tag_intelligence_runtime(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "mode": "unknown",
+            "execution_authority": "none",
+        }
+    return {
+        "available": True,
+        "observed_at": raw.get("generated_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "target_count": int(raw.get("target_count") or 0),
+        "available_target_count": int(
+            raw.get("available_target_count") or 0
+        ),
+        "failed_target_count": int(
+            raw.get("failed_target_count") or 0
+        ),
+        "critical_issue_count": int(
+            raw.get("critical_issue_count") or 0
+        ),
+        "high_issue_count": int(raw.get("high_issue_count") or 0),
+        "critical_change_count": int(
+            raw.get("critical_change_count") or 0
+        ),
+        "automatic_tag_mutation": (
+            raw.get("automatic_tag_mutation") is True
+        ),
+        "measurement_platform_write": (
+            raw.get("measurement_platform_write") is True
+        ),
+        "actual_revenue": False,
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
 def _pricing_verification_runtime(
     raw: dict[str, Any] | None,
     path: Path,
@@ -888,6 +928,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         / "commercial_catalog"
         / "pricing_verification_latest.json"
     )
+    tag_intelligence_runtime_path = (
+        runtime / "tag_intelligence" / "latest.json"
+    )
     buyer_review_readiness_runtime_path = (
         runtime / "buyer_acquisition" / "review_readiness_latest.json"
     )
@@ -1038,6 +1081,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "commercial_pricing_verification": _pricing_verification_runtime(
             _read_json(pricing_verification_runtime_path),
             pricing_verification_runtime_path,
+        ),
+        "tag_intelligence": _tag_intelligence_runtime(
+            _read_json(tag_intelligence_runtime_path),
+            tag_intelligence_runtime_path,
         ),
         "buyer_scout_review_readiness": _buyer_review_readiness_runtime(
             _read_json(buyer_review_readiness_runtime_path),
