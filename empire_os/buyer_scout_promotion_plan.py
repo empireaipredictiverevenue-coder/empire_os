@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from empire_os.buyer_scout_review_readiness import reliable_business_name
+
 
 OUTPUT = Path("runtime/buyer_acquisition/promotion_plan_latest.json")
 
@@ -70,6 +72,19 @@ def build_promotion_plan(
         if not candidate_id or not business_name or not website:
             blocked["identity_incomplete"] = blocked.get(
                 "identity_incomplete", 0
+            ) + 1
+            continue
+        site_for_identity = (
+            dict(row.get("site_evidence"))
+            if isinstance(row.get("site_evidence"), Mapping)
+            else {}
+        )
+        if not reliable_business_name(
+            business_name,
+            source=site_for_identity.get("business_name_source"),
+        ):
+            blocked["business_name_not_verified"] = blocked.get(
+                "business_name_not_verified", 0
             ) + 1
             continue
 
