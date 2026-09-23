@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 from empire_os.tag_intelligence import (
     compare_tag_snapshots,
@@ -53,6 +54,60 @@ def _baseline_change_summary() -> dict[str, Any]:
     }
 
 
+def _issue_codes(analysis: Mapping[str, Any]) -> list[str]:
+    return [
+        str(row.get("code") or "")
+        for row in (analysis.get("issues") or [])
+        if isinstance(row, Mapping)
+        and str(row.get("code") or "").strip()
+    ]
+
+
+def _static_observation_state(
+    rows: list[dict[str, Any]],
+    key: str,
+) -> str:
+    available = [row for row in rows if row.get("available") is True]
+    if not available:
+        return "UNKNOWN"
+    if any((row.get("measurement_tags") or {}).get(key) for row in available):
+        return "OBSERVED_IN_STATIC_MARKUP"
+    return "NOT_OBSERVED_IN_STATIC_MARKUP"
+
+
+def _configured_evidence_state(
+    rows: list[dict[str, Any]],
+    key: str,
+) -> str:
+    values = [
+        (row.get("measurement_tags") or {}).get(key)
+        for row in rows
+        if row.get("available") is True
+        and (row.get("measurement_tags") or {}).get(key) is not None
+    ]
+    if not values:
+        return "UNKNOWN"
+    if all(value is True for value in values):
+        return "VERIFIED_BY_CONFIGURED_EVIDENCE"
+    if any(value is False for value in values):
+        return "NOT_VERIFIED"
+    return "UNKNOWN"
+
+
+def _site_count(configured: list[dict[str, Any]]) -> int:
+    hosts: set[str] = set()
+    for row in configured:
+        value = str(row.get("url") or "").strip()
+        if not value:
+            continue
+        parsed = urlparse(
+            value if "://" in value else f"https://{value}"
+        )
+        if parsed.hostname:
+            hosts.add(parsed.hostname.lower())
+    return len(hosts)
+
+
 def refresh_tag_intelligence_monitor(
     repo_root: str | Path,
 ) -> dict[str, Any]:
@@ -91,7 +146,15 @@ def refresh_tag_intelligence_monitor(
     results: list[dict[str, Any]] = []
     critical_issues = 0
     high_issues = 0
+    search_issues = 0
+    measurement_issues = 0
+    change_count = 0
     critical_changes = 0
+    pages_with_public_noindex = 0
+    pages_missing_canonical = 0
+    pages_missing_schema = 0
+    missing_conversion_events = 0
+    duplicate_conversion_events = 0
     failed = 0
 
     for index, target in enumerate(configured, start=1):
@@ -161,10 +224,31 @@ def refresh_tag_intelligence_monitor(
         else:
             changes = _baseline_change_summary()
 
+        codes = _issue_codes(analysis)
         critical_issues += int(analysis.get("critical_count") or 0)
         high_issues += int(analysis.get("high_count") or 0)
+        search_issues += int(analysis.get("search_tag_issue_count") or 0)
+        measurement_issues += int(
+            analysis.get("measurement_tag_issue_count") or 0
+        )
+        change_count += int(changes.get("change_count") or 0)
         critical_changes += int(
             changes.get("critical_change_count") or 0
+        )
+        pages_with_public_noindex += int(
+            "public_page_noindex" in codes
+        )
+        pages_missing_canonical += int(
+            "missing_canonical" in codes
+        )
+        pages_missing_schema += int(
+            "structured_data_missing" in codes
+        )
+        missing_conversion_events += codes.count(
+            "required_conversion_event_missing"
+        )
+        duplicate_conversion_events += codes.count(
+            "duplicate_conversion_event"
         )
 
         results.append({
@@ -187,13 +271,45 @@ def refresh_tag_intelligence_monitor(
         "mode": "OBSERVE",
         "generated_at": now,
         "target_count": len(configured),
+        "monitored_site_count": _site_count(configured),
+        "monitored_page_count": sum(
+            row.get("available") is True for row in results
+        ),
         "available_target_count": sum(
             row.get("available") is True for row in results
         ),
         "failed_target_count": failed,
         "critical_issue_count": critical_issues,
         "high_issue_count": high_issues,
+        "search_issue_count": search_issues,
+        "measurement_issue_count": measurement_issues,
+        "change_count": change_count,
         "critical_change_count": critical_changes,
+        "pages_with_public_noindex": pages_with_public_noindex,
+        "pages_missing_canonical": pages_missing_canonical,
+        "pages_missing_schema": pages_missing_schema,
+        "missing_conversion_event_count": missing_conversion_events,
+        "duplicate_conversion_event_count": duplicate_conversion_events,
+        "measurement_observation": {
+            "meta_pixel": _static_observation_state(
+                results, "meta_pixel_ids"
+            ),
+            "ga4": _static_observation_state(
+                results, "ga4_measurement_ids"
+            ),
+            "gtm": _static_observation_state(
+                results, "gtm_container_ids"
+            ),
+            "google_ads_conversion": _static_observation_state(
+                results, "google_ads_conversion_ids"
+            ),
+            "meta_capi_dedup": _configured_evidence_state(
+                results, "meta_event_id_dedup"
+            ),
+            "revenue_truth_linkage": _configured_evidence_state(
+                results, "revenue_truth_linked"
+            ),
+        },
         "targets": results,
         "automatic_tag_mutation": False,
         "publishing_execution": False,
