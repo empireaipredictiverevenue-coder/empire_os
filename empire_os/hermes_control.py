@@ -513,19 +513,35 @@ def run_hermes(
         args[2:2] = ["--provider", provider]
 
     started = _utc_now()
-    result = _run(
+    env = _hermes_environment()
+    env["PYTHONUNBUFFERED"] = "1"
+
+    process = subprocess.Popen(
         args,
-        cwd=worktree,
-        env=_hermes_environment(),
-        timeout=job.max_runtime_seconds,
-        check=False,
+        cwd=str(worktree),
+        env=env,
+        text=True,
     )
+    try:
+        returncode = process.wait(timeout=job.max_runtime_seconds)
+    except subprocess.TimeoutExpired as exc:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)
+        raise HermesControlError(
+            f"Hermes timed out after {job.max_runtime_seconds}s"
+        ) from exc
+
     return {
         "started_at": started,
         "completed_at": _utc_now(),
-        "returncode": result.returncode,
-        "stdout": result.stdout[-20_000:],
-        "stderr": result.stderr[-10_000:],
+        "returncode": returncode,
+        "stdout": "",
+        "stderr": "",
+        "journal_streamed": True,
     }
 
 
