@@ -5,10 +5,48 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any, Callable, Mapping
+import re
 
 
 OUTPUT = Path("runtime/buyer_acquisition/review_readiness_latest.json")
 PatchCall = Callable[[str, str, dict[str, Any]], Any]
+
+
+GENERIC_BUSINESS_NAMES = frozenset({
+    "home",
+    "about",
+    "about us",
+    "contact",
+    "contact us",
+    "services",
+    "our services",
+    "welcome",
+    "homepage",
+    "index",
+})
+
+
+def _reliable_business_name(
+    name: str,
+    *,
+    source: str | None = None,
+) -> bool:
+    text = re.sub(r"\s+", " ", str(name or "")).strip()
+    if not text:
+        return False
+
+    lowered = text.lower().strip(" -|:")
+    if lowered in GENERIC_BUSINESS_NAMES:
+        return False
+
+    if str(source or "") == "page_title_fallback":
+        if re.match(
+            r"^(home|about(?: us)?|contact(?: us)?|services?)\s*[-|:]",
+            lowered,
+        ):
+            return False
+
+    return True
 
 
 def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
@@ -24,6 +62,11 @@ def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
     domain = str(row.get("domain") or "").strip()
     if not business_name or not website or not domain:
         return False, "business_identity_incomplete"
+    if not _reliable_business_name(
+        business_name,
+        source=row.get("business_name_source"),
+    ):
+        return False, "business_name_not_verified"
 
     query_evidence = row.get("query_evidence")
     if not isinstance(query_evidence, list) or not query_evidence:
