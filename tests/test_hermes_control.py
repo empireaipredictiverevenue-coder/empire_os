@@ -204,10 +204,10 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
         hermes_control,
         "_select_omniroute_model",
         lambda env: (
-            "z-ai/glm-5.3-flash:free",
+            "openrouter/z-ai/glm-5.3-flash:free",
             [
                 {
-                    "model": "z-ai/glm-5.3-flash:free",
+                    "model": "openrouter/z-ai/glm-5.3-flash:free",
                     "ok": "true",
                     "reason": "ok",
                 }
@@ -228,7 +228,7 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     assert result["returncode"] == 0
     assert result["endpoint_mode"] == "isolated_omniroute"
     assert result["provider"] == "custom"
-    assert result["model"] == "z-ai/glm-5.3-flash:free"
+    assert result["model"] == "openrouter/z-ai/glm-5.3-flash:free"
     assert result["hermes_home_isolated"] is True
     assert "local-test-key" not in result["output_tail"]
     assert "[REDACTED]" in result["output_tail"]
@@ -237,13 +237,13 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     provider_index = args.index("--provider")
     model_index = args.index("--model")
     assert args[provider_index + 1] == "custom"
-    assert args[model_index + 1] == "z-ai/glm-5.3-flash:free"
+    assert args[model_index + 1] == "openrouter/z-ai/glm-5.3-flash:free"
 
     hermes_home = repo / "runtime/hermes_control/hermes_home"
     assert captured["env"]["HERMES_HOME"] == str(hermes_home)
     config = (hermes_home / "config.yaml").read_text()
     assert '"provider": "custom"' in config
-    assert '"default": "z-ai/glm-5.3-flash:free"' in config
+    assert '"default": "openrouter/z-ai/glm-5.3-flash:free"' in config
     assert "http://127.0.0.1:20128/v1" in config
     assert "local-test-key" in config
 
@@ -252,8 +252,8 @@ def test_omniroute_model_selector_skips_failed_candidates(monkeypatch):
     from empire_os import hermes_control
 
     outcomes = {
-        "z-ai/glm-5.3-flash:free": (False, "http_429"),
-        "deepseek/deepseek-v4-flash-0731:free": (True, "ok"),
+        "openrouter/z-ai/glm-5.3-flash:free": (False, "http_429"),
+        "openrouter/deepseek/deepseek-v4-flash-0731:free": (True, "ok"),
     }
 
     def fake_probe(*, base_url, api_key, model, timeout=25):
@@ -273,6 +273,6 @@ def test_omniroute_model_selector_skips_failed_candidates(monkeypatch):
         }
     )
 
-    assert model == "deepseek/deepseek-v4-flash-0731:free"
+    assert model == "openrouter/deepseek/deepseek-v4-flash-0731:free"
     assert attempts[0]["ok"] == "false"
     assert attempts[1]["ok"] == "true"
