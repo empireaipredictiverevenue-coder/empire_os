@@ -544,3 +544,99 @@ class TestAcquisitionWebsiteIdentity:
         assert acquisition_ev["accepted"] is True
         assert result["fields"]["website"] == candidate
         assert result["fields"]["email"] == "info@allstarroofingtx.com"
+
+
+class TestAcquisitionWebsiteFallback:
+    def test_rejected_acquisition_site_falls_back_to_search_fabric(self):
+        wrong = "https://wrong-source.example"
+        real = "https://real-solar.example"
+
+        def fake_extract(url):
+            if url == wrong:
+                return (
+                    {"website": wrong, "phone": "020 1111 1111"},
+                    {
+                        "ok": True,
+                        "domain": "wrong-source.example",
+                        "canonical_url": wrong,
+                        "phones": ["020 1111 1111"],
+                        "pages_checked": [{"url": wrong}],
+                        "evidence_score": 0.4,
+                    },
+                )
+            assert url == real
+            return (
+                {
+                    "website": real,
+                    "email": "sales@real-solar.example",
+                    "phone": "020 2222 2222",
+                },
+                {
+                    "ok": True,
+                    "domain": "real-solar.example",
+                    "canonical_url": real,
+                    "phones": ["020 2222 2222"],
+                    "pages_checked": [{"url": real}],
+                    "evidence_score": 0.9,
+                },
+            )
+
+        def fake_identity(*, prospect, candidate_url, probe):
+            if candidate_url == wrong:
+                return {
+                    "accepted": False,
+                    "candidate_url": wrong,
+                    "reasons": ["candidate_identity_does_not_match_prospect"],
+                }
+            return {
+                "accepted": True,
+                "candidate_url": real,
+                "reasons": [],
+            }
+
+        with patch.object(
+            pe,
+            "fused_search",
+            return_value={
+                "organic": [{
+                    "title": "Real Solar Ltd",
+                    "link": real,
+                    "snippet": "Solar installer",
+                    "result_type": "direct_business",
+                    "confidence_score": 0.95,
+                    "relevance_score": 1.0,
+                    "geo_score": 1.0,
+                    "entity_score": 1.0,
+                    "provenance": ["bing_rss"],
+                }]
+            },
+        ), patch.object(
+            pe,
+            "_extract_site",
+            side_effect=fake_extract,
+        ), patch.object(
+            pe,
+            "assess_first_party_identity",
+            side_effect=fake_identity,
+        ), patch.object(
+            pe,
+            "_rdap",
+            return_value={},
+        ):
+            result = pe.enrich_prospect_for_scoring({
+                "business_name": "Real Solar Ltd",
+                "metro": "United Kingdom",
+                "niche": "solar",
+                "website": "",
+                "_acquisition_website": wrong,
+            })
+
+        assert result["fields"]["website"] == real
+        assert result["fields"]["email"] == "sales@real-solar.example"
+        assert "search_fabric" in result["sources"]
+        fallback = next(
+            item for item in result["evidence"]
+            if item.get("source") == "enrichment_fallback"
+        )
+        assert fallback["reason"] == "acquisition_website_rejected"
+        assert fallback["rejected_url"] == wrong
