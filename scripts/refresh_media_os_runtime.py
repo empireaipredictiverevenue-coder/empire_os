@@ -42,8 +42,20 @@ def main() -> int:
         "idea_candidate_count": (
             payload["idea_backlog"]["candidate_count"]
         ),
+        "research_pack_candidate_count": (
+            payload["research_packs"]["candidate_count"]
+        ),
+        "research_script_ready_count": (
+            payload["research_packs"]["script_ready_count"]
+        ),
         "ready_for_research_generation": (
             payload["ready_for_research_generation"]
+        ),
+        "ready_for_claim_verification": (
+            payload["ready_for_claim_verification"]
+        ),
+        "ready_for_script_generation": (
+            payload["ready_for_script_generation"]
         ),
         "public_publish_authorized": False,
         "external_action_performed": False,
