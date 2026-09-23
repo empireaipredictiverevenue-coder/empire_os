@@ -1,0 +1,12 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "revp0-01-runtime-revenue-audit",
+  "kind": "code_task",
+  "authority": "observe",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "prompt": "Perform a read-only Revenue P0 audit of the live EmpireOS host. Inspect only non-secret production runtime evidence and documented localhost read endpoints. Determine: current Commercial Funnel stage and next event; Revenue Pulse highest-priority blocker, recognized revenue and realized GP; Next-Best Action counts and the strongest factual actions; Commercial Product Catalog readiness; Buyer Acquisition/Scout current state; Commercial Exchange inventory/capacity state; current git HEAD/status; and service health for the revenue/founder/buyer components that already exist. Unknown stays unknown. Do not read or print secrets, do not sudo, do not mutate runtime, services, database, Git refs, outbound, payments, accounting, recovery/, or toop/. Create docs/REVENUE_P0_RUNTIME_AUDIT.md with observed facts, evidence paths/endpoints, the single current revenue bottleneck, and the next 3 reversible internal actions justified by evidence. Do not invent customers, conversations, revenue, or market facts.",
+  "allowed_paths": ["docs/"],
+  "pytest_targets": ["tests/test_revenue_command_queue.py","tests/test_founder_dashboard.py"],
+  "max_runtime_seconds": 900,
+  "created_at": "2026-09-23T16:09:10Z"
+}
