@@ -28,6 +28,7 @@ CALL_READY_PATH = Path(
 
 DEFERABLE_REASONS = frozenset({
     "site_unavailable",
+    "site_timeout",
     "no_decision_maker",
     "no_contact_evidence",
     "no_bound_contact",
