@@ -96,3 +96,52 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
     assert result["database_write_performed"] is False
     assert result["outbound_sent"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_scout_uses_bounded_parallel_probe_workers(monkeypatch):
+    seen = []
+
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {
+            query: [
+                "one.example",
+                "two.example",
+                "three.example",
+            ]
+            for query in queries
+        },
+    )
+
+    def fake_probe(url, **kwargs):
+        seen.append((url, kwargs))
+        return {
+            "ok": True,
+            "canonical_url": url,
+            "business_names": [url],
+            "description": "Local business",
+            "emails": [],
+            "phones": [],
+            "people": [],
+            "pages_checked": [],
+            "evidence_score": 0.7,
+        }
+
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        fake_probe,
+    )
+
+    result = run_buyer_scout(
+        plan(),
+        max_queries=1,
+        max_domains=3,
+        max_probes=3,
+    )
+
+    assert result["probed_domain_count"] == 3
+    assert len(seen) == 3
+    assert all(
+        kwargs["time_budget_seconds"] == 12.0
+        for _, kwargs in seen
+    )
