@@ -235,9 +235,9 @@ def test_product_demand_separates_sellable_from_market_validation():
         ),
     )
 
-    assert plan["product_demand_count"] == 2
+    assert plan["product_demand_count"] == 6
     assert plan["sellable_product_demand_count"] == 1
-    assert plan["market_validate_product_count"] == 1
+    assert plan["market_validate_product_count"] == 5
 
     managed = next(
         row for row in plan["product_demand_queue"]
