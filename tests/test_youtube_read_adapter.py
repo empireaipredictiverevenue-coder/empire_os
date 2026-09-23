@@ -182,3 +182,76 @@ def test_youtube_read_contract_contains_no_mutation_capability():
     assert contract["rating_mutation_supported"] is False
     assert contract["comment_mutation_supported"] is False
     assert contract["execution_authority"] == "none"
+
+
+def test_public_channel_inventory_uses_uploads_playlist_without_search():
+    calls = []
+
+    def transport(url, headers, timeout):
+        calls.append(url)
+        path = urlparse(url).path
+        query = parse_qs(urlparse(url).query)
+
+        if path.endswith("/youtube/v3/channels"):
+            assert query["part"] == ["contentDetails"]
+            assert query["id"] == ["channel-1"]
+            return {
+                "items": [
+                    {
+                        "id": "channel-1",
+                        "contentDetails": {
+                            "relatedPlaylists": {
+                                "uploads": "uploads-1",
+                            }
+                        },
+                    }
+                ]
+            }
+
+        if path.endswith("/youtube/v3/playlistItems"):
+            assert query["playlistId"] == ["uploads-1"]
+            return {
+                "items": [
+                    {"contentDetails": {"videoId": "v1"}},
+                    {"contentDetails": {"videoId": "v2"}},
+                ]
+            }
+
+        if path.endswith("/youtube/v3/videos"):
+            assert query["id"] == ["v1,v2"]
+            return {
+                "items": [
+                    {
+                        "id": "v1",
+                        "snippet": {
+                            "channelId": "channel-1",
+                            "title": "Video 1",
+                        },
+                        "statistics": {"viewCount": "100"},
+                    },
+                    {
+                        "id": "v2",
+                        "snippet": {
+                            "channelId": "channel-1",
+                            "title": "Video 2",
+                        },
+                        "statistics": {"viewCount": "200"},
+                    },
+                ]
+            }
+
+        raise AssertionError(f"unexpected URL: {url}")
+
+    adapter = YouTubeDataReadAdapter(
+        api_key="key",
+        transport=transport,
+    )
+
+    rows = adapter.channel_videos(
+        "channel-1",
+        max_videos=10,
+    )
+
+    assert [row["id"] for row in rows] == ["v1", "v2"]
+    assert len(calls) == 3
+    assert all("/search" not in url for url in calls)
