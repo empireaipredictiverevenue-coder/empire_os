@@ -16,7 +16,7 @@ Environment=PYTHONPATH=/srv/empire_os
 Environment=EMPIRE_AUTONOMOUS_MODE=OBSERVE
 Environment=EMPIRE_HERMES_GOVERNED_WORKER=1
 EnvironmentFile=-/etc/empire_os/omniroute-hermes.env
-ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_hermes_control_worker.py --repo-root /srv/empire_os --control-branch ops/hermes-control --max-jobs 1
+ExecStart=/bin/bash /srv/empire_os/scripts/run_hermes_resident_latest.sh
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
