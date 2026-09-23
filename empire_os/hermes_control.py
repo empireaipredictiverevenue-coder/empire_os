@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from typing import Any, Iterable, Mapping
@@ -520,7 +521,8 @@ DEFAULT_OMNIROUTE_MODEL_CANDIDATES = (
     "openrouter/deepseek/deepseek-v4-flash-0731:free",
 )
 
-MAX_DISCOVERED_MODEL_CANDIDATES = 12
+MAX_DISCOVERED_MODEL_CANDIDATES = 4
+MAX_COOLDOWN_RETRY_SECONDS = 30
 
 
 def _is_zero_cost_model(model: str) -> bool:
@@ -636,7 +638,7 @@ def _probe_omniroute_model(
     base_url: str,
     api_key: str,
     model: str,
-    timeout: int = 40,
+    timeout: int = 15,
 ) -> tuple[bool, str]:
     url = base_url.rstrip("/") + "/chat/completions"
     payload = json.dumps(
@@ -727,8 +729,19 @@ def _select_omniroute_model(
             "paid inference remains disabled"
         )
 
+    def cooldown_seconds(reason: str) -> int | None:
+        if "http_429" not in reason or "model_cooldown" not in reason:
+            return None
+        match = re.search(r'"reset_seconds"\s*:\s*(\d+)', reason)
+        if not match:
+            return 5
+        return max(
+            1,
+            min(int(match.group(1)), MAX_COOLDOWN_RETRY_SECONDS),
+        )
+
     attempts: list[dict[str, str]] = []
-    for model in candidates:
+    for index, model in enumerate(candidates):
         ok, reason = _probe_omniroute_model(
             base_url=base_url,
             api_key=api_key,
@@ -743,6 +756,38 @@ def _select_omniroute_model(
         )
         if ok:
             return model, attempts
+
+        # openrouter/free already routes across the available free pool. If
+        # OmniRoute says that router is cooling down, hammering every concrete
+        # :free model immediately just cascades the same cooldown across the
+        # catalog. Honor one bounded retry, then fail fast if the router remains
+        # in model_cooldown. Specific free fallbacks are still used for genuine
+        # non-cooldown failures such as timeouts.
+        if index == 0 and model == "openrouter/openrouter/free":
+            delay = cooldown_seconds(reason)
+            if delay is not None:
+                time.sleep(delay + 1)
+                retry_ok, retry_reason = _probe_omniroute_model(
+                    base_url=base_url,
+                    api_key=api_key,
+                    model=model,
+                )
+                attempts.append(
+                    {
+                        "model": model,
+                        "ok": "true" if retry_ok else "false",
+                        "reason": retry_reason,
+                        "retry": "cooldown_once",
+                    }
+                )
+                if retry_ok:
+                    return model, attempts
+                if cooldown_seconds(retry_reason) is not None:
+                    raise HermesControlError(
+                        "OpenRouter free router remains in model cooldown after "
+                        "one bounded retry; skipped free-model fan-out to avoid "
+                        "extending provider cooldowns"
+                    )
 
     raise HermesControlError(
         "no healthy OmniRoute model candidate; "
