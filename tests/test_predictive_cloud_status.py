@@ -430,3 +430,38 @@ def test_status_exposes_icp_buyer_trigger_intelligence(tmp_path):
     assert summary["icp_profile_count"] == 6
     assert summary["icp_execution_authority"] == "none"
     assert summary["live_outbound_send"] is False
+
+
+def test_status_exposes_buyer_scout_icp_evidence_counts(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/buyer_acquisition/scout_latest.json",
+        {
+            "generated_at": "2026-09-23T12:10:00+00:00",
+            "query_count": 12,
+            "domain_count": 8,
+            "candidate_count": 4,
+            "explicit_direct_buyer_candidate_count": 1,
+            "icp_assessed_candidate_count": 4,
+            "observed_trigger_candidate_count": 2,
+            "decision_maker_role_match_count": 2,
+            "economic_capacity_proxy_count": 1,
+            "verified_budget_candidate_count": 0,
+            "database_write_performed": False,
+            "outbound_sent": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime.fromisoformat("2026-09-23T12:15:00+00:00"),
+    )
+    summary = result["components"]["buyer_acquisition_scout"]["summary"]
+
+    assert summary["icp_assessed_candidate_count"] == 4
+    assert summary["observed_trigger_candidate_count"] == 2
+    assert summary["decision_maker_role_match_count"] == 2
+    assert summary["economic_capacity_proxy_count"] == 1
+    assert summary["verified_budget_candidate_count"] == 0
+    assert summary["outbound_sent"] is False
