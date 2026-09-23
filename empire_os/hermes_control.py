@@ -544,7 +544,7 @@ def run_hermes(
     ]
     provider = str(
         os.environ.get("EMPIRE_HERMES_PROVIDER")
-        or "custom"
+        or "openai-api"
     ).strip()
     model = str(
         os.environ.get("EMPIRE_HERMES_MODEL")
