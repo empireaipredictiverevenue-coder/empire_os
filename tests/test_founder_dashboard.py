@@ -1979,3 +1979,64 @@ def test_dashboard_exposes_media_os_foundation_without_publish_authority(
     assert media["material_gpu_cloud_commitment_authorized"] is False
     assert media["actual_revenue"] is False
     assert media["execution_authority"] == "none"
+
+
+def test_dashboard_surfaces_live_media_os_runtime_without_publish_authority(
+    tmp_path,
+):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/media_os/latest.json",
+        {
+            "schema_version": "empire.media_os.runtime.v1",
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T13:30:00+00:00",
+            "runtime_active": True,
+            "real_evidence_present": True,
+            "observed_source_count": 4,
+            "youtube_public": {
+                "observation_count": 12,
+                "outliers": {
+                    "candidate_count": 3,
+                },
+            },
+            "algorithm_intelligence": {
+                "observation_count": 8,
+                "hypothesis_count": 4,
+            },
+            "trend_fusion": {
+                "topic_count": 5,
+            },
+            "build_journal": {
+                "opportunity_candidate_count": 2,
+            },
+            "idea_backlog": {
+                "candidate_count": 9,
+                "pending_quant_review_count": 9,
+            },
+            "ready_for_research_generation": True,
+            "public_publish_authorized": False,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    media = result["media_os"]
+
+    assert media["architecture_available"] is True
+    assert media["runtime_active"] is True
+    assert media["real_evidence_present"] is True
+    assert media["observed_source_count"] == 4
+    assert media["youtube_observation_count"] == 12
+    assert media["outlier_candidate_count"] == 3
+    assert media["algorithm_observation_count"] == 8
+    assert media["algorithm_hypothesis_count"] == 4
+    assert media["trend_topic_count"] == 5
+    assert media["build_journal_opportunity_count"] == 2
+    assert media["idea_candidate_count"] == 9
+    assert media["pending_quant_review_count"] == 9
+    assert media["ready_for_research_generation"] is True
+    assert media["public_publish_authorized"] is False
+    assert media["actual_revenue"] is False
+    assert media["execution_authority"] == "none"
