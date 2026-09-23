@@ -179,3 +179,46 @@ def test_site_timeout_is_durable_deferred_reason():
     from empire_os.buyer_deferred_enrichment import DEFERABLE_REASONS
 
     assert "site_timeout" in DEFERABLE_REASONS
+
+
+def test_source_review_exact_subset_is_intersected_with_hot_source_ids(monkeypatch):
+    captured = {}
+
+    monkeypatch.setattr(
+        bridge,
+        "fetch_hot_source_prospect_ids",
+        lambda **kwargs: [P1, P2],
+    )
+
+    class Result:
+        def as_dict(self):
+            return {
+                "errors": [],
+                "outcomes": [],
+            }
+
+    monkeypatch.setattr(
+        bridge,
+        "run_buyer_review_materializer",
+        lambda *args, **kwargs: (
+            captured.update(kwargs) or Result()
+        ),
+    )
+    monkeypatch.setattr(
+        bridge,
+        "BuyerDeferredEnrichmentQueue",
+        lambda: type("Queue", (), {
+            "enqueue": lambda self, payload: False,
+            "snapshot": lambda self: {},
+        })(),
+    )
+
+    result = bridge.run_source_buyer_review(
+        source="recc_solar",
+        niche="solar",
+        prospect_ids=[P2, P3],
+    )
+
+    assert result["prospect_ids"] == [P2]
+    assert result["selected_hot_prospects"] == 1
+    assert captured["prospect_ids"] == [P2]
