@@ -112,6 +112,7 @@ class BuyerReviewMaterializerResult:
     deferred_enrichment: int
     rejection_counts: tuple[tuple[str, int], ...]
     errors: tuple[str, ...]
+    outcomes: tuple[dict[str, Any], ...]
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -125,6 +126,7 @@ class BuyerReviewMaterializerResult:
             "deferred_enrichment": self.deferred_enrichment,
             "rejection_counts": dict(self.rejection_counts),
             "errors": list(self.errors),
+            "outcomes": [dict(item) for item in self.outcomes],
             "actual_revenue": False,
             "outbound_sent": False,
             "commercial_terms_accepted": False,
@@ -296,6 +298,7 @@ def run_buyer_review_materializer(
     deferred_enrichment = 0
     rejection_counts: Counter[str] = Counter()
     errors: list[str] = []
+    outcomes: list[dict[str, Any]] = []
     work: list[tuple[Any, dict[str, Any]]] = []
 
     for row in rows:
@@ -317,6 +320,53 @@ def run_buyer_review_materializer(
             return candidate, probe(probe_row), None
         except Exception as exc:
             return candidate, None, exc
+
+    def record_outcome(
+        candidate,
+        result: Mapping[str, Any] | None,
+        *,
+        status: str,
+        reason: str | None = None,
+    ) -> None:
+        decision = (
+            result.get("decision_maker")
+            if isinstance(result, Mapping)
+            else None
+        )
+        recovery = (
+            result.get("identity_recovery")
+            if isinstance(result, Mapping)
+            else None
+        )
+        outcomes.append({
+            "prospect_id": candidate.prospect_id,
+            "business_name": candidate.business_name,
+            "status": status,
+            "reason": reason,
+            "review_ready": bool(
+                isinstance(result, Mapping)
+                and result.get("review_ready") is True
+            ),
+            "outreach_ready": bool(
+                isinstance(result, Mapping)
+                and result.get("outreach_ready") is True
+            ),
+            "decision_name": (
+                str(decision.get("name") or "").strip()
+                if isinstance(decision, Mapping)
+                else None
+            ),
+            "decision_title": (
+                str(decision.get("title") or "").strip()
+                if isinstance(decision, Mapping)
+                else None
+            ),
+            "identity_recovery": (
+                dict(recovery)
+                if isinstance(recovery, Mapping)
+                else None
+            ),
+        })
 
     def queue_deferred(candidate, reason: str) -> None:
         nonlocal deferred_enrichment
@@ -350,10 +400,22 @@ def run_buyer_review_materializer(
                     f"{candidate.prospect_id}:"
                     f"{type(exc).__name__}:{str(exc)[:180]}"
                 )
+                record_outcome(
+                    candidate,
+                    None,
+                    status="probe_error",
+                    reason="probe_error",
+                )
                 continue
             if not isinstance(result, Mapping):
                 rejection_counts["invalid_probe_result"] += 1
                 skipped_ineligible += 1
+                record_outcome(
+                    candidate,
+                    None,
+                    status="rejected",
+                    reason="invalid_probe_result",
+                )
                 continue
             if (
                 result.get("review_ready") is not True
@@ -370,6 +432,12 @@ def run_buyer_review_materializer(
                 rejection_counts[reason] += 1
                 queue_deferred(candidate, reason)
                 skipped_ineligible += 1
+                record_outcome(
+                    candidate,
+                    result,
+                    status="deferred",
+                    reason=reason,
+                )
                 continue
 
             decision = result.get("decision_maker")
@@ -377,6 +445,12 @@ def run_buyer_review_materializer(
                 rejection_counts["decision_maker_missing"] += 1
                 queue_deferred(candidate, "decision_maker_missing")
                 skipped_ineligible += 1
+                record_outcome(
+                    candidate,
+                    result,
+                    status="deferred",
+                    reason="decision_maker_missing",
+                )
                 continue
             try:
                 decision_score = float(
@@ -388,10 +462,22 @@ def run_buyer_review_materializer(
                 rejection_counts["decision_score_below_floor"] += 1
                 queue_deferred(candidate, "decision_score_below_floor")
                 skipped_ineligible += 1
+                record_outcome(
+                    candidate,
+                    result,
+                    status="deferred",
+                    reason="decision_score_below_floor",
+                )
                 continue
 
             review_ready += 1
             if proposed >= cap:
+                record_outcome(
+                    candidate,
+                    result,
+                    status="review_ready_not_proposed",
+                    reason="proposal_cap_reached",
+                )
                 continue
 
             contact_plan = {
@@ -417,15 +503,32 @@ def run_buyer_review_materializer(
                 )
                 if isinstance(response, Mapping) and response.get("review_id"):
                     proposed += 1
+                    record_outcome(
+                        candidate,
+                        result,
+                        status="proposed",
+                    )
                 else:
                     errors.append(
                         f"{candidate.prospect_id}:proposal_returned_no_review"
+                    )
+                    record_outcome(
+                        candidate,
+                        result,
+                        status="proposal_failed",
+                        reason="proposal_returned_no_review",
                     )
             except Exception as proposal_exc:
                 errors.append(
                     f"{candidate.prospect_id}:"
                     f"{type(proposal_exc).__name__}:"
                     f"{str(proposal_exc)[:180]}"
+                )
+                record_outcome(
+                    candidate,
+                    result,
+                    status="proposal_failed",
+                    reason=type(proposal_exc).__name__,
                 )
 
     return BuyerReviewMaterializerResult(
@@ -439,4 +542,5 @@ def run_buyer_review_materializer(
         deferred_enrichment=deferred_enrichment,
         rejection_counts=tuple(sorted(rejection_counts.items())),
         errors=tuple(errors),
+        outcomes=tuple(outcomes),
     )
