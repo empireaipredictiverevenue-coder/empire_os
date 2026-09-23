@@ -827,7 +827,7 @@ def _buyer_acquisition_runtime(
     }
 
 
-def _buyer_scout_runtime(
+def _buyer_scout_observation_runtime(
     raw: dict[str, Any] | None,
     path: Path,
 ) -> dict[str, Any]:
@@ -894,8 +894,8 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     buyer_promotion_plan_runtime_path = (
         runtime / "buyer_acquisition" / "promotion_plan_latest.json"
     )
-    buyer_scout_runtime_path = (
-        runtime / "buyer_acquisition" / "scout_latest.json"
+    buyer_scout_observation_runtime_path = (
+        runtime / "buyer_acquisition" / "scout_observations_latest.json"
     )
 
     raw_loop = _read_json(loop_path)
@@ -1047,9 +1047,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             _read_json(buyer_promotion_plan_runtime_path),
             buyer_promotion_plan_runtime_path,
         ),
-        "buyer_scout": _buyer_scout_runtime(
-            _read_json(buyer_scout_runtime_path),
-            buyer_scout_runtime_path,
+        "buyer_scout": _buyer_scout_observation_runtime(
+            _read_json(buyer_scout_observation_runtime_path),
+            buyer_scout_observation_runtime_path,
         ),
         "commercial_pricing_proposal": build_launch_pricing_proposal(),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
