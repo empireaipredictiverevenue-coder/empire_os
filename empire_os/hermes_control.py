@@ -516,13 +516,95 @@ TASK
 
 
 DEFAULT_OMNIROUTE_MODEL_CANDIDATES = (
-    "openrouter/z-ai/glm-5.3-flash:free",
-    "openrouter/deepseek/deepseek-v4-flash-0731:free",
     "openrouter/openrouter/free",
+    "openrouter/deepseek/deepseek-v4-flash-0731:free",
+    "openrouter/z-ai/glm-5.3-flash",
     "gemini/gemini-3.5-flash-lite",
     "gemini/gemini-3.1-flash-lite",
     "gemini/gemini-3.1-pro-preview",
 )
+
+MAX_DISCOVERED_MODEL_CANDIDATES = 12
+
+
+def _fetch_omniroute_catalog(
+    *,
+    base_url: str,
+    api_key: str,
+    timeout: int = 10,
+) -> tuple[str, ...]:
+    """Return model IDs advertised by the live OmniRoute OpenAI API."""
+    url = base_url.rstrip("/") + "/models"
+    headers = {"Accept": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    request = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            if response.status != 200:
+                return ()
+            body = json.loads(response.read().decode("utf-8", "replace") or "{}")
+    except (
+        urllib.error.URLError,
+        urllib.error.HTTPError,
+        TimeoutError,
+        json.JSONDecodeError,
+    ):
+        return ()
+
+    data = body.get("data")
+    if not isinstance(data, list):
+        return ()
+    models: list[str] = []
+    for row in data:
+        if not isinstance(row, dict):
+            continue
+        model_id = str(row.get("id") or "").strip()
+        if model_id and model_id not in models:
+            models.append(model_id)
+    return tuple(models)
+
+
+def _rank_catalog_candidates(
+    catalog: Iterable[str],
+    preferred: Iterable[str],
+) -> tuple[str, ...]:
+    """Choose only live catalog IDs, preferring free and coding-capable routes."""
+    live = tuple(dict.fromkeys(str(model).strip() for model in catalog if str(model).strip()))
+    live_set = set(live)
+    ordered: list[str] = []
+
+    for model in preferred:
+        model = str(model).strip()
+        if model and model in live_set and model not in ordered:
+            ordered.append(model)
+
+    def priority(model: str) -> tuple[int, str]:
+        lower = model.lower()
+        if lower == "openrouter/openrouter/free":
+            return (0, lower)
+        if lower.startswith("openrouter/") and ":free" in lower:
+            coding_markers = (
+                "nemotron",
+                "north-mini-code",
+                "laguna",
+                "deepseek",
+                "gpt-oss",
+            )
+            return (1 if any(marker in lower for marker in coding_markers) else 2, lower)
+        if lower.startswith("gemini/") and "flash-lite" in lower:
+            return (3, lower)
+        return (9, lower)
+
+    discovered = [
+        model
+        for model in live
+        if model not in ordered and priority(model)[0] < 9
+    ]
+    discovered.sort(key=priority)
+    ordered.extend(discovered)
+
+    return tuple(ordered[:MAX_DISCOVERED_MODEL_CANDIDATES])
 
 
 def _probe_omniroute_model(
@@ -588,11 +670,21 @@ def _select_omniroute_model(
     configured = str(
         os.environ.get("EMPIRE_HERMES_MODEL_CANDIDATES") or ""
     ).strip()
-    candidates = tuple(
+    preferred = tuple(
         item.strip()
         for item in configured.split(",")
         if item.strip()
     ) or DEFAULT_OMNIROUTE_MODEL_CANDIDATES
+
+    catalog = _fetch_omniroute_catalog(
+        base_url=base_url,
+        api_key=api_key,
+    )
+    candidates = _rank_catalog_candidates(catalog, preferred) if catalog else preferred
+    if not candidates:
+        raise HermesControlError(
+            "OmniRoute live catalog has no eligible Hermes model candidates"
+        )
 
     attempts: list[dict[str, str]] = []
     for model in candidates:
