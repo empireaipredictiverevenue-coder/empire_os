@@ -23,3 +23,13 @@ def test_buyer_scout_timer_is_not_high_frequency():
 
     assert "OnUnitInactiveSec=30min" in text
     assert "Persistent=true" in text
+
+
+def test_buyer_scout_service_persists_only_to_holding_area():
+    text = (
+        ROOT / "deploy/systemd/empire-buyer-acquisition-scout.service"
+    ).read_text()
+
+    assert "reconcile_buyer_acquisition_scout.py" in text
+    assert "persist_buyer_scout_candidates.py" in text
+    assert "outbound_governor" not in text
