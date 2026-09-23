@@ -14,6 +14,12 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--proposal-limit", type=int, default=10)
     parser.add_argument("--min-company-score", type=float, default=70.0)
+    parser.add_argument(
+        "--prospect-id",
+        action="append",
+        default=[],
+        help="Optional exact hot-source prospect id; may be repeated.",
+    )
     args = parser.parse_args()
 
     result = run_source_buyer_review(
@@ -22,6 +28,7 @@ def main() -> int:
         limit=args.limit,
         proposal_limit=args.proposal_limit,
         min_company_score=args.min_company_score,
+        prospect_ids=args.prospect_id or None,
     )
     print(json.dumps(result, indent=2, sort_keys=True))
     errors = result["materializer"].get("errors") or []
