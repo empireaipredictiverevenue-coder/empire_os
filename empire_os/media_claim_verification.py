@@ -243,6 +243,7 @@ def observe_research_sources(
                     min(float(per_source_time_budget_seconds), 20.0),
                 ),
                 page_priority="default",
+                public_only=True,
             )
         except Exception as exc:
             failures.append({
@@ -820,6 +821,7 @@ def refresh_media_claim_verification(
             isinstance(prior, Mapping)
             and prior.get("source_input_fingerprint")
             == pack_fingerprints[research_id]
+            and prior.get("verification_retry_required") is not True
         )
         if unchanged and not force:
             preserved[research_id] = dict(prior)
@@ -866,6 +868,24 @@ def refresh_media_claim_verification(
             timezone.utc
         ).isoformat()
         verified["verification_attempt_complete"] = True
+        proposal_reason = _clean(proposals.get("reason"))
+        source_failures = observations.get("failures") or []
+        verifier_unknown = bool(verified.get("unknown_claims"))
+        transient_proposal_failure = (
+            "gateway_error" in proposal_reason
+            or proposal_reason in {
+                "no_direct_source_observations",
+                "proposal_response_not_object",
+            }
+        )
+        verified["verification_retry_required"] = bool(
+            verifier_unknown
+            or transient_proposal_failure
+            or (
+                not observations.get("observed_source_count")
+                and source_failures
+            )
+        )
         processed[research_id] = verified
 
         results.append({
