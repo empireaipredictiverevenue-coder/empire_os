@@ -659,12 +659,13 @@ def _publish_result_once(
     runtime_root: Path,
 ) -> None:
     job_id = str(result_payload["job_id"])
-    worktree = Path(
+    result_root = Path(
         tempfile.mkdtemp(
             prefix="control-result-",
             dir=runtime_root,
         )
     )
+    worktree = result_root / "worktree"
     try:
         _git(
             repo_root,
@@ -725,7 +726,7 @@ def _publish_result_once(
             str(worktree),
             check=False,
         )
-        shutil.rmtree(worktree, ignore_errors=True)
+        shutil.rmtree(result_root, ignore_errors=True)
 
 
 def publish_result(
