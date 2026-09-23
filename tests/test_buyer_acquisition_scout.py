@@ -86,6 +86,9 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
     row = result["candidates"][0]
     assert row["domain"] == "buyer.example"
     assert row["explicit_direct_buyer_evidence"] is True
+    assert row["first_party_emails"] == ["jane@buyer.example"]
+    assert row["first_party_phones"] == ["+15125550123"]
+    assert row["first_party_people"][0]["name"] == "Jane Smith"
     assert row["candidate_state"] == "RESEARCH_EVIDENCE_ONLY"
     assert row["canonical_identity_verified"] is False
     assert row["commercial_terms_verified"] is False
