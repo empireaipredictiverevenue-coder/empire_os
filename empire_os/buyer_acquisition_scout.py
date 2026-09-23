@@ -174,11 +174,23 @@ def run_buyer_scout(
             ] += 1
             continue
 
+        business_names = [
+            str(value).strip()
+            for value in (evidence.get("business_names") or [])
+            if str(value).strip()
+        ]
         record = {
             "business_name": (
-                (evidence.get("business_names") or [None])[0]
-                or evidence.get("title")
+                business_names[0]
+                if business_names
+                else evidence.get("title")
             ),
+            "business_name_source": (
+                "first_party_business_name"
+                if business_names
+                else "page_title_fallback"
+            ),
+            "site_business_names": business_names[:10],
             "website": evidence.get("canonical_url")
             or evidence.get("final_url"),
             "description": evidence.get("description"),
@@ -209,6 +221,8 @@ def run_buyer_scout(
         candidates.append({
             "domain": domain,
             "business_name": record["business_name"],
+            "business_name_source": record["business_name_source"],
+            "site_business_names": record["site_business_names"],
             "website": record["website"],
             "description": record["description"],
             "first_party_emails": list(
