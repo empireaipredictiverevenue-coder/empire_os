@@ -15,6 +15,7 @@ SAFE_SYSTEM_UNITS = (
     "empire-buyer-deferred-enrichment.timer",
     "empire-buyer-capacity-readiness.timer",
     "empire-commercial-evidence-auto-verifier.timer",
+    "empire-commercial-product-catalog.timer",
     "empire-commercial-exchange.timer",
     "empire-buyer-acquisition-team.timer",
 )
