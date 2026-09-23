@@ -1,0 +1,23 @@
+{
+  "authority": "observe",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "changed_paths": [],
+  "completed_at": "2026-09-23T17:25:51.557291+00:00",
+  "database_mutation_performed": false,
+  "error": "HermesControlError: no healthy OmniRoute model candidate; openrouter/z-ai/glm-5.3-flash:free=http_400:{\"error\":{\"message\":\"Model 'z-ai/glm-5.3-flash:free' is not available in the active live catalog for provider 'openrouter'.\",\"type\":\"invalid_request_error\",\"code\":\"bad_request\"}}; openrouter/deepseek/deepseek-v4-flash-0731:free=http_400:{\"error\":{\"message\":\"Model 'deepseek/deepseek-v4-flash-0731:free' is not available in the active live catalog for provider 'openrouter'.\",\"type\":\"invalid_request_error\",\"code\":\"bad_request\"}}; openrouter/openrouter/free=network:TimeoutError; gemini/gemini-3.5-flash-lite=network:TimeoutError; gemini/gemini-3.1-flash-lite=network:TimeoutError; gemini/gemini-3.1-pro-preview=network:TimeoutError",
+  "execution_authority": "none",
+  "external_commercial_action_performed": false,
+  "founder_gate_required": false,
+  "git_remote_io_performed": true,
+  "hermes": null,
+  "job_id": "revp0-09-live-post-deploy-verification",
+  "job_path": "jobs/inbox/revp0-09-live-post-deploy-verification.json",
+  "kind": "code_task",
+  "payment_action_performed": false,
+  "proposal_branch": null,
+  "proposal_commit": null,
+  "schema_version": "empire.hermes.control_result.v1",
+  "started_at": "2026-09-23T17:24:09.382685+00:00",
+  "status": "FAILED",
+  "verification": null
+}
