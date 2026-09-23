@@ -1820,7 +1820,25 @@ def test_dashboard_exposes_tag_intelligence_monitor(tmp_path):
             "failed_target_count": 1,
             "critical_issue_count": 2,
             "high_issue_count": 5,
+            "search_issue_count": 7,
+            "measurement_issue_count": 4,
+            "change_count": 3,
             "critical_change_count": 1,
+            "monitored_site_count": 2,
+            "monitored_page_count": 2,
+            "pages_with_public_noindex": 1,
+            "pages_missing_canonical": 1,
+            "pages_missing_schema": 2,
+            "missing_conversion_event_count": 3,
+            "duplicate_conversion_event_count": 1,
+            "measurement_observation": {
+                "ga4": "OBSERVED_IN_STATIC_MARKUP",
+                "gtm": "OBSERVED_IN_STATIC_MARKUP",
+                "meta_pixel": "NOT_OBSERVED_IN_STATIC_MARKUP",
+                "google_ads_conversion": "UNKNOWN",
+                "meta_capi_dedup": "UNKNOWN",
+                "revenue_truth_linkage": "UNKNOWN",
+            },
             "automatic_tag_mutation": False,
             "measurement_platform_write": False,
             "actual_revenue": False,
@@ -1833,7 +1851,20 @@ def test_dashboard_exposes_tag_intelligence_monitor(tmp_path):
     assert runtime["available"] is True
     assert runtime["target_count"] == 3
     assert runtime["critical_issue_count"] == 2
+    assert runtime["search_issue_count"] == 7
+    assert runtime["measurement_issue_count"] == 4
+    assert runtime["change_count"] == 3
     assert runtime["critical_change_count"] == 1
+    assert runtime["monitored_site_count"] == 2
+    assert runtime["monitored_page_count"] == 2
+    assert runtime["pages_with_public_noindex"] == 1
+    assert runtime["pages_missing_canonical"] == 1
+    assert runtime["pages_missing_schema"] == 2
+    assert runtime["missing_conversion_event_count"] == 3
+    assert runtime["duplicate_conversion_event_count"] == 1
+    assert runtime["measurement_observation"]["ga4"] == (
+        "OBSERVED_IN_STATIC_MARKUP"
+    )
     assert runtime["automatic_tag_mutation"] is False
     assert runtime["measurement_platform_write"] is False
     assert runtime["execution_authority"] == "none"
