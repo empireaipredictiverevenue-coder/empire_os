@@ -503,3 +503,11 @@ def test_company_routed_review_evidence_is_explicit():
     assert evidence["routing_name"] == "Jane Smith"
     assert evidence["routing_title"] == "CEO"
     assert evidence["outreach_ready"] is True
+
+
+def test_localized_solar_offer_is_reviewable():
+    import empire_os.buyer_review_materializer as materializer
+
+    assert "solar_opportunity_map_gb" in materializer.REVIEWABLE_OFFER_KEYS
+    assert "solar_opportunity_map_us" in materializer.REVIEWABLE_OFFER_KEYS
+    assert "solar_opportunity_map_de" in materializer.REVIEWABLE_OFFER_KEYS
