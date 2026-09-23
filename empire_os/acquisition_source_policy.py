@@ -68,11 +68,27 @@ def choose_source(
     *,
     log_path: str | Path,
 ) -> dict[str, Any]:
-    family_index = int(state.get("next_family_index", 0)) % len(
+    start_index = int(state.get("next_family_index", 0)) % len(
         FAMILY_ROTATION
     )
+    source_states = {
+        str(key): str(value).upper()
+        for key, value in (state.get("source_states") or {}).items()
+    }
+    family_index = start_index
     family = FAMILY_ROTATION[family_index]
-    candidates = SOURCE_FAMILIES[family]
+    candidates: tuple[str, ...] = ()
+    for offset in range(len(FAMILY_ROTATION)):
+        family_index = (start_index + offset) % len(FAMILY_ROTATION)
+        family = FAMILY_ROTATION[family_index]
+        candidates = tuple(
+            source for source in SOURCE_FAMILIES[family]
+            if source_states.get(source) != "QUARANTINED"
+        )
+        if candidates:
+            break
+    if not candidates:
+        raise RuntimeError("all acquisition source families are quarantined")
     stats = recent_source_stats(log_path)
 
     def rank(source: str) -> tuple[float, float, str]:
