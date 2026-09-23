@@ -1,0 +1,12 @@
+{
+  "schema_version":"empire.hermes.control_job.v1",
+  "job_id":"revp0-06-command-queue",
+  "kind":"code_task",
+  "authority":"internal_write",
+  "base_branch":"feature/revenue-intelligence-v2",
+  "prompt":"Verify the existing Revenue Command Queue against canonical live evidence and fix only concrete correctness gaps. Reuse existing CRM, buyer-state, product catalog, opportunity, funnel and Revenue Pulse modules; create no shadow stores or ledgers. Ensure the queue exposes who/what can move toward revenue now, product/offer only when known, factual commercial state, exact blocker, next reversible internal action, evidence refs and founder/external gates. Unknown stays unknown; forecast/model score/proposal/send/payment request/unverified payment is not revenue. Keep outbound/payment/DB/accounting/revenue-recognition authority false. Ensure Founder Console exposure and update docs/REVENUE_SPRINT_72H.md with the evidence-based next sequence. Add focused tests.",
+  "allowed_paths":["empire_os/","tests/","docs/"],
+  "pytest_targets":["tests/test_revenue_command_queue.py","tests/test_founder_dashboard.py"],
+  "max_runtime_seconds":1200,
+  "created_at":"2026-09-23T16:30:20Z"
+}
