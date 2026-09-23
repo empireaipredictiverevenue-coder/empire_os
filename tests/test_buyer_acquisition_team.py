@@ -105,3 +105,26 @@ def test_plan_automates_internal_team_but_not_live_send():
     assert plan["legacy_buyer_hunter_is_canonical"] is False
     assert plan["buyer_capacity_never_gates_acquisition"] is True
     assert plan["execution_authority"] == "none"
+
+
+def test_buyer_acquisition_covers_end_buyers_enterprise_and_saas():
+    plan = build_buyer_acquisition_plan(
+        {"inventory": [], "buyer_seats": []},
+        generated_at=datetime(
+            2026, 9, 23, 0, 0, tzinfo=timezone.utc
+        ),
+    )
+    pools = {row["pool"]: row for row in plan["buyer_pools"]}
+
+    assert "end_service_buyers" in pools
+    assert "direct_demand_buyers" in pools
+    assert "agency_and_reseller_buyers" in pools
+    assert "enterprise_and_data_buyers" in pools
+    assert "software_and_advisory_buyers" in pools
+    assert "qualified_leads" in pools["end_service_buyers"]["purchases"]
+    assert "vertical_intelligence" in pools[
+        "enterprise_and_data_buyers"
+    ]["purchases"]
+    assert "saas_subscriptions" in pools[
+        "software_and_advisory_buyers"
+    ]["purchases"]
