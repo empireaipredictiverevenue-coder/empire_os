@@ -516,10 +516,12 @@ TASK
 
 
 DEFAULT_OMNIROUTE_MODEL_CANDIDATES = (
+    "z-ai/glm-5.3-flash:free",
+    "deepseek/deepseek-v4-flash-0731:free",
+    "openrouter/openrouter/free",
     "gemini/gemini-3.5-flash-lite",
     "gemini/gemini-3.1-flash-lite",
     "gemini/gemini-3.1-pro-preview",
-    "openrouter/openrouter/free",
 )
 
 
