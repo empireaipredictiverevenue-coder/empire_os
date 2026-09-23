@@ -141,25 +141,46 @@ def fetch_candidate_rows(
     *,
     scan_limit: int = 25,
     scan_offset: int = 0,
+    prospect_ids: list[str] | tuple[str, ...] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     bounded = max(1, min(int(scan_limit), 100))
     offset = max(0, int(scan_offset))
+
+    target_ids: list[str] = []
+    if prospect_ids is not None:
+        from uuid import UUID
+
+        for value in prospect_ids:
+            try:
+                normalized = str(UUID(str(value).strip()))
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if normalized not in target_ids:
+                target_ids.append(normalized)
+        if not target_ids:
+            return [], 0
+        target_ids = target_ids[:bounded]
+
+    params: dict[str, Any] = {
+        "select": (
+            "id,business_name,niche,metro,phone,website,buy_signal_score,"
+            "status,notes,contact_name,contact_title,contact_source,"
+            "contacted_status,created_at"
+        ),
+        "website": "not.is.null",
+        "order": (
+            "buy_signal_score.desc.nullslast,created_at.desc"
+        ),
+        "limit": bounded,
+        "offset": offset,
+    }
+    if target_ids:
+        params["id"] = f"in.({','.join(target_ids)})"
+
     prospects = _get(
         request,
         "/rest/v1/prospects",
-        {
-            "select": (
-                "id,business_name,niche,metro,phone,website,buy_signal_score,"
-                "status,notes,contact_name,contact_title,contact_source,"
-                "contacted_status,created_at"
-            ),
-            "website": "not.is.null",
-            "order": (
-                "buy_signal_score.desc.nullslast,created_at.desc"
-            ),
-            "limit": bounded,
-            "offset": offset,
-        },
+        params,
     )
 
     ready: list[dict[str, Any]] = []
@@ -219,7 +240,11 @@ def fetch_candidate_rows(
     return ready, skipped_existing
 
 
-def _eligible_candidate(row: Mapping[str, Any]):
+def _eligible_candidate(
+    row: Mapping[str, Any],
+    *,
+    min_company_score: float = 70.0,
+):
     candidate = build_candidate(
         row,
         entity_id=row.get("entity_id") or None,
@@ -229,7 +254,7 @@ def _eligible_candidate(row: Mapping[str, Any]):
         return None
     if candidate.offer_key not in REVIEWABLE_OFFER_KEYS:
         return None
-    if candidate.company_score < 70:
+    if candidate.company_score < float(min_company_score):
         return None
     return candidate
 
@@ -243,11 +268,14 @@ def run_buyer_review_materializer(
     proposal_limit: int = 5,
     scan_offset: int = 0,
     probe_workers: int = 6,
+    prospect_ids: list[str] | tuple[str, ...] | None = None,
+    min_company_score: float = 70.0,
 ) -> BuyerReviewMaterializerResult:
     rows, skipped_existing = fetch_candidate_rows(
         request,
         scan_limit=scan_limit,
         scan_offset=scan_offset,
+        prospect_ids=prospect_ids,
     )
     cap = max(1, min(int(proposal_limit), 20))
     workers = max(1, min(int(probe_workers), 24))
@@ -259,7 +287,10 @@ def run_buyer_review_materializer(
     work: list[tuple[Any, dict[str, Any]]] = []
 
     for row in rows:
-        candidate = _eligible_candidate(row)
+        candidate = _eligible_candidate(
+            row,
+            min_company_score=min_company_score,
+        )
         if candidate is None:
             skipped_ineligible += 1
             continue
