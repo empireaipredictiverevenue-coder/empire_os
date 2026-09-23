@@ -18,7 +18,7 @@ SAFE_SYSTEM_UNITS = (
     "empire-commercial-product-catalog.timer",
     "empire-commercial-exchange.timer",
     "empire-buyer-acquisition-team.timer",
-    "empire-buyer-scout.timer",
+    "empire-buyer-acquisition-scout.timer",
 )
 
 LIVE_EXTERNAL_UNITS = (
