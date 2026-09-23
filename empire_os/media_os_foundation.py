@@ -388,6 +388,7 @@ def media_os_architecture_contract() -> dict[str, Any]:
             "workflow_skill_candidate_compiler",
             "flagship_media_runtime",
             "empire_intelligence_bridge",
+            "opportunity_research_to_media_bridge",
         ],
         "subscriber_strategy": {
             "first_major_scale_milestone": 100_000,
@@ -480,6 +481,11 @@ def media_os_founder_status(
         if isinstance(runtime.get("idea_backlog"), Mapping)
         else {}
     )
+    research = (
+        runtime.get("research_packs")
+        if isinstance(runtime.get("research_packs"), Mapping)
+        else {}
+    )
 
     return {
         "architecture_available": True,
@@ -540,8 +546,23 @@ def media_os_founder_status(
         "commercial_quant_available_count": int(
             ideas.get("commercial_quant_available_count") or 0
         ),
+        "research_pack_candidate_count": int(
+            research.get("candidate_count") or 0
+        ),
+        "research_verified_claim_count": int(
+            research.get("verified_claim_count") or 0
+        ),
+        "research_script_ready_count": int(
+            research.get("script_ready_count") or 0
+        ),
         "ready_for_research_generation": (
             runtime.get("ready_for_research_generation") is True
+        ),
+        "ready_for_claim_verification": (
+            runtime.get("ready_for_claim_verification") is True
+        ),
+        "ready_for_script_generation": (
+            runtime.get("ready_for_script_generation") is True
         ),
         "first_major_scale_milestone": 100_000,
         "long_term_network_objective": 1_000_000,
