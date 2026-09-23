@@ -7,6 +7,22 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/trust",
   },
+  openGraph: {
+    title: "Trust Center | Empire AI",
+    description:
+      "How Empire AI handles evidence, security, commercial proof and trust.",
+    url: "https://empire-ai.co.uk/trust",
+    siteName: "Empire AI",
+    type: "website",
+    images: [
+      {
+        url: "/brand/empire-logo.svg",
+        width: 560,
+        height: 128,
+        alt: "Empire AI Predictive Revenue",
+      },
+    ],
+  },
 };
 
 const verified = [
