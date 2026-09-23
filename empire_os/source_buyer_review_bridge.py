@@ -19,6 +19,9 @@ from empire_os.buyer_review_materializer import (
     run_buyer_probe_isolated,
     run_buyer_review_materializer,
 )
+from empire_os.solar_opportunity_map_automation import (
+    materialize_solar_maps_for_review_outcomes,
+)
 from empire_os.qualification_worker_v2 import (
     SCORING_ENGINE,
     SCORING_VERSION,
@@ -303,6 +306,10 @@ def run_source_buyer_review(
         min_company_score=float(min_company_score),
     )
 
+    artifact_materialization = materialize_solar_maps_for_review_outcomes(
+        materialized.outcomes,
+    )
+
     return {
         "schema_version": "empire.source_buyer_review_bridge.v1",
         "mode": "GOVERNED_REVIEW_PREPARATION",
@@ -311,6 +318,7 @@ def run_source_buyer_review(
         "selected_hot_prospects": len(selected_ids),
         "prospect_ids": selected_ids,
         "materializer": materialized.as_dict(),
+        "artifact_materialization": artifact_materialization,
         "deferred_queue": queue.snapshot(),
         "review_approval_granted": False,
         "outbound_sent": False,
