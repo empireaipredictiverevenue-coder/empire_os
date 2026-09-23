@@ -108,3 +108,36 @@ Only explicit evidence may be promoted. Unknown stays unknown.
 - Canonical settlement is USDT on BSC.
 - Legacy Solana/USDC buyer-hunter assumptions are reference-only.
 - No synthetic buyers, capacity, prices or revenue.
+
+
+## Recovered EmpireOS MRR product lineage
+
+The historical recurring-revenue catalogue is preserved in
+`docs/MRR_PRODUCT_RECOVERY_2026-09-23.md` and
+`empire_os/mrr_product_recovery.py`.
+
+Phase 4 actively recovers these Commercial Exchange products:
+- Commercial Exchange Starter Seat;
+- Commercial Exchange Growth Seat;
+- Commercial Exchange Pro Seat;
+- Commercial Exchange Enterprise.
+
+These products are now included in Buyer Acquisition product-demand planning.
+They remain `MARKET_VALIDATE_TERMS_REQUIRED` until a separately governed
+pricing ladder is approved and verified in the canonical commercial catalog.
+
+The remaining historical recurring products are not discarded:
+- Platform SaaS tiers → Phase 8;
+- Empire Leads Engine → merged into Commercial Exchange / Managed Growth;
+- Satellite Idle Watch → Phase 6 industrial intelligence;
+- White-label platform → Phase 8;
+- Affiliate / referral → Phase 8;
+- Omega Evaluation / Value Meter → Phase 8;
+- Hourly Intelligence Retainer → Phase 8;
+- Hermes Framework / Agent Co-Pilot → Phase 10;
+- OpenCut / creative automation → incubate for Phase 8;
+- AEO Monitor → superseded by current verified AEO/GEO/Search products;
+- Synthetic Agent → retired under current truth rules.
+
+Legacy names, SQLite subscriptions, Solana/USDC settlement and historical prices
+are not current commercial truth.
