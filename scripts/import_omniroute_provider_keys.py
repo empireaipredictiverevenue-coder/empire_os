@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import pwd
+import shlex
 import subprocess
 from typing import Iterable
 
@@ -89,7 +90,7 @@ def run_as_user(user: str, home: Path, args: Iterable[str], env: dict[str, str])
     command = (
         'export NVM_DIR="$HOME/.nvm"; '
         '[ ! -s "$NVM_DIR/nvm.sh" ] || . "$NVM_DIR/nvm.sh"; '
-        + " ".join(subprocess.list2cmdline([x]) for x in args)
+        + " ".join(shlex.quote(x) for x in args)
     )
     return subprocess.run(
         ["bash", "-lc", command],
