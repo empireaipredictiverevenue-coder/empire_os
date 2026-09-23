@@ -28,8 +28,10 @@ LIVE_EXTERNAL_UNITS = (
 )
 
 REQUIRED_ARTIFACTS = (
+    "runtime/commercial_catalog/latest.json",
     "runtime/commercial_exchange/latest.json",
     "runtime/buyer_acquisition/latest.json",
+    "runtime/buyer_acquisition/scout_latest.json",
 )
 
 
