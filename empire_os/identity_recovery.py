@@ -249,12 +249,11 @@ def recover_identity(
             person_name = str(seed.get("person_name") or "").strip()
             if not person_name:
                 continue
-            sources_tried.append("search_fabric")
-            result = search(
+            sources_tried.append("empire_serp")
+            for organic in _serp_results(
                 f'site:{domain} "{person_name}"',
-                num=max(1, min(max_search_results, 10)),
-            )
-            for organic in result.get("organic") or []:
+                num=max_search_results,
+            ):
                 if not isinstance(organic, dict):
                     continue
                 link = str(organic.get("link") or "").strip()
