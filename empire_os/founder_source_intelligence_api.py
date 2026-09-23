@@ -67,13 +67,14 @@ def _latest_source_run(
         if msg in {"candidate", "prospect_acquired", "prospect_matched"}:
             if str(row.get("source") or "") != source:
                 continue
-            if str(row.get("niche") or "") != niche:
+            row_niche = str(row.get("niche") or "")
+            if row_niche and row_niche != niche:
                 continue
             candidates.append(
                 {
                     "name": row.get("name"),
                     "source": row.get("source"),
-                    "niche": row.get("niche"),
+                    "niche": row.get("niche") or niche,
                     "metro": row.get("metro"),
                     "quality_confidence": row.get("quality_confidence"),
                     "entity_kind": row.get("entity_kind"),
