@@ -86,3 +86,19 @@ def test_non_review_ready_candidate_is_not_proposed():
     assert result["blocked_reason_counts"] == {
         "not_review_ready": 1
     }
+
+
+
+def test_stale_review_ready_generic_name_is_rejected_at_promotion():
+    row = candidate(
+        business_name="Step 1",
+        review_state="review_ready",
+        reconciliation_state="REVIEW_READY",
+    )
+
+    result = build_promotion_plan([row])
+
+    assert result["proposal_count"] == 0
+    assert result["blocked_reason_counts"] == {
+        "business_name_not_verified": 1
+    }
