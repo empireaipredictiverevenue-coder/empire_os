@@ -4,8 +4,23 @@ set -u
 REPO=/srv/empire_os
 SYSTEMD=/etc/systemd/system
 
-cp "$REPO/deploy/systemd/empire-revenue-runtime-supervisor.service"   "$SYSTEMD/empire-revenue-runtime-supervisor.service"
-cp "$REPO/deploy/systemd/empire-revenue-runtime-supervisor.timer"   "$SYSTEMD/empire-revenue-runtime-supervisor.timer"
+UNITS=(
+  empire-resend-inbound.service
+  empire-outbound-governor.service
+  empire-outbound-governor.timer
+  empire-outbound-followup.service
+  empire-outbound-followup.timer
+  empire-gtm-pipeline.service
+  empire-gtm-pipeline.timer
+  empire-closer-reply-worker.service
+  empire-closer-reply-worker.timer
+  empire-revenue-runtime-supervisor.service
+  empire-revenue-runtime-supervisor.timer
+)
+
+for unit in "${UNITS[@]}"; do
+  cp "$REPO/deploy/systemd/$unit" "$SYSTEMD/$unit"
+done
 
 systemctl daemon-reload
 
