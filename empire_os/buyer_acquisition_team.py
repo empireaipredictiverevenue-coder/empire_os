@@ -1,0 +1,499 @@
+"""Phase 4 Buyer Acquisition Team control plane.
+
+This is the canonical demand-side orchestration contract for Commercial
+Exchange. It coordinates existing buyer discovery/enrichment/review/evidence
+components without granting outbound, terms, payment or revenue authority.
+
+The team targets companies that directly buy B2B leads, calls, appointments,
+data feeds or white-label demand, plus qualified end-buyers where appropriate.
+"""
+from __future__ import annotations
+
+from collections import Counter
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import re
+from typing import Any, Iterable, Mapping
+
+
+OUTPUT = Path("runtime/buyer_acquisition/latest.json")
+
+
+DIRECT_BUYER_SIGNALS = {
+    "lead generation": 25,
+    "lead gen": 25,
+    "buy leads": 35,
+    "lead buyer": 35,
+    "lead buyers": 35,
+    "pay per lead": 35,
+    "cost per lead": 25,
+    "cpl": 15,
+    "inbound calls": 25,
+    "call buyer": 35,
+    "pay per call": 35,
+    "appointment setting": 20,
+    "booked appointments": 25,
+    "performance marketing": 20,
+    "affiliate network": 25,
+    "affiliate marketing": 15,
+    "lead distribution": 30,
+    "lead marketplace": 35,
+    "lead exchange": 35,
+    "demand generation": 15,
+    "demand gen": 15,
+    "data provider": 15,
+    "data broker": 20,
+    "intent data": 20,
+    "customer acquisition": 15,
+    "call center": 15,
+    "contact center": 15,
+    "aggregator": 20,
+}
+
+RESELLER_SIGNALS = {
+    "agency": 12,
+    "marketing agency": 18,
+    "growth agency": 18,
+    "white label": 25,
+    "reseller": 25,
+    "broker": 15,
+    "network": 10,
+}
+
+TARGET_BUYER_TYPES = (
+    "direct_lead_buyer",
+    "call_buyer",
+    "appointment_buyer",
+    "lead_aggregator",
+    "performance_marketing_firm",
+    "affiliate_network",
+    "lead_marketplace",
+    "white_label_agency",
+    "data_or_intent_buyer",
+    "qualified_end_buyer",
+)
+
+TEAM_ROLES = (
+    {
+        "role": "demand_gap_analyst",
+        "purpose": (
+            "Prioritize corridors with overflow, zero active seats, weak "
+            "capacity or material supply/demand imbalance."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+    {
+        "role": "buyer_scout",
+        "purpose": (
+            "Discover businesses with evidence they buy leads, calls, "
+            "appointments, intent/data feeds or white-label demand."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+    {
+        "role": "decision_maker_resolver",
+        "purpose": (
+            "Resolve current economic/functional buyers from first-party and "
+            "corroborated public evidence."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+    {
+        "role": "contact_verifier",
+        "purpose": (
+            "Verify person-bound contact paths separately from identity."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+    {
+        "role": "buyer_qualifier",
+        "purpose": (
+            "Determine purchased unit, verticals, territories, volume, "
+            "delivery route, exclusivity and commercial evidence gaps."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+    {
+        "role": "outreach_preparer",
+        "purpose": (
+            "Prepare concise evidence-led outbound proposals and channel plans."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+    {
+        "role": "buyer_conversation_intake",
+        "purpose": (
+            "Classify replies and extract buyer-stated price, capacity, "
+            "territory, delivery and acceptance criteria."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+    {
+        "role": "commercial_evidence_verifier",
+        "purpose": (
+            "Advance only deterministic buyer-stated evidence allowed by "
+            "existing verification authority."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+    {
+        "role": "seat_readiness_agent",
+        "purpose": (
+            "Evaluate verified terms, capacity, territory and delivery "
+            "evidence for corridor-seat readiness."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+    {
+        "role": "buyer_success_capacity_agent",
+        "purpose": (
+            "Refresh capacity and route overflow when seats become full or "
+            "available without ever stopping acquisition."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
+)
+
+
+def _text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _corpus(record: Mapping[str, Any]) -> str:
+    values = (
+        record.get("business_name"),
+        record.get("niche"),
+        record.get("notes"),
+        record.get("website"),
+        record.get("description"),
+        record.get("category"),
+    )
+    return " ".join(_text(value).lower() for value in values if _text(value))
+
+
+def direct_buyer_profile(record: Mapping[str, Any]) -> dict[str, Any]:
+    corpus = _corpus(record)
+    direct_hits = {
+        phrase: weight
+        for phrase, weight in DIRECT_BUYER_SIGNALS.items()
+        if phrase in corpus
+    }
+    reseller_hits = {
+        phrase: weight
+        for phrase, weight in RESELLER_SIGNALS.items()
+        if phrase in corpus
+    }
+    score = min(
+        100,
+        sum(direct_hits.values()) + sum(reseller_hits.values()),
+    )
+
+    if any(
+        phrase in direct_hits
+        for phrase in (
+            "buy leads",
+            "lead buyer",
+            "lead buyers",
+            "pay per lead",
+            "lead marketplace",
+            "lead exchange",
+            "lead distribution",
+        )
+    ):
+        buyer_type = "direct_lead_buyer"
+    elif any(
+        phrase in direct_hits
+        for phrase in ("call buyer", "pay per call", "inbound calls")
+    ):
+        buyer_type = "call_buyer"
+    elif any(
+        phrase in direct_hits
+        for phrase in ("appointment setting", "booked appointments")
+    ):
+        buyer_type = "appointment_buyer"
+    elif "affiliate network" in direct_hits:
+        buyer_type = "affiliate_network"
+    elif "performance marketing" in direct_hits:
+        buyer_type = "performance_marketing_firm"
+    elif any(
+        phrase in reseller_hits for phrase in ("white label", "reseller")
+    ):
+        buyer_type = "white_label_agency"
+    elif any(
+        phrase in direct_hits
+        for phrase in ("data provider", "data broker", "intent data")
+    ):
+        buyer_type = "data_or_intent_buyer"
+    elif any(
+        phrase in reseller_hits for phrase in ("agency", "marketing agency")
+    ):
+        buyer_type = "white_label_agency"
+    else:
+        buyer_type = "qualified_end_buyer"
+
+    return {
+        "buyer_type": buyer_type,
+        "direct_buyer_score": score,
+        "direct_signal_hits": sorted(direct_hits),
+        "reseller_signal_hits": sorted(reseller_hits),
+        "explicit_direct_buyer_evidence": bool(direct_hits),
+        "binding_commercial_evidence": False,
+    }
+
+
+def _corridor_parts(key: str) -> dict[str, str | None]:
+    text = _text(key)
+    match = re.fullmatch(
+        r"corridor:v1:([^:]+):([^:]+):([^:]+):([^:]+)",
+        text,
+    )
+    if not match:
+        return {
+            "niche_family": None,
+            "territory": None,
+            "demand_type": None,
+            "delivery_type": None,
+        }
+    return {
+        "niche_family": match.group(1),
+        "territory": match.group(2),
+        "demand_type": match.group(3),
+        "delivery_type": match.group(4),
+    }
+
+
+def build_demand_gap_queue(
+    exchange_snapshot: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    inventory = [
+        dict(row)
+        for row in (exchange_snapshot.get("inventory") or [])
+        if isinstance(row, Mapping)
+    ]
+    seats = [
+        dict(row)
+        for row in (exchange_snapshot.get("buyer_seats") or [])
+        if isinstance(row, Mapping)
+    ]
+
+    corridor_inventory: Counter[str] = Counter()
+    corridor_overflow: Counter[str] = Counter()
+    corridor_candidates: Counter[str] = Counter()
+    active_capacity: Counter[str] = Counter()
+    blocked_seats: Counter[str] = Counter()
+
+    for row in inventory:
+        corridor = _text(row.get("corridor_key"))
+        if not corridor:
+            continue
+        corridor_inventory[corridor] += 1
+        state = _text(row.get("state"))
+        if state == "overflow_no_capacity":
+            corridor_overflow[corridor] += 1
+        if state == "allocation_candidate":
+            corridor_candidates[corridor] += 1
+
+    for row in seats:
+        corridor = _text(row.get("corridor_key"))
+        if not corridor:
+            continue
+        state = _text(row.get("seat_state"))
+        if state == "active_capacity":
+            try:
+                capacity = max(int(row.get("remaining_capacity") or 0), 0)
+            except (TypeError, ValueError):
+                capacity = 0
+            active_capacity[corridor] += capacity
+        elif state == "blocked_missing_evidence":
+            blocked_seats[corridor] += 1
+
+    all_corridors = sorted(
+        set(corridor_inventory)
+        | set(active_capacity)
+        | set(blocked_seats)
+    )
+
+    queue: list[dict[str, Any]] = []
+    for corridor in all_corridors:
+        supply = corridor_inventory[corridor]
+        overflow = corridor_overflow[corridor]
+        candidates = corridor_candidates[corridor]
+        capacity = active_capacity[corridor]
+        blocked = blocked_seats[corridor]
+
+        priority = (
+            overflow * 100
+            + max(supply - capacity, 0) * 40
+            + (50 if supply > 0 and capacity == 0 else 0)
+            + min(blocked, 20)
+        )
+
+        if priority <= 0 and supply <= 0:
+            continue
+
+        parts = _corridor_parts(corridor)
+        queue.append({
+            "corridor_key": corridor,
+            **parts,
+            "qualified_inventory_count": supply,
+            "overflow_count": overflow,
+            "allocation_candidate_count": candidates,
+            "active_remaining_capacity": capacity,
+            "blocked_seat_count": blocked,
+            "priority_score": priority,
+            "buyer_hunt_required": bool(
+                overflow > 0 or (supply > 0 and capacity == 0)
+            ),
+            "acquisition_should_continue": True,
+        })
+
+    queue.sort(
+        key=lambda row: (
+            -int(row["priority_score"]),
+            str(row["corridor_key"]),
+        )
+    )
+    for index, row in enumerate(queue, start=1):
+        row["rank"] = index
+    return queue
+
+
+def buyer_research_queries(
+    *,
+    niche_family: str | None,
+    territory: str | None,
+) -> list[str]:
+    niche = _text(niche_family).replace("_", " ") or "B2B"
+    place = _text(territory).replace("_", " ") or ""
+    suffix = f" {place}".rstrip()
+    return [
+        f'"buy {niche} leads"{suffix}',
+        f'"{niche} lead buyer"{suffix}',
+        f'"pay per lead" {niche}{suffix}',
+        f'"pay per call" {niche}{suffix}',
+        f'"{niche}" "lead generation agency"{suffix}',
+        f'"{niche}" "performance marketing"{suffix}',
+        f'"{niche}" "affiliate network"{suffix}',
+        f'"{niche}" "lead marketplace"{suffix}',
+        f'"{niche}" "booked appointments"{suffix}',
+    ]
+
+
+def build_buyer_acquisition_plan(
+    exchange_snapshot: Mapping[str, Any],
+    *,
+    generated_at: datetime | None = None,
+) -> dict[str, Any]:
+    queue = build_demand_gap_queue(exchange_snapshot)
+    targets = []
+    for row in queue[:25]:
+        targets.append({
+            **row,
+            "research_queries": buyer_research_queries(
+                niche_family=row.get("niche_family"),
+                territory=row.get("territory"),
+            ),
+            "preferred_buyer_types": list(TARGET_BUYER_TYPES),
+        })
+
+    now = generated_at or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        raise ValueError("generated_at must include timezone")
+
+    supply = exchange_snapshot.get("supply_gate_diagnostics")
+    supply = dict(supply) if isinstance(supply, Mapping) else {}
+    seat_blockers = exchange_snapshot.get("seat_activation_blocker_counts")
+    seat_blockers = (
+        dict(seat_blockers)
+        if isinstance(seat_blockers, Mapping)
+        else {}
+    )
+
+    return {
+        "schema_version": "empire.buyer_acquisition_team.v1",
+        "phase": "4",
+        "mode": "OBSERVE",
+        "generated_at": now.astimezone(timezone.utc).isoformat(),
+        "team_roles": [dict(row) for row in TEAM_ROLES],
+        "team_role_count": len(TEAM_ROLES),
+        "target_buyer_types": list(TARGET_BUYER_TYPES),
+        "demand_gap_queue": queue,
+        "demand_gap_count": len(queue),
+        "priority_targets": targets,
+        "supply_gate_diagnostics": supply,
+        "seat_activation_blocker_counts": seat_blockers,
+        "commercial_fact_capture": [
+            "purchased_unit",
+            "niches_or_products",
+            "territories",
+            "daily_capacity",
+            "monthly_capacity",
+            "exclusive_or_shared",
+            "acceptance_criteria",
+            "delivery_method",
+            "price_or_rate",
+            "return_or_replacement_terms",
+            "compliance_requirements",
+            "payment_terms",
+            "settlement_rail",
+        ],
+        "automation": {
+            "demand_gap_reprioritization": True,
+            "buyer_research_planning": True,
+            "decision_maker_resolution": True,
+            "contact_enrichment": True,
+            "review_proposal_generation": True,
+            "reply_classification": True,
+            "commercial_evidence_extraction": True,
+            "deterministic_evidence_verification": True,
+            "seat_readiness_refresh": True,
+            "capacity_refresh": True,
+            "live_outbound_send": False,
+        },
+        "legacy_buyer_hunter_is_canonical": False,
+        "legacy_settlement_assumptions_allowed": False,
+        "canonical_settlement_rail": "USDT_BSC",
+        "buyer_capacity_never_gates_acquisition": True,
+        "overflow_remains_empire_owned": True,
+        "outbound_sent": False,
+        "terms_accepted": False,
+        "payment_mutation": False,
+        "actual_revenue": False,
+        "commercial_authority": "none",
+        "execution_authority": "none",
+    }
+
+
+def refresh_buyer_acquisition_plan(
+    repo_root: str | Path,
+) -> dict[str, Any]:
+    root = Path(repo_root).resolve()
+    exchange_path = root / "runtime/commercial_exchange/latest.json"
+    try:
+        exchange = json.loads(exchange_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        exchange = {}
+    if not isinstance(exchange, dict):
+        exchange = {}
+
+    payload = build_buyer_acquisition_plan(exchange)
+    path = root / OUTPUT
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+    return payload
