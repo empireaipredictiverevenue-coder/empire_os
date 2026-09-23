@@ -248,17 +248,29 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     assert "local-test-key" in config
 
 
-def test_omniroute_model_selector_skips_failed_candidates(monkeypatch):
+def test_omniroute_model_selector_uses_live_catalog_and_skips_failed_candidates(monkeypatch):
     from empire_os import hermes_control
 
+    catalog = (
+        "openrouter/openrouter/free",
+        "openrouter/deepseek/deepseek-v4-flash-0731:free",
+        "openrouter/nvidia/nemotron-3-ultra:free",
+    )
     outcomes = {
-        "openrouter/z-ai/glm-5.3-flash:free": (False, "http_429"),
+        "openrouter/openrouter/free": (False, "network:TimeoutError"),
         "openrouter/deepseek/deepseek-v4-flash-0731:free": (True, "ok"),
     }
+    probed = []
 
     def fake_probe(*, base_url, api_key, model, timeout=25):
+        probed.append(model)
         return outcomes.get(model, (False, "not_tested"))
 
+    monkeypatch.setattr(
+        hermes_control,
+        "_fetch_omniroute_catalog",
+        lambda **kwargs: catalog,
+    )
     monkeypatch.setattr(
         hermes_control,
         "_probe_omniroute_model",
@@ -274,5 +286,32 @@ def test_omniroute_model_selector_skips_failed_candidates(monkeypatch):
     )
 
     assert model == "openrouter/deepseek/deepseek-v4-flash-0731:free"
+    assert probed == [
+        "openrouter/openrouter/free",
+        "openrouter/deepseek/deepseek-v4-flash-0731:free",
+    ]
     assert attempts[0]["ok"] == "false"
     assert attempts[1]["ok"] == "true"
+
+
+def test_omniroute_catalog_ranking_excludes_stale_and_paid_discovery():
+    from empire_os import hermes_control
+
+    ranked = hermes_control._rank_catalog_candidates(
+        (
+            "openrouter/nvidia/nemotron-3-ultra:free",
+            "openrouter/z-ai/glm-5.3-flash",
+            "openrouter/openrouter/free",
+            "gemini/gemini-3.5-flash-lite",
+        ),
+        (
+            "openrouter/deepseek/deepseek-v4-flash-0731:free",
+            "openrouter/openrouter/free",
+        ),
+    )
+
+    assert ranked[0] == "openrouter/openrouter/free"
+    assert "openrouter/nvidia/nemotron-3-ultra:free" in ranked
+    assert "gemini/gemini-3.5-flash-lite" in ranked
+    assert "openrouter/deepseek/deepseek-v4-flash-0731:free" not in ranked
+    assert "openrouter/z-ai/glm-5.3-flash" not in ranked
