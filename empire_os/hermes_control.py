@@ -551,6 +551,16 @@ def run_hermes(
         or "auto"
     ).strip()
 
+    # Backward-compatibility for the first OmniRoute bootstrap, which wrote
+    # EMPIRE_HERMES_PROVIDER=custom into /etc/empire_os/omniroute-hermes.env.
+    # Hermes' documented provider for arbitrary OpenAI-compatible endpoints is
+    # openai-api; keep accepting the stale value so a repo deploy heals it.
+    if (
+        provider == "custom"
+        and str(os.environ.get("OPENAI_BASE_URL") or "").strip()
+    ):
+        provider = "openai-api"
+
     if provider:
         args[2:2] = ["--provider", provider]
     if model:
