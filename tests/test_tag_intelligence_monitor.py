@@ -83,7 +83,25 @@ def test_monitor_writes_observe_only_runtime_artifact(tmp_path, monkeypatch):
     assert result["available_target_count"] == 1
     assert result["failed_target_count"] == 0
     assert result["high_issue_count"] >= 1
+    assert result["monitored_site_count"] == 1
+    assert result["monitored_page_count"] == 1
+    assert result["search_issue_count"] == 0
+    assert result["measurement_issue_count"] >= 1
+    assert result["change_count"] == 0
     assert result["critical_change_count"] == 0
+    assert result["pages_with_public_noindex"] == 0
+    assert result["pages_missing_canonical"] == 0
+    assert result["pages_missing_schema"] == 0
+    assert result["missing_conversion_event_count"] == 0
+    assert result["duplicate_conversion_event_count"] == 0
+    assert result["measurement_observation"]["ga4"] == (
+        "NOT_OBSERVED_IN_STATIC_MARKUP"
+    )
+    assert result["measurement_observation"]["gtm"] == (
+        "NOT_OBSERVED_IN_STATIC_MARKUP"
+    )
+    assert result["measurement_observation"]["meta_capi_dedup"] == "UNKNOWN"
+    assert result["measurement_observation"]["revenue_truth_linkage"] == "UNKNOWN"
     change_state = result["targets"][0]["changes"]
     assert change_state["comparison_state"] == "BASELINE_ESTABLISHED"
     assert change_state["previous_snapshot_available"] is False
