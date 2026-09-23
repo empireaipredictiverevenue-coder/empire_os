@@ -684,8 +684,39 @@ def _tag_intelligence_runtime(
             raw.get("critical_issue_count") or 0
         ),
         "high_issue_count": int(raw.get("high_issue_count") or 0),
+        "search_issue_count": int(raw.get("search_issue_count") or 0),
+        "measurement_issue_count": int(
+            raw.get("measurement_issue_count") or 0
+        ),
+        "change_count": int(raw.get("change_count") or 0),
         "critical_change_count": int(
             raw.get("critical_change_count") or 0
+        ),
+        "monitored_site_count": int(
+            raw.get("monitored_site_count") or 0
+        ),
+        "monitored_page_count": int(
+            raw.get("monitored_page_count") or 0
+        ),
+        "pages_with_public_noindex": int(
+            raw.get("pages_with_public_noindex") or 0
+        ),
+        "pages_missing_canonical": int(
+            raw.get("pages_missing_canonical") or 0
+        ),
+        "pages_missing_schema": int(
+            raw.get("pages_missing_schema") or 0
+        ),
+        "missing_conversion_event_count": int(
+            raw.get("missing_conversion_event_count") or 0
+        ),
+        "duplicate_conversion_event_count": int(
+            raw.get("duplicate_conversion_event_count") or 0
+        ),
+        "measurement_observation": (
+            raw.get("measurement_observation")
+            if isinstance(raw.get("measurement_observation"), dict)
+            else {}
         ),
         "automatic_tag_mutation": (
             raw.get("automatic_tag_mutation") is True
