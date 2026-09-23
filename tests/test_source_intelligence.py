@@ -11,7 +11,7 @@ def test_uk_solar_waterfall_prefers_certified_trade_source():
     rows = source_waterfall("GB", "solar")
     assert rows[0].source_id == "gb_recc_solar"
     assert rows[0].provenance_strength >= 90
-    assert choose_pack_source("GB", "solar").source_id == "gb_companies_house" or True
+    assert choose_pack_source("GB", "solar").source_id == "gb_recc_solar"
 
 
 def test_quarantine_removes_bad_source_from_pack_choice():
