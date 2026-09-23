@@ -316,6 +316,21 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "explicit_direct_buyer_candidate_count": payload.get(
                 "explicit_direct_buyer_candidate_count"
             ),
+            "icp_assessed_candidate_count": payload.get(
+                "icp_assessed_candidate_count"
+            ),
+            "observed_trigger_candidate_count": payload.get(
+                "observed_trigger_candidate_count"
+            ),
+            "decision_maker_role_match_count": payload.get(
+                "decision_maker_role_match_count"
+            ),
+            "economic_capacity_proxy_count": payload.get(
+                "economic_capacity_proxy_count"
+            ),
+            "verified_budget_candidate_count": payload.get(
+                "verified_budget_candidate_count"
+            ),
             "database_write_performed": payload.get(
                 "database_write_performed"
             ),
