@@ -230,6 +230,34 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             1800,
         ),
         ComponentSpec(
+            "media_os",
+            (
+                "media_opportunity_scan_requested",
+                "search_opportunity_ready",
+                "community_pain_observed",
+                "revenue_pulse_refreshed",
+                "media_analytics_refreshed",
+                "build_journal_event_recorded",
+            ),
+            (
+                "media_opportunity_features_ready",
+                "media_research_pack_requested",
+                "media_draft_ready",
+                "media_experiment_requested",
+                "founder_gate_required",
+            ),
+            (
+                "marketing",
+                "search_intelligence",
+                "intelligence_fabric",
+                "quant_brain",
+                "experiment_intelligence",
+                "revenue_pulse",
+            ),
+            "internal_write",
+            1800,
+        ),
+        ComponentSpec(
             "search_intelligence",
             (
                 "search_intelligence_refresh_requested",
