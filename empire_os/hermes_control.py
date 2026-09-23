@@ -469,6 +469,10 @@ MANDATORY RULES
 ALLOWED EDIT PATHS
 {allowed}
 
+PYTHON / TEST ENVIRONMENT
+Use {production_repo / '.venv/bin/python'} for Python/pytest.
+Use PYTHONPATH={worktree} when running EmpireOS code from this worktree.
+
 WORKER VERIFICATION TARGETS
 {tests}
 
@@ -528,11 +532,16 @@ def run_hermes(
 def run_verification(
     job: HermesJob,
     *,
+    production_repo: Path,
     worktree: Path,
     changed_paths: Iterable[str],
 ) -> dict[str, Any]:
     changed = list(changed_paths)
     checks: list[dict[str, Any]] = []
+
+    python_bin = str(production_repo / ".venv/bin/python")
+    verify_env = dict(os.environ)
+    verify_env["PYTHONPATH"] = str(worktree)
 
     python_files = [
         path for path in changed if path.endswith(".py")
@@ -540,14 +549,13 @@ def run_verification(
     if python_files:
         result = _run(
             [
-                str(worktree / ".venv/bin/python")
-                if (worktree / ".venv/bin/python").exists()
-                else "python3",
+                python_bin,
                 "-m",
                 "py_compile",
                 *python_files,
             ],
             cwd=worktree,
+            env=verify_env,
             timeout=180,
             check=False,
         )
@@ -559,11 +567,6 @@ def run_verification(
         })
 
     if job.pytest_targets:
-        python_bin = (
-            str(worktree / ".venv/bin/python")
-            if (worktree / ".venv/bin/python").exists()
-            else "python3"
-        )
         result = _run(
             [
                 python_bin,
@@ -573,6 +576,7 @@ def run_verification(
                 *job.pytest_targets,
             ],
             cwd=worktree,
+            env=verify_env,
             timeout=min(job.max_runtime_seconds, 900),
             check=False,
         )
@@ -843,6 +847,7 @@ def process_job(
         else:
             verification = run_verification(
                 job,
+                production_repo=repo_root,
                 worktree=worktree,
                 changed_paths=changed,
             )
