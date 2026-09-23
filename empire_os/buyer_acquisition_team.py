@@ -30,34 +30,63 @@ OUTPUT = Path("runtime/buyer_acquisition/latest.json")
 
 
 DIRECT_BUYER_SIGNALS = {
-    "lead generation": 25,
-    "lead gen": 25,
     "buy leads": 35,
     "lead buyer": 35,
     "lead buyers": 35,
-    "pay per lead": 35,
-    "cost per lead": 25,
-    "cpl": 15,
-    "inbound calls": 25,
+    "buy calls": 35,
     "call buyer": 35,
-    "pay per call": 35,
-    "appointment setting": 20,
-    "booked appointments": 25,
-    "performance marketing": 20,
-    "affiliate network": 25,
-    "affiliate marketing": 15,
-    "lead distribution": 30,
-    "lead marketplace": 35,
-    "lead exchange": 35,
-    "demand generation": 15,
-    "demand gen": 15,
-    "data provider": 15,
-    "data broker": 20,
-    "intent data": 20,
-    "customer acquisition": 15,
-    "call center": 15,
-    "contact center": 15,
-    "aggregator": 20,
+    "buy appointments": 35,
+    "lead purchasing": 30,
+    "purchase leads": 35,
+    "third party leads": 25,
+    "third-party leads": 25,
+    "lead vendors": 25,
+    "lead sources": 20,
+    "daily budget": 20,
+    "daily cap": 20,
+    "buying criteria": 25,
+    "buy box": 25,
+    "pay per lead": 20,
+    "pay per call": 20,
+    "inbound calls": 15,
+    "booked appointments": 15,
+    "lead marketplace": 20,
+    "lead exchange": 20,
+    "customer acquisition": 10,
+    "call center": 10,
+    "contact center": 10,
+    "aggregator": 15,
+}
+
+BUYER_SIDE_SIGNALS = {
+    "we buy leads": 50,
+    "buy leads": 35,
+    "purchase leads": 40,
+    "lead purchasing": 35,
+    "buy calls": 40,
+    "buy appointments": 40,
+    "lead buyer": 35,
+    "lead buyers": 35,
+    "third party leads": 25,
+    "third-party leads": 25,
+    "lead vendors": 25,
+    "lead sources": 20,
+    "daily budget": 20,
+    "daily cap": 20,
+    "buy box": 25,
+    "buying criteria": 25,
+}
+
+SUPPLIER_SIDE_SIGNALS = {
+    "lead generation agency": 35,
+    "lead generation services": 35,
+    "sales lead generation": 25,
+    "we generate leads": 35,
+    "we deliver leads": 40,
+    "we send leads": 40,
+    "lead generation platform": 25,
+    "generate qualified leads": 30,
+    "performance marketing agency": 25,
 }
 
 RESELLER_SIGNALS = {
@@ -308,52 +337,63 @@ def direct_buyer_profile(record: Mapping[str, Any]) -> dict[str, Any]:
         for phrase, weight in DIRECT_BUYER_SIGNALS.items()
         if phrase in corpus
     }
+    buyer_side_hits = {
+        phrase: weight
+        for phrase, weight in BUYER_SIDE_SIGNALS.items()
+        if phrase in corpus
+    }
+    supplier_side_hits = {
+        phrase: weight
+        for phrase, weight in SUPPLIER_SIDE_SIGNALS.items()
+        if phrase in corpus
+    }
     reseller_hits = {
         phrase: weight
         for phrase, weight in RESELLER_SIGNALS.items()
         if phrase in corpus
     }
-    score = min(
-        100,
-        sum(direct_hits.values()) + sum(reseller_hits.values()),
+
+    # Direct-demand precision matters more than recall. Generic lead-gen or
+    # performance-marketing language is supplier-side evidence, not proof that
+    # the company purchases third-party commercial inventory.
+    buyer_score = (
+        sum(buyer_side_hits.values())
+        + sum(
+            weight
+            for phrase, weight in direct_hits.items()
+            if phrase in buyer_side_hits
+        )
+        - min(sum(supplier_side_hits.values()), 60)
+    )
+    score = max(0, min(100, buyer_score))
+
+    explicit_buyer = bool(buyer_side_hits) and (
+        score >= 25 or not supplier_side_hits
     )
 
     if any(
-        phrase in direct_hits
+        phrase in buyer_side_hits
         for phrase in (
+            "we buy leads",
             "buy leads",
+            "purchase leads",
+            "lead purchasing",
             "lead buyer",
             "lead buyers",
-            "pay per lead",
-            "lead marketplace",
-            "lead exchange",
-            "lead distribution",
         )
     ):
         buyer_type = "direct_lead_buyer"
     elif any(
-        phrase in direct_hits
-        for phrase in ("call buyer", "pay per call", "inbound calls")
+        phrase in buyer_side_hits
+        for phrase in ("buy calls", "call buyer")
     ):
         buyer_type = "call_buyer"
-    elif any(
-        phrase in direct_hits
-        for phrase in ("appointment setting", "booked appointments")
-    ):
+    elif "buy appointments" in buyer_side_hits:
         buyer_type = "appointment_buyer"
-    elif "affiliate network" in direct_hits:
-        buyer_type = "affiliate_network"
-    elif "performance marketing" in direct_hits:
-        buyer_type = "performance_marketing_firm"
     elif any(
         phrase in reseller_hits for phrase in ("white label", "reseller")
     ):
         buyer_type = "white_label_agency"
-    elif any(
-        phrase in direct_hits
-        for phrase in ("data provider", "data broker", "intent data")
-    ):
-        buyer_type = "data_or_intent_buyer"
     elif any(
         phrase in reseller_hits for phrase in ("agency", "marketing agency")
     ):
@@ -365,8 +405,10 @@ def direct_buyer_profile(record: Mapping[str, Any]) -> dict[str, Any]:
         "buyer_type": buyer_type,
         "direct_buyer_score": score,
         "direct_signal_hits": sorted(direct_hits),
+        "buyer_side_signal_hits": sorted(buyer_side_hits),
+        "supplier_side_signal_hits": sorted(supplier_side_hits),
         "reseller_signal_hits": sorted(reseller_hits),
-        "explicit_direct_buyer_evidence": bool(direct_hits),
+        "explicit_direct_buyer_evidence": explicit_buyer,
         "binding_commercial_evidence": False,
     }
 
@@ -499,15 +541,17 @@ def buyer_research_queries(
 
     return {
         "direct_demand_buyers": [
+            f'"we buy {niche} leads"{suffix}',
             f'"buy {niche} leads"{suffix}',
+            f'"purchase {niche} leads"{suffix}',
             f'"{niche} lead buyer"{suffix}',
-            f'"pay per lead" {niche}{suffix}',
-            f'"pay per call" {niche}{suffix}',
-            f'"{niche}" "lead generation agency"{suffix}',
-            f'"{niche}" "performance marketing"{suffix}',
-            f'"{niche}" "affiliate network"{suffix}',
-            f'"{niche}" "lead marketplace"{suffix}',
-            f'"{niche}" "booked appointments"{suffix}',
+            f'"buy {niche} calls"{suffix}',
+            f'"buy {niche} appointments"{suffix}',
+            f'"{niche}" "third-party leads"{suffix}',
+            f'"{niche}" "lead vendors"{suffix}',
+            f'"{niche}" "daily budget" leads{suffix}',
+            f'"{niche}" "daily cap" leads{suffix}',
+            f'"{niche}" "buy box" leads{suffix}',
         ],
         "local_and_smb_buyers": [
             f'"{niche}" "near me"{suffix}',
