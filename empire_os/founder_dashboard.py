@@ -716,6 +716,43 @@ def _buyer_review_readiness_runtime(
     }
 
 
+def _buyer_promotion_plan_runtime(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "mode": "unknown",
+            "execution_authority": "none",
+        }
+    return {
+        "available": True,
+        "observed_at": raw.get("generated_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "proposal_count": int(raw.get("proposal_count") or 0),
+        "blocked_count": int(raw.get("blocked_count") or 0),
+        "blocked_reason_counts": (
+            raw.get("blocked_reason_counts")
+            if isinstance(raw.get("blocked_reason_counts"), dict)
+            else {}
+        ),
+        "database_write_performed": (
+            raw.get("database_write_performed") is True
+        ),
+        "canonical_promotion_performed": (
+            raw.get("canonical_promotion_performed") is True
+        ),
+        "buy_signal_score_policy": raw.get(
+            "buy_signal_score_policy"
+        ),
+        "outbound_sent": raw.get("outbound_sent") is True,
+        "actual_revenue": False,
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
 def _buyer_acquisition_runtime(
     raw: dict[str, Any] | None,
     path: Path,
@@ -846,6 +883,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     )
     buyer_review_readiness_runtime_path = (
         runtime / "buyer_acquisition" / "review_readiness_latest.json"
+    )
+    buyer_promotion_plan_runtime_path = (
+        runtime / "buyer_acquisition" / "promotion_plan_latest.json"
     )
     buyer_scout_runtime_path = (
         runtime / "buyer_acquisition" / "scout_latest.json"
@@ -988,6 +1028,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "buyer_scout_review_readiness": _buyer_review_readiness_runtime(
             _read_json(buyer_review_readiness_runtime_path),
             buyer_review_readiness_runtime_path,
+        ),
+        "buyer_scout_promotion_plan": _buyer_promotion_plan_runtime(
+            _read_json(buyer_promotion_plan_runtime_path),
+            buyer_promotion_plan_runtime_path,
         ),
         "buyer_scout": _buyer_scout_runtime(
             _read_json(buyer_scout_runtime_path),
