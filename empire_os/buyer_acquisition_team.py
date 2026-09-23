@@ -527,12 +527,147 @@ def buyer_research_queries(
     }
 
 
+def _product_buyer_pools(
+    product_family: str,
+    product_code: str,
+) -> list[str]:
+    family = _text(product_family).lower()
+    code = _text(product_code).lower()
+
+    if family == "search_intelligence" or "search" in code or "serp" in code:
+        return [
+            "local_and_smb_buyers",
+            "agency_and_reseller_buyers",
+            "enterprise_and_data_buyers",
+            "software_and_advisory_buyers",
+        ]
+    if family in {
+        "private_capital",
+        "property",
+        "public_record_intelligence",
+    }:
+        return [
+            "enterprise_and_data_buyers",
+            "agency_and_reseller_buyers",
+            "software_and_advisory_buyers",
+        ]
+    if family == "opportunity_intelligence":
+        return [
+            "local_and_smb_buyers",
+            "end_service_buyers",
+            "agency_and_reseller_buyers",
+            "enterprise_and_data_buyers",
+            "software_and_advisory_buyers",
+        ]
+    return [
+        "software_and_advisory_buyers",
+        "enterprise_and_data_buyers",
+        "agency_and_reseller_buyers",
+    ]
+
+
+def build_product_demand_queue(
+    catalog_snapshot: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    snapshot = (
+        dict(catalog_snapshot)
+        if isinstance(catalog_snapshot, Mapping)
+        else {}
+    )
+    products = [
+        dict(row)
+        for row in (snapshot.get("products") or [])
+        if isinstance(row, Mapping)
+        and row.get("active") is True
+    ]
+
+    queue: list[dict[str, Any]] = []
+    for row in products:
+        product_code = _text(row.get("product_code"))
+        product_name = _text(row.get("product_name"))
+        product_family = _text(row.get("product_family"))
+        if not product_code:
+            continue
+
+        terms_ready = row.get("binding_terms_ready") is True
+        catalog_verified = (
+            _text(row.get("catalog_state")).upper() == "VERIFIED"
+            and _text(row.get("version_state")).upper() == "VERIFIED"
+        )
+        if terms_ready and catalog_verified:
+            state = "SELLABLE_TERMS_READY"
+            priority = 100
+        else:
+            state = "MARKET_VALIDATE_TERMS_REQUIRED"
+            priority = 35
+
+        pools = _product_buyer_pools(product_family, product_code)
+        queue.append({
+            "product_code": product_code,
+            "product_name": product_name or product_code,
+            "product_family": product_family or None,
+            "billing_model": row.get("billing_model"),
+            "commercial_state": state,
+            "binding_terms_ready": terms_ready,
+            "catalog_verified": catalog_verified,
+            "target_buyer_pools": pools,
+            "priority_score": priority,
+            "price_claim_allowed": terms_ready and catalog_verified,
+            "actual_revenue": False,
+        })
+
+    queue.sort(
+        key=lambda row: (
+            -int(row["priority_score"]),
+            str(row["product_code"]),
+        )
+    )
+    for index, row in enumerate(queue, start=1):
+        row["rank"] = index
+    return queue
+
+
+def product_research_queries(
+    product: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    name = _text(product.get("product_name")) or _text(
+        product.get("product_code")
+    )
+    family = _text(product.get("product_family")).replace("_", " ")
+    subject = family or name
+
+    return {
+        "local_and_smb_buyers": [
+            f'"{subject}" "small business"',
+            f'"{subject}" "local business"',
+            f'"{subject}" agency',
+        ],
+        "agency_and_reseller_buyers": [
+            f'"{subject}" "marketing agency"',
+            f'"{subject}" "white label"',
+            f'"{subject}" reseller',
+        ],
+        "enterprise_and_data_buyers": [
+            f'"{subject}" enterprise',
+            f'"{subject}" "data team"',
+            f'"{subject}" "market intelligence"',
+        ],
+        "software_and_advisory_buyers": [
+            f'"{subject}" software',
+            f'"{subject}" "revenue operations"',
+            f'"{subject}" "growth team"',
+        ],
+    }
+
+
 def build_buyer_acquisition_plan(
     exchange_snapshot: Mapping[str, Any],
     *,
+    catalog_snapshot: Mapping[str, Any] | None = None,
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
     queue = build_demand_gap_queue(exchange_snapshot)
+    product_queue = build_product_demand_queue(catalog_snapshot)
     targets = []
     for row in queue[:25]:
         targets.append({
@@ -543,6 +678,14 @@ def build_buyer_acquisition_plan(
             ),
             "preferred_buyer_types": list(TARGET_BUYER_TYPES),
         })
+
+    product_targets = [
+        {
+            **row,
+            "research_queries": product_research_queries(row),
+        }
+        for row in product_queue[:25]
+    ]
 
     now = generated_at or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -576,6 +719,20 @@ def build_buyer_acquisition_plan(
         "demand_gap_queue": queue,
         "demand_gap_count": len(queue),
         "priority_targets": targets,
+        "product_demand_queue": product_queue,
+        "product_demand_count": len(product_queue),
+        "sellable_product_demand_count": sum(
+            row["binding_terms_ready"] and row["catalog_verified"]
+            for row in product_queue
+        ),
+        "market_validate_product_count": sum(
+            not (
+                row["binding_terms_ready"]
+                and row["catalog_verified"]
+            )
+            for row in product_queue
+        ),
+        "product_priority_targets": product_targets,
         "supply_gate_diagnostics": supply,
         "seat_activation_blocker_counts": seat_blockers,
         "commercial_fact_capture": [
@@ -632,7 +789,18 @@ def refresh_buyer_acquisition_plan(
     if not isinstance(exchange, dict):
         exchange = {}
 
-    payload = build_buyer_acquisition_plan(exchange)
+    catalog_path = root / "runtime/commercial_catalog/latest.json"
+    try:
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        catalog = {}
+    if not isinstance(catalog, dict):
+        catalog = {}
+
+    payload = build_buyer_acquisition_plan(
+        exchange,
+        catalog_snapshot=catalog,
+    )
     path = root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
