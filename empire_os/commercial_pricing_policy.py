@@ -40,15 +40,42 @@ class PricePolicy:
         )
         return int(contribution * 10000 / self.amount_cents)
 
+    def as_approved_dict(
+        self,
+        approval_reference: str,
+    ) -> dict[str, Any]:
+        reference = str(approval_reference or "").strip()
+        if not reference:
+            raise ValueError("explicit founder approval reference required")
+
+        value = self.as_dict()
+        for key in (
+            "price_basis",
+            "acquisition_cost_basis",
+            "fulfilment_cost_basis",
+            "margin_policy",
+        ):
+            basis = dict(value[key])
+            basis["state"] = "VERIFIED"
+            basis["source_type"] = "founder_approved"
+            basis["approval_reference"] = reference
+            basis.pop("proposal_reference", None)
+            value[key] = basis
+
+        value["binding"] = False
+        value["founder_approval_required"] = False
+        value["founder_approval_reference"] = reference
+        return value
+
     def as_dict(self) -> dict[str, Any]:
         price_basis: dict[str, Any] = {
-            "state": "VERIFIED",
+            "state": "PROPOSED",
             "basis_type": "founder_policy",
-            "source_type": "founder_approval_required",
+            "source_type": "founder_policy_proposal",
             "currency": "USD",
             "unit": self.unit,
             "amount_cents": self.amount_cents,
-            "approval_reference": POLICY_REFERENCE,
+            "proposal_reference": POLICY_REFERENCE,
         }
         if self.included_units is not None:
             price_basis["included_units"] = self.included_units
@@ -61,30 +88,30 @@ class PricePolicy:
             "currency": "USD",
             "price_basis": price_basis,
             "acquisition_cost_basis": {
-                "state": "VERIFIED",
+                "state": "PROPOSED",
                 "basis_type": "policy_ceiling",
-                "source_type": "founder_approval_required",
+                "source_type": "founder_policy_proposal",
                 "currency": "USD",
                 "unit": self.unit,
                 "amount_cents": self.acquisition_cost_ceiling_cents,
                 "observed_actual": False,
-                "approval_reference": POLICY_REFERENCE,
+                "proposal_reference": POLICY_REFERENCE,
             },
             "fulfilment_cost_basis": {
-                "state": "VERIFIED",
+                "state": "PROPOSED",
                 "basis_type": "policy_ceiling",
-                "source_type": "founder_approval_required",
+                "source_type": "founder_policy_proposal",
                 "currency": "USD",
                 "unit": self.unit,
                 "amount_cents": self.fulfilment_cost_ceiling_cents,
                 "observed_actual": False,
-                "approval_reference": POLICY_REFERENCE,
+                "proposal_reference": POLICY_REFERENCE,
             },
             "margin_policy": {
-                "state": "VERIFIED",
+                "state": "PROPOSED",
                 "basis_type": "founder_policy",
                 "minimum_margin_bps": self.minimum_margin_bps,
-                "approval_reference": POLICY_REFERENCE,
+                "proposal_reference": POLICY_REFERENCE,
             },
             "policy_margin_bps": self.policy_margin_bps,
             "positioning": self.positioning,
