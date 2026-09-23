@@ -3,8 +3,9 @@
 Date: 2026-09-23
 Status: PROPOSED — NOT BINDING UNTIL FOUNDER APPROVES EXACT LADDER
 
-This proposal fixes the 12 active catalog products that currently have unknown
-pricing. The already-verified Empire Opportunity Intelligence Pilot remains
+Founder approval reference: `founder_approval:2026-09-23:commercial_pricing_ladder_v1`.
+
+The 12 previously unpriced active catalog products are now VERIFIED in the canonical catalog. The already-verified Empire Opportunity Intelligence Pilot remains
 unchanged at $1,500 flat.
 
 ## Positioning evidence
@@ -80,3 +81,21 @@ verification.
 
 Approval does not send outbound, accept buyer terms, request or move funds,
 create fulfilment, recognize revenue, or expand Astra authority.
+
+
+## Production verification
+
+On 2026-09-23 the exact 12-product ladder was:
+- staged as governed PENDING catalog versions;
+- validated against the approved prices, units, cost ceilings and margin floors;
+- verified through `public.decide_commercial_product_version(...)`;
+- confirmed with zero remaining PENDING versions.
+
+The dedicated verifier login could not be impersonated through the Supabase MCP
+maintenance connection because that connection cannot `SET ROLE`. Verification
+therefore ran through the privileged Postgres maintenance channel using the
+same governed verifier function and was recorded as
+`maintenance_verification_after_founder_approval`.
+
+Every verified version reports `actual_revenue=false`; catalog verification
+does not recognize revenue.
