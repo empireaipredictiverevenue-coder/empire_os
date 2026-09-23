@@ -1775,3 +1775,17 @@ def test_dashboard_exposes_non_mutating_buyer_promotion_plan(tmp_path):
     assert runtime["buy_signal_score_policy"] == "UNKNOWN_NULL"
     assert runtime["outbound_sent"] is False
     assert runtime["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_historical_mrr_product_recovery(tmp_path):
+    result = build_founder_dashboard(make_root(tmp_path))
+    mrr = result["recovery_portfolio"]["mrr_recovery"]
+
+    assert mrr["summary"]["product_count"] >= 15
+    rows = {row["key"]: row for row in mrr["products"]}
+    assert rows["platform_saas_tiers"]["disposition"] == "REBUILD"
+    assert rows["lane_seat_subscription_tiers"]["disposition"] == "MIGRATE"
+    assert rows["aeo_monitor"]["disposition"] == "MERGE"
+    assert rows["synthetic_agent"]["disposition"] == "RETIRE"
+    assert mrr["summary"]["canonical_settlement_rail"] == "USDT_BSC"
+    assert mrr["summary"]["legacy_pricing_approved_current_count"] == 0
