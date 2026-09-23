@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -51,6 +52,26 @@ def refresh_tag_intelligence_monitor(
         if isinstance(row, Mapping)
         and row.get("enabled", True) is not False
     ]
+
+    if not configured:
+        env_urls = [
+            value.strip()
+            for value in os.environ.get(
+                "EMPIRE_TAG_MONITOR_URLS", ""
+            ).split(",")
+            if value.strip()
+        ]
+        configured = [
+            {
+                "id": f"default-{index}",
+                "url": url,
+                "expectations": {
+                    "intended_public": True,
+                    "schema_expected": True,
+                },
+            }
+            for index, url in enumerate(env_urls, start=1)
+        ]
 
     results: list[dict[str, Any]] = []
     critical_issues = 0
