@@ -867,6 +867,16 @@ def _buyer_acquisition_runtime(
         "product_priority_target_count": len(
             raw.get("product_priority_targets") or []
         ),
+        "icp_priority_target_count": int(
+            raw.get("icp_priority_target_count") or 0
+        ),
+        "icp_intelligence": (
+            raw.get("icp_buyer_trigger_intelligence")
+            if isinstance(
+                raw.get("icp_buyer_trigger_intelligence"), dict
+            )
+            else {}
+        ),
         "target_buyer_types": list(raw.get("target_buyer_types") or []),
         "buyer_pools": list(raw.get("buyer_pools") or []),
         "supply_gate_diagnostics": (
