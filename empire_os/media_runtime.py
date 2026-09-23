@@ -21,6 +21,9 @@ from empire_os.media_algorithm_intelligence import (
     build_algorithm_hypothesis_packet,
     build_recommendation_chain_packet,
 )
+from empire_os.media_analytics import (
+    normalize_owned_channel_analytics,
+)
 from empire_os.media_build_journal import (
     BuildJournalEntry,
     content_opportunity_from_build,
@@ -40,6 +43,9 @@ INPUT_DIR = Path("runtime/media_os/input")
 INPUTS = {
     "youtube_public": INPUT_DIR / "youtube_public_observations.json",
     "youtube_owned_analytics": INPUT_DIR / "youtube_owned_analytics.json",
+    "youtube_owned_video_metrics": (
+        INPUT_DIR / "youtube_owned_video_metrics.json"
+    ),
     "trend_signals": INPUT_DIR / "trend_signals.json",
     "build_journal": INPUT_DIR / "build_journal.json",
     "idea_candidates": INPUT_DIR / "idea_candidates.json",
@@ -168,6 +174,72 @@ def _youtube_public_runtime(
         ),
         "outliers": outliers,
         "observations": observations,
+    }
+
+
+def _owned_video_metrics_runtime(
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    normalized = []
+    rejected = []
+
+    for index, row in enumerate(rows):
+        refs = _refs(row)
+        if not refs:
+            rejected.append({
+                "index": index,
+                "reason": "missing_evidence_refs",
+            })
+            continue
+        try:
+            item = normalize_owned_channel_analytics(
+                row,
+                evidence_refs=refs,
+            )
+        except (TypeError, ValueError) as exc:
+            rejected.append({
+                "index": index,
+                "reason": str(exc),
+            })
+            continue
+        normalized.append(item)
+
+    totals = {
+        "views": 0.0,
+        "engaged_views": 0.0,
+        "watch_time_minutes": 0.0,
+        "subscribers_gained": 0.0,
+        "subscribers_lost": 0.0,
+    }
+    known_counts = {key: 0 for key in totals}
+
+    for item in normalized:
+        metrics = item.get("metrics") or {}
+        for key in totals:
+            value = metrics.get(key)
+            if value is None:
+                continue
+            totals[key] += float(value)
+            known_counts[key] += 1
+
+    observed_totals = {
+        key: (
+            round(value, 6)
+            if known_counts[key] > 0
+            else None
+        )
+        for key, value in totals.items()
+    }
+
+    return {
+        "record_count": len(normalized),
+        "rejected_count": len(rejected),
+        "rejected": rejected,
+        "observed_totals": observed_totals,
+        "metrics": normalized,
+        "platform_estimated_revenue_is_not_revenue_pulse_truth": True,
+        "actual_revenue": False,
+        "execution_authority": "none",
     }
 
 
@@ -485,6 +557,9 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
     owned_rows = _records(
         _read_json(repo_root / INPUTS["youtube_owned_analytics"])
     )
+    owned_video_rows = _records(
+        _read_json(repo_root / INPUTS["youtube_owned_video_metrics"])
+    )
     trend_rows = _records(
         _read_json(repo_root / INPUTS["trend_signals"])
     )
@@ -496,6 +571,9 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
     )
 
     youtube_public = _youtube_public_runtime(public_rows)
+    owned_video_metrics = _owned_video_metrics_runtime(
+        owned_video_rows
+    )
     algorithm = _owned_algorithm_runtime(owned_rows)
     trends = _trend_runtime(trend_rows)
     journal = _build_journal_runtime(journal_rows)
@@ -520,6 +598,7 @@ def build_media_os_runtime(repo_root: Path) -> dict[str, Any]:
         "source_state": sources,
         "observed_source_count": observed_source_count,
         "youtube_public": youtube_public,
+        "owned_video_metrics": owned_video_metrics,
         "algorithm_intelligence": algorithm,
         "trend_fusion": trends,
         "build_journal": journal,
