@@ -19,6 +19,7 @@ from typing import Any, Iterable, Mapping
 from empire_os.phase4_exchange_mrr_products import (
     build_exchange_mrr_product_plan,
 )
+from empire_os.search_intelligence.products import get_search_product
 
 
 OUTPUT = Path("runtime/buyer_acquisition/latest.json")
@@ -606,6 +607,32 @@ def _phase4_exchange_mrr_demand_rows() -> list[dict[str, Any]]:
     return rows
 
 
+def _tag_intelligence_demand_row() -> dict[str, Any]:
+    product = get_search_product("tag_intelligence_monitor")
+    if product is None:
+        raise RuntimeError("tag intelligence product contract missing")
+    return {
+        "product_code": product.key,
+        "product_name": product.name,
+        "product_family": product.category,
+        "billing_model": product.commercial_model,
+        "commercial_state": "MARKET_VALIDATE_TERMS_REQUIRED",
+        "binding_terms_ready": False,
+        "catalog_verified": False,
+        "target_buyer_pools": [
+            "local_and_smb_buyers",
+            "agency_and_reseller_buyers",
+            "enterprise_and_data_buyers",
+        ],
+        "priority_score": 80,
+        "price_claim_allowed": False,
+        "actual_revenue": False,
+        "recovered_mrr_product": False,
+        "new_mrr_product": True,
+        "revenue_models": list(product.revenue_models),
+    }
+
+
 def build_product_demand_queue(
     catalog_snapshot: Mapping[str, Any] | None,
 ) -> list[dict[str, Any]]:
@@ -663,6 +690,13 @@ def build_product_demand_queue(
     for row in _phase4_exchange_mrr_demand_rows():
         if row["product_code"] not in known_codes:
             queue.append(row)
+
+    tag_row = _tag_intelligence_demand_row()
+    if tag_row["product_code"] not in {
+        str(row.get("product_code") or "")
+        for row in queue
+    }:
+        queue.append(tag_row)
 
     queue.sort(
         key=lambda row: (
