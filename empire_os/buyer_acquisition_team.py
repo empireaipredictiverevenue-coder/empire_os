@@ -20,6 +20,10 @@ from empire_os.phase4_exchange_mrr_products import (
     build_exchange_mrr_product_plan,
 )
 from empire_os.search_intelligence.products import get_search_product
+from empire_os.icp_buyer_trigger_intelligence import (
+    build_icp_priority_targets,
+    icp_learning_contract,
+)
 
 
 OUTPUT = Path("runtime/buyer_acquisition/latest.json")
@@ -181,6 +185,15 @@ BUYER_POOLS = (
 )
 
 TEAM_ROLES = (
+    {
+        "role": "icp_trigger_strategist",
+        "purpose": (
+            "Define evidence-backed ideal client profiles, decision-maker maps "
+            "and observable buying triggers before Buyer Scout searches."
+        ),
+        "automatic": True,
+        "external_action": False,
+    },
     {
         "role": "demand_gap_analyst",
         "purpose": (
@@ -770,6 +783,10 @@ def build_buyer_acquisition_plan(
         }
         for row in product_queue[:25]
     ]
+    icp_targets = build_icp_priority_targets(
+        corridor_targets=targets,
+        product_targets=product_targets,
+    )
 
     now = generated_at or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -817,6 +834,19 @@ def build_buyer_acquisition_plan(
             for row in product_queue
         ),
         "product_priority_targets": product_targets,
+        "icp_buyer_trigger_intelligence": {
+            "enabled": True,
+            "profile_count": len(icp_targets),
+            "priority_targets": icp_targets,
+            "learning_contract": icp_learning_contract(),
+            "budget_estimates_are_verified": False,
+            "binding_intent_created": False,
+            "qualification_created": False,
+            "outreach_authorized": False,
+            "execution_authority": "none",
+        },
+        "icp_priority_target_count": len(icp_targets),
+        "icp_priority_targets": icp_targets,
         "supply_gate_diagnostics": supply,
         "seat_activation_blocker_counts": seat_blockers,
         "commercial_fact_capture": [
@@ -836,6 +866,8 @@ def build_buyer_acquisition_plan(
         ],
         "automation": {
             "demand_gap_reprioritization": True,
+            "icp_definition": True,
+            "buying_trigger_detection": True,
             "buyer_research_planning": True,
             "decision_maker_resolution": True,
             "contact_enrichment": True,
