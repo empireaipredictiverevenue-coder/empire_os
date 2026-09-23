@@ -133,6 +133,25 @@ def _email_domain(value: Any) -> str:
     return text.rsplit("@", 1)[-1] if "@" in text else ""
 
 
+_COMPANY_ROUTING_PREFIXES = {
+    "info", "contact", "hello", "office", "reception",
+    "enquiries", "enquiry", "sales", "team", "general",
+    "support", "customerservice", "customer.service", "mail",
+}
+
+
+def _is_company_routing_email(value: Any) -> bool:
+    text = _text(value).lower()
+    if "@" not in text:
+        return False
+    local, domain = text.rsplit("@", 1)
+    return (
+        local in _COMPANY_ROUTING_PREFIXES
+        and bool(domain)
+        and "." in domain
+    )
+
+
 def _publication_is_recent(value: Any, *, max_age_days: int = 730) -> bool:
     text = _text(value)
     if not text:
@@ -822,7 +841,10 @@ def verify_contact_plan(
     ):
         company_routed_eligible = [
             item for item in verified
-            if item["is_role_address"]
+            if (
+                item["is_role_address"]
+                or _is_company_routing_email(item["email"])
+            )
             and not item["is_disposable"]
             and item["source"] in {"site_observed", "official_site"}
             and not item["bound_to_decision_maker"]
