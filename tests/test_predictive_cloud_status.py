@@ -286,3 +286,48 @@ def test_status_exposes_commercial_exchange_without_external_authority(tmp_path)
     assert component["summary"]["supply_gate_diagnostics"][
         "qualification_ready_count"
     ] == 2
+
+
+def test_status_exposes_buyer_acquisition_team_without_live_send(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/buyer_acquisition/latest.json",
+        {
+            "generated_at": "2026-09-23T00:15:00+00:00",
+            "team_role_count": 10,
+            "buyer_pools": [
+                {"pool": "local_and_smb_buyers"},
+                {"pool": "direct_demand_buyers"},
+                {"pool": "enterprise_and_data_buyers"},
+            ],
+            "demand_gap_count": 5,
+            "priority_targets": [{}, {}, {}],
+            "product_demand_count": 8,
+            "sellable_product_demand_count": 1,
+            "market_validate_product_count": 7,
+            "automation": {
+                "live_outbound_send": False,
+            },
+            "canonical_settlement_rail": "USDT_BSC",
+            "buyer_capacity_never_gates_acquisition": True,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime.fromisoformat("2026-09-23T00:20:00+00:00"),
+    )
+    component = result["components"]["buyer_acquisition_team"]
+
+    assert component["available"] is True
+    assert component["freshness"] == "fresh"
+    assert component["summary"]["team_role_count"] == 10
+    assert component["summary"]["buyer_pool_count"] == 3
+    assert component["summary"]["demand_gap_count"] == 5
+    assert component["summary"]["product_demand_count"] == 8
+    assert component["summary"]["sellable_product_demand_count"] == 1
+    assert component["summary"]["market_validate_product_count"] == 7
+    assert component["summary"]["live_outbound_send"] is False
+    assert component["summary"]["canonical_settlement_rail"] == "USDT_BSC"
+    assert component["execution_authority"] == "none"
