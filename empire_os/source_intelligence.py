@@ -226,14 +226,10 @@ def choose_pack_source(
     ]
     if not usable:
         return None
-    return max(
-        usable,
-        key=lambda item: (
-            item.provenance_strength,
-            item.freshness in {"real_time", "near_real_time", "daily", "current"},
-            item.source_id,
-        ),
-    )
+    # Waterfall order is deliberate: niche-specific certified/official sources
+    # come before general company registries. Identity registries remain the
+    # corroboration/enrichment layer.
+    return usable[0]
 
 
 def research_backlog() -> tuple[dict[str, Any], ...]:
