@@ -33,3 +33,12 @@ def test_buyer_scout_service_persists_only_to_holding_area():
     assert "reconcile_buyer_acquisition_scout.py" in text
     assert "persist_buyer_scout_candidates.py" in text
     assert "outbound_governor" not in text
+
+
+def test_buyer_scout_service_materializes_review_readiness():
+    text = (
+        ROOT / "deploy/systemd/empire-buyer-acquisition-scout.service"
+    ).read_text()
+
+    assert "materialize_buyer_scout_review_readiness.py" in text
+    assert "persist_buyer_scout_candidates.py" in text
