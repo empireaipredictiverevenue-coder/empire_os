@@ -182,3 +182,26 @@ catalog remain recovery candidates until separately governed.
 - No synthetic buyer, usage, revenue or outcome data.
 - Recovered product ideas must enter the governed commercial catalog before
   becoming sellable.
+
+
+## New MRR product added during Phase 4
+
+### Tag Intelligence & Revenue Measurement Monitor
+
+This is a new current product, not a restored legacy SKU.
+
+It monitors:
+- search/social/schema metadata;
+- indexing/control tags;
+- Google/Meta/LinkedIn/TikTok/Microsoft/Reddit/Pinterest measurement tags;
+- conversion-event declarations and duplicates;
+- consent/server-side measurement evidence;
+- Revenue Truth attribution linkage;
+- configuration/tag regressions over time.
+
+Commercial state:
+- monthly subscription;
+- Buyer Acquisition demand research active;
+- pricing not yet approved;
+- no binding price claim;
+- OBSERVE-only execution.
