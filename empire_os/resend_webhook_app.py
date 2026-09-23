@@ -27,10 +27,21 @@ from empire_os.reply_classifier import classify_reply_text
 MAX_WEBHOOK_BYTES = 1_000_000
 
 
+def _receiving_api_key() -> str:
+    return (
+        os.getenv("RESEND_RECEIVING_API_KEY", "").strip()
+        or os.getenv("RESEND_API_KEY", "").strip()
+    )
+
+
 def _defaults():
     import resend
-    resend.api_key = os.getenv("RESEND_API_KEY", "").strip()
-    return resend.Webhooks.verify, resend.Emails.Receiving.get
+
+    def fetch_received_email(email_id: str):
+        resend.api_key = _receiving_api_key()
+        return resend.Emails.Receiving.get(email_id)
+
+    return resend.Webhooks.verify, fetch_received_email
 
 
 def create_app(*, verify_webhook: Callable[..., Any] | None = None,
