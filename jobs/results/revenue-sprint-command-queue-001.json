@@ -1,0 +1,29 @@
+{
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "changed_paths": [],
+  "completed_at": "2026-09-23T15:55:22.279285+00:00",
+  "database_mutation_performed": false,
+  "execution_authority": "none",
+  "external_commercial_action_performed": false,
+  "founder_gate_required": false,
+  "git_remote_io_performed": true,
+  "hermes": {
+    "completed_at": "2026-09-23T15:55:22.253546+00:00",
+    "journal_streamed": true,
+    "returncode": 1,
+    "started_at": "2026-09-23T15:55:16.136890+00:00",
+    "stderr": "",
+    "stdout": ""
+  },
+  "job_id": "revenue-sprint-command-queue-001",
+  "job_path": "jobs/inbox/revenue-sprint-command-queue-001.json",
+  "kind": "code_task",
+  "payment_action_performed": false,
+  "proposal_branch": null,
+  "proposal_commit": null,
+  "schema_version": "empire.hermes.control_result.v1",
+  "started_at": "2026-09-23T15:55:14.051271+00:00",
+  "status": "HERMES_FAILED",
+  "verification": null
+}
