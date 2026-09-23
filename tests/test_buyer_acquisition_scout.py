@@ -107,6 +107,8 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
     )
 
     assert result["candidate_count"] == 1
+    assert result["icp_assessed_candidate_count"] == 1
+    assert result["verified_budget_candidate_count"] == 0
     row = result["candidates"][0]
     assert row["domain"] == "buyer.example"
     assert row["explicit_direct_buyer_evidence"] is True
