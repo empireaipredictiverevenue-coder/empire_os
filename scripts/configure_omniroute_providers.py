@@ -24,6 +24,8 @@ KEY_TO_PROVIDER = {
     "GROQ_API_KEY": "groq",
     "CEREBRAS_API_KEY": "cerebras",
     "SILICONFLOW_API_KEY": "siliconflow",
+    "GLM_API_KEY": "glm",
+    "ZAI_API_KEY": "zai",
     "HF_TOKEN": "huggingface",
     "MISTRAL_API_KEY": "mistral",
     "TOGETHER_API_KEY": "together",
