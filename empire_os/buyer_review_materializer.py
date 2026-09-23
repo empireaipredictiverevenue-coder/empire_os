@@ -32,6 +32,7 @@ Defer = Callable[[Mapping[str, Any]], bool]
 
 
 REVIEWABLE_OFFER_KEYS = frozenset({
+    "solar_opportunity_map",
     "managed_service",
     "software_mrr",
     "white_label",
