@@ -11,6 +11,9 @@ class Response:
         <title>Example</title>
         <meta name="description" content="Example description">
         <meta name="robots" content="index,follow">
+        <meta name="googlebot" content="index,follow">
+        <meta name="google-site-verification" content="google-verify">
+        <meta name="facebook-domain-verification" content="fb-verify">
         <meta name="viewport" content="width=device-width">
         <meta charset="utf-8">
         <link rel="canonical" href="/">
@@ -29,9 +32,15 @@ class Response:
           G-AAAA;
           AW-12345;
           fbq('init', '999');
+          _linkedin_partner_id = "12345";
+          ttq.load('TT-ABC');
+          rdt('init', 'RD-ABC');
+          pintrk('load', 'PIN-ABC');
+          var uet = {ti:"uet"}; // marker only
           gtag('event', 'generate_lead');
           gtag('consent', 'default', {});
         </script>
+        <script src="https://bat.bing.com/bat.js"></script>
       </head>
       <body>
         <h1>Example</h1>
@@ -54,6 +63,9 @@ def test_static_tag_probe_extracts_search_and_measurement_tags():
     assert page["title"] == "Example"
     assert page["canonical_url"] == "https://example.com/"
     assert page["json_ld_types"] == ["Organization"]
+    assert page["googlebot"] == "index,follow"
+    assert page["site_verification_tags"]["google"] == "google-verify"
+    assert page["site_verification_tags"]["facebook"] == "fb-verify"
     assert page["h1_count"] == 1
     assert page["images_missing_alt"] == 0
 
@@ -62,6 +74,11 @@ def test_static_tag_probe_extracts_search_and_measurement_tags():
     assert tags["ga4_measurement_ids"] == ["G-AAAA"]
     assert tags["google_ads_conversion_ids"] == ["AW-12345"]
     assert tags["meta_pixel_ids"] == ["999"]
+    assert tags["linkedin_insight_partner_ids"] == ["12345"]
+    assert tags["tiktok_pixel_ids"] == ["TT-ABC"]
+    assert tags["reddit_pixel_ids"] == ["RD-ABC"]
+    assert tags["pinterest_tag_ids"] == ["PIN-ABC"]
+    assert tags["microsoft_uet_present"] is True
     assert tags["observed_events"] == ["generate_lead"]
     assert tags["consent_mode_enabled"] is True
 
