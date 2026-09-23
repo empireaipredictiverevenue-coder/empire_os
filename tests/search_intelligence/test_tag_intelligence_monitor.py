@@ -117,3 +117,46 @@ def test_monitor_compares_against_previous_snapshot(monkeypatch, tmp_path):
     fields = {row["field"] for row in changes["changes"]}
     assert "robots" in fields
     assert "meta_pixel_ids" in fields
+
+
+
+def test_monitor_uses_env_public_target_when_no_target_file(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setenv(
+        "EMPIRE_TAG_MONITOR_URLS",
+        "https://empire-ai.co.uk",
+    )
+    monkeypatch.setattr(
+        module,
+        "observe_tag_surface",
+        lambda url: {
+            "ok": True,
+            "page_tags": {
+                "url": url,
+                "title": "Empire AI",
+                "meta_description": "Predictive Revenue",
+                "canonical_url": url,
+                "robots": "index,follow",
+                "open_graph": {
+                    "title": "Empire AI",
+                    "description": "Predictive Revenue",
+                    "url": url,
+                    "image": url + "/og.jpg",
+                },
+                "twitter": {"card": "summary_large_image"},
+                "json_ld_types": ["Organization"],
+            },
+            "measurement_tags": {},
+            "limitations": [],
+        },
+    )
+
+    result = module.refresh_tag_intelligence_monitor(tmp_path)
+
+    assert result["target_count"] == 1
+    row = result["targets"][0]
+    assert row["url"] == "https://empire-ai.co.uk"
+    assert row["expectations"]["intended_public"] is True
+    assert row["expectations"]["schema_expected"] is True
