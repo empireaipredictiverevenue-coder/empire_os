@@ -42,7 +42,7 @@ def main() -> int:
             method,
             path,
             payload=body,
-            headers={"Prefer": "return=representation"},
+            prefer="return=representation",
         ),
     )
     write_review_readiness(args.repo_root, payload)
