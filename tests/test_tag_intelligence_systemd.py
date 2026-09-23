@@ -22,3 +22,15 @@ def test_tag_intelligence_timer_runs_every_six_hours():
 
     assert "OnUnitInactiveSec=6h" in text
     assert "Persistent=true" in text
+
+
+
+def test_tag_intelligence_service_has_safe_default_public_target():
+    text = (
+        ROOT / "deploy/systemd/empire-tag-intelligence.service"
+    ).read_text()
+
+    assert (
+        "EMPIRE_TAG_MONITOR_URLS=https://empire-ai.co.uk"
+        in text
+    )
