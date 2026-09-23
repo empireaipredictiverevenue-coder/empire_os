@@ -206,6 +206,50 @@ def build_first_touch_copy(
     )
 
 
+def _number(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _entry_offer_for_followup(
+    row: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Pick a verified low-friction entry offer without claiming company size.
+
+    The router uses observable commercial signals only. It does not assert that
+    a business is small, medium or enterprise; it simply lowers friction for
+    lighter-signal owner-led accounts and preserves the managed pilot for the
+    strongest opportunities.
+    """
+    company_score = _number(row.get("company_score"))
+    review_count = int(_number(evidence.get("review_count")))
+    buy_signal_score = _number(evidence.get("buy_signal_score"))
+
+    if company_score >= 90 or review_count >= 1000 or buy_signal_score >= 95:
+        return {
+            "product_code": "managed_service",
+            "name": "Empire Opportunity Intelligence Pilot",
+            "price_text": "$1,500 flat pilot",
+            "cta": "pilot",
+        }
+    if company_score >= 80 or review_count >= 300 or buy_signal_score >= 80:
+        return {
+            "product_code": "search_opportunity_map",
+            "name": "Search Opportunity Map",
+            "price_text": "$249 one-off",
+            "cta": "map",
+        }
+    return {
+        "product_code": "competitor_search_gap",
+        "name": "Competitor Search Gap",
+        "price_text": "$199 one-off",
+        "cta": "gap",
+    }
+
+
 def build_followup_copy(
     row: Mapping[str, Any],
     *,
@@ -222,28 +266,39 @@ def build_followup_copy(
     root_subject = _usable(row.get("root_subject"))
     subject = f"Re: {root_subject}" if root_subject else f"{business} — quick follow-up"
 
+    offer = _entry_offer_for_followup(row, evidence)
+
     if step == 1:
         useful_detail = (
             f"The trigger I mentioned is still the useful part: {trigger['summary']}"
             if trigger is not None
             else (
-                f"Rather than another pitch, I can send the one-page {metro} "
-                f"{niche} brief I mentioned for {business}."
+                f"I pulled the first practical angles I’d pressure-test for "
+                f"{business} in {metro}."
             )
         )
         message = (
             "Hi,\n\n"
             f"{useful_detail}\n\n"
-            "It covers the three areas I’d investigate first and how I’d separate "
-            "observed evidence from checks that still need validating.\n\n"
-            "If you want it, just reply “send it”.\n\n"
+            "The three checks are:\n"
+            f"1) demand capture — where high-intent {metro} {niche} searches may "
+            "not be fully covered;\n"
+            "2) competitor position — which local operators are winning the "
+            "highest-value visibility and how they frame the offer;\n"
+            "3) follow-up leakage — where enquiry speed or stale-lead reactivation "
+            "is worth pressure-testing.\n\n"
+            f"For a lower-friction first step, the matching option is the "
+            f"{offer['name']} at {offer['price_text']}. No long retainer. "
+            f"If useful, reply “{offer['cta']}” and I’ll send the exact scope.\n\n"
         )
     elif step == 2:
         message = (
             "Hi,\n\n"
-            f"Closing the loop on {business}. If {niche} demand, search visibility "
-            "or follow-up becomes a priority, reply here and I can send the concise "
-            f"{metro} market brief. No need for a call first.\n\n"
+            f"Closing the loop on {business}. The lowest-friction next step I’d "
+            f"use here is the {offer['name']} at {offer['price_text']}. "
+            "If the evidence is useful, we can stop there or expand later — "
+            "there’s no need to start with a large engagement.\n\n"
+            f"Reply “{offer['cta']}” if you want the scope.\n\n"
         )
     else:
         raise ValueError("follow-up step must be 1 or 2")
