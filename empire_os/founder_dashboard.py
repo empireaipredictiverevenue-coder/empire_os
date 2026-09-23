@@ -540,6 +540,42 @@ def _commercial_exchange_runtime(
     }
 
 
+def _buyer_scout_runtime(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "mode": "unknown",
+            "execution_authority": "none",
+        }
+    return {
+        "available": True,
+        "observed_at": raw.get("generated_at") or _mtime_iso(path),
+        "mode": raw.get("mode"),
+        "query_count": int(raw.get("query_count") or 0),
+        "domain_count": int(raw.get("domain_count") or 0),
+        "probed_domain_count": int(raw.get("probed_domain_count") or 0),
+        "candidate_count": int(raw.get("candidate_count") or 0),
+        "explicit_direct_buyer_candidate_count": int(
+            raw.get("explicit_direct_buyer_candidate_count") or 0
+        ),
+        "probe_failure_counts": (
+            raw.get("probe_failure_counts")
+            if isinstance(raw.get("probe_failure_counts"), dict)
+            else {}
+        ),
+        "database_write_performed": (
+            raw.get("database_write_performed") is True
+        ),
+        "outbound_sent": raw.get("outbound_sent") is True,
+        "actual_revenue": False,
+        "execution_authority": raw.get("execution_authority", "none"),
+    }
+
+
 def _buyer_acquisition_runtime(
     raw: dict[str, Any] | None,
     path: Path,
@@ -653,6 +689,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     )
     buyer_acquisition_runtime_path = (
         runtime / "buyer_acquisition" / "latest.json"
+    )
+    buyer_scout_runtime_path = (
+        runtime / "buyer_acquisition" / "scout_latest.json"
     )
     buyer_scout_runtime_path = (
         runtime / "buyer_acquisition" / "scout_latest.json"
@@ -775,6 +814,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "buyer_acquisition_team": _buyer_acquisition_runtime(
             _read_json(buyer_acquisition_runtime_path),
             buyer_acquisition_runtime_path,
+        ),
+        "buyer_acquisition_scout": _buyer_scout_runtime(
+            _read_json(buyer_scout_runtime_path),
+            buyer_scout_runtime_path,
         ),
         "buyer_scout": _buyer_scout_runtime(
             _read_json(buyer_scout_runtime_path),
