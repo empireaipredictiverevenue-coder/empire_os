@@ -1956,3 +1956,24 @@ def test_dashboard_exposes_buyer_scout_icp_evidence_counts(tmp_path):
     assert scout["verified_budget_candidate_count"] == 0
     assert scout["outbound_sent"] is False
     assert scout["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_media_os_foundation_without_publish_authority(
+    tmp_path,
+):
+    result = build_founder_dashboard(make_root(tmp_path))
+    media = result["media_os"]
+
+    assert media["architecture_available"] is True
+    assert media["runtime_active"] is False
+    assert media["phase"] == "A"
+    assert media["mode"] == "OBSERVE"
+    assert media["department"] == "marketing_growth"
+    assert media["first_major_scale_milestone"] == 100_000
+    assert media["long_term_network_objective"] == 1_000_000
+    assert media["subscriber_targets_are_guarantees"] is False
+    assert media["public_publish_authorized"] is False
+    assert media["new_channel_launch_authorized"] is False
+    assert media["material_gpu_cloud_commitment_authorized"] is False
+    assert media["actual_revenue"] is False
+    assert media["execution_authority"] == "none"
