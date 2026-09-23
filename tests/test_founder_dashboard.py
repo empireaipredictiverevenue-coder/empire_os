@@ -1647,3 +1647,32 @@ def test_dashboard_exposes_buyer_acquisition_scout(tmp_path):
     assert scout["database_write_performed"] is False
     assert scout["outbound_sent"] is False
     assert scout["execution_authority"] == "none"
+
+
+def test_dashboard_exposes_buyer_scout_holding_persistence(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/buyer_acquisition/persistence_latest.json",
+        {
+            "mode": "OBSERVE",
+            "generated_at": "2026-09-23T08:30:00+00:00",
+            "persisted_candidate_count": 7,
+            "skipped_candidate_count": 3,
+            "holding_area_only": True,
+            "canonical_promotion_performed": False,
+            "automatic_ingest_authorized": False,
+            "outbound_sent": False,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+
+    runtime = build_founder_dashboard(root)["buyer_scout_persistence"]
+
+    assert runtime["available"] is True
+    assert runtime["persisted_candidate_count"] == 7
+    assert runtime["holding_area_only"] is True
+    assert runtime["canonical_promotion_performed"] is False
+    assert runtime["automatic_ingest_authorized"] is False
+    assert runtime["outbound_sent"] is False
+    assert runtime["execution_authority"] == "none"
