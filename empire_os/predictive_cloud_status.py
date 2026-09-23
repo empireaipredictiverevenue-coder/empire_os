@@ -507,6 +507,16 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(youtube.get("outliers"), Mapping)
             else {}
         )
+        owned = (
+            payload.get("owned_video_metrics")
+            if isinstance(payload.get("owned_video_metrics"), Mapping)
+            else {}
+        )
+        owned_totals = (
+            owned.get("observed_totals")
+            if isinstance(owned.get("observed_totals"), Mapping)
+            else {}
+        )
         algorithm = (
             payload.get("algorithm_intelligence")
             if isinstance(payload.get("algorithm_intelligence"), Mapping)
@@ -535,6 +545,22 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             ),
             "outlier_candidate_count": outliers.get(
                 "candidate_count"
+            ),
+            "owned_video_metric_count": owned.get(
+                "record_count"
+            ),
+            "owned_views_observed": owned_totals.get("views"),
+            "owned_engaged_views_observed": owned_totals.get(
+                "engaged_views"
+            ),
+            "owned_watch_time_minutes_observed": owned_totals.get(
+                "watch_time_minutes"
+            ),
+            "owned_subscribers_gained_observed": owned_totals.get(
+                "subscribers_gained"
+            ),
+            "owned_subscribers_lost_observed": owned_totals.get(
+                "subscribers_lost"
             ),
             "algorithm_observation_count": algorithm.get(
                 "observation_count"
