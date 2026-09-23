@@ -20,6 +20,10 @@ from empire_os.commercial_recovery_registry import (
 from empire_os.commercial_recovery_audit import (
     build_recovery_implementation_audit,
 )
+from empire_os.mrr_product_recovery import (
+    mrr_recovery_catalog,
+    mrr_recovery_summary,
+)
 from empire_os.canonical_phase_plan import (
     build_canonical_phase_plan,
 )
@@ -989,6 +993,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "recovery_portfolio": {
             "summary": recovery_summary(),
             "products": recovery_product_catalog(),
+            "mrr_recovery": {
+                "summary": mrr_recovery_summary(),
+                "products": mrr_recovery_catalog(),
+            },
             "implementation_audit": (
                 build_recovery_implementation_audit(repo_root)
             ),
