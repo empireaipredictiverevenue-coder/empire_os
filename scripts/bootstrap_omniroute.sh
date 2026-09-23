@@ -140,6 +140,13 @@ chmod 600 "$ENV_FILE"
 echo "=== RECOVER EXISTING HERMES / EMPIRE KEYS INTO PRIVATE ENV ==="
 PYTHONPATH="$REPO_ROOT"   "$REPO_ROOT/.venv/bin/python"   "$REPO_ROOT/scripts/export_omniroute_provider_env.py"   --home "$TARGET_HOME"   --output "$PROVIDER_ENV"
 
+echo "=== PULL OMNIROUTE IMAGE ==="
+if ! docker image inspect diegosouzapw/omniroute:3.8.50 >/dev/null 2>&1; then
+  docker pull diegosouzapw/omniroute:3.8.50
+else
+  echo "OmniRoute image already present"
+fi
+
 echo "=== INSTALL SYSTEMD UNITS ==="
 install -m 0644 "$REPO_ROOT/deploy/systemd/empire-omniroute.service"   /etc/systemd/system/empire-omniroute.service
 install -m 0644 "$REPO_ROOT/deploy/systemd/empire-hermes-control.service"   /etc/systemd/system/empire-hermes-control.service
