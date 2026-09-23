@@ -838,6 +838,9 @@ def build_buyer_acquisition_plan(
             "enabled": True,
             "profile_count": len(icp_targets),
             "priority_targets": icp_targets,
+            "target_company_count_per_campaign": 100,
+            "bounded_incremental_discovery": True,
+            "single_run_100_company_scrape": False,
             "research_stages": [
                 {
                     "stage": "define_icp",
