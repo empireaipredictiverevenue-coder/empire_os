@@ -19,6 +19,9 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 
 from empire_os.buyer_acquisition_team import direct_buyer_profile
+from empire_os.icp_buyer_trigger_intelligence import (
+    assess_icp_candidate,
+)
 from empire_os.search_fabric.search import search_domains_parallel
 from empire_os.search_fabric.site_probe import probe_site
 
@@ -47,6 +50,7 @@ def collect_research_queries(
     for target_kind, targets in (
         ("corridor", plan.get("priority_targets") or []),
         ("product", plan.get("product_priority_targets") or []),
+        ("icp", plan.get("icp_priority_targets") or []),
     ):
         for target in targets:
             if not isinstance(target, Mapping):
@@ -67,6 +71,13 @@ def collect_research_queries(
                         "target_kind": target_kind,
                         "corridor_key": target.get("corridor_key"),
                         "product_code": target.get("product_code"),
+                        "icp_profile_key": target.get("icp_profile_key"),
+                        "buying_triggers": list(
+                            target.get("buying_triggers") or []
+                        ),
+                        "decision_maker_roles": list(
+                            target.get("decision_maker_roles") or []
+                        ),
                         "priority_score": int(
                             target.get("priority_score") or 0
                         ),
@@ -128,6 +139,13 @@ def run_buyer_scout(
                 "target_kind": row["target_kind"],
                 "corridor_key": row.get("corridor_key"),
                 "product_code": row.get("product_code"),
+                "icp_profile_key": row.get("icp_profile_key"),
+                "buying_triggers": list(
+                    row.get("buying_triggers") or []
+                ),
+                "decision_maker_roles": list(
+                    row.get("decision_maker_roles") or []
+                ),
             })
 
     ranked_domains = sorted(
@@ -217,6 +235,25 @@ def run_buyer_scout(
             for item in provenance[domain]
             if str(item.get("corridor_key") or "")
         })
+        icp_profiles = sorted({
+            str(item.get("icp_profile_key") or "")
+            for item in provenance[domain]
+            if str(item.get("icp_profile_key") or "")
+        })
+        icp = assess_icp_candidate(
+            {
+                **record,
+                "buyer_type": profile["buyer_type"],
+                "direct_signal_hits": profile["direct_signal_hits"],
+                "reseller_signal_hits": profile["reseller_signal_hits"],
+                "target_buyer_pools": pools,
+                "target_product_codes": products,
+                "first_party_people": list(
+                    evidence.get("people") or []
+                )[:10],
+            },
+            target_profile_keys=icp_profiles,
+        )
 
         candidates.append({
             "domain": domain,
@@ -246,6 +283,19 @@ def run_buyer_scout(
             "target_buyer_pools": pools,
             "target_product_codes": products,
             "target_corridor_keys": corridors,
+            "target_icp_profile_keys": icp_profiles,
+            "icp_intelligence": icp,
+            "observed_buying_triggers": list(
+                icp.get("observed_buying_triggers") or []
+            ),
+            "why_now_state": icp.get("why_now_state"),
+            "decision_maker_state": icp.get(
+                "decision_maker_state"
+            ),
+            "economic_capacity_state": icp.get(
+                "economic_capacity_state"
+            ),
+            "budget_verified": False,
             "query_evidence_count": len(provenance[domain]),
             "query_evidence": provenance[domain],
             "site_evidence_score": evidence.get("evidence_score"),
