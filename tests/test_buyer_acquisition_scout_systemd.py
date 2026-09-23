@@ -42,3 +42,11 @@ def test_buyer_scout_service_materializes_review_readiness():
 
     assert "materialize_buyer_scout_review_readiness.py" in text
     assert "persist_buyer_scout_candidates.py" in text
+
+
+def test_buyer_scout_service_builds_non_mutating_promotion_plan():
+    text = (
+        ROOT / "deploy/systemd/empire-buyer-acquisition-scout.service"
+    ).read_text()
+
+    assert "build_buyer_scout_promotion_plan.py" in text
