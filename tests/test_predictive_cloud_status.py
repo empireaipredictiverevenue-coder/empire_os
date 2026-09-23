@@ -465,3 +465,63 @@ def test_status_exposes_buyer_scout_icp_evidence_counts(tmp_path):
     assert summary["economic_capacity_proxy_count"] == 1
     assert summary["verified_budget_candidate_count"] == 0
     assert summary["outbound_sent"] is False
+
+
+def test_status_exposes_media_os_runtime_without_external_authority(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/media_os/latest.json",
+        {
+            "generated_at": "2026-09-23T13:30:00+00:00",
+            "mode": "OBSERVE",
+            "runtime_active": True,
+            "real_evidence_present": True,
+            "observed_source_count": 4,
+            "youtube_public": {
+                "observation_count": 12,
+                "outliers": {
+                    "candidate_count": 3,
+                },
+            },
+            "algorithm_intelligence": {
+                "observation_count": 8,
+                "hypothesis_count": 4,
+            },
+            "trend_fusion": {
+                "topic_count": 5,
+            },
+            "idea_backlog": {
+                "candidate_count": 9,
+                "pending_quant_review_count": 9,
+            },
+            "ready_for_research_generation": True,
+            "public_publish_authorized": False,
+            "external_action_performed": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime(2026, 9, 23, 13, 45, tzinfo=timezone.utc),
+    )
+
+    row = result["components"]["media_os"]
+    summary = row["summary"]
+
+    assert row["available"] is True
+    assert row["freshness"] == "fresh"
+    assert summary["runtime_active"] is True
+    assert summary["real_evidence_present"] is True
+    assert summary["observed_source_count"] == 4
+    assert summary["youtube_observation_count"] == 12
+    assert summary["outlier_candidate_count"] == 3
+    assert summary["algorithm_observation_count"] == 8
+    assert summary["algorithm_hypothesis_count"] == 4
+    assert summary["trend_topic_count"] == 5
+    assert summary["idea_candidate_count"] == 9
+    assert summary["pending_quant_review_count"] == 9
+    assert summary["ready_for_research_generation"] is True
+    assert summary["public_publish_authorized"] is False
+    assert summary["external_action_performed"] is False
+    assert row["execution_authority"] == "none"
