@@ -32,6 +32,9 @@ from empire_os.commercial_exchange_contract import (
 from empire_os.buyer_acquisition_team import (
     refresh_buyer_acquisition_plan,
 )
+from empire_os.commercial_pricing_policy import (
+    build_launch_pricing_proposal,
+)
 from empire_os.competitor_audience_runtime import (
     build_competitor_audience_runtime,
 )
@@ -744,5 +747,6 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             _read_json(buyer_acquisition_runtime_path),
             buyer_acquisition_runtime_path,
         ),
+        "commercial_pricing_proposal": build_launch_pricing_proposal(),
         "phases": _phase_projection(repo_root / "docs" / "BLUEPRINT_V6.md"),
     }
