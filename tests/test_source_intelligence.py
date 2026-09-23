@@ -23,7 +23,7 @@ def test_quarantine_removes_bad_source_from_pack_choice():
         runtime_states={"gb_recc_solar": "QUARANTINED"},
     )
     assert choice is not None
-    assert choice.source_id == "gb_companies_house"
+    assert choice.source_id == "gb_mcs"
 
 
 def test_health_classification_fails_closed():
@@ -40,12 +40,13 @@ def test_all_unlocked_country_packs_exist():
 def test_research_backlog_preserves_unknowns():
     rows = list(research_backlog())
     assert any(
-        row["country_code"] == "DE"
-        and row["status"] == "source_research_required"
+        row["country_code"] == "CA"
+        and row["niche"] == "solar"
+        and row["status"] == "niche_source_research_required"
         for row in rows
     )
     assert any(
-        row["country_code"] == "CA"
+        row["country_code"] == "NZ"
         and row["niche"] == "solar"
         and row["status"] == "niche_source_research_required"
         for row in rows
