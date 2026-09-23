@@ -429,11 +429,54 @@ def media_os_architecture_contract() -> dict[str, Any]:
     }
 
 
-def media_os_founder_status() -> dict[str, Any]:
+def media_os_founder_status(
+    runtime_payload: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     contract = media_os_architecture_contract()
+    runtime = (
+        dict(runtime_payload)
+        if isinstance(runtime_payload, Mapping)
+        else {}
+    )
+    youtube = (
+        runtime.get("youtube_public")
+        if isinstance(runtime.get("youtube_public"), Mapping)
+        else {}
+    )
+    outliers = (
+        youtube.get("outliers")
+        if isinstance(youtube.get("outliers"), Mapping)
+        else {}
+    )
+    algorithm = (
+        runtime.get("algorithm_intelligence")
+        if isinstance(runtime.get("algorithm_intelligence"), Mapping)
+        else {}
+    )
+    trends = (
+        runtime.get("trend_fusion")
+        if isinstance(runtime.get("trend_fusion"), Mapping)
+        else {}
+    )
+    journal = (
+        runtime.get("build_journal")
+        if isinstance(runtime.get("build_journal"), Mapping)
+        else {}
+    )
+    ideas = (
+        runtime.get("idea_backlog")
+        if isinstance(runtime.get("idea_backlog"), Mapping)
+        else {}
+    )
+
     return {
         "architecture_available": True,
-        "runtime_active": contract["runtime_active"],
+        "runtime_active": runtime.get("runtime_active") is True,
+        "runtime_generated_at": runtime.get("generated_at"),
+        "real_evidence_present": runtime.get("real_evidence_present") is True,
+        "observed_source_count": int(
+            runtime.get("observed_source_count") or 0
+        ),
         "phase": contract["phase"],
         "mode": contract["mode"],
         "department": contract["department"],
@@ -443,6 +486,31 @@ def media_os_founder_status() -> dict[str, Any]:
         "algorithm_intelligence_available": (
             "algorithm_intelligence_engine"
             in contract["new_media_contracts"]
+        ),
+        "youtube_observation_count": int(
+            youtube.get("observation_count") or 0
+        ),
+        "outlier_candidate_count": int(
+            outliers.get("candidate_count") or 0
+        ),
+        "algorithm_observation_count": int(
+            algorithm.get("observation_count") or 0
+        ),
+        "algorithm_hypothesis_count": int(
+            algorithm.get("hypothesis_count") or 0
+        ),
+        "trend_topic_count": int(trends.get("topic_count") or 0),
+        "build_journal_opportunity_count": int(
+            journal.get("opportunity_candidate_count") or 0
+        ),
+        "idea_candidate_count": int(
+            ideas.get("candidate_count") or 0
+        ),
+        "pending_quant_review_count": int(
+            ideas.get("pending_quant_review_count") or 0
+        ),
+        "ready_for_research_generation": (
+            runtime.get("ready_for_research_generation") is True
         ),
         "first_major_scale_milestone": 100_000,
         "long_term_network_objective": 1_000_000,
