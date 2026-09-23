@@ -26,7 +26,16 @@ export async function generateMetadata({
       title: page.title,
       description: page.subtitle,
       url: `https://empire-ai.co.uk/industries/${page.slug}`,
+      siteName: "Empire AI",
       type: "website",
+      images: [
+        {
+          url: "/brand/empire-logo.svg",
+          width: 560,
+          height: 128,
+          alt: "Empire AI Predictive Revenue",
+        },
+      ],
     },
   };
 }
