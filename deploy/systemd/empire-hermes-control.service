@@ -1,7 +1,8 @@
 [Unit]
 Description=Empire Hermes governed resident worker
 After=network-online.target empire-omniroute.service
-Wants=network-online.target empire-omniroute.service
+Wants=network-online.target
+Requires=empire-omniroute.service
 
 [Service]
 Type=oneshot
