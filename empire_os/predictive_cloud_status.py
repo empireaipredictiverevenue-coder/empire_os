@@ -573,6 +573,9 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "pending_quant_review_count": ideas.get(
                 "pending_quant_review_count"
             ),
+            "commercial_quant_available_count": ideas.get(
+                "commercial_quant_available_count"
+            ),
             "ready_for_research_generation": payload.get(
                 "ready_for_research_generation"
             ),
