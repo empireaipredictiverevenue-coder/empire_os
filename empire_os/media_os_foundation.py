@@ -389,6 +389,8 @@ def media_os_architecture_contract() -> dict[str, Any]:
             "flagship_media_runtime",
             "empire_intelligence_bridge",
             "opportunity_research_to_media_bridge",
+            "evidence_gated_claim_verification",
+            "verified_canonical_content_pipeline",
         ],
         "subscriber_strategy": {
             "first_major_scale_milestone": 100_000,
@@ -486,6 +488,11 @@ def media_os_founder_status(
         if isinstance(runtime.get("research_packs"), Mapping)
         else {}
     )
+    content_pipeline = (
+        runtime.get("content_pipeline")
+        if isinstance(runtime.get("content_pipeline"), Mapping)
+        else {}
+    )
 
     return {
         "architecture_available": True,
@@ -555,6 +562,19 @@ def media_os_founder_status(
         "research_script_ready_count": int(
             research.get("script_ready_count") or 0
         ),
+        "canonical_content_candidate_count": int(
+            content_pipeline.get(
+                "canonical_content_candidate_count"
+            ) or 0
+        ),
+        "script_brief_candidate_count": int(
+            content_pipeline.get(
+                "script_brief_candidate_count"
+            ) or 0
+        ),
+        "script_prose_generated": (
+            content_pipeline.get("script_prose_generated") is True
+        ),
         "ready_for_research_generation": (
             runtime.get("ready_for_research_generation") is True
         ),
@@ -563,6 +583,12 @@ def media_os_founder_status(
         ),
         "ready_for_script_generation": (
             runtime.get("ready_for_script_generation") is True
+        ),
+        "ready_for_script_prose_generation": (
+            runtime.get("ready_for_script_prose_generation") is True
+        ),
+        "ready_for_storyboard_generation": (
+            runtime.get("ready_for_storyboard_generation") is True
         ),
         "first_major_scale_milestone": 100_000,
         "long_term_network_objective": 1_000_000,
