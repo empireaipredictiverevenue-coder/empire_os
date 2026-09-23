@@ -106,11 +106,11 @@ def run(metro: str = None) -> Iterator[LeadCandidate]:
 def register_source(reg):
     reg(SourceInfo(
         name="biz_search",
-        tier="real",
+        tier="stub",
         requires=[],
         description=(
-            "Empire free business search scraper — DDG/Mojeek + existing "
-            "business-domain filtering, canonical ingest only"
+            "Experimental fallback only. Consumer search backends are not trusted "
+            "as a production acquisition source."
         ),
         run_fn=run,
     ))
