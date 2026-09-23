@@ -33,6 +33,7 @@ REQUIRED_ARTIFACTS = (
     "runtime/buyer_acquisition/latest.json",
     "runtime/buyer_acquisition/scout_latest.json",
     "runtime/buyer_acquisition/reconciliation_latest.json",
+    "runtime/buyer_acquisition/persistence_latest.json",
 )
 
 
@@ -87,6 +88,9 @@ def main() -> int:
     reconciliation = _read_json(
         root / "runtime/buyer_acquisition/reconciliation_latest.json"
     )
+    persistence = _read_json(
+        root / "runtime/buyer_acquisition/persistence_latest.json"
+    )
     exchange = _read_json(root / "runtime/commercial_exchange/latest.json")
 
     safe_automation_ready = all(
@@ -120,6 +124,14 @@ def main() -> int:
         and reconciliation.get("outbound_sent") is False
         and reconciliation.get("execution_authority") == "none"
     )
+    persistence_safe = (
+        persistence.get("mode") == "OBSERVE"
+        and persistence.get("holding_area_only") is True
+        and persistence.get("canonical_promotion_performed") is False
+        and persistence.get("automatic_ingest_authorized") is False
+        and persistence.get("outbound_sent") is False
+        and persistence.get("execution_authority") == "none"
+    )
     exchange_safe = (
         exchange.get("mode") == "OBSERVE"
         and exchange.get("automatic_external_delivery") is False
@@ -132,6 +144,7 @@ def main() -> int:
         plan_safe,
         scout_safe,
         reconciliation_safe,
+        persistence_safe,
         exchange_safe,
         not live_external_automation_detected,
     ))
@@ -144,6 +157,7 @@ def main() -> int:
         "buyer_plan_safe": plan_safe,
         "buyer_scout_safe": scout_safe,
         "buyer_scout_reconciliation_safe": reconciliation_safe,
+        "buyer_scout_persistence_safe": persistence_safe,
         "commercial_exchange_safe": exchange_safe,
         "live_external_automation_detected": (
             live_external_automation_detected
@@ -175,6 +189,9 @@ def main() -> int:
         ),
         "new_external_buyer_candidate_count": int(
             reconciliation.get("new_external_candidate_count") or 0
+        ),
+        "persisted_holding_candidate_count": int(
+            persistence.get("persisted_candidate_count") or 0
         ),
         "market_validate_product_count": int(
             buyer_plan.get("market_validate_product_count") or 0
