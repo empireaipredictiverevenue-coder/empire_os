@@ -411,6 +411,8 @@ def _hermes_environment() -> dict[str, str]:
         "HTTP_PROXY",
         "ALL_PROXY",
         "NO_PROXY",
+        "OPENAI_BASE_URL",
+        "OPENAI_API_KEY",
     )
     env = {
         key: value
