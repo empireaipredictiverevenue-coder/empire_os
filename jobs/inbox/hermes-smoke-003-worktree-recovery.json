@@ -1,0 +1,17 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "hermes-smoke-003-worktree-recovery",
+  "kind": "code_task",
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "prompt": "Prove the resident Hermes worker after the stale-worktree recovery fix. Create docs/HERMES_WORKTREE_RECOVERY_SMOKE.md and only that file. State that the worker ran from an isolated worktree, remained proposal-only, and did not perform live outbound, payment/fund movement, database mutation, production merge, recovery/ access, or toop/ access. Do not alter any other file.",
+  "allowed_paths": [
+    "docs/"
+  ],
+  "pytest_targets": [
+    "tests/test_hermes_control.py",
+    "tests/test_hermes_control_systemd.py"
+  ],
+  "max_runtime_seconds": 600,
+  "created_at": "2026-09-23T15:55:00Z"
+}
