@@ -214,7 +214,7 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     assert result["returncode"] == 0
     assert result["endpoint_mode"] == "isolated_omniroute"
     assert result["provider"] == "custom"
-    assert result["model"] == "auto/coding"
+    assert result["model"] == "openrouter/openrouter/free"
     assert result["hermes_home_isolated"] is True
     assert "local-test-key" not in result["output_tail"]
     assert "[REDACTED]" in result["output_tail"]
@@ -223,12 +223,12 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     provider_index = args.index("--provider")
     model_index = args.index("--model")
     assert args[provider_index + 1] == "custom"
-    assert args[model_index + 1] == "auto/coding"
+    assert args[model_index + 1] == "openrouter/openrouter/free"
 
     hermes_home = repo / "runtime/hermes_control/hermes_home"
     assert captured["env"]["HERMES_HOME"] == str(hermes_home)
     config = (hermes_home / "config.yaml").read_text()
     assert '"provider": "custom"' in config
-    assert '"default": "auto/coding"' in config
+    assert '"default": "openrouter/openrouter/free"' in config
     assert "http://127.0.0.1:20128/v1" in config
     assert "local-test-key" in config
