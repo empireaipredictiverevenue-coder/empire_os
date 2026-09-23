@@ -35,7 +35,7 @@ def test_existing_buyer_wins_before_prospect_match():
             {
                 "id": "buyer-1",
                 "buyer_name": "Buyer Co",
-                "website": "https://www.buyer.example",
+                "email": "sales@buyer.example",
                 "status": "active",
                 "is_active": True,
             }
@@ -84,3 +84,24 @@ def test_unknown_domain_stays_external_candidate_without_auto_ingest():
     assert row["outreach_authorized"] is False
     assert result["new_external_candidate_count"] == 1
     assert result["execution_authority"] == "none"
+
+
+def test_free_email_domain_does_not_create_false_buyer_domain_match():
+    result = reconcile_scout_candidates(
+        scout("gmail.com"),
+        prospects=[],
+        buyers=[
+            {
+                "id": "buyer-1",
+                "buyer_name": "Generic Mail Buyer",
+                "email": "someone@gmail.com",
+                "status": "active",
+                "is_active": True,
+            }
+        ],
+    )
+
+    row = result["results"][0]
+    assert row["reconciliation_state"] == "NEW_EXTERNAL_BUYER_CANDIDATE"
+    assert result["existing_buyer_count"] == 0
+    assert result["new_external_candidate_count"] == 1
