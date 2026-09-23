@@ -61,6 +61,7 @@ def run_buyer_probe_isolated(
                 "max_pages",
                 "request_timeout",
                 "time_budget_seconds",
+                "allow_company_routed",
             }
         })
     payload["_probe_options"] = defaults
@@ -366,6 +367,16 @@ def run_buyer_review_materializer(
                 if isinstance(recovery, Mapping)
                 else None
             ),
+            "preferred_email": (
+                str(result.get("preferred_email") or "").strip()
+                if isinstance(result, Mapping)
+                else None
+            ) or None,
+            "contact_route": (
+                str(result.get("contact_route") or "").strip()
+                if isinstance(result, Mapping)
+                else None
+            ) or None,
         })
 
     def queue_deferred(candidate, reason: str) -> None:
@@ -486,6 +497,10 @@ def run_buyer_review_materializer(
                 "preferred_email": result.get("preferred_email"),
                 "decision_maker": dict(decision),
                 "verified_contacts": result.get("verified_contacts") or [],
+                "contact_route": result.get("contact_route"),
+                "person_bound": bool(result.get("person_bound")),
+                "routing_name": result.get("routing_name"),
+                "routing_title": result.get("routing_title"),
             }
             plan = build_candidate_review_plan(
                 candidate,
