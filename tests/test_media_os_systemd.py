@@ -15,6 +15,7 @@ def test_media_os_runtime_service_is_internal_and_unprivileged():
     assert "ProtectSystem=strict" in text
     assert "ReadWritePaths=/srv/empire_os/runtime" in text
     assert "refresh_media_empire_bridge.py" in text
+    assert "refresh_media_research_bridge.py" in text
     assert "refresh_media_os_runtime.py" in text
 
     lowered = text.lower()
