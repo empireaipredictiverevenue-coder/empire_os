@@ -108,44 +108,82 @@ def main(argv=None) -> int:
     if args.execute and auto_approve and args.mode == "GUARDED_EXECUTE":
         approver_rpc = _approver_rpc()
 
+    # Already-approved sends are the most actionable work. Process them before
+    # pending approvals so a policy-rejected approval can never starve the send
+    # queue.
+    work = sorted(
+        work,
+        key=lambda item: (
+            0 if str(item.get("status") or "") == "approved" else 1,
+            str(item.get("updated_at") or ""),
+            str(item.get("intent_id") or ""),
+        ),
+    )
+
+    fatal_errors = 0
     for item in work:
         intent_id = str(item["intent_id"])
-        decision = _evaluate(sender_rpc, intent_id, policy)
-        record = {"intent_id": intent_id, "evaluation": decision}
+        record = {"intent_id": intent_id}
+        try:
+            decision = _evaluate(sender_rpc, intent_id, policy)
+            record["evaluation"] = decision
 
-        executable_actions = {"AUTO_APPROVE_ELIGIBLE", "AUTO_SEND_ELIGIBLE"}
-        if (
-            args.execute
-            and decision.get("mutation_authorized") is True
-            and decision.get("decision") in executable_actions
-        ):
-            execution = execute_governor_decision(
-                decision,
-                approver_rpc=approver_rpc,
-                sender_rpc=sender_rpc,
-                actor=os.getenv("EMPIRE_OPERATOR_ID", "outbound_governor"),
-                sender=os.getenv("EMPIRE_OUTBOUND_FROM", "").strip() or None,
-                reply_to=os.getenv("EMPIRE_REPLY_TO", "").strip() or None,
-                resend_api_key=os.getenv("RESEND_API_KEY", "").strip() or None,
-            )
-            record["execution"] = execution
-
-            if execution["decision"] == "AUTO_APPROVED" and auto_send:
-                after = _evaluate(sender_rpc, intent_id, policy)
-                record["post_approval_evaluation"] = after
-                if after.get("decision") == "AUTO_SEND_ELIGIBLE":
-                    record["send_execution"] = execute_governor_decision(
-                        after,
+            executable_actions = {"AUTO_APPROVE_ELIGIBLE", "AUTO_SEND_ELIGIBLE"}
+            if (
+                args.execute
+                and decision.get("mutation_authorized") is True
+                and decision.get("decision") in executable_actions
+            ):
+                try:
+                    execution = execute_governor_decision(
+                        decision,
+                        approver_rpc=approver_rpc,
                         sender_rpc=sender_rpc,
-                        actor=os.getenv(
-                            "EMPIRE_OPERATOR_ID", "outbound_governor"
-                        ),
-                        sender=os.getenv("EMPIRE_OUTBOUND_FROM", "").strip(),
-                        reply_to=os.getenv("EMPIRE_REPLY_TO", "").strip(),
-                        resend_api_key=os.getenv("RESEND_API_KEY", "").strip(),
+                        actor=os.getenv("EMPIRE_OPERATOR_ID", "outbound_governor"),
+                        sender=os.getenv("EMPIRE_OUTBOUND_FROM", "").strip() or None,
+                        reply_to=os.getenv("EMPIRE_REPLY_TO", "").strip() or None,
+                        resend_api_key=os.getenv("RESEND_API_KEY", "").strip() or None,
                     )
-        elif args.execute and decision.get("decision") == "AUTO_REPAIR":
-            record["execution_deferred"] = "deterministic repair adapter not yet enabled"
+                    record["execution"] = execution
+                except RuntimeError as exc:
+                    message = str(exc)
+                    if (
+                        decision.get("decision") == "AUTO_APPROVE_ELIGIBLE"
+                        and "existing outbound history requires explicit review"
+                        in message
+                    ):
+                        record["execution_blocked"] = {
+                            "reason": "existing_outbound_history_requires_explicit_review",
+                            "nonfatal": True,
+                        }
+                        results.append(record)
+                        continue
+                    raise
+
+                if execution["decision"] == "AUTO_APPROVED" and auto_send:
+                    after = _evaluate(sender_rpc, intent_id, policy)
+                    record["post_approval_evaluation"] = after
+                    if after.get("decision") == "AUTO_SEND_ELIGIBLE":
+                        record["send_execution"] = execute_governor_decision(
+                            after,
+                            sender_rpc=sender_rpc,
+                            actor=os.getenv(
+                                "EMPIRE_OPERATOR_ID", "outbound_governor"
+                            ),
+                            sender=os.getenv("EMPIRE_OUTBOUND_FROM", "").strip(),
+                            reply_to=os.getenv("EMPIRE_REPLY_TO", "").strip(),
+                            resend_api_key=os.getenv("RESEND_API_KEY", "").strip(),
+                        )
+            elif args.execute and decision.get("decision") == "AUTO_REPAIR":
+                record["execution_deferred"] = (
+                    "deterministic repair adapter not yet enabled"
+                )
+        except Exception as exc:
+            fatal_errors += 1
+            record["execution_error"] = {
+                "type": type(exc).__name__,
+                "message": str(exc)[:500],
+            }
         results.append(record)
 
     print(json.dumps({
@@ -153,9 +191,10 @@ def main(argv=None) -> int:
         "mode": policy.mode,
         "execute": bool(args.execute),
         "count": len(results),
+        "fatal_error_count": fatal_errors,
         "results": results,
     }, indent=2, sort_keys=True, default=str))
-    return 0
+    return 2 if fatal_errors else 0
 
 
 if __name__ == "__main__":
