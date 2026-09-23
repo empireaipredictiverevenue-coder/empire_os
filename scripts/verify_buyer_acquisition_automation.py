@@ -34,6 +34,7 @@ REQUIRED_ARTIFACTS = (
     "runtime/buyer_acquisition/scout_latest.json",
     "runtime/buyer_acquisition/reconciliation_latest.json",
     "runtime/buyer_acquisition/persistence_latest.json",
+    "runtime/commercial_catalog/pricing_verification_latest.json",
 )
 
 
@@ -91,6 +92,9 @@ def main() -> int:
     persistence = _read_json(
         root / "runtime/buyer_acquisition/persistence_latest.json"
     )
+    pricing = _read_json(
+        root / "runtime/commercial_catalog/pricing_verification_latest.json"
+    )
     exchange = _read_json(root / "runtime/commercial_exchange/latest.json")
 
     safe_automation_ready = all(
@@ -132,6 +136,11 @@ def main() -> int:
         and persistence.get("outbound_sent") is False
         and persistence.get("execution_authority") == "none"
     )
+    pricing_safe = (
+        pricing.get("pricing_matches_approved_policy") is True
+        and int(pricing.get("drift_count") or 0) == 0
+        and pricing.get("execution_authority") == "none"
+    )
     exchange_safe = (
         exchange.get("mode") == "OBSERVE"
         and exchange.get("automatic_external_delivery") is False
@@ -145,6 +154,7 @@ def main() -> int:
         scout_safe,
         reconciliation_safe,
         persistence_safe,
+        pricing_safe,
         exchange_safe,
         not live_external_automation_detected,
     ))
@@ -158,6 +168,7 @@ def main() -> int:
         "buyer_scout_safe": scout_safe,
         "buyer_scout_reconciliation_safe": reconciliation_safe,
         "buyer_scout_persistence_safe": persistence_safe,
+        "pricing_policy_safe": pricing_safe,
         "commercial_exchange_safe": exchange_safe,
         "live_external_automation_detected": (
             live_external_automation_detected
