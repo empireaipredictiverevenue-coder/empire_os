@@ -186,6 +186,22 @@ def test_source_review_exact_subset_is_intersected_with_hot_source_ids(monkeypat
 
     monkeypatch.setattr(
         bridge,
+        "sync_solar_opportunity_map_product",
+        lambda: {
+            "product_code": "solar_opportunity_map",
+            "binding_terms_ready": False,
+        },
+    )
+    monkeypatch.setattr(
+        bridge,
+        "materialize_solar_maps_for_review_outcomes",
+        lambda outcomes: {
+            "materialized_count": 0,
+            "errors": [],
+        },
+    )
+    monkeypatch.setattr(
+        bridge,
         "fetch_hot_source_prospect_ids",
         lambda **kwargs: [P1, P2],
     )
