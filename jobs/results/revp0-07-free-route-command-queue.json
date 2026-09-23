@@ -1,0 +1,23 @@
+{
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "changed_paths": [],
+  "completed_at": "2026-09-23T16:58:29.666182+00:00",
+  "database_mutation_performed": false,
+  "error": "HermesControlError: no healthy OmniRoute model candidate; gemini/gemini-3.5-flash-lite=network:TimeoutError; gemini/gemini-3.1-flash-lite=network:TimeoutError; gemini/gemini-3.1-pro-preview=http_429:{\"error\":{\"message\":\"All credentials for model gemini-3.1-pro-preview are cooling down\",\"type\":\"rate_limit_error\",\"code\":\"model_cooldown\",\"model\":\"gemini-3.1-pro-preview\",\"reset_seconds\":56,\"retry_after\":\"2026-09-23T16:59:00.033Z\",\"credenti; openrouter/openrouter/free=network:TimeoutError",
+  "execution_authority": "none",
+  "external_commercial_action_performed": false,
+  "founder_gate_required": false,
+  "git_remote_io_performed": true,
+  "hermes": null,
+  "job_id": "revp0-07-free-route-command-queue",
+  "job_path": "jobs/inbox/revp0-07-free-route-command-queue.json",
+  "kind": "code_task",
+  "payment_action_performed": false,
+  "proposal_branch": null,
+  "proposal_commit": null,
+  "schema_version": "empire.hermes.control_result.v1",
+  "started_at": "2026-09-23T16:56:51.594306+00:00",
+  "status": "FAILED",
+  "verification": null
+}
