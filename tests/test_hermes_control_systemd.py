@@ -12,6 +12,8 @@ def test_hermes_service_is_unprivileged_and_observe_bounded():
     assert "User=ubuntu" in text
     assert "Group=ubuntu" in text
     assert "EMPIRE_AUTONOMOUS_MODE=OBSERVE" in text
+    assert "EMPIRE_HERMES_BIN=/home/ubuntu/.local/bin/hermes" in text
+    assert "/home/ubuntu/.local/bin" in text
     assert "NoNewPrivileges=true" in text
     assert "ProtectSystem=strict" in text
     assert "ProtectHome=read-only" in text
