@@ -69,11 +69,17 @@ class SearchFabricSerpAdapter:
             raise SerpSnapshotError("SERP query required")
 
         requested = max(1, min(int(num), 20))
-        response = self._search(
-            clean_query,
-            num=requested,
-            engine=engine,
-        )
+        if engine is None:
+            response = self._search(
+                clean_query,
+                num=requested,
+            )
+        else:
+            response = self._search(
+                clean_query,
+                num=requested,
+                engine=engine,
+            )
         if not isinstance(response, Mapping):
             raise SerpSnapshotError(
                 "Search Fabric returned invalid payload"
