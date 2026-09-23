@@ -202,3 +202,14 @@ def test_broaden_query_only_removes_exact_match_quotes():
     assert search_module._broaden_query(
         '"buy roofing leads" Austin TX'
     ) == "buy roofing leads Austin TX"
+
+
+def test_high_level_search_registry_has_redundant_keyless_recovery():
+    from empire_os.search_fabric.engines import active_engines
+
+    names = {engine.name for engine in active_engines()}
+
+    assert "duckduckgo_html" in names
+    assert "bing_rss" in names
+    assert "duckduckgo_lite" in names
+    assert "mojeek" in names
