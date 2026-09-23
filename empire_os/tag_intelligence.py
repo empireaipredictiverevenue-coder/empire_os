@@ -131,9 +131,12 @@ def _page_tag_issues(
         )
 
     robots = str(page.get("robots") or "").lower()
+    googlebot = str(page.get("googlebot") or "").lower()
     x_robots = str(page.get("x_robots_tag") or "").lower()
     if intended_public and (
-        "noindex" in robots or "noindex" in x_robots
+        "noindex" in robots
+        or "noindex" in googlebot
+        or "noindex" in x_robots
     ):
         _issue(
             issues, "public_page_noindex", "search", "critical",
@@ -166,6 +169,24 @@ def _page_tag_issues(
             "No X/Twitter card metadata was observed.",
             "Add a card type and verified social preview metadata.",
         )
+
+    if expectations.get("site_verification_expected") is True:
+        verification = page.get("site_verification_tags")
+        verification = (
+            dict(verification)
+            if isinstance(verification, Mapping)
+            else {}
+        )
+        if not any(
+            str(value or "").strip()
+            for value in verification.values()
+        ):
+            _issue(
+                issues, "site_verification_tag_missing", "technical", "medium",
+                "Site verification metadata was expected but no supported verification tag was observed.",
+                "Verify the intended search/social webmaster verification method.",
+                manual_review=True,
+            )
 
     if expectations.get("schema_expected") is True:
         if not _values(page.get("json_ld_types")):
@@ -495,7 +516,11 @@ def _normalized_snapshot(
         "meta_description": page.get("meta_description"),
         "canonical_url": page.get("canonical_url"),
         "robots": page.get("robots"),
+        "googlebot": page.get("googlebot"),
         "x_robots_tag": page.get("x_robots_tag"),
+        "site_verification_tags": dict(
+            page.get("site_verification_tags") or {}
+        ),
         "open_graph": dict(page.get("open_graph") or {}),
         "twitter": dict(page.get("twitter") or {}),
         "json_ld_types": sorted(_values(page.get("json_ld_types"))),
@@ -548,6 +573,7 @@ def compare_tag_snapshots(
 
     critical_fields = {
         "robots",
+        "googlebot",
         "x_robots_tag",
         "canonical_url",
         "meta_pixel_ids",
