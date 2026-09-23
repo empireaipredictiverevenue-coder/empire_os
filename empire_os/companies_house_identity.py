@@ -76,11 +76,23 @@ def _display_name(value: str) -> str:
     raw = " ".join(str(value or "").split())
     if not raw:
         return ""
+
+    def normalise_part(part: str) -> str:
+        value = " ".join(str(part or "").split())
+        return value.title() if value.isupper() else value
+
     if "," not in raw:
-        return raw.title() if raw.isupper() else raw
+        return normalise_part(raw)
+
     surname, given = [part.strip() for part in raw.split(",", 1)]
-    name = " ".join(part for part in (given, surname) if part)
-    return name.title() if name.isupper() else name
+    return " ".join(
+        part
+        for part in (
+            normalise_part(given),
+            normalise_part(surname),
+        )
+        if part
+    )
 
 
 def _request_json(
