@@ -22,7 +22,8 @@ def test_hermes_service_is_unprivileged_and_observe_bounded():
     assert "--max-jobs 1" in text
 
     assert "/srv/empire_os/.git" in text
-    assert "/srv/empire_os/runtime/hermes_control" in text
+    assert "/srv/empire_os/runtime" in text
+    assert "/srv/empire_os/runtime/hermes_control" not in text
 
 
 def test_hermes_timer_is_bounded():
