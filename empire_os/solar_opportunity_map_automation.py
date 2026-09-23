@@ -64,8 +64,10 @@ def materialize_solar_maps_for_review_outcomes(
                 })
                 continue
 
+            artifact_root = Path(root or ARTIFACT_ROOT)
             observed = materialize_with_resource_observation(
                 prospect_id,
+                observation_root=artifact_root / "economics",
                 build=lambda pid: build_solar_opportunity_map(
                     pid,
                     request=request,
