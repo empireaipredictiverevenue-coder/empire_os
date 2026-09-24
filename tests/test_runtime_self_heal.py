@@ -217,3 +217,15 @@ def test_inactive_consequential_timer_requires_founder_gate(monkeypatch, tmp_pat
     assert payload["status"] == "DEGRADED"
     assert payload["founder_gate_required_count"] == 1
     assert payload["inventory_findings"][0]["repair_executed"] is False
+
+
+def test_enterprise_contact_intelligence_units_are_auto_repairable():
+    assert runtime_self_heal.unit_is_auto_repairable(
+        "empire-buyer-deferred-enrichment.timer"
+    )
+    assert runtime_self_heal.unit_is_auto_repairable(
+        "empire-predictive-revenue-enterprise-activation.timer"
+    )
+    assert runtime_self_heal.unit_is_auto_repairable(
+        "empire-predictive-revenue-enterprise-activation.service"
+    )
