@@ -415,6 +415,34 @@ def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _reconcile_moved_head(
+    incident: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    branch, head, dirty = _main_state()
+    if branch != "feature/revenue-intelligence-v2" or dirty:
+        return dict(incident), None
+    recorded = str(incident.get("base_head") or "").strip()
+    if not recorded or recorded == head:
+        return dict(incident), None
+
+    tests = list(incident.get("failing_tests") or [])
+    if tests:
+        passed, _output = _verify(ROOT, tests)
+        if passed:
+            return dict(incident), {
+                "status": "RESOLVED_BY_CONCURRENT_CHANGE",
+                "classification": "CODE_DEFECT",
+                "action": "failing_tests_now_pass",
+                "verified_tests": tests,
+            }
+
+    updated = dict(incident)
+    updated["base_head"] = head
+    updated["rebased_at"] = _now()
+    _atomic_json(INCIDENT_PATH, updated)
+    return updated, None
+
+
 def _retry_branch_push() -> dict[str, Any]:
     branch, _head, dirty = _main_state()
     if branch != "feature/revenue-intelligence-v2" or dirty:
@@ -504,55 +532,62 @@ def run_repair_cycle() -> dict[str, Any]:
             "action": "existing_deferred_enrichment_loop",
         }
     elif classification == "CODE_DEFECT":
+        incident, concurrent_resolution = _reconcile_moved_head(incident)
         fingerprint = str(incident.get("fingerprint") or "")
-        same_incident = (
-            fingerprint
-            and state.get("last_fingerprint") == fingerprint
-        )
-        repair_attempts = (
-            int(state.get("repair_attempts") or 0)
-            if same_incident
-            else 0
-        )
-        if (
-            same_incident
-            and state.get("last_status") == "MERGED_LOCAL_PUSH_FAILED"
-        ):
-            result = _retry_branch_push()
-            result["classification"] = classification
-        elif (
-            same_incident
-            and state.get("last_status") in {
-                "RESOLVED_AND_PUSHED",
-                "QUARANTINED_HEAD_MOVED",
-                "QUARANTINED_REPAIR_EXHAUSTED",
-            }
-        ):
-            result = {
-                "status": str(state["last_status"]),
-                "classification": classification,
-                "action": "already_processed",
-            }
-        elif repair_attempts >= 3:
-            result = {
-                "status": "QUARANTINED_REPAIR_EXHAUSTED",
-                "classification": classification,
-                "action": "repair_budget_exhausted",
-                "repair_attempts": repair_attempts,
-            }
+        if concurrent_resolution is not None:
+            result = concurrent_resolution
         else:
-            try:
-                result = _repair_code_incident(incident)
+            same_incident = (
+                fingerprint
+                and state.get("last_fingerprint") == fingerprint
+            )
+            repair_attempts = (
+                int(state.get("repair_attempts") or 0)
+                if same_incident
+                else 0
+            )
+            if (
+                same_incident
+                and state.get("last_status")
+                == "MERGED_LOCAL_PUSH_FAILED"
+            ):
+                result = _retry_branch_push()
                 result["classification"] = classification
-                result["repair_attempts"] = repair_attempts + 1
-            except Exception as exc:
-                result = {
-                    "status": "CODER_REPAIR_FAILED",
-                    "classification": classification,
-                    "action": "retry_on_next_cycle",
-                    "repair_attempts": repair_attempts + 1,
-                    "error": f"{type(exc).__name__}:{str(exc)[:1800]}",
+            elif (
+                same_incident
+                and state.get("last_status") in {
+                    "RESOLVED_AND_PUSHED",
+                    "QUARANTINED_REPAIR_EXHAUSTED",
                 }
+            ):
+                result = {
+                    "status": str(state["last_status"]),
+                    "classification": classification,
+                    "action": "already_processed",
+                }
+            elif repair_attempts >= 3:
+                result = {
+                    "status": "QUARANTINED_REPAIR_EXHAUSTED",
+                    "classification": classification,
+                    "action": "repair_budget_exhausted",
+                    "repair_attempts": repair_attempts,
+                }
+            else:
+                try:
+                    result = _repair_code_incident(incident)
+                    result["classification"] = classification
+                    result["repair_attempts"] = repair_attempts + 1
+                except Exception as exc:
+                    result = {
+                        "status": "CODER_REPAIR_FAILED",
+                        "classification": classification,
+                        "action": "retry_on_next_cycle",
+                        "repair_attempts": repair_attempts + 1,
+                        "error": (
+                            f"{type(exc).__name__}:"
+                            f"{str(exc)[:1800]}"
+                        ),
+                    }
     else:
         result = {
             "status": "OBSERVE_ONLY_UNKNOWN",
