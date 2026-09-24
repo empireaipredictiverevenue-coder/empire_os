@@ -467,3 +467,15 @@ def test_nyc_owner_fingerprint_does_not_depend_on_permittee_phone():
     assert first["legacy_phone_role"] == "permittee_contact"
     assert second["legacy_phone_role"] == "permittee_contact"
     assert first["identity_fingerprint"] == second["identity_fingerprint"]
+
+
+def test_generic_owner_labels_are_not_recoverable():
+    for name in ("OWNER", "N.A", "N/A", "245"):
+        parsed = parse_legacy_lane_notes(
+            f"name={name} email= phone=(718) 555-0100 "
+            "metro=NYC state=NY details=A2.PL permit 401975190 "
+            "issued 2026-08-16: . BBL 4092480052. "
+            "Address: 84-90 127 STREET, Queens"
+        )
+        assert parsed["identity_recoverable"] is False
+        assert parsed["routing_only"] is True
