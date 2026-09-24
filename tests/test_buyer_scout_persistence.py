@@ -22,6 +22,9 @@ def test_only_new_external_candidates_are_persisted():
                 "website": "https://new.example",
                 "business_name": "New Buyer",
                 "business_name_source": "first_party_business_name",
+                "canonical_seed_identity_corroborated": True,
+                "permit_territory_state": "NYC_FIRST_PARTY_EVIDENCE",
+                "permit_territory_evidence": ["nyc"],
                 "site_business_names": ["New Buyer"],
                 "description": "We buy leads.",
                 "buyer_type": "direct_lead_buyer",
@@ -111,6 +114,15 @@ def test_only_new_external_candidates_are_persisted():
     )
     assert payload["p_site_evidence"]["site_business_names"] == [
         "New Buyer"
+    ]
+    assert payload["p_site_evidence"][
+        "canonical_seed_identity_corroborated"
+    ] is True
+    assert payload["p_site_evidence"]["permit_territory_state"] == (
+        "NYC_FIRST_PARTY_EVIDENCE"
+    )
+    assert payload["p_site_evidence"]["permit_territory_evidence"] == [
+        "nyc"
     ]
     assert payload["p_site_evidence"]["first_party_emails"] == [
         "sales@new.example"
