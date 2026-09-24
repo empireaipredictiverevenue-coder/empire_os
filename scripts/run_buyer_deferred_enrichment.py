@@ -258,7 +258,101 @@ def _persist_recovered_identity(
     return True
 
 
-def _propose_review(candidate, result: dict[str, Any]) -> bool:
+def _targeted_enterprise_probe(
+    candidate,
+    item: dict[str, Any],
+    *,
+    available_budget: int,
+    attempts: int,
+) -> tuple[dict[str, Any] | None, int]:
+    people = [
+        dict(person)
+        for person in (item.get("target_people") or [])
+        if isinstance(person, dict)
+        and str(person.get("name") or "").strip()
+        and str(person.get("title") or "").strip()
+    ]
+    if not people or available_budget <= 0:
+        return None, 0
+
+    count = min(2, len(people), max(0, int(available_budget)))
+    start = ((max(1, int(attempts)) - 1) * 2) % len(people)
+    selected = [
+        people[(start + offset) % len(people)]
+        for offset in range(count)
+    ]
+
+    best: dict[str, Any] | None = None
+    used = 0
+    base = candidate.to_dict()
+    base["id"] = base.pop("prospect_id")
+
+    for person in selected:
+        probe_row = dict(base)
+        probe_row["contact_name"] = str(person["name"]).strip()
+        probe_row["contact_title"] = str(person["title"]).strip()
+        probe_row["contact_source"] = "enterprise_target_observed"
+
+        result = run_buyer_probe_isolated(
+            probe_row,
+            hard_timeout_seconds=24.0,
+            probe_options={
+                "max_pages": 6,
+                "request_timeout": 3.5,
+                "time_budget_seconds": 14.0,
+                "allow_company_routed": False,
+            },
+        )
+        used += 1
+        decision = result.get("decision_maker")
+        decision_name = (
+            str(decision.get("name") or "").strip()
+            if isinstance(decision, dict)
+            else ""
+        )
+        matched = (
+            decision_name.casefold()
+            == str(person["name"]).strip().casefold()
+        )
+        result = dict(result)
+        result["enterprise_target_match"] = matched
+        result["enterprise_target_person"] = dict(person)
+
+        if (
+            matched
+            and result.get("review_ready") is True
+            and result.get("outreach_ready") is True
+            and result.get("person_bound") is True
+            and result.get("preferred_email")
+        ):
+            return result, used
+
+        if best is None:
+            best = result
+        elif (
+            result.get("review_ready") is True
+            and best.get("review_ready") is not True
+        ):
+            best = result
+
+    if best is not None:
+        best = dict(best)
+        best["review_ready"] = False
+        best["outreach_ready"] = False
+        best["rejection_reason"] = (
+            "target_contact_not_verified"
+            if best.get("enterprise_target_match") is True
+            else "target_identity_mismatch"
+        )
+    return best, used
+
+
+def _propose_review(
+    candidate,
+    result: dict[str, Any],
+    *,
+    item: dict[str, Any] | None = None,
+) -> bool:
     decision = result.get("decision_maker")
     if not isinstance(decision, dict):
         return False
@@ -266,6 +360,14 @@ def _propose_review(candidate, result: dict[str, Any]) -> bool:
         score = float(decision.get("decision_score") or 0.0)
     except (TypeError, ValueError):
         score = 0.0
+
+    enterprise_item = item if isinstance(item, dict) else {}
+    if (
+        enterprise_item.get("target_people")
+        and result.get("enterprise_target_match") is not True
+    ):
+        return False
+
     if (
         score < 0.70
         or result.get("review_ready") is not True
@@ -273,20 +375,42 @@ def _propose_review(candidate, result: dict[str, Any]) -> bool:
     ):
         return False
 
+    contact_plan = {
+        "review_ready": True,
+        "outreach_ready": True,
+        "preferred_email": result.get("preferred_email"),
+        "decision_maker": decision,
+        "verified_contacts": result.get("verified_contacts") or [],
+        "contact_route": result.get("contact_route"),
+        "person_bound": bool(result.get("person_bound")),
+        "routing_name": result.get("routing_name"),
+        "routing_title": result.get("routing_title"),
+    }
+    offer_key = str(enterprise_item.get("offer_key") or "").strip()
+    if offer_key:
+        contact_plan["offer_key"] = offer_key
+
     plan = build_candidate_review_plan(
         candidate,
-        {
-            "review_ready": True,
-            "outreach_ready": True,
-            "preferred_email": result.get("preferred_email"),
-            "decision_maker": decision,
-            "verified_contacts": result.get("verified_contacts") or [],
-        },
+        contact_plan,
         idempotency_key=(
             f"buyer-review:{candidate.prospect_id}:"
             f"{str(result.get('preferred_email') or '').lower()}:v1"
         ),
     )
+    if enterprise_item.get("account_key"):
+        plan["params"]["p_evidence"].update({
+            "source": "enterprise_targeted_enrichment.v1",
+            "account_key": enterprise_item.get("account_key"),
+            "wave": enterprise_item.get("wave"),
+            "target_product_codes": (
+                enterprise_item.get("target_product_codes") or []
+            ),
+            "enterprise_target_match": True,
+            "live_outbound_send": False,
+            "actual_revenue": False,
+        })
+
     response = request_json(
         "POST",
         "/rest/v1/rpc/propose_buyer_candidate_review",
@@ -296,7 +420,6 @@ def _propose_review(candidate, result: dict[str, Any]) -> bool:
         isinstance(response, dict)
         and response.get("review_id")
     )
-
 
 def run_cycle(*, limit: int = 5) -> dict[str, Any]:
     queue = BuyerDeferredEnrichmentQueue()
@@ -371,52 +494,78 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                     "reason": "network_probe_budget_exhausted",
                 })
                 continue
-            network_probes += 1
 
-            probe_row = candidate.to_dict()
-            probe_row["id"] = probe_row.pop("prospect_id")
-            result = run_buyer_probe_isolated(
-                probe_row,
-                hard_timeout_seconds=28.0,
-            )
-
+            target_people = [
+                person
+                for person in (item.get("target_people") or [])
+                if isinstance(person, dict)
+            ]
+            result = None
             recovery = None
-            if not result.get("decision_maker"):
-                recovery = recover_identity_isolated(
-                    business_name=candidate.business_name,
-                    website=candidate.website,
-                    metro=candidate.metro,
-                    hard_timeout_seconds=45.0,
+
+            if target_people:
+                result, used = _targeted_enterprise_probe(
+                    candidate,
+                    item,
+                    available_budget=(
+                        network_probe_budget - network_probes
+                    ),
+                    attempts=attempts,
                 )
-                recovered = recovery.get("identity")
-                if isinstance(recovered, dict):
-                    probe_row["contact_name"] = recovered.get("name")
-                    probe_row["contact_title"] = recovered.get("title")
-                    probe_row["contact_source"] = recovered.get("source")
-                    result = run_buyer_probe_isolated(
-                        probe_row,
-                        hard_timeout_seconds=28.0,
+                network_probes += used
+
+            if result is None:
+                if network_probes >= network_probe_budget:
+                    results.append({
+                        "prospect_id": prospect_id,
+                        "outcome": "deferred_by_network_budget",
+                        "reason": "network_probe_budget_exhausted",
+                    })
+                    continue
+
+                network_probes += 1
+                probe_row = candidate.to_dict()
+                probe_row["id"] = probe_row.pop("prospect_id")
+                result = run_buyer_probe_isolated(
+                    probe_row,
+                    hard_timeout_seconds=28.0,
+                )
+
+                if not result.get("decision_maker"):
+                    recovery = recover_identity_isolated(
+                        business_name=candidate.business_name,
+                        website=candidate.website,
+                        metro=candidate.metro,
+                        hard_timeout_seconds=45.0,
                     )
-                    if not result.get("decision_maker"):
-                        result = dict(result)
-                        recovered_title = str(
-                            recovered.get("title") or ""
-                        ).strip()
-                        recovered_role, recovered_authority = (
-                            classify_decision_role(recovered_title)
+                    recovered = recovery.get("identity")
+                    if isinstance(recovered, dict):
+                        probe_row["contact_name"] = recovered.get("name")
+                        probe_row["contact_title"] = recovered.get("title")
+                        probe_row["contact_source"] = recovered.get("source")
+                        result = run_buyer_probe_isolated(
+                            probe_row,
+                            hard_timeout_seconds=28.0,
                         )
-                        result["decision_maker"] = {
-                            "name": recovered.get("name"),
-                            "title": recovered_title,
-                            "url": recovered.get("source_url"),
-                            "source": recovered.get("source"),
-                            "decision_role": recovered_role,
-                            # Identity confidence answers "is this the person";
-                            # buyer authority answers "is this a commercial
-                            # decision role". Never substitute one for the other.
-                            "decision_score": recovered_authority,
-                            "identity_confidence": recovered.get("confidence"),
-                        }
+                        if not result.get("decision_maker"):
+                            result = dict(result)
+                            recovered_title = str(
+                                recovered.get("title") or ""
+                            ).strip()
+                            recovered_role, recovered_authority = (
+                                classify_decision_role(recovered_title)
+                            )
+                            result["decision_maker"] = {
+                                "name": recovered.get("name"),
+                                "title": recovered_title,
+                                "url": recovered.get("source_url"),
+                                "source": recovered.get("source"),
+                                "decision_role": recovered_role,
+                                "decision_score": recovered_authority,
+                                "identity_confidence": recovered.get(
+                                    "confidence"
+                                ),
+                            }
 
             identity_recovered = _persist_recovered_identity(
                 row,
@@ -426,7 +575,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
             if identity_recovered:
                 identities_recovered += 1
 
-            if _propose_review(candidate, result):
+            if _propose_review(candidate, result, item=item):
                 queue.resolve(
                     prospect_id,
                     outcome="buyer_review_proposed",
