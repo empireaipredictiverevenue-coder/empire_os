@@ -19,10 +19,25 @@ install_unit "deploy/systemd/empire-commercial-product-catalog.service"
 systemctl daemon-reload
 
 systemctl enable empire-ops-privileged-helper.service
+systemctl reset-failed empire-ops-privileged-helper.service || true
 systemctl restart empire-ops-privileged-helper.service
 
-test "$(systemctl is-active empire-ops-privileged-helper.service)" = "active"
-test -S /run/empire-ops/privileged.sock
+READY=0
+for _ in $(seq 1 20); do
+  if [ "$(systemctl is-active empire-ops-privileged-helper.service 2>/dev/null || true)" = "active" ] \
+    && [ -S /run/empire-ops/privileged.sock ]; then
+    READY=1
+    break
+  fi
+  sleep 0.5
+done
+
+if [ "$READY" -ne 1 ]; then
+  echo "ERROR: privileged helper did not become ready"
+  systemctl status empire-ops-privileged-helper.service --no-pager -l || true
+  journalctl -u empire-ops-privileged-helper.service -n 100 --no-pager || true
+  exit 1
+fi
 
 echo "EmpireOS ops self-heal control plane installed."
 echo "Privileged helper: active"
