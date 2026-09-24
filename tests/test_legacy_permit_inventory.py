@@ -7,6 +7,7 @@ def _payload(*, record_id, state, mode, classification="REUSE", next_offset=10):
         "scan_epoch": "test-epoch",
         "scan_order": "prospect_id.asc,created_at.asc,id.asc",
         "scan_offset": 0,
+        "scanned_row_count": 1,
         "next_offset": next_offset,
         "generated_at": "2026-09-24T19:00:00+00:00",
         "database_write_performed": False,
