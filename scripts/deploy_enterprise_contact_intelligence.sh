@@ -58,6 +58,7 @@ PYTHONPATH=/srv/empire_os ./.venv/bin/python -m py_compile \
   empire_os/ops_privileged_helper.py \
   scripts/run_buyer_deferred_enrichment.py \
   scripts/run_enterprise_contact_intelligence.py \
+  scripts/run_enterprise_contact_sync_cycle.py \
   scripts/verify_enterprise_contact_intelligence.py \
   scripts/run_enterprise_contact_repair.py
 
