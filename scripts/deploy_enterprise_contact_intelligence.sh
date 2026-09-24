@@ -57,6 +57,7 @@ PYTHONPATH=/srv/empire_os ./.venv/bin/python -m py_compile \
   empire_os/ops_privileged_helper.py \
   scripts/run_buyer_deferred_enrichment.py \
   scripts/run_enterprise_contact_intelligence.py \
+  scripts/verify_enterprise_contact_intelligence.py \
   scripts/run_enterprise_contact_repair.py
 
 echo
@@ -92,6 +93,8 @@ if [ "$SYNC_RC" -ne 0 ] || [ "$SYNC_RESULT" != "success" ]; then
     --no-pager || true
 else
   echo "Canonical-env sync + Buyer Acquisition refresh + verification: success"
+
+  sudo systemctl start empire-enterprise-contact-repair.service || true
 
   if [ -f runtime/predictive_revenue/enterprise_contact_intelligence_latest.json ]; then
     ./.venv/bin/python - <<'PY'
