@@ -187,3 +187,14 @@ def test_checkout_proxy_rejects_non_json():
     )
     assert response.status_code == 415
     assert response.json()["error"] == "application_json_required"
+
+
+
+def test_exchange_interest_proxy_rejects_non_json():
+    response = client.post(
+        "/v1/checkout/exchange/interests",
+        content="not-json",
+        headers={"Content-Type": "text/plain"},
+    )
+    assert response.status_code == 415
+    assert response.json()["error"] == "application_json_required"
