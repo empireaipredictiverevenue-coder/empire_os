@@ -46,6 +46,7 @@ def test_inactive_safe_service_is_repaired_and_verified(monkeypatch, tmp_path):
 
     payload = runtime_self_heal.run_runtime_self_heal(
         now=NOW,
+        observe_only=False,
         service_status=status,
         repair=repair,
         unit_inventory=lambda: [],
@@ -84,6 +85,7 @@ def test_missing_snapshot_runs_bounded_writer_repair(monkeypatch, tmp_path):
 
     payload = runtime_self_heal.run_runtime_self_heal(
         now=NOW,
+        observe_only=False,
         repair=repair,
         unit_inventory=lambda: [],
         latest_path=tmp_path / "latest.json",
@@ -113,6 +115,7 @@ def test_repair_cooldown_prevents_restart_loop(monkeypatch, tmp_path):
 
     payload = runtime_self_heal.run_runtime_self_heal(
         now=NOW,
+        observe_only=False,
         service_status=lambda _unit: (False, "inactive"),
         unit_inventory=lambda: [],
         repair=lambda _action, _unit: (_ for _ in ()).throw(
