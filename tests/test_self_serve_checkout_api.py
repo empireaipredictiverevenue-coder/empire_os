@@ -111,3 +111,62 @@ def test_exchange_interest_endpoint_records_buyer_request(monkeypatch):
     assert body["decision"] == "interest_recorded"
     assert body["seat_activated"] is False
     assert body["actual_revenue"] is False
+
+
+
+def test_predictive_revenue_products_endpoint(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "predictive_revenue_product_catalog",
+        lambda: {
+            "products": [
+                {
+                    "product_code": "predictive_revenue_diagnostic",
+                    "deployment_price_cents": 2500000,
+                }
+            ],
+            "product_count": 1,
+            "binding_terms_ready": False,
+            "actual_revenue": False,
+        },
+    )
+    client = TestClient(api.app)
+    response = client.get("/v1/predictive-revenue/products")
+
+    assert response.status_code == 200
+    assert response.json()["product_count"] == 1
+    assert response.json()["actual_revenue"] is False
+
+
+def test_predictive_revenue_interest_endpoint(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "record_predictive_revenue_interest",
+        lambda **kwargs: {
+            "decision": "deployment_interest_recorded",
+            "prospect_id": "prospect-1",
+            "product_code": kwargs["product_code"],
+            "binding_commercial_terms": False,
+            "actual_revenue": False,
+        },
+    )
+    client = TestClient(api.app)
+    response = client.post(
+        "/v1/predictive-revenue/interests",
+        json={
+            "product_code": "predictive_revenue_diagnostic",
+            "business_name": "Example Group",
+            "email": "buyer@example.com",
+            "domain": "example.com",
+            "industry": "Roofing",
+            "geography": "UK",
+            "annual_revenue_band": "25m_100m",
+            "desired_outcome": "Improve forecast accuracy.",
+            "systems": ["CRM"],
+            "idempotency_key": "predictive-api-001",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "deployment_interest_recorded"
+    assert response.json()["actual_revenue"] is False
