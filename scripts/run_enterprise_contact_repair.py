@@ -18,6 +18,7 @@ ROOT = Path("/srv/empire_os")
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--record-test-log")
+    parser.add_argument("--kind", default="test_failure")
     parser.add_argument("--command", default="")
     parser.add_argument("--returncode", type=int, default=1)
     args = parser.parse_args()
@@ -35,7 +36,7 @@ def main() -> int:
             check=False,
         ).stdout.strip()
         payload = record_incident(
-            kind="test_failure",
+            kind=args.kind,
             log_text=log,
             command=args.command or "pytest",
             returncode=args.returncode,
