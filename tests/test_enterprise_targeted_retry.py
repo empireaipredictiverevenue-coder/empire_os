@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
@@ -28,8 +28,18 @@ def test_deferred_queue_preserves_enterprise_target_context(tmp_path):
         ],
     })
 
+    queued = next(
+        iter(
+            queue.due(
+                now=datetime.now(timezone.utc) + timedelta(minutes=1)
+            )
+        )
+    )
+    retry_at = datetime.fromisoformat(
+        str(queued["next_retry_at"]).replace("Z", "+00:00")
+    )
     due = queue.due(
-        now=datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc)
+        now=retry_at + timedelta(seconds=1)
     )
     assert len(due) == 1
     row = due[0]
@@ -46,7 +56,7 @@ def test_deferred_queue_preserves_enterprise_target_context(tmp_path):
         "reason": "contact_not_verified",
     })
     row = queue.due(
-        now=datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc)
+        now=datetime.now(timezone.utc) + timedelta(minutes=1)
     )[0]
     assert row["account_key"] == "apex_service_partners"
     assert row["offer_key"] == "predictive_revenue_intelligence_os"
