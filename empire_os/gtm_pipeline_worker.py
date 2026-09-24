@@ -176,8 +176,8 @@ def build_outbound_payload(
 def run_gtm_pipeline(
     request: Request,
     *,
-    limit: int = 10,
-    daily_cap: int = 10,
+    limit: int = 25,
+    daily_cap: int = 25,
     now: datetime | None = None,
 ) -> GTMPipelineResult:
     bounded = max(1, min(int(limit), 50))
