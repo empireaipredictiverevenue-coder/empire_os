@@ -41,6 +41,10 @@ ALLOWED_UNITS = frozenset({
     "empire-hermes-control.timer",
     "empire-coder-worker.service",
     "empire-coder-worker.timer",
+    "empire-buyer-deferred-enrichment.service",
+    "empire-buyer-deferred-enrichment.timer",
+    "empire-predictive-revenue-enterprise-activation.service",
+    "empire-predictive-revenue-enterprise-activation.timer",
 })
 START_ONLY_UNITS = frozenset({
     "empire-revenue-pulse.service",
@@ -53,6 +57,8 @@ START_ONLY_UNITS = frozenset({
     "empire-buyer-acquisition-team.service",
     "empire-source-health.service",
     "empire-coder-worker.service",
+    "empire-buyer-deferred-enrichment.service",
+    "empire-predictive-revenue-enterprise-activation.service",
 })
 MAX_REQUEST_BYTES = 8192
 
