@@ -28,6 +28,12 @@ from empire_os.search_fabric.site_probe import probe_site
 
 OUTPUT = Path("runtime/buyer_acquisition/scout_latest.json")
 
+PREDICTIVE_REVENUE_ENTERPRISE_ICP_KEYS = {
+    "predictive_revenue_home_services_platform",
+    "predictive_revenue_franchise_network",
+    "predictive_revenue_portfolio_value_creation",
+}
+
 
 def _host(value: str) -> str:
     text = str(value or "").strip().lower()
@@ -255,6 +261,21 @@ def run_buyer_scout(
             target_profile_keys=icp_profiles,
         )
 
+        enterprise_profile = str(
+            icp.get("best_profile_key") or ""
+        )
+        enterprise_fit_score = (
+            int(icp.get("model_fit_score") or 0)
+            if enterprise_profile
+            in PREDICTIVE_REVENUE_ENTERPRISE_ICP_KEYS
+            else 0
+        )
+        enterprise_candidate = bool(
+            enterprise_profile
+            in PREDICTIVE_REVENUE_ENTERPRISE_ICP_KEYS
+            and enterprise_fit_score >= 40
+        )
+
         candidates.append({
             "domain": domain,
             "business_name": record["business_name"],
@@ -285,6 +306,15 @@ def run_buyer_scout(
             "target_corridor_keys": corridors,
             "target_icp_profile_keys": icp_profiles,
             "icp_intelligence": icp,
+            "predictive_revenue_enterprise_candidate": (
+                enterprise_candidate
+            ),
+            "predictive_revenue_enterprise_profile": (
+                enterprise_profile if enterprise_candidate else None
+            ),
+            "predictive_revenue_enterprise_fit_score": (
+                enterprise_fit_score
+            ),
             "observed_buying_triggers": list(
                 icp.get("observed_buying_triggers") or []
             ),
@@ -328,6 +358,10 @@ def run_buyer_scout(
         "domain_count": len(ranked_domains),
         "probed_domain_count": min(len(ranked_domains), max_probes),
         "candidate_count": len(candidates),
+        "predictive_revenue_enterprise_candidate_count": sum(
+            row.get("predictive_revenue_enterprise_candidate") is True
+            for row in candidates
+        ),
         "explicit_direct_buyer_candidate_count": sum(
             row["explicit_direct_buyer_evidence"]
             for row in candidates
