@@ -12,6 +12,7 @@ from empire_os.control_conveyor import build_conveyor
 from empire_os.incident_manager import build_incident_report
 from empire_os.ops_healer import execute_plan
 from empire_os.ops_sentinel import observe
+from empire_os.runtime_self_heal import run_runtime_self_heal
 
 OUTPUT = Path("/srv/empire_os/runtime/ops_control/latest.json")
 
@@ -32,6 +33,9 @@ def main() -> int:
     if mode not in {"OBSERVE", "GUARDED_EXECUTE"}:
         mode = "OBSERVE"
 
+    runtime_doctor = run_runtime_self_heal(
+        observe_only=mode != "GUARDED_EXECUTE",
+    )
     sentinel = observe(unit_state)
     repairs = []
     if mode == "GUARDED_EXECUTE":
@@ -52,6 +56,7 @@ def main() -> int:
         "schema_version": "empire.ops_control_cycle.v1",
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
+        "runtime_doctor": runtime_doctor,
         "sentinel": sentinel,
         "healer": {
             "proposed": len(sentinel.get("repair_plan") or []),
@@ -60,9 +65,12 @@ def main() -> int:
         },
         "incident_manager": incident_manager,
         "conveyor": conveyor,
-        "healthy": not any(
-            row.get("severity") in {"critical", "warning"}
-            for row in sentinel.get("findings") or []
+        "healthy": (
+            runtime_doctor.get("status") == "HEALTHY"
+            and not any(
+                row.get("severity") in {"critical", "warning"}
+                for row in sentinel.get("findings") or []
+            )
         ),
         "business_blocker": next(
             (
