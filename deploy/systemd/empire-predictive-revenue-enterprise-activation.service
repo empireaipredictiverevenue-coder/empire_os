@@ -12,6 +12,7 @@ EnvironmentFile=/etc/empire_os.env
 Environment=PYTHONPATH=/srv/empire_os
 Environment=EMPIRE_AUTONOMOUS_MODE=OBSERVE
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/activate_predictive_revenue_enterprise_targets.py
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_enterprise_contact_intelligence.py
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_buyer_acquisition_team.py --repo-root /srv/empire_os
 NoNewPrivileges=true
 PrivateTmp=true
