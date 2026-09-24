@@ -3,7 +3,9 @@ from urllib.parse import parse_qs, urlparse
 from empire_os.legacy_permit_recovery import (
     build_recovery_observer,
     dedupe_legacy_lane_rows,
+    fetch_canonical_prospects_by_metro,
     fetch_legacy_permit_rows,
+    match_canonical_identity,
     parse_legacy_lane_notes,
     revalidate_nyc_permits,
 )
@@ -114,7 +116,7 @@ def test_verified_current_permit_is_reuse_but_never_promoted():
     assert record["recovery_state"] == "VERIFIED_CURRENT"
     assert record["historical_omega"]["historical_only"] is True
     assert record["historical_omega"]["current_truth"] is False
-    assert record["current_identity_match_state"] == "UNKNOWN_NOT_CHECKED"
+    assert record["current_identity_match_state"] == "NO_MATCH"
     assert record["canonical_prospect_id"] is None
     assert record["canonical_promotion_performed"] is False
     assert record["commercial_ready"] is False
@@ -231,3 +233,137 @@ def test_fetch_is_read_only_and_bounded(monkeypatch):
     assert params["notes"] == ["ilike.*permit*"]
     assert params["limit"] == ["500"]
     assert params["offset"] == ["7"]
+
+
+def test_verified_current_exact_phone_match_becomes_merge_candidate():
+    payload = build_recovery_observer(
+        [_row()],
+        nyc_validation={
+            "401975190": {
+                "validation_state": "VERIFIED_CURRENT",
+                "validation_reason": "current_public_source_match",
+                "source_system": "nyc_dob_permits",
+                "source_freshness": "SOURCE_REVALIDATED_CURRENT",
+            }
+        },
+        canonical_prospects_by_metro={
+            "nyc": {
+                "rows": [{
+                    "id": "canonical-1",
+                    "business_name": "Different Display Name",
+                    "phone": "7183489398",
+                    "metro": "nyc",
+                }],
+                "rows_scanned": 1,
+                "truncated": False,
+            }
+        },
+    )
+
+    record = payload["records"][0]
+    assert record["current_identity_match_state"] == "MATCHED"
+    assert record["canonical_match_method"] == "exact_phone"
+    assert record["canonical_prospect_id"] == "canonical-1"
+    assert record["recovery_classification"] == "MERGE"
+    assert record["recovery_state"] == "VERIFIED_CURRENT"
+    assert record["canonical_promotion_performed"] is False
+    assert payload["classification_counts"] == {"MERGE": 1}
+
+
+def test_verified_current_ambiguous_identity_requires_review():
+    payload = build_recovery_observer(
+        [_row()],
+        nyc_validation={
+            "401975190": {
+                "validation_state": "VERIFIED_CURRENT",
+                "validation_reason": "current_public_source_match",
+                "source_system": "nyc_dob_permits",
+                "source_freshness": "SOURCE_REVALIDATED_CURRENT",
+            }
+        },
+        canonical_prospects_by_metro={
+            "nyc": {
+                "rows": [
+                    {
+                        "id": "canonical-1",
+                        "business_name": "A",
+                        "phone": "7183489398",
+                        "metro": "nyc",
+                    },
+                    {
+                        "id": "canonical-2",
+                        "business_name": "B",
+                        "phone": "(718) 348-9398",
+                        "metro": "nyc",
+                    },
+                ],
+                "rows_scanned": 2,
+                "truncated": False,
+            }
+        },
+    )
+
+    record = payload["records"][0]
+    assert record["current_identity_match_state"] == "AMBIGUOUS"
+    assert record["canonical_match_reason"] == (
+        "multiple_exact_phone_matches"
+    )
+    assert record["canonical_prospect_id"] is None
+    assert record["recovery_classification"] == "MODERNIZE"
+    assert record["recovery_state"] == "IDENTITY_REVIEW_REQUIRED"
+    assert record["canonical_promotion_performed"] is False
+
+
+def test_canonical_lookup_reuses_existing_match_contract():
+    parsed = parse_legacy_lane_notes(NYC_NOTE)
+    result = match_canonical_identity(
+        parsed,
+        {
+            "nyc": {
+                "rows": [{
+                    "id": "canonical-name",
+                    "business_name": "Peykar Realty",
+                    "phone": "",
+                    "metro": "NYC",
+                }],
+                "rows_scanned": 1,
+                "truncated": False,
+            }
+        },
+    )
+
+    assert result["match_state"] == "MATCHED"
+    assert result["match_method"] == "exact_name_metro"
+    assert result["canonical_prospect_id"] == "canonical-name"
+
+
+def test_canonical_lookup_is_read_only_and_bounded(monkeypatch):
+    calls = []
+
+    def fake_request(method, path):
+        calls.append((method, path))
+        if "offset=0" in path:
+            return [{
+                "id": "canonical-1",
+                "business_name": "Peykar Realty",
+                "phone": "7183489398",
+                "metro": "nyc",
+            }]
+        return []
+
+    monkeypatch.setattr(
+        "empire_os.legacy_permit_recovery.request_json",
+        fake_request,
+    )
+
+    result = fetch_canonical_prospects_by_metro(
+        ["NYC"],
+        page_size=10,
+        max_rows_per_metro=100,
+    )
+
+    assert result["nyc"]["rows_scanned"] == 1
+    assert result["nyc"]["truncated"] is False
+    assert calls
+    assert all(method == "GET" for method, _ in calls)
+    assert "/rest/v1/prospects?" in calls[0][1]
