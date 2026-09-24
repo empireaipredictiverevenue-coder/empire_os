@@ -17,7 +17,6 @@ ROOT = Path("/srv/empire_os")
 RUNTIME = ROOT / "runtime"
 
 CRITICAL_SERVICES = (
-    "empire-autonomous-execution.service",
     "empire-public-gateway.service",
     "empire-ops-mcp.service",
     "empire-ops-privileged-helper.service",
