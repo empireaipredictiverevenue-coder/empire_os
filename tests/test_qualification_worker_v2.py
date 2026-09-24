@@ -52,6 +52,29 @@ def test_egress_budget_opens_local_circuit_before_runaway(monkeypatch, tmp_path)
     assert state["circuit"]["source"] == "local_request_budget"
 
 
+def test_component_request_budget_trips_before_global_budget(monkeypatch, tmp_path):
+    _isolate_egress_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR", "100")
+    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY", "1000")
+    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_COMPONENT_HOUR", "2")
+    monkeypatch.setenv("EMPIRE_COMPONENT", "noisy-worker")
+    monkeypatch.setattr(worker, "_egress_now", lambda: 7200.0)
+
+    worker._reserve_supabase_request()
+    worker._reserve_supabase_request()
+
+    try:
+        worker._reserve_supabase_request()
+    except RuntimeError as exc:
+        assert "component_hourly_request_budget_exceeded:noisy-worker" in str(exc)
+    else:
+        raise AssertionError("component request budget should fail closed")
+
+    state = worker._load_egress_state(worker._EGRESS_STATE_PATH)
+    assert state["counts"]["components"]["noisy-worker"]["hour_count"] == 2
+    assert state["circuit"]["open"] is True
+
+
 def test_egress_402_trips_circuit_and_blocks_repeat_calls(monkeypatch, tmp_path):
     _isolate_egress_state(monkeypatch, tmp_path)
     monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR", "100")
