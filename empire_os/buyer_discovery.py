@@ -118,6 +118,15 @@ def _uuid_or_none(value: Any) -> str | None:
         raise ValueError("canonical UUID required") from exc
 
 
+def _title_has(value: str, term: str) -> bool:
+    return bool(
+        re.search(
+            rf"(?<!\\w){re.escape(term.lower())}(?!\\w)",
+            value,
+        )
+    )
+
+
 def classify_decision_role(title: Any) -> tuple[str, float]:
     value = _text(title).lower()
     if not value:
@@ -133,11 +142,11 @@ def classify_decision_role(title: Any) -> tuple[str, float]:
             "operations", "analytics", "strategy", "technology",
             "data", " ai", "transformation", "commercial",
         )
-        if any(term in value for term in functional_remits):
+        if any(_title_has(value, term) for term in functional_remits):
             return "functional_buyer", 0.8
         return "influencer", 0.6
 
-    if any(term in value for term in ECONOMIC_BUYER_TERMS):
+    if any(_title_has(value, term) for term in ECONOMIC_BUYER_TERMS):
         return "economic_buyer", 1.0
 
     functional_c_suite_phrases = (
@@ -160,7 +169,7 @@ def classify_decision_role(title: Any) -> tuple[str, float]:
         "cdo",
     )
     if (
-        any(term in value for term in functional_c_suite_phrases)
+        any(_title_has(value, term) for term in functional_c_suite_phrases)
         or any(
             re.search(rf"\\b{re.escape(term)}\\b", value)
             for term in functional_c_suite_acronyms
@@ -168,11 +177,11 @@ def classify_decision_role(title: Any) -> tuple[str, float]:
     ):
         return "functional_buyer", 0.8
 
-    if any(term in value for term in FUNCTIONAL_BUYER_TERMS):
+    if any(_title_has(value, term) for term in FUNCTIONAL_BUYER_TERMS):
         return "functional_buyer", 0.8
-    if "general manager" in value:
+    if _title_has(value, "general manager"):
         return "functional_buyer", 0.7
-    if any(term in value for term in ("director", "head", "manager")):
+    if any(_title_has(value, term) for term in ("director", "head", "manager")):
         return "influencer", 0.5
     return "other", 0.2
 
