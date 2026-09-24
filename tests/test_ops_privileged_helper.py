@@ -59,3 +59,28 @@ def test_start_is_narrower_than_restart_allowlist():
         validate_request(
             request("service_start", "empire-public-gateway.service")
         )
+
+
+def test_runtime_self_heal_units_are_allowlisted_without_outbound_authority():
+    from empire_os.ops_privileged_helper import ALLOWED_UNITS
+
+    expected = {
+        "empire-self-serve-checkout.service",
+        "empire-ops-mcp.service",
+        "empire-commercial-product-catalog.service",
+        "empire-commercial-product-catalog.timer",
+        "empire-commercial-exchange.service",
+        "empire-commercial-exchange.timer",
+        "empire-buyer-acquisition-team.service",
+        "empire-buyer-acquisition-team.timer",
+        "empire-source-health.service",
+        "empire-source-health.timer",
+        "empire-revenue-pulse.timer",
+        "empire-acquisition.timer",
+        "empire-qualification.timer",
+        "empire-hermes-control.timer",
+    }
+    assert expected.issubset(ALLOWED_UNITS)
+    assert all("outbound" not in unit for unit in ALLOWED_UNITS)
+    assert all("payment" not in unit for unit in ALLOWED_UNITS)
+    assert all("settlement" not in unit for unit in ALLOWED_UNITS)
