@@ -12,16 +12,9 @@ def test_choose_jobs_drives_internal_launch_pipeline():
     }
     source = {"end_to_end_healthy": True}
     assert choose_jobs(loop, source) == [
-        "buyer_review_materializer",
-        "gtm_pipeline",
-        "closer_reply_handoff",
-        "commercial_product_catalog_refresh",
-        "commercial_evidence_auto_verifier",
         "commercial_terms_materializer",
         "conversion_intelligence_refresh",
         "commercial_loop_refresh",
-        "revenue_pulse_refresh",
-        "opportunity_loop_refresh",
         "astra_executive_refresh",
         "astra_department_dispatch",
     ]
@@ -38,16 +31,9 @@ def test_choose_jobs_adds_source_repair_but_no_duplicate_jobs():
     }
     source = {"end_to_end_healthy": False}
     assert choose_jobs(loop, source) == [
-        "source_health_refresh",
-        "buyer_review_materializer",
-        "closer_reply_handoff",
-        "commercial_product_catalog_refresh",
-        "commercial_evidence_auto_verifier",
         "commercial_terms_materializer",
         "conversion_intelligence_refresh",
         "commercial_loop_refresh",
-        "revenue_pulse_refresh",
-        "opportunity_loop_refresh",
         "astra_executive_refresh",
         "astra_department_dispatch",
     ]
@@ -58,7 +44,6 @@ def test_complete_commercial_loop_keeps_discovering_next_opportunity():
         {"loop_complete": True, "stages": []},
         {"end_to_end_healthy": True},
     ) == [
-        "opportunity_loop_refresh",
         "astra_executive_refresh",
         "astra_department_dispatch",
     ]
@@ -77,12 +62,47 @@ def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
     review = {"deferred_enrichment": 4}
     jobs = choose_jobs(loop, source, review)
     assert "buyer_deferred_enrichment" not in jobs
-    assert jobs[0] == "buyer_review_materializer"
-    assert jobs[-3:] == [
-        "opportunity_loop_refresh",
+    assert jobs[0] == "commercial_terms_materializer"
+    assert jobs[-2:] == [
         "astra_executive_refresh",
         "astra_department_dispatch",
     ]
+    for timer_owned in (
+        "source_health_refresh",
+        "buyer_review_materializer",
+        "gtm_pipeline",
+        "closer_reply_handoff",
+        "commercial_product_catalog_refresh",
+        "commercial_evidence_auto_verifier",
+        "revenue_pulse_refresh",
+        "opportunity_loop_refresh",
+    ):
+        assert timer_owned not in jobs
+
+
+def test_choose_jobs_does_not_duplicate_timer_owned_workers():
+    jobs = choose_jobs(
+        {
+            "loop_complete": False,
+            "stages": [
+                {"stage": "recognized_revenue", "observed": False},
+                {"stage": "buyer_conversation", "observed": False},
+                {"stage": "commercial_terms", "observed": False},
+            ],
+        },
+        {"end_to_end_healthy": False},
+    )
+    timer_owned = {
+        "source_health_refresh",
+        "buyer_review_materializer",
+        "gtm_pipeline",
+        "closer_reply_handoff",
+        "commercial_product_catalog_refresh",
+        "commercial_evidence_auto_verifier",
+        "revenue_pulse_refresh",
+        "opportunity_loop_refresh",
+    }
+    assert timer_owned.isdisjoint(jobs)
 
 
 def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
@@ -107,7 +127,7 @@ def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
     def fake_run(command, **kwargs):
         calls.append(command)
         if any(
-            str(part).endswith("run_buyer_review_materializer.py")
+            str(part).endswith("refresh_commercial_loop.py")
             for part in command
         ):
             raise subprocess.TimeoutExpired(command, 10)
