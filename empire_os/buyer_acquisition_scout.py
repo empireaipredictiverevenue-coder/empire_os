@@ -367,12 +367,29 @@ def run_buyer_scout(
         seed = canonical_seed_by_domain.get(domain) or {}
         seed_name = str(seed.get("business_name") or "").strip()
         seed_niche = str(seed.get("niche") or "").strip()
-        business_name, business_name_source, seed_corroborated = (
-            _site_identity(
+        seed_profile = str(seed.get("icp_profile_key") or "").strip()
+
+        if (
+            seed
+            and seed_profile != "high_ticket_home_service"
+            and reliable_business_name(seed_name)
+        ):
+            # Preserve established canonical-fallback semantics for
+            # non-permit lanes. Permit/home-service fallback alone gets the
+            # stricter first-party identity replacement below.
+            business_name = seed_name
+            business_name_source = "canonical_prospect_seed"
+            seed_corroborated = False
+        else:
+            (
+                business_name,
+                business_name_source,
+                seed_corroborated,
+            ) = _site_identity(
                 evidence,
                 seed_name=seed_name,
             )
-        )
+
         nyc_territory, nyc_territory_hits = _nyc_territory_evidence(
             evidence
         )
