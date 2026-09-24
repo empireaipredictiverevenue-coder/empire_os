@@ -91,6 +91,10 @@ def _reserve_supabase_request() -> None:
         "EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR",
         _DEFAULT_HOURLY_BUDGET,
     )
+    component_hourly_budget = _env_int(
+        "EMPIRE_SUPABASE_MAX_REQUESTS_PER_COMPONENT_HOUR",
+        1000,
+    )
     daily_budget = _env_int(
         "EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY",
         _DEFAULT_DAILY_BUDGET,
@@ -134,15 +138,43 @@ def _reserve_supabase_request() -> None:
 
         hour_count = int(counts.get("hour_count") or 0)
         day_count = int(counts.get("day_count") or 0)
-        if hour_count >= hourly_budget or day_count >= daily_budget:
-            reason = (
-                "hourly_request_budget_exceeded"
-                if hour_count >= hourly_budget
-                else "daily_request_budget_exceeded"
-            )
+
+        component = _component_name()
+        components = counts.get("components")
+        components = dict(components) if isinstance(components, dict) else {}
+        component_state = components.get(component)
+        component_state = (
+            dict(component_state)
+            if isinstance(component_state, dict)
+            else {}
+        )
+        if component_state.get("hour_bucket") != hour_bucket:
+            component_state["hour_bucket"] = hour_bucket
+            component_state["hour_count"] = 0
+        component_hour_count = int(
+            component_state.get("hour_count") or 0
+        )
+
+        if (
+            component_hour_count >= component_hourly_budget
+            or hour_count >= hourly_budget
+            or day_count >= daily_budget
+        ):
+            if component_hour_count >= component_hourly_budget:
+                reason = (
+                    "component_hourly_request_budget_exceeded:"
+                    + component
+                )
+            elif hour_count >= hourly_budget:
+                reason = "hourly_request_budget_exceeded"
+            else:
+                reason = "daily_request_budget_exceeded"
             reset_at = (
                 (hour_bucket + 1) * 3600
-                if reason.startswith("hourly")
+                if (
+                    reason.startswith("hourly")
+                    or reason.startswith("component_hourly")
+                )
                 else (day_bucket + 1) * 86400
             )
             state["circuit"] = {
@@ -160,6 +192,10 @@ def _reserve_supabase_request() -> None:
 
         counts["hour_count"] = hour_count + 1
         counts["day_count"] = day_count + 1
+        component_state["hour_count"] = component_hour_count + 1
+        component_state["updated_at"] = now
+        components[component] = component_state
+        counts["components"] = components
         counts["updated_at"] = now
         state["counts"] = counts
         _write_egress_state(_EGRESS_STATE_PATH, state)
@@ -209,6 +245,17 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _component_name() -> str:
+    raw_component = (
+        os.getenv("EMPIRE_COMPONENT", "").strip()
+        or Path(sys.argv[0] or "python").name
+    )
+    return (
+        re.sub(r"[^A-Za-z0-9_.-]+", "-", raw_component)[:80]
+        or "python"
+    )
+
+
 def _client() -> tuple[str, dict[str, str]]:
     env = load_runtime_env(
         ENV_PATH,
@@ -216,15 +263,7 @@ def _client() -> tuple[str, dict[str, str]]:
     )
     base = env["SUPABASE_URL"].rstrip("/")
     key = env["SUPABASE_SERVICE_KEY"]
-    raw_component = (
-        os.getenv("EMPIRE_COMPONENT", "").strip()
-        or Path(sys.argv[0] or "python").name
-    )
-    component = re.sub(
-        r"[^A-Za-z0-9_.-]+",
-        "-",
-        raw_component,
-    )[:80] or "python"
+    component = _component_name()
     return base, {
         "apikey": key,
         "Authorization": "Bearer " + key,
