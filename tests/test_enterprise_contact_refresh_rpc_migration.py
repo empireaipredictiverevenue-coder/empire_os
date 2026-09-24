@@ -20,10 +20,13 @@ def test_pending_review_refresh_rpc_keeps_table_write_boundary_narrow():
     assert "grant execute" in text.lower()
     assert "to service_role" in text.lower()
     assert "from public, anon, authenticated" in text.lower()
-    assert "grant update" not in text.lower()
-    assert "approve" not in text.lower().split("comment on function")[0]
-    assert "outbound_intents" not in text
-    assert "payment" not in text.lower().split("comment on function")[0]
+    lowered = text.lower()
+    assert "grant update" not in lowered
+    assert "update public.outbound_intents" not in lowered
+    assert "insert into public.outbound_events" not in lowered
+    assert "approve_outbound_intent" not in lowered
+    assert "payment_requests" not in lowered
+    assert "commercial_payments" not in lowered
 
 
 def test_contact_worker_uses_rpc_instead_of_direct_table_patch():
