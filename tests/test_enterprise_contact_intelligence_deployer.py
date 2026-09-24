@@ -52,3 +52,13 @@ def test_enterprise_contact_deployer_retries_once_after_verified_self_repair():
     assert "Retrying deployment once" in text
     assert "exec bash scripts/deploy_enterprise_contact_intelligence.sh" in text
     assert "repaired deployment already retried once" in text
+
+
+def test_enterprise_contact_deployer_surfaces_coder_repair_error():
+    text = (
+        ROOT / "scripts/deploy_enterprise_contact_intelligence.sh"
+    ).read_text()
+
+    assert '"CODER_REPAIR_FAILED"' in text
+    assert "Repair controller error:" in text
+    assert 'payload.get("error")' in text
