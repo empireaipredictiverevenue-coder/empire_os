@@ -1014,30 +1014,73 @@ def build_buyer_acquisition_plan(
     }
 
 
+def _read_runtime_snapshot(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}, {
+            "state": "MISSING",
+            "path": str(path),
+            "readable": False,
+        }
+    except PermissionError:
+        return {}, {
+            "state": "PERMISSION_DENIED",
+            "path": str(path),
+            "readable": False,
+        }
+    except OSError as exc:
+        return {}, {
+            "state": "READ_ERROR",
+            "path": str(path),
+            "readable": False,
+            "error": f"{type(exc).__name__}:{str(exc)[:160]}",
+        }
+
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}, {
+            "state": "INVALID_JSON",
+            "path": str(path),
+            "readable": True,
+        }
+    if not isinstance(value, dict):
+        return {}, {
+            "state": "INVALID_ROOT_TYPE",
+            "path": str(path),
+            "readable": True,
+        }
+    return value, {
+        "state": "OK",
+        "path": str(path),
+        "readable": True,
+    }
+
+
 def refresh_buyer_acquisition_plan(
     repo_root: str | Path,
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
-    exchange_path = root / "runtime/commercial_exchange/latest.json"
-    try:
-        exchange = json.loads(exchange_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        exchange = {}
-    if not isinstance(exchange, dict):
-        exchange = {}
-
-    catalog_path = root / "runtime/commercial_catalog/latest.json"
-    try:
-        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        catalog = {}
-    if not isinstance(catalog, dict):
-        catalog = {}
+    exchange, exchange_health = _read_runtime_snapshot(
+        root / "runtime/commercial_exchange/latest.json"
+    )
+    catalog, catalog_health = _read_runtime_snapshot(
+        root / "runtime/commercial_catalog/latest.json"
+    )
 
     payload = build_buyer_acquisition_plan(
         exchange,
         catalog_snapshot=catalog,
     )
+    payload["runtime_input_health"] = {
+        "commercial_exchange": exchange_health,
+        "commercial_catalog": catalog_health,
+        "degraded": (
+            exchange_health["state"] != "OK"
+            or catalog_health["state"] != "OK"
+        ),
+    }
     path = root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
