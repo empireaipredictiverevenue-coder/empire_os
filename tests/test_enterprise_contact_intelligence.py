@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from empire_os.enterprise_contact_intelligence import (
+    current_target_people,
     reconcile_verified_enterprise_contact,
     sync_enterprise_activation,
 )
@@ -183,3 +184,47 @@ def test_enterprise_sync_worker_keeps_execution_governed():
     ).read_text()
     assert '"live_outbound_send": False' in source
     assert '"actual_revenue": False' in source
+
+
+def test_current_first_party_leadership_precedes_curated_fallback():
+    row = {
+        "account_name": "Sila Services",
+        "probe": {
+            "site_people": [{
+                "name": "Kyle Martin",
+                "title": "Chief Strategy Officer",
+                "url": "https://silaservices.com/leadership/",
+            }]
+        },
+    }
+    people = current_target_people(row)
+    kyle = next(
+        person for person in people
+        if person["name"] == "Kyle Martin"
+    )
+    assert kyle["title"] == "Chief Strategy Officer"
+    assert kyle["source"] == "first_party_site_current"
+
+
+def test_reconciliation_uses_current_first_party_title_when_available():
+    row = {
+        "account_name": "Sila Services",
+        "person_contact_verified": True,
+        "probe": {
+            **_probe(
+                "Kyle Martin",
+                "President",
+                "kmartin@sila.com",
+            ),
+            "site_people": [{
+                "name": "Kyle Martin",
+                "title": "Vice President, Corporate Development",
+                "url": "https://silaservices.com/leadership/",
+            }],
+        },
+    }
+    result = reconcile_verified_enterprise_contact(row)
+    assert result["title"] == "Vice President, Corporate Development"
+    assert result["decision_role"] == "functional_buyer"
+    assert result["decision_score"] == 0.8
+    assert result["leadership_source"] == "first_party_site_current"
