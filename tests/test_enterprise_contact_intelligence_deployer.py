@@ -38,3 +38,17 @@ def test_enterprise_contact_deployer_uses_canonical_systemd_env_for_sync():
     assert "verify_enterprise_contact_intelligence.py" in text
     assert "SYNC_RESULT" in text
     assert "EnvironmentFile" not in text
+
+
+def test_enterprise_contact_deployer_retries_once_after_verified_self_repair():
+    text = (
+        ROOT / "scripts/deploy_enterprise_contact_intelligence.sh"
+    ).read_text()
+
+    assert "=== AUTOMATIC REPAIR ATTEMPT ===" in text
+    assert "EMPIRE_CONTACT_DEPLOY_REENTRY" in text
+    assert "RESOLVED_AND_PUSHED" in text
+    assert "RESOLVED_BY_CONCURRENT_CHANGE" in text
+    assert "Retrying deployment once" in text
+    assert "exec bash scripts/deploy_enterprise_contact_intelligence.sh" in text
+    assert "repaired deployment already retried once" in text
