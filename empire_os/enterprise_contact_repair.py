@@ -198,7 +198,7 @@ def _tracked_dirty_status(*, cwd: Path = ROOT) -> str:
         "--porcelain",
         "--untracked-files=no",
         cwd=cwd,
-    ).stdout.strip()
+    ).stdout.rstrip("\n")
 
 
 def _tracked_dirty_paths(*, cwd: Path = ROOT) -> list[str]:
