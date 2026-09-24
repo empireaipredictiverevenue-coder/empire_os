@@ -53,3 +53,61 @@ def test_order_endpoint_keeps_proposal_gated(monkeypatch):
     )
     assert response.status_code == 200
     assert response.json()["payment_request_created"] is False
+
+
+
+def test_exchange_tiers_endpoint_is_non_binding(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "exchange_tier_catalog",
+        lambda: {
+            "products": [{"product_code": "exchange_seat_starter"}],
+            "count": 1,
+            "pricing_binding": False,
+            "actual_revenue": False,
+        },
+    )
+    client = TestClient(api.app)
+    response = client.get("/v1/exchange/tiers")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["pricing_binding"] is False
+    assert body["actual_revenue"] is False
+
+
+def test_exchange_interest_endpoint_records_buyer_request(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "record_exchange_interest",
+        lambda **kwargs: {
+            "decision": "interest_recorded",
+            "candidate_id": "candidate-1",
+            "tier_code": kwargs["tier_code"],
+            "seat_activated": False,
+            "pricing_binding": False,
+            "actual_revenue": False,
+        },
+    )
+    client = TestClient(api.app)
+    response = client.post(
+        "/v1/exchange/interests",
+        json={
+            "tier_code": "exchange_seat_growth",
+            "business_name": "Example Roofing Ltd",
+            "email": "buyer@example.com",
+            "domain": "example.com",
+            "niche": "Roofing",
+            "territory": "Greater Manchester",
+            "daily_capacity": 12,
+            "delivery_preference": "webhook",
+            "exclusivity_interest": False,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["decision"] == "interest_recorded"
+    assert body["seat_activated"] is False
+    assert body["actual_revenue"] is False
