@@ -137,37 +137,72 @@ class BuyerDeferredEnrichmentQueue:
                     "created_at": now,
                     "attempts": 0,
                 }
+            target_people = [
+                {
+                    "name": str(person.get("name") or "").strip(),
+                    "title": str(person.get("title") or "").strip(),
+                }
+                for person in (item.get("target_people") or [])
+                if isinstance(person, Mapping)
+                and str(person.get("name") or "").strip()
+                and str(person.get("title") or "").strip()
+            ][:6]
+            target_product_codes = [
+                str(value).strip()
+                for value in (item.get("target_product_codes") or [])
+                if str(value).strip()
+            ][:6]
+            company_contact_routes = [
+                dict(route)
+                for route in (item.get("company_contact_routes") or [])
+                if isinstance(route, Mapping)
+                and route.get("verified") is True
+                and str(route.get("value") or "").strip()
+            ][:8]
+
             existing.update({
                 "business_name": str(item.get("business_name") or "").strip(),
                 "website": str(item.get("website") or "").strip(),
-                "phone": str(item.get("phone") or "").strip(),
-                "entity_id": str(item.get("entity_id") or "").strip() or None,
+                "phone": (
+                    str(item.get("phone") or "").strip()
+                    or str(existing.get("phone") or "").strip()
+                ),
+                "entity_id": (
+                    str(item.get("entity_id") or "").strip()
+                    or existing.get("entity_id")
+                    or None
+                ),
                 "reason": reason,
                 "status": "pending",
                 "updated_at": now,
                 "next_retry_at": existing.get("next_retry_at") or now,
                 "account_key": (
-                    str(item.get("account_key") or "").strip() or None
+                    str(item.get("account_key") or "").strip()
+                    or existing.get("account_key")
+                    or None
                 ),
-                "wave": str(item.get("wave") or "").strip() or None,
+                "wave": (
+                    str(item.get("wave") or "").strip()
+                    or existing.get("wave")
+                    or None
+                ),
                 "offer_key": (
-                    str(item.get("offer_key") or "").strip() or None
+                    str(item.get("offer_key") or "").strip()
+                    or existing.get("offer_key")
+                    or None
                 ),
-                "target_people": [
-                    {
-                        "name": str(person.get("name") or "").strip(),
-                        "title": str(person.get("title") or "").strip(),
-                    }
-                    for person in (item.get("target_people") or [])
-                    if isinstance(person, Mapping)
-                    and str(person.get("name") or "").strip()
-                    and str(person.get("title") or "").strip()
-                ][:6],
-                "target_product_codes": [
-                    str(value).strip()
-                    for value in (item.get("target_product_codes") or [])
-                    if str(value).strip()
-                ][:6],
+                "target_people": (
+                    target_people
+                    or list(existing.get("target_people") or [])
+                ),
+                "target_product_codes": (
+                    target_product_codes
+                    or list(existing.get("target_product_codes") or [])
+                ),
+                "company_contact_routes": (
+                    company_contact_routes
+                    or list(existing.get("company_contact_routes") or [])
+                ),
             })
             data[prospect_id] = existing
             return True
