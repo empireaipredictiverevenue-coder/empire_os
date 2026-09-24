@@ -122,15 +122,27 @@ def test_send_payload_uses_intent_specific_reply_alias():
     assert resolved == "00000000-0000-0000-0000-000000000001"
 
 
+def test_send_payload_accepts_verified_root_founder_sender():
+    payload = build_resend_send(
+        authorized_claim(),
+        sender="Phil - Founder - Empire AI <founder@empire-ai.co.uk>",
+        reply_to="reply@mail.empire-ai.co.uk",
+    )
+    assert payload["_sender_address"] == "founder@empire-ai.co.uk"
+    assert payload["reply_to"] == [
+        "reply+00000000-0000-0000-0000-000000000001@mail.empire-ai.co.uk"
+    ]
+
+
 def test_send_payload_rejects_wrong_sender_or_reply_domain():
     with pytest.raises(OutboundProviderError, match="sender domain"):
         build_resend_send(
-            authorized_claim(), sender="Phil <phil@empire-ai.co.uk>",
+            authorized_claim(), sender="Phil <phil@example.com>",
             reply_to="reply@mail.empire-ai.co.uk",
         )
     with pytest.raises(OutboundProviderError, match="reply domain"):
         build_resend_send(
-            authorized_claim(), sender="Phil <phil@mail.empire-ai.co.uk>",
+            authorized_claim(), sender="Phil <founder@empire-ai.co.uk>",
             reply_to="reply@empire-ai.co.uk",
         )
 
