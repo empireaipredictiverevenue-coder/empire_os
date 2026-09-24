@@ -55,6 +55,8 @@ def test_parse_legacy_nyc_permit_identity():
     assert parsed["bbl"] == "4092480052"
     assert parsed["address"] == "84-90 127 STREET, Queens"
     assert parsed["source_system"] == "nyc_dob_permits"
+    assert parsed["legacy_name_role"] == "property_owner"
+    assert parsed["legacy_phone_role"] == "permittee_contact"
     assert parsed["identity_recoverable"] is True
     assert parsed["identity_fingerprint"]
 
@@ -103,6 +105,7 @@ def test_verified_current_permit_is_reuse_but_never_promoted():
                 "validation_reason": "current_public_source_match",
                 "source_system": "nyc_dob_permits",
                 "source_freshness": "SOURCE_REVALIDATED_CURRENT",
+                "source_owner_names": ["Peykar Realty"],
             }
         },
     )
@@ -116,6 +119,7 @@ def test_verified_current_permit_is_reuse_but_never_promoted():
     assert record["recovery_state"] == "VERIFIED_CURRENT"
     assert record["historical_omega"]["historical_only"] is True
     assert record["historical_omega"]["current_truth"] is False
+    assert record["source_owner_identity_state"] == "MATCHED"
     assert record["current_identity_match_state"] == "NO_MATCH"
     assert record["canonical_prospect_id"] is None
     assert record["canonical_promotion_performed"] is False
@@ -184,6 +188,18 @@ def test_revalidate_nyc_permits_batches_and_matches(monkeypatch):
                 "job__": "401975190",
                 "dobrundate": "2026-08-16T00:00:00.000",
                 "permit_status": "ISSUED",
+                "owner_s_business_name": "Peykar Realty",
+                "owner_s_first_name": "",
+                "owner_s_last_name": "",
+                "permittee_s_business_name": "Pipe Co",
+                "permittee_s_first_name": "",
+                "permittee_s_last_name": "",
+                "permittee_s_phone__": "7183489398",
+                "permittee_s_license_type": "MP",
+                "permittee_s_license__": "12345",
+                "house__": "84-90",
+                "street_name": "127 STREET",
+                "borough": "QUEENS",
             }]
 
     def fake_get(url, params, timeout):
@@ -203,6 +219,13 @@ def test_revalidate_nyc_permits_batches_and_matches(monkeypatch):
     assert len(seen) == 1
     assert "job__ in(" in seen[0][1]["$where"]
     assert result["401975190"]["validation_state"] == "VERIFIED_CURRENT"
+    assert result["401975190"]["source_owner_names"] == ["Peykar Realty"]
+    assert result["401975190"]["source_permittees"][0]["business_name"] == (
+        "Pipe Co"
+    )
+    assert result["401975190"]["source_permittees"][0]["phone"] == (
+        "7183489398"
+    )
     assert result["999999999"]["validation_state"] == "NOT_FOUND"
 
 
@@ -235,7 +258,7 @@ def test_fetch_is_read_only_and_bounded(monkeypatch):
     assert params["offset"] == ["7"]
 
 
-def test_verified_current_exact_phone_and_name_becomes_merge_candidate():
+def test_verified_current_exact_owner_name_becomes_merge_candidate():
     payload = build_recovery_observer(
         [_row()],
         nyc_validation={
@@ -244,6 +267,7 @@ def test_verified_current_exact_phone_and_name_becomes_merge_candidate():
                 "validation_reason": "current_public_source_match",
                 "source_system": "nyc_dob_permits",
                 "source_freshness": "SOURCE_REVALIDATED_CURRENT",
+                "source_owner_names": ["Peykar Realty"],
             }
         },
         canonical_prospects_by_metro={
@@ -262,7 +286,7 @@ def test_verified_current_exact_phone_and_name_becomes_merge_candidate():
 
     record = payload["records"][0]
     assert record["current_identity_match_state"] == "MATCHED"
-    assert record["canonical_match_method"] == "exact_phone_name_metro"
+    assert record["canonical_match_method"] == "exact_name_metro"
     assert record["canonical_prospect_id"] == "canonical-1"
     assert record["recovery_classification"] == "MERGE"
     assert record["recovery_state"] == "VERIFIED_CURRENT"
@@ -279,6 +303,7 @@ def test_verified_current_ambiguous_identity_requires_review():
                 "validation_reason": "current_public_source_match",
                 "source_system": "nyc_dob_permits",
                 "source_freshness": "SOURCE_REVALIDATED_CURRENT",
+                "source_owner_names": ["Peykar Realty"],
             }
         },
         canonical_prospects_by_metro={
@@ -286,14 +311,14 @@ def test_verified_current_ambiguous_identity_requires_review():
                 "rows": [
                     {
                         "id": "canonical-1",
-                        "business_name": "A",
-                        "phone": "7183489398",
+                        "business_name": "Peykar Realty",
+                        "phone": "1111111111",
                         "metro": "nyc",
                     },
                     {
                         "id": "canonical-2",
-                        "business_name": "B",
-                        "phone": "(718) 348-9398",
+                        "business_name": "Peykar Realty",
+                        "phone": "2222222222",
                         "metro": "nyc",
                     },
                 ],
@@ -306,7 +331,7 @@ def test_verified_current_ambiguous_identity_requires_review():
     record = payload["records"][0]
     assert record["current_identity_match_state"] == "AMBIGUOUS"
     assert record["canonical_match_reason"] == (
-        "multiple_exact_phone_matches"
+        "multiple_exact_name_metro_matches"
     )
     assert record["canonical_prospect_id"] is None
     assert record["recovery_classification"] == "MODERNIZE"
@@ -369,7 +394,7 @@ def test_canonical_lookup_is_read_only_and_bounded(monkeypatch):
     assert "/rest/v1/prospects?" in calls[0][1]
 
 
-def test_verified_current_phone_only_match_requires_review():
+def test_permittee_phone_does_not_merge_property_owner():
     payload = build_recovery_observer(
         [_row()],
         nyc_validation={
@@ -378,6 +403,7 @@ def test_verified_current_phone_only_match_requires_review():
                 "validation_reason": "current_public_source_match",
                 "source_system": "nyc_dob_permits",
                 "source_freshness": "SOURCE_REVALIDATED_CURRENT",
+                "source_owner_names": ["Peykar Realty"],
             }
         },
         canonical_prospects_by_metro={
@@ -395,12 +421,48 @@ def test_verified_current_phone_only_match_requires_review():
     )
 
     record = payload["records"][0]
-    assert record["current_identity_match_state"] == "PHONE_ONLY_REVIEW"
-    assert record["canonical_match_reason"] == (
-        "exact_phone_without_name_corroboration"
+    assert record["recovered_fields"]["legacy_name_role"] == (
+        "property_owner"
     )
-    assert record["canonical_match_method"] == "exact_phone_review_only"
-    assert record["canonical_prospect_id"] == "canonical-shared-phone"
+    assert record["recovered_fields"]["legacy_phone_role"] == (
+        "permittee_contact"
+    )
+    assert record["current_identity_match_state"] == "NO_MATCH"
+    assert record["canonical_match_reason"] == "no_strong_identity_match"
+    assert record["canonical_prospect_id"] is None
+    assert record["source_owner_identity_state"] == "MATCHED"
+    assert record["recovery_classification"] == "REUSE"
+    assert record["recovery_state"] == "VERIFIED_CURRENT"
+    assert record["canonical_promotion_performed"] is False
+
+
+def test_current_permit_owner_mismatch_requires_identity_review():
+    payload = build_recovery_observer(
+        [_row()],
+        nyc_validation={
+            "401975190": {
+                "validation_state": "VERIFIED_CURRENT",
+                "validation_reason": "current_public_source_match",
+                "source_system": "nyc_dob_permits",
+                "source_freshness": "SOURCE_REVALIDATED_CURRENT",
+                "source_owner_names": ["Different Owner LLC"],
+            }
+        },
+    )
+
+    record = payload["records"][0]
+    assert record["source_owner_identity_state"] == "MISMATCH"
     assert record["recovery_classification"] == "MODERNIZE"
     assert record["recovery_state"] == "IDENTITY_REVIEW_REQUIRED"
     assert record["canonical_promotion_performed"] is False
+
+
+def test_nyc_owner_fingerprint_does_not_depend_on_permittee_phone():
+    first = parse_legacy_lane_notes(NYC_NOTE)
+    second = parse_legacy_lane_notes(
+        NYC_NOTE.replace("(718) 348-9398", "(212) 555-9999")
+    )
+
+    assert first["legacy_phone_role"] == "permittee_contact"
+    assert second["legacy_phone_role"] == "permittee_contact"
+    assert first["identity_fingerprint"] == second["identity_fingerprint"]
