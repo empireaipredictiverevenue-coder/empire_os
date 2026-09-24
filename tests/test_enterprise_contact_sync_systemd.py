@@ -32,6 +32,9 @@ def test_enterprise_contact_verifier_is_fail_closed():
     assert '"payment_action": False' in text
     assert '"actual_revenue": False' in text
     assert "reviews_approved" in text
+    assert "title_mismatches" in text
+    assert "target.observed_people" in text
+    assert "and not title_mismatches" in text
 
 
 def test_enterprise_contact_sync_cycle_captures_every_stage():
