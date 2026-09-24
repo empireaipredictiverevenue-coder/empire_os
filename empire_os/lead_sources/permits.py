@@ -153,9 +153,12 @@ def _run_nyc(lookback_days: int = 7) -> Iterator[LeadCandidate]:
                 "ownerself",
                 "ownerasself",
                 "self",
+                "same",
             }
-            if owner_key in placeholder_owner_keys or owner_key.isdigit():
-                continue
+            owner_identity_available = not (
+                owner_key in placeholder_owner_keys
+                or owner_key.isdigit()
+            )
 
             # IMPORTANT IDENTITY SEMANTICS:
             # NYC DOB labels this contact as the *permittee*, not the property
@@ -197,9 +200,20 @@ def _run_nyc(lookback_days: int = 7) -> Iterator[LeadCandidate]:
                 score += 5
 
             evidence = dict(row)
+            candidate_name = (
+                f"{owner_name} ({borough})"
+                if owner_identity_available
+                else f"NYC Permit {job_no} ({borough})"
+            )
             evidence["_empire_identity_roles"] = {
-                "candidate_name_role": "property_owner",
+                "candidate_name_role": (
+                    "property_owner"
+                    if owner_identity_available
+                    else "project_signal"
+                ),
                 "candidate_phone_role": "none",
+                "owner_identity_available": owner_identity_available,
+                "source_owner_name": owner_name or None,
                 "permittee_role": "permittee_contractor_or_professional",
                 "permittee_business_name": permittee_biz,
                 "permittee_name": permittee_name,
@@ -207,7 +221,7 @@ def _run_nyc(lookback_days: int = 7) -> Iterator[LeadCandidate]:
             }
 
             yield LeadCandidate(
-                name=f"{owner_name} ({borough})",
+                name=candidate_name,
                 # The dataset does not identify permittee_s_phone__ as an
                 # owner phone. Keep owner phone unknown instead of conflating
                 # two entities.
