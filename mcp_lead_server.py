@@ -14,6 +14,16 @@ Run:  python3 mcp_lead_server.py [--port 9000]
 Settlement is out-of-band (USDC, TS-5) — this server is the DISCOVERY/SUPPLY layer.
 """
 import json, sqlite3, re, argparse, subprocess, os, time, sys
+
+LEGACY_MCP_ENABLE_ENV = "EMPIRE_ENABLE_LEGACY_MCP_LEAD_SERVER"
+LEGACY_MCP_RETIREMENT_REASON = (
+    "retired_legacy_mcp_lead_server_use_governed_agent_web_a2a_and_bsc_usdt"
+)
+
+
+def legacy_runtime_enabled() -> bool:
+    return os.getenv(LEGACY_MCP_ENABLE_ENV, "").strip().upper() == "YES"
+
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 CONTAINER = "empire-hub"
@@ -510,7 +520,11 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-def main():
+def main() -> int:
+    if not legacy_runtime_enabled():
+        print(LEGACY_MCP_RETIREMENT_REASON, file=sys.stderr)
+        return 2
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=9000)
     args = ap.parse_args()
@@ -518,7 +532,8 @@ def main():
     print(f"[mcp] Empire Lead Marketplace MCP server v2 on :{args.port} "
           f"({len(TOOLS)} tools) — A2A supply layer LIVE")
     srv.serve_forever()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
