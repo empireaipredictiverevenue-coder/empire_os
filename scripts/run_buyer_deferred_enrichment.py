@@ -291,7 +291,10 @@ def _targeted_enterprise_probe(
         probe_row = dict(base)
         probe_row["contact_name"] = str(person["name"]).strip()
         probe_row["contact_title"] = str(person["title"]).strip()
-        probe_row["contact_source"] = "enterprise_target_observed"
+        probe_row["contact_source"] = (
+            str(person.get("source") or "").strip()
+            or "enterprise_target_observed"
+        )
 
         result = run_buyer_probe_isolated(
             probe_row,
@@ -405,6 +408,9 @@ def _propose_review(
             "wave": enterprise_item.get("wave"),
             "target_product_codes": (
                 enterprise_item.get("target_product_codes") or []
+            ),
+            "enterprise_target_person": (
+                result.get("enterprise_target_person") or {}
             ),
             "enterprise_target_match": True,
             "live_outbound_send": False,
