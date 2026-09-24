@@ -248,7 +248,7 @@ def test_fetch_is_read_only_and_bounded(monkeypatch):
 
     assert len(rows) == 1
     assert next_offset == 0
-    assert scan_limit == 500
+    assert scan_limit == 2500
     assert calls[0][0] == "GET"
     parsed = urlparse(calls[0][1])
     params = parse_qs(parsed.query)
@@ -256,6 +256,7 @@ def test_fetch_is_read_only_and_bounded(monkeypatch):
     assert params["notes"] == ["ilike.*permit*"]
     assert params["limit"] == ["500"]
     assert params["offset"] == ["7"]
+    assert params["order"] == ["prospect_id.asc,created_at.asc,id.asc"]
 
 
 def test_verified_current_exact_owner_name_becomes_merge_candidate():
