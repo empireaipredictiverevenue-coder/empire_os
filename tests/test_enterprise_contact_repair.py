@@ -20,6 +20,10 @@ def test_failure_classifier_distinguishes_safe_repair_classes():
         "FAILED tests/test_timeout_logic.py::test_x - AssertionError"
     ) == "CODE_DEFECT"
     assert repair.classify_failure(
+        "RuntimeError: missing required runtime env: "
+        "SUPABASE_SERVICE_KEY,SUPABASE_URL"
+    ) == "RUNTIME_ENV_CONTEXT"
+    assert repair.classify_failure(
         "unclassified strange condition"
     ) == "UNKNOWN"
 
@@ -241,3 +245,41 @@ def test_moved_head_closes_incident_when_failure_already_fixed(
         "tests/test_buyer_discovery.py::test_example"
     ]
     assert not incident_path.exists()
+
+
+def test_healthy_runtime_closes_stale_env_context_incident(
+    monkeypatch,
+    tmp_path,
+):
+    incident = tmp_path / "incident.json"
+    state = tmp_path / "state.json"
+    latest = tmp_path / "latest.json"
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+
+    incident.write_text(
+        """{
+          "fingerprint": "env-context",
+          "classification": "UNKNOWN",
+          "status": "OPEN",
+          "log_tail": "RuntimeError:missing required runtime env: SUPABASE_URL"
+        }\n"""
+    )
+    (runtime / "enterprise_contact_intelligence_latest.json").write_text(
+        """{
+          "error_count": 0,
+          "live_outbound_send": false,
+          "actual_revenue": false
+        }\n"""
+    )
+
+    monkeypatch.setattr(repair, "INCIDENT_PATH", incident)
+    monkeypatch.setattr(repair, "STATE_PATH", state)
+    monkeypatch.setattr(repair, "LATEST_PATH", latest)
+    monkeypatch.setattr(repair, "RUNTIME", runtime)
+
+    result = repair.run_repair_cycle()
+    assert result["status"] == "RESOLVED_BY_HEALTHY_RUNTIME_STATE"
+    assert result["classification"] == "RUNTIME_ENV_CONTEXT"
+    saved = repair._load(incident)
+    assert saved["status"] == "RESOLVED"
