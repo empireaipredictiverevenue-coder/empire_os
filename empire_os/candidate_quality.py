@@ -41,6 +41,7 @@ IDENTITY_OR_DIRECT_SOURCES = frozenset({
     "aeo_form",
     "manual_import",
     "permits_nyc_resolved",
+    "public_enterprise_target",
 })
 
 GENERIC_SIGNAL_PREFIXES = (
