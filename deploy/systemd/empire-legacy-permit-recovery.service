@@ -10,7 +10,7 @@ Group=ubuntu
 WorkingDirectory=/srv/empire_os
 EnvironmentFile=-/etc/empire_os.env
 Environment=PYTHONPATH=/srv/empire_os
-ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_legacy_permit_recovery_observer.py --repo-root /srv/empire_os --batch-size 250
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_legacy_permit_recovery_observer.py --repo-root /srv/empire_os --batch-size 500
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
