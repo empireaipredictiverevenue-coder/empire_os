@@ -469,7 +469,9 @@ def fetch_legacy_permit_rows(
 ) -> tuple[list[dict[str, Any]], int, int]:
     batch_size = max(100, min(int(batch_size), MAX_BATCH_SIZE))
     offset = max(0, int(offset))
-    scan_limit = min(MAX_SCAN_ROWS, batch_size * 5)
+    # Fetch exactly the bounded batch. Advancing an offset past rows that were
+    # fetched but not processed would create silent recovery gaps.
+    scan_limit = batch_size
     params = urllib.parse.urlencode({
         "select": (
             "id,lane_id,prospect_id,status,omega_score,omega_tier,"
