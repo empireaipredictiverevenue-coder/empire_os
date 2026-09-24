@@ -133,6 +133,14 @@ def _visibility_recipient_match(
     founder = _valid_email(founder_inbox)
     if founder and founder in normalized:
         return True
+
+    # Some provider surfaces require the exact configured Reply-To address
+    # rather than an intent-specific plus alias. Preserve human visibility
+    # for those replies even when intent correlation is unavailable.
+    reply_base = _valid_email(reply_to)
+    if reply_base and reply_base in normalized:
+        return True
+
     if reply_to:
         try:
             resolve_intent_from_recipients(
