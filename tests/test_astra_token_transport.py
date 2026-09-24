@@ -1,9 +1,23 @@
+import io
 import json
+from urllib.error import HTTPError
 
 import pytest
 
+import empire_os.astra_token_transport as transport
 from empire_os.astra_token_transport import SupabaseTokenAstraRpc
 from empire_os.outcome_role_transport import OutcomeTransportError
+
+
+@pytest.fixture(autouse=True)
+def isolate_egress_guard(monkeypatch):
+    monkeypatch.setattr(transport, "_reserve_supabase_request", lambda: None)
+    monkeypatch.setattr(transport, "_close_supabase_egress_circuit", lambda: None)
+    monkeypatch.setattr(
+        transport,
+        "_open_supabase_egress_circuit",
+        lambda _reason: None,
+    )
 
 
 class FakeResponse:
@@ -60,6 +74,8 @@ def test_feedback_rpc_uses_token_wrapper_only(tmp_path):
     assert body["p_token"] == "a" * 64
     assert body["p_limit"] == 25
     assert request.headers["Apikey"] == "sb_publishable_test"
+    assert request.headers["User-agent"] == "EmpireOS/astra-observer"
+    assert request.headers["X-empire-component"] == "astra-observer"
 
 
 def test_operational_rpc_uses_token_wrapper_only(tmp_path):
@@ -78,6 +94,40 @@ def test_write_functions_are_rejected_locally(tmp_path):
         rpc("recognize_bsc_revenue", {})
     with pytest.raises(OutcomeTransportError, match="not allowed"):
         rpc("record_commercial_outcome", {})
+
+
+def test_quota_402_opens_shared_egress_circuit(monkeypatch, tmp_path):
+    opened = []
+    monkeypatch.setattr(
+        transport,
+        "_open_supabase_egress_circuit",
+        lambda reason: opened.append(reason),
+    )
+
+    def opener(request, timeout=15):
+        raise HTTPError(
+            request.full_url,
+            402,
+            "Payment Required",
+            hdrs=None,
+            fp=io.BytesIO(
+                b'{"message":"restricted due to the following violations: exceed_egress_quota"}'
+            ),
+        )
+
+    token_file = tmp_path / "observer_token"
+    token_file.write_text("a" * 64, encoding="utf-8")
+    rpc = SupabaseTokenAstraRpc(
+        "https://example.supabase.co",
+        "sb_publishable_test",
+        token_file,
+        opener=opener,
+    )
+
+    with pytest.raises(OutcomeTransportError):
+        rpc("get_astra_operational_evidence", {})
+
+    assert opened == ["exceed_egress_quota"]
 
 
 def test_https_and_token_file_are_required(tmp_path):
