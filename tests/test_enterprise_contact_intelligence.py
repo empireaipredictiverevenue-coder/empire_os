@@ -230,7 +230,8 @@ def test_reconciliation_uses_current_first_party_title_when_available():
     assert result["title"] == "Vice President, Corporate Development"
     assert result["decision_role"] == "functional_buyer"
     assert result["decision_score"] == 0.8
-    assert result["leadership_source"] == "first_party_site_current"
+    assert result["leadership_source"] == "curated_public_evidence"
+    assert result["site_title_conflict"] is False
 
 
 def test_enterprise_sync_retries_transient_prospect_fetch_failure(monkeypatch):
@@ -508,16 +509,22 @@ def test_structured_title_cannot_beat_curated_first_party_role():
     assert richard["source"] == "curated_public_evidence"
 
 
-def test_visible_leadership_title_can_supersede_curated_role():
+def test_conflicting_scraped_title_cannot_supersede_curated_target_role():
     row = {
         "account_name": "Sila Services",
+        "person_contact_verified": True,
         "probe": {
+            **_probe(
+                "Kyle Martin",
+                "Chief Strategy Officer",
+                "kmartin@sila.com",
+            ),
             "site_people": [{
                 "name": "Kyle Martin",
                 "title": "Chief Strategy Officer",
                 "url": "https://silaservices.com/leadership/",
                 "source_kind": "visible_text",
-            }]
+            }],
         },
     }
 
@@ -525,8 +532,16 @@ def test_visible_leadership_title_can_supersede_curated_role():
     kyle = next(
         person for person in people if person["name"] == "Kyle Martin"
     )
-    assert kyle["title"] == "Chief Strategy Officer"
-    assert kyle["source"] == "first_party_site_current"
+    assert kyle["title"] == "Vice President, Corporate Development"
+    assert kyle["source"] == "curated_public_evidence"
+
+    reconciled = reconcile_verified_enterprise_contact(row)
+    assert reconciled is not None
+    assert reconciled["title"] == "Vice President, Corporate Development"
+    assert reconciled["site_title_conflict"] is True
+    assert reconciled["site_title_conflicts"][0]["title"] == (
+        "Chief Strategy Officer"
+    )
 
 
 def test_pending_review_refresh_uses_governed_rpc_not_direct_patch():
