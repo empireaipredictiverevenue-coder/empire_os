@@ -1073,9 +1073,57 @@ def refresh_buyer_acquisition_plan(
         exchange,
         catalog_snapshot=catalog,
     )
+
+    enterprise_activation, enterprise_activation_health = (
+        _read_runtime_snapshot(
+            root
+            / "runtime/predictive_revenue/"
+            "enterprise_activation_latest.json"
+        )
+    )
+    if enterprise_activation:
+        payload["predictive_revenue_enterprise_activation"] = {
+            "status": enterprise_activation.get("status"),
+            "target_count": enterprise_activation.get("target_count", 0),
+            "canonical_prospect_count": enterprise_activation.get(
+                "canonical_prospect_count", 0
+            ),
+            "qualified_count": enterprise_activation.get(
+                "qualified_count", 0
+            ),
+            "review_ready_count": enterprise_activation.get(
+                "review_ready_count", 0
+            ),
+            "person_contact_verified_count": enterprise_activation.get(
+                "person_contact_verified_count", 0
+            ),
+            "company_route_available_count": enterprise_activation.get(
+                "company_route_available_count", 0
+            ),
+            "failed_count": enterprise_activation.get("failed_count", 0),
+            "live_outbound_send": False,
+            "actual_revenue": False,
+        }
+    else:
+        payload["predictive_revenue_enterprise_activation"] = {
+            "status": "NOT_MATERIALIZED",
+            "target_count": 0,
+            "canonical_prospect_count": 0,
+            "qualified_count": 0,
+            "review_ready_count": 0,
+            "person_contact_verified_count": 0,
+            "company_route_available_count": 0,
+            "failed_count": 0,
+            "live_outbound_send": False,
+            "actual_revenue": False,
+        }
+
     payload["runtime_input_health"] = {
         "commercial_exchange": exchange_health,
         "commercial_catalog": catalog_health,
+        "predictive_revenue_enterprise_activation": (
+            enterprise_activation_health
+        ),
         "degraded": (
             exchange_health["state"] != "OK"
             or catalog_health["state"] != "OK"
