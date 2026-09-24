@@ -176,7 +176,7 @@ def run_standing_bridge(
     *,
     review_limit: int = 20,
     outbound_limit: int = 20,
-    daily_cap: int = 10,
+    daily_cap: int = 25,
     now: datetime | None = None,
 ) -> StandingBridgeResult:
     cap = max(1, min(int(daily_cap), 50))
