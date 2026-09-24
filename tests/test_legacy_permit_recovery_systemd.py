@@ -12,7 +12,7 @@ def test_recovery_service_uses_protected_runtime_environment():
     assert "User=ubuntu" in text
     assert "EnvironmentFile=-/etc/empire_os.env" in text
     assert "Environment=PYTHONPATH=/srv/empire_os" in text
-    assert "--batch-size 250" in text
+    assert "--batch-size 500" in text
 
 
 def test_recovery_service_is_observe_only_and_runtime_write_bounded():
