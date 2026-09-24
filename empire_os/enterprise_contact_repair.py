@@ -192,10 +192,31 @@ def _git(*args: str, cwd: Path = ROOT, timeout: int = 60):
     return _run(["git", *args], cwd=cwd, timeout=timeout)
 
 
+def _tracked_dirty_status(*, cwd: Path = ROOT) -> str:
+    return _git(
+        "status",
+        "--porcelain",
+        "--untracked-files=no",
+        cwd=cwd,
+    ).stdout.strip()
+
+
+def _tracked_dirty_paths(*, cwd: Path = ROOT) -> list[str]:
+    raw = _tracked_dirty_status(cwd=cwd)
+    paths: list[str] = []
+    for line in raw.splitlines():
+        candidate = line[3:].strip()
+        if " -> " in candidate:
+            candidate = candidate.split(" -> ", 1)[1].strip()
+        if candidate:
+            paths.append(candidate)
+    return list(dict.fromkeys(paths))
+
+
 def _main_state() -> tuple[str, str, bool]:
     branch = _git("branch", "--show-current").stdout.strip()
     head = _git("rev-parse", "HEAD").stdout.strip()
-    dirty = bool(_git("status", "--porcelain").stdout.strip())
+    dirty = bool(_tracked_dirty_status())
     return branch, head, dirty
 
 
@@ -282,7 +303,11 @@ def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
     if branch != "feature/revenue-intelligence-v2":
         raise RuntimeError(f"unexpected_main_branch:{branch}")
     if dirty:
-        raise RuntimeError("main_checkout_dirty")
+        paths = _tracked_dirty_paths()
+        raise RuntimeError(
+            "main_checkout_dirty:"
+            + ",".join(paths[:20])
+        )
     recorded_head = str(incident.get("base_head") or "").strip()
     if recorded_head and recorded_head != base_head:
         raise RuntimeError("incident_base_head_changed")
