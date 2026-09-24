@@ -119,6 +119,24 @@ def persist_new_external_candidates(
                 )
                 or 0
             ),
+            "continuous_commercial_lane": candidate.get(
+                "continuous_commercial_lane"
+            ),
+            "continuous_lane_candidate": bool(
+                candidate.get("continuous_lane_candidate")
+            ),
+            "continuous_lane_fit_score": int(
+                candidate.get("continuous_lane_fit_score") or 0
+            ),
+            "continuous_commercial_lane": candidate.get(
+                "continuous_commercial_lane"
+            ),
+            "continuous_lane_candidate": bool(
+                candidate.get("continuous_lane_candidate")
+            ),
+            "continuous_lane_fit_score": int(
+                candidate.get("continuous_lane_fit_score") or 0
+            ),
             "icp_intelligence": (
                 dict(candidate.get("icp_intelligence"))
                 if isinstance(candidate.get("icp_intelligence"), Mapping)
