@@ -83,6 +83,7 @@ def test_runtime_self_heal_units_are_allowlisted_without_outbound_authority():
         "empire-buyer-deferred-enrichment.timer",
         "empire-predictive-revenue-enterprise-activation.service",
         "empire-predictive-revenue-enterprise-activation.timer",
+        "empire-enterprise-contact-sync.service",
         "empire-enterprise-contact-repair.service",
         "empire-enterprise-contact-repair.timer",
     }
