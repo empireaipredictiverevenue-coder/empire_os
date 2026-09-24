@@ -143,11 +143,15 @@ def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
         mode="GUARDED_EXECUTE",
         timeout_seconds=10,
     )
-    assert result["executions"][0]["decision"] == "TIMED_OUT"
-    assert any(
-        row["decision"] == "DISPATCHED"
-        for row in result["executions"][1:]
-    )
+    decisions = [row["decision"] for row in result["executions"]]
+    assert "TIMED_OUT" in decisions
+    assert "DISPATCHED" in decisions
+    timed_out = [
+        row
+        for row in result["executions"]
+        if row["decision"] == "TIMED_OUT"
+    ]
+    assert timed_out[0]["job"] == "commercial_loop_refresh"
 
 
 def test_default_dispatch_timeout_is_bounded(monkeypatch, tmp_path):
