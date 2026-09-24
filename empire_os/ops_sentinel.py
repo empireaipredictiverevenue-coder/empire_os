@@ -20,6 +20,7 @@ CRITICAL_SERVICES = (
     "empire-autonomous-execution.service",
     "empire-public-gateway.service",
     "empire-ops-mcp.service",
+    "empire-ops-privileged-helper.service",
     "empire-cloudflared.service",
 )
 CRITICAL_TIMERS = (
