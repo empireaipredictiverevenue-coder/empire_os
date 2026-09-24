@@ -147,6 +147,14 @@ def test_sync_queues_unresolved_account_with_intended_people():
             "probe": {
                 "rejection_reason": "no_contact_evidence",
             },
+            "company_contact_routes": [{
+                "channel": "voice",
+                "value": "+18552178437",
+                "verified": True,
+                "person_bound": False,
+                "source": "first_party_contact_page",
+                "evidence_url": "https://neighborlybrands.com/contact-us/",
+            }],
         }]
     }
     queue = FakeQueue()
@@ -165,6 +173,8 @@ def test_sync_queues_unresolved_account_with_intended_people():
         for person in item["target_people"]
     )
     assert item["reason"] == "no_contact_evidence"
+    assert item["phone"] == "+18552178437"
+    assert item["company_contact_routes"][0]["channel"] == "voice"
 
 
 def test_enterprise_sync_worker_keeps_execution_governed():
