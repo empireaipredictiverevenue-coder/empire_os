@@ -160,6 +160,9 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1560px] items-center justify-between">
           <Brand />
           <div className="pointer-events-auto flex items-center gap-2">
+            <a href="/predictive-revenue" className="hidden rounded-full border border-[#60a5fa]/25 bg-[#2563eb]/10 px-4 py-2.5 text-[9px] font-semibold tracking-[0.14em] text-[#dbeafe]/80 backdrop-blur-2xl transition hover:border-[#7dd3fc]/50 hover:text-white lg:inline-flex">
+              PREDICTIVE REVENUE
+            </a>
             <a href="/buy" className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/[0.06] px-4 py-2.5 text-[9px] font-semibold tracking-[0.14em] text-emerald-100/80 backdrop-blur-2xl transition hover:border-emerald-200/40 hover:text-white sm:inline-flex">
               BUY INTELLIGENCE
             </a>
@@ -233,6 +236,9 @@ export default function Home() {
                     ENTER THE SYSTEM
                     <ChevronDown className="size-3.5 transition-transform group-hover:translate-y-0.5" />
                   </button>
+                  <a href="/predictive-revenue" className="inline-flex min-h-12 items-center rounded-full border border-[#60a5fa]/30 bg-[#2563eb]/12 px-5 text-[9px] font-semibold tracking-[0.13em] text-[#dbeafe]/85 backdrop-blur-2xl transition hover:border-[#7dd3fc]/50 hover:text-white">
+                    DEPLOY PREDICTIVE REVENUE
+                  </a>
                   <a href="/buy" className="inline-flex min-h-12 items-center rounded-full border border-emerald-300/20 bg-emerald-300/[0.07] px-5 text-[9px] font-semibold tracking-[0.13em] text-emerald-100/80 backdrop-blur-2xl transition hover:border-emerald-200/40 hover:text-white">
                     BUY INTELLIGENCE
                   </a>
