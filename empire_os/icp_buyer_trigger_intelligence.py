@@ -274,6 +274,122 @@ ICP_PROFILES: tuple[dict[str, Any], ...] = (
         "priority_score": 100,
     },
     {
+        "profile_key": "legal_mass_tort_plaintiff_firm",
+        "name": "Legal — Mass Tort Plaintiff Firm",
+        "buyer_pools": [
+            "enterprise_and_data_buyers",
+            "software_and_advisory_buyers",
+            "direct_demand_buyers",
+        ],
+        "industry_signals": [
+            "mass tort law firm", "mass tort attorneys",
+            "class action law firm", "multidistrict litigation",
+            "mdL", "plaintiff law firm",
+        ],
+        "decision_maker_roles": [
+            "managing partner", "founding partner", "partner",
+            "chief marketing officer", "marketing director",
+            "intake director", "chief operating officer",
+            "business development",
+        ],
+        "likely_problems": [
+            "volatile case acquisition cost",
+            "uneven campaign and intake capacity",
+            "slow market and litigation signal detection",
+            "fragmented search and competitor intelligence",
+        ],
+        "buying_triggers": [
+            "new litigation", "multidistrict litigation",
+            "case intake", "mass tort", "class action",
+            "campaign launch", "intake expansion",
+        ],
+        "product_codes": [
+            "managed_service",
+            "search_growth_command",
+            "tag_intelligence_monitor",
+            "competitor_search_gap",
+        ],
+        "priority_score": 100,
+    },
+    {
+        "profile_key": "legal_plaintiff_growth_firm",
+        "name": "Legal — Personal Injury / High-value Plaintiff Firm",
+        "buyer_pools": [
+            "enterprise_and_data_buyers",
+            "software_and_advisory_buyers",
+            "direct_demand_buyers",
+        ],
+        "industry_signals": [
+            "personal injury law firm", "plaintiff law firm",
+            "medical malpractice law firm", "workers compensation law firm",
+            "catastrophic injury", "trial lawyers",
+        ],
+        "decision_maker_roles": [
+            "managing partner", "founding partner", "partner",
+            "chief marketing officer", "marketing director",
+            "intake director", "chief operating officer",
+            "business development",
+        ],
+        "likely_problems": [
+            "high lead acquisition cost",
+            "weak intake conversion visibility",
+            "territory and practice-area demand gaps",
+            "competitive search pressure",
+        ],
+        "buying_triggers": [
+            "expansion", "new office", "hiring",
+            "case intake", "marketing", "growth",
+            "new practice area",
+        ],
+        "product_codes": [
+            "managed_service",
+            "search_growth_command",
+            "tag_intelligence_monitor",
+            "competitor_search_gap",
+        ],
+        "priority_score": 98,
+    },
+    {
+        "profile_key": "insurance_distribution_growth",
+        "name": "Insurance — Distribution / Agency Network",
+        "buyer_pools": [
+            "enterprise_and_data_buyers",
+            "software_and_advisory_buyers",
+            "direct_demand_buyers",
+        ],
+        "industry_signals": [
+            "insurance agency network", "insurance brokerage",
+            "independent insurance agency", "insurance distribution",
+            "insurance marketplace", "insurance leads",
+            "insurance call center",
+        ],
+        "decision_maker_roles": [
+            "chief executive officer", "ceo",
+            "chief revenue officer", "cro",
+            "chief marketing officer", "cmo",
+            "chief growth officer", "head of growth",
+            "distribution", "digital", "analytics",
+        ],
+        "likely_problems": [
+            "uneven producer and territory demand",
+            "high customer acquisition cost",
+            "fragmented channel attribution",
+            "slow identification of profitable markets",
+        ],
+        "buying_triggers": [
+            "acquisition", "expansion", "new market",
+            "digital transformation", "distribution growth",
+            "new leadership", "lead generation",
+        ],
+        "product_codes": [
+            "managed_service",
+            "search_growth_command",
+            "tag_intelligence_monitor",
+            "competitor_search_gap",
+        ],
+        "priority_score": 98,
+    },
+    {
         "profile_key": "enterprise_growth_data_team",
         "name": "Enterprise Growth / Data Team",
         "buyer_pools": [
