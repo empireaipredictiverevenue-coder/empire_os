@@ -5,6 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+User=root
+Group=ubuntu
+UMask=0027
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 EnvironmentFile=/etc/empire_os.env
