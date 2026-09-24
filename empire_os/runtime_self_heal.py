@@ -125,6 +125,13 @@ SNAPSHOTS: tuple[SnapshotSpec, ...] = (
         108000,
         "empire-predictive-revenue-enterprise-activation.service",
     ),
+    SnapshotSpec(
+        "enterprise_contact_repair",
+        "/srv/empire_os/runtime/predictive_revenue/"
+        "enterprise_contact_repair_latest.json",
+        1800,
+        "empire-enterprise-contact-repair.service",
+    ),
 )
 
 HTTP_CHECKS: tuple[HttpSpec, ...] = (
