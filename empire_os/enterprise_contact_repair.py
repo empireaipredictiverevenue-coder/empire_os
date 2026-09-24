@@ -57,6 +57,12 @@ TRANSIENT_TOKENS = (
     "temporarily unavailable",
     "thread killed by timeout",
 )
+RUNTIME_ENV_TOKENS = (
+    "missing required runtime env",
+    "supabase_service_key",
+    "supabase_url",
+)
+
 DATA_QUALITY_TOKENS = (
     "no_bound_contact",
     "no_contact_evidence",
@@ -105,6 +111,8 @@ def classify_failure(text: str) -> str:
         )
     ):
         return "CODE_DEFECT"
+    if any(token in value for token in RUNTIME_ENV_TOKENS):
+        return "RUNTIME_ENV_CONTEXT"
     if any(token in value for token in DATA_QUALITY_TOKENS):
         return "DATA_QUALITY"
     if any(token in value for token in TRANSIENT_TOKENS):
@@ -472,29 +480,45 @@ def _retry_branch_push() -> dict[str, Any]:
 
 
 def _retry_runtime_sync() -> dict[str, Any]:
-    command = [
-        str(ROOT / ".venv/bin/python"),
-        str(ROOT / "scripts/run_enterprise_contact_intelligence.py"),
-    ]
-    last = None
+    commands = (
+        [
+            str(ROOT / ".venv/bin/python"),
+            str(ROOT / "scripts/run_enterprise_contact_intelligence.py"),
+        ],
+        [
+            str(ROOT / ".venv/bin/python"),
+            str(ROOT / "scripts/refresh_buyer_acquisition_team.py"),
+            "--repo-root",
+            str(ROOT),
+        ],
+        [
+            str(ROOT / ".venv/bin/python"),
+            str(ROOT / "scripts/verify_enterprise_contact_intelligence.py"),
+        ],
+    )
+    last_output = ""
     for attempt in range(1, 4):
-        last = _run(command, cwd=ROOT, timeout=120)
-        if last.returncode == 0:
+        ok = True
+        chunks: list[str] = []
+        for command in commands:
+            completed = _run(command, cwd=ROOT, timeout=120)
+            chunks.append((completed.stdout or "") + "\n" + (completed.stderr or ""))
+            if completed.returncode != 0:
+                ok = False
+                break
+        last_output = "\n".join(chunks)[-7000:]
+        if ok:
             return {
                 "status": "RESOLVED_RUNTIME_RETRY",
                 "attempts": attempt,
-                "output": (last.stdout or "")[-4000:],
+                "output": last_output,
             }
         time.sleep(2 ** (attempt - 1))
-    assert last is not None
     return {
         "status": "RUNTIME_RETRY_EXHAUSTED",
         "attempts": 3,
-        "output": (
-            (last.stdout or "") + "\n" + (last.stderr or "")
-        )[-5000:],
+        "output": last_output,
     }
-
 
 def run_repair_cycle() -> dict[str, Any]:
     incident = _load(INCIDENT_PATH)
@@ -505,6 +529,15 @@ def run_repair_cycle() -> dict[str, Any]:
         incident = {}
 
     classification = str(incident.get("classification") or "")
+    if incident and classification in {"", "UNKNOWN"}:
+        classification = classify_failure(
+            str(incident.get("log_tail") or "")
+        )
+        if classification != str(incident.get("classification") or ""):
+            incident = dict(incident)
+            incident["classification"] = classification
+            _atomic_json(INCIDENT_PATH, incident)
+
     if not incident and int(intel.get("error_count") or 0) > 0:
         error_text = json.dumps(intel.get("errors") or [])
         classification = classify_failure(error_text)
@@ -522,7 +555,10 @@ def run_repair_cycle() -> dict[str, Any]:
             "classification": None,
             "action": "none",
         }
-    elif classification == "TRANSIENT_INFRA":
+    elif classification in {
+        "TRANSIENT_INFRA",
+        "RUNTIME_ENV_CONTEXT",
+    }:
         result = _retry_runtime_sync()
         result["classification"] = classification
     elif classification == "DATA_QUALITY":
