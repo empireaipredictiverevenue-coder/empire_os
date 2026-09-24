@@ -422,11 +422,6 @@ def test_refresh_surfaces_enterprise_activation_summary(tmp_path, monkeypatch):
         }\n"""
     )
 
-    monkeypatch.setattr(
-        "empire_os.buyer_acquisition_team._write_json",
-        lambda *args, **kwargs: None,
-    )
-
     payload = refresh_buyer_acquisition_plan(tmp_path)
     summary = payload["predictive_revenue_enterprise_activation"]
     assert summary["target_count"] == 9
