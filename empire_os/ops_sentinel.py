@@ -103,12 +103,39 @@ def analyze(
             ))
 
     source = runtime.get("source_health") or {}
-    if source and source.get("end_to_end_healthy") is not True:
-        findings.append(Finding(
-            "source_pipeline_degraded", "warning", "source_health",
-            "Acquisition source pipeline is not end-to-end healthy",
-            True, 90, {"end_to_end_healthy": source.get("end_to_end_healthy")},
-        ))
+    if source:
+        if source.get("endpoint_healthy") is False:
+            findings.append(Finding(
+                "source_pipeline_degraded", "warning", "source_health",
+                "Acquisition source endpoint is not healthy",
+                True, 90, {
+                    "endpoint_healthy": source.get("endpoint_healthy"),
+                    "blockers": source.get("blockers") or [],
+                    "errors": source.get("errors") or [],
+                },
+            ))
+        elif source.get("canonical_ingest_scheduled") is False:
+            findings.append(Finding(
+                "source_pipeline_unscheduled", "warning", "source_health",
+                "Canonical acquisition scheduler is not active",
+                False, 88, {
+                    "canonical_ingest_scheduled": False,
+                    "blockers": source.get("blockers") or [],
+                },
+            ))
+        elif source.get("canonical_ingest_authorized") is False:
+            findings.append(Finding(
+                "source_ingest_evidence_unverified", "info", "source_health",
+                "Source endpoint is healthy but recent direct canonical-write evidence is not verified",
+                False, 65, {
+                    "endpoint_healthy": source.get("endpoint_healthy"),
+                    "canonical_ingest_scheduled": source.get(
+                        "canonical_ingest_scheduled"
+                    ),
+                    "canonical_ingest_authorized": False,
+                    "blockers": source.get("blockers") or [],
+                },
+            ))
 
     loop = runtime.get("commercial_loop") or {}
     if loop and loop.get("loop_complete") is not True:
@@ -160,7 +187,7 @@ def analyze(
             degraded_routes.append(key)
     if degraded_routes:
         findings.append(Finding(
-            "coder_model_route_degraded", "warning", "empire_coder",
+            "coder_model_route_degraded", "info", "empire_coder",
             f"{len(degraded_routes)} Coder model route(s) are cooling down; failover is active",
             False, 75, {"routes": degraded_routes},
         ))
