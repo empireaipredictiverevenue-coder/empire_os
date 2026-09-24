@@ -99,8 +99,9 @@ ICP_PROFILES: tuple[dict[str, Any], ...] = (
             "hiring", "expansion",
         ],
         "product_codes": [
-            "managed_service", "local_search_grid",
-            "search_growth_command", "tag_intelligence_monitor",
+            "permit_intelligence", "managed_service",
+            "local_search_grid", "search_growth_command",
+            "tag_intelligence_monitor",
         ],
         "priority_score": 94,
     },
