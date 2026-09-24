@@ -144,6 +144,28 @@ class BuyerDeferredEnrichmentQueue:
                 "status": "pending",
                 "updated_at": now,
                 "next_retry_at": existing.get("next_retry_at") or now,
+                "account_key": (
+                    str(item.get("account_key") or "").strip() or None
+                ),
+                "wave": str(item.get("wave") or "").strip() or None,
+                "offer_key": (
+                    str(item.get("offer_key") or "").strip() or None
+                ),
+                "target_people": [
+                    {
+                        "name": str(person.get("name") or "").strip(),
+                        "title": str(person.get("title") or "").strip(),
+                    }
+                    for person in (item.get("target_people") or [])
+                    if isinstance(person, Mapping)
+                    and str(person.get("name") or "").strip()
+                    and str(person.get("title") or "").strip()
+                ][:6],
+                "target_product_codes": [
+                    str(value).strip()
+                    for value in (item.get("target_product_codes") or [])
+                    if str(value).strip()
+                ][:6],
             })
             data[prospect_id] = existing
             return True
