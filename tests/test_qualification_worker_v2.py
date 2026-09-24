@@ -163,6 +163,24 @@ def test_egress_circuit_self_heals_after_successful_probe(monkeypatch, tmp_path)
     assert state["circuit"]["reason"] == "probe_succeeded"
 
 
+def test_client_identifies_empire_component(monkeypatch):
+    monkeypatch.setattr(
+        worker,
+        "load_runtime_env",
+        lambda *_args, **_kwargs: {
+            "SUPABASE_URL": "https://example.supabase.co",
+            "SUPABASE_SERVICE_KEY": "service-key",
+        },
+    )
+    monkeypatch.setenv("EMPIRE_COMPONENT", "empire-gtm-pipeline")
+
+    base, headers = worker._client()
+
+    assert base == "https://example.supabase.co"
+    assert headers["User-Agent"] == "EmpireOS/empire-gtm-pipeline"
+    assert headers["X-Empire-Component"] == "empire-gtm-pipeline"
+
+
 def test_evidence_backed_payload_uses_v2_and_preserves_provenance(monkeypatch):
     monkeypatch.setattr(
         worker,
