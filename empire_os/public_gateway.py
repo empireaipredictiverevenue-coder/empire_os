@@ -32,6 +32,10 @@ RESEND_INBOUND_URL = os.getenv(
     "EMPIRE_RESEND_INBOUND_URL",
     "http://127.0.0.1:8097/webhooks/resend-inbound",
 ).strip()
+CHECKOUT_INTERNAL_URL = os.getenv(
+    "EMPIRE_CHECKOUT_INTERNAL_URL",
+    "http://127.0.0.1:8098",
+).rstrip("/")
 
 app = FastAPI(title="Empire AI Public Gateway", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/aeo", StaticFiles(directory=str(AEO_ROOT), html=True), name="aeo")
@@ -99,6 +103,8 @@ def _site_html_path(route: str, root: Path | None = None) -> Path | None:
         candidate = base / "trust.html"
     elif clean == "industries":
         candidate = base / "industries.html"
+    elif clean == "buy":
+        candidate = base / "buy.html"
     elif clean.startswith("industries/"):
         slug = clean.split("/", 1)[1]
         if not slug or any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789-" for ch in slug):
@@ -116,6 +122,8 @@ def _public_site_urls(root: Path | None = None) -> list[str]:
         urls.append(f"{PUBLIC_BASE_URL}/trust")
     if (base / "industries.html").is_file():
         urls.append(f"{PUBLIC_BASE_URL}/industries")
+    if (base / "buy.html").is_file():
+        urls.append(f"{PUBLIC_BASE_URL}/buy")
     industries = base / "industries"
     if industries.is_dir():
         for path in sorted(industries.glob("*.html")):
@@ -227,6 +235,66 @@ async def resend_inbound_proxy(request: Request):
             status_code=503,
         )
 
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
+
+
+@app.get("/v1/checkout/catalog")
+async def checkout_catalog_proxy():
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{CHECKOUT_INTERNAL_URL}/v1/catalog"
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"error": "checkout_unavailable"},
+            status_code=503,
+        )
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
+
+
+@app.post("/v1/checkout/orders")
+async def checkout_order_proxy(request: Request):
+    raw = await request.body()
+    if len(raw) > 32_768:
+        return JSONResponse(
+            {"error": "checkout_payload_too_large"},
+            status_code=413,
+        )
+    if "application/json" not in request.headers.get(
+        "content-type",
+        ""
+    ).lower():
+        return JSONResponse(
+            {"error": "application_json_required"},
+            status_code=415,
+        )
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                f"{CHECKOUT_INTERNAL_URL}/v1/orders",
+                content=raw,
+                headers={"Content-Type": "application/json"},
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"error": "checkout_unavailable"},
+            status_code=503,
+        )
     return Response(
         content=response.content,
         status_code=response.status_code,
@@ -400,6 +468,17 @@ def trust_page():
     path = _site_html_path("trust")
     if path is None:
         return JSONResponse({"error": "public_site_page_unavailable"}, status_code=404)
+    return FileResponse(path, media_type="text/html")
+
+
+@app.get("/buy")
+def buy_page():
+    path = _site_html_path("buy")
+    if path is None:
+        return JSONResponse(
+            {"error": "public_site_page_unavailable"},
+            status_code=404,
+        )
     return FileResponse(path, media_type="text/html")
 
 
