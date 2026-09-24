@@ -202,6 +202,28 @@ def _validate_changed_paths(worktree: Path) -> list[str]:
     return paths
 
 
+def _guard_candidate_diff(worktree: Path, changed: list[str]) -> None:
+    diff = _git("diff", "--", *changed, cwd=worktree).stdout
+    lower = diff.lower()
+    if any(
+        token in lower
+        for token in (
+            "pytest.skip",
+            "@pytest.mark.skip",
+            "@pytest.mark.xfail",
+            "unittest.skip",
+        )
+    ):
+        raise RuntimeError("coder repair attempted to suppress tests")
+    if any(path.startswith("tests/") for path in changed):
+        for line in diff.splitlines():
+            stripped = line.lstrip()
+            if stripped.startswith("-") and "assert " in stripped:
+                raise RuntimeError(
+                    "coder repair attempted to remove a test assertion"
+                )
+
+
 def _verify(worktree: Path, tests: list[str]) -> tuple[bool, str]:
     command = [
         str(ROOT / ".venv/bin/python"),
@@ -226,7 +248,9 @@ def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
         raise RuntimeError("incident_base_head_changed")
 
     fingerprint = str(incident["fingerprint"])[:12]
-    worktree_id = f"contact-repair-{fingerprint}"
+    worktree_id = (
+        f"contact-repair-{fingerprint}-{int(time.time())}"
+    )
     WORKTREE_ROOT.mkdir(parents=True, exist_ok=True)
 
     state = WorktreeController(ROOT).create_isolated(
@@ -278,6 +302,7 @@ def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
 
     coder.apply_structured_patch(task.id, candidate)
     changed = _validate_changed_paths(worktree)
+    _guard_candidate_diff(worktree, changed)
     tests = list(incident.get("failing_tests") or [])
     verify_tests = list(dict.fromkeys(tests + list(CORE_TESTS)))
     passed, verification_output = _verify(worktree, verify_tests)
@@ -325,8 +350,26 @@ def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
 
     passed_main, main_output = _verify(ROOT, verify_tests)
     if not passed_main:
+        revert = _git(
+            "-c",
+            "user.name=EmpireOS Repair Controller",
+            "-c",
+            "user.email=repair@empire-ai.local",
+            "revert",
+            "--no-edit",
+            repair_head,
+            cwd=ROOT,
+        )
+        if revert.returncode != 0:
+            raise RuntimeError(
+                "post_merge_verification_failed_and_revert_failed:"
+                + main_output[-1800:]
+                + ":"
+                + revert.stderr[-800:]
+            )
         raise RuntimeError(
-            "post_merge_verification_failed:" + main_output[-3000:]
+            "post_merge_verification_failed_reverted:"
+            + main_output[-2400:]
         )
 
     push = _git(
