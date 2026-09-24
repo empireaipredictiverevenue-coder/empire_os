@@ -298,6 +298,9 @@ def source_owner_identity_state(
     if _clean(validation.get("validation_state")) != "VERIFIED_CURRENT":
         return "NOT_AVAILABLE"
 
+    if not _meaningful_name(_clean(parsed.get("business_name"))):
+        return "PLACEHOLDER"
+
     legacy_name = _identity_name_key(parsed.get("business_name"))
     owner_names = [
         _identity_name_key(value)
