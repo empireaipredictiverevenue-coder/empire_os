@@ -16,6 +16,7 @@ def test_enterprise_contact_installer_wires_safe_internal_timers():
     assert "empire-predictive-revenue-enterprise-activation.timer" in text
     assert "empire-enterprise-contact-repair.service" in text
     assert "empire-enterprise-contact-repair.timer" in text
+    assert "/home/ubuntu/empire_os_repair_worktrees" in text
     assert "systemctl daemon-reload" in text
     assert "systemctl restart empire-ops-privileged-helper.service" in text
     assert (
