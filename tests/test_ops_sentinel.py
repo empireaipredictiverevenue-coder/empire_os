@@ -37,11 +37,14 @@ def test_business_blocker_is_not_auto_repaired():
     assert build_repair_plan(findings) == []
 
 
-def test_degraded_source_requests_safe_refresh():
+def test_legacy_end_to_end_flag_alone_does_not_trigger_repair():
     units = healthy_units()
-    findings = analyze(unit_states=units, runtime={"source_health": {"end_to_end_healthy": False}})
-    plan = build_repair_plan(findings)
-    assert any(row["target"] == "source_health_refresh" for row in plan)
+    findings = analyze(
+        unit_states=units,
+        runtime={"source_health": {"end_to_end_healthy": False}},
+    )
+    assert findings == []
+    assert build_repair_plan(findings) == []
 
 
 def test_coder_model_cooldown_is_visible_but_not_repaired():
