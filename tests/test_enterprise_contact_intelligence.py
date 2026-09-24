@@ -187,7 +187,7 @@ def test_enterprise_sync_worker_keeps_execution_governed():
     assert '"actual_revenue": False' in source
 
 
-def test_current_first_party_leadership_precedes_curated_fallback():
+def test_curated_enterprise_leadership_precedes_conflicting_scrape():
     row = {
         "account_name": "Sila Services",
         "probe": {
@@ -204,8 +204,8 @@ def test_current_first_party_leadership_precedes_curated_fallback():
         person for person in people
         if person["name"] == "Kyle Martin"
     )
-    assert kyle["title"] == "Chief Strategy Officer"
-    assert kyle["source"] == "first_party_site_current"
+    assert kyle["title"] == "Vice President, Corporate Development"
+    assert kyle["source"] == "curated_public_evidence"
 
 
 def test_reconciliation_uses_current_first_party_title_when_available():
