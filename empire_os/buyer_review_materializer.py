@@ -204,6 +204,65 @@ def fetch_candidate_rows(
         params,
     )
 
+    prospect_ids_for_batch = [
+        str(row.get("id") or "").strip()
+        for row in prospects
+        if str(row.get("id") or "").strip()
+    ]
+    if not prospect_ids_for_batch:
+        return [], 0
+
+    encoded_ids = f"in.({','.join(prospect_ids_for_batch)})"
+
+    review_rows = _get(
+        request,
+        "/rest/v1/buyer_candidate_reviews",
+        {
+            "select": "prospect_id,id,status,proposed_at",
+            "prospect_id": encoded_ids,
+            "order": "prospect_id.asc,proposed_at.desc",
+            "limit": max(100, len(prospect_ids_for_batch) * 10),
+        },
+    )
+    latest_review_by_prospect: dict[str, dict[str, Any]] = {}
+    for review in review_rows:
+        pid = str(review.get("prospect_id") or "").strip()
+        if pid and pid not in latest_review_by_prospect:
+            latest_review_by_prospect[pid] = review
+
+    link_rows = _get(
+        request,
+        "/rest/v1/prospect_entity_links",
+        {
+            "select": "prospect_id,entity_id,active,match_score,created_at",
+            "prospect_id": encoded_ids,
+            "active": "eq.true",
+            "order": "prospect_id.asc,match_score.desc,created_at.desc",
+            "limit": max(100, len(prospect_ids_for_batch) * 2),
+        },
+    )
+    link_by_prospect: dict[str, dict[str, Any]] = {}
+    for link in link_rows:
+        pid = str(link.get("prospect_id") or "").strip()
+        if pid and pid not in link_by_prospect:
+            link_by_prospect[pid] = link
+
+    acquisition_rows = _get(
+        request,
+        "/rest/v1/prospect_acquisitions",
+        {
+            "select": "prospect_id,source,evidence,created_at",
+            "prospect_id": encoded_ids,
+            "order": "prospect_id.asc,created_at.desc",
+            "limit": max(100, len(prospect_ids_for_batch) * 10),
+        },
+    )
+    acquisition_by_prospect: dict[str, dict[str, Any]] = {}
+    for acquisition in acquisition_rows:
+        pid = str(acquisition.get("prospect_id") or "").strip()
+        if pid and pid not in acquisition_by_prospect:
+            acquisition_by_prospect[pid] = acquisition
+
     ready: list[dict[str, Any]] = []
     skipped_existing = 0
     for row in prospects:
@@ -211,49 +270,22 @@ def fetch_candidate_rows(
         if not prospect_id:
             continue
 
-        reviews = _get(
-            request,
-            "/rest/v1/buyer_candidate_reviews",
-            {
-                "select": "id,status",
-                "prospect_id": f"eq.{prospect_id}",
-                "order": "proposed_at.desc",
-                "limit": 1,
-            },
-        )
-        if any(
-            str(item.get("status") or "") in {"pending", "approved"}
-            for item in reviews
+        latest_review = latest_review_by_prospect.get(prospect_id)
+        if (
+            latest_review is not None
+            and str(latest_review.get("status") or "") in {"pending", "approved"}
         ):
             skipped_existing += 1
             continue
 
-        links = _get(
-            request,
-            "/rest/v1/prospect_entity_links",
-            {
-                "select": "entity_id,active,match_score",
-                "prospect_id": f"eq.{prospect_id}",
-                "active": "eq.true",
-                "limit": 1,
-            },
-        )
-        if links:
-            row["entity_id"] = links[0].get("entity_id")
+        link = link_by_prospect.get(prospect_id)
+        if link:
+            row["entity_id"] = link.get("entity_id")
 
-        acquisitions = _get(
-            request,
-            "/rest/v1/prospect_acquisitions",
-            {
-                "select": "source,evidence,created_at",
-                "prospect_id": f"eq.{prospect_id}",
-                "order": "created_at.desc",
-                "limit": 1,
-            },
-        )
-        if acquisitions:
-            row["_acquisition_source"] = acquisitions[0].get("source")
-            evidence = acquisitions[0].get("evidence")
+        acquisition = acquisition_by_prospect.get(prospect_id)
+        if acquisition:
+            row["_acquisition_source"] = acquisition.get("source")
+            evidence = acquisition.get("evidence")
             if accepted_acquisition_website(evidence):
                 row["_acquisition_evidence"] = evidence
 
