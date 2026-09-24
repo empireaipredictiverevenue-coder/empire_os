@@ -1118,11 +1118,39 @@ def refresh_buyer_acquisition_plan(
             "actual_revenue": False,
         }
 
+    enterprise_contacts, enterprise_contacts_health = (
+        _read_runtime_snapshot(
+            root
+            / "runtime/predictive_revenue/"
+            "enterprise_contact_intelligence_latest.json"
+        )
+    )
+    payload["predictive_revenue_enterprise_contact_intelligence"] = {
+        "status": (
+            "ACTIVE"
+            if enterprise_contacts
+            else "NOT_MATERIALIZED"
+        ),
+        "proposed_review_count": enterprise_contacts.get(
+            "proposed_review_count", 0
+        ),
+        "targeted_retry_queued_count": enterprise_contacts.get(
+            "targeted_retry_queued_count", 0
+        ),
+        "skipped_count": enterprise_contacts.get("skipped_count", 0),
+        "error_count": enterprise_contacts.get("error_count", 0),
+        "live_outbound_send": False,
+        "actual_revenue": False,
+    }
+
     payload["runtime_input_health"] = {
         "commercial_exchange": exchange_health,
         "commercial_catalog": catalog_health,
         "predictive_revenue_enterprise_activation": (
             enterprise_activation_health
+        ),
+        "predictive_revenue_enterprise_contact_intelligence": (
+            enterprise_contacts_health
         ),
         "degraded": (
             exchange_health["state"] != "OK"
