@@ -72,6 +72,24 @@ def test_candidate_scoring_uses_only_observed_fields():
     assert c.mode == "OBSERVE" and c.write_authorized is False
 
 
+def test_legal_buyer_routes_to_verified_managed_service_pilot():
+    candidate = build_candidate({
+        "id": "legal-1",
+        "business_name": "Example Injury Law",
+        "niche": "personal injury lawyer",
+        "metro": "Austin",
+        "website": "https://examplelaw.test",
+        "phone": "5125550101",
+        "buy_signal_score": 100,
+        "contact_name": "Jane Smith",
+        "contact_title": "Owner",
+        "contact_source": "official_site",
+    })
+    assert candidate.decision_role == "economic_buyer"
+    assert candidate.decision_score == 1.0
+    assert candidate.offer_key == "managed_service"
+
+
 def test_directory_website_is_not_first_party_buyer_evidence():
     row = {
         "id": "dir-1",
