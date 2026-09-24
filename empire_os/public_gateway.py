@@ -1,7 +1,8 @@
 """Empire AI public gateway behind Cloudflare Tunnel.
 
 Public surface is discovery/read-mostly with narrow allowlisted commerce-intake
-proxies for self-serve orders and Lead Exchange interest. It deliberately
+proxies for self-serve orders, Lead Exchange interest and Predictive Revenue
+deployment interest. It deliberately
 excludes settlement execution, allocation, outreach execution, buyer activation
 and closer mutation endpoints.
 """
