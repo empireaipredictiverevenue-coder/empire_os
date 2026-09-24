@@ -1,0 +1,18 @@
+[Unit]
+Description=EmpireOS Legacy Permit Recovery Observer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=-/etc/empire_os.env
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_legacy_permit_recovery_observer.py --repo-root /srv/empire_os --batch-size 250
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=600
