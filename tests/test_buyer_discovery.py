@@ -37,6 +37,12 @@ def test_decision_role_ranking_is_explicit_and_conservative():
     assert classify_decision_role(
         "Project Coordinator"
     ) == ("other", 0.2)
+    assert classify_decision_role(
+        "Account Coordinator"
+    ) == ("other", 0.2)
+    assert classify_decision_role(
+        "Microsoft Partner Manager"
+    ) == ("influencer", 0.5)
     assert classify_decision_role("") == ("unknown", 0.0)
 
 
