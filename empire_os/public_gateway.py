@@ -305,6 +305,66 @@ async def checkout_order_proxy(request: Request):
     )
 
 
+@app.get("/v1/checkout/exchange/tiers")
+async def checkout_exchange_tiers_proxy():
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{CHECKOUT_INTERNAL_URL}/v1/exchange/tiers"
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"error": "exchange_checkout_unavailable"},
+            status_code=503,
+        )
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
+
+
+@app.post("/v1/checkout/exchange/interests")
+async def checkout_exchange_interest_proxy(request: Request):
+    raw = await request.body()
+    if len(raw) > 32_768:
+        return JSONResponse(
+            {"error": "checkout_payload_too_large"},
+            status_code=413,
+        )
+    if "application/json" not in request.headers.get(
+        "content-type",
+        ""
+    ).lower():
+        return JSONResponse(
+            {"error": "application_json_required"},
+            status_code=415,
+        )
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                f"{CHECKOUT_INTERNAL_URL}/v1/exchange/interests",
+                content=raw,
+                headers={"Content-Type": "application/json"},
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"error": "exchange_checkout_unavailable"},
+            status_code=503,
+        )
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
+
+
 @app.get("/agent-web/capabilities")
 def capabilities(surface: str | None = Query(default=None, pattern="^(webmcp|mcp|a2a)$")):
     return {
