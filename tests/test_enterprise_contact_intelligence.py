@@ -195,6 +195,7 @@ def test_current_first_party_leadership_precedes_curated_fallback():
                 "name": "Kyle Martin",
                 "title": "Chief Strategy Officer",
                 "url": "https://silaservices.com/leadership/",
+                "source_kind": "visible_text",
             }]
         },
     }
@@ -441,3 +442,65 @@ def test_existing_non_pending_review_is_not_rewritten():
         request=request,
     )
     assert refreshed is False
+
+
+def test_legacy_untyped_site_person_cannot_beat_curated_first_party_role():
+    row = {
+        "account_name": "Sila Services",
+        "probe": {
+            "site_people": [{
+                "name": "Kyle Martin",
+                "title": "President",
+                "url": "https://silaservices.com/leadership/",
+            }]
+        },
+    }
+
+    people = current_target_people(row)
+    kyle = next(
+        person for person in people if person["name"] == "Kyle Martin"
+    )
+    assert kyle["title"] == "Vice President, Corporate Development"
+    assert kyle["source"] == "curated_public_evidence"
+
+
+def test_structured_title_cannot_beat_curated_first_party_role():
+    row = {
+        "account_name": "Redwood Services",
+        "probe": {
+            "site_people": [{
+                "name": "Richard Lewis",
+                "title": "Chief Executive Officer",
+                "url": "https://redwoodservices.com/team/",
+                "source_kind": "structured_data",
+            }]
+        },
+    }
+
+    people = current_target_people(row)
+    richard = next(
+        person for person in people if person["name"] == "Richard Lewis"
+    )
+    assert richard["title"] == "Chief Executive Officer & Founder"
+    assert richard["source"] == "curated_public_evidence"
+
+
+def test_visible_leadership_title_can_supersede_curated_role():
+    row = {
+        "account_name": "Sila Services",
+        "probe": {
+            "site_people": [{
+                "name": "Kyle Martin",
+                "title": "Chief Strategy Officer",
+                "url": "https://silaservices.com/leadership/",
+                "source_kind": "visible_text",
+            }]
+        },
+    }
+
+    people = current_target_people(row)
+    kyle = next(
+        person for person in people if person["name"] == "Kyle Martin"
+    )
+    assert kyle["title"] == "Chief Strategy Officer"
+    assert kyle["source"] == "first_party_site_current"
