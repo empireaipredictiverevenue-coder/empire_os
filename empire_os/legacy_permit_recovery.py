@@ -25,6 +25,7 @@ from empire_os.prospect_ingest import match_existing_prospect
 OUTPUT = Path("runtime/recovery/legacy_permit_recovery_latest.json")
 MAX_BATCH_SIZE = 500
 MAX_SCAN_ROWS = 2500
+SCAN_ORDER = "prospect_id.asc,created_at.asc,id.asc"
 
 _NOTE_RE = re.compile(
     r"^name=(.*?)\s+email=(.*?)\s+phone=(.*?)\s+metro=(.*?)"
@@ -878,7 +879,7 @@ def build_recovery_observer(
         })
 
     return {
-        "schema_version": "empire.legacy-permit-recovery-observer.v3",
+        "schema_version": "empire.legacy-permit-recovery-observer.v4",
         "generated_at": _now(),
         "mode": "OBSERVE",
         "input_row_count": len(list(rows)) if isinstance(rows, list) else None,
@@ -937,7 +938,7 @@ def fetch_legacy_permit_rows(
             ),
             "prospect_id": "like.prospect_*",
             "notes": "ilike.*permit*",
-            "order": "prospect_id.asc,created_at.asc,id.asc",
+            "order": SCAN_ORDER,
             "limit": str(limit),
             "offset": str(offset + raw_consumed),
         })
@@ -988,6 +989,13 @@ def _previous_next_offset(path: Path) -> int:
         return 0
     if not isinstance(payload, Mapping):
         return 0
+
+    # Numeric offsets are only meaningful for the ordering that created them.
+    # A recovery deploy that changes scan order must restart from zero once
+    # rather than silently skipping records.
+    if payload.get("scan_order") != SCAN_ORDER:
+        return 0
+
     try:
         return max(0, int(payload.get("next_offset") or 0))
     except (TypeError, ValueError):
@@ -1045,6 +1053,7 @@ def refresh_legacy_permit_recovery_observer(
         "source_store": "public.lane_leads",
         "scan_offset": offset,
         "scan_limit": scan_limit,
+        "scan_order": SCAN_ORDER,
         "scanned_row_count": len(rows),
         "next_offset": next_offset,
         "canonical_store": "supabase",
