@@ -29,3 +29,15 @@ def test_ops_sentinel_watches_privileged_helper():
     unit = "empire-ops-privileged-helper.service"
     assert unit in CRITICAL_SERVICES
     assert unit in REPAIRABLE_UNITS
+
+
+def test_control_plane_installer_waits_for_socket_and_diagnoses_failure():
+    text = (
+        ROOT / "scripts/install_ops_self_heal_control_plane.sh"
+    ).read_text()
+
+    assert "for _ in $(seq 1 20)" in text
+    assert "test -S /run/empire-ops/privileged.sock" not in text
+    assert "[ -S /run/empire-ops/privileged.sock ]" in text
+    assert "systemctl status empire-ops-privileged-helper.service" in text
+    assert "journalctl -u empire-ops-privileged-helper.service" in text
