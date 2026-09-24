@@ -179,3 +179,77 @@ def test_scout_uses_bounded_parallel_probe_workers(monkeypatch):
         kwargs["time_budget_seconds"] == 12.0
         for _, kwargs in seen
     )
+
+
+def test_scout_classifies_predictive_revenue_enterprise_candidate(monkeypatch):
+    enterprise_plan = {
+        "priority_targets": [],
+        "product_priority_targets": [],
+        "icp_priority_targets": [{
+            "priority_score": 100,
+            "icp_profile_key": (
+                "predictive_revenue_home_services_platform"
+            ),
+            "buying_triggers": [
+                "acquisition",
+                "data analytics",
+            ],
+            "decision_maker_roles": [
+                "chief revenue officer",
+                "chief marketing officer",
+            ],
+            "research_queries": {
+                "enterprise_and_data_buyers": [
+                    '"home services platform" "acquisition"'
+                ],
+            },
+        }],
+    }
+
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {
+            query: ["platform.example"]
+            for query in queries
+        },
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "canonical_url": "https://platform.example",
+            "final_url": "https://platform.example",
+            "business_names": ["Platform Services Group"],
+            "title": "Platform Services Group",
+            "description": (
+                "National home services platform expanding by acquisition "
+                "with data analytics across portfolio brands."
+            ),
+            "emails": ["growth@platform.example"],
+            "phones": ["+15125550123"],
+            "people": [{
+                "name": "Jane Smith",
+                "title": "Chief Revenue Officer",
+            }],
+            "pages_checked": [],
+            "evidence_score": 0.95,
+        },
+    )
+
+    result = run_buyer_scout(
+        enterprise_plan,
+        max_queries=10,
+        max_domains=10,
+        max_probes=10,
+    )
+
+    assert result[
+        "predictive_revenue_enterprise_candidate_count"
+    ] == 1
+    row = result["candidates"][0]
+    assert row["predictive_revenue_enterprise_candidate"] is True
+    assert row["predictive_revenue_enterprise_profile"] == (
+        "predictive_revenue_home_services_platform"
+    )
+    assert row["predictive_revenue_enterprise_fit_score"] >= 40
+    assert row["outreach_authorized"] is False
