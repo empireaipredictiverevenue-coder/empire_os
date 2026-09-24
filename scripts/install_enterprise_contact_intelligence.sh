@@ -20,6 +20,7 @@ install_unit "deploy/systemd/empire-buyer-deferred-enrichment.service"
 install_unit "deploy/systemd/empire-buyer-deferred-enrichment.timer"
 install_unit "deploy/systemd/empire-predictive-revenue-enterprise-activation.service"
 install_unit "deploy/systemd/empire-predictive-revenue-enterprise-activation.timer"
+install_unit "deploy/systemd/empire-enterprise-contact-sync.service"
 install_unit "deploy/systemd/empire-enterprise-contact-repair.service"
 install_unit "deploy/systemd/empire-enterprise-contact-repair.timer"
 
