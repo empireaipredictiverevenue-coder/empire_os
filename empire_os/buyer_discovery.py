@@ -437,7 +437,8 @@ def _person_evidence_priority(person: Mapping[str, Any]) -> tuple[int, int, int]
     title = _text(person.get("title"))
 
     source_score = {
-        "visible_text": 3,
+        "visible_text": 4,
+        "curated_first_party": 3,
         "structured_data": 2,
     }.get(source_kind, 1)
     page_score = (
