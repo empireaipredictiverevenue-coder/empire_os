@@ -49,6 +49,9 @@ type ExchangeTier = {
   exclusivity_eligible: boolean;
   delivery_modes: string[];
   included_features: string[];
+  monthly_price_cents: number;
+  monthly_price_display: string;
+  usage_discount_bps: number | null;
   pricing_state: string;
   binding_terms_ready: boolean;
 };
@@ -523,8 +526,17 @@ export default function BuyPage() {
                           ? " · exclusivity eligible"
                           : ""}
                       </div>
-                      <div className="mt-3 text-sm font-semibold text-[#bfdbfe]">
-                        Monthly membership
+                      <div className="mt-3 flex items-end justify-between gap-3">
+                        <div className="text-sm font-semibold text-[#bfdbfe]">
+                          {item.monthly_price_display}
+                        </div>
+                        <div className="text-[9px] text-white/32">
+                          {item.usage_discount_bps === null
+                            ? "Custom usage"
+                            : item.usage_discount_bps > 0
+                              ? `${item.usage_discount_bps / 100}% usage discount`
+                              : "Standard usage"}
+                        </div>
                       </div>
                     </button>
                   );
@@ -677,8 +689,8 @@ export default function BuyPage() {
                 ) : null}
 
                 <div className="mt-5 text-center text-[10px] leading-5 text-white/28">
-                  Membership + usage/overage · pricing becomes binding only
-                  after approved commercial terms
+                  Founder-approved membership pricing + usage/overage · seat
+                  activation still requires verified commercial terms
                 </div>
               </form>
             </section>
