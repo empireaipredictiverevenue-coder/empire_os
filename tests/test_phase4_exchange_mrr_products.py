@@ -40,3 +40,17 @@ def test_exchange_mrr_products_preserve_current_truth_rules():
     assert result["canonical_settlement_rail"] == "USDT_BSC"
     assert result["actual_revenue"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_exchange_mrr_products_define_lead_access():
+    result = build_exchange_mrr_product_plan()
+    rows = {row["product_code"]: row for row in result["products"]}
+
+    assert rows["exchange_seat_starter"]["lead_classes"] == (
+        "verified",
+        "qualified",
+    )
+    assert rows["exchange_seat_growth"]["allocation_priority"] == "priority"
+    assert rows["exchange_seat_pro"]["exclusivity_eligible"] is True
+    assert rows["exchange_seat_enterprise"]["territory_model"] == "custom_contract"
