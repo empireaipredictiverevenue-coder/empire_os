@@ -35,6 +35,18 @@ def test_decision_role_ranking_is_explicit_and_conservative():
         "COO"
     ) == ("functional_buyer", 0.8)
     assert classify_decision_role(
+        "CTO"
+    ) == ("functional_buyer", 0.8)
+    assert classify_decision_role(
+        "CMO"
+    ) == ("functional_buyer", 0.8)
+    assert classify_decision_role(
+        "CIO"
+    ) == ("functional_buyer", 0.8)
+    assert classify_decision_role(
+        "CDO"
+    ) == ("functional_buyer", 0.8)
+    assert classify_decision_role(
         "Project Coordinator"
     ) == ("other", 0.2)
     assert classify_decision_role(
