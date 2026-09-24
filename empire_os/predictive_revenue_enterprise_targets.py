@@ -217,6 +217,10 @@ TARGETS: tuple[EnterpriseTarget, ...] = (
             {"name": "Ryan Flaherty", "title": "Chief Revenue Officer"},
             {"name": "Keith Chisholm", "title": "Chief Technology Officer"},
             {"name": "Lara Drake", "title": "Chief Marketing Officer"},
+            {
+                "name": "Kyle Martin",
+                "title": "Vice President, Corporate Development",
+            },
         ),
         target_roles=(
             "chief revenue officer",
