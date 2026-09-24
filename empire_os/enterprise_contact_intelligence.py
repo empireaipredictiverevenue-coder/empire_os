@@ -298,22 +298,30 @@ def _refresh_pending_review(
     ):
         return False
 
-    patch_params = urllib.parse.urlencode({
-        "id": f"eq.{review_id}",
-        "status": "eq.pending",
-    })
-    _request_with_retry(
+    response = _request_with_retry(
         request,
-        "PATCH",
-        f"/rest/v1/buyer_candidate_reviews?{patch_params}",
+        "POST",
+        "/rest/v1/rpc/refresh_pending_buyer_candidate_review",
         payload={
-            "contact_name": desired_name,
-            "contact_title": desired_title,
-            "contact_email": desired_email,
-            "decision_score": float(decision_score),
-            "evidence": dict(evidence),
+            "p_review_id": review_id,
+            "p_contact_name": desired_name,
+            "p_contact_title": desired_title,
+            "p_contact_email": desired_email,
+            "p_decision_score": float(decision_score),
+            "p_evidence": dict(evidence),
         },
     )
+    decision = (
+        _text(response.get("decision")).lower()
+        if isinstance(response, Mapping)
+        else ""
+    )
+    if decision == "not_pending":
+        return False
+    if decision not in {"updated", "no_change"}:
+        raise RuntimeError(
+            "pending review refresh rpc returned unexpected decision"
+        )
 
     verify = _request_with_retry(
         request,
