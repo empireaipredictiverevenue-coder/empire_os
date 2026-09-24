@@ -488,6 +488,14 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                 continue
 
             if network_probes >= network_probe_budget:
+                queue.defer_again(
+                    prospect_id,
+                    reason="network_probe_budget_exhausted",
+                    attempts=attempts,
+                    retry_minutes=10,
+                )
+                deferred_again += 1
+                processed += 1
                 results.append({
                     "prospect_id": prospect_id,
                     "outcome": "deferred_by_network_budget",
