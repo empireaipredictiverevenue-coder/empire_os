@@ -266,7 +266,8 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
     forward_sender = (
         reply_forward_sender
         if reply_forward_sender is not None
-        else os.getenv("EMPIRE_OUTBOUND_FROM", "")
+        else os.getenv("EMPIRE_REPLY_FORWARD_FROM", "").strip()
+        or reply_base
     ).strip()
     founder_address = (
         founder_inbox
@@ -374,6 +375,11 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                     if forward_result.get("forwarded")
                     else None
                 ),
+                "reply_forward_reason": (
+                    forward_result.get("reason")
+                    if not forward_result.get("forwarded")
+                    else None
+                ),
             }
         if reply is None:
             return {
@@ -385,6 +391,11 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                 "reply_forward_target": (
                     forward_result.get("target")
                     if forward_result.get("forwarded")
+                    else None
+                ),
+                "reply_forward_reason": (
+                    forward_result.get("reason")
+                    if not forward_result.get("forwarded")
                     else None
                 ),
             }
