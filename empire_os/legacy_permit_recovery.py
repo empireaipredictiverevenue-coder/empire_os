@@ -26,6 +26,7 @@ OUTPUT = Path("runtime/recovery/legacy_permit_recovery_latest.json")
 MAX_BATCH_SIZE = 500
 MAX_SCAN_ROWS = 2500
 SCAN_ORDER = "prospect_id.asc,created_at.asc,id.asc"
+SCAN_EPOCH = "permit-owner-project-v5"
 
 _NOTE_RE = re.compile(
     r"^name=(.*?)\s+email=(.*?)\s+phone=(.*?)\s+metro=(.*?)"
@@ -1016,7 +1017,10 @@ def _previous_next_offset(path: Path) -> int:
     # Numeric offsets are only meaningful for the ordering that created them.
     # A recovery deploy that changes scan order must restart from zero once
     # rather than silently skipping records.
-    if payload.get("scan_order") != SCAN_ORDER:
+    if (
+        payload.get("scan_order") != SCAN_ORDER
+        or payload.get("scan_epoch") != SCAN_EPOCH
+    ):
         return 0
 
     try:
@@ -1077,6 +1081,7 @@ def refresh_legacy_permit_recovery_observer(
         "scan_offset": offset,
         "scan_limit": scan_limit,
         "scan_order": SCAN_ORDER,
+        "scan_epoch": SCAN_EPOCH,
         "scanned_row_count": len(rows),
         "next_offset": next_offset,
         "canonical_store": "supabase",
