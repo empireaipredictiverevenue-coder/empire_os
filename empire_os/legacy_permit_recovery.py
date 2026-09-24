@@ -44,14 +44,17 @@ _NYC_BOROUGH_SUFFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
-_PLACEHOLDER_NAMES = {
+_PLACEHOLDER_NAME_KEYS = {
     "",
-    "n/a",
     "na",
     "none",
     "unknown",
-    "not available",
-    "not applicable",
+    "notavailable",
+    "notapplicable",
+    "owner",
+    "ownerself",
+    "ownerasself",
+    "self",
 }
 
 
@@ -67,8 +70,21 @@ def _phone_digits(value: str) -> str:
     return "".join(char for char in _clean(value) if char.isdigit())
 
 
+def _placeholder_name_key(value: Any) -> str:
+    return re.sub(
+        r"[^a-z0-9]+",
+        "",
+        _clean(value).casefold(),
+    )
+
+
 def _meaningful_name(value: str) -> bool:
-    return _clean(value).casefold() not in _PLACEHOLDER_NAMES
+    key = _placeholder_name_key(value)
+    if key in _PLACEHOLDER_NAME_KEYS:
+        return False
+    if key.isdigit():
+        return False
+    return bool(key)
 
 
 def _identity_fingerprint(
@@ -890,28 +906,77 @@ def fetch_legacy_permit_rows(
     batch_size: int = 100,
     offset: int = 0,
 ) -> tuple[list[dict[str, Any]], int, int]:
+    """Fetch a gap-free bounded batch of unique legacy prospect groups.
+
+    lane_leads contains several lane rows per legacy prospect. Read rows in
+    prospect_id order so duplicates stay contiguous, then stop immediately
+    before the first row belonging to the next unique prospect after the
+    requested batch size. The returned next_offset therefore never skips an
+    unprocessed raw row.
+    """
     batch_size = max(100, min(int(batch_size), MAX_BATCH_SIZE))
     offset = max(0, int(offset))
-    # Fetch exactly the bounded batch. Advancing an offset past rows that were
-    # fetched but not processed would create silent recovery gaps.
-    scan_limit = batch_size
-    params = urllib.parse.urlencode({
-        "select": (
-            "id,lane_id,prospect_id,status,omega_score,omega_tier,"
-            "notes,created_at,buyer_id,niche,metro"
-        ),
-        "prospect_id": "like.prospect_*",
-        "notes": "ilike.*permit*",
-        "order": "created_at.asc,id.asc",
-        "limit": str(scan_limit),
-        "offset": str(offset),
-    })
-    rows = request_json("GET", f"/rest/v1/lane_leads?{params}") or []
-    if not isinstance(rows, list):
-        rows = []
-    next_offset = offset + len(rows) if len(rows) == scan_limit else 0
-    return [dict(row) for row in rows if isinstance(row, Mapping)], next_offset, scan_limit
+    scan_budget = MAX_SCAN_ROWS
+    page_size = min(500, scan_budget)
 
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    raw_consumed = 0
+    reached_end = False
+    batch_complete = False
+
+    while raw_consumed < scan_budget and not batch_complete:
+        limit = min(page_size, scan_budget - raw_consumed)
+        params = urllib.parse.urlencode({
+            "select": (
+                "id,lane_id,prospect_id,status,omega_score,omega_tier,"
+                "notes,created_at,buyer_id,niche,metro"
+            ),
+            "prospect_id": "like.prospect_*",
+            "notes": "ilike.*permit*",
+            "order": "prospect_id.asc,created_at.asc,id.asc",
+            "limit": str(limit),
+            "offset": str(offset + raw_consumed),
+        })
+        batch = request_json(
+            "GET",
+            f"/rest/v1/lane_leads?{params}",
+        ) or []
+        if not isinstance(batch, list):
+            batch = []
+
+        if not batch:
+            reached_end = True
+            break
+
+        for raw in batch:
+            if not isinstance(raw, Mapping):
+                raw_consumed += 1
+                continue
+
+            prospect_id = _clean(raw.get("prospect_id"))
+            if (
+                prospect_id
+                and prospect_id not in seen
+                and len(seen) >= batch_size
+            ):
+                batch_complete = True
+                break
+
+            rows.append(dict(raw))
+            raw_consumed += 1
+            if prospect_id:
+                seen.add(prospect_id)
+
+        if batch_complete:
+            break
+
+        if len(batch) < limit:
+            reached_end = True
+            break
+
+    next_offset = 0 if reached_end else offset + raw_consumed
+    return rows, next_offset, scan_budget
 
 def _previous_next_offset(path: Path) -> int:
     try:
