@@ -117,39 +117,34 @@ def choose_jobs(
     source: dict[str, Any],
     buyer_review: dict[str, Any] | None = None,
 ) -> list[str]:
-    jobs: list[str] = []
-    if source.get("end_to_end_healthy") is not True:
-        jobs.append("source_health_refresh")
+    """Choose only work Astra uniquely owns.
 
+    Recurring production workers with dedicated systemd timers must not also be
+    relaunched by Astra. Duplicating them here multiplies canonical REST reads,
+    burns Supabase egress and can create retry storms without adding commercial
+    value.
+    """
+    jobs: list[str] = []
+
+    # Dedicated timers own source health, buyer review materialization, GTM,
+    # closer replies, catalog refresh, commercial evidence verification,
+    # revenue pulse and opportunity loop. Astra observes their artifacts rather
+    # than scheduling a second copy of those workers.
     if loop.get("loop_complete") is not True:
-        # Deferred buyer enrichment is intentionally owned by its dedicated
-        # bounded timer. Astra must not synchronously duplicate that slow lane.
         stages = {
             str(row.get("stage") or ""): row.get("observed")
             for row in (loop.get("stages") or [])
             if isinstance(row, dict)
         }
-        if stages.get("recognized_revenue") is not True:
-            jobs.append("buyer_review_materializer")
-        if stages.get("buyer_conversation") is not True:
-            jobs.append("gtm_pipeline")
         if stages.get("commercial_terms") is not True:
-            jobs.append("closer_reply_handoff")
-            jobs.append("commercial_product_catalog_refresh")
-            jobs.append("commercial_evidence_auto_verifier")
             jobs.append("commercial_terms_materializer")
         jobs.append("conversion_intelligence_refresh")
         jobs.append("commercial_loop_refresh")
-        jobs.append("revenue_pulse_refresh")
 
-    # Opportunity discovery is continuous even when the current commercial
-    # loop completes. The canonical loop has its own freshness guard so the
-    # five-minute Astra cadence does not repeat public research unnecessarily.
-    jobs.append("opportunity_loop_refresh")
+    # Executive synthesis and department dispatch remain Astra-owned.
     jobs.append("astra_executive_refresh")
     jobs.append("astra_department_dispatch")
     return list(dict.fromkeys(jobs))
-
 
 def dispatch(
     *,
