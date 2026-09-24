@@ -1,7 +1,7 @@
 from empire_os.lead_sources import permits
 
 
-def test_generic_owner_labels_do_not_emit_candidates(monkeypatch):
+def test_generic_owner_labels_emit_project_signals(monkeypatch):
     base = {
         "job__": "401975190",
         "work_type": "PL",
@@ -35,4 +35,12 @@ def test_generic_owner_labels_do_not_emit_candidates(monkeypatch):
             "empire_os.lead_sources.permits.requests.get",
             lambda *args, _response=response, **kwargs: _response,
         )
-        assert list(permits._run_nyc(lookback_days=7)) == []
+        candidates = list(permits._run_nyc(lookback_days=7))
+        assert len(candidates) == 1
+        candidate = candidates[0]
+        assert candidate.name == "NYC Permit 401975190 (Queens)"
+        assert candidate.phone == ""
+        roles = candidate.raw["_empire_identity_roles"]
+        assert roles["candidate_name_role"] == "project_signal"
+        assert roles["owner_identity_available"] is False
+        assert roles["source_owner_name"] == label
