@@ -16,6 +16,12 @@ def test_failure_classifier_distinguishes_safe_repair_classes():
     assert repair.classify_failure(
         "AssertionError FAILED tests/test_buyer_discovery.py::test_x"
     ) == "CODE_DEFECT"
+    assert repair.classify_failure(
+        "FAILED tests/test_timeout_logic.py::test_x - AssertionError"
+    ) == "CODE_DEFECT"
+    assert repair.classify_failure(
+        "unclassified strange condition"
+    ) == "UNKNOWN"
 
 
 def test_failed_pytest_nodes_are_extracted_for_targeted_verification():
@@ -81,6 +87,8 @@ def test_repair_controller_uses_isolated_worktree_and_compare_swap_guards():
     assert "git_add_failed" in source
     assert '"merge", "--ff-only"' in source
     assert '"push",' in source
+    assert "coder repair attempted authority expansion" in source
+    assert "coder repair attempted to remove a test assertion" in source
 
 
 def test_repair_systemd_is_internal_observe_only():
