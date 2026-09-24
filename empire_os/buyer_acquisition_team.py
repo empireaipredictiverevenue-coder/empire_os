@@ -24,6 +24,9 @@ from empire_os.icp_buyer_trigger_intelligence import (
     build_icp_priority_targets,
     icp_learning_contract,
 )
+from empire_os.predictive_revenue_enterprise_targets import (
+    build_enterprise_target_review,
+)
 
 
 OUTPUT = Path("runtime/buyer_acquisition/latest.json")
@@ -831,6 +834,7 @@ def build_buyer_acquisition_plan(
         corridor_targets=targets,
         product_targets=product_targets,
     )
+    enterprise_review = build_enterprise_target_review()
 
     now = generated_at or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -954,6 +958,10 @@ def build_buyer_acquisition_plan(
         },
         "icp_priority_target_count": len(icp_targets),
         "icp_priority_targets": icp_targets,
+        "predictive_revenue_enterprise_targets": enterprise_review,
+        "predictive_revenue_enterprise_target_count": enterprise_review[
+            "target_count"
+        ],
         "supply_gate_diagnostics": supply,
         "seat_activation_blocker_counts": seat_blockers,
         "commercial_fact_capture": [
