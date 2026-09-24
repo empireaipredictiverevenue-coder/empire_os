@@ -141,6 +141,12 @@ class BuyerDeferredEnrichmentQueue:
                 {
                     "name": str(person.get("name") or "").strip(),
                     "title": str(person.get("title") or "").strip(),
+                    "source": (
+                        str(person.get("source") or "").strip() or None
+                    ),
+                    "evidence_url": (
+                        str(person.get("evidence_url") or "").strip() or None
+                    ),
                 }
                 for person in (item.get("target_people") or [])
                 if isinstance(person, Mapping)
