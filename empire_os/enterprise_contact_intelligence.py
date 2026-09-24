@@ -7,6 +7,7 @@ accepts terms, moves funds, or recognizes revenue.
 from __future__ import annotations
 
 from typing import Any, Mapping
+import time
 import urllib.parse
 
 from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
@@ -32,6 +33,35 @@ TARGET_BY_NAME = {
     target.account_name: target
     for target in TARGETS
 }
+
+
+def _request_with_retry(
+    request,
+    method: str,
+    path: str,
+    *,
+    payload: Any | None = None,
+    attempts: int = 3,
+    base_delay_seconds: float = 0.35,
+):
+    last_error: Exception | None = None
+    for attempt in range(1, max(1, int(attempts)) + 1):
+        try:
+            return request(
+                method,
+                path,
+                payload=payload,
+            )
+        except (RuntimeError, OSError, TimeoutError) as exc:
+            last_error = exc
+            if attempt >= attempts:
+                break
+            time.sleep(
+                max(0.0, float(base_delay_seconds))
+                * (2 ** (attempt - 1))
+            )
+    assert last_error is not None
+    raise last_error
 
 
 def current_target_people(
@@ -209,7 +239,11 @@ def _fetch_prospect(
         "id": f"eq.{prospect_id}",
         "limit": 1,
     })
-    rows = request("GET", f"/rest/v1/prospects?{params}") or []
+    rows = _request_with_retry(
+        request,
+        "GET",
+        f"/rest/v1/prospects?{params}",
+    ) or []
     if not rows or not isinstance(rows[0], dict):
         raise RuntimeError(f"canonical prospect missing:{prospect_id}")
     return rows[0]
@@ -297,7 +331,8 @@ def sync_enterprise_activation(
                     "live_outbound_send": False,
                     "actual_revenue": False,
                 })
-                response = request(
+                response = _request_with_retry(
+                    request,
                     "POST",
                     "/rest/v1/rpc/propose_buyer_candidate_review",
                     payload=plan["params"],
