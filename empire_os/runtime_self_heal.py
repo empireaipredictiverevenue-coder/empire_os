@@ -73,6 +73,14 @@ AUTO_REPAIR_TIMERS: tuple[ServiceSpec, ...] = (
     ServiceSpec("acquisition_timer", "empire-acquisition.timer"),
     ServiceSpec("qualification_timer", "empire-qualification.timer"),
     ServiceSpec("hermes_control_timer", "empire-hermes-control.timer"),
+    ServiceSpec(
+        "buyer_deferred_enrichment_timer",
+        "empire-buyer-deferred-enrichment.timer",
+    ),
+    ServiceSpec(
+        "enterprise_contact_intelligence_timer",
+        "empire-predictive-revenue-enterprise-activation.timer",
+    ),
 )
 
 SNAPSHOTS: tuple[SnapshotSpec, ...] = (
@@ -105,6 +113,13 @@ SNAPSHOTS: tuple[SnapshotSpec, ...] = (
         "/srv/empire_os/runtime/source_health/latest.json",
         1800,
         "empire-source-health.service",
+    ),
+    SnapshotSpec(
+        "enterprise_contact_intelligence",
+        "/srv/empire_os/runtime/predictive_revenue/"
+        "enterprise_contact_intelligence_latest.json",
+        108000,
+        "empire-predictive-revenue-enterprise-activation.service",
     ),
 )
 
