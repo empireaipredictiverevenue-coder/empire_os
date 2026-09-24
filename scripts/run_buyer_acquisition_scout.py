@@ -12,6 +12,20 @@ from empire_os.qualification_worker_v2 import request_json
 
 SEED_LANES = (
     (
+        "high_ticket_home_service",
+        (
+            "plumbing",
+            "general_contractor",
+            "roofing",
+            "residential_roofing",
+            "roof_repair",
+            "restoration",
+            "water_damage_restoration",
+            "hvac",
+            "solar",
+        ),
+    ),
+    (
         "legal_mass_tort_plaintiff_firm",
         (
             "mass tort lawyer",
