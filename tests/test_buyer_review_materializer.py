@@ -76,13 +76,20 @@ class FakeRequest:
             return [prospect()]
         if path.startswith("/rest/v1/buyer_candidate_reviews?"):
             if self.existing:
-                return [{"id": "r1", "status": "approved"}]
+                return [{
+                    "prospect_id": PROSPECT_ID,
+                    "id": "r1",
+                    "status": "approved",
+                    "proposed_at": "2026-09-20T13:00:00+00:00",
+                }]
             return []
         if path.startswith("/rest/v1/prospect_entity_links?"):
             return [{
+                "prospect_id": PROSPECT_ID,
                 "entity_id": ENTITY_ID,
                 "active": True,
                 "match_score": 1.0,
+                "created_at": "2026-09-20T12:30:00+00:00",
             }]
         if path.startswith("/rest/v1/prospect_acquisitions?"):
             return []
@@ -306,6 +313,62 @@ def test_candidate_fetch_is_cross_pool_and_uses_score_only_for_ordering():
     assert "website=not.is.null" in prospect_path
     assert "niche.ilike." not in prospect_path
     assert "buy_signal_score.desc.nullslast" in prospect_path
+
+
+def test_candidate_fetch_batches_related_evidence_reads():
+    second_id = "00000000-0000-0000-0000-000000000102"
+    calls = []
+
+    def request(method, path, payload=None, **_kwargs):
+        assert method == "GET"
+        calls.append(path)
+        if path.startswith("/rest/v1/prospects?"):
+            second = prospect()
+            second["id"] = second_id
+            second["business_name"] = "Second Roofing"
+            return [prospect(), second]
+        if path.startswith("/rest/v1/buyer_candidate_reviews?"):
+            return []
+        if path.startswith("/rest/v1/prospect_entity_links?"):
+            return [
+                {
+                    "prospect_id": PROSPECT_ID,
+                    "entity_id": ENTITY_ID,
+                    "active": True,
+                    "match_score": 1.0,
+                    "created_at": "2026-09-20T12:30:00+00:00",
+                }
+            ]
+        if path.startswith("/rest/v1/prospect_acquisitions?"):
+            return []
+        raise AssertionError(path)
+
+    rows, skipped = fetch_candidate_rows(
+        request,
+        scan_limit=10,
+    )
+
+    assert skipped == 0
+    assert len(rows) == 2
+    assert len(calls) == 4
+    assert sum(
+        path.startswith("/rest/v1/buyer_candidate_reviews?")
+        for path in calls
+    ) == 1
+    assert sum(
+        path.startswith("/rest/v1/prospect_entity_links?")
+        for path in calls
+    ) == 1
+    assert sum(
+        path.startswith("/rest/v1/prospect_acquisitions?")
+        for path in calls
+    ) == 1
+    related = [
+        path
+        for path in calls
+        if not path.startswith("/rest/v1/prospects?")
+    ]
+    assert all("prospect_id=in." in path for path in related)
 
 
 def test_cross_pool_review_still_requires_company_score_floor():
