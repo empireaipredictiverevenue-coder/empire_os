@@ -105,6 +105,20 @@ def persist_new_external_candidates(
             "reseller_signal_hits": list(
                 candidate.get("reseller_signal_hits") or []
             ),
+            "predictive_revenue_enterprise_candidate": bool(
+                candidate.get(
+                    "predictive_revenue_enterprise_candidate"
+                )
+            ),
+            "predictive_revenue_enterprise_profile": candidate.get(
+                "predictive_revenue_enterprise_profile"
+            ),
+            "predictive_revenue_enterprise_fit_score": int(
+                candidate.get(
+                    "predictive_revenue_enterprise_fit_score"
+                )
+                or 0
+            ),
             "icp_intelligence": (
                 dict(candidate.get("icp_intelligence"))
                 if isinstance(candidate.get("icp_intelligence"), Mapping)
@@ -145,6 +159,20 @@ def persist_new_external_candidates(
             "outreach_authorized": False,
             "icp_profile_keys": list(
                 candidate.get("target_icp_profile_keys") or []
+            ),
+            "predictive_revenue_enterprise_candidate": bool(
+                candidate.get(
+                    "predictive_revenue_enterprise_candidate"
+                )
+            ),
+            "predictive_revenue_enterprise_profile": candidate.get(
+                "predictive_revenue_enterprise_profile"
+            ),
+            "predictive_revenue_enterprise_fit_score": int(
+                candidate.get(
+                    "predictive_revenue_enterprise_fit_score"
+                )
+                or 0
             ),
             "why_now_state": candidate.get("why_now_state"),
             "personalization_requires_verified_evidence": True,
