@@ -87,7 +87,7 @@ def test_auto_send_claims_validates_sends_and_records():
         guarded("AUTO_SEND_ELIGIBLE"),
         sender_rpc=sender_rpc,
         actor="outbound_governor",
-        sender="Phil - Founder - Empire AI <phil@mail.empire-ai.co.uk>",
+        sender="Phil - Founder - Empire AI <founder@empire-ai.co.uk>",
         reply_to="reply@mail.empire-ai.co.uk",
         resend_api_key="re_test",
         resend_module=FakeResend,
