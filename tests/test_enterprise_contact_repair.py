@@ -203,3 +203,41 @@ def test_resolved_incident_does_not_hide_new_runtime_failure(
     result = repair.run_repair_cycle()
     assert result["status"] == "RESOLVED_RUNTIME_RETRY"
     assert result["classification"] == "TRANSIENT_INFRA"
+
+
+def test_moved_head_closes_incident_when_failure_already_fixed(
+    monkeypatch,
+    tmp_path,
+):
+    incident_path = tmp_path / "incident.json"
+    monkeypatch.setattr(repair, "INCIDENT_PATH", incident_path)
+    monkeypatch.setattr(
+        repair,
+        "_main_state",
+        lambda: (
+            "feature/revenue-intelligence-v2",
+            "new-head",
+            False,
+        ),
+    )
+    monkeypatch.setattr(
+        repair,
+        "_verify",
+        lambda _root, tests: (True, "1 passed"),
+    )
+
+    incident, resolution = repair._reconcile_moved_head({
+        "fingerprint": "abc",
+        "base_head": "old-head",
+        "failing_tests": [
+            "tests/test_buyer_discovery.py::test_example"
+        ],
+    })
+
+    assert incident["base_head"] == "old-head"
+    assert resolution is not None
+    assert resolution["status"] == "RESOLVED_BY_CONCURRENT_CHANGE"
+    assert resolution["verified_tests"] == [
+        "tests/test_buyer_discovery.py::test_example"
+    ]
+    assert not incident_path.exists()
