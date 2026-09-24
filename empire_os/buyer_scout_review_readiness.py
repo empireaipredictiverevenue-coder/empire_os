@@ -121,8 +121,9 @@ def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
             "NYC_FIRST_PARTY_EVIDENCE"
         ):
             return False, "permit_territory_not_verified"
-        if site.get("business_name_source") == (
-            "canonical_seed_unconfirmed"
+        if (
+            site.get("business_name_source") == "canonical_prospect_seed"
+            and site.get("canonical_seed_identity_corroborated") is not True
         ):
             return False, "permit_business_identity_unconfirmed"
 
