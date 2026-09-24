@@ -495,6 +495,26 @@ def run_runtime_self_heal(
         policy = str(row.get("policy") or "OBSERVE_ONLY")
         policy_counts[policy] = policy_counts.get(policy, 0) + 1
 
+    explicitly_checked_units = {
+        spec.unit for spec in AUTO_REPAIR_SERVICES + AUTO_REPAIR_TIMERS
+    }
+    inventory_findings: list[dict[str, Any]] = []
+    for row in inventory:
+        unit = str(row.get("unit") or "")
+        if not unit.endswith(".timer") or unit in explicitly_checked_units:
+            continue
+        file_state = str(row.get("unit_file_state") or "")
+        active_state = str(row.get("active_state") or "")
+        if file_state.startswith("enabled") and active_state != "active":
+            inventory_findings.append({
+                "code": "enabled_timer_inactive",
+                "unit": unit,
+                "policy": row.get("policy") or "OBSERVE_ONLY",
+                "unit_file_state": file_state,
+                "active_state": active_state,
+                "repair_executed": False,
+            })
+
     checks: list[dict[str, Any]] = []
     repairs: list[dict[str, Any]] = []
     repair_count = 0
@@ -626,6 +646,8 @@ def run_runtime_self_heal(
         elif row.get("healthy") is not True:
             unresolved += 1
 
+    unresolved += len(inventory_findings)
+
     payload = {
         "schema_version": "empire.runtime-self-heal.v1",
         "observed_at": _iso(current),
@@ -639,6 +661,12 @@ def run_runtime_self_heal(
         "system_unit_count": len(inventory),
         "system_unit_policy_counts": dict(sorted(policy_counts.items())),
         "system_units": inventory,
+        "inventory_finding_count": len(inventory_findings),
+        "founder_gate_required_count": sum(
+            row.get("policy") == "FOUNDER_GATE"
+            for row in inventory_findings
+        ),
+        "inventory_findings": inventory_findings,
         "checks": checks,
         "repairs": repairs,
         "founder_gate_policy": {
