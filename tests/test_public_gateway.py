@@ -14,12 +14,12 @@ from empire_os.public_gateway import (
 client = TestClient(app)
 
 
-def test_health_is_read_only_public_surface():
+def test_health_describes_narrow_commerce_intake_surface():
     r = client.get("/health")
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "online"
-    assert body["execution"] == "read-only-public-surface"
+    assert body["execution"] == "read-mostly-with-narrow-commerce-intake"
 
 
 def test_home_is_public_landing():
