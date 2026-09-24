@@ -9,11 +9,11 @@ echo "=================================================="
 
 echo
 echo "=== TEST ==="
-PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q   tests/test_buyer_discovery.py   tests/test_enterprise_contact_intelligence.py   tests/test_enterprise_targeted_retry.py   tests/test_enterprise_contact_intelligence_installer.py   tests/test_predictive_revenue_enterprise_activation.py   tests/test_predictive_revenue_enterprise_activation_systemd.py   tests/test_buyer_acquisition_team.py   tests/test_runtime_self_heal.py   tests/test_ops_privileged_helper.py   tests/test_buyer_deferred_identity_timeout.py
+PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q   tests/test_buyer_discovery.py   tests/test_buyer_probe_worker.py   tests/test_enterprise_contact_intelligence.py   tests/test_enterprise_targeted_retry.py   tests/test_enterprise_contact_intelligence_installer.py   tests/test_predictive_revenue_enterprise_activation.py   tests/test_predictive_revenue_enterprise_activation_systemd.py   tests/test_buyer_acquisition_team.py   tests/test_runtime_self_heal.py   tests/test_ops_privileged_helper.py   tests/test_buyer_deferred_identity_timeout.py
 
 echo
 echo "=== COMPILE ==="
-PYTHONPATH=/srv/empire_os ./.venv/bin/python -m py_compile   empire_os/buyer_discovery.py   empire_os/buyer_deferred_enrichment.py   empire_os/enterprise_contact_intelligence.py   empire_os/runtime_self_heal.py   empire_os/ops_privileged_helper.py   scripts/run_buyer_deferred_enrichment.py   scripts/run_enterprise_contact_intelligence.py
+PYTHONPATH=/srv/empire_os ./.venv/bin/python -m py_compile   empire_os/buyer_discovery.py   empire_os/buyer_probe_worker.py   empire_os/buyer_deferred_enrichment.py   empire_os/enterprise_contact_intelligence.py   empire_os/runtime_self_heal.py   empire_os/ops_privileged_helper.py   scripts/run_buyer_deferred_enrichment.py   scripts/run_enterprise_contact_intelligence.py
 
 echo
 echo "=== INSTALL AUTOMATION ==="
