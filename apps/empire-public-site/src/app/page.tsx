@@ -160,6 +160,9 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1560px] items-center justify-between">
           <Brand />
           <div className="pointer-events-auto flex items-center gap-2">
+            <a href="/buy" className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/[0.06] px-4 py-2.5 text-[9px] font-semibold tracking-[0.14em] text-emerald-100/80 backdrop-blur-2xl transition hover:border-emerald-200/40 hover:text-white sm:inline-flex">
+              BUY INTELLIGENCE
+            </a>
             <a href="/industries" className="hidden rounded-full border border-white/[0.09] bg-[#07142f]/70 px-4 py-2.5 text-[9px] font-semibold tracking-[0.14em] text-white/55 backdrop-blur-2xl transition hover:border-[#60a5fa]/35 hover:text-white sm:inline-flex">
               INDUSTRIES
             </a>
@@ -230,6 +233,9 @@ export default function Home() {
                     ENTER THE SYSTEM
                     <ChevronDown className="size-3.5 transition-transform group-hover:translate-y-0.5" />
                   </button>
+                  <a href="/buy" className="inline-flex min-h-12 items-center rounded-full border border-emerald-300/20 bg-emerald-300/[0.07] px-5 text-[9px] font-semibold tracking-[0.13em] text-emerald-100/80 backdrop-blur-2xl transition hover:border-emerald-200/40 hover:text-white">
+                    BUY INTELLIGENCE
+                  </a>
                   <a href="/industries" className="inline-flex min-h-12 items-center rounded-full border border-white/10 bg-[#08152f]/65 px-5 text-[9px] font-semibold tracking-[0.13em] text-white/60 backdrop-blur-2xl transition hover:border-[#60a5fa]/30 hover:text-white">
                     EXPLORE INDUSTRIES
                   </a>
