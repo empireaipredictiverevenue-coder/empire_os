@@ -86,10 +86,12 @@ def test_public_site_route_resolution_is_allowlisted(tmp_path):
     (tmp_path / "index.html").write_text("home")
     (tmp_path / "trust.html").write_text("trust")
     (tmp_path / "industries.html").write_text("industries")
+    (tmp_path / "buy.html").write_text("buy")
     (tmp_path / "industries/property.html").write_text("property")
     assert _site_html_path("", tmp_path).name == "index.html"
     assert _site_html_path("trust", tmp_path).name == "trust.html"
     assert _site_html_path("industries/property", tmp_path).name == "property.html"
+    assert _site_html_path("buy", tmp_path).name == "buy.html"
     assert _site_html_path("../secret", tmp_path) is None
     assert _site_html_path("industries/../../secret", tmp_path) is None
 
@@ -102,10 +104,12 @@ def test_public_site_urls_are_added_to_sitemap(tmp_path):
     (site / "industries").mkdir(parents=True)
     (site / "trust.html").write_text("trust")
     (site / "industries.html").write_text("industries")
+    (site / "buy.html").write_text("buy")
     (site / "industries/property.html").write_text("property")
     xml = _sitemap_xml(aeo, site)
     assert "/trust" in xml
     assert "/industries" in xml
+    assert "/buy" in xml
     assert "/industries/property" in xml
     assert "/aeo/roofing/DFW/" in xml
 
@@ -173,3 +177,13 @@ def test_favicon_alias_is_served_from_export(monkeypatch, tmp_path):
     response = favicon()
     assert Path(response.path) == icon
     assert response.media_type == "image/svg+xml"
+
+
+def test_checkout_proxy_rejects_non_json():
+    response = client.post(
+        "/v1/checkout/orders",
+        content="not-json",
+        headers={"Content-Type": "text/plain"},
+    )
+    assert response.status_code == 415
+    assert response.json()["error"] == "application_json_required"
