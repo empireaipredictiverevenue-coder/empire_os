@@ -16,6 +16,9 @@ def test_legacy_permit_recovery_runner_is_observe_only():
     assert "outbound_sent" in text
     assert "actual_revenue" in text
     assert "execution_authority" in text
+    assert "update_cumulative_inventory" in text
+    assert "cumulative_unique_inventory" in text
+    assert "cumulative_project_only" in text
 
 
 def test_legacy_permit_recovery_core_has_no_mutating_rest_method():
