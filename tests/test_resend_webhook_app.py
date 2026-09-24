@@ -312,6 +312,61 @@ def test_forward_sender_defaults_to_reply_domain(
     assert payload["from"] == "reply@mail.empire-ai.co.uk"
 
 
+def test_base_reply_inbox_is_mirrored_to_founder_gmail(
+    monkeypatch,
+):
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    _ForwardEmails.sent = []
+
+    base_reply_event = {
+        "type": "email.received",
+        "data": {
+            "email_id": "em_base_reply_1",
+            "from": "buyer@example.com",
+            "received_for": ["reply@mail.empire-ai.co.uk"],
+            "to": ["reply@mail.empire-ai.co.uk"],
+            "subject": "Re: pilot",
+            "created_at": "2026-09-24T21:55:00Z",
+        },
+    }
+    base_reply_fetched = {
+        "from": "buyer@example.com",
+        "subject": "Re: pilot",
+        "text": "Interested. Tell me more.",
+        "received_for": ["reply@mail.empire-ai.co.uk"],
+        "headers": {},
+    }
+
+    app = create_app(
+        verify_webhook=lambda _: base_reply_event,
+        fetch_email=lambda _: base_reply_fetched,
+        reply_rpc=lambda *_: (_ for _ in ()).throw(
+            AssertionError("base reply visibility must not invent intent correlation")
+        ),
+        webhook_secret="whsec_test",
+        reply_to="reply@mail.empire-ai.co.uk",
+        founder_inbox="founder@empire-ai.co.uk",
+        reply_forward_to="flavag83@gmail.com",
+        resend_module=_ForwardResend,
+    )
+    r = TestClient(app).post(
+        "/webhooks/resend-inbound",
+        content="{}",
+        headers=HEADERS,
+    )
+
+    assert r.status_code == 200
+    assert r.json()["ignored"] is True
+    assert r.json()["reply_forwarded"] is True
+    assert r.json()["reply_forward_target"] == "flavag83@gmail.com"
+
+    payload, options = _ForwardEmails.sent[0]
+    assert payload["to"] == ["flavag83@gmail.com"]
+    assert payload["subject"] == "[Empire inbox] Re: pilot"
+    assert "Interested. Tell me more." in payload["text"]
+    assert options["idempotency_key"] == "reply-forward/em_base_reply_1"
+
+
 def test_direct_founder_inbox_is_mirrored_without_reply_automation(
     monkeypatch,
 ):
