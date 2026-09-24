@@ -9,10 +9,16 @@ from empire_os.runtime_self_heal import run_runtime_self_heal
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--observe-only", action="store_true")
+    parser.add_argument(
+        "--execute-safe-repairs",
+        action="store_true",
+        help="execute only allowlisted reversible repairs",
+    )
     args = parser.parse_args()
 
-    payload = run_runtime_self_heal(observe_only=args.observe_only)
+    payload = run_runtime_self_heal(
+        observe_only=not args.execute_safe_repairs,
+    )
     print(json.dumps({
         "ok": payload["status"] == "HEALTHY",
         "status": payload["status"],
