@@ -443,6 +443,12 @@ def run_runtime_self_heal(
                 spec.unit,
                 spec.repair_action,
             )
+            if row["repair"].get("executed") is True and row["repair"].get("ok") is True:
+                after_ok, after_detail = service_status(spec.unit)
+                row["after_repair"] = {
+                    "healthy": after_ok,
+                    "detail": after_detail,
+                }
         checks.append(row)
 
     for spec in AUTO_REPAIR_TIMERS:
@@ -460,6 +466,12 @@ def run_runtime_self_heal(
                 spec.unit,
                 spec.repair_action,
             )
+            if row["repair"].get("executed") is True and row["repair"].get("ok") is True:
+                after_ok, after_detail = service_status(spec.unit)
+                row["after_repair"] = {
+                    "healthy": after_ok,
+                    "detail": after_detail,
+                }
         checks.append(row)
 
     for spec in SNAPSHOTS:
@@ -510,14 +522,7 @@ def run_runtime_self_heal(
             if after.get("healthy") is not True:
                 unresolved += 1
         elif row.get("healthy") is not True:
-            repair_row = row.get("repair")
-            if not (
-                isinstance(repair_row, Mapping)
-                and repair_row.get("executed") is True
-                and repair_row.get("ok") is True
-                and row.get("kind") in {"service", "timer"}
-            ):
-                unresolved += 1
+            unresolved += 1
 
     payload = {
         "schema_version": "empire.runtime-self-heal.v1",
