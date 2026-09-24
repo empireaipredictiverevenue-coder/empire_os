@@ -111,6 +111,21 @@ def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
     if contact_count <= 0:
         return False, "first_party_contact_path_missing"
 
+    products = {
+        str(value)
+        for value in (row.get("target_product_codes") or [])
+        if str(value).strip()
+    }
+    if "permit_intelligence" in products:
+        if site.get("permit_territory_state") != (
+            "NYC_FIRST_PARTY_EVIDENCE"
+        ):
+            return False, "permit_territory_not_verified"
+        if site.get("business_name_source") == (
+            "canonical_seed_unconfirmed"
+        ):
+            return False, "permit_business_identity_unconfirmed"
+
     pools = {
         str(value)
         for value in (row.get("target_buyer_pools") or [])
