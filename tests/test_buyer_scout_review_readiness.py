@@ -110,3 +110,55 @@ def test_home_title_fallback_is_rejected():
         False,
         "business_name_not_verified",
     )
+
+
+def test_permit_buyer_requires_first_party_nyc_territory():
+    row = candidate(
+        target_product_codes=["permit_intelligence"],
+        site_evidence={
+            "business_name_source": "first_party_site_identity",
+            "permit_territory_state": "NYC_NOT_OBSERVED",
+            "site_evidence_score": 0.9,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        },
+    )
+    assert review_readiness(row) == (
+        False,
+        "permit_territory_not_verified",
+    )
+
+
+def test_permit_buyer_rejects_unconfirmed_seed_identity():
+    row = candidate(
+        target_product_codes=["permit_intelligence"],
+        site_evidence={
+            "business_name_source": "canonical_seed_unconfirmed",
+            "permit_territory_state": "NYC_FIRST_PARTY_EVIDENCE",
+            "site_evidence_score": 0.9,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        },
+    )
+    assert review_readiness(row) == (
+        False,
+        "permit_business_identity_unconfirmed",
+    )
+
+
+def test_permit_buyer_can_be_review_ready_with_site_identity_and_nyc():
+    row = candidate(
+        business_name="VIP Fire Sprinklers Inc",
+        target_product_codes=["permit_intelligence"],
+        site_evidence={
+            "business_name_source": "first_party_site_identity",
+            "permit_territory_state": "NYC_FIRST_PARTY_EVIDENCE",
+            "site_evidence_score": 0.85,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 2,
+            "people_count": 0,
+        },
+    )
+    assert review_readiness(row) == (True, "review_ready")
