@@ -340,3 +340,58 @@ def test_database_contract_incident_does_not_invoke_coder(
     assert result["action"] == (
         "database_migration_or_privilege_contract_required"
     )
+
+
+def test_main_state_ignores_untracked_files(monkeypatch):
+    class Result:
+        def __init__(self, stdout=""):
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = 0
+
+    def fake_git(*args, cwd=repair.ROOT, timeout=60):
+        if args == ("branch", "--show-current"):
+            return Result("feature/revenue-intelligence-v2\n")
+        if args == ("rev-parse", "HEAD"):
+            return Result("abc123\n")
+        if args == (
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+        ):
+            return Result("")
+        raise AssertionError(args)
+
+    monkeypatch.setattr(repair, "_git", fake_git)
+
+    branch, head, dirty = repair._main_state()
+    assert branch == "feature/revenue-intelligence-v2"
+    assert head == "abc123"
+    assert dirty is False
+
+
+def test_tracked_dirty_paths_are_reportable(monkeypatch):
+    class Result:
+        def __init__(self, stdout=""):
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = 0
+
+    def fake_git(*args, cwd=repair.ROOT, timeout=60):
+        if args == (
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+        ):
+            return Result(
+                " M empire_os/enterprise_contact_intelligence.py\n"
+                "M  tests/test_enterprise_contact_intelligence.py\n"
+            )
+        raise AssertionError(args)
+
+    monkeypatch.setattr(repair, "_git", fake_git)
+
+    assert repair._tracked_dirty_paths() == [
+        "empire_os/enterprise_contact_intelligence.py",
+        "tests/test_enterprise_contact_intelligence.py",
+    ]
