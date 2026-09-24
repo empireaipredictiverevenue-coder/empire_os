@@ -37,20 +37,44 @@ def threaded_reply_address(reply_to: str, intent_id: Any) -> str:
     return f"{local}+{_intent_uuid(intent_id)}@{domain}"
 
 
-def build_resend_send(claim: dict[str, Any], *, sender: str, reply_to: str,
-                      required_sender_domain: str = "mail.empire-ai.co.uk",
-                      required_postal_footer: str = "31 St Thomas St, Bolton, BL1 2QR, UK") -> dict[str, Any]:
+def build_resend_send(
+    claim: dict[str, Any],
+    *,
+    sender: str,
+    reply_to: str,
+    required_sender_domain: str | None = None,
+    required_reply_domain: str = "mail.empire-ai.co.uk",
+    allowed_sender_domains: tuple[str, ...] = (
+        "empire-ai.co.uk",
+        "mail.empire-ai.co.uk",
+    ),
+    required_postal_footer: str = "31 St Thomas St, Bolton, BL1 2QR, UK",
+) -> dict[str, Any]:
     if not isinstance(claim, dict) or claim.get("decision") != "authorized_send":
         raise OutboundProviderError("database-authorized send claim required")
     if claim.get("actual_revenue") is not False or claim.get("channel") != "email":
         raise OutboundProviderError("safe email send claim required")
     recipient = _email(claim.get("recipient"))
     sender_address = _email(sender)
-    required_domain = str(required_sender_domain or "").strip().lower()
-    if not required_domain or sender_address.rsplit("@", 1)[-1] != required_domain:
+    sender_domain = sender_address.rsplit("@", 1)[-1]
+    if required_sender_domain:
+        approved_sender_domains = {
+            str(required_sender_domain).strip().lower()
+        }
+    else:
+        approved_sender_domains = {
+            str(value).strip().lower()
+            for value in allowed_sender_domains
+            if str(value).strip()
+        }
+    if sender_domain not in approved_sender_domains:
         raise OutboundProviderError("approved outbound sender domain required")
+
+    reply_domain = str(required_reply_domain or "").strip().lower()
+    if not reply_domain:
+        raise OutboundProviderError("approved outbound reply domain required")
     reply_address = threaded_reply_address(reply_to, claim.get("intent_id"))
-    if reply_address.rsplit("@", 1)[-1] != required_domain:
+    if reply_address.rsplit("@", 1)[-1] != reply_domain:
         raise OutboundProviderError("approved outbound reply domain required")
     body_text = str(claim.get("body_text") or "")
     if not body_text.strip():
