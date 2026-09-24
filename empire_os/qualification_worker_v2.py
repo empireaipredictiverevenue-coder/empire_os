@@ -64,12 +64,17 @@ def _write_egress_state(path: Path, state: dict[str, Any]) -> None:
         json.dumps(state, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    # This file contains counters/circuit metadata only, never credentials.
+    # Root- and ubuntu-owned EmpireOS services share the same runtime guard.
+    os.chmod(tmp, 0o666)
     tmp.replace(path)
+    os.chmod(path, 0o666)
 
 
 def _with_egress_lock(fn):
     _EGRESS_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     with _EGRESS_LOCK_PATH.open("a+", encoding="utf-8") as lock:
+        os.chmod(_EGRESS_LOCK_PATH, 0o666)
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         try:
             return fn()
