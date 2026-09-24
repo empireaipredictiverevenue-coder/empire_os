@@ -56,6 +56,7 @@ _PLACEHOLDER_NAME_KEYS = {
     "ownerself",
     "ownerasself",
     "self",
+    "same",
 }
 
 
@@ -189,6 +190,7 @@ def parse_legacy_lane_notes(notes: str) -> dict[str, Any]:
         "legacy_phone_role": legacy_phone_role,
         "permit_evidence_present": bool(permit_number),
         "identity_recoverable": identity_recoverable,
+        "opportunity_recoverable": bool(permit_number and address),
         "routing_only": not identity_recoverable,
         "identity_fingerprint": _identity_fingerprint(
             business_name if _meaningful_name(business_name) else "",
@@ -687,8 +689,6 @@ def classify_recovery(
 ) -> tuple[str, str]:
     if parsed.get("parsed") is not True:
         return "REJECT", "REJECTED"
-    if parsed.get("identity_recoverable") is not True:
-        return "REJECT", "REJECTED"
     if not parsed.get("permit_number"):
         return "ARCHIVE", "RECOVERED_EVIDENCE"
 
@@ -696,6 +696,11 @@ def classify_recovery(
     identity_state = _clean(canonical_identity_state).upper()
 
     if state == "VERIFIED_CURRENT":
+        if parsed.get("identity_recoverable") is not True:
+            if parsed.get("opportunity_recoverable") is True:
+                return "REUSE", "VERIFIED_CURRENT_PROJECT_ONLY"
+            return "REJECT", "REJECTED"
+
         source_state = _clean(source_identity_state).upper()
         if (
             _clean(parsed.get("source_system")) == "nyc_dob_permits"
@@ -748,6 +753,7 @@ def build_recovery_observer(
     identity_states: dict[str, int] = {}
     source_identity_states: dict[str, int] = {}
     permittee_phone_states: dict[str, int] = {}
+    inventory_modes: dict[str, int] = {}
 
     for row, parsed in parsed_rows:
         permit_number = _clean(parsed.get("permit_number"))
@@ -810,6 +816,16 @@ def build_recovery_observer(
         )
         states[recovery_state] = states.get(recovery_state, 0) + 1
 
+        if recovery_state == "VERIFIED_CURRENT_PROJECT_ONLY":
+            inventory_mode = "PROJECT_ONLY"
+        elif parsed.get("identity_recoverable") is True:
+            inventory_mode = "OWNER_IDENTIFIED"
+        else:
+            inventory_mode = "NON_COMMERCIAL_IDENTITY"
+        inventory_modes[inventory_mode] = (
+            inventory_modes.get(inventory_mode, 0) + 1
+        )
+
         recovered.append({
             "legacy_prospect_id": _clean(row.get("prospect_id")),
             "legacy_lane_ids": list(row.get("legacy_lane_ids") or []),
@@ -853,6 +869,10 @@ def build_recovery_observer(
             "identity_recoverable": bool(
                 parsed.get("identity_recoverable")
             ),
+            "opportunity_recoverable": bool(
+                parsed.get("opportunity_recoverable")
+            ),
+            "inventory_identity_mode": inventory_mode,
             "parse_state": (
                 "PARSED" if parsed.get("parsed") is True else "UNPARSED"
             ),
@@ -879,7 +899,7 @@ def build_recovery_observer(
         })
 
     return {
-        "schema_version": "empire.legacy-permit-recovery-observer.v4",
+        "schema_version": "empire.legacy-permit-recovery-observer.v5",
         "generated_at": _now(),
         "mode": "OBSERVE",
         "input_row_count": len(list(rows)) if isinstance(rows, list) else None,
@@ -893,6 +913,9 @@ def build_recovery_observer(
         ),
         "source_permittee_phone_counts": dict(
             sorted(permittee_phone_states.items())
+        ),
+        "inventory_identity_mode_counts": dict(
+            sorted(inventory_modes.items())
         ),
         "records": recovered,
         "historical_omega_is_current_truth": False,
