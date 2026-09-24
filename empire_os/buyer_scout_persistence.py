@@ -75,6 +75,15 @@ def persist_new_external_candidates(
             "business_name_source": candidate.get(
                 "business_name_source"
             ),
+            "canonical_seed_identity_corroborated": bool(
+                candidate.get("canonical_seed_identity_corroborated")
+            ),
+            "permit_territory_state": candidate.get(
+                "permit_territory_state"
+            ),
+            "permit_territory_evidence": list(
+                candidate.get("permit_territory_evidence") or []
+            )[:10],
             "site_business_names": list(
                 candidate.get("site_business_names") or []
             )[:10],
