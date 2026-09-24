@@ -340,3 +340,36 @@ def test_visible_people_preserves_compound_ceo_founder_title():
         person for person in people if person["name"] == "Richard Lewis"
     )
     assert richard["title"] == "Chief Executive Officer & Founder"
+
+
+def test_visible_people_rejects_customer_testimonial_owner_context():
+    people = _visible_people_from_html(
+        "<section>"
+        "<h4>April D.</h4>"
+        "<p>New York</p>"
+        "<p>Had a leaking sprinkler head at my restaurant. "
+        "As a small business owner, I appreciate this level of "
+        "professionalism. Highly recommend.</p>"
+        "</section>",
+        page_url="https://vip.example/about/",
+        page_title="About Us",
+        emails=[],
+    )
+
+    assert not any(person["name"] == "April D." for person in people)
+    assert not any(person["name"] == "New York" for person in people)
+
+
+def test_visible_people_keeps_real_adjacent_owner_card():
+    people = _visible_people_from_html(
+        "<section><h3>Thomas Petronis</h3><p>Owner</p></section>",
+        page_url="https://vip.example/team/",
+        page_title="Our Team",
+        emails=[],
+    )
+
+    assert any(
+        person["name"] == "Thomas Petronis"
+        and person["title"].lower() == "owner"
+        for person in people
+    )
