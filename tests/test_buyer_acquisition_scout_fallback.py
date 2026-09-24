@@ -264,3 +264,60 @@ def test_canonical_fallback_processing_is_bounded(monkeypatch):
     assert result["candidate_count"] <= 2
     assert result["outbound_sent"] is False
     assert result["database_write_performed"] is False
+
+
+def test_permit_home_service_seed_preserves_buyer_pool_and_product_fit(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {query: [] for query in queries},
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda url, **_kwargs: _evidence(
+            url,
+            description=(
+                "General contractor serving New York with free estimates "
+                "and expansion into new service areas."
+            ),
+            role="Owner",
+        ),
+    )
+
+    result = run_buyer_scout(
+        _plan("high_ticket_home_service"),
+        canonical_seed_records=[{
+            "id": "seed-gc-nyc",
+            "business_name": "NYC Build Co",
+            "niche": "general_contractor",
+            "website": "https://nyc-build.example",
+            "metro": "NYC",
+            "icp_profile_key": "high_ticket_home_service",
+            "seed_buyer_pools": [
+                "end_service_buyers",
+                "local_and_smb_buyers",
+            ],
+            "seed_product_code": "permit_intelligence",
+            "seed_corridor_key": (
+                "permit-recovery:v1:general_contractor:nyc"
+            ),
+        }],
+        max_domains=10,
+        max_probes=10,
+    )
+
+    assert result["canonical_seed_fallback_used"] is True
+    assert result["candidate_count"] == 1
+    row = result["candidates"][0]
+    assert row["continuous_commercial_lane"] == "permit_home_services"
+    assert row["continuous_lane_candidate"] is True
+    assert row["continuous_lane_fit_score"] >= 40
+    assert "end_service_buyers" in row["target_buyer_pools"]
+    assert "local_and_smb_buyers" in row["target_buyer_pools"]
+    assert "permit_intelligence" in row["target_product_codes"]
+    assert (
+        "permit-recovery:v1:general_contractor:nyc"
+        in row["target_corridor_keys"]
+    )
+    assert row["outreach_authorized"] is False
