@@ -138,7 +138,7 @@ def _site_identity(
             return name, "first_party_site_identity", seed_corroborated
 
     if seed_name and reliable_business_name(seed_name):
-        return seed_name, "canonical_seed_unconfirmed", False
+        return seed_name, "canonical_prospect_seed", False
 
     return "", "unresolved", False
 
