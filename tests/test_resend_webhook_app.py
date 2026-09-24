@@ -263,6 +263,55 @@ def test_governed_reply_is_ingested_and_mirrored_to_founder_gmail(
     assert options["idempotency_key"] == "reply-forward/em_1"
 
 
+def test_forward_sender_defaults_to_reply_domain(
+    monkeypatch,
+):
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    _ForwardEmails.sent = []
+
+    direct_event = {
+        "type": "email.received",
+        "data": {
+            "email_id": "em_founder_default_sender",
+            "from": "sender@example.com",
+            "received_for": ["founder@empire-ai.co.uk"],
+            "to": ["founder@empire-ai.co.uk"],
+            "subject": "Sender fallback",
+            "created_at": "2026-09-24T20:00:00Z",
+        },
+    }
+    direct_fetched = {
+        "from": "sender@example.com",
+        "subject": "Sender fallback",
+        "text": "Visibility copy.",
+        "received_for": ["founder@empire-ai.co.uk"],
+        "headers": {},
+    }
+
+    app = create_app(
+        verify_webhook=lambda _: direct_event,
+        fetch_email=lambda _: direct_fetched,
+        reply_rpc=lambda *_: (_ for _ in ()).throw(
+            AssertionError("direct founder inbox must not enter reply RPC")
+        ),
+        webhook_secret="whsec_test",
+        reply_to="reply@mail.empire-ai.co.uk",
+        founder_inbox="founder@empire-ai.co.uk",
+        reply_forward_to="flavag83@gmail.com",
+        resend_module=_ForwardResend,
+    )
+    r = TestClient(app).post(
+        "/webhooks/resend-inbound",
+        content="{}",
+        headers=HEADERS,
+    )
+
+    assert r.status_code == 200
+    assert r.json()["reply_forwarded"] is True
+    payload, _ = _ForwardEmails.sent[0]
+    assert payload["from"] == "reply@mail.empire-ai.co.uk"
+
+
 def test_direct_founder_inbox_is_mirrored_without_reply_automation(
     monkeypatch,
 ):
