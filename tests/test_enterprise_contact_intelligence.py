@@ -312,7 +312,7 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
         "decision_score": 1.0,
         "evidence": {},
     }
-    calls["patch"] = 0
+    calls["refresh_rpc"] = 0
 
     def request(method, path, payload=None, **kwargs):
         if method == "GET" and "/prospects?" in path:
@@ -327,10 +327,24 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
             }]
         if method == "GET" and "/buyer_candidate_reviews?" in path:
             return [dict(review)]
-        if method == "PATCH" and "/buyer_candidate_reviews?" in path:
-            calls["patch"] += 1
-            review.update(dict(payload or {}))
-            return None
+        if method == "POST" and (
+            path
+            == "/rest/v1/rpc/refresh_pending_buyer_candidate_review"
+        ):
+            calls["refresh_rpc"] += 1
+            review.update({
+                "contact_name": payload["p_contact_name"],
+                "contact_title": payload["p_contact_title"],
+                "contact_email": payload["p_contact_email"],
+                "decision_score": payload["p_decision_score"],
+                "evidence": dict(payload["p_evidence"]),
+            })
+            return {
+                "decision": "updated",
+                "review_id": review_id,
+                "status": "pending",
+                "actual_revenue": False,
+            }
 
         calls["post"] += 1
         if calls["post"] == 1:
@@ -357,7 +371,7 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
     assert result["error_count"] == 0
     assert result["proposed_review_count"] == 1
     assert calls["post"] == 2
-    assert calls["patch"] == 1
+    assert calls["refresh_rpc"] == 1
     assert review["contact_title"] == "Chief Executive Officer & Founder"
 
 
@@ -391,16 +405,24 @@ def test_existing_pending_review_refreshes_current_verified_title():
                 "decision_score": 0.8,
                 "evidence": {},
             }]
-        if method == "PATCH":
-            assert payload["contact_title"] == (
+        if method == "POST" and (
+            path
+            == "/rest/v1/rpc/refresh_pending_buyer_candidate_review"
+        ):
+            assert payload["p_contact_title"] == (
                 "Vice President, Corporate Development"
             )
-            assert payload["contact_email"] == "kmartin@sila.com"
-            assert payload["decision_score"] == 0.8
-            assert payload["evidence"]["source"] == (
+            assert payload["p_contact_email"] == "kmartin@sila.com"
+            assert payload["p_decision_score"] == 0.8
+            assert payload["p_evidence"]["source"] == (
                 "enterprise_contact_intelligence.v1"
             )
-            return None
+            return {
+                "decision": "updated",
+                "review_id": review_id,
+                "status": "pending",
+                "actual_revenue": False,
+            }
         raise AssertionError((method, path))
 
     refreshed = _refresh_pending_review(
@@ -417,7 +439,7 @@ def test_existing_pending_review_refreshes_current_verified_title():
     )
 
     assert refreshed is True
-    assert [call[0] for call in calls] == ["GET", "PATCH", "GET"]
+    assert [call[0] for call in calls] == ["GET", "POST", "GET"]
 
 
 def test_existing_non_pending_review_is_not_rewritten():
@@ -505,3 +527,18 @@ def test_visible_leadership_title_can_supersede_curated_role():
     )
     assert kyle["title"] == "Chief Strategy Officer"
     assert kyle["source"] == "first_party_site_current"
+
+
+def test_pending_review_refresh_uses_governed_rpc_not_direct_patch():
+    source = Path(
+        "empire_os/enterprise_contact_intelligence.py"
+    ).read_text()
+
+    assert (
+        "/rest/v1/rpc/refresh_pending_buyer_candidate_review"
+        in source
+    )
+    assert (
+        '"PATCH",\n        f"/rest/v1/buyer_candidate_reviews'
+        not in source
+    )
