@@ -163,9 +163,41 @@ _NON_PERSON_WORDS = {
     "chief", "executive", "officer", "ceo", "cro", "cco",
 }
 
+_NON_PERSON_NAMES = {
+    "new york",
+    "new york city",
+    "brooklyn",
+    "queens",
+    "bronx",
+    "manhattan",
+    "staten island",
+}
+
+_CUSTOMER_OWNER_CONTEXT = (
+    "my restaurant",
+    "my business",
+    "my home",
+    "my property",
+    "our properties",
+    "i appreciate",
+    "highly recommend",
+    "the tech",
+    "service call",
+    "customer service",
+)
+
+
+def _testimonial_owner_context(block: str, title: str) -> bool:
+    if "owner" not in str(title or "").casefold():
+        return False
+    text = " ".join(str(block or "").casefold().split())
+    return any(phrase in text for phrase in _CUSTOMER_OWNER_CONTEXT)
+
 
 def _looks_like_visible_person_name(value: str) -> bool:
     text = re.sub(r"\s+", " ", str(value or "")).strip(" ,|:/–—-")
+    if text.casefold() in _NON_PERSON_NAMES:
+        return False
     words = text.split()
     if not 2 <= len(words) <= 4:
         return False
@@ -288,6 +320,8 @@ def _visible_people_from_html(
         match = _PEOPLE_TITLE_RE.search(block)
         if match:
             matched_title = _expanded_visible_title(block, match)
+            if _testimonial_owner_context(block, matched_title):
+                continue
 
             before = block[:match.start()].strip(" ,|:/–—-")
             words = before.split()
@@ -323,12 +357,18 @@ def _visible_people_from_html(
                 neighbor_block = blocks[neighbor_index]
                 title_match = _PEOPLE_TITLE_RE.search(neighbor_block)
                 if title_match:
+                    expanded_title = _expanded_visible_title(
+                        neighbor_block,
+                        title_match,
+                    )
+                    if _testimonial_owner_context(
+                        neighbor_block,
+                        expanded_title,
+                    ):
+                        continue
                     add(
                         block,
-                        _expanded_visible_title(
-                            neighbor_block,
-                            title_match,
-                        ),
+                        expanded_title,
                     )
                     break
 
