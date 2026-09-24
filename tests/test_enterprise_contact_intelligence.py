@@ -557,3 +557,107 @@ def test_pending_review_refresh_uses_governed_rpc_not_direct_patch():
         '"PATCH",\n        f"/rest/v1/buyer_candidate_reviews'
         not in source
     )
+
+
+def test_sila_existing_review_is_refreshed_from_curated_title_end_to_end():
+    prospect_id = "00000000-0000-0000-0000-00000000a001"
+    review_id = "00000000-0000-0000-0000-00000000a002"
+    activation = {
+        "targets": [{
+            "account_name": "Sila Services",
+            "prospect_id": prospect_id,
+            "person_contact_verified": True,
+            "probe": {
+                **_probe(
+                    "Kyle Martin",
+                    "President",
+                    "kmartin@sila.com",
+                ),
+                "site_people": [{
+                    "name": "Kyle Martin",
+                    "title": "President",
+                    "url": "https://silaservices.com/leadership/",
+                    "source_kind": "visible_text",
+                }],
+            },
+        }]
+    }
+    review = {
+        "id": review_id,
+        "status": "pending",
+        "contact_name": "Kyle Martin",
+        "contact_title": "President",
+        "contact_email": "kmartin@sila.com",
+        "decision_score": 1.0,
+        "evidence": {},
+    }
+    calls = []
+
+    def request(method, path, payload=None, **kwargs):
+        calls.append((method, path, payload))
+
+        if method == "GET" and "/prospects?" in path:
+            return [{
+                "id": prospect_id,
+                "business_name": "Sila Services",
+                "niche": "predictive_revenue_enterprise",
+                "metro": "King of Prussia, PA",
+                "website": "https://silaservices.com",
+                "buy_signal_score": 50,
+                "contact_source": "public_enterprise_target",
+            }]
+
+        if method == "POST" and (
+            path == "/rest/v1/rpc/propose_buyer_candidate_review"
+        ):
+            assert payload["p_contact_title"] == (
+                "Vice President, Corporate Development"
+            )
+            assert payload["p_decision_score"] == 0.8
+            return {
+                "decision": "existing",
+                "review_id": review_id,
+                "status": "pending",
+                "actual_revenue": False,
+            }
+
+        if method == "GET" and "/buyer_candidate_reviews?" in path:
+            return [dict(review)]
+
+        if method == "POST" and (
+            path
+            == "/rest/v1/rpc/refresh_pending_buyer_candidate_review"
+        ):
+            assert payload["p_contact_title"] == (
+                "Vice President, Corporate Development"
+            )
+            assert payload["p_decision_score"] == 0.8
+            review.update({
+                "contact_name": payload["p_contact_name"],
+                "contact_title": payload["p_contact_title"],
+                "contact_email": payload["p_contact_email"],
+                "decision_score": payload["p_decision_score"],
+                "evidence": dict(payload["p_evidence"]),
+            })
+            return {
+                "decision": "updated",
+                "review_id": review_id,
+                "status": "pending",
+                "actual_revenue": False,
+            }
+
+        raise AssertionError((method, path))
+
+    result = sync_enterprise_activation(
+        activation,
+        request=request,
+        queue=FakeQueue(),
+    )
+
+    assert result["error_count"] == 0
+    assert result["proposed_review_count"] == 1
+    assert review["contact_title"] == (
+        "Vice President, Corporate Development"
+    )
+    assert review["decision_score"] == 0.8
+    assert result["outcomes"][0]["pending_review_refreshed"] is True
