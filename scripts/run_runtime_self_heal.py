@@ -23,7 +23,9 @@ def main() -> int:
         "execution_authority": payload["execution_authority"],
         "actual_revenue": payload["actual_revenue"],
     }, indent=2, sort_keys=True))
-    return 0 if payload["status"] == "HEALTHY" else 2
+    # Component degradation is represented in the health snapshot. The
+    # controller itself remains runnable so the timer can keep repairing.
+    return 0
 
 
 if __name__ == "__main__":
