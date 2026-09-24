@@ -285,7 +285,15 @@ def send_with_resend(payload: dict[str, Any], *, api_key: str,
         resend_module.api_key = api_key
         result = resend_module.Emails.send(outbound, {"idempotency_key": idempotency_key})
     except Exception as exc:
-        raise OutboundProviderError("Resend send failed") from exc
+        # Preserve a short, sanitized provider reason so the governed worker
+        # can distinguish configuration failures (for example, a key that is
+        # restricted to a different sending domain) from transient failures.
+        message = str(exc).strip()
+        message = re.sub(r"re_[A-Za-z0-9_-]+", "[REDACTED_API_KEY]", message)
+        if len(message) > 240:
+            message = message[:240]
+        suffix = f": {message}" if message else ""
+        raise OutboundProviderError(f"Resend send failed{suffix}") from exc
     if isinstance(result, dict):
         message_id = result.get("id") or (result.get("data") or {}).get("id")
     else:
