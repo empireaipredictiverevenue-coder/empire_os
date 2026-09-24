@@ -44,6 +44,8 @@ NON_PERSON_NAME_TERMS = {
     "where", "why", "how", "was", "were", "is", "are", "does", "did", "not",
     "after", "before", "through", "each", "very", "exceptional", "needed", "came",
     "ship", "club", "engineer", "your", "referral", "program", "email",
+    "learn", "more", "strategic", "operations", "leadership", "about",
+    "read", "meet", "turnpoint", "thats",
 }
 
 
@@ -84,6 +86,12 @@ def looks_like_person_name(value: Any) -> bool:
         return False
     lowered = {w.lower().strip("'\"-") for w in words}
     if lowered & NON_PERSON_NAME_TERMS:
+        return False
+    edge_words = (
+        words[0].replace("'", "").replace("-", "").replace(".", ""),
+        words[-1].replace("'", "").replace("-", "").replace(".", ""),
+    )
+    if any(len(word) < 2 for word in edge_words):
         return False
     for word in words:
         cleaned = word.replace("'", "").replace("-", "").replace(".", "")
