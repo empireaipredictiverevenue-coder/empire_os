@@ -81,6 +81,10 @@ AUTO_REPAIR_TIMERS: tuple[ServiceSpec, ...] = (
         "enterprise_contact_intelligence_timer",
         "empire-predictive-revenue-enterprise-activation.timer",
     ),
+    ServiceSpec(
+        "enterprise_contact_repair_timer",
+        "empire-enterprise-contact-repair.timer",
+    ),
 )
 
 SNAPSHOTS: tuple[SnapshotSpec, ...] = (
