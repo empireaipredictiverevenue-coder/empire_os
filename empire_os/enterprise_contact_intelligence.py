@@ -34,6 +34,70 @@ TARGET_BY_NAME = {
 }
 
 
+def current_target_people(
+    row: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    account_name = _text(row.get("account_name"))
+    target = TARGET_BY_NAME.get(account_name)
+    if target is None:
+        return []
+
+    people: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    probe = row.get("probe")
+    site_people = (
+        probe.get("site_people")
+        if isinstance(probe, Mapping)
+        else None
+    )
+    for person in site_people or []:
+        if not isinstance(person, Mapping):
+            continue
+        name = _text(person.get("name"))
+        title = _text(person.get("title"))
+        if not looks_like_person_name(name) or not title:
+            continue
+        role, score = classify_decision_role(title)
+        if score < 0.5:
+            continue
+        key = _key(name)
+        if key in seen:
+            continue
+        seen.add(key)
+        people.append({
+            "name": name,
+            "title": title,
+            "source": "first_party_site_current",
+            "evidence_url": _text(person.get("url")) or None,
+            "decision_role": role,
+            "decision_score": score,
+        })
+
+    for person in target.observed_people:
+        name = _text(person.get("name"))
+        title = _text(person.get("title"))
+        key = _key(name)
+        if not name or not title or key in seen:
+            continue
+        seen.add(key)
+        role, score = classify_decision_role(title)
+        people.append({
+            "name": name,
+            "title": title,
+            "source": "curated_public_evidence",
+            "evidence_url": (
+                target.evidence_urls[0]
+                if target.evidence_urls
+                else None
+            ),
+            "decision_role": role,
+            "decision_score": score,
+        })
+
+    return people[:8]
+
+
 def reconcile_verified_enterprise_contact(
     row: Mapping[str, Any],
 ) -> dict[str, Any] | None:
@@ -67,7 +131,7 @@ def reconcile_verified_enterprise_contact(
     observed = next(
         (
             dict(person)
-            for person in target.observed_people
+            for person in current_target_people(row)
             if _key(person.get("name")) == _key(name)
         ),
         None,
@@ -84,6 +148,8 @@ def reconcile_verified_enterprise_contact(
             "decision_score": score,
             "source": "enterprise_target_reconciled",
             "probe_source": _text(decision.get("source")) or None,
+            "leadership_source": observed.get("source"),
+            "leadership_evidence_url": observed.get("evidence_url"),
             "role_reconciled": True,
             "target_evidence_urls": list(target.evidence_urls),
         }
@@ -298,10 +364,7 @@ def sync_enterprise_activation(
                 "account_key": target.account_key,
                 "wave": target.wave,
                 "offer_key": offer_key,
-                "target_people": [
-                    dict(person)
-                    for person in target.observed_people
-                ],
+                "target_people": current_target_people(row),
                 "target_product_codes": list(
                     target.target_product_codes
                 ),
@@ -314,10 +377,7 @@ def sync_enterprise_activation(
                     "prospect_id": prospect_id,
                     "outcome": "targeted_enrichment_queued",
                     "reason": reason,
-                    "target_people": [
-                        dict(person)
-                        for person in target.observed_people
-                    ],
+                    "target_people": current_target_people(row),
                     "offer_key": offer_key,
                 })
             else:
