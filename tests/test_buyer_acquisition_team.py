@@ -4,6 +4,7 @@ from empire_os.buyer_acquisition_team import (
     build_buyer_acquisition_plan,
     build_demand_gap_queue,
     direct_buyer_profile,
+    _read_runtime_snapshot,
 )
 
 
@@ -371,3 +372,26 @@ def test_plan_includes_predictive_revenue_enterprise_review_queue():
     assert review["outreach_authorized"] is False
     assert review["actual_revenue"] is False
     assert review["execution_authority"] == "none"
+
+
+def test_runtime_snapshot_reader_distinguishes_missing_from_empty(tmp_path):
+    payload, health = _read_runtime_snapshot(tmp_path / "missing.json")
+    assert payload == {}
+    assert health["state"] == "MISSING"
+    assert health["readable"] is False
+
+    path = tmp_path / "empty.json"
+    path.write_text("{}\n", encoding="utf-8")
+    payload, health = _read_runtime_snapshot(path)
+    assert payload == {}
+    assert health["state"] == "OK"
+    assert health["readable"] is True
+
+
+def test_runtime_snapshot_reader_surfaces_invalid_json(tmp_path):
+    path = tmp_path / "bad.json"
+    path.write_text("{broken", encoding="utf-8")
+    payload, health = _read_runtime_snapshot(path)
+    assert payload == {}
+    assert health["state"] == "INVALID_JSON"
+    assert health["readable"] is True
