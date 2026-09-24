@@ -9,11 +9,54 @@ echo "=================================================="
 
 echo
 echo "=== TEST ==="
-PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q   tests/test_buyer_discovery.py   tests/test_buyer_probe_worker.py   tests/test_enterprise_contact_intelligence.py   tests/test_enterprise_targeted_retry.py   tests/test_enterprise_contact_intelligence_installer.py   tests/test_predictive_revenue_enterprise_activation.py   tests/test_predictive_revenue_enterprise_activation_systemd.py   tests/test_buyer_acquisition_team.py   tests/test_runtime_self_heal.py   tests/test_ops_privileged_helper.py   tests/test_buyer_deferred_identity_timeout.py
+TEST_LOG="$(mktemp)"
+set +e
+PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
+  tests/test_buyer_discovery.py \
+  tests/test_buyer_probe_worker.py \
+  tests/test_enterprise_contact_intelligence.py \
+  tests/test_enterprise_targeted_retry.py \
+  tests/test_enterprise_contact_repair.py \
+  tests/test_enterprise_contact_intelligence_installer.py \
+  tests/test_predictive_revenue_enterprise_activation.py \
+  tests/test_predictive_revenue_enterprise_activation_systemd.py \
+  tests/test_buyer_acquisition_team.py \
+  tests/test_runtime_self_heal.py \
+  tests/test_ops_privileged_helper.py \
+  tests/test_buyer_deferred_identity_timeout.py \
+  2>&1 | tee "$TEST_LOG"
+TEST_RC="${PIPESTATUS[0]}"
+set -e
+
+if [ "$TEST_RC" -ne 0 ]; then
+  PYTHONPATH=/srv/empire_os \
+  ./.venv/bin/python scripts/run_enterprise_contact_repair.py \
+    --record-test-log "$TEST_LOG" \
+    --command "enterprise contact deployment pytest" \
+    --returncode "$TEST_RC" || true
+
+  sudo systemctl start --no-block \
+    empire-enterprise-contact-repair.service 2>/dev/null || true
+
+  echo "STOP: unsafe deployment blocked; repair incident captured."
+  rm -f "$TEST_LOG"
+  exit "$TEST_RC"
+fi
+rm -f "$TEST_LOG"
 
 echo
 echo "=== COMPILE ==="
-PYTHONPATH=/srv/empire_os ./.venv/bin/python -m py_compile   empire_os/buyer_discovery.py   empire_os/buyer_probe_worker.py   empire_os/buyer_deferred_enrichment.py   empire_os/enterprise_contact_intelligence.py   empire_os/runtime_self_heal.py   empire_os/ops_privileged_helper.py   scripts/run_buyer_deferred_enrichment.py   scripts/run_enterprise_contact_intelligence.py
+PYTHONPATH=/srv/empire_os ./.venv/bin/python -m py_compile \
+  empire_os/buyer_discovery.py \
+  empire_os/buyer_probe_worker.py \
+  empire_os/buyer_deferred_enrichment.py \
+  empire_os/enterprise_contact_intelligence.py \
+  empire_os/enterprise_contact_repair.py \
+  empire_os/runtime_self_heal.py \
+  empire_os/ops_privileged_helper.py \
+  scripts/run_buyer_deferred_enrichment.py \
+  scripts/run_enterprise_contact_intelligence.py \
+  scripts/run_enterprise_contact_repair.py
 
 echo
 echo "=== INSTALL AUTOMATION ==="
@@ -21,7 +64,25 @@ sudo bash scripts/install_enterprise_contact_intelligence.sh /srv/empire_os
 
 echo
 echo "=== SYNC EXISTING ENTERPRISE ACTIVATION ==="
-PYTHONPATH=/srv/empire_os ./.venv/bin/python scripts/run_enterprise_contact_intelligence.py
+SYNC_LOG="$(mktemp)"
+set +e
+PYTHONPATH=/srv/empire_os \
+./.venv/bin/python scripts/run_enterprise_contact_intelligence.py \
+  2>&1 | tee "$SYNC_LOG"
+SYNC_RC="${PIPESTATUS[0]}"
+set -e
+
+if [ "$SYNC_RC" -ne 0 ]; then
+  PYTHONPATH=/srv/empire_os \
+  ./.venv/bin/python scripts/run_enterprise_contact_repair.py \
+    --record-test-log "$SYNC_LOG" \
+    --command "enterprise contact runtime sync" \
+    --returncode "$SYNC_RC" || true
+  sudo systemctl start --no-block \
+    empire-enterprise-contact-repair.service || true
+  echo "Runtime sync deferred to automatic repair controller."
+fi
+rm -f "$SYNC_LOG"
 
 echo
 echo "=== REFRESH BUYER ACQUISITION ==="
@@ -129,6 +190,7 @@ echo "=== TIMERS ==="
 printf '%-58s %s\n'   "empire-buyer-deferred-enrichment.timer"   "$(systemctl is-active empire-buyer-deferred-enrichment.timer)"
 printf '%-58s %s\n'   "empire-predictive-revenue-enterprise-activation.timer"   "$(systemctl is-active empire-predictive-revenue-enterprise-activation.timer)"
 printf '%-58s %s\n'   "empire-ops-control.timer"   "$(systemctl is-active empire-ops-control.timer)"
+printf '%-58s %s\n'   "empire-enterprise-contact-repair.timer"   "$(systemctl is-active empire-enterprise-contact-repair.timer)"
 
 echo
 echo "=================================================="
@@ -140,6 +202,7 @@ echo "Company fallback evidence: PRESERVED"
 echo "Daily leadership/contact refresh: ACTIVE"
 echo "10-minute deferred retry loop: ACTIVE"
 echo "Self-heal: ACTIVE"
+echo "Contact failure diagnosis/repair: ACTIVE"
 echo "Live outbound: OFF"
 echo "Payment/revenue mutation: OFF"
 echo "=================================================="
