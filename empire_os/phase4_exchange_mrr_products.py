@@ -26,12 +26,24 @@ class ExchangeMrrProduct:
     territory_model: str
     exclusivity_eligible: bool
     delivery_modes: tuple[str, ...]
-    pricing_state: str = "FOUNDER_GATE"
+    monthly_price_cents: int
+    usage_discount_bps: int | None
+    pricing_state: str = "FOUNDER_APPROVED"
+    price_approved_at: str = "2026-09-24"
     binding_terms_ready: bool = False
     execution_authority: str = "none"
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+EXCHANGE_BASE_USAGE_PRICES_CENTS: dict[str, int] = {
+    "verified": 3900,
+    "qualified": 5900,
+    "high_intent": 9900,
+    "exclusive": 14900,
+    "booked_appointment_floor": 19900,
+}
 
 
 EXCHANGE_MRR_PRODUCTS: tuple[ExchangeMrrProduct, ...] = (
@@ -57,6 +69,8 @@ EXCHANGE_MRR_PRODUCTS: tuple[ExchangeMrrProduct, ...] = (
         territory_model="single_corridor",
         exclusivity_eligible=False,
         delivery_modes=("email", "webhook"),
+        monthly_price_cents=9900,
+        usage_discount_bps=0,
     ),
     ExchangeMrrProduct(
         product_code="exchange_seat_growth",
@@ -83,6 +97,8 @@ EXCHANGE_MRR_PRODUCTS: tuple[ExchangeMrrProduct, ...] = (
         territory_model="multi_corridor",
         exclusivity_eligible=False,
         delivery_modes=("email", "webhook", "api"),
+        monthly_price_cents=24900,
+        usage_discount_bps=1000,
     ),
     ExchangeMrrProduct(
         product_code="exchange_seat_pro",
@@ -116,6 +132,8 @@ EXCHANGE_MRR_PRODUCTS: tuple[ExchangeMrrProduct, ...] = (
         territory_model="premium_multi_corridor",
         exclusivity_eligible=True,
         delivery_modes=("email", "webhook", "api"),
+        monthly_price_cents=49900,
+        usage_discount_bps=2000,
     ),
     ExchangeMrrProduct(
         product_code="exchange_seat_enterprise",
@@ -154,6 +172,8 @@ EXCHANGE_MRR_PRODUCTS: tuple[ExchangeMrrProduct, ...] = (
         territory_model="custom_contract",
         exclusivity_eligible=True,
         delivery_modes=("email", "webhook", "api", "private_feed"),
+        monthly_price_cents=99900,
+        usage_discount_bps=None,
     ),
 )
 
@@ -170,7 +190,7 @@ def build_exchange_mrr_product_plan() -> dict[str, Any]:
             "capacity_is_verified_not_assumed": True,
             "acquisition_continues_when_capacity_full": True,
             "overflow_remains_empire_owned": True,
-            "pricing_is_governed_not_hardcoded": True,
+            "pricing_is_founder_approved_and_governed": True,
             "territory_requires_evidence": True,
             "exclusivity_requires_explicit_terms": True,
             "delivery_requires_verified_destination": True,
@@ -178,7 +198,9 @@ def build_exchange_mrr_product_plan() -> dict[str, Any]:
             "legacy_usdc_solana_not_used": True,
         },
         "canonical_settlement_rail": "USDT_BSC",
-        "pricing_authority": "none",
+        "pricing_authority": "founder_approved_2026_09_24",
+        "base_usage_prices_cents": dict(EXCHANGE_BASE_USAGE_PRICES_CENTS),
+        "enterprise_usage_pricing": "negotiated_or_reserved_volume",
         "binding_terms_ready": False,
         "actual_revenue": False,
         "execution_authority": "none",
@@ -205,7 +227,11 @@ def public_exchange_seat_projection() -> dict[str, Any]:
             "exclusivity_eligible": row.exclusivity_eligible,
             "delivery_modes": list(row.delivery_modes),
             "included_features": list(row.included_features),
+            "monthly_price_cents": row.monthly_price_cents,
+            "monthly_price_display": f"$" + f"{row.monthly_price_cents / 100:,.0f}" + "/mo",
+            "usage_discount_bps": row.usage_discount_bps,
             "pricing_state": row.pricing_state,
+            "price_approved_at": row.price_approved_at,
             "binding_terms_ready": False,
         })
     return {
@@ -217,5 +243,7 @@ def public_exchange_seat_projection() -> dict[str, Any]:
         "capacity_gates_delivery_only": True,
         "overflow_remains_empire_owned": True,
         "pricing_binding": False,
+        "base_usage_prices_cents": dict(EXCHANGE_BASE_USAGE_PRICES_CENTS),
+        "enterprise_usage_pricing": "negotiated_or_reserved_volume",
         "actual_revenue": False,
     }
