@@ -19,6 +19,7 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 
 from empire_os.buyer_acquisition_team import direct_buyer_profile
+from empire_os.buyer_scout_review_readiness import reliable_business_name
 from empire_os.icp_buyer_trigger_intelligence import (
     assess_icp_candidate,
 )
@@ -44,6 +45,114 @@ CONTINUOUS_COMMERCIAL_LANE_BY_ICP = {
     "insurance_distribution_growth": "insurance",
     "high_ticket_home_service": "permit_home_services",
 }
+
+
+_COMPANY_STOPWORDS = {
+    "a", "an", "and", "the", "of",
+    "inc", "incorporated", "llc", "ltd", "limited",
+    "corp", "corporation", "company", "co",
+    "contracting", "contractor", "contractors", "construction",
+}
+
+_NYC_TERRITORY_TERMS = (
+    "new york city",
+    "new york",
+    "nyc",
+    "manhattan",
+    "brooklyn",
+    "queens",
+    "bronx",
+    "staten island",
+)
+
+
+def _identity_tokens(value: Any) -> set[str]:
+    text = str(value or "").casefold()
+    tokens = {
+        token
+        for token in "".join(
+            char if char.isalnum() else " "
+            for char in text
+        ).split()
+        if token and token not in _COMPANY_STOPWORDS
+    }
+    return tokens
+
+
+def _clean_site_title(value: Any) -> str:
+    text = " ".join(str(value or "").split()).strip(" -|:")
+    lowered = text.casefold()
+    for prefix in ("home ", "welcome to "):
+        if lowered.startswith(prefix):
+            candidate = text[len(prefix):].lstrip(" -|:")
+            if reliable_business_name(candidate):
+                return candidate
+    return text
+
+
+def _site_corpus(evidence: Mapping[str, Any]) -> str:
+    parts: list[str] = [
+        str(evidence.get("title") or ""),
+        str(evidence.get("description") or ""),
+        *[
+            str(value)
+            for value in (evidence.get("business_names") or [])
+        ],
+        *[
+            str(value)
+            for value in (evidence.get("addresses") or [])
+        ],
+    ]
+    for page in (evidence.get("pages_checked") or [])[:4]:
+        if isinstance(page, Mapping):
+            parts.append(str(page.get("visible_text") or ""))
+    return " ".join(parts).casefold()
+
+
+def _site_identity(
+    evidence: Mapping[str, Any],
+    *,
+    seed_name: str = "",
+) -> tuple[str, str, bool]:
+    corpus = _site_corpus(evidence)
+    seed_tokens = _identity_tokens(seed_name)
+    seed_corroborated = bool(
+        seed_tokens
+        and all(token in corpus for token in seed_tokens)
+    )
+
+    names = [
+        str(value).strip()
+        for value in (evidence.get("business_names") or [])
+        if reliable_business_name(str(value))
+    ]
+    title = _clean_site_title(evidence.get("title"))
+    if reliable_business_name(title):
+        names.append(title)
+
+    if seed_name and seed_corroborated and reliable_business_name(seed_name):
+        return seed_name, "canonical_seed_corroborated_by_site", True
+
+    for name in names:
+        if reliable_business_name(name):
+            return name, "first_party_site_identity", seed_corroborated
+
+    if seed_name and reliable_business_name(seed_name):
+        return seed_name, "canonical_seed_unconfirmed", False
+
+    return "", "unresolved", False
+
+
+def _nyc_territory_evidence(
+    evidence: Mapping[str, Any],
+) -> tuple[bool, list[str]]:
+    corpus = _site_corpus(evidence)
+    hits = [
+        term
+        for term in _NYC_TERRITORY_TERMS
+        if term in corpus
+    ]
+    return bool(hits), hits
 
 
 def _host(value: str) -> str:
@@ -253,27 +362,23 @@ def run_buyer_scout(
         business_names = [
             str(value).strip()
             for value in (evidence.get("business_names") or [])
-            if str(value).strip()
+            if reliable_business_name(str(value))
         ]
         seed = canonical_seed_by_domain.get(domain) or {}
         seed_name = str(seed.get("business_name") or "").strip()
         seed_niche = str(seed.get("niche") or "").strip()
+        business_name, business_name_source, seed_corroborated = (
+            _site_identity(
+                evidence,
+                seed_name=seed_name,
+            )
+        )
+        nyc_territory, nyc_territory_hits = _nyc_territory_evidence(
+            evidence
+        )
         record = {
-            "business_name": (
-                business_names[0]
-                if business_names
-                else seed_name
-                or evidence.get("title")
-            ),
-            "business_name_source": (
-                "first_party_business_name"
-                if business_names
-                else (
-                    "canonical_prospect_seed"
-                    if seed_name
-                    else "page_title_fallback"
-                )
-            ),
+            "business_name": business_name,
+            "business_name_source": business_name_source,
             "site_business_names": business_names[:10],
             "website": evidence.get("canonical_url")
             or evidence.get("final_url"),
@@ -356,6 +461,10 @@ def run_buyer_scout(
             continuous_lane
             and int(icp.get("model_fit_score") or 0) >= 40
         )
+        if continuous_lane == "permit_home_services":
+            continuous_lane_candidate = bool(
+                continuous_lane_candidate and nyc_territory
+            )
 
         candidates.append({
             "domain": domain,
@@ -373,6 +482,13 @@ def run_buyer_scout(
             "business_name": record["business_name"],
             "business_name_source": record["business_name_source"],
             "site_business_names": record["site_business_names"],
+            "canonical_seed_identity_corroborated": seed_corroborated,
+            "permit_territory_state": (
+                "NYC_FIRST_PARTY_EVIDENCE"
+                if nyc_territory
+                else "NYC_NOT_OBSERVED"
+            ),
+            "permit_territory_evidence": nyc_territory_hits,
             "website": record["website"],
             "description": record["description"],
             "first_party_emails": list(
