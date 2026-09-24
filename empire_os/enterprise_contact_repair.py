@@ -548,8 +548,10 @@ def run_repair_cycle() -> dict[str, Any]:
             )
             if (
                 same_incident
-                and state.get("last_status")
-                == "MERGED_LOCAL_PUSH_FAILED"
+                and state.get("last_status") in {
+                    "MERGED_LOCAL_PUSH_FAILED",
+                    "PUSH_RETRY_BLOCKED",
+                }
             ):
                 result = _retry_branch_push()
                 result["classification"] = classification
