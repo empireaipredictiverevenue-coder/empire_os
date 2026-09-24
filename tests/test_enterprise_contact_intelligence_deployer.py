@@ -62,3 +62,23 @@ def test_enterprise_contact_deployer_surfaces_coder_repair_error():
     assert '"CODER_REPAIR_FAILED"' in text
     assert "Repair controller error:" in text
     assert 'payload.get("error")' in text
+
+
+def test_enterprise_contact_deployer_suppresses_live_banner_on_sync_failure():
+    text = (
+        ROOT / "scripts/deploy_enterprise_contact_intelligence.sh"
+    ).read_text()
+
+    assert "STOP: canonical enterprise contact sync is not healthy." in text
+    assert "LIVE banner suppressed; incident retained for repair." in text
+    failure_index = text.index(
+        "Canonical-env sync did not complete cleanly."
+    )
+    stop_index = text.index(
+        "STOP: canonical enterprise contact sync is not healthy."
+    )
+    live_index = text.index(
+        'echo "ENTERPRISE CONTACT INTELLIGENCE LIVE"'
+    )
+    assert failure_index < stop_index < live_index
+    assert 'exit "${SYNC_RC:-1}"' in text
