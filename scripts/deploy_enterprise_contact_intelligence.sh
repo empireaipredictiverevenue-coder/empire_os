@@ -37,11 +37,52 @@ if [ "$TEST_RC" -ne 0 ]; then
     --command "enterprise contact deployment pytest" \
     --returncode "$TEST_RC" || true
 
-  sudo systemctl start --no-block \
-    empire-enterprise-contact-repair.service 2>/dev/null || true
-
-  echo "STOP: unsafe deployment blocked; repair incident captured."
   rm -f "$TEST_LOG"
+
+  REENTRY_COUNT="${EMPIRE_CONTACT_DEPLOY_REENTRY:-0}"
+  if [ "$REENTRY_COUNT" -ge 1 ]; then
+    echo "STOP: repaired deployment already retried once; incident remains."
+    exit "$TEST_RC"
+  fi
+
+  if systemctl cat empire-enterprise-contact-repair.service \
+      >/dev/null 2>&1; then
+    echo
+    echo "=== AUTOMATIC REPAIR ATTEMPT ==="
+    sudo systemctl reset-failed \
+      empire-enterprise-contact-repair.service 2>/dev/null || true
+    sudo systemctl start \
+      empire-enterprise-contact-repair.service || true
+
+    REPAIR_STATUS="$(
+      ./.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+path = Path(
+    "runtime/predictive_revenue/"
+    "enterprise_contact_repair_latest.json"
+)
+try:
+    payload = json.loads(path.read_text())
+except Exception:
+    payload = {}
+print(payload.get("status") or "UNKNOWN")
+PY
+    )"
+
+    echo "Repair controller status: $REPAIR_STATUS"
+
+    case "$REPAIR_STATUS" in
+      RESOLVED_AND_PUSHED|RESOLVED_BY_CONCURRENT_CHANGE)
+        echo "Verified repair integrated. Retrying deployment once."
+        EMPIRE_CONTACT_DEPLOY_REENTRY=1 \
+          exec bash scripts/deploy_enterprise_contact_intelligence.sh
+        ;;
+    esac
+  fi
+
+  echo "STOP: unsafe deployment blocked; repair incident retained."
   exit "$TEST_RC"
 fi
 rm -f "$TEST_LOG"
