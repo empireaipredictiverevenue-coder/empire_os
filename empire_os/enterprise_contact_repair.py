@@ -66,6 +66,13 @@ RUNTIME_ENV_TOKENS = (
     "supabase_url",
 )
 
+DATABASE_CONTRACT_TOKENS = (
+    "permission denied for table buyer_candidate_reviews",
+    "permission denied for function refresh_pending_buyer_candidate_review",
+    "could not find the function public.refresh_pending_buyer_candidate_review",
+    "refresh_pending_buyer_candidate_review does not exist",
+)
+
 DATA_QUALITY_TOKENS = (
     "no_bound_contact",
     "no_contact_evidence",
@@ -116,6 +123,8 @@ def classify_failure(text: str) -> str:
         return "CODE_DEFECT"
     if any(token in value for token in RUNTIME_ENV_TOKENS):
         return "RUNTIME_ENV_CONTEXT"
+    if any(token in value for token in DATABASE_CONTRACT_TOKENS):
+        return "DATABASE_CONTRACT"
     if any(token in value for token in DATA_QUALITY_TOKENS):
         return "DATA_QUALITY"
     if any(token in value for token in TRANSIENT_TOKENS):
@@ -576,6 +585,12 @@ def run_repair_cycle() -> dict[str, Any]:
     }:
         result = _retry_runtime_sync()
         result["classification"] = classification
+    elif classification == "DATABASE_CONTRACT":
+        result = {
+            "status": "OBSERVE_ONLY_DATABASE_CONTRACT",
+            "classification": classification,
+            "action": "database_migration_or_privilege_contract_required",
+        }
     elif classification == "DATA_QUALITY":
         result = {
             "status": "RESOLVED_DEFERRED_TO_TARGETED_ENRICHMENT",
