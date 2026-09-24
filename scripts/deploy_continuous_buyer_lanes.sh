@@ -58,6 +58,15 @@ payload = json.loads(path.read_text())
 print("Scout:")
 print("  queries:", payload.get("query_count"))
 print("  domains:", payload.get("domain_count"))
+print("  search domains:", payload.get("search_domain_count"))
+print(
+    "  canonical fallback domains:",
+    payload.get("canonical_seed_domain_count"),
+)
+print(
+    "  canonical fallback used:",
+    payload.get("canonical_seed_fallback_used"),
+)
 print("  candidates:", payload.get("candidate_count"))
 print("  lane candidates:")
 for lane, count in sorted(
@@ -74,6 +83,7 @@ echo "CONTINUOUS BUYER LANES ACTIVE"
 echo "HEAD: $(git rev-parse --short HEAD)"
 echo "Enterprise unresolved contacts: 10-minute retry loop"
 echo "Net-new company discovery: 30-minute Buyer Scout loop"
+echo "Canonical legal/insurance seed fallback: ACTIVE when search is empty"
 echo "Lanes: Predictive Revenue / Legal Mass Tort / Legal / Insurance"
 echo "Discovery/probing/reconciliation/persistence: AUTOMATIC"
 echo "Individual plaintiff targeting: OFF"
