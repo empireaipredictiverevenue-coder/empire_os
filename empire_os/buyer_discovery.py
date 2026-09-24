@@ -431,23 +431,74 @@ def reconcile_decision_maker(candidate: BuyerCandidate, official_people: Iterabl
     }
 
 
+def _person_evidence_priority(person: Mapping[str, Any]) -> tuple[int, int, int]:
+    source_kind = _text(person.get("source_kind")).lower()
+    url = _text(person.get("url") or person.get("page_url")).lower()
+    title = _text(person.get("title"))
+
+    source_score = {
+        "visible_text": 3,
+        "structured_data": 2,
+    }.get(source_kind, 1)
+    page_score = (
+        3
+        if any(token in url for token in (
+            "/leadership",
+            "/team",
+            "/our-team",
+            "/meet-the-team",
+            "/people",
+            "/management",
+        ))
+        else 1
+    )
+    specificity = min(len(title.split()), 12)
+    return source_score, page_score, specificity
+
+
 def rank_site_people(people: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    ranked = []
+    by_person: dict[str, dict[str, Any]] = {}
+    priorities: dict[str, tuple[int, int, int]] = {}
+
     for person in people or []:
         name = _text(person.get("name"))
         title = _text(person.get("title"))
         if not looks_like_person_name(name) or not title:
             continue
+
         role, authority = classify_decision_role(title)
-        ranked.append({
+        item = {
             "name": name,
             "title": title,
             "email": _text(person.get("email")),
-            "url": _text(person.get("url")),
+            "url": _text(person.get("url") or person.get("page_url")),
+            "source_kind": _text(person.get("source_kind")) or None,
             "decision_role": role,
             "decision_score": authority,
-        })
-    ranked.sort(key=lambda p: p["decision_score"], reverse=True)
+        }
+        key = name.casefold()
+        priority = _person_evidence_priority(person)
+        previous = priorities.get(key)
+
+        if previous is None or priority > previous:
+            by_person[key] = item
+            priorities[key] = priority
+        elif priority == previous:
+            existing = by_person[key]
+            if (
+                not existing.get("email")
+                and item.get("email")
+            ):
+                by_person[key] = item
+
+    ranked = list(by_person.values())
+    ranked.sort(
+        key=lambda p: (
+            -float(p["decision_score"]),
+            -_person_evidence_priority(p)[1],
+            p["name"].casefold(),
+        )
+    )
     return ranked
 
 
