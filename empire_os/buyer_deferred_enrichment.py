@@ -36,6 +36,8 @@ DEFERABLE_REASONS = frozenset({
     "outreach_not_ready",
     "decision_maker_missing",
     "decision_score_below_floor",
+    "target_contact_not_verified",
+    "target_identity_mismatch",
 })
 
 
