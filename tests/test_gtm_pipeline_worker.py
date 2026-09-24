@@ -86,6 +86,32 @@ def test_pipeline_auto_reviews_then_proposes_only_ready_reviews():
     assert POSTAL_ADDRESS in proposal["p_body_text"]
 
 
+def test_pipeline_defaults_to_25_daily_review_cap():
+    seen_caps = []
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            if "status=eq.approved" in path:
+                return []
+            return [{
+                "id": "00000000-0000-0000-0000-000000000099",
+                "contact_email": "owner@example.com",
+            }]
+        if path.endswith("auto_review_buyer_candidate"):
+            seen_caps.append(payload["p_daily_cap"])
+            return {"status": "approved", "decision": "approved"}
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+
+    assert result.candidate_auto_approved == 1
+    assert seen_caps == [25]
+
+
 def test_pipeline_skips_ineligible_review_without_fabricating_evidence():
     def request(method, path, payload=None, **_kwargs):
         if method == "GET" and path.startswith("/rest/v1/buyer_candidate_reviews?"):
