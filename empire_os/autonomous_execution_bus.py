@@ -56,6 +56,12 @@ from empire_os.niche_taxonomy import (
     normalise,
 )
 from empire_os.runtime_env import load_runtime_env
+from empire_os.qualification_worker_v2 import (
+    _close_supabase_egress_circuit,
+    _component_name,
+    _open_supabase_egress_circuit,
+    _reserve_supabase_request,
+)
 
 
 ENV_PATH = os.environ.get(
@@ -141,11 +147,15 @@ ENV = load_env()
 SUPABASE_URL = ENV["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = ENV["SUPABASE_SERVICE_KEY"]
 
+_COMPONENT = _component_name()
+
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": "Bearer " + SUPABASE_KEY,
     "Content-Type": "application/json",
     "Accept": "application/json",
+    "User-Agent": f"EmpireOS/{_COMPONENT}",
+    "X-Empire-Component": _COMPONENT,
 }
 
 
@@ -187,12 +197,22 @@ def rpc(
         headers=HEADERS,
     )
 
+    _reserve_supabase_request()
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
             raw = response.read().decode("utf-8")
+            _close_supabase_egress_circuit()
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
+        if (
+            exc.code == 402
+            and (
+                "exceed_egress_quota" in body
+                or "restricted due to the following violations" in body
+            )
+        ):
+            _open_supabase_egress_circuit("exceed_egress_quota")
         raise BusError(
             f"RPC {function_name} failed HTTP {exc.code}: "
             f"{body[:1000]}"
@@ -241,11 +261,20 @@ def insert_event(
         },
     )
 
+    _reserve_supabase_request()
     try:
         with urllib.request.urlopen(req, timeout=30):
-            pass
+            _close_supabase_egress_circuit()
     except urllib.error.HTTPError as exc:
         body_text = exc.read().decode("utf-8", errors="replace")
+        if (
+            exc.code == 402
+            and (
+                "exceed_egress_quota" in body_text
+                or "restricted due to the following violations" in body_text
+            )
+        ):
+            _open_supabase_egress_circuit("exceed_egress_quota")
         raise BusError(
             f"commercial event insert failed HTTP {exc.code}: "
             f"{body_text[:1000]}"
@@ -515,12 +544,22 @@ def _rest_json(
         headers=headers,
     )
 
+    _reserve_supabase_request()
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
             raw = response.read().decode("utf-8")
+            _close_supabase_egress_circuit()
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as exc:
         body_text = exc.read().decode("utf-8", errors="replace")
+        if (
+            exc.code == 402
+            and (
+                "exceed_egress_quota" in body_text
+                or "restricted due to the following violations" in body_text
+            )
+        ):
+            _open_supabase_egress_circuit("exceed_egress_quota")
         raise BusError(
             f"REST {method} {path} failed HTTP {exc.code}: "
             f"{body_text[:1000]}"
