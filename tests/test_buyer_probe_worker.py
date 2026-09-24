@@ -135,6 +135,8 @@ def test_run_promotes_only_native_confirmed_first_party_contact(monkeypatch):
 
     assert result["outreach_ready"] is True
     assert result["preferred_email"] == "jane.smith@acme.test"
+    assert "site_people" in result
+    assert result["site_people"] == []
     assert result["hunter_confirmed_contacts"][0]["state"] == "confirmed"
     assert result["hunter_domain_pattern"]["pattern"] == "first.last"
 
