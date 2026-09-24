@@ -301,7 +301,16 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
     calls = {"post": 0}
 
     review_id = "00000000-0000-0000-0000-000000001222"
-    review_reads = {"count": 0}
+    review = {
+        "id": review_id,
+        "status": "pending",
+        "contact_name": "Richard Lewis",
+        "contact_title": "Chief Executive Officer",
+        "contact_email": "richard@redwoodservices.com",
+        "decision_score": 1.0,
+        "evidence": {},
+    }
+    calls["patch"] = 0
 
     def request(method, path, payload=None, **kwargs):
         if method == "GET" and "/prospects?" in path:
@@ -315,16 +324,12 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
                 "contact_source": "public_enterprise_target",
             }]
         if method == "GET" and "/buyer_candidate_reviews?" in path:
-            review_reads["count"] += 1
-            return [{
-                "id": review_id,
-                "status": "pending",
-                "contact_name": "Richard Lewis",
-                "contact_title": "Chief Executive Officer",
-                "contact_email": "richard@redwoodservices.com",
-                "decision_score": 1.0,
-                "evidence": {},
-            }]
+            return [dict(review)]
+        if method == "PATCH" and "/buyer_candidate_reviews?" in path:
+            calls["patch"] += 1
+            review.update(dict(payload or {}))
+            return None
+
         calls["post"] += 1
         if calls["post"] == 1:
             raise RuntimeError(
@@ -350,6 +355,8 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
     assert result["error_count"] == 0
     assert result["proposed_review_count"] == 1
     assert calls["post"] == 2
+    assert calls["patch"] == 1
+    assert review["contact_title"] == "Chief Executive Officer & Founder"
 
 
 def test_sync_worker_prints_error_details_for_operator_diagnostics():
