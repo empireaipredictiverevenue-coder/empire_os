@@ -20,7 +20,7 @@ def test_control_plane_installer_installs_privileged_helper_first():
     assert helper < ops < catalog
     assert "systemctl daemon-reload" in text
     assert "systemctl restart empire-ops-privileged-helper.service" in text
-    assert "test -S /run/empire-ops/privileged.sock" in text
+    assert "/run/empire-ops/privileged.sock" in text
 
 
 def test_ops_sentinel_watches_privileged_helper():
@@ -41,3 +41,12 @@ def test_control_plane_installer_waits_for_socket_and_diagnoses_failure():
     assert "[ -S /run/empire-ops/privileged.sock ]" in text
     assert "systemctl status empire-ops-privileged-helper.service" in text
     assert "journalctl -u empire-ops-privileged-helper.service" in text
+
+
+def test_control_plane_installer_installs_required_timers():
+    text = (
+        ROOT / "scripts/install_ops_self_heal_control_plane.sh"
+    ).read_text()
+
+    assert 'deploy/systemd/empire-ops-control.timer' in text
+    assert 'deploy/systemd/empire-commercial-product-catalog.timer' in text
