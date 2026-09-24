@@ -112,20 +112,45 @@ def parse_legacy_lane_notes(notes: str) -> dict[str, Any]:
     lead_ref_match = _LEAD_REF_RE.search(details)
     business_name = _NYC_BOROUGH_SUFFIX_RE.sub("", source_name).strip()
 
-    identity_recoverable = bool(
-        _meaningful_name(business_name)
-        and (_phone_digits(phone) or address)
-    )
-
     metro_upper = metro.upper()
     if metro_upper == "NYC":
         source_system = "nyc_dob_permits"
+        legacy_name_role = "property_owner"
+        legacy_phone_role = "permittee_contact"
+        # The old NYC crawler paired owner name with permittee phone.
+        # Owner identity therefore requires owner name + project address;
+        # permittee phone cannot make the owner identity recoverable.
+        identity_recoverable = bool(
+            _meaningful_name(business_name) and address
+        )
+        fingerprint_phone = ""
     elif metro_upper == "CHI":
         source_system = "chicago_permits_legacy"
+        legacy_name_role = "legacy_subject"
+        legacy_phone_role = "unknown"
+        identity_recoverable = bool(
+            _meaningful_name(business_name)
+            and (_phone_digits(phone) or address)
+        )
+        fingerprint_phone = phone
     elif metro_upper == "LAX":
         source_system = "los_angeles_permits_legacy"
+        legacy_name_role = "legacy_subject"
+        legacy_phone_role = "unknown"
+        identity_recoverable = bool(
+            _meaningful_name(business_name)
+            and (_phone_digits(phone) or address)
+        )
+        fingerprint_phone = phone
     else:
         source_system = "legacy_permit_unknown"
+        legacy_name_role = "legacy_subject"
+        legacy_phone_role = "unknown"
+        identity_recoverable = bool(
+            _meaningful_name(business_name)
+            and (_phone_digits(phone) or address)
+        )
+        fingerprint_phone = phone
 
     return {
         "parsed": True,
@@ -143,12 +168,14 @@ def parse_legacy_lane_notes(notes: str) -> dict[str, Any]:
         "bbl": _clean(bbl_match.group(1)) if bbl_match else None,
         "lead_ref": _clean(lead_ref_match.group(1)) if lead_ref_match else None,
         "source_system": source_system,
+        "legacy_name_role": legacy_name_role,
+        "legacy_phone_role": legacy_phone_role,
         "permit_evidence_present": bool(permit_number),
         "identity_recoverable": identity_recoverable,
         "routing_only": not identity_recoverable,
         "identity_fingerprint": _identity_fingerprint(
             business_name if _meaningful_name(business_name) else "",
-            phone,
+            fingerprint_phone,
             address,
         ),
         "raw_notes": raw,
@@ -214,6 +241,83 @@ def _permit_chunks(values: Iterable[str], size: int = 40) -> Iterable[list[str]]
         yield cleaned[start:start + size]
 
 
+def _source_identity_name(
+    row: Mapping[str, Any],
+    business_key: str,
+    first_key: str,
+    last_key: str,
+) -> str:
+    business = _clean(row.get(business_key))
+    if business:
+        return business
+    return " ".join(
+        part
+        for part in (
+            _clean(row.get(first_key)),
+            _clean(row.get(last_key)),
+        )
+        if part
+    ).strip()
+
+
+def _unique_text(values: Iterable[Any]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        text = _clean(value)
+        key = _identity_name_key(text)
+        if not text or not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(text)
+    return result
+
+
+def source_owner_identity_state(
+    parsed: Mapping[str, Any],
+    validation: Mapping[str, Any],
+) -> str:
+    if _clean(parsed.get("source_system")) != "nyc_dob_permits":
+        return "NOT_AVAILABLE"
+    if _clean(validation.get("validation_state")) != "VERIFIED_CURRENT":
+        return "NOT_AVAILABLE"
+
+    legacy_name = _identity_name_key(parsed.get("business_name"))
+    owner_names = [
+        _identity_name_key(value)
+        for value in (validation.get("source_owner_names") or [])
+        if _identity_name_key(value)
+    ]
+    if not legacy_name or not owner_names:
+        return "UNKNOWN"
+    if legacy_name in owner_names:
+        return "MATCHED"
+    return "MISMATCH"
+
+
+def source_permittee_phone_state(
+    parsed: Mapping[str, Any],
+    validation: Mapping[str, Any],
+) -> str:
+    if _clean(parsed.get("legacy_phone_role")) != "permittee_contact":
+        return "NOT_AVAILABLE"
+    legacy_phone = _phone_digits(_clean(parsed.get("phone")))
+    if not legacy_phone:
+        return "NOT_AVAILABLE"
+    permittees = validation.get("source_permittees") or []
+    phones = {
+        _phone_digits(_clean(item.get("phone")))
+        for item in permittees
+        if isinstance(item, Mapping)
+        and _phone_digits(_clean(item.get("phone")))
+    }
+    if not phones:
+        return "UNKNOWN"
+    if legacy_phone in phones:
+        return "SOURCE_CONFIRMED"
+    return "MISMATCH"
+
+
 def revalidate_nyc_permits(
     permit_numbers: Iterable[str],
     *,
@@ -261,6 +365,60 @@ def revalidate_nyc_permits(
             matches = by_job.get(permit) or []
             if matches:
                 latest = matches[0]
+                owner_names = _unique_text(
+                    _source_identity_name(
+                        item,
+                        "owner_s_business_name",
+                        "owner_s_first_name",
+                        "owner_s_last_name",
+                    )
+                    for item in matches
+                )
+                permittees_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+                for item in matches:
+                    permittee_name = _source_identity_name(
+                        item,
+                        "permittee_s_business_name",
+                        "permittee_s_first_name",
+                        "permittee_s_last_name",
+                    )
+                    permittee_phone = _clean(
+                        item.get("permittee_s_phone__")
+                    )
+                    key = (
+                        _identity_name_key(permittee_name),
+                        _phone_digits(permittee_phone),
+                    )
+                    if not any(key):
+                        continue
+                    permittees_by_key.setdefault(
+                        key,
+                        {
+                            "business_name": _clean(
+                                item.get("permittee_s_business_name")
+                            ) or None,
+                            "name": permittee_name or None,
+                            "phone": permittee_phone or None,
+                            "license_type": _clean(
+                                item.get("permittee_s_license_type")
+                            ) or None,
+                            "license_number": _clean(
+                                item.get("permittee_s_license__")
+                            ) or None,
+                        },
+                    )
+                source_addresses = _unique_text(
+                    " ".join(
+                        part
+                        for part in (
+                            _clean(item.get("house__")),
+                            _clean(item.get("street_name")),
+                            _clean(item.get("borough")),
+                        )
+                        if part
+                    )
+                    for item in matches
+                )
                 results[permit] = {
                     "validation_state": "VERIFIED_CURRENT",
                     "validation_reason": "current_public_source_match",
@@ -274,6 +432,9 @@ def revalidate_nyc_permits(
                     "matched_permit_status": _clean(
                         latest.get("permit_status")
                     ) or None,
+                    "source_owner_names": owner_names,
+                    "source_permittees": list(permittees_by_key.values()),
+                    "source_addresses": source_addresses,
                 }
             else:
                 results[permit] = {
@@ -367,7 +528,7 @@ def match_canonical_identity(
     parsed: Mapping[str, Any],
     canonical_prospects_by_metro: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """Apply the existing conservative prospect identity contract."""
+    """Match the legacy subject identity, never a role-mismatched contact."""
     if parsed.get("parsed") is not True:
         return {
             "match_state": "NOT_ELIGIBLE",
@@ -404,7 +565,11 @@ def match_canonical_identity(
             "prospect": {
                 "business_name": parsed.get("business_name"),
                 "metro": parsed.get("metro"),
-                "phone": parsed.get("phone"),
+                "phone": (
+                    ""
+                    if parsed.get("legacy_phone_role") == "permittee_contact"
+                    else parsed.get("phone")
+                ),
             }
         },
         [
@@ -498,6 +663,7 @@ def classify_recovery(
     validation: Mapping[str, Any],
     *,
     canonical_identity_state: str = "NO_MATCH",
+    source_identity_state: str = "NOT_AVAILABLE",
 ) -> tuple[str, str]:
     if parsed.get("parsed") is not True:
         return "REJECT", "REJECTED"
@@ -510,6 +676,12 @@ def classify_recovery(
     identity_state = _clean(canonical_identity_state).upper()
 
     if state == "VERIFIED_CURRENT":
+        source_state = _clean(source_identity_state).upper()
+        if (
+            _clean(parsed.get("source_system")) == "nyc_dob_permits"
+            and source_state != "MATCHED"
+        ):
+            return "MODERNIZE", "IDENTITY_REVIEW_REQUIRED"
         if identity_state == "MATCHED":
             return "MERGE", "VERIFIED_CURRENT"
         if identity_state in {"AMBIGUOUS", "PHONE_ONLY_REVIEW"}:
@@ -554,6 +726,8 @@ def build_recovery_observer(
     classifications: dict[str, int] = {}
     states: dict[str, int] = {}
     identity_states: dict[str, int] = {}
+    source_identity_states: dict[str, int] = {}
+    permittee_phone_states: dict[str, int] = {}
 
     for row, parsed in parsed_rows:
         permit_number = _clean(parsed.get("permit_number"))
@@ -581,6 +755,21 @@ def build_recovery_observer(
                 "source_freshness": "UNKNOWN",
             }
 
+        source_identity = source_owner_identity_state(
+            parsed,
+            validation,
+        )
+        source_identity_states[source_identity] = (
+            source_identity_states.get(source_identity, 0) + 1
+        )
+        permittee_phone_state = source_permittee_phone_state(
+            parsed,
+            validation,
+        )
+        permittee_phone_states[permittee_phone_state] = (
+            permittee_phone_states.get(permittee_phone_state, 0) + 1
+        )
+
         identity_match = match_canonical_identity(
             parsed,
             canonical_prospects_by_metro,
@@ -594,6 +783,7 @@ def build_recovery_observer(
             parsed,
             validation,
             canonical_identity_state=identity_state,
+            source_identity_state=source_identity,
         )
         classifications[recovery_class] = (
             classifications.get(recovery_class, 0) + 1
@@ -635,6 +825,8 @@ def build_recovery_observer(
                     "bbl",
                     "lead_ref",
                     "source_system",
+                    "legacy_name_role",
+                    "legacy_phone_role",
                     "identity_fingerprint",
                 )
             },
@@ -646,6 +838,8 @@ def build_recovery_observer(
             ),
             "validation": validation,
             "source_freshness": validation.get("source_freshness"),
+            "source_owner_identity_state": source_identity,
+            "source_permittee_phone_state": permittee_phone_state,
             "current_identity_match_state": identity_state,
             "canonical_match_reason": identity_match.get("match_reason"),
             "canonical_match_method": identity_match.get("match_method"),
@@ -665,7 +859,7 @@ def build_recovery_observer(
         })
 
     return {
-        "schema_version": "empire.legacy-permit-recovery-observer.v2",
+        "schema_version": "empire.legacy-permit-recovery-observer.v3",
         "generated_at": _now(),
         "mode": "OBSERVE",
         "input_row_count": len(list(rows)) if isinstance(rows, list) else None,
@@ -674,6 +868,12 @@ def build_recovery_observer(
         "classification_counts": dict(sorted(classifications.items())),
         "recovery_state_counts": dict(sorted(states.items())),
         "identity_match_counts": dict(sorted(identity_states.items())),
+        "source_owner_identity_counts": dict(
+            sorted(source_identity_states.items())
+        ),
+        "source_permittee_phone_counts": dict(
+            sorted(permittee_phone_states.items())
+        ),
         "records": recovered,
         "historical_omega_is_current_truth": False,
         "database_write_performed": False,
