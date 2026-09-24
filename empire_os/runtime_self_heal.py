@@ -125,10 +125,16 @@ HTTP_CHECKS: tuple[HttpSpec, ...] = (
 # start them because doing so could cause an external or commercial action.
 FOUNDER_GATE_UNIT_PREFIXES: tuple[str, ...] = (
     "empire-outbound-",
+    "empire-outreach-",
     "empire-voice-outbound",
     "empire-closer-reply",
+    "empire-call-manager",
     "empire-payment",
     "empire-settlement",
+    "empire-settle-",
+    "empire-revenue-recognition",
+    "empire-ppc-billing",
+    "empire-marketing-deploy",
 )
 
 
@@ -138,6 +144,76 @@ def _utc_now() -> datetime:
 
 def _iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat()
+
+
+def classify_unit_policy(unit: str) -> str:
+    text = str(unit or "").strip()
+    if any(text.startswith(prefix) for prefix in FOUNDER_GATE_UNIT_PREFIXES):
+        return "FOUNDER_GATE"
+    if unit_is_auto_repairable(text):
+        return "AUTO_REPAIR"
+    return "OBSERVE_ONLY"
+
+
+def _discover_empire_units() -> list[dict[str, Any]]:
+    """Inventory installed Empire system units with one bounded systemd scan."""
+    files = subprocess.run(
+        [
+            "systemctl",
+            "list-unit-files",
+            "empire-*",
+            "--no-legend",
+            "--no-pager",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    active = subprocess.run(
+        [
+            "systemctl",
+            "list-units",
+            "--all",
+            "empire-*",
+            "--no-legend",
+            "--no-pager",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    active_map: dict[str, dict[str, str]] = {}
+    for raw in (active.stdout or "").splitlines():
+        parts = raw.split(None, 4)
+        if len(parts) < 4:
+            continue
+        unit, load_state, active_state, sub_state = parts[:4]
+        active_map[unit] = {
+            "load_state": load_state,
+            "active_state": active_state,
+            "sub_state": sub_state,
+        }
+
+    rows: list[dict[str, Any]] = []
+    for raw in (files.stdout or "").splitlines():
+        parts = raw.split()
+        if len(parts) < 2:
+            continue
+        unit, unit_file_state = parts[:2]
+        runtime = active_map.get(unit, {})
+        rows.append({
+            "unit": unit,
+            "unit_file_state": unit_file_state,
+            "load_state": runtime.get("load_state", "unknown"),
+            "active_state": runtime.get("active_state", "inactive"),
+            "sub_state": runtime.get("sub_state", "unknown"),
+            "policy": classify_unit_policy(unit),
+        })
+    rows.sort(key=lambda row: str(row["unit"]))
+    return rows
 
 
 def unit_is_auto_repairable(unit: str) -> bool:
@@ -388,6 +464,7 @@ def run_runtime_self_heal(
     service_status: Callable[[str], tuple[bool, str]] = _systemctl_active,
     http_check: Callable[[str, int], tuple[bool, str]] = _http_ok,
     repair: Callable[[str, str], Mapping[str, Any]] = privileged_request,
+    unit_inventory: Callable[[], list[dict[str, Any]]] = _discover_empire_units,
     latest_path: Path = LATEST_PATH,
     state_path: Path = STATE_PATH,
 ) -> dict[str, Any]:
@@ -397,6 +474,27 @@ def run_runtime_self_heal(
         observe_only = True
 
     state = _load_state(state_path)
+    try:
+        inventory = unit_inventory()
+    except (OSError, subprocess.SubprocessError) as exc:
+        inventory = [{
+            "unit": "systemd_inventory",
+            "unit_file_state": "unknown",
+            "load_state": "unknown",
+            "active_state": "unknown",
+            "sub_state": type(exc).__name__,
+            "policy": "OBSERVE_ONLY",
+        }]
+    installed_units = {
+        str(row.get("unit") or "")
+        for row in inventory
+        if str(row.get("unit") or "")
+    }
+    policy_counts: dict[str, int] = {}
+    for row in inventory:
+        policy = str(row.get("policy") or "OBSERVE_ONLY")
+        policy_counts[policy] = policy_counts.get(policy, 0) + 1
+
     checks: list[dict[str, Any]] = []
     repairs: list[dict[str, Any]] = []
     repair_count = 0
@@ -429,6 +527,8 @@ def run_runtime_self_heal(
         return result
 
     for spec in AUTO_REPAIR_SERVICES:
+        if installed_units and spec.unit not in installed_units:
+            continue
         healthy, detail = service_status(spec.unit)
         row = {
             "kind": "service",
@@ -452,6 +552,8 @@ def run_runtime_self_heal(
         checks.append(row)
 
     for spec in AUTO_REPAIR_TIMERS:
+        if installed_units and spec.unit not in installed_units:
+            continue
         healthy, detail = service_status(spec.unit)
         row = {
             "kind": "timer",
@@ -534,6 +636,9 @@ def run_runtime_self_heal(
         "unresolved_count": unresolved,
         "repair_count": repair_count,
         "repair_budget": max_repairs_per_run,
+        "system_unit_count": len(inventory),
+        "system_unit_policy_counts": dict(sorted(policy_counts.items())),
+        "system_units": inventory,
         "checks": checks,
         "repairs": repairs,
         "founder_gate_policy": {
