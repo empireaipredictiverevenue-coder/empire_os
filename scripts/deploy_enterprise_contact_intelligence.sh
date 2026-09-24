@@ -88,11 +88,31 @@ rm -f "$SYNC_LOG"
 
 echo
 echo "=== REFRESH BUYER ACQUISITION ==="
-PYTHONPATH=/srv/empire_os ./.venv/bin/python scripts/refresh_buyer_acquisition_team.py   --repo-root /srv/empire_os >/tmp/empire_buyer_acquisition_refresh.json
+REFRESH_LOG="$(mktemp)"
+set +e
+PYTHONPATH=/srv/empire_os \
+./.venv/bin/python scripts/refresh_buyer_acquisition_team.py \
+  --repo-root /srv/empire_os 2>&1 | tee "$REFRESH_LOG"
+REFRESH_RC="${PIPESTATUS[0]}"
+set -e
+if [ "$REFRESH_RC" -ne 0 ]; then
+  PYTHONPATH=/srv/empire_os \
+  ./.venv/bin/python scripts/run_enterprise_contact_repair.py \
+    --record-test-log "$REFRESH_LOG" \
+    --kind "buyer_acquisition_refresh_failure" \
+    --command "refresh_buyer_acquisition_team.py" \
+    --returncode "$REFRESH_RC" || true
+  sudo systemctl start --no-block \
+    empire-enterprise-contact-repair.service || true
+  echo "Buyer Acquisition refresh deferred to automatic repair controller."
+fi
+rm -f "$REFRESH_LOG"
 
 echo
 echo "=== VERIFY REVIEW + RETRY STATE ==="
-PYTHONPATH=/srv/empire_os ./.venv/bin/python - <<'PY'
+VERIFY_LOG="$(mktemp)"
+set +e
+PYTHONPATH=/srv/empire_os ./.venv/bin/python - <<'PY' 2>&1 | tee "$VERIFY_LOG"
 import json
 import urllib.parse
 from pathlib import Path
@@ -181,6 +201,20 @@ assert intel["actual_revenue"] is False
 assert summary["live_outbound_send"] is False
 assert summary["actual_revenue"] is False
 PY
+VERIFY_RC="${PIPESTATUS[0]}"
+set -e
+if [ "$VERIFY_RC" -ne 0 ]; then
+  PYTHONPATH=/srv/empire_os \
+  ./.venv/bin/python scripts/run_enterprise_contact_repair.py \
+    --record-test-log "$VERIFY_LOG" \
+    --kind "post_install_verification_failure" \
+    --command "enterprise contact deployment verification" \
+    --returncode "$VERIFY_RC" || true
+  sudo systemctl start --no-block \
+    empire-enterprise-contact-repair.service || true
+  echo "Post-install verification deferred to automatic repair controller."
+fi
+rm -f "$VERIFY_LOG"
 
 echo
 echo "=== START TARGETED RETRIES ASYNC ==="
