@@ -166,6 +166,114 @@ ICP_PROFILES: tuple[dict[str, Any], ...] = (
         "priority_score": 95,
     },
     {
+        "profile_key": "predictive_revenue_home_services_platform",
+        "name": "Predictive Revenue — Multi-brand Home Services Platform",
+        "buyer_pools": [
+            "enterprise_and_data_buyers",
+            "software_and_advisory_buyers",
+        ],
+        "industry_signals": [
+            "home services platform", "multi-brand home services",
+            "hvac plumbing electrical", "residential services platform",
+            "portfolio brands", "national home services",
+            "multi-location home services",
+        ],
+        "decision_maker_roles": [
+            "chief executive officer", "ceo", "chief revenue officer",
+            "cro", "chief marketing officer", "cmo",
+            "chief technology officer", "cto", "chief information officer",
+            "revenue operations", "analytics", "data",
+        ],
+        "likely_problems": [
+            "fragmented cross-brand revenue visibility",
+            "uneven market demand and capacity",
+            "slow identification of growth opportunities",
+            "inconsistent forecasting across operating companies",
+        ],
+        "buying_triggers": [
+            "acquisition", "expansion", "data analytics",
+            "technology investment", "new market", "new leadership",
+            "portfolio growth",
+        ],
+        "product_codes": [
+            "predictive_revenue_intelligence_os",
+            "predictive_revenue_autonomous_os",
+            "predictive_revenue_private_strategic",
+        ],
+        "priority_score": 100,
+    },
+    {
+        "profile_key": "predictive_revenue_franchise_network",
+        "name": "Predictive Revenue — Franchise / Multi-location Network",
+        "buyer_pools": [
+            "enterprise_and_data_buyers",
+            "software_and_advisory_buyers",
+        ],
+        "industry_signals": [
+            "franchise network", "multi-brand franchise",
+            "franchise platform", "franchise locations",
+            "multi-location services", "central marketing",
+            "consumer insights",
+        ],
+        "decision_maker_roles": [
+            "chief executive officer", "ceo",
+            "chief marketing officer", "cmo",
+            "chief growth officer", "growth",
+            "strategic operations", "analytics",
+            "consumer insights", "data",
+        ],
+        "likely_problems": [
+            "fragmented franchise performance signals",
+            "slow cross-brand demand detection",
+            "weak leading indicators across locations",
+            "inconsistent local market visibility",
+        ],
+        "buying_triggers": [
+            "analytics", "ai", "marketing automation",
+            "expansion", "new app", "new leadership",
+            "customer data",
+        ],
+        "product_codes": [
+            "predictive_revenue_autonomous_os",
+            "predictive_revenue_intelligence_os",
+            "predictive_revenue_private_strategic",
+        ],
+        "priority_score": 99,
+    },
+    {
+        "profile_key": "predictive_revenue_portfolio_value_creation",
+        "name": "Predictive Revenue — Portfolio Value Creation / Operating Team",
+        "buyer_pools": ["enterprise_and_data_buyers"],
+        "industry_signals": [
+            "private equity operating team", "portfolio value creation",
+            "portfolio operations", "operating partner",
+            "portfolio analytics", "ai value creation",
+            "digital transformation portfolio",
+        ],
+        "decision_maker_roles": [
+            "operating partner", "portfolio operations",
+            "value creation", "digital", "ai",
+            "data", "technology", "chief executive officer",
+        ],
+        "likely_problems": [
+            "inconsistent revenue measurement across portfolio companies",
+            "slow opportunity detection",
+            "weak forecast-versus-actual calibration",
+            "fragmented operating data across portfolio companies",
+        ],
+        "buying_triggers": [
+            "value creation", "ai", "portfolio transformation",
+            "operational performance", "growth", "acquisition",
+            "digital transformation",
+        ],
+        "product_codes": [
+            "predictive_revenue_diagnostic",
+            "predictive_revenue_private_strategic",
+            "predictive_revenue_intelligence_os",
+        ],
+        "priority_score": 100,
+    },
+    {
         "profile_key": "enterprise_growth_data_team",
         "name": "Enterprise Growth / Data Team",
         "buyer_pools": [
