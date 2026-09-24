@@ -56,6 +56,11 @@ def test_only_new_external_candidates_are_persisted():
                 ],
                 "direct_signal_hits": ["buy leads"],
                 "reseller_signal_hits": [],
+                "predictive_revenue_enterprise_candidate": True,
+                "predictive_revenue_enterprise_profile": (
+                    "predictive_revenue_home_services_platform"
+                ),
+                "predictive_revenue_enterprise_fit_score": 82,
                 "candidate_state": "RESEARCH_EVIDENCE_ONLY",
             },
             {
@@ -112,6 +117,15 @@ def test_only_new_external_candidates_are_persisted():
         "best_profile_key"
     ] == "direct_demand_buyer"
     assert payload["p_site_evidence"]["budget_verified"] is False
+    assert payload["p_site_evidence"][
+        "predictive_revenue_enterprise_candidate"
+    ] is True
+    assert payload["p_site_evidence"][
+        "predictive_revenue_enterprise_profile"
+    ] == "predictive_revenue_home_services_platform"
+    assert payload["p_site_evidence"][
+        "predictive_revenue_enterprise_fit_score"
+    ] == 82
     assert payload["p_provenance"]["target_icp_profile_keys"] == [
         "direct_demand_buyer"
     ]
