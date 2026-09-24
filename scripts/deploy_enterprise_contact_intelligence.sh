@@ -16,6 +16,7 @@ PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
   tests/test_site_probe_people.py \
   tests/test_buyer_probe_worker.py \
   tests/test_enterprise_contact_intelligence.py \
+  tests/test_enterprise_contact_refresh_rpc_migration.py \
   tests/test_enterprise_targeted_retry.py \
   tests/test_enterprise_contact_repair.py \
   tests/test_enterprise_contact_sync_systemd.py \
@@ -156,6 +157,11 @@ if [ "$SYNC_RC" -ne 0 ] || [ "$SYNC_RESULT" != "success" ]; then
     -u empire-enterprise-contact-sync.service \
     -n 80 \
     --no-pager || true
+
+  echo
+  echo "STOP: canonical enterprise contact sync is not healthy."
+  echo "LIVE banner suppressed; incident retained for repair."
+  exit "${SYNC_RC:-1}"
 else
   echo "Canonical-env sync + Buyer Acquisition refresh + verification: success"
 
