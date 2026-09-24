@@ -13,6 +13,7 @@ PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
   tests/test_legacy_permit_recovery.py \
   tests/test_legacy_permit_recovery_runner.py \
   tests/test_legacy_permit_recovery_systemd.py \
+  tests/test_permits_source_identity.py \
   tests/test_permit_intelligence_runtime.py
 
 echo
@@ -59,7 +60,15 @@ print("  scanned:", payload.get("scanned_row_count"))
 print("  processed:", payload.get("processed_count"))
 print("  classifications:", payload.get("classification_counts"))
 print("  states:", payload.get("recovery_state_counts"))
-print("  identity matches:", payload.get("identity_match_counts"))
+print("  owner canonical matches:", payload.get("identity_match_counts"))
+print(
+    "  source owner identity:",
+    payload.get("source_owner_identity_counts"),
+)
+print(
+    "  permittee phone evidence:",
+    payload.get("source_permittee_phone_counts"),
+)
 print("  next offset:", payload.get("next_offset"))
 print("  database write:", payload.get("database_write_performed"))
 print("  promotion:", payload.get("canonical_promotion_performed"))
