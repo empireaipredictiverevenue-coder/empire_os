@@ -233,6 +233,38 @@ def test_site_people_are_ranked_and_do_not_invent_identity():
     assert all(p["name"] != "No Title" for p in ranked)
 
 
+def test_site_people_conflict_prefers_visible_leadership_title():
+    people = [
+        {
+            "name": "Kyle Martin",
+            "title": "President",
+            "email": "kmartin@sila.example",
+            "url": "https://sila.example/leadership/",
+            "source_kind": "structured_data",
+        },
+        {
+            "name": "Kyle Martin",
+            "title": "Vice President, Corporate Development",
+            "email": "kmartin@sila.example",
+            "url": "https://sila.example/leadership/",
+            "source_kind": "visible_text",
+        },
+        {
+            "name": "Other Executive",
+            "title": "Chief Executive Officer",
+            "email": "other@sila.example",
+            "url": "https://sila.example/leadership/",
+            "source_kind": "visible_text",
+        },
+    ]
+
+    ranked = rank_site_people(people)
+    kyle = [person for person in ranked if person["name"] == "Kyle Martin"]
+    assert len(kyle) == 1
+    assert kyle[0]["title"] == "Vice President, Corporate Development"
+    assert kyle[0]["source_kind"] == "visible_text"
+
+
 def test_enrichment_prefers_existing_canonical_contact_then_site_person():
     canonical = build_candidate({
         "id":"00000000-0000-0000-0000-000000000001","business_name":"Acme","niche":"software","metro":"London",
