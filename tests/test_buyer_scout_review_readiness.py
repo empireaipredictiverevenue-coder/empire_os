@@ -134,7 +134,8 @@ def test_permit_buyer_rejects_unconfirmed_seed_identity():
     row = candidate(
         target_product_codes=["permit_intelligence"],
         site_evidence={
-            "business_name_source": "canonical_seed_unconfirmed",
+            "business_name_source": "canonical_prospect_seed",
+            "canonical_seed_identity_corroborated": False,
             "permit_territory_state": "NYC_FIRST_PARTY_EVIDENCE",
             "site_evidence_score": 0.9,
             "first_party_email_count": 1,
