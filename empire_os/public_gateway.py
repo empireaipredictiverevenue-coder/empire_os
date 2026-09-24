@@ -107,6 +107,8 @@ def _site_html_path(route: str, root: Path | None = None) -> Path | None:
         candidate = base / "industries.html"
     elif clean == "buy":
         candidate = base / "buy.html"
+    elif clean == "predictive-revenue":
+        candidate = base / "predictive-revenue.html"
     elif clean.startswith("industries/"):
         slug = clean.split("/", 1)[1]
         if not slug or any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789-" for ch in slug):
@@ -126,6 +128,8 @@ def _public_site_urls(root: Path | None = None) -> list[str]:
         urls.append(f"{PUBLIC_BASE_URL}/industries")
     if (base / "buy.html").is_file():
         urls.append(f"{PUBLIC_BASE_URL}/buy")
+    if (base / "predictive-revenue.html").is_file():
+        urls.append(f"{PUBLIC_BASE_URL}/predictive-revenue")
     industries = base / "industries"
     if industries.is_dir():
         for path in sorted(industries.glob("*.html")):
@@ -367,6 +371,66 @@ async def checkout_exchange_interest_proxy(request: Request):
     )
 
 
+@app.get("/v1/checkout/predictive-revenue/products")
+async def checkout_predictive_revenue_products_proxy():
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{CHECKOUT_INTERNAL_URL}/v1/predictive-revenue/products"
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"error": "predictive_revenue_checkout_unavailable"},
+            status_code=503,
+        )
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
+
+
+@app.post("/v1/checkout/predictive-revenue/interests")
+async def checkout_predictive_revenue_interest_proxy(request: Request):
+    raw = await request.body()
+    if len(raw) > 65_536:
+        return JSONResponse(
+            {"error": "checkout_payload_too_large"},
+            status_code=413,
+        )
+    if "application/json" not in request.headers.get(
+        "content-type",
+        ""
+    ).lower():
+        return JSONResponse(
+            {"error": "application_json_required"},
+            status_code=415,
+        )
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                f"{CHECKOUT_INTERNAL_URL}/v1/predictive-revenue/interests",
+                content=raw,
+                headers={"Content-Type": "application/json"},
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"error": "predictive_revenue_checkout_unavailable"},
+            status_code=503,
+        )
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
+
+
 @app.get("/agent-web/capabilities")
 def capabilities(surface: str | None = Query(default=None, pattern="^(webmcp|mcp|a2a)$")):
     return {
@@ -530,6 +594,17 @@ def trust_page():
     path = _site_html_path("trust")
     if path is None:
         return JSONResponse({"error": "public_site_page_unavailable"}, status_code=404)
+    return FileResponse(path, media_type="text/html")
+
+
+@app.get("/predictive-revenue")
+def predictive_revenue_page():
+    path = _site_html_path("predictive-revenue")
+    if path is None:
+        return JSONResponse(
+            {"error": "public_site_page_unavailable"},
+            status_code=404,
+        )
     return FileResponse(path, media_type="text/html")
 
 
