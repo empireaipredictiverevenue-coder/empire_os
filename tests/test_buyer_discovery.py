@@ -22,6 +22,15 @@ def test_decision_role_ranking_is_explicit_and_conservative():
     assert classify_decision_role(
         "Executive Vice President, Strategic Operations & Analytics"
     ) == ("functional_buyer", 0.8)
+    assert classify_decision_role(
+        "Chief Strategy Officer"
+    ) == ("functional_buyer", 0.8)
+    assert classify_decision_role(
+        "Chief Marketing Officer"
+    ) == ("functional_buyer", 0.8)
+    assert classify_decision_role(
+        "Chief Technology Officer"
+    ) == ("functional_buyer", 0.8)
     assert classify_decision_role("") == ("unknown", 0.0)
 
 
