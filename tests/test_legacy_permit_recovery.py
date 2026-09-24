@@ -223,11 +223,11 @@ def test_fetch_is_read_only_and_bounded(monkeypatch):
 
     assert len(rows) == 1
     assert next_offset == 0
-    assert scan_limit == 2500
+    assert scan_limit == 500
     assert calls[0][0] == "GET"
     parsed = urlparse(calls[0][1])
     params = parse_qs(parsed.query)
     assert params["prospect_id"] == ["like.prospect_*"]
     assert params["notes"] == ["ilike.*permit*"]
-    assert params["limit"] == ["2500"]
+    assert params["limit"] == ["500"]
     assert params["offset"] == ["7"]
