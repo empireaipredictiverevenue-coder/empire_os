@@ -134,9 +134,10 @@ _PLACEHOLDER_EMAIL_DOMAINS = {
 }
 
 _PEOPLE_TITLE_RE = re.compile(
-    r"\b(?:co-founder|founder|owner|chief executive officer|ceo|"
-    r"managing director|president|principal|chief revenue officer|cro|"
-    r"chief commercial officer|cco|vice president(?: of)? sales|vp sales|"
+    r"\b(?:co-founder|founder|owner|"
+    r"chief\s+(?:[a-z][a-z&/-]*\s+){0,4}officer|ceo|coo|cto|cmo|cio|cdo|cro|cco|"
+    r"managing director|president|principal|"
+    r"(?:executive\s+|senior\s+|regional\s+)?vice president|vp(?:\s+of)?\s+[a-z&/-]+|"
     r"sales director|head of sales|head of growth|growth director|"
     r"commercial director|business development director|general manager)\b",
     re.I,
@@ -272,13 +273,24 @@ def _visible_people_from_html(
             continue
         match = _PEOPLE_TITLE_RE.search(block)
         if match:
+            matched_title = match.group(0)
+            remainder = block[match.end():].strip()
+            if (
+                match.start() == 0
+                and len(block) <= 120
+                and remainder
+                and remainder[0] in ",&/–—-"
+                and not any(mark in block for mark in ".!?")
+            ):
+                matched_title = block.strip(" ,|:/–—-")
+
             before = block[:match.start()].strip(" ,|:/–—-")
             words = before.split()
             for width in (2, 3, 4):
                 if len(words) >= width:
                     candidate = " ".join(words[-width:])
                     if _looks_like_visible_person_name(candidate):
-                        add(candidate, match.group(0))
+                        add(candidate, matched_title)
                         break
 
             after = block[match.end():].strip(" ,|:/–—-")
@@ -287,7 +299,7 @@ def _visible_people_from_html(
                 if len(words) >= width:
                     candidate = " ".join(words[:width])
                     if _looks_like_visible_person_name(candidate):
-                        add(candidate, match.group(0))
+                        add(candidate, matched_title)
                         break
 
             for neighbor_index in (index - 1, index - 2, index + 1, index + 2):
@@ -297,7 +309,7 @@ def _visible_people_from_html(
                 if len(neighbor) > 100:
                     continue
                 if _looks_like_visible_person_name(neighbor):
-                    add(neighbor, match.group(0))
+                    add(neighbor, matched_title)
                     break
         elif _looks_like_visible_person_name(block):
             for neighbor_index in (index + 1, index + 2):
@@ -908,8 +920,22 @@ def probe_site(
         addresses.extend(schema["addresses"])
         socials.extend(document.socials)
         schema_types.extend(schema["schema_types"])
-        people.extend(schema["people"])
-        people.extend(visible_people)
+        people.extend(
+            {
+                **person,
+                "source_kind": "structured_data",
+                "page_url": document.url,
+            }
+            for person in schema["people"]
+        )
+        people.extend(
+            {
+                **person,
+                "source_kind": "visible_text",
+                "page_url": document.url,
+            }
+            for person in visible_people
+        )
 
         page_emails = [
             value
