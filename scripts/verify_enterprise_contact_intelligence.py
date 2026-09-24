@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import urllib.parse
 
+from empire_os.predictive_revenue_enterprise_targets import TARGETS
 from empire_os.qualification_worker_v2 import request_json
 
 
@@ -32,6 +33,19 @@ def main() -> int:
         if isinstance(row, dict) and row.get("prospect_id")
     ]
 
+    targets_by_name = {
+        target.account_name: target
+        for target in TARGETS
+    }
+    account_by_prospect = {
+        str(row.get("prospect_id") or "").strip():
+        str(row.get("account_name") or "").strip()
+        for row in activation.get("targets") or []
+        if isinstance(row, dict)
+        and row.get("prospect_id")
+        and row.get("account_name")
+    }
+
     reviews = []
     if ids:
         params = urllib.parse.urlencode({
@@ -56,6 +70,34 @@ def main() -> int:
             "buyer acquisition missing enterprise contact intelligence summary"
         )
 
+    title_mismatches = []
+    for row in reviews:
+        if not isinstance(row, dict):
+            continue
+        prospect_id = str(row.get("prospect_id") or "").strip()
+        account_name = account_by_prospect.get(prospect_id)
+        target = targets_by_name.get(account_name or "")
+        if target is None:
+            continue
+        contact_name = str(row.get("contact_name") or "").strip()
+        contact_title = str(row.get("contact_title") or "").strip()
+        expected = next(
+            (
+                str(person.get("title") or "").strip()
+                for person in target.observed_people
+                if str(person.get("name") or "").strip().casefold()
+                == contact_name.casefold()
+            ),
+            "",
+        )
+        if expected and contact_title != expected:
+            title_mismatches.append({
+                "account_name": account_name,
+                "contact_name": contact_name,
+                "expected_title": expected,
+                "observed_title": contact_title,
+            })
+
     payload = {
         "ok": (
             int(intel.get("error_count") or 0) == 0
@@ -63,6 +105,7 @@ def main() -> int:
             and intel.get("actual_revenue") is False
             and summary.get("live_outbound_send") is False
             and summary.get("actual_revenue") is False
+            and not title_mismatches
         ),
         "proposed_review_count": int(
             intel.get("proposed_review_count") or 0
@@ -72,6 +115,7 @@ def main() -> int:
         ),
         "error_count": int(intel.get("error_count") or 0),
         "enterprise_review_row_count": len(reviews),
+        "title_mismatches": title_mismatches,
         "reviews": [
             {
                 "status": row.get("status"),
