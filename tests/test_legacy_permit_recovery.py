@@ -235,7 +235,7 @@ def test_fetch_is_read_only_and_bounded(monkeypatch):
     assert params["offset"] == ["7"]
 
 
-def test_verified_current_exact_phone_match_becomes_merge_candidate():
+def test_verified_current_exact_phone_and_name_becomes_merge_candidate():
     payload = build_recovery_observer(
         [_row()],
         nyc_validation={
@@ -250,7 +250,7 @@ def test_verified_current_exact_phone_match_becomes_merge_candidate():
             "nyc": {
                 "rows": [{
                     "id": "canonical-1",
-                    "business_name": "Different Display Name",
+                    "business_name": "Peykar Realty",
                     "phone": "7183489398",
                     "metro": "nyc",
                 }],
@@ -262,7 +262,7 @@ def test_verified_current_exact_phone_match_becomes_merge_candidate():
 
     record = payload["records"][0]
     assert record["current_identity_match_state"] == "MATCHED"
-    assert record["canonical_match_method"] == "exact_phone"
+    assert record["canonical_match_method"] == "exact_phone_name_metro"
     assert record["canonical_prospect_id"] == "canonical-1"
     assert record["recovery_classification"] == "MERGE"
     assert record["recovery_state"] == "VERIFIED_CURRENT"
@@ -367,3 +367,40 @@ def test_canonical_lookup_is_read_only_and_bounded(monkeypatch):
     assert calls
     assert all(method == "GET" for method, _ in calls)
     assert "/rest/v1/prospects?" in calls[0][1]
+
+
+def test_verified_current_phone_only_match_requires_review():
+    payload = build_recovery_observer(
+        [_row()],
+        nyc_validation={
+            "401975190": {
+                "validation_state": "VERIFIED_CURRENT",
+                "validation_reason": "current_public_source_match",
+                "source_system": "nyc_dob_permits",
+                "source_freshness": "SOURCE_REVALIDATED_CURRENT",
+            }
+        },
+        canonical_prospects_by_metro={
+            "nyc": {
+                "rows": [{
+                    "id": "canonical-shared-phone",
+                    "business_name": "Regional Scaffold & Hoisting",
+                    "phone": "7183489398",
+                    "metro": "nyc",
+                }],
+                "rows_scanned": 1,
+                "truncated": False,
+            }
+        },
+    )
+
+    record = payload["records"][0]
+    assert record["current_identity_match_state"] == "PHONE_ONLY_REVIEW"
+    assert record["canonical_match_reason"] == (
+        "exact_phone_without_name_corroboration"
+    )
+    assert record["canonical_match_method"] == "exact_phone_review_only"
+    assert record["canonical_prospect_id"] == "canonical-shared-phone"
+    assert record["recovery_classification"] == "MODERNIZE"
+    assert record["recovery_state"] == "IDENTITY_REVIEW_REQUIRED"
+    assert record["canonical_promotion_performed"] is False
