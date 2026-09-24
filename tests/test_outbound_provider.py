@@ -107,6 +107,40 @@ def test_send_with_resend_uses_validated_payload_and_requires_message_id():
         send_with_resend(payload, api_key="", resend_module=FakeResend)
 
 
+def test_send_with_resend_surfaces_sanitized_provider_reason():
+    class Emails:
+        @staticmethod
+        def send(payload, options=None):
+            raise RuntimeError(
+                "This API key re_SECRET123 is not authorized to send emails from empire-ai.co.uk"
+            )
+
+    class FakeResend:
+        api_key = None
+
+    FakeResend.Emails = Emails
+
+    from empire_os.outbound_provider import send_with_resend
+
+    payload = build_resend_send(
+        authorized_claim(),
+        sender="Phil - Founder - Empire AI <founder@empire-ai.co.uk>",
+        reply_to="reply@mail.empire-ai.co.uk",
+    )
+
+    with pytest.raises(OutboundProviderError) as exc:
+        send_with_resend(
+            payload,
+            api_key="re_test",
+            resend_module=FakeResend,
+        )
+
+    message = str(exc.value)
+    assert "not authorized to send emails from empire-ai.co.uk" in message
+    assert "re_SECRET123" not in message
+    assert "[REDACTED_API_KEY]" in message
+
+
 def test_send_payload_uses_intent_specific_reply_alias():
     payload = build_resend_send(
         authorized_claim(), sender="Phil - Founder - Empire AI <phil@mail.empire-ai.co.uk>",
