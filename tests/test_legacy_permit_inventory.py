@@ -31,6 +31,7 @@ def _payload(*, record_id, state, mode, classification="REUSE", next_offset=10):
                 "metro": "NYC",
                 "permit_number": "123",
                 "business_name": "Example",
+                "address": "1 TEST STREET, Queens",
             },
         }],
     }
@@ -60,8 +61,23 @@ def test_cumulative_inventory_counts_unique_records(tmp_path):
     assert second["verified_current_inventory"] == 2
     assert second["verified_current_owner_identified"] == 1
     assert second["verified_current_project_only"] == 1
+    assert second["borough_counts"]["Queens"] == 2
     assert second["full_scan_complete"] is True
+    assert second["full_scan_completions"] == 1
     assert second["canonical_database_write_performed"] is False
+
+    third = update_cumulative_inventory(
+        tmp_path,
+        _payload(
+            record_id="p3",
+            state="VERIFIED_CURRENT",
+            mode="OWNER_IDENTIFIED",
+            next_offset=50,
+        ),
+    )
+    assert third["full_scan_complete"] is True
+    assert third["latest_cycle_completed_scan"] is False
+    assert third["full_scan_completions"] == 1
 
 
 def test_cumulative_inventory_is_idempotent_by_legacy_id(tmp_path):
