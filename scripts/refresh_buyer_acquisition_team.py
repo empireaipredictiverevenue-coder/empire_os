@@ -33,6 +33,9 @@ def main() -> int:
         "icp_priority_target_count": payload[
             "icp_priority_target_count"
         ],
+        "predictive_revenue_enterprise_target_count": payload[
+            "predictive_revenue_enterprise_target_count"
+        ],
         "icp_campaign_target_company_count": payload[
             "icp_buyer_trigger_intelligence"
         ]["target_company_count_per_campaign"],
