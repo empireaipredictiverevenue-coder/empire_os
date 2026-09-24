@@ -28,6 +28,9 @@ def main() -> int:
         "query_count": payload["query_count"],
         "domain_count": payload["domain_count"],
         "candidate_count": payload["candidate_count"],
+        "predictive_revenue_enterprise_candidate_count": payload[
+            "predictive_revenue_enterprise_candidate_count"
+        ],
         "explicit_direct_buyer_candidate_count": payload[
             "explicit_direct_buyer_candidate_count"
         ],
