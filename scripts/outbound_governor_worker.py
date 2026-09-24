@@ -74,7 +74,7 @@ def _approver_rpc():
         except OutboundProviderError as exc:
             if "psycopg is required" not in str(exc):
                 raise
-    cap = int(os.getenv("EMPIRE_GTM_DAILY_EXTERNAL_CAP", "10"))
+    cap = int(os.getenv("EMPIRE_GTM_DAILY_EXTERNAL_CAP", "25"))
     return SupabaseStandingAuthorityApproverRpc(daily_cap=cap)
 
 
@@ -180,10 +180,19 @@ def main(argv=None) -> int:
                 )
         except Exception as exc:
             fatal_errors += 1
+            message = str(exc)
             record["execution_error"] = {
                 "type": type(exc).__name__,
-                "message": str(exc)[:500],
+                "message": message[:500],
             }
+            results.append(record)
+            if "not authorized to send emails from" in message.lower():
+                # Provider credential/domain mismatch is configuration-wide.
+                # Stop this cycle after the first proof instead of hammering
+                # every approved intent with the same deterministic 403.
+                record["execution_error"]["configuration_blocked"] = True
+                break
+            continue
         results.append(record)
 
     print(json.dumps({
