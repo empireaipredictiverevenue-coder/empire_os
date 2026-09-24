@@ -17,6 +17,8 @@ install_unit "deploy/systemd/empire-buyer-deferred-enrichment.service"
 install_unit "deploy/systemd/empire-buyer-deferred-enrichment.timer"
 install_unit "deploy/systemd/empire-predictive-revenue-enterprise-activation.service"
 install_unit "deploy/systemd/empire-predictive-revenue-enterprise-activation.timer"
+install_unit "deploy/systemd/empire-enterprise-contact-repair.service"
+install_unit "deploy/systemd/empire-enterprise-contact-repair.timer"
 
 systemctl daemon-reload
 
@@ -42,12 +44,15 @@ fi
 
 systemctl enable --now empire-buyer-deferred-enrichment.timer
 systemctl enable --now empire-predictive-revenue-enterprise-activation.timer
+systemctl enable --now empire-enterprise-contact-repair.timer
 
 test "$(systemctl is-active empire-buyer-deferred-enrichment.timer)" = "active"
 test "$(systemctl is-active empire-predictive-revenue-enterprise-activation.timer)" = "active"
+test "$(systemctl is-active empire-enterprise-contact-repair.timer)" = "active"
 
 echo "EmpireOS enterprise contact intelligence installed."
 echo "Privileged helper: active"
 echo "Deferred buyer enrichment timer: active"
 echo "Enterprise contact refresh timer: active"
+echo "Enterprise contact repair timer: active"
 echo "Live outbound authority: unchanged"
