@@ -14,7 +14,9 @@ install_unit() {
 
 install_unit "deploy/systemd/empire-ops-privileged-helper.service"
 install_unit "deploy/systemd/empire-ops-control.service"
+install_unit "deploy/systemd/empire-ops-control.timer"
 install_unit "deploy/systemd/empire-commercial-product-catalog.service"
+install_unit "deploy/systemd/empire-commercial-product-catalog.timer"
 
 systemctl daemon-reload
 
