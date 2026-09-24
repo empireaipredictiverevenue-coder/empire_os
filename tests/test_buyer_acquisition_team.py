@@ -356,3 +356,18 @@ def test_icp_intelligence_precedes_scout_and_covers_full_research_loop():
     assert plan["automation"]["personalized_outreach_preparation"] is True
     assert plan["automation"]["batch_personalization_preparation"] is True
     assert plan["automation"]["live_outbound_send"] is False
+
+
+def test_plan_includes_predictive_revenue_enterprise_review_queue():
+    payload = build_buyer_acquisition_plan(
+        {"inventory": [], "buyer_seats": []},
+        catalog_snapshot={"products": []},
+        generated_at=datetime(2026, 9, 24, tzinfo=timezone.utc),
+    )
+    review = payload["predictive_revenue_enterprise_targets"]
+    assert payload["predictive_revenue_enterprise_target_count"] == 9
+    assert review["target_count"] == 9
+    assert review["status"] == "INTERNAL_REVIEW_ONLY"
+    assert review["outreach_authorized"] is False
+    assert review["actual_revenue"] is False
+    assert review["execution_authority"] == "none"
