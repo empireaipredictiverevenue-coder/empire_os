@@ -32,6 +32,7 @@ if [ "$TEST_RC" -ne 0 ]; then
   PYTHONPATH=/srv/empire_os \
   ./.venv/bin/python scripts/run_enterprise_contact_repair.py \
     --record-test-log "$TEST_LOG" \
+    --kind "test_failure" \
     --command "enterprise contact deployment pytest" \
     --returncode "$TEST_RC" || true
 
@@ -76,6 +77,7 @@ if [ "$SYNC_RC" -ne 0 ]; then
   PYTHONPATH=/srv/empire_os \
   ./.venv/bin/python scripts/run_enterprise_contact_repair.py \
     --record-test-log "$SYNC_LOG" \
+    --kind "runtime_sync_failure" \
     --command "enterprise contact runtime sync" \
     --returncode "$SYNC_RC" || true
   sudo systemctl start --no-block \
