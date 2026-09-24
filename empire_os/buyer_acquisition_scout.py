@@ -67,7 +67,7 @@ _NYC_TERRITORY_TERMS = (
 
 
 def _identity_tokens(value: Any) -> set[str]:
-    text = str(value or "").casefold()
+    text = str(value or "").casefold().replace(".", "")
     tokens = {
         token
         for token in "".join(
