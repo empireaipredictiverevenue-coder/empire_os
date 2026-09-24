@@ -229,3 +229,9 @@ def test_enterprise_contact_intelligence_units_are_auto_repairable():
     assert runtime_self_heal.unit_is_auto_repairable(
         "empire-predictive-revenue-enterprise-activation.service"
     )
+    assert runtime_self_heal.unit_is_auto_repairable(
+        "empire-enterprise-contact-repair.timer"
+    )
+    assert runtime_self_heal.unit_is_auto_repairable(
+        "empire-enterprise-contact-repair.service"
+    )
