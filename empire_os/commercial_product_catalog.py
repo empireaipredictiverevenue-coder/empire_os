@@ -109,9 +109,11 @@ def write_catalog_snapshot(
         json.dumps(dict(snapshot), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    os.chmod(tmp, 0o600)
+    # Runtime readers execute as the ubuntu group. Keep the snapshot private
+    # to owner/group while allowing those governed readers to consume it.
+    os.chmod(tmp, 0o640)
     tmp.replace(target)
-    os.chmod(target, 0o600)
+    os.chmod(target, 0o640)
     return target
 
 
