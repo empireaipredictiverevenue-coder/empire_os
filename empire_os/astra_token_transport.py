@@ -8,6 +8,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from empire_os.outcome_role_transport import OutcomeTransportError
+from empire_os.qualification_worker_v2 import (
+    _close_supabase_egress_circuit,
+    _open_supabase_egress_circuit,
+    _reserve_supabase_request,
+)
 
 
 ASTRA_TOKEN_FUNCTIONS = {
@@ -60,6 +65,7 @@ class SupabaseTokenAstraRpc:
         payload = {"p_token": self._token()}
         for key in keys:
             payload[key] = params[key]
+        _reserve_supabase_request()
         request = Request(
             f"{self.base_url}/rest/v1/rpc/{rpc_name}",
             data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
@@ -68,13 +74,29 @@ class SupabaseTokenAstraRpc:
                 "Authorization": f"Bearer {self.publishable_key}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
+                "User-Agent": "EmpireOS/astra-observer",
+                "X-Empire-Component": "astra-observer",
             },
             method="POST",
         )
         try:
             with self._open(request, timeout=15) as response:
                 raw = response.read().decode("utf-8")
-        except (HTTPError, URLError, OSError) as exc:
+                _close_supabase_egress_circuit()
+        except HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            if (
+                exc.code == 402
+                and (
+                    "exceed_egress_quota" in body
+                    or "restricted due to the following violations" in body
+                )
+            ):
+                _open_supabase_egress_circuit("exceed_egress_quota")
+            raise OutcomeTransportError(
+                "token-authenticated Astra RPC failed"
+            ) from exc
+        except (URLError, OSError) as exc:
             raise OutcomeTransportError(
                 "token-authenticated Astra RPC failed"
             ) from exc
