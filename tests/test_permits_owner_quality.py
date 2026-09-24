@@ -29,7 +29,7 @@ def test_generic_owner_labels_emit_project_signals(monkeypatch):
         def json(self):
             return [{**base, "owner_s_business_name": self.label}]
 
-    for label in ("OWNER", "N.A", "245"):
+    for label in ("OWNER", "N.A", "SAME", "245"):
         response = Response(label)
         monkeypatch.setattr(
             "empire_os.lead_sources.permits.requests.get",
