@@ -38,6 +38,20 @@ def test_deferred_queue_preserves_enterprise_target_context(tmp_path):
     assert row["target_people"][0]["name"] == "AJ Brown"
     assert len(row["target_people"]) == 2
 
+    # A later generic retry must not erase enterprise targeting context.
+    assert queue.enqueue({
+        "prospect_id": "00000000-0000-0000-0000-000000000123",
+        "business_name": "Apex Service Partners",
+        "website": "https://apexservicepartners.com",
+        "reason": "contact_not_verified",
+    })
+    row = queue.due(
+        now=datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc)
+    )[0]
+    assert row["account_key"] == "apex_service_partners"
+    assert row["offer_key"] == "predictive_revenue_intelligence_os"
+    assert row["target_people"][0]["name"] == "AJ Brown"
+
 
 def _candidate():
     return SimpleNamespace(
