@@ -258,7 +258,11 @@ def run_buyer_scout(
             "business_name_source": (
                 "first_party_business_name"
                 if business_names
-                else "page_title_fallback"
+                else (
+                    "canonical_prospect_seed"
+                    if seed_name
+                    else "page_title_fallback"
+                )
             ),
             "site_business_names": business_names[:10],
             "website": evidence.get("canonical_url")
