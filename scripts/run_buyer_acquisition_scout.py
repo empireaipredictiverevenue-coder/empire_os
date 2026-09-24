@@ -65,12 +65,19 @@ def _canonical_seed_records(
     rows: list[dict] = []
 
     for lane_index, (profile_key, niches) in enumerate(SEED_LANES):
-        offset = ((half_hour_slot + lane_index * 7) % 20) * per_lane
+        demand_critical_permit_lane = (
+            profile_key == "high_ticket_home_service"
+        )
+        offset = (
+            0
+            if demand_critical_permit_lane
+            else ((half_hour_slot + lane_index * 7) % 20) * per_lane
+        )
         niche_filter = ",".join(
             '"' + niche.replace('"', '\\"') + '"'
             for niche in niches
         )
-        params = urllib.parse.urlencode({
+        query_params = {
             "select": (
                 "id,business_name,niche,website,metro,status,created_at"
             ),
@@ -79,7 +86,11 @@ def _canonical_seed_records(
             "order": "created_at.desc",
             "limit": str(per_lane),
             "offset": str(offset),
-        })
+        }
+        if demand_critical_permit_lane:
+            query_params["metro"] = "ilike.NYC"
+
+        params = urllib.parse.urlencode(query_params)
         try:
             batch = request_json(
                 "GET",
@@ -99,6 +110,20 @@ def _canonical_seed_records(
                 continue
             row = dict(raw)
             row["icp_profile_key"] = profile_key
+            if demand_critical_permit_lane:
+                row["seed_buyer_pools"] = [
+                    "end_service_buyers",
+                    "local_and_smb_buyers",
+                ]
+                row["seed_product_code"] = "permit_intelligence"
+                row["seed_corridor_key"] = (
+                    "permit-recovery:v1:"
+                    + str(row.get("niche") or "home_services")
+                    .strip()
+                    .lower()
+                    .replace(" ", "_")
+                    + ":nyc"
+                )
             rows.append(row)
 
     return rows
