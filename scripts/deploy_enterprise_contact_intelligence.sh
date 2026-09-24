@@ -17,6 +17,7 @@ PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
   tests/test_enterprise_contact_intelligence.py \
   tests/test_enterprise_targeted_retry.py \
   tests/test_enterprise_contact_repair.py \
+  tests/test_enterprise_contact_sync_systemd.py \
   tests/test_enterprise_contact_intelligence_installer.py \
   tests/test_predictive_revenue_enterprise_activation.py \
   tests/test_predictive_revenue_enterprise_activation_systemd.py \
