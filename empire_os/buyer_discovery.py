@@ -122,6 +122,21 @@ def classify_decision_role(title: Any) -> tuple[str, float]:
     value = _text(title).lower()
     if not value:
         return "unknown", 0.0
+
+    # "Vice President" must be classified before the bare "president"
+    # economic-buyer term. Substring matching otherwise overstates VP
+    # authority and can incorrectly promote functional leaders.
+    if "vice president" in value or re.search(r"\\bvp\\b", value):
+        functional_remits = (
+            "sales", "revenue", "growth", "marketing",
+            "business development", "corporate development",
+            "operations", "analytics", "strategy", "technology",
+            "data", " ai", "transformation", "commercial",
+        )
+        if any(term in value for term in functional_remits):
+            return "functional_buyer", 0.8
+        return "influencer", 0.6
+
     if any(term in value for term in ECONOMIC_BUYER_TERMS):
         return "economic_buyer", 1.0
     if any(term in value for term in FUNCTIONAL_BUYER_TERMS):
