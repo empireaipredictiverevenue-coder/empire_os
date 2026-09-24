@@ -1029,3 +1029,53 @@ def test_solar_offer_uses_acquisition_source_market_before_location_guess():
     })
 
     assert candidate.offer_key == "solar_opportunity_map_de"
+
+
+def test_enterprise_scrape_fragments_and_trailing_initial_are_rejected():
+    bad = [
+        "AJ B.",
+        "Learn More",
+        "Strategic Operations",
+        "That's TurnPoint.",
+    ]
+    for value in bad:
+        assert looks_like_person_name(value) is False, value
+
+    assert looks_like_person_name("J. R. Smith") is True
+
+
+def test_candidate_review_accepts_explicit_evidence_backed_offer_override():
+    candidate = build_candidate({
+        "id": "00000000-0000-0000-0000-000000000901",
+        "business_name": "Enterprise Co",
+        "niche": "predictive_revenue_enterprise",
+        "metro": "Austin, TX",
+        "website": "https://enterprise.example",
+    })
+    contact = {
+        "review_ready": True,
+        "outreach_ready": True,
+        "preferred_email": "jane@enterprise.example",
+        "decision_maker": {
+            "name": "Jane Smith",
+            "title": "Chief Revenue Officer",
+            "decision_score": 1.0,
+            "decision_role": "economic_buyer",
+        },
+        "verified_contacts": [{
+            "email": "jane@enterprise.example",
+            "is_valid": True,
+            "source": "official_site",
+        }],
+        "offer_key": "predictive_revenue_intelligence_os",
+    }
+    from empire_os.buyer_discovery import build_candidate_review_plan
+    plan = build_candidate_review_plan(
+        candidate,
+        contact,
+        idempotency_key="enterprise:test:offer:v1",
+    )
+    assert (
+        plan["params"]["p_offer_key"]
+        == "predictive_revenue_intelligence_os"
+    )
