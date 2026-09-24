@@ -24,6 +24,10 @@ def test_failure_classifier_distinguishes_safe_repair_classes():
         "SUPABASE_SERVICE_KEY,SUPABASE_URL"
     ) == "RUNTIME_ENV_CONTEXT"
     assert repair.classify_failure(
+        "POST /rest/v1/buyer_candidate_reviews -> HTTP 403: "
+        "permission denied for table buyer_candidate_reviews"
+    ) == "DATABASE_CONTRACT"
+    assert repair.classify_failure(
         "unclassified strange condition"
     ) == "UNKNOWN"
 
@@ -291,3 +295,48 @@ def test_healthy_runtime_closes_stale_env_context_incident(
     assert result["classification"] == "RUNTIME_ENV_CONTEXT"
     saved = repair._load(incident)
     assert saved["status"] == "RESOLVED"
+
+
+def test_database_contract_incident_does_not_invoke_coder(
+    monkeypatch,
+    tmp_path,
+):
+    incident = tmp_path / "incident.json"
+    state = tmp_path / "state.json"
+    latest = tmp_path / "latest.json"
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+
+    incident.write_text(
+        """{
+          "fingerprint": "db-contract",
+          "classification": "DATABASE_CONTRACT",
+          "status": "OPEN",
+          "log_tail": "permission denied for table buyer_candidate_reviews"
+        }\n"""
+    )
+    (runtime / "enterprise_contact_intelligence_latest.json").write_text(
+        """{
+          "error_count": 1,
+          "live_outbound_send": false,
+          "actual_revenue": false
+        }\n"""
+    )
+
+    monkeypatch.setattr(repair, "INCIDENT_PATH", incident)
+    monkeypatch.setattr(repair, "STATE_PATH", state)
+    monkeypatch.setattr(repair, "LATEST_PATH", latest)
+    monkeypatch.setattr(repair, "RUNTIME", runtime)
+    monkeypatch.setattr(
+        repair,
+        "_repair_code_incident",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("coder must not run for database contract")
+        ),
+    )
+
+    result = repair.run_repair_cycle()
+    assert result["status"] == "OBSERVE_ONLY_DATABASE_CONTRACT"
+    assert result["action"] == (
+        "database_migration_or_privilege_contract_required"
+    )
