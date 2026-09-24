@@ -12,6 +12,13 @@ from empire_os.exchange_self_serve import (
     exchange_tier_catalog,
     record_exchange_interest,
 )
+from empire_os.predictive_revenue_products import (
+    predictive_revenue_product_catalog,
+)
+from empire_os.predictive_revenue_self_serve import (
+    PredictiveRevenueInterestError,
+    record_predictive_revenue_interest,
+)
 from empire_os.self_serve_checkout import (
     CheckoutError,
     create_payment_request_for_order,
@@ -33,6 +40,19 @@ def _proposal_authorized() -> bool:
         "EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED",
         "OFF",
     ).strip().upper() in {"1", "ON", "TRUE", "YES"}
+
+
+class PredictiveRevenueInterestRequest(BaseModel):
+    product_code: str = Field(min_length=1, max_length=120)
+    business_name: str = Field(min_length=1, max_length=200)
+    email: str = Field(min_length=3, max_length=320)
+    domain: str = Field(min_length=3, max_length=253)
+    industry: str = Field(min_length=1, max_length=120)
+    geography: str = Field(min_length=1, max_length=160)
+    annual_revenue_band: str = Field(default="unknown", max_length=40)
+    desired_outcome: str = Field(min_length=1, max_length=1200)
+    systems: list[str] = Field(default_factory=list, max_length=20)
+    idempotency_key: str = Field(min_length=8, max_length=128)
 
 
 class ExchangeInterestRequest(BaseModel):
@@ -124,4 +144,34 @@ def exchange_interest(req: ExchangeInterestRequest):
         raise HTTPException(
             status_code=503,
             detail=f"exchange_intake_unavailable:{type(exc).__name__}",
+        ) from exc
+
+
+
+@app.get("/v1/predictive-revenue/products")
+def predictive_revenue_products():
+    return predictive_revenue_product_catalog()
+
+
+@app.post("/v1/predictive-revenue/interests")
+def predictive_revenue_interest(req: PredictiveRevenueInterestRequest):
+    try:
+        return record_predictive_revenue_interest(
+            product_code=req.product_code,
+            business_name=req.business_name,
+            email=req.email,
+            domain=req.domain,
+            industry=req.industry,
+            geography=req.geography,
+            annual_revenue_band=req.annual_revenue_band,
+            desired_outcome=req.desired_outcome,
+            systems=req.systems,
+            idempotency_key=req.idempotency_key,
+        )
+    except (PredictiveRevenueInterestError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"predictive_revenue_intake_unavailable:{type(exc).__name__}",
         ) from exc
