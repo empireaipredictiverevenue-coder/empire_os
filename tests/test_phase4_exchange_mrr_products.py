@@ -15,13 +15,20 @@ def test_phase4_exchange_mrr_products_modernize_legacy_seats():
     assert rows["exchange_seat_enterprise"]["corridor_limit"] is None
 
 
-def test_exchange_mrr_products_keep_pricing_at_founder_gate():
+def test_exchange_mrr_products_use_founder_approved_launch_prices():
     result = build_exchange_mrr_product_plan()
+    rows = {row["product_code"]: row for row in result["products"]}
 
-    assert result["pricing_authority"] == "none"
+    assert result["pricing_authority"] == "founder_approved_2026_09_24"
     assert result["binding_terms_ready"] is False
+    assert rows["exchange_seat_starter"]["monthly_price_cents"] == 9900
+    assert rows["exchange_seat_growth"]["monthly_price_cents"] == 24900
+    assert rows["exchange_seat_pro"]["monthly_price_cents"] == 49900
+    assert rows["exchange_seat_enterprise"]["monthly_price_cents"] == 99900
+    assert rows["exchange_seat_growth"]["usage_discount_bps"] == 1000
+    assert rows["exchange_seat_pro"]["usage_discount_bps"] == 2000
     assert all(
-        row["pricing_state"] == "FOUNDER_GATE"
+        row["pricing_state"] == "FOUNDER_APPROVED"
         and row["binding_terms_ready"] is False
         for row in result["products"]
     )
@@ -34,7 +41,7 @@ def test_exchange_mrr_products_preserve_current_truth_rules():
     assert upgrades["capacity_is_verified_not_assumed"] is True
     assert upgrades["acquisition_continues_when_capacity_full"] is True
     assert upgrades["overflow_remains_empire_owned"] is True
-    assert upgrades["pricing_is_governed_not_hardcoded"] is True
+    assert upgrades["pricing_is_founder_approved_and_governed"] is True
     assert upgrades["legacy_sqlite_not_used"] is True
     assert upgrades["legacy_usdc_solana_not_used"] is True
     assert result["canonical_settlement_rail"] == "USDT_BSC"
