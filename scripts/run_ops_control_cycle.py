@@ -52,12 +52,62 @@ def main() -> int:
         commercial_loop if isinstance(commercial_loop, dict) else {}
     )
 
+    findings = sentinel.get("findings") or []
+    blocking_findings = [
+        row
+        for row in findings
+        if row.get("severity") in {"critical", "warning"}
+    ]
+    health_domains = {
+        "infrastructure": (
+            "HEALTHY"
+            if runtime_doctor.get("status") == "HEALTHY"
+            else "DEGRADED"
+        ),
+        "services_and_timers": (
+            "DEGRADED"
+            if any(
+                row.get("code") in {
+                    "critical_service_down",
+                    "critical_timer_down",
+                }
+                for row in blocking_findings
+            )
+            else "HEALTHY"
+        ),
+        "acquisition_and_buyer_pipeline": (
+            "DEGRADED"
+            if any(
+                row.get("code") in {
+                    "source_pipeline_degraded",
+                    "buyer_review_worker_failed",
+                }
+                for row in blocking_findings
+            )
+            else "HEALTHY"
+        ),
+        "model_providers": (
+            "DEGRADED"
+            if any(
+                row.get("code") in {
+                    "model_provider_degraded",
+                    "coder_model_route_degraded",
+                }
+                for row in blocking_findings
+            )
+            else "HEALTHY"
+        ),
+    }
+
     payload = {
         "schema_version": "empire.ops_control_cycle.v1",
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
         "runtime_doctor": runtime_doctor,
         "sentinel": sentinel,
+        "health_domains": health_domains,
+        "blocking_finding_count": len(blocking_findings),
+        "blocking_findings": blocking_findings,
         "healer": {
             "proposed": len(sentinel.get("repair_plan") or []),
             "executed": len(repairs),
@@ -67,10 +117,7 @@ def main() -> int:
         "conveyor": conveyor,
         "healthy": (
             runtime_doctor.get("status") == "HEALTHY"
-            and not any(
-                row.get("severity") in {"critical", "warning"}
-                for row in sentinel.get("findings") or []
-            )
+            and not blocking_findings
         ),
         "business_blocker": next(
             (
