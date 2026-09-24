@@ -1,4 +1,6 @@
 from uuid import uuid4
+import io
+import urllib.error
 
 import empire_os.qualification_worker_v2 as worker
 
@@ -14,6 +16,151 @@ def _prospect():
         "address": "100 Main St, Austin, TX",
         "buy_signal_score": None,
     }
+
+
+def _isolate_egress_state(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        worker,
+        "_EGRESS_STATE_PATH",
+        tmp_path / "supabase_egress_state.json",
+    )
+    monkeypatch.setattr(
+        worker,
+        "_EGRESS_LOCK_PATH",
+        tmp_path / "supabase_egress_state.lock",
+    )
+
+
+def test_egress_budget_opens_local_circuit_before_runaway(monkeypatch, tmp_path):
+    _isolate_egress_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR", "2")
+    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY", "10")
+    monkeypatch.setattr(worker, "_egress_now", lambda: 3600.0)
+
+    worker._reserve_supabase_request()
+    worker._reserve_supabase_request()
+
+    try:
+        worker._reserve_supabase_request()
+    except RuntimeError as exc:
+        assert "hourly_request_budget_exceeded" in str(exc)
+    else:
+        raise AssertionError("request budget should fail closed")
+
+    state = worker._load_egress_state(worker._EGRESS_STATE_PATH)
+    assert state["circuit"]["open"] is True
+    assert state["circuit"]["source"] == "local_request_budget"
+
+
+def test_egress_402_trips_circuit_and_blocks_repeat_calls(monkeypatch, tmp_path):
+    _isolate_egress_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR", "100")
+    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY", "1000")
+    monkeypatch.setenv("EMPIRE_SUPABASE_EGRESS_PROBE_SECONDS", "1800")
+    now = [7200.0]
+    monkeypatch.setattr(worker, "_egress_now", lambda: now[0])
+    monkeypatch.setattr(
+        worker,
+        "_client",
+        lambda: (
+            "https://example.supabase.co",
+            {
+                "apikey": "test",
+                "Authorization": "Bearer test",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        ),
+    )
+
+    calls = []
+
+    def quota_error(req, timeout=30):
+        calls.append(req.full_url)
+        raise urllib.error.HTTPError(
+            req.full_url,
+            402,
+            "Payment Required",
+            hdrs=None,
+            fp=io.BytesIO(
+                b'{"message":"restricted due to the following violations: exceed_egress_quota"}'
+            ),
+        )
+
+    monkeypatch.setattr(worker.urllib.request, "urlopen", quota_error)
+
+    try:
+        worker.request_json("GET", "/rest/v1/prospects?limit=1")
+    except RuntimeError as exc:
+        assert "HTTP 402" in str(exc)
+    else:
+        raise AssertionError("402 must surface to the caller")
+
+    assert len(calls) == 1
+
+    try:
+        worker.request_json("GET", "/rest/v1/prospects?limit=1")
+    except RuntimeError as exc:
+        assert "egress circuit open locally" in str(exc)
+    else:
+        raise AssertionError("open circuit must block network retries")
+
+    assert len(calls) == 1
+
+
+def test_egress_circuit_self_heals_after_successful_probe(monkeypatch, tmp_path):
+    _isolate_egress_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR", "100")
+    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY", "1000")
+    monkeypatch.setenv("EMPIRE_SUPABASE_EGRESS_PROBE_SECONDS", "60")
+    now = [1000.0]
+    monkeypatch.setattr(worker, "_egress_now", lambda: now[0])
+    monkeypatch.setattr(
+        worker,
+        "_client",
+        lambda: (
+            "https://example.supabase.co",
+            {
+                "apikey": "test",
+                "Authorization": "Bearer test",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        ),
+    )
+    worker._open_supabase_egress_circuit("exceed_egress_quota")
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'[]'
+
+    calls = []
+    monkeypatch.setattr(
+        worker.urllib.request,
+        "urlopen",
+        lambda req, timeout=30: (calls.append(req.full_url) or Response()),
+    )
+
+    try:
+        worker.request_json("GET", "/rest/v1/prospects?limit=1")
+    except RuntimeError as exc:
+        assert "egress circuit open locally" in str(exc)
+    else:
+        raise AssertionError("probe must wait until lease expires")
+
+    now[0] = 1061.0
+    assert worker.request_json("GET", "/rest/v1/prospects?limit=1") == []
+    assert len(calls) == 1
+
+    state = worker._load_egress_state(worker._EGRESS_STATE_PATH)
+    assert state["circuit"]["open"] is False
+    assert state["circuit"]["reason"] == "probe_succeeded"
 
 
 def test_evidence_backed_payload_uses_v2_and_preserves_provenance(monkeypatch):
