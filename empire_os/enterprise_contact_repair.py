@@ -505,19 +505,27 @@ def run_repair_cycle() -> dict[str, Any]:
         }
     elif classification == "CODE_DEFECT":
         fingerprint = str(incident.get("fingerprint") or "")
-        if (
+        same_incident = (
             fingerprint
             and state.get("last_fingerprint") == fingerprint
+        )
+        repair_attempts = (
+            int(state.get("repair_attempts") or 0)
+            if same_incident
+            else 0
+        )
+        if (
+            same_incident
             and state.get("last_status") == "MERGED_LOCAL_PUSH_FAILED"
         ):
             result = _retry_branch_push()
             result["classification"] = classification
         elif (
-            fingerprint
-            and state.get("last_fingerprint") == fingerprint
+            same_incident
             and state.get("last_status") in {
                 "RESOLVED_AND_PUSHED",
                 "QUARANTINED_HEAD_MOVED",
+                "QUARANTINED_REPAIR_EXHAUSTED",
             }
         ):
             result = {
@@ -525,9 +533,26 @@ def run_repair_cycle() -> dict[str, Any]:
                 "classification": classification,
                 "action": "already_processed",
             }
+        elif repair_attempts >= 3:
+            result = {
+                "status": "QUARANTINED_REPAIR_EXHAUSTED",
+                "classification": classification,
+                "action": "repair_budget_exhausted",
+                "repair_attempts": repair_attempts,
+            }
         else:
-            result = _repair_code_incident(incident)
-            result["classification"] = classification
+            try:
+                result = _repair_code_incident(incident)
+                result["classification"] = classification
+                result["repair_attempts"] = repair_attempts + 1
+            except Exception as exc:
+                result = {
+                    "status": "CODER_REPAIR_FAILED",
+                    "classification": classification,
+                    "action": "retry_on_next_cycle",
+                    "repair_attempts": repair_attempts + 1,
+                    "error": f"{type(exc).__name__}:{str(exc)[:1800]}",
+                }
     else:
         result = {
             "status": "OBSERVE_ONLY_UNKNOWN",
@@ -542,11 +567,25 @@ def run_repair_cycle() -> dict[str, Any]:
         incident["resolution"] = result
         _atomic_json(INCIDENT_PATH, incident)
 
+    previous_attempts = (
+        int(state.get("repair_attempts") or 0)
+        if (
+            incident
+            and state.get("last_fingerprint")
+            == incident.get("fingerprint")
+        )
+        else 0
+    )
     state = {
         "updated_at": _now(),
         "last_fingerprint": incident.get("fingerprint") if incident else None,
         "last_status": result.get("status"),
         "last_classification": result.get("classification"),
+        "repair_attempts": int(
+            result.get("repair_attempts")
+            if result.get("repair_attempts") is not None
+            else previous_attempts
+        ),
     }
     _atomic_json(STATE_PATH, state)
 
