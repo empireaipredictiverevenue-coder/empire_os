@@ -253,3 +253,139 @@ def test_scout_classifies_predictive_revenue_enterprise_candidate(monkeypatch):
     )
     assert row["predictive_revenue_enterprise_fit_score"] >= 40
     assert row["outreach_authorized"] is False
+
+
+def test_scout_classifies_mass_tort_firm_lane(monkeypatch):
+    legal_plan = {
+        "priority_targets": [],
+        "product_priority_targets": [],
+        "icp_priority_targets": [{
+            "priority_score": 100,
+            "icp_profile_key": "legal_mass_tort_plaintiff_firm",
+            "buying_triggers": [
+                "new litigation",
+                "case intake",
+            ],
+            "decision_maker_roles": [
+                "managing partner",
+                "intake director",
+            ],
+            "research_queries": {
+                "enterprise_and_data_buyers": [
+                    '"mass tort law firm" "new litigation"'
+                ],
+            },
+        }],
+    }
+
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {
+            query: ["masslaw.example"]
+            for query in queries
+        },
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "canonical_url": "https://masslaw.example",
+            "final_url": "https://masslaw.example",
+            "business_names": ["Mass Law Group"],
+            "title": "Mass Law Group",
+            "description": (
+                "Plaintiff mass tort law firm expanding case intake "
+                "for multidistrict litigation."
+            ),
+            "emails": ["intake@masslaw.example"],
+            "phones": ["+12125550100"],
+            "people": [{
+                "name": "Jane Smith",
+                "title": "Managing Partner",
+            }],
+            "pages_checked": [],
+            "evidence_score": 0.95,
+        },
+    )
+
+    result = run_buyer_scout(
+        legal_plan,
+        max_queries=10,
+        max_domains=10,
+        max_probes=10,
+    )
+
+    row = result["candidates"][0]
+    assert row["continuous_commercial_lane"] == "legal_mass_tort"
+    assert row["continuous_lane_candidate"] is True
+    assert result["continuous_lane_candidate_counts"][
+        "legal_mass_tort"
+    ] == 1
+    assert row["outreach_authorized"] is False
+
+
+def test_scout_classifies_insurance_lane(monkeypatch):
+    insurance_plan = {
+        "priority_targets": [],
+        "product_priority_targets": [],
+        "icp_priority_targets": [{
+            "priority_score": 98,
+            "icp_profile_key": "insurance_distribution_growth",
+            "buying_triggers": [
+                "acquisition",
+                "expansion",
+            ],
+            "decision_maker_roles": [
+                "chief revenue officer",
+                "chief marketing officer",
+            ],
+            "research_queries": {
+                "enterprise_and_data_buyers": [
+                    '"insurance agency network" "acquisition"'
+                ],
+            },
+        }],
+    }
+
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {
+            query: ["insurance.example"]
+            for query in queries
+        },
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "canonical_url": "https://insurance.example",
+            "final_url": "https://insurance.example",
+            "business_names": ["Insurance Network Group"],
+            "title": "Insurance Network Group",
+            "description": (
+                "Insurance agency network expanding distribution "
+                "through acquisitions and new markets."
+            ),
+            "emails": ["growth@insurance.example"],
+            "phones": ["+13125550100"],
+            "people": [{
+                "name": "John Smith",
+                "title": "Chief Revenue Officer",
+            }],
+            "pages_checked": [],
+            "evidence_score": 0.95,
+        },
+    )
+
+    result = run_buyer_scout(
+        insurance_plan,
+        max_queries=10,
+        max_domains=10,
+        max_probes=10,
+    )
+
+    row = result["candidates"][0]
+    assert row["continuous_commercial_lane"] == "insurance"
+    assert row["continuous_lane_candidate"] is True
+    assert result["continuous_lane_candidate_counts"]["insurance"] == 1
+    assert row["outreach_authorized"] is False
