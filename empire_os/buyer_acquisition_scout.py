@@ -42,6 +42,7 @@ CONTINUOUS_COMMERCIAL_LANE_BY_ICP = {
     "legal_mass_tort_plaintiff_firm": "legal_mass_tort",
     "legal_plaintiff_growth_firm": "legal_services",
     "insurance_distribution_growth": "insurance",
+    "high_ticket_home_service": "permit_home_services",
 }
 
 
