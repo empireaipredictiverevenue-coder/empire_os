@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 
@@ -18,14 +19,26 @@ def test_legacy_permit_recovery_runner_is_observe_only():
 
 
 def test_legacy_permit_recovery_core_has_no_mutating_rest_method():
-    text = (
-        ROOT / "empire_os/legacy_permit_recovery.py"
-    ).read_text()
+    path = ROOT / "empire_os/legacy_permit_recovery.py"
+    text = path.read_text()
+    tree = ast.parse(text)
 
-    assert 'request_json("GET"' in text
-    assert 'request_json("POST"' not in text
-    assert 'request_json("PATCH"' not in text
-    assert 'request_json("DELETE"' not in text
+    methods = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id != "request_json":
+            continue
+        if not node.args:
+            continue
+        method = node.args[0]
+        if isinstance(method, ast.Constant) and isinstance(method.value, str):
+            methods.append(method.value.upper())
+
+    assert methods
+    assert set(methods) == {"GET"}
     assert '"NO_PROMOTION_OBSERVE_ONLY"' in text
     assert '"historical_only": True' in text
     assert '"current_truth": False' in text
