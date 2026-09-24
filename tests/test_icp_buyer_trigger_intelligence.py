@@ -118,3 +118,33 @@ def test_predictive_revenue_enterprise_profiles_are_continuously_targeted():
             code.startswith("predictive_revenue_")
             for code in row["product_codes"]
         )
+
+
+def test_legal_and_insurance_profiles_are_continuously_targeted():
+    rows = build_icp_priority_targets()
+    by_key = {
+        row["icp_profile_key"]: row
+        for row in rows
+    }
+    expected = {
+        "legal_mass_tort_plaintiff_firm",
+        "legal_plaintiff_growth_firm",
+        "insurance_distribution_growth",
+    }
+
+    assert expected <= set(by_key)
+    assert by_key["legal_mass_tort_plaintiff_firm"][
+        "priority_score"
+    ] >= 100
+    assert by_key["legal_plaintiff_growth_firm"][
+        "priority_score"
+    ] >= 98
+    assert by_key["insurance_distribution_growth"][
+        "priority_score"
+    ] >= 98
+
+    for key in expected:
+        row = by_key[key]
+        assert row["research_queries"]
+        assert row["budget_verified"] is False
+        assert row["binding_intent_verified"] is False
