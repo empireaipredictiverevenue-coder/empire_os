@@ -458,7 +458,7 @@ def _attempt_repair(
 def run_runtime_self_heal(
     *,
     now: datetime | None = None,
-    observe_only: bool = False,
+    observe_only: bool = True,
     cooldown_seconds: int = DEFAULT_REPAIR_COOLDOWN_SECONDS,
     max_repairs_per_run: int = DEFAULT_MAX_REPAIRS_PER_RUN,
     service_status: Callable[[str], tuple[bool, str]] = _systemctl_active,
