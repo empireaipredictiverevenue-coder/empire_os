@@ -310,3 +310,32 @@ def test_sitemap_people_candidates_find_hidden_team_pages(monkeypatch):
         deadline=time.monotonic() + 5,
     )
     assert rows == ["https://acme.test/about/leadership"]
+
+
+def test_visible_people_preserves_current_vp_corporate_development_title():
+    people = _visible_people_from_html(
+        "<section><h3>Kyle Martin</h3>"
+        "<p>Vice President, Corporate Development</p></section>",
+        page_url="https://sila.example/leadership/",
+        page_title="Leadership",
+        emails=["kmartin@sila.example"],
+    )
+
+    kyle = next(person for person in people if person["name"] == "Kyle Martin")
+    assert kyle["title"] == "Vice President, Corporate Development"
+    assert kyle["email"] == "kmartin@sila.example"
+
+
+def test_visible_people_preserves_compound_ceo_founder_title():
+    people = _visible_people_from_html(
+        "<section><h3>Richard Lewis</h3>"
+        "<p>Chief Executive Officer & Founder</p></section>",
+        page_url="https://redwood.example/team/",
+        page_title="Team",
+        emails=["richard@redwood.example"],
+    )
+
+    richard = next(
+        person for person in people if person["name"] == "Richard Lewis"
+    )
+    assert richard["title"] == "Chief Executive Officer & Founder"
