@@ -1,7 +1,11 @@
 """Bounded production qualification cycle for canonical Lead Scoring v2."""
 from __future__ import annotations
 
+import fcntl
 import json
+import os
+from pathlib import Path
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -19,6 +23,179 @@ from empire_os.singleton_identity_plan import (
 ENV_PATH = "/etc/empire_os.env"
 SCORING_ENGINE = "empire_os.lead_scoring"
 SCORING_VERSION = "v2"
+
+_EGRESS_STATE_PATH = Path(os.getenv(
+    "EMPIRE_SUPABASE_EGRESS_STATE_PATH",
+    "/srv/empire_os/runtime/control/supabase_egress_state.json",
+))
+_EGRESS_LOCK_PATH = Path(os.getenv(
+    "EMPIRE_SUPABASE_EGRESS_LOCK_PATH",
+    "/srv/empire_os/runtime/control/supabase_egress_state.lock",
+))
+_DEFAULT_HOURLY_BUDGET = 3000
+_DEFAULT_DAILY_BUDGET = 25000
+_DEFAULT_PROBE_SECONDS = 1800
+
+
+def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, value)
+
+
+def _egress_now() -> float:
+    return time.time()
+
+
+def _load_egress_state(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _write_egress_state(path: Path, state: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(
+        json.dumps(state, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+
+
+def _with_egress_lock(fn):
+    _EGRESS_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _EGRESS_LOCK_PATH.open("a+", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            return fn()
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def _reserve_supabase_request() -> None:
+    """Fail closed before a runaway REST loop can exhaust hosted egress."""
+    now = _egress_now()
+    hourly_budget = _env_int(
+        "EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR",
+        _DEFAULT_HOURLY_BUDGET,
+    )
+    daily_budget = _env_int(
+        "EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY",
+        _DEFAULT_DAILY_BUDGET,
+    )
+    probe_seconds = _env_int(
+        "EMPIRE_SUPABASE_EGRESS_PROBE_SECONDS",
+        _DEFAULT_PROBE_SECONDS,
+        minimum=60,
+    )
+
+    def reserve():
+        state = _load_egress_state(_EGRESS_STATE_PATH)
+        circuit = state.get("circuit")
+        if isinstance(circuit, dict) and circuit.get("open") is True:
+            next_probe_at = float(circuit.get("next_probe_at") or 0)
+            if now < next_probe_at:
+                remaining = max(1, int(next_probe_at - now))
+                raise RuntimeError(
+                    "Supabase egress circuit open locally; "
+                    f"next probe in {remaining}s"
+                )
+            # Reserve the single probe slot before leaving the lock. Other
+            # processes fail closed until this probe succeeds or the lease
+            # expires.
+            circuit["next_probe_at"] = now + probe_seconds
+            circuit["last_probe_reserved_at"] = now
+            state["circuit"] = circuit
+            _write_egress_state(_EGRESS_STATE_PATH, state)
+            return
+
+        hour_bucket = int(now // 3600)
+        day_bucket = int(now // 86400)
+        counts = state.get("counts")
+        counts = dict(counts) if isinstance(counts, dict) else {}
+        if counts.get("hour_bucket") != hour_bucket:
+            counts["hour_bucket"] = hour_bucket
+            counts["hour_count"] = 0
+        if counts.get("day_bucket") != day_bucket:
+            counts["day_bucket"] = day_bucket
+            counts["day_count"] = 0
+
+        hour_count = int(counts.get("hour_count") or 0)
+        day_count = int(counts.get("day_count") or 0)
+        if hour_count >= hourly_budget or day_count >= daily_budget:
+            reason = (
+                "hourly_request_budget_exceeded"
+                if hour_count >= hourly_budget
+                else "daily_request_budget_exceeded"
+            )
+            reset_at = (
+                (hour_bucket + 1) * 3600
+                if reason.startswith("hourly")
+                else (day_bucket + 1) * 86400
+            )
+            state["circuit"] = {
+                "open": True,
+                "reason": reason,
+                "opened_at": now,
+                "next_probe_at": reset_at,
+                "source": "local_request_budget",
+            }
+            state["counts"] = counts
+            _write_egress_state(_EGRESS_STATE_PATH, state)
+            raise RuntimeError(
+                "Supabase egress circuit opened locally: " + reason
+            )
+
+        counts["hour_count"] = hour_count + 1
+        counts["day_count"] = day_count + 1
+        counts["updated_at"] = now
+        state["counts"] = counts
+        _write_egress_state(_EGRESS_STATE_PATH, state)
+
+    _with_egress_lock(reserve)
+
+
+def _open_supabase_egress_circuit(reason: str) -> None:
+    now = _egress_now()
+    probe_seconds = _env_int(
+        "EMPIRE_SUPABASE_EGRESS_PROBE_SECONDS",
+        _DEFAULT_PROBE_SECONDS,
+        minimum=60,
+    )
+
+    def update():
+        state = _load_egress_state(_EGRESS_STATE_PATH)
+        state["circuit"] = {
+            "open": True,
+            "reason": reason,
+            "opened_at": now,
+            "next_probe_at": now + probe_seconds,
+            "source": "supabase_response",
+        }
+        _write_egress_state(_EGRESS_STATE_PATH, state)
+
+    _with_egress_lock(update)
+
+
+def _close_supabase_egress_circuit() -> None:
+    def update():
+        state = _load_egress_state(_EGRESS_STATE_PATH)
+        circuit = state.get("circuit")
+        if not isinstance(circuit, dict) or circuit.get("open") is not True:
+            return
+        state["circuit"] = {
+            "open": False,
+            "reason": "probe_succeeded",
+            "closed_at": _egress_now(),
+        }
+        _write_egress_state(_EGRESS_STATE_PATH, state)
+
+    _with_egress_lock(update)
 
 
 def _now() -> str:
@@ -47,6 +224,7 @@ def request_json(
     *,
     prefer: str | None = None,
 ) -> Any:
+    _reserve_supabase_request()
     base, headers = _client()
     if prefer:
         headers["Prefer"] = prefer
@@ -60,9 +238,18 @@ def request_json(
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
             raw = response.read().decode("utf-8")
+            _close_supabase_egress_circuit()
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
+        if (
+            exc.code == 402
+            and (
+                "exceed_egress_quota" in body
+                or "restricted due to the following violations" in body
+            )
+        ):
+            _open_supabase_egress_circuit("exceed_egress_quota")
         raise RuntimeError(
             f"{method} {path} -> HTTP {exc.code}: {body[:1000]}"
         ) from exc
