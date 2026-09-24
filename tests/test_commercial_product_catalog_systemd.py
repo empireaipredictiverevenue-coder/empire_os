@@ -59,3 +59,13 @@ def test_catalog_cycle_syncs_founder_approved_commercial_pricing():
     ).read_text()
 
     assert "sync_founder_approved_commercial_pricing.py" in text
+
+
+def test_catalog_writer_uses_runtime_reader_group():
+    text = (
+        ROOT / "deploy/systemd/empire-commercial-product-catalog.service"
+    ).read_text()
+
+    assert "User=root" in text
+    assert "Group=ubuntu" in text
+    assert "UMask=0027" in text
