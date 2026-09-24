@@ -218,6 +218,13 @@ def sync_enterprise_activation(
                         target.target_product_codes
                     ),
                     "target_evidence_urls": list(target.evidence_urls),
+                    "company_contact_routes": [
+                        dict(route)
+                        for route in (
+                            row.get("company_contact_routes") or []
+                        )
+                        if isinstance(route, Mapping)
+                    ],
                     "role_reconciled": bool(
                         reconciled["role_reconciled"]
                     ),
@@ -262,10 +269,31 @@ def sync_enterprise_activation(
                 )
                 or "contact_not_ready"
             )
+            company_routes = [
+                dict(route)
+                for route in (row.get("company_contact_routes") or [])
+                if isinstance(route, Mapping)
+                and route.get("verified") is True
+                and _text(route.get("value"))
+            ]
+            voice_route = next(
+                (
+                    route
+                    for route in company_routes
+                    if _text(route.get("channel")).lower() == "voice"
+                    and route.get("person_bound") is not True
+                ),
+                None,
+            )
             enqueued = queue.enqueue({
                 "prospect_id": prospect_id,
                 "business_name": account_name,
                 "website": _text(row.get("canonical_website")),
+                "phone": (
+                    _text(voice_route.get("value"))
+                    if isinstance(voice_route, Mapping)
+                    else ""
+                ),
                 "reason": reason,
                 "account_key": target.account_key,
                 "wave": target.wave,
@@ -277,6 +305,7 @@ def sync_enterprise_activation(
                 "target_product_codes": list(
                     target.target_product_codes
                 ),
+                "company_contact_routes": company_routes,
             })
             if enqueued:
                 queued += 1
