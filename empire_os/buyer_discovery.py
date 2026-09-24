@@ -45,7 +45,7 @@ NON_PERSON_NAME_TERMS = {
     "after", "before", "through", "each", "very", "exceptional", "needed", "came",
     "ship", "club", "engineer", "your", "referral", "program", "email",
     "learn", "more", "strategic", "operations", "leadership", "about",
-    "read", "meet", "turnpoint", "thats",
+    "read", "meet", "turnpoint", "thats", "that's",
 }
 
 
@@ -87,11 +87,13 @@ def looks_like_person_name(value: Any) -> bool:
     lowered = {w.lower().strip("'\"-") for w in words}
     if lowered & NON_PERSON_NAME_TERMS:
         return False
-    edge_words = (
-        words[0].replace("'", "").replace("-", "").replace(".", ""),
-        words[-1].replace("'", "").replace("-", "").replace(".", ""),
+    final_word = (
+        words[-1]
+        .replace("'", "")
+        .replace("-", "")
+        .replace(".", "")
     )
-    if any(len(word) < 2 for word in edge_words):
+    if len(final_word) < 2:
         return False
     for word in words:
         cleaned = word.replace("'", "").replace("-", "").replace(".", "")
@@ -1076,7 +1078,10 @@ def build_candidate_review_plan(candidate: BuyerCandidate, contact_plan: Mapping
             "p_contact_name": name,
             "p_contact_title": title,
             "p_contact_email": email,
-            "p_offer_key": candidate.offer_key,
+            "p_offer_key": (
+            _text(contact_plan.get("offer_key"))
+            or candidate.offer_key
+        ),
             "p_company_score": candidate.company_score,
             "p_decision_score": decision_score,
             "p_evidence": evidence,
