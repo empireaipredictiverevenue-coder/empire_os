@@ -301,6 +301,10 @@ def run(
         "site_evidence_score": evidence.get("evidence_score"),
         "budget_exhausted": bool(evidence.get("budget_exhausted")),
         "decision_maker": enriched.get("decision_maker"),
+        "site_people": [
+            dict(person)
+            for person in rank_site_people(evidence.get("people") or [])[:10]
+        ],
         "contacts": enriched.get("contact_candidates") or [],
         "verified_contacts": contact.get("verified_contacts") or [],
         "review_ready": bool(contact.get("review_ready")),
