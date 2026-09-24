@@ -139,17 +139,22 @@ def _run_nyc(lookback_days: int = 7) -> Iterator[LeadCandidate]:
             owner_last = (row.get("owner_s_last_name") or "").strip()
             owner_name = owner_biz or f"{owner_first} {owner_last}".strip()
 
-            placeholder_names = {
+            owner_key = "".join(
+                char for char in owner_name.casefold() if char.isalnum()
+            )
+            placeholder_owner_keys = {
                 "",
                 "na",
-                "n/a",
                 "none",
                 "unknown",
-                "not available",
-                "not applicable",
+                "notavailable",
+                "notapplicable",
+                "owner",
+                "ownerself",
+                "ownerasself",
+                "self",
             }
-
-            if owner_name.strip().casefold() in placeholder_names:
+            if owner_key in placeholder_owner_keys or owner_key.isdigit():
                 continue
 
             # IMPORTANT IDENTITY SEMANTICS:
