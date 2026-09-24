@@ -567,11 +567,16 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                                 ),
                             }
 
-            identity_recovered = _persist_recovered_identity(
-                row,
-                candidate,
-                result,
-            )
+            identity_recovered = False
+            if (
+                not target_people
+                or result.get("enterprise_target_match") is True
+            ):
+                identity_recovered = _persist_recovered_identity(
+                    row,
+                    candidate,
+                    result,
+                )
             if identity_recovered:
                 identities_recovered += 1
 
