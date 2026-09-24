@@ -18,7 +18,6 @@ import time
 from typing import Any, Mapping
 
 from empire_os.coder.orchestrator import EmpireCoder
-from empire_os.coder.models import VerificationVerdict
 from empire_os.coder.worktree import WorktreeController
 
 
@@ -395,6 +394,34 @@ def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _retry_branch_push() -> dict[str, Any]:
+    branch, _head, dirty = _main_state()
+    if branch != "feature/revenue-intelligence-v2" or dirty:
+        return {
+            "status": "PUSH_RETRY_BLOCKED",
+            "reason": (
+                f"branch={branch};dirty={dirty}"
+            ),
+        }
+    push = _git(
+        "push",
+        "origin",
+        "feature/revenue-intelligence-v2",
+        cwd=ROOT,
+        timeout=120,
+    )
+    return {
+        "status": (
+            "RESOLVED_AND_PUSHED"
+            if push.returncode == 0
+            else "MERGED_LOCAL_PUSH_FAILED"
+        ),
+        "push_error": (
+            None if push.returncode == 0 else push.stderr[-1000:]
+        ),
+    }
+
+
 def _retry_runtime_sync() -> dict[str, Any]:
     command = [
         str(ROOT / ".venv/bin/python"),
@@ -452,14 +479,20 @@ def run_repair_cycle() -> dict[str, Any]:
             "classification": classification,
             "action": "existing_deferred_enrichment_loop",
         }
-    elif classification in {"CODE_DEFECT", "UNKNOWN"}:
+    elif classification == "CODE_DEFECT":
         fingerprint = str(incident.get("fingerprint") or "")
         if (
             fingerprint
             and state.get("last_fingerprint") == fingerprint
+            and state.get("last_status") == "MERGED_LOCAL_PUSH_FAILED"
+        ):
+            result = _retry_branch_push()
+            result["classification"] = classification
+        elif (
+            fingerprint
+            and state.get("last_fingerprint") == fingerprint
             and state.get("last_status") in {
                 "RESOLVED_AND_PUSHED",
-                "RESOLVED_LOCAL_PUSH_FAILED",
                 "QUARANTINED_HEAD_MOVED",
             }
         ):
