@@ -19,6 +19,7 @@ import requests
 
 from empire_os.lead_sources.permits import URL as NYC_PERMIT_URL
 from empire_os.qualification_worker_v2 import request_json
+from empire_os.prospect_ingest import match_existing_prospect
 
 
 OUTPUT = Path("runtime/recovery/legacy_permit_recovery_latest.json")
@@ -288,6 +289,151 @@ def revalidate_nyc_permits(
     return results
 
 
+def fetch_canonical_prospects_by_metro(
+    metros: Iterable[str],
+    *,
+    page_size: int = 1000,
+    max_rows_per_metro: int = 50000,
+) -> dict[str, dict[str, Any]]:
+    """Read canonical prospects once per metro for bounded identity matching."""
+    page_size = max(1, min(int(page_size), 1000))
+    max_rows_per_metro = max(page_size, int(max_rows_per_metro))
+    result: dict[str, dict[str, Any]] = {}
+
+    for raw_metro in metros:
+        metro = _clean(raw_metro).casefold()
+        if not metro or metro in result:
+            continue
+
+        rows: list[dict[str, Any]] = []
+        offset = 0
+        truncated = False
+
+        while offset < max_rows_per_metro:
+            limit = min(page_size, max_rows_per_metro - offset)
+            params = urllib.parse.urlencode({
+                "select": (
+                    "id,business_name,phone,metro,niche,website,address,"
+                    "status,contact_source,created_at"
+                ),
+                "metro": f"ilike.{metro}",
+                "order": "created_at.asc",
+                "limit": str(limit),
+                "offset": str(offset),
+            })
+            batch = request_json(
+                "GET",
+                f"/rest/v1/prospects?{params}",
+            ) or []
+            if not isinstance(batch, list):
+                batch = []
+
+            rows.extend(
+                dict(row)
+                for row in batch
+                if isinstance(row, Mapping)
+            )
+
+            if len(batch) < limit:
+                break
+
+            offset += len(batch)
+        else:
+            truncated = True
+
+        if len(rows) >= max_rows_per_metro:
+            truncated = True
+
+        result[metro] = {
+            "rows": rows,
+            "rows_scanned": len(rows),
+            "truncated": truncated,
+        }
+
+    return result
+
+
+def match_canonical_identity(
+    parsed: Mapping[str, Any],
+    canonical_prospects_by_metro: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Apply the existing conservative prospect identity contract."""
+    if parsed.get("parsed") is not True:
+        return {
+            "match_state": "NOT_ELIGIBLE",
+            "match_reason": "legacy_note_unparsed",
+            "canonical_prospect_id": None,
+            "match_method": None,
+            "rows_scanned": 0,
+        }
+    if parsed.get("identity_recoverable") is not True:
+        return {
+            "match_state": "NOT_ELIGIBLE",
+            "match_reason": "identity_not_recoverable",
+            "canonical_prospect_id": None,
+            "match_method": None,
+            "rows_scanned": 0,
+        }
+
+    metro = _clean(parsed.get("metro")).casefold()
+    bucket = canonical_prospects_by_metro.get(metro) or {}
+    rows = bucket.get("rows") or []
+    rows_scanned = int(bucket.get("rows_scanned") or len(rows))
+
+    if bucket.get("truncated") is True:
+        return {
+            "match_state": "AMBIGUOUS",
+            "match_reason": "canonical_lookup_truncated",
+            "canonical_prospect_id": None,
+            "match_method": None,
+            "rows_scanned": rows_scanned,
+        }
+
+    lookup = match_existing_prospect(
+        {
+            "prospect": {
+                "business_name": parsed.get("business_name"),
+                "metro": parsed.get("metro"),
+                "phone": parsed.get("phone"),
+            }
+        },
+        [
+            dict(row)
+            for row in rows
+            if isinstance(row, Mapping)
+        ],
+    )
+
+    decision = _clean(lookup.get("decision"))
+    reason = _clean(lookup.get("reason"))
+    prospect = lookup.get("prospect")
+
+    if decision == "matched" and isinstance(prospect, Mapping):
+        return {
+            "match_state": "MATCHED",
+            "match_reason": reason,
+            "canonical_prospect_id": _clean(prospect.get("id")) or None,
+            "match_method": reason,
+            "rows_scanned": rows_scanned,
+        }
+    if decision == "ambiguous":
+        return {
+            "match_state": "AMBIGUOUS",
+            "match_reason": reason,
+            "canonical_prospect_id": None,
+            "match_method": None,
+            "rows_scanned": rows_scanned,
+        }
+
+    return {
+        "match_state": "NO_MATCH",
+        "match_reason": reason or "no_strong_identity_match",
+        "canonical_prospect_id": None,
+        "match_method": None,
+        "rows_scanned": rows_scanned,
+    }
+
+
 def _pending_validation(parsed: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "validation_state": "REVALIDATION_PENDING",
@@ -302,7 +448,7 @@ def classify_recovery(
     parsed: Mapping[str, Any],
     validation: Mapping[str, Any],
     *,
-    canonical_identity_match: bool = False,
+    canonical_identity_state: str = "NO_MATCH",
 ) -> tuple[str, str]:
     if parsed.get("parsed") is not True:
         return "REJECT", "REJECTED"
@@ -312,9 +458,13 @@ def classify_recovery(
         return "ARCHIVE", "RECOVERED_EVIDENCE"
 
     state = _clean(validation.get("validation_state"))
+    identity_state = _clean(canonical_identity_state).upper()
+
     if state == "VERIFIED_CURRENT":
-        if canonical_identity_match:
+        if identity_state == "MATCHED":
             return "MERGE", "VERIFIED_CURRENT"
+        if identity_state == "AMBIGUOUS":
+            return "MODERNIZE", "IDENTITY_REVIEW_REQUIRED"
         return "REUSE", "VERIFIED_CURRENT"
     if state == "NOT_FOUND":
         return "ARCHIVE", "REVALIDATION_FAILED"
@@ -328,6 +478,9 @@ def build_recovery_observer(
     *,
     batch_size: int = 100,
     nyc_validation: Mapping[str, Mapping[str, Any]] | None = None,
+    canonical_prospects_by_metro: (
+        Mapping[str, Mapping[str, Any]] | None
+    ) = None,
 ) -> dict[str, Any]:
     batch_size = max(1, min(int(batch_size), MAX_BATCH_SIZE))
     deduped = dedupe_legacy_lane_rows(rows)[:batch_size]
@@ -345,9 +498,13 @@ def build_recovery_observer(
             and parsed.get("permit_number")
         )
 
+    if canonical_prospects_by_metro is None:
+        canonical_prospects_by_metro = {}
+
     recovered: list[dict[str, Any]] = []
     classifications: dict[str, int] = {}
     states: dict[str, int] = {}
+    identity_states: dict[str, int] = {}
 
     for row, parsed in parsed_rows:
         permit_number = _clean(parsed.get("permit_number"))
@@ -375,10 +532,19 @@ def build_recovery_observer(
                 "source_freshness": "UNKNOWN",
             }
 
+        identity_match = match_canonical_identity(
+            parsed,
+            canonical_prospects_by_metro,
+        )
+        identity_state = _clean(identity_match.get("match_state"))
+        identity_states[identity_state] = (
+            identity_states.get(identity_state, 0) + 1
+        )
+
         recovery_class, recovery_state = classify_recovery(
             parsed,
             validation,
-            canonical_identity_match=False,
+            canonical_identity_state=identity_state,
         )
         classifications[recovery_class] = (
             classifications.get(recovery_class, 0) + 1
@@ -431,8 +597,15 @@ def build_recovery_observer(
             ),
             "validation": validation,
             "source_freshness": validation.get("source_freshness"),
-            "current_identity_match_state": "UNKNOWN_NOT_CHECKED",
-            "canonical_prospect_id": None,
+            "current_identity_match_state": identity_state,
+            "canonical_match_reason": identity_match.get("match_reason"),
+            "canonical_match_method": identity_match.get("match_method"),
+            "canonical_lookup_rows_scanned": identity_match.get(
+                "rows_scanned"
+            ),
+            "canonical_prospect_id": identity_match.get(
+                "canonical_prospect_id"
+            ),
             "canonical_promotion_performed": False,
             "recovery_classification": recovery_class,
             "recovery_state": recovery_state,
@@ -443,7 +616,7 @@ def build_recovery_observer(
         })
 
     return {
-        "schema_version": "empire.legacy-permit-recovery-observer.v1",
+        "schema_version": "empire.legacy-permit-recovery-observer.v2",
         "generated_at": _now(),
         "mode": "OBSERVE",
         "input_row_count": len(list(rows)) if isinstance(rows, list) else None,
@@ -451,6 +624,7 @@ def build_recovery_observer(
         "processed_count": len(recovered),
         "classification_counts": dict(sorted(classifications.items())),
         "recovery_state_counts": dict(sorted(states.items())),
+        "identity_match_counts": dict(sorted(identity_states.items())),
         "records": recovered,
         "historical_omega_is_current_truth": False,
         "database_write_performed": False,
@@ -527,9 +701,28 @@ def refresh_legacy_permit_recovery_observer(
             offset=0,
         )
 
+    bounded_batch_size = max(
+        100,
+        min(int(batch_size), MAX_BATCH_SIZE),
+    )
+    preview = dedupe_legacy_lane_rows(rows)[:bounded_batch_size]
+    canonical_prospects_by_metro = fetch_canonical_prospects_by_metro(
+        {
+            parsed.get("metro")
+            for parsed in (
+                parse_legacy_lane_notes(_clean(row.get("notes")))
+                for row in preview
+            )
+            if parsed.get("parsed") is True
+            and parsed.get("identity_recoverable") is True
+            and _clean(parsed.get("metro"))
+        }
+    )
+
     payload = build_recovery_observer(
         rows,
-        batch_size=max(100, min(int(batch_size), MAX_BATCH_SIZE)),
+        batch_size=bounded_batch_size,
+        canonical_prospects_by_metro=canonical_prospects_by_metro,
     )
     payload.update({
         "source_store": "public.lane_leads",
