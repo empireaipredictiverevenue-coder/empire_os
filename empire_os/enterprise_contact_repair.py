@@ -33,17 +33,20 @@ ALLOWED_REPAIR_PATHS = frozenset({
     "empire_os/buyer_probe_worker.py",
     "empire_os/buyer_deferred_enrichment.py",
     "empire_os/enterprise_contact_intelligence.py",
+    "empire_os/search_fabric/site_probe.py",
     "scripts/run_buyer_deferred_enrichment.py",
     "scripts/run_enterprise_contact_intelligence.py",
     "tests/test_buyer_discovery.py",
     "tests/test_buyer_probe_worker.py",
     "tests/test_enterprise_contact_intelligence.py",
+    "tests/test_site_probe_people.py",
     "tests/test_enterprise_targeted_retry.py",
 })
 CORE_TESTS = (
     "tests/test_buyer_discovery.py",
     "tests/test_buyer_probe_worker.py",
     "tests/test_enterprise_contact_intelligence.py",
+    "tests/test_site_probe_people.py",
     "tests/test_enterprise_targeted_retry.py",
 )
 TRANSIENT_TOKENS = (
