@@ -6,7 +6,6 @@ accepts terms, moves funds, or recognizes revenue.
 """
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import Any, Mapping
 import urllib.parse
 
@@ -130,7 +129,11 @@ def reconcile_verified_enterprise_contact(
     }
 
 
-def _fetch_prospect(prospect_id: str) -> dict[str, Any]:
+def _fetch_prospect(
+    prospect_id: str,
+    *,
+    request=request_json,
+) -> dict[str, Any]:
     params = urllib.parse.urlencode({
         "select": (
             "id,business_name,niche,metro,phone,website,address,"
@@ -140,7 +143,7 @@ def _fetch_prospect(prospect_id: str) -> dict[str, Any]:
         "id": f"eq.{prospect_id}",
         "limit": 1,
     })
-    rows = request_json("GET", f"/rest/v1/prospects?{params}") or []
+    rows = request("GET", f"/rest/v1/prospects?{params}") or []
     if not rows or not isinstance(rows[0], dict):
         raise RuntimeError(f"canonical prospect missing:{prospect_id}")
     return rows[0]
@@ -176,7 +179,10 @@ def sync_enterprise_activation(
 
         try:
             if reconciled is not None:
-                prospect = _fetch_prospect(prospect_id)
+                prospect = _fetch_prospect(
+                    prospect_id,
+                    request=request,
+                )
                 candidate = build_candidate(
                     prospect,
                     entity_id=prospect.get("entity_id") or None,
