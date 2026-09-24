@@ -140,7 +140,7 @@ def classify_decision_role(title: Any) -> tuple[str, float]:
     if any(term in value for term in ECONOMIC_BUYER_TERMS):
         return "economic_buyer", 1.0
 
-    functional_c_suite = (
+    functional_c_suite_phrases = (
         "chief strategy",
         "chief marketing",
         "chief technology",
@@ -151,13 +151,21 @@ def classify_decision_role(title: Any) -> tuple[str, float]:
         "chief digital",
         "chief transformation",
         "chief operating",
+    )
+    functional_c_suite_acronyms = (
         "coo",
         "cto",
         "cmo",
         "cio",
         "cdo",
     )
-    if any(term in value for term in functional_c_suite):
+    if (
+        any(term in value for term in functional_c_suite_phrases)
+        or any(
+            re.search(rf"\\b{re.escape(term)}\\b", value)
+            for term in functional_c_suite_acronyms
+        )
+    ):
         return "functional_buyer", 0.8
 
     if any(term in value for term in FUNCTIONAL_BUYER_TERMS):
