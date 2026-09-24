@@ -34,6 +34,16 @@ PREDICTIVE_REVENUE_ENTERPRISE_ICP_KEYS = {
     "predictive_revenue_portfolio_value_creation",
 }
 
+CONTINUOUS_COMMERCIAL_LANE_BY_ICP = {
+    **{
+        key: "predictive_revenue_enterprise"
+        for key in PREDICTIVE_REVENUE_ENTERPRISE_ICP_KEYS
+    },
+    "legal_mass_tort_plaintiff_firm": "legal_mass_tort",
+    "legal_plaintiff_growth_firm": "legal_services",
+    "insurance_distribution_growth": "insurance",
+}
+
 
 def _host(value: str) -> str:
     text = str(value or "").strip().lower()
@@ -275,6 +285,13 @@ def run_buyer_scout(
             in PREDICTIVE_REVENUE_ENTERPRISE_ICP_KEYS
             and enterprise_fit_score >= 40
         )
+        continuous_lane = CONTINUOUS_COMMERCIAL_LANE_BY_ICP.get(
+            enterprise_profile
+        )
+        continuous_lane_candidate = bool(
+            continuous_lane
+            and int(icp.get("model_fit_score") or 0) >= 40
+        )
 
         candidates.append({
             "domain": domain,
@@ -314,6 +331,15 @@ def run_buyer_scout(
             ),
             "predictive_revenue_enterprise_fit_score": (
                 enterprise_fit_score
+            ),
+            "continuous_commercial_lane": (
+                continuous_lane if continuous_lane_candidate else None
+            ),
+            "continuous_lane_candidate": continuous_lane_candidate,
+            "continuous_lane_fit_score": (
+                int(icp.get("model_fit_score") or 0)
+                if continuous_lane_candidate
+                else 0
             ),
             "observed_buying_triggers": list(
                 icp.get("observed_buying_triggers") or []
@@ -362,6 +388,15 @@ def run_buyer_scout(
             row.get("predictive_revenue_enterprise_candidate") is True
             for row in candidates
         ),
+        "continuous_lane_candidate_counts": {
+            lane: sum(
+                row.get("continuous_commercial_lane") == lane
+                for row in candidates
+            )
+            for lane in sorted(
+                set(CONTINUOUS_COMMERCIAL_LANE_BY_ICP.values())
+            )
+        },
         "explicit_direct_buyer_candidate_count": sum(
             row["explicit_direct_buyer_evidence"]
             for row in candidates
