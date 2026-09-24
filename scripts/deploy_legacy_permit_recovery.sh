@@ -13,7 +13,9 @@ PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
   tests/test_legacy_permit_recovery.py \
   tests/test_legacy_permit_recovery_runner.py \
   tests/test_legacy_permit_recovery_systemd.py \
+  tests/test_legacy_permit_recovery_batching.py \
   tests/test_permits_source_identity.py \
+  tests/test_permits_owner_quality.py \
   tests/test_permit_intelligence_runtime.py
 
 echo
