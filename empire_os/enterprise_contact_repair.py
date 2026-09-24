@@ -92,10 +92,6 @@ def _load(path: Path) -> dict[str, Any]:
 
 def classify_failure(text: str) -> str:
     value = str(text or "").lower()
-    if any(token in value for token in TRANSIENT_TOKENS):
-        return "TRANSIENT_INFRA"
-    if any(token in value for token in DATA_QUALITY_TOKENS):
-        return "DATA_QUALITY"
     if any(
         token in value
         for token in (
@@ -109,6 +105,10 @@ def classify_failure(text: str) -> str:
         )
     ):
         return "CODE_DEFECT"
+    if any(token in value for token in DATA_QUALITY_TOKENS):
+        return "DATA_QUALITY"
+    if any(token in value for token in TRANSIENT_TOKENS):
+        return "TRANSIENT_INFRA"
     return "UNKNOWN"
 
 
@@ -214,6 +214,27 @@ def _guard_candidate_diff(worktree: Path, changed: list[str]) -> None:
         )
     ):
         raise RuntimeError("coder repair attempted to suppress tests")
+    risky_additions = (
+        "live_outbound_send = true",
+        '"live_outbound_send": true',
+        "outreach_authorized = true",
+        '"outreach_authorized": true',
+        "payment_action = true",
+        '"payment_action": true',
+        "actual_revenue = true",
+        '"actual_revenue": true',
+        "reviews_approved = 1",
+        "empire_autonomous_mode=execute",
+    )
+    for line in diff.splitlines():
+        stripped = line.strip().lower()
+        if stripped.startswith("+") and any(
+            token in stripped for token in risky_additions
+        ):
+            raise RuntimeError(
+                "coder repair attempted authority expansion"
+            )
+
     if any(path.startswith("tests/") for path in changed):
         for line in diff.splitlines():
             stripped = line.lstrip()
@@ -382,7 +403,7 @@ def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
         "status": (
             "RESOLVED_AND_PUSHED"
             if push.returncode == 0
-            else "RESOLVED_LOCAL_PUSH_FAILED"
+            else "MERGED_LOCAL_PUSH_FAILED"
         ),
         "worktree": str(worktree),
         "repair_head": repair_head,
