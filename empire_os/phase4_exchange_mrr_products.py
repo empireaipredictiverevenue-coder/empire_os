@@ -1,10 +1,10 @@
 """Phase 4 recurring-revenue product plan for Commercial Exchange.
 
-Modernizes historical lane-seat subscriptions without reviving legacy prices,
+Modernizes historical lane-seat subscriptions without reviving legacy pricing,
 SQLite commercial truth, or Solana/USDC settlement.
 
-No price is binding here. All products require governed commercial catalog
-versions before they can be sold.
+Launch membership pricing is founder-approved. Seat activation, fulfilment,
+usage billing and revenue remain governed by verified commercial terms.
 """
 from __future__ import annotations
 
@@ -211,8 +211,8 @@ def build_exchange_mrr_product_plan() -> dict[str, Any]:
 def public_exchange_seat_projection() -> dict[str, Any]:
     """Public, non-binding view of Exchange seat capabilities.
 
-    No price is emitted until the founder-approved governed catalog version
-    exists. This endpoint is suitable for self-serve buyer interest capture.
+    Approved launch pricing is exposed for buyer interest capture. A displayed
+    price does not activate the seat or imply verified fulfilment economics.
     """
     products = []
     for row in EXCHANGE_MRR_PRODUCTS:
