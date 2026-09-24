@@ -223,6 +223,25 @@ def reconcile_verified_enterprise_contact(
                     ),
                 })
 
+    if curated_match is not None:
+        title = _text(curated_match.get("title"))
+        role, score = classify_decision_role(title)
+        return {
+            "name": name,
+            "title": title,
+            "email": email,
+            "decision_role": role,
+            "decision_score": score,
+            "source": "enterprise_target_reconciled",
+            "probe_source": _text(decision.get("source")) or None,
+            "leadership_source": "curated_public_evidence",
+            "leadership_evidence_url": _leadership_evidence_url(target),
+            "role_reconciled": True,
+            "site_title_conflict": bool(site_title_conflicts),
+            "site_title_conflicts": site_title_conflicts,
+            "target_evidence_urls": list(target.evidence_urls),
+        }
+
     if observed is not None:
         title = _text(observed.get("title"))
         role, score = classify_decision_role(title)
