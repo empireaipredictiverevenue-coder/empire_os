@@ -192,6 +192,37 @@ def reconcile_verified_enterprise_contact(
         None,
     )
 
+    site_title_conflicts: list[dict[str, Any]] = []
+    curated_match = next(
+        (
+            person
+            for person in target.observed_people
+            if _key(person.get("name")) == _key(name)
+        ),
+        None,
+    )
+    if curated_match is not None:
+        curated_title = _text(curated_match.get("title"))
+        for person in (probe.get("site_people") or []):
+            if not isinstance(person, Mapping):
+                continue
+            if _key(person.get("name")) != _key(name):
+                continue
+            candidate_title = _text(person.get("title"))
+            if (
+                candidate_title
+                and _key(candidate_title) != _key(curated_title)
+            ):
+                site_title_conflicts.append({
+                    "title": candidate_title,
+                    "source_kind": _text(person.get("source_kind")) or None,
+                    "url": (
+                        _text(person.get("url"))
+                        or _text(person.get("page_url"))
+                        or None
+                    ),
+                })
+
     if observed is not None:
         title = _text(observed.get("title"))
         role, score = classify_decision_role(title)
@@ -206,6 +237,8 @@ def reconcile_verified_enterprise_contact(
             "leadership_source": observed.get("source"),
             "leadership_evidence_url": observed.get("evidence_url"),
             "role_reconciled": True,
+            "site_title_conflict": bool(site_title_conflicts),
+            "site_title_conflicts": site_title_conflicts,
             "target_evidence_urls": list(target.evidence_urls),
         }
 
