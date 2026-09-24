@@ -21,6 +21,21 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
+def _borough_from_address(value: Any) -> str:
+    address = _text(value)
+    if not address:
+        return ""
+    tail = address.rsplit(",", 1)[-1].strip().casefold()
+    mapping = {
+        "queens": "Queens",
+        "brooklyn": "Brooklyn",
+        "manhattan": "Manhattan",
+        "bronx": "Bronx",
+        "staten island": "Staten Island",
+    }
+    return mapping.get(tail, "")
+
+
 def _open(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
@@ -34,6 +49,7 @@ def _open(path: Path) -> sqlite3.Connection:
             inventory_identity_mode text not null,
             niche text,
             metro text,
+            borough text,
             permit_number text,
             owner_name text,
             source_owner_identity_state text,
@@ -80,6 +96,7 @@ def _count_by(conn: sqlite3.Connection, column: str) -> dict[str, int]:
         "inventory_identity_mode",
         "niche",
         "metro",
+        "borough",
         "source_owner_identity_state",
     }
     if column not in allowed:
@@ -156,19 +173,21 @@ def update_cumulative_inventory(
                     inventory_identity_mode,
                     niche,
                     metro,
+                    borough,
                     permit_number,
                     owner_name,
                     source_owner_identity_state,
                     source_freshness,
                     canonical_prospect_id,
                     updated_at
-                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict(legacy_prospect_id) do update set
                     recovery_classification = excluded.recovery_classification,
                     recovery_state = excluded.recovery_state,
                     inventory_identity_mode = excluded.inventory_identity_mode,
                     niche = excluded.niche,
                     metro = excluded.metro,
+                    borough = excluded.borough,
                     permit_number = excluded.permit_number,
                     owner_name = excluded.owner_name,
                     source_owner_identity_state =
@@ -184,6 +203,7 @@ def update_cumulative_inventory(
                     _text(record.get("inventory_identity_mode")),
                     _text(original.get("niche")),
                     _text(fields.get("metro") or original.get("metro")),
+                    _borough_from_address(fields.get("address")),
                     _text(fields.get("permit_number")),
                     _text(fields.get("business_name")),
                     _text(record.get("source_owner_identity_state")),
@@ -194,7 +214,22 @@ def update_cumulative_inventory(
             )
 
         cycles = int(_meta(conn, "cycles") or 0) + 1
+        full_scan_completions = int(
+            _meta(conn, "full_scan_completions") or 0
+        )
+        latest_cycle_completed_scan = bool(
+            int(payload.get("next_offset") or 0) == 0
+            and int(payload.get("scanned_row_count") or 0) > 0
+        )
+        if latest_cycle_completed_scan:
+            full_scan_completions += 1
+
         _set_meta(conn, "cycles", cycles)
+        _set_meta(
+            conn,
+            "full_scan_completions",
+            full_scan_completions,
+        )
         _set_meta(conn, "scan_epoch", scan_epoch)
         _set_meta(conn, "scan_order", scan_order)
         _set_meta(conn, "last_scan_offset", payload.get("scan_offset") or 0)
@@ -265,12 +300,15 @@ def update_cumulative_inventory(
             ),
             "niche_counts": _count_by(conn, "niche"),
             "metro_counts": _count_by(conn, "metro"),
+            "borough_counts": _count_by(conn, "borough"),
             "source_owner_identity_counts": _count_by(
                 conn, "source_owner_identity_state"
             ),
             "last_scan_offset": int(payload.get("scan_offset") or 0),
             "next_offset": int(payload.get("next_offset") or 0),
-            "full_scan_complete": int(payload.get("next_offset") or 0) == 0,
+            "latest_cycle_completed_scan": latest_cycle_completed_scan,
+            "full_scan_completions": full_scan_completions,
+            "full_scan_complete": full_scan_completions > 0,
             "canonical_database_write_performed": False,
             "canonical_promotion_performed": False,
             "outbound_sent": False,
