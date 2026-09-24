@@ -87,11 +87,13 @@ def test_public_site_route_resolution_is_allowlisted(tmp_path):
     (tmp_path / "trust.html").write_text("trust")
     (tmp_path / "industries.html").write_text("industries")
     (tmp_path / "buy.html").write_text("buy")
+    (tmp_path / "predictive-revenue.html").write_text("predictive")
     (tmp_path / "industries/property.html").write_text("property")
     assert _site_html_path("", tmp_path).name == "index.html"
     assert _site_html_path("trust", tmp_path).name == "trust.html"
     assert _site_html_path("industries/property", tmp_path).name == "property.html"
     assert _site_html_path("buy", tmp_path).name == "buy.html"
+    assert _site_html_path("predictive-revenue", tmp_path).name == "predictive-revenue.html"
     assert _site_html_path("../secret", tmp_path) is None
     assert _site_html_path("industries/../../secret", tmp_path) is None
 
@@ -105,11 +107,13 @@ def test_public_site_urls_are_added_to_sitemap(tmp_path):
     (site / "trust.html").write_text("trust")
     (site / "industries.html").write_text("industries")
     (site / "buy.html").write_text("buy")
+    (site / "predictive-revenue.html").write_text("predictive")
     (site / "industries/property.html").write_text("property")
     xml = _sitemap_xml(aeo, site)
     assert "/trust" in xml
     assert "/industries" in xml
     assert "/buy" in xml
+    assert "/predictive-revenue" in xml
     assert "/industries/property" in xml
     assert "/aeo/roofing/DFW/" in xml
 
@@ -193,6 +197,17 @@ def test_checkout_proxy_rejects_non_json():
 def test_exchange_interest_proxy_rejects_non_json():
     response = client.post(
         "/v1/checkout/exchange/interests",
+        content="not-json",
+        headers={"Content-Type": "text/plain"},
+    )
+    assert response.status_code == 415
+    assert response.json()["error"] == "application_json_required"
+
+
+
+def test_predictive_revenue_interest_proxy_rejects_non_json():
+    response = client.post(
+        "/v1/checkout/predictive-revenue/interests",
         content="not-json",
         headers={"Content-Type": "text/plain"},
     )
