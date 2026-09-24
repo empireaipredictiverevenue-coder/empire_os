@@ -1,7 +1,9 @@
 """Empire AI public gateway behind Cloudflare Tunnel.
 
-Public surface is discovery/read-only. It deliberately excludes legacy settlement,
-allocation, outreach, buyer activation and closer mutation endpoints.
+Public surface is discovery/read-mostly with narrow allowlisted commerce-intake
+proxies for self-serve orders and Lead Exchange interest. It deliberately
+excludes settlement execution, allocation, outreach execution, buyer activation
+and closer mutation endpoints.
 """
 from __future__ import annotations
 
@@ -199,7 +201,7 @@ def health():
         "status": "online",
         "service": "empire-ai-public-gateway",
         "version": GATEWAY_VERSION,
-        "execution": "read-only-public-surface",
+        "execution": "read-mostly-with-narrow-commerce-intake",
         "astra": "governed",
     }
 
