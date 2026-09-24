@@ -182,19 +182,28 @@ def run_buyer_scout(
             if profile_key not in CONTINUOUS_COMMERCIAL_LANE_BY_ICP:
                 continue
             canonical_seed_by_domain[host] = row
-            provenance.setdefault(host, []).append({
-                "source": "canonical_prospect_seed",
-                "query": None,
-                "buyer_pool": "enterprise_and_data_buyers",
-                "target_kind": "canonical_seed",
-                "corridor_key": None,
-                "product_code": None,
-                "icp_profile_key": profile_key,
-                "buying_triggers": [],
-                "decision_maker_roles": [],
-                "prospect_id": row.get("id"),
-                "canonical_niche": row.get("niche"),
-            })
+            seed_pools = [
+                str(value).strip()
+                for value in (row.get("seed_buyer_pools") or [])
+                if str(value).strip()
+            ]
+            if not seed_pools:
+                seed_pools = ["enterprise_and_data_buyers"]
+
+            for seed_pool in seed_pools:
+                provenance.setdefault(host, []).append({
+                    "source": "canonical_prospect_seed",
+                    "query": None,
+                    "buyer_pool": seed_pool,
+                    "target_kind": "canonical_seed",
+                    "corridor_key": row.get("seed_corridor_key"),
+                    "product_code": row.get("seed_product_code"),
+                    "icp_profile_key": profile_key,
+                    "buying_triggers": [],
+                    "decision_maker_roles": [],
+                    "prospect_id": row.get("id"),
+                    "canonical_niche": row.get("niche"),
+                })
         seed_domain_count = len(canonical_seed_by_domain)
 
     ranked_domains = sorted(
@@ -279,7 +288,10 @@ def run_buyer_scout(
                         if isinstance(page, Mapping)
                     ],
                     (
-                        f"canonical prospect niche: {seed_niche}"
+                        (
+                            "canonical prospect niche: "
+                            + seed_niche.replace("_", " ")
+                        )
                         if seed_niche
                         else ""
                     ),
