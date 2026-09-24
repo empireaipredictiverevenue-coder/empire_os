@@ -68,7 +68,8 @@ sudo bash scripts/install_enterprise_contact_intelligence.sh /srv/empire_os
 
 echo
 echo "=== SYNC + VERIFY THROUGH CANONICAL SYSTEMD ENV ==="
-sudo systemctl reset-failed empire-enterprise-contact-sync.service || true
+sudo systemctl reset-failed empire-enterprise-contact-sync.service \
+  2>/dev/null || true
 
 set +e
 sudo systemctl start empire-enterprise-contact-sync.service
