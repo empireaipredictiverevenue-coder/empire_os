@@ -1,0 +1,175 @@
+from pathlib import Path
+
+from empire_os.enterprise_contact_intelligence import (
+    reconcile_verified_enterprise_contact,
+    sync_enterprise_activation,
+)
+
+
+class FakeQueue:
+    def __init__(self):
+        self.enqueued = []
+        self.resolved = []
+
+    def enqueue(self, item):
+        self.enqueued.append(dict(item))
+        return True
+
+    def resolve(self, prospect_id, *, outcome):
+        self.resolved.append((prospect_id, outcome))
+
+
+def _probe(name, title, email):
+    return {
+        "review_ready": True,
+        "outreach_ready": True,
+        "person_bound": True,
+        "preferred_email": email,
+        "contact_route": "person_bound",
+        "decision_maker": {
+            "name": name,
+            "title": title,
+            "decision_score": 1.0,
+            "decision_role": "economic_buyer",
+            "source": "website_structured_data",
+        },
+        "verified_contacts": [{
+            "email": email,
+            "is_valid": True,
+            "source": "person_structured_data",
+        }],
+    }
+
+
+def test_sila_verified_contact_reconciles_to_current_observed_title():
+    row = {
+        "account_name": "Sila Services",
+        "person_contact_verified": True,
+        "probe": _probe(
+            "Kyle Martin",
+            "President",
+            "kmartin@sila.com",
+        ),
+    }
+    result = reconcile_verified_enterprise_contact(row)
+    assert result is not None
+    assert result["name"] == "Kyle Martin"
+    assert result["title"] == "Vice President, Corporate Development"
+    assert result["role_reconciled"] is True
+
+
+def test_unobserved_generated_identity_cannot_enter_review_gate():
+    row = {
+        "account_name": "EQT",
+        "person_contact_verified": True,
+        "probe": {
+            **_probe(
+                "Gautam Nadella",
+                "Chief Executive Officer",
+                "gautam@example.com",
+            ),
+            "decision_maker": {
+                "name": "Gautam Nadella",
+                "title": "Chief Executive Officer",
+                "decision_score": 1.0,
+                "source": "generated_pattern",
+            },
+            "verified_contacts": [{
+                "email": "gautam@example.com",
+                "is_valid": True,
+                "source": "generated_pattern",
+            }],
+        },
+    }
+    assert reconcile_verified_enterprise_contact(row) is None
+
+
+def test_sync_proposes_verified_redwood_review_with_predictive_offer():
+    prospect_id = "00000000-0000-0000-0000-000000000777"
+    activation = {
+        "targets": [{
+            "account_name": "Redwood Services",
+            "prospect_id": prospect_id,
+            "person_contact_verified": True,
+            "probe": _probe(
+                "Richard Lewis",
+                "Chief Executive Officer",
+                "richard@redwoodservices.com",
+            ),
+        }]
+    }
+    calls = []
+
+    def request(method, path, payload=None, **kwargs):
+        calls.append((method, path, payload))
+        if method == "GET":
+            return [{
+                "id": prospect_id,
+                "business_name": "Redwood Services",
+                "niche": "predictive_revenue_enterprise",
+                "metro": "Memphis, TN",
+                "website": "https://redwoodservices.com",
+                "buy_signal_score": 50,
+                "contact_source": "public_enterprise_target",
+            }]
+        return {
+            "decision": "proposed",
+            "review_id": "00000000-0000-0000-0000-000000000888",
+            "status": "pending",
+            "actual_revenue": False,
+        }
+
+    queue = FakeQueue()
+    result = sync_enterprise_activation(
+        activation,
+        request=request,
+        queue=queue,
+    )
+    assert result["proposed_review_count"] == 1
+    assert result["targeted_retry_queued_count"] == 0
+    post = next(call for call in calls if call[0] == "POST")
+    assert (
+        post[2]["p_offer_key"]
+        == "predictive_revenue_intelligence_os"
+    )
+    assert post[2]["p_contact_name"] == "Richard Lewis"
+    assert post[2]["p_evidence"]["live_outbound_send"] is False
+    assert queue.resolved
+
+
+def test_sync_queues_unresolved_account_with_intended_people():
+    activation = {
+        "targets": [{
+            "account_name": "Neighborly",
+            "prospect_id": "00000000-0000-0000-0000-000000000999",
+            "person_contact_verified": False,
+            "canonical_website": "https://neighborlybrands.com",
+            "probe": {
+                "rejection_reason": "no_contact_evidence",
+            },
+        }]
+    }
+    queue = FakeQueue()
+    result = sync_enterprise_activation(
+        activation,
+        request=lambda *args, **kwargs: None,
+        queue=queue,
+    )
+    assert result["proposed_review_count"] == 0
+    assert result["targeted_retry_queued_count"] == 1
+    item = queue.enqueued[0]
+    assert item["account_key"] == "neighborly"
+    assert item["offer_key"] == "predictive_revenue_autonomous_os"
+    assert any(
+        person["name"] == "Tanner Stutz"
+        for person in item["target_people"]
+    )
+    assert item["reason"] == "no_contact_evidence"
+
+
+def test_enterprise_sync_worker_keeps_execution_governed():
+    source = Path(
+        "scripts/run_enterprise_contact_intelligence.py"
+    ).read_text()
+    assert '"live_outbound_send": False' in source
+    assert '"actual_revenue": False' in source
