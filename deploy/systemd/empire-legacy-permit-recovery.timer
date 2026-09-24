@@ -1,5 +1,5 @@
 [Unit]
-Description=Run EmpireOS Legacy Permit Recovery Observer every 30 minutes
+Description=Run EmpireOS Legacy Permit Recovery Observer every 15 minutes
 
 [Timer]
 OnBootSec=5min
