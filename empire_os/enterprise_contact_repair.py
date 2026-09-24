@@ -473,6 +473,9 @@ def run_repair_cycle() -> dict[str, Any]:
     state = _load(STATE_PATH)
     intel = _load(RUNTIME / "enterprise_contact_intelligence_latest.json")
 
+    if incident.get("status") == "RESOLVED":
+        incident = {}
+
     classification = str(incident.get("classification") or "")
     if not incident and int(intel.get("error_count") or 0) > 0:
         error_text = json.dumps(intel.get("errors") or [])
@@ -496,7 +499,7 @@ def run_repair_cycle() -> dict[str, Any]:
         result["classification"] = classification
     elif classification == "DATA_QUALITY":
         result = {
-            "status": "DEFERRED_TO_TARGETED_ENRICHMENT",
+            "status": "RESOLVED_DEFERRED_TO_TARGETED_ENRICHMENT",
             "classification": classification,
             "action": "existing_deferred_enrichment_loop",
         }
