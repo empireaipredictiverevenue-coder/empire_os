@@ -213,6 +213,20 @@ def _matching_person_email(name: str, emails: Iterable[str]) -> str:
     return ""
 
 
+def _expanded_visible_title(block: str, match: re.Match[str]) -> str:
+    title = match.group(0)
+    remainder = block[match.end():].strip()
+    if (
+        match.start() == 0
+        and len(block) <= 120
+        and remainder
+        and remainder[0] in ",&/–—-"
+        and not any(mark in block for mark in ".!?")
+    ):
+        return block.strip(" ,|:/–—-")
+    return title
+
+
 def _visible_people_from_html(
     page: str,
     *,
@@ -273,16 +287,7 @@ def _visible_people_from_html(
             continue
         match = _PEOPLE_TITLE_RE.search(block)
         if match:
-            matched_title = match.group(0)
-            remainder = block[match.end():].strip()
-            if (
-                match.start() == 0
-                and len(block) <= 120
-                and remainder
-                and remainder[0] in ",&/–—-"
-                and not any(mark in block for mark in ".!?")
-            ):
-                matched_title = block.strip(" ,|:/–—-")
+            matched_title = _expanded_visible_title(block, match)
 
             before = block[:match.start()].strip(" ,|:/–—-")
             words = before.split()
@@ -315,9 +320,16 @@ def _visible_people_from_html(
             for neighbor_index in (index + 1, index + 2):
                 if neighbor_index >= len(blocks):
                     continue
-                title_match = _PEOPLE_TITLE_RE.search(blocks[neighbor_index])
+                neighbor_block = blocks[neighbor_index]
+                title_match = _PEOPLE_TITLE_RE.search(neighbor_block)
                 if title_match:
-                    add(block, title_match.group(0))
+                    add(
+                        block,
+                        _expanded_visible_title(
+                            neighbor_block,
+                            title_match,
+                        ),
+                    )
                     break
 
     title_name = re.sub(r"\s+[|–—-].*$", "", str(page_title or "")).strip()
@@ -325,7 +337,7 @@ def _visible_people_from_html(
         visible = " ".join(blocks)[:6000]
         match = _PEOPLE_TITLE_RE.search(visible)
         if match:
-            add(title_name, match.group(0))
+            add(title_name, _expanded_visible_title(visible, match))
 
     return people
 
