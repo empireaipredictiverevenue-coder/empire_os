@@ -74,6 +74,25 @@ PY
 
     echo "Repair controller status: $REPAIR_STATUS"
 
+    if [ "$REPAIR_STATUS" = "CODER_REPAIR_FAILED" ]; then
+      ./.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+path = Path(
+    "runtime/predictive_revenue/"
+    "enterprise_contact_repair_latest.json"
+)
+try:
+    payload = json.loads(path.read_text())
+except Exception:
+    payload = {}
+error = str(payload.get("error") or "").strip()
+if error:
+    print("Repair controller error:", error)
+PY
+    fi
+
     case "$REPAIR_STATUS" in
       RESOLVED_AND_PUSHED|RESOLVED_BY_CONCURRENT_CHANGE)
         echo "Verified repair integrated. Retrying deployment once."
