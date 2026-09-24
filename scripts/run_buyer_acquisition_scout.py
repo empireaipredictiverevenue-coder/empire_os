@@ -31,6 +31,9 @@ def main() -> int:
         "predictive_revenue_enterprise_candidate_count": payload[
             "predictive_revenue_enterprise_candidate_count"
         ],
+        "continuous_lane_candidate_counts": payload[
+            "continuous_lane_candidate_counts"
+        ],
         "explicit_direct_buyer_candidate_count": payload[
             "explicit_direct_buyer_candidate_count"
         ],
