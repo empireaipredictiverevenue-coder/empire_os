@@ -76,7 +76,7 @@ def main() -> int:
     bridge = run_standing_bridge(
         review_limit=min(50, max(10, int(args.proposal_limit) * 2)),
         outbound_limit=min(50, max(10, int(args.proposal_limit) * 2)),
-        daily_cap=10,
+        daily_cap=25,
     )
     payload["standing_bridge"] = bridge.as_dict()
     payload["ok"] = (
