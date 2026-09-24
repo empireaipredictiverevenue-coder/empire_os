@@ -16,6 +16,7 @@ from empire_os.buyer_discovery import (
     build_candidate_review_plan,
     classify_decision_role,
     looks_like_person_name,
+    rank_site_people,
 )
 from empire_os.predictive_revenue_enterprise_targets import TARGETS
 from empire_os.qualification_worker_v2 import request_json
@@ -64,6 +65,28 @@ def _request_with_retry(
     raise last_error
 
 
+def _leadership_evidence_url(target) -> str | None:
+    urls = [
+        _text(url)
+        for url in target.evidence_urls
+        if _text(url)
+    ]
+    for url in urls:
+        lowered = url.lower()
+        if any(
+            token in lowered
+            for token in (
+                "/leadership",
+                "/team",
+                "/people",
+                "/management",
+                "/who-we-are",
+            )
+        ):
+            return url
+    return urls[0] if urls else None
+
+
 def current_target_people(
     row: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
@@ -72,8 +95,7 @@ def current_target_people(
     if target is None:
         return []
 
-    people: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    evidence: list[dict[str, Any]] = []
 
     probe = row.get("probe")
     site_people = (
@@ -88,45 +110,48 @@ def current_target_people(
         title = _text(person.get("title"))
         if not looks_like_person_name(name) or not title:
             continue
-        role, score = classify_decision_role(title)
-        if score < 0.5:
-            continue
-        key = _key(name)
-        if key in seen:
-            continue
-        seen.add(key)
-        people.append({
+        evidence.append({
             "name": name,
             "title": title,
-            "source": "first_party_site_current",
-            "evidence_url": _text(person.get("url")) or None,
-            "decision_role": role,
-            "decision_score": score,
+            "email": _text(person.get("email")),
+            "url": (
+                _text(person.get("url"))
+                or _text(person.get("page_url"))
+            ),
+            "source_kind": _text(person.get("source_kind")),
         })
 
+    curated_url = _leadership_evidence_url(target)
     for person in target.observed_people:
         name = _text(person.get("name"))
         title = _text(person.get("title"))
-        key = _key(name)
-        if not name or not title or key in seen:
+        if not name or not title:
             continue
-        seen.add(key)
-        role, score = classify_decision_role(title)
-        people.append({
+        evidence.append({
             "name": name,
             "title": title,
-            "source": "curated_public_evidence",
-            "evidence_url": (
-                target.evidence_urls[0]
-                if target.evidence_urls
-                else None
-            ),
-            "decision_role": role,
-            "decision_score": score,
+            "email": "",
+            "url": curated_url or "",
+            "source_kind": "curated_first_party",
         })
 
-    return people[:8]
-
+    ranked = rank_site_people(evidence)
+    return [
+        {
+            **person,
+            "source": (
+                "first_party_site_current"
+                if person.get("source_kind") == "visible_text"
+                else (
+                    "curated_public_evidence"
+                    if person.get("source_kind") == "curated_first_party"
+                    else "first_party_site_observed"
+                )
+            ),
+            "evidence_url": person.get("url") or None,
+        }
+        for person in ranked[:8]
+    ]
 
 def reconcile_verified_enterprise_contact(
     row: Mapping[str, Any],
