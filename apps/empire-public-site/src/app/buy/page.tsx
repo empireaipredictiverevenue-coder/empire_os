@@ -286,6 +286,16 @@ export default function BuyPage() {
           </p>
         </div>
 
+        <div className="mb-6 rounded-2xl border border-blue-300/15 bg-blue-300/[0.04] p-4 md:flex md:items-center md:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold tracking-[0.16em] text-[#93c5fd]">ENTERPRISE</div>
+            <div className="mt-1 text-sm text-white/70">Deploy Predictive Revenue across the business.</div>
+          </div>
+          <a href="/predictive-revenue" className="mt-3 inline-flex rounded-full border border-[#60a5fa]/35 bg-[#2563eb]/15 px-4 py-2.5 text-[9px] font-semibold tracking-[0.12em] text-[#dbeafe] transition hover:border-[#7dd3fc]/60 hover:text-white md:mt-0">
+            DEPLOY PREDICTIVE REVENUE
+          </a>
+        </div>
+
         <div className="mb-8 inline-flex rounded-full border border-white/[0.08] bg-white/[0.025] p-1">
           <button
             type="button"
