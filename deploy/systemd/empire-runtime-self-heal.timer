@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EmpireOS runtime self-heal every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=empire-runtime-self-heal.service
+
+[Install]
+WantedBy=timers.target
