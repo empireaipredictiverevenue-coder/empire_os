@@ -20,11 +20,25 @@ SOCKET_PATH = Path("/run/empire-ops/privileged.sock")
 ALLOWED_ACTIONS = frozenset({"service_status", "service_restart", "service_start"})
 ALLOWED_UNITS = frozenset({
     "empire-public-gateway.service",
+    "empire-self-serve-checkout.service",
+    "empire-ops-mcp.service",
     "empire-revenue-pulse.service",
+    "empire-revenue-pulse.timer",
     "empire-conversation-recovery.service",
     "empire-buyer-capacity-readiness.service",
     "empire-acquisition.service",
+    "empire-acquisition.timer",
     "empire-qualification.service",
+    "empire-qualification.timer",
+    "empire-commercial-product-catalog.service",
+    "empire-commercial-product-catalog.timer",
+    "empire-commercial-exchange.service",
+    "empire-commercial-exchange.timer",
+    "empire-buyer-acquisition-team.service",
+    "empire-buyer-acquisition-team.timer",
+    "empire-source-health.service",
+    "empire-source-health.timer",
+    "empire-hermes-control.timer",
     "empire-coder-worker.service",
     "empire-coder-worker.timer",
 })
@@ -34,6 +48,10 @@ START_ONLY_UNITS = frozenset({
     "empire-buyer-capacity-readiness.service",
     "empire-acquisition.service",
     "empire-qualification.service",
+    "empire-commercial-product-catalog.service",
+    "empire-commercial-exchange.service",
+    "empire-buyer-acquisition-team.service",
+    "empire-source-health.service",
     "empire-coder-worker.service",
 })
 MAX_REQUEST_BYTES = 8192
