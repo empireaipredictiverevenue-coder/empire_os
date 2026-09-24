@@ -29,6 +29,12 @@ def main() -> int:
         "classification_counts": payload["classification_counts"],
         "recovery_state_counts": payload["recovery_state_counts"],
         "identity_match_counts": payload["identity_match_counts"],
+        "source_owner_identity_counts": payload[
+            "source_owner_identity_counts"
+        ],
+        "source_permittee_phone_counts": payload[
+            "source_permittee_phone_counts"
+        ],
         "next_offset": payload["next_offset"],
         "historical_omega_is_current_truth": payload[
             "historical_omega_is_current_truth"
