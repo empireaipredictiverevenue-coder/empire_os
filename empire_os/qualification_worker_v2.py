@@ -5,6 +5,8 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import re
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -214,11 +216,22 @@ def _client() -> tuple[str, dict[str, str]]:
     )
     base = env["SUPABASE_URL"].rstrip("/")
     key = env["SUPABASE_SERVICE_KEY"]
+    raw_component = (
+        os.getenv("EMPIRE_COMPONENT", "").strip()
+        or Path(sys.argv[0] or "python").name
+    )
+    component = re.sub(
+        r"[^A-Za-z0-9_.-]+",
+        "-",
+        raw_component,
+    )[:80] or "python"
     return base, {
         "apikey": key,
         "Authorization": "Bearer " + key,
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "User-Agent": f"EmpireOS/{component}",
+        "X-Empire-Component": component,
     }
 
 
