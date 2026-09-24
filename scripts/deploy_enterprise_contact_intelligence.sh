@@ -13,6 +13,7 @@ TEST_LOG="$(mktemp)"
 set +e
 PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
   tests/test_buyer_discovery.py \
+  tests/test_site_probe_people.py \
   tests/test_buyer_probe_worker.py \
   tests/test_enterprise_contact_intelligence.py \
   tests/test_enterprise_targeted_retry.py \
@@ -91,6 +92,7 @@ echo
 echo "=== COMPILE ==="
 PYTHONPATH=/srv/empire_os ./.venv/bin/python -m py_compile \
   empire_os/buyer_discovery.py \
+  empire_os/search_fabric/site_probe.py \
   empire_os/buyer_probe_worker.py \
   empire_os/buyer_deferred_enrichment.py \
   empire_os/enterprise_contact_intelligence.py \
