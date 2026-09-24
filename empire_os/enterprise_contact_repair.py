@@ -555,6 +555,18 @@ def run_repair_cycle() -> dict[str, Any]:
             "classification": None,
             "action": "none",
         }
+    elif (
+        classification in {
+            "TRANSIENT_INFRA",
+            "RUNTIME_ENV_CONTEXT",
+        }
+        and int(intel.get("error_count") or 0) == 0
+    ):
+        result = {
+            "status": "RESOLVED_BY_HEALTHY_RUNTIME_STATE",
+            "classification": classification,
+            "action": "latest_contact_intelligence_is_healthy",
+        }
     elif classification in {
         "TRANSIENT_INFRA",
         "RUNTIME_ENV_CONTEXT",
