@@ -5,8 +5,7 @@ from empire_os.ops_sentinel import analyze, build_repair_plan
 
 def test_down_service_gets_safe_restart_plan():
     units = {
-        "empire-autonomous-execution.service": "failed",
-        "empire-public-gateway.service": "active",
+        "empire-public-gateway.service": "failed",
         "empire-ops-mcp.service": "active",
         "empire-cloudflared.service": "active",
         "empire-acquisition.timer": "active",
@@ -16,14 +15,13 @@ def test_down_service_gets_safe_restart_plan():
     plan = build_repair_plan(findings)
     assert any(
         row["action"] == "restart_unit"
-        and row["target"] == "empire-autonomous-execution.service"
+        and row["target"] == "empire-public-gateway.service"
         for row in plan
     )
 
 
 def test_business_blocker_is_not_auto_repaired():
     units = {
-        "empire-autonomous-execution.service": "active",
         "empire-public-gateway.service": "active",
         "empire-ops-mcp.service": "active",
         "empire-cloudflared.service": "active",
@@ -40,7 +38,6 @@ def test_business_blocker_is_not_auto_repaired():
 
 def test_degraded_source_requests_safe_refresh():
     units = {
-        "empire-autonomous-execution.service": "active",
         "empire-public-gateway.service": "active",
         "empire-ops-mcp.service": "active",
         "empire-cloudflared.service": "active",
@@ -54,7 +51,6 @@ def test_degraded_source_requests_safe_refresh():
 
 def test_coder_model_cooldown_is_visible_but_not_repaired():
     units = {
-        "empire-autonomous-execution.service": "active",
         "empire-public-gateway.service": "active",
         "empire-ops-mcp.service": "active",
         "empire-cloudflared.service": "active",
@@ -82,7 +78,6 @@ def test_coder_model_cooldown_is_visible_but_not_repaired():
 
 def test_expired_coder_cooldown_is_not_reported():
     units = {
-        "empire-autonomous-execution.service": "active",
         "empire-public-gateway.service": "active",
         "empire-ops-mcp.service": "active",
         "empire-cloudflared.service": "active",
