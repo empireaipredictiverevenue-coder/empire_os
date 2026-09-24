@@ -11,9 +11,9 @@ from empire_os.qualification_worker_v2 import request_json
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--limit", type=int, default=25)
     args = parser.parse_args()
-    cap = int(os.getenv("EMPIRE_GTM_DAILY_EXTERNAL_CAP", "10"))
+    cap = int(os.getenv("EMPIRE_GTM_DAILY_EXTERNAL_CAP", "25"))
     result = run_gtm_pipeline(
         request_json,
         limit=args.limit,
