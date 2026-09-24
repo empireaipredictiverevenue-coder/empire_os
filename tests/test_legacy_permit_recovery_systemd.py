@@ -31,7 +31,7 @@ def test_recovery_timer_is_bounded_cadence():
         ROOT / "deploy/systemd/empire-legacy-permit-recovery.timer"
     ).read_text()
 
-    assert "OnUnitInactiveSec=30min" in text
+    assert "OnUnitInactiveSec=15min" in text
     assert "Persistent=true" in text
 
 
