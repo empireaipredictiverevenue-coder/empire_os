@@ -50,3 +50,12 @@ def test_catalog_service_can_write_solar_economics_runtime():
 
     assert "ProtectSystem=strict" in text
     assert "ReadWritePaths=/srv/empire_os/runtime/solar_opportunity_maps" in text
+
+
+
+def test_catalog_cycle_syncs_founder_approved_commercial_pricing():
+    text = (
+        ROOT / "deploy/systemd/empire-commercial-product-catalog.service"
+    ).read_text()
+
+    assert "sync_founder_approved_commercial_pricing.py" in text
