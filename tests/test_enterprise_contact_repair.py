@@ -69,6 +69,14 @@ def test_autonomous_code_repair_scope_is_narrow():
         "empire_os/enterprise_contact_intelligence.py"
         in repair.ALLOWED_REPAIR_PATHS
     )
+    assert (
+        "empire_os/search_fabric/site_probe.py"
+        in repair.ALLOWED_REPAIR_PATHS
+    )
+    assert (
+        "tests/test_site_probe_people.py"
+        in repair.ALLOWED_REPAIR_PATHS
+    )
     forbidden = (
         "deploy/systemd/empire-outbound-governor.service",
         "supabase/migrations/example.sql",
