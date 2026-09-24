@@ -292,6 +292,10 @@ def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
     if add.returncode != 0:
         raise RuntimeError("git_add_failed:" + add.stderr[-500:])
     commit = _git(
+        "-c",
+        "user.name=EmpireOS Repair Controller",
+        "-c",
+        "user.email=repair@empire-ai.local",
         "commit",
         "-m",
         f"repair: auto enterprise contact {fingerprint}",
