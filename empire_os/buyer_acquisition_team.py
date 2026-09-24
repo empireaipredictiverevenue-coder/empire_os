@@ -27,6 +27,7 @@ from empire_os.icp_buyer_trigger_intelligence import (
 from empire_os.predictive_revenue_enterprise_targets import (
     build_enterprise_target_review,
 )
+from empire_os.niche_taxonomy import niche_family
 
 
 OUTPUT = Path("runtime/buyer_acquisition/latest.json")
@@ -1074,6 +1075,91 @@ def refresh_buyer_acquisition_plan(
         catalog_snapshot=catalog,
     )
 
+    permit_inventory, permit_inventory_health = _read_runtime_snapshot(
+        root / "runtime/recovery/legacy_permit_inventory_summary.json"
+    )
+    permit_targets: list[dict[str, Any]] = []
+    niche_counts = (
+        dict(permit_inventory.get("niche_counts") or {})
+        if permit_inventory
+        else {}
+    )
+    ranked_niches = sorted(
+        (
+            (str(raw_niche), int(raw_count or 0))
+            for raw_niche, raw_count in niche_counts.items()
+            if int(raw_count or 0) > 0
+        ),
+        key=lambda item: (-item[1], item[0]),
+    )
+    seen_families: set[str] = set()
+    for raw_niche, count in ranked_niches:
+        family = niche_family(raw_niche)
+        if not family or family in seen_families:
+            continue
+        seen_families.add(family)
+        permit_targets.append({
+            "corridor_key": (
+                "permit-recovery:v1:"
+                + re.sub(r"[^a-z0-9]+", "_", family).strip("_")
+                + ":nyc"
+            ),
+            "niche_family": family,
+            "territory": "nyc",
+            "qualified_inventory_count": count,
+            "verified_supply_observation_count": count,
+            "overflow_count": 0,
+            "allocation_candidate_count": 0,
+            "active_remaining_capacity": 0,
+            "blocked_seat_count": 0,
+            "priority_score": 10000 + min(count, 9999),
+            "buyer_hunt_required": True,
+            "acquisition_should_continue": True,
+            "research_queries": buyer_research_queries(
+                niche_family=family,
+                territory="nyc",
+            ),
+            "preferred_buyer_types": list(TARGET_BUYER_TYPES),
+            "product_code": "permit_intelligence",
+            "source": "legacy_permit_verified_inventory",
+            "canonical_inventory_claimed": False,
+            "commercial_ready_claimed": False,
+        })
+        if len(permit_targets) >= 5:
+            break
+
+    if permit_targets:
+        payload["priority_targets"] = [
+            *permit_targets,
+            *list(payload.get("priority_targets") or []),
+        ]
+        payload["demand_gap_count"] = len(payload["priority_targets"])
+
+    payload["permit_inventory_demand"] = {
+        "status": (
+            "ACTIVE" if permit_inventory else "NOT_MATERIALIZED"
+        ),
+        "verified_current_inventory": int(
+            permit_inventory.get("verified_current_inventory") or 0
+        ),
+        "verified_current_owner_identified": int(
+            permit_inventory.get(
+                "verified_current_owner_identified"
+            ) or 0
+        ),
+        "verified_current_project_only": int(
+            permit_inventory.get("verified_current_project_only") or 0
+        ),
+        "buyer_hunt_target_count": len(permit_targets),
+        "buyer_hunt_targets": permit_targets,
+        "product_code": "permit_intelligence",
+        "canonical_inventory_claimed": False,
+        "commercial_ready_claimed": False,
+        "allocation_authority": "none",
+        "outbound_authority": "none",
+        "actual_revenue": False,
+    }
+
     enterprise_activation, enterprise_activation_health = (
         _read_runtime_snapshot(
             root
@@ -1152,9 +1238,11 @@ def refresh_buyer_acquisition_plan(
         "predictive_revenue_enterprise_contact_intelligence": (
             enterprise_contacts_health
         ),
+        "permit_inventory": permit_inventory_health,
         "degraded": (
             exchange_health["state"] != "OK"
             or catalog_health["state"] != "OK"
+            or permit_inventory_health["state"] != "OK"
         ),
     }
     path = root / OUTPUT
