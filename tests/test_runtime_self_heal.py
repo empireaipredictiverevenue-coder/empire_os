@@ -171,3 +171,46 @@ def test_unit_policy_defaults_to_observe_only_and_gates_consequential():
         )
         == "AUTO_REPAIR"
     )
+
+
+def test_enabled_inactive_unknown_timer_surfaces_degradation(monkeypatch, tmp_path):
+    _clear_runtime(monkeypatch)
+    payload = runtime_self_heal.run_runtime_self_heal(
+        now=NOW,
+        unit_inventory=lambda: [{
+            "unit": "empire-future-worker.timer",
+            "unit_file_state": "enabled",
+            "load_state": "loaded",
+            "active_state": "inactive",
+            "sub_state": "dead",
+            "policy": "OBSERVE_ONLY",
+        }],
+        latest_path=tmp_path / "latest.json",
+        state_path=tmp_path / "state.json",
+    )
+
+    assert payload["status"] == "DEGRADED"
+    assert payload["inventory_finding_count"] == 1
+    assert payload["inventory_findings"][0]["policy"] == "OBSERVE_ONLY"
+    assert payload["repair_count"] == 0
+
+
+def test_inactive_consequential_timer_requires_founder_gate(monkeypatch, tmp_path):
+    _clear_runtime(monkeypatch)
+    payload = runtime_self_heal.run_runtime_self_heal(
+        now=NOW,
+        unit_inventory=lambda: [{
+            "unit": "empire-outbound-governor.timer",
+            "unit_file_state": "enabled",
+            "load_state": "loaded",
+            "active_state": "inactive",
+            "sub_state": "dead",
+            "policy": "FOUNDER_GATE",
+        }],
+        latest_path=tmp_path / "latest.json",
+        state_path=tmp_path / "state.json",
+    )
+
+    assert payload["status"] == "DEGRADED"
+    assert payload["founder_gate_required_count"] == 1
+    assert payload["inventory_findings"][0]["repair_executed"] is False
