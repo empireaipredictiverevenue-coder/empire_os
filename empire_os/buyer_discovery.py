@@ -261,6 +261,20 @@ def choose_offer(record: Mapping[str, Any], decision_role: str) -> str:
         return "solar_opportunity_map"
     if any(term in text for term in ("agency", "marketing", "seo", "advertising", "lead gen")):
         return "white_label"
+    if any(
+        term in niche
+        for term in (
+            "lawyer",
+            "attorney",
+            "law firm",
+            "legal services",
+        )
+    ):
+        # Legal plaintiff firms enter through the bounded first-cash
+        # Opportunity Intelligence Pilot. This keeps initial outreach tied to
+        # the verified managed-service catalog instead of an unbound generic
+        # software offer. Live outbound authority remains unchanged.
+        return "managed_service"
     if decision_role == "economic_buyer" and any(
         term in text for term in ("software", "saas", "technology", "consulting", "finance", "recruit")
     ):
