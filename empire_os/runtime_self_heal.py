@@ -123,7 +123,7 @@ SNAPSHOTS: tuple[SnapshotSpec, ...] = (
         "/srv/empire_os/runtime/predictive_revenue/"
         "enterprise_contact_intelligence_latest.json",
         108000,
-        "empire-predictive-revenue-enterprise-activation.service",
+        "empire-enterprise-contact-sync.service",
     ),
     SnapshotSpec(
         "enterprise_contact_repair",
