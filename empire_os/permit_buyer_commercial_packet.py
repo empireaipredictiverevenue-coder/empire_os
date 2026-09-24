@@ -13,6 +13,8 @@ from typing import Any, Mapping
 import json
 import re
 
+from empire_os.buyer_deferred_enrichment import canonical_phone
+
 
 OUTPUT_DIR = Path("runtime/revenue/permit_buyer_packets")
 
@@ -67,13 +69,13 @@ def _company_routes(
         if (value := _clean_email(raw))
     ])
     phones = _unique([
-        _text(value)
-        for value in [
+        value
+        for raw in [
             route.get("phone"),
             route.get("fallback_phone"),
             *(site.get("first_party_phones") or []),
         ]
-        if _text(value)
+        if (value := canonical_phone(raw))
     ])
     return {
         "route_type": "company_route",
