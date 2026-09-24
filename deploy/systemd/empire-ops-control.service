@@ -6,7 +6,8 @@ Wants=network-online.target empire-ops-privileged-helper.service
 [Service]
 Type=oneshot
 User=root
-Group=root
+Group=ubuntu
+UMask=0027
 WorkingDirectory=/srv/empire_os
 EnvironmentFile=/etc/empire_os.env
 Environment=PYTHONPATH=/srv/empire_os
