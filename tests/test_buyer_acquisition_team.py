@@ -421,6 +421,14 @@ def test_refresh_surfaces_enterprise_activation_summary(tmp_path, monkeypatch):
           "failed_count": 0
         }\n"""
     )
+    (activation / "enterprise_contact_intelligence_latest.json").write_text(
+        """{
+          "proposed_review_count": 2,
+          "targeted_retry_queued_count": 7,
+          "skipped_count": 0,
+          "error_count": 0
+        }\n"""
+    )
 
     payload = refresh_buyer_acquisition_plan(tmp_path)
     summary = payload["predictive_revenue_enterprise_activation"]
@@ -432,3 +440,13 @@ def test_refresh_surfaces_enterprise_activation_summary(tmp_path, monkeypatch):
     assert summary["company_route_available_count"] == 9
     assert summary["live_outbound_send"] is False
     assert summary["actual_revenue"] is False
+
+    contacts = payload[
+        "predictive_revenue_enterprise_contact_intelligence"
+    ]
+    assert contacts["status"] == "ACTIVE"
+    assert contacts["proposed_review_count"] == 2
+    assert contacts["targeted_retry_queued_count"] == 7
+    assert contacts["error_count"] == 0
+    assert contacts["live_outbound_send"] is False
+    assert contacts["actual_revenue"] is False
