@@ -57,6 +57,7 @@ def main() -> int:
         ),
         "skipped_count": result["skipped_count"],
         "error_count": result["error_count"],
+        "errors": result["errors"],
         "live_outbound_send": False,
         "actual_revenue": False,
     }, indent=2, sort_keys=True))
