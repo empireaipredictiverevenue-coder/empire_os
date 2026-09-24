@@ -28,6 +28,7 @@ def main() -> int:
         "processed_count": payload["processed_count"],
         "classification_counts": payload["classification_counts"],
         "recovery_state_counts": payload["recovery_state_counts"],
+        "identity_match_counts": payload["identity_match_counts"],
         "next_offset": payload["next_offset"],
         "historical_omega_is_current_truth": payload[
             "historical_omega_is_current_truth"
