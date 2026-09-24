@@ -24,6 +24,7 @@ ALLOWED_PLAYBOOKS = (
     "queue_recovery",
     "data_refresh",
     "observe_business_blocker",
+    "observe_data_evidence",
     "escalate",
 )
 
@@ -32,6 +33,11 @@ _CODE_MAP = {
     "coder_model_route_degraded": ("capacity_contention", "provider_failover"),
     "commercial_loop_blocked": ("business_blocker", "observe_business_blocker"),
     "source_pipeline_degraded": ("data_freshness", "data_refresh"),
+    "source_pipeline_unscheduled": ("workflow_stall", "escalate"),
+    "source_ingest_evidence_unverified": (
+        "data_freshness",
+        "observe_data_evidence",
+    ),
     "buyer_review_worker_failed": ("workflow_stall", "queue_recovery"),
     "critical_service_down": ("dependency_failure", "escalate"),
     "critical_timer_down": ("workflow_stall", "escalate"),
