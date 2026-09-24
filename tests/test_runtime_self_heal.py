@@ -226,9 +226,13 @@ def test_enterprise_contact_intelligence_units_are_auto_repairable():
     assert runtime_self_heal.unit_is_auto_repairable(
         "empire-predictive-revenue-enterprise-activation.timer"
     )
+
+    # Stale contact intelligence must use the lightweight canonical-env sync.
+    # The full enterprise activation service is intentionally not a direct
+    # self-heal target because it performs the much larger discovery/probe run.
     assert runtime_self_heal.unit_is_auto_repairable(
         "empire-predictive-revenue-enterprise-activation.service"
-    )
+    ) is False
     assert runtime_self_heal.unit_is_auto_repairable(
         "empire-enterprise-contact-sync.service"
     )
