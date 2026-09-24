@@ -220,7 +220,7 @@ def test_visible_people_recovers_named_ceo_without_schema():
 
     assert people
     assert people[0]["name"] == "Jane Smith"
-    assert people[0]["title"].lower() in {"founder", "ceo"}
+    assert people[0]["title"] == "Founder & CEO"
     assert people[0]["email"] == "jane@acme.test"
 
 
@@ -248,6 +248,7 @@ def test_visible_people_pairs_adjacent_team_card_blocks():
 
     assert people
     assert people[0]["name"] == "John Carter"
+    assert people[0]["title"] == "Owner & President"
     assert people[0]["email"] == "john@acme.test"
 
 
