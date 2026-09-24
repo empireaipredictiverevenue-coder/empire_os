@@ -27,3 +27,14 @@ def test_enterprise_contact_deployer_tests_installs_syncs_and_starts_async():
     assert '"live_outbound_send"] is False' in text
     assert '"payment_action"] is False' in text
     assert '"actual_revenue"] is False' in text
+
+
+def test_enterprise_contact_deployer_uses_canonical_systemd_env_for_sync():
+    text = (
+        ROOT / "scripts/deploy_enterprise_contact_intelligence.sh"
+    ).read_text()
+
+    assert "systemctl start empire-enterprise-contact-sync.service" in text
+    assert "verify_enterprise_contact_intelligence.py" in text
+    assert "SYNC_RESULT" in text
+    assert "EnvironmentFile" not in text
