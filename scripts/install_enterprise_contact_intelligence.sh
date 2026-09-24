@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="${1:-/srv/empire_os}"
 SYSTEMD_DIR="/etc/systemd/system"
 
+install -d -m 0750 -o ubuntu -g ubuntu \
+  /home/ubuntu/empire_os_repair_worktrees
+
 install_unit() {
   local source="$1"
   local name
