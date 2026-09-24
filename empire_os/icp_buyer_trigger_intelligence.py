@@ -282,8 +282,9 @@ ICP_PROFILES: tuple[dict[str, Any], ...] = (
             "direct_demand_buyers",
         ],
         "industry_signals": [
-            "mass tort law firm", "mass tort attorneys",
-            "class action law firm", "multidistrict litigation",
+            "mass tort law firm", "mass tort lawyer",
+            "mass tort attorneys", "class action law firm",
+            "class action lawyer", "multidistrict litigation",
             "mdL", "plaintiff law firm",
         ],
         "decision_maker_roles": [
@@ -320,8 +321,10 @@ ICP_PROFILES: tuple[dict[str, Any], ...] = (
             "direct_demand_buyers",
         ],
         "industry_signals": [
-            "personal injury law firm", "plaintiff law firm",
-            "medical malpractice law firm", "workers compensation law firm",
+            "personal injury law firm", "personal injury lawyer",
+            "plaintiff law firm", "medical malpractice law firm",
+            "medical malpractice lawyer", "workers compensation law firm",
+            "workers comp lawyer",
             "catastrophic injury", "trial lawyers",
         ],
         "decision_maker_roles": [
@@ -361,7 +364,9 @@ ICP_PROFILES: tuple[dict[str, Any], ...] = (
             "insurance agency network", "insurance brokerage",
             "independent insurance agency", "insurance distribution",
             "insurance marketplace", "insurance leads",
-            "insurance call center",
+            "insurance call center", "auto insurance",
+            "life insurance agent", "public insurance adjuster",
+            "final expense insurance", "medicare advantage agent",
         ],
         "decision_maker_roles": [
             "chief executive officer", "ceo",
