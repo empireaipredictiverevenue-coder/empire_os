@@ -127,6 +127,7 @@ def run_buyer_scout(
     results_per_query: int = 8,
     max_domains: int = 40,
     max_probes: int = 20,
+    canonical_seed_records: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     queries = collect_research_queries(
         plan,
@@ -163,6 +164,37 @@ def run_buyer_scout(
                     row.get("decision_maker_roles") or []
                 ),
             })
+
+    search_domain_count = len(provenance)
+    seed_domain_count = 0
+    canonical_seed_by_domain: dict[str, dict[str, Any]] = {}
+
+    if not provenance:
+        for raw in canonical_seed_records or []:
+            if not isinstance(raw, Mapping):
+                continue
+            row = dict(raw)
+            host = _host(str(row.get("website") or ""))
+            if not host:
+                continue
+            profile_key = str(row.get("icp_profile_key") or "").strip()
+            if profile_key not in CONTINUOUS_COMMERCIAL_LANE_BY_ICP:
+                continue
+            canonical_seed_by_domain[host] = row
+            provenance.setdefault(host, []).append({
+                "source": "canonical_prospect_seed",
+                "query": None,
+                "buyer_pool": "enterprise_and_data_buyers",
+                "target_kind": "canonical_seed",
+                "corridor_key": None,
+                "product_code": None,
+                "icp_profile_key": profile_key,
+                "buying_triggers": [],
+                "decision_maker_roles": [],
+                "prospect_id": row.get("id"),
+                "canonical_niche": row.get("niche"),
+            })
+        seed_domain_count = len(canonical_seed_by_domain)
 
     ranked_domains = sorted(
         provenance,
@@ -213,11 +245,15 @@ def run_buyer_scout(
             for value in (evidence.get("business_names") or [])
             if str(value).strip()
         ]
+        seed = canonical_seed_by_domain.get(domain) or {}
+        seed_name = str(seed.get("business_name") or "").strip()
+        seed_niche = str(seed.get("niche") or "").strip()
         record = {
             "business_name": (
                 business_names[0]
                 if business_names
-                else evidence.get("title")
+                else seed_name
+                or evidence.get("title")
             ),
             "business_name_source": (
                 "first_party_business_name"
@@ -229,10 +265,21 @@ def run_buyer_scout(
             or evidence.get("final_url"),
             "description": evidence.get("description"),
             "notes": " ".join(
-                str(page.get("visible_text") or "")[:1500]
-                for page in (evidence.get("pages_checked") or [])[:2]
-                if isinstance(page, Mapping)
-            ),
+                [
+                    *[
+                        str(page.get("visible_text") or "")[:1500]
+                        for page in (
+                            evidence.get("pages_checked") or []
+                        )[:2]
+                        if isinstance(page, Mapping)
+                    ],
+                    (
+                        f"canonical prospect niche: {seed_niche}"
+                        if seed_niche
+                        else ""
+                    ),
+                ]
+            ).strip(),
         }
         profile = direct_buyer_profile(record)
 
@@ -295,6 +342,17 @@ def run_buyer_scout(
 
         candidates.append({
             "domain": domain,
+            "discovery_source": (
+                "canonical_prospect_seed"
+                if domain in canonical_seed_by_domain
+                else "search_fabric"
+            ),
+            "canonical_seed_prospect_id": (
+                canonical_seed_by_domain.get(domain, {}).get("id")
+            ),
+            "canonical_seed_niche": (
+                canonical_seed_by_domain.get(domain, {}).get("niche")
+            ),
             "business_name": record["business_name"],
             "business_name_source": record["business_name_source"],
             "site_business_names": record["site_business_names"],
@@ -381,6 +439,11 @@ def run_buyer_scout(
         "mode": "OBSERVE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "query_count": len(queries),
+        "search_domain_count": search_domain_count,
+        "canonical_seed_domain_count": seed_domain_count,
+        "canonical_seed_fallback_used": bool(
+            seed_domain_count and search_domain_count == 0
+        ),
         "domain_count": len(ranked_domains),
         "probed_domain_count": min(len(ranked_domains), max_probes),
         "candidate_count": len(candidates),
