@@ -1,12 +1,8 @@
-from scripts import run_ops_control_cycle as ops_control
+from pathlib import Path
 
 
 def test_ops_control_source_exposes_structured_health_domains():
-    source = (
-        __import__("pathlib").Path(
-            "scripts/run_ops_control_cycle.py"
-        ).read_text()
-    )
+    source = Path("scripts/run_ops_control_cycle.py").read_text()
 
     assert '"health_domains": health_domains' in source
     assert '"blocking_findings": blocking_findings' in source
