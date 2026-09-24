@@ -395,3 +395,45 @@ def test_runtime_snapshot_reader_surfaces_invalid_json(tmp_path):
     assert payload == {}
     assert health["state"] == "INVALID_JSON"
     assert health["readable"] is True
+
+
+def test_refresh_surfaces_enterprise_activation_summary(tmp_path, monkeypatch):
+    from empire_os.buyer_acquisition_team import refresh_buyer_acquisition_plan
+
+    exchange = tmp_path / "runtime/commercial_exchange"
+    catalog = tmp_path / "runtime/commercial_catalog"
+    activation = tmp_path / "runtime/predictive_revenue"
+    exchange.mkdir(parents=True)
+    catalog.mkdir(parents=True)
+    activation.mkdir(parents=True)
+
+    (exchange / "latest.json").write_text('{"inventory_count": 0}\n')
+    (catalog / "latest.json").write_text('{"products": []}\n')
+    (activation / "enterprise_activation_latest.json").write_text(
+        """{
+          "status": "INTERNAL_REVIEW_READY",
+          "target_count": 9,
+          "canonical_prospect_count": 9,
+          "qualified_count": 9,
+          "review_ready_count": 4,
+          "person_contact_verified_count": 2,
+          "company_route_available_count": 9,
+          "failed_count": 0
+        }\n"""
+    )
+
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_team._write_json",
+        lambda *args, **kwargs: None,
+    )
+
+    payload = refresh_buyer_acquisition_plan(tmp_path)
+    summary = payload["predictive_revenue_enterprise_activation"]
+    assert summary["target_count"] == 9
+    assert summary["canonical_prospect_count"] == 9
+    assert summary["qualified_count"] == 9
+    assert summary["review_ready_count"] == 4
+    assert summary["person_contact_verified_count"] == 2
+    assert summary["company_route_available_count"] == 9
+    assert summary["live_outbound_send"] is False
+    assert summary["actual_revenue"] is False
