@@ -228,3 +228,117 @@ def test_reconciliation_uses_current_first_party_title_when_available():
     assert result["decision_role"] == "functional_buyer"
     assert result["decision_score"] == 0.8
     assert result["leadership_source"] == "first_party_site_current"
+
+
+def test_enterprise_sync_retries_transient_prospect_fetch_failure(monkeypatch):
+    prospect_id = "00000000-0000-0000-0000-000000001111"
+    activation = {
+        "targets": [{
+            "account_name": "Redwood Services",
+            "prospect_id": prospect_id,
+            "person_contact_verified": True,
+            "probe": _probe(
+                "Richard Lewis",
+                "Chief Executive Officer",
+                "richard@redwoodservices.com",
+            ),
+        }]
+    }
+    calls = {"get": 0, "post": 0}
+
+    def request(method, path, payload=None, **kwargs):
+        if method == "GET":
+            calls["get"] += 1
+            if calls["get"] == 1:
+                raise TimeoutError("transient read timeout")
+            return [{
+                "id": prospect_id,
+                "business_name": "Redwood Services",
+                "niche": "predictive_revenue_enterprise",
+                "metro": "Memphis, TN",
+                "website": "https://redwoodservices.com",
+                "buy_signal_score": 50,
+                "contact_source": "public_enterprise_target",
+            }]
+        calls["post"] += 1
+        return {
+            "decision": "proposed",
+            "review_id": "00000000-0000-0000-0000-000000001112",
+            "status": "pending",
+            "actual_revenue": False,
+        }
+
+    monkeypatch.setattr(
+        "empire_os.enterprise_contact_intelligence.time.sleep",
+        lambda _seconds: None,
+    )
+    result = sync_enterprise_activation(
+        activation,
+        request=request,
+        queue=FakeQueue(),
+    )
+    assert result["error_count"] == 0
+    assert result["proposed_review_count"] == 1
+    assert calls["get"] == 2
+    assert calls["post"] == 1
+
+
+def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
+    prospect_id = "00000000-0000-0000-0000-000000001221"
+    activation = {
+        "targets": [{
+            "account_name": "Redwood Services",
+            "prospect_id": prospect_id,
+            "person_contact_verified": True,
+            "probe": _probe(
+                "Richard Lewis",
+                "Chief Executive Officer",
+                "richard@redwoodservices.com",
+            ),
+        }]
+    }
+    calls = {"post": 0}
+
+    def request(method, path, payload=None, **kwargs):
+        if method == "GET":
+            return [{
+                "id": prospect_id,
+                "business_name": "Redwood Services",
+                "niche": "predictive_revenue_enterprise",
+                "metro": "Memphis, TN",
+                "website": "https://redwoodservices.com",
+                "buy_signal_score": 50,
+                "contact_source": "public_enterprise_target",
+            }]
+        calls["post"] += 1
+        if calls["post"] == 1:
+            raise RuntimeError(
+                "POST /rest/v1/rpc/propose_buyer_candidate_review "
+                "-> HTTP 504: timeout"
+            )
+        return {
+            "decision": "existing",
+            "review_id": "00000000-0000-0000-0000-000000001222",
+            "status": "pending",
+            "actual_revenue": False,
+        }
+
+    monkeypatch.setattr(
+        "empire_os.enterprise_contact_intelligence.time.sleep",
+        lambda _seconds: None,
+    )
+    result = sync_enterprise_activation(
+        activation,
+        request=request,
+        queue=FakeQueue(),
+    )
+    assert result["error_count"] == 0
+    assert result["proposed_review_count"] == 1
+    assert calls["post"] == 2
+
+
+def test_sync_worker_prints_error_details_for_operator_diagnostics():
+    source = Path(
+        "scripts/run_enterprise_contact_intelligence.py"
+    ).read_text()
+    assert '"errors": result["errors"]' in source
