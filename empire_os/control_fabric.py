@@ -210,6 +210,25 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             60,
         ),
         ComponentSpec(
+            "runtime_self_heal",
+            (
+                "runtime_health_tick",
+                "component_degraded",
+                "snapshot_stale",
+                "service_unhealthy",
+            ),
+            (
+                "runtime_health_refreshed",
+                "runtime_repair_attempted",
+                "runtime_repair_verified",
+                "founder_gate_required",
+            ),
+            ("control_fabric",),
+            "internal_write",
+            120,
+            "allowlisted_reversible_only",
+        ),
+        ComponentSpec(
             "marketing",
             (
                 "marketing_objective_ready",
