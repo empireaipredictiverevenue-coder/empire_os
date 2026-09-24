@@ -16,7 +16,8 @@ PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
   tests/test_buyer_acquisition_scout_systemd.py \
   tests/test_buyer_scout_reconciliation.py \
   tests/test_buyer_scout_review_readiness.py \
-  tests/test_buyer_scout_promotion_plan.py
+  tests/test_buyer_scout_promotion_plan.py \
+  tests/test_continuous_enterprise_scout_deployer.py
 
 echo
 echo "=== COMPILE ==="
