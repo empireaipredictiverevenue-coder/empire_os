@@ -48,6 +48,7 @@ def test_inactive_safe_service_is_repaired_and_verified(monkeypatch, tmp_path):
         now=NOW,
         service_status=status,
         repair=repair,
+        unit_inventory=lambda: [],
         latest_path=tmp_path / "latest.json",
         state_path=tmp_path / "state.json",
     )
@@ -84,6 +85,7 @@ def test_missing_snapshot_runs_bounded_writer_repair(monkeypatch, tmp_path):
     payload = runtime_self_heal.run_runtime_self_heal(
         now=NOW,
         repair=repair,
+        unit_inventory=lambda: [],
         latest_path=tmp_path / "latest.json",
         state_path=tmp_path / "state.json",
     )
@@ -112,6 +114,7 @@ def test_repair_cooldown_prevents_restart_loop(monkeypatch, tmp_path):
     payload = runtime_self_heal.run_runtime_self_heal(
         now=NOW,
         service_status=lambda _unit: (False, "inactive"),
+        unit_inventory=lambda: [],
         repair=lambda _action, _unit: (_ for _ in ()).throw(
             AssertionError("repair must not run during cooldown")
         ),
@@ -136,6 +139,7 @@ def test_non_observe_mode_forces_observe_only(monkeypatch, tmp_path):
     payload = runtime_self_heal.run_runtime_self_heal(
         now=NOW,
         service_status=lambda _unit: (False, "inactive"),
+        unit_inventory=lambda: [],
         repair=lambda _action, _unit: (_ for _ in ()).throw(
             AssertionError("repair must not execute")
         ),
@@ -146,3 +150,24 @@ def test_non_observe_mode_forces_observe_only(monkeypatch, tmp_path):
     assert payload["observe_only"] is True
     assert payload["repairs"][0]["decision"] == "WOULD_AUTO_REPAIR"
     assert payload["repairs"][0]["executed"] is False
+
+
+def test_unit_policy_defaults_to_observe_only_and_gates_consequential():
+    assert (
+        runtime_self_heal.classify_unit_policy(
+            "empire-brand-new-internal.service"
+        )
+        == "OBSERVE_ONLY"
+    )
+    assert (
+        runtime_self_heal.classify_unit_policy(
+            "empire-outbound-governor.service"
+        )
+        == "FOUNDER_GATE"
+    )
+    assert (
+        runtime_self_heal.classify_unit_policy(
+            "empire-public-gateway.service"
+        )
+        == "AUTO_REPAIR"
+    )
