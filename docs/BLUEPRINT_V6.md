@@ -791,3 +791,51 @@ incubation opportunities such as Oil & Gas / Energy Infrastructure.
 Recovery status is not production status. Historical pricing is not current
 pricing. The governed commercial catalog, runtime and canonical Supabase remain
 the final truth for what is sellable, executable or recognized as revenue.
+
+
+## Predictive Revenue Commercial Hierarchy — Locked 2026-09-24
+
+Predictive Revenue is the flagship commercial engine inside Predictive Cloud.
+
+Commercial ladder:
+
+1. **Self-Serve Intelligence**
+   - fixed-price intelligence products;
+   - low-friction entry and evidence wedge.
+
+2. **Commercial Exchange**
+   - Starter **$99/mo**;
+   - Growth **$249/mo**;
+   - Pro **$499/mo**;
+   - Enterprise **$999/mo floor**;
+   - monthly membership + usage/overage;
+   - corridor, capacity, territory and exclusivity economics remain governed.
+
+3. **Predictive Revenue Enterprise**
+   - Diagnostic **$25k**;
+   - Command Center **$50k starting deployment**;
+   - Intelligence OS **$100k starting deployment**;
+   - Autonomous OS **$200k starting deployment**;
+   - Private Strategic Deployment **$250k+ floor**.
+
+The $250k+ private deployment uses an internal direct-delivery budget ceiling of
+$75k and enterprise acquisition ceiling of $25k, corresponding to a 70% gross
+margin at the fulfilment ceiling and 60% contribution margin after the
+acquisition ceiling. These are commercial budget ceilings, not observed
+historical costs.
+
+High-ticket deployment requests are qualification/scoping events only.
+They do not create contracts, payment requests, deployments or actual revenue.
+
+Distribution strategy:
+- direct multi-brand / multi-location operators;
+- PE portfolio operating teams;
+- Neudata for institutional data discovery;
+- Snowflake / Databricks marketplace data products;
+- AWS Data Exchange / Marketplace and Google BigQuery sharing when seller/KYB
+  requirements are commercially practical.
+
+Canonical references:
+- `docs/PREDICTIVE_REVENUE_COMMERCIAL_LADDER.md`
+- `docs/PREDICTIVE_REVENUE_PRIVATE_250K_SCOPE.md`
+- `docs/PREDICTIVE_REVENUE_BUYER_DISTRIBUTION_2026-09-24.md`
