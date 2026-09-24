@@ -21,6 +21,11 @@ class ExchangeMrrProduct:
     capacity_model: str
     included_features: tuple[str, ...]
     monetization: tuple[str, ...]
+    lead_classes: tuple[str, ...]
+    allocation_priority: str
+    territory_model: str
+    exclusivity_eligible: bool
+    delivery_modes: tuple[str, ...]
     pricing_state: str = "FOUNDER_GATE"
     binding_terms_ready: bool = False
     execution_authority: str = "none"
@@ -47,6 +52,11 @@ EXCHANGE_MRR_PRODUCTS: tuple[ExchangeMrrProduct, ...] = (
             "monthly_subscription",
             "usage_or_overage",
         ),
+        lead_classes=("verified", "qualified"),
+        allocation_priority="standard",
+        territory_model="single_corridor",
+        exclusivity_eligible=False,
+        delivery_modes=("email", "webhook"),
     ),
     ExchangeMrrProduct(
         product_code="exchange_seat_growth",
@@ -68,6 +78,11 @@ EXCHANGE_MRR_PRODUCTS: tuple[ExchangeMrrProduct, ...] = (
             "usage_or_overage",
             "reserved_capacity",
         ),
+        lead_classes=("verified", "qualified", "high_intent"),
+        allocation_priority="priority",
+        territory_model="multi_corridor",
+        exclusivity_eligible=False,
+        delivery_modes=("email", "webhook", "api"),
     ),
     ExchangeMrrProduct(
         product_code="exchange_seat_pro",
@@ -91,6 +106,16 @@ EXCHANGE_MRR_PRODUCTS: tuple[ExchangeMrrProduct, ...] = (
             "reserved_capacity",
             "premium_territory",
         ),
+        lead_classes=(
+            "verified",
+            "qualified",
+            "high_intent",
+            "exclusive_eligible",
+        ),
+        allocation_priority="high_priority",
+        territory_model="premium_multi_corridor",
+        exclusivity_eligible=True,
+        delivery_modes=("email", "webhook", "api"),
     ),
     ExchangeMrrProduct(
         product_code="exchange_seat_enterprise",
@@ -118,6 +143,17 @@ EXCHANGE_MRR_PRODUCTS: tuple[ExchangeMrrProduct, ...] = (
             "exclusivity_premium",
             "private_feed",
         ),
+        lead_classes=(
+            "verified",
+            "qualified",
+            "high_intent",
+            "exclusive_eligible",
+            "reserved_inventory",
+        ),
+        allocation_priority="contract_priority",
+        territory_model="custom_contract",
+        exclusivity_eligible=True,
+        delivery_modes=("email", "webhook", "api", "private_feed"),
     ),
 )
 
@@ -146,4 +182,40 @@ def build_exchange_mrr_product_plan() -> dict[str, Any]:
         "binding_terms_ready": False,
         "actual_revenue": False,
         "execution_authority": "none",
+    }
+
+
+
+def public_exchange_seat_projection() -> dict[str, Any]:
+    """Public, non-binding view of Exchange seat capabilities.
+
+    No price is emitted until the founder-approved governed catalog version
+    exists. This endpoint is suitable for self-serve buyer interest capture.
+    """
+    products = []
+    for row in EXCHANGE_MRR_PRODUCTS:
+        products.append({
+            "product_code": row.product_code,
+            "name": row.name,
+            "buyer_segment": row.buyer_segment,
+            "corridor_limit": row.corridor_limit,
+            "lead_classes": list(row.lead_classes),
+            "allocation_priority": row.allocation_priority,
+            "territory_model": row.territory_model,
+            "exclusivity_eligible": row.exclusivity_eligible,
+            "delivery_modes": list(row.delivery_modes),
+            "included_features": list(row.included_features),
+            "pricing_state": row.pricing_state,
+            "binding_terms_ready": False,
+        })
+    return {
+        "schema_version": "empire.public.exchange-seats.v1",
+        "products": products,
+        "count": len(products),
+        "monthly_membership": True,
+        "usage_or_overage": True,
+        "capacity_gates_delivery_only": True,
+        "overflow_remains_empire_owned": True,
+        "pricing_binding": False,
+        "actual_revenue": False,
     }
