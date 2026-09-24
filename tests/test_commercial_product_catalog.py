@@ -1,3 +1,5 @@
+import stat
+
 from empire_os.commercial_product_catalog import (
     assess_catalog_item,
     fetch_catalog,
@@ -195,3 +197,10 @@ def test_fetch_catalog_postgres_uses_restricted_role():
             ("managed_service", 500),
         ),
     ]
+
+
+def test_snapshot_is_group_readable_but_not_world_readable(tmp_path):
+    path = tmp_path / "catalog.json"
+    write_catalog_snapshot(summarize_catalog([]), path)
+    mode = stat.S_IMODE(path.stat().st_mode)
+    assert mode == 0o640
