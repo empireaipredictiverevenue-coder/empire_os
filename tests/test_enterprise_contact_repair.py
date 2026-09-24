@@ -108,3 +108,98 @@ def test_repair_systemd_is_internal_observe_only():
     assert "Persistent=true" in timer
     assert "outbound" not in service.lower()
     assert "payment" not in service.lower()
+
+
+def test_code_repair_budget_quarantines_after_three_attempts(
+    monkeypatch,
+    tmp_path,
+):
+    incident = tmp_path / "incident.json"
+    state = tmp_path / "state.json"
+    latest = tmp_path / "latest.json"
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+
+    incident.write_text(
+        """{
+          "fingerprint": "same-failure",
+          "classification": "CODE_DEFECT",
+          "status": "OPEN",
+          "log_tail": "AssertionError FAILED tests/test_x.py::test_x"
+        }\n"""
+    )
+    state.write_text(
+        """{
+          "last_fingerprint": "same-failure",
+          "last_status": "CODER_REPAIR_FAILED",
+          "repair_attempts": 3
+        }\n"""
+    )
+
+    monkeypatch.setattr(repair, "INCIDENT_PATH", incident)
+    monkeypatch.setattr(repair, "STATE_PATH", state)
+    monkeypatch.setattr(repair, "LATEST_PATH", latest)
+    monkeypatch.setattr(repair, "RUNTIME", runtime)
+    monkeypatch.setattr(
+        repair,
+        "_repair_code_incident",
+        lambda _incident: (_ for _ in ()).throw(
+            AssertionError("repair must not run after budget exhaustion")
+        ),
+    )
+
+    result = repair.run_repair_cycle()
+    assert result["status"] == "QUARANTINED_REPAIR_EXHAUSTED"
+    assert result["repair_attempts"] == 3
+    assert result["actual_revenue"] is False
+
+
+def test_resolved_incident_does_not_hide_new_runtime_failure(
+    monkeypatch,
+    tmp_path,
+):
+    incident = tmp_path / "incident.json"
+    state = tmp_path / "state.json"
+    latest = tmp_path / "latest.json"
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+
+    incident.write_text(
+        """{
+          "fingerprint": "old",
+          "classification": "CODE_DEFECT",
+          "status": "RESOLVED"
+        }\n"""
+    )
+    (runtime / "enterprise_contact_intelligence_latest.json").write_text(
+        """{
+          "error_count": 1,
+          "errors": [{"error": "HTTP 504: timeout"}]
+        }\n"""
+    )
+
+    monkeypatch.setattr(repair, "INCIDENT_PATH", incident)
+    monkeypatch.setattr(repair, "STATE_PATH", state)
+    monkeypatch.setattr(repair, "LATEST_PATH", latest)
+    monkeypatch.setattr(repair, "RUNTIME", runtime)
+    monkeypatch.setattr(
+        repair,
+        "_git",
+        lambda *args, **kwargs: type(
+            "Result",
+            (),
+            {"stdout": "abc123\n", "stderr": "", "returncode": 0},
+        )(),
+    )
+    monkeypatch.setattr(
+        repair,
+        "_retry_runtime_sync",
+        lambda: {
+            "status": "RESOLVED_RUNTIME_RETRY",
+            "attempts": 1,
+        },
+    )
+
+    result = repair.run_repair_cycle()
+    assert result["status"] == "RESOLVED_RUNTIME_RETRY"
+    assert result["classification"] == "TRANSIENT_INFRA"
