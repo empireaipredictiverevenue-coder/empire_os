@@ -187,3 +187,137 @@ def test_permanent_bounce_requests_suppression():
     assert seen["p_event_type"] == "bounced"
     assert seen["p_suppress"] is True
     assert r.json()["suppressed"] is True
+
+
+
+class _ForwardEmails:
+    sent = []
+
+    @classmethod
+    def send(cls, payload, options=None):
+        cls.sent.append((payload, options))
+        return {"id": "em_forward_test"}
+
+
+class _ForwardResend:
+    api_key = None
+    Emails = _ForwardEmails
+
+
+def test_governed_reply_is_ingested_and_mirrored_to_founder_gmail(
+    monkeypatch,
+):
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    _ForwardEmails.sent = []
+    calls = []
+
+    def rpc(name, params):
+        calls.append((name, params))
+        if name == "ingest_outbound_reply":
+            return {
+                "decision": "recorded",
+                "reply_id": (
+                    "00000000-0000-0000-0000-000000000099"
+                ),
+            }
+        if name == "classify_outbound_reply":
+            return {
+                "decision": "classified",
+                "classification": params["p_classification"],
+                "suppressed": False,
+            }
+        raise AssertionError(name)
+
+    app = create_app(
+        verify_webhook=lambda _: event(),
+        fetch_email=lambda _: fetched(),
+        reply_rpc=rpc,
+        webhook_secret="whsec_test",
+        reply_to="replies@empire-ai.co.uk",
+        reply_forward_to="flavag83@gmail.com",
+        reply_forward_sender=(
+            "Phil - Founder - Empire AI "
+            "<founder@empire-ai.co.uk>"
+        ),
+        resend_module=_ForwardResend,
+    )
+    r = TestClient(app).post(
+        "/webhooks/resend-inbound",
+        content="{}",
+        headers=HEADERS,
+    )
+
+    assert r.status_code == 200
+    assert r.json()["reply_forwarded"] is True
+    assert r.json()["reply_forward_target"] == "flavag83@gmail.com"
+    assert calls[0][0] == "ingest_outbound_reply"
+
+    payload, options = _ForwardEmails.sent[0]
+    assert payload["to"] == ["flavag83@gmail.com"]
+    assert payload["from"] == (
+        "Phil - Founder - Empire AI "
+        "<founder@empire-ai.co.uk>"
+    )
+    assert payload["subject"].startswith("[Empire buyer reply]")
+    assert "Interested, tell me more." in payload["text"]
+    assert options["idempotency_key"] == "reply-forward/em_1"
+
+
+def test_direct_founder_inbox_is_mirrored_without_reply_automation(
+    monkeypatch,
+):
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    _ForwardEmails.sent = []
+
+    direct_event = {
+        "type": "email.received",
+        "data": {
+            "email_id": "em_founder_1",
+            "from": "Sender <sender@example.com>",
+            "received_for": ["founder@empire-ai.co.uk"],
+            "to": ["founder@empire-ai.co.uk"],
+            "subject": "Hello founder",
+            "created_at": "2026-09-24T20:00:00Z",
+        },
+    }
+    direct_fetched = {
+        "from": "Sender <sender@example.com>",
+        "subject": "Hello founder",
+        "text": "Direct founder inbox message.",
+        "received_for": ["founder@empire-ai.co.uk"],
+        "headers": {},
+    }
+
+    app = create_app(
+        verify_webhook=lambda _: direct_event,
+        fetch_email=lambda _: direct_fetched,
+        reply_rpc=lambda *_: (_ for _ in ()).throw(
+            AssertionError("direct founder inbox must not enter reply RPC")
+        ),
+        webhook_secret="whsec_test",
+        reply_to="reply@mail.empire-ai.co.uk",
+        founder_inbox="founder@empire-ai.co.uk",
+        reply_forward_to="flavag83@gmail.com",
+        reply_forward_sender=(
+            "Phil - Founder - Empire AI "
+            "<founder@empire-ai.co.uk>"
+        ),
+        resend_module=_ForwardResend,
+    )
+    r = TestClient(app).post(
+        "/webhooks/resend-inbound",
+        content="{}",
+        headers=HEADERS,
+    )
+
+    assert r.status_code == 200
+    assert r.json()["ignored"] is True
+    assert r.json()["reply_forwarded"] is True
+    assert r.json()["reply_forward_target"] == "flavag83@gmail.com"
+
+    payload, options = _ForwardEmails.sent[0]
+    assert payload["subject"] == "[Empire inbox] Hello founder"
+    assert "Direct founder inbox message." in payload["text"]
+    assert options["idempotency_key"] == (
+        "reply-forward/em_founder_1"
+    )
