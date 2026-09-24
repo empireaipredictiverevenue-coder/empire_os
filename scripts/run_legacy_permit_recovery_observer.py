@@ -7,6 +7,7 @@ import json
 from empire_os.legacy_permit_recovery import (
     refresh_legacy_permit_recovery_observer,
 )
+from empire_os.legacy_permit_inventory import update_cumulative_inventory
 
 
 def main() -> int:
@@ -21,6 +22,10 @@ def main() -> int:
         batch_size=args.batch_size,
         offset=args.offset,
     )
+    inventory = update_cumulative_inventory(
+        args.repo_root,
+        payload,
+    )
     print(json.dumps({
         "ok": True,
         "mode": payload["mode"],
@@ -34,6 +39,24 @@ def main() -> int:
         ],
         "source_permittee_phone_counts": payload[
             "source_permittee_phone_counts"
+        ],
+        "inventory_identity_mode_counts": payload[
+            "inventory_identity_mode_counts"
+        ],
+        "cumulative_unique_inventory": inventory[
+            "unique_inventory_records"
+        ],
+        "cumulative_verified_current": inventory[
+            "verified_current_inventory"
+        ],
+        "cumulative_owner_identified": inventory[
+            "verified_current_owner_identified"
+        ],
+        "cumulative_project_only": inventory[
+            "verified_current_project_only"
+        ],
+        "cumulative_full_scan_complete": inventory[
+            "full_scan_complete"
         ],
         "next_offset": payload["next_offset"],
         "historical_omega_is_current_truth": payload[
