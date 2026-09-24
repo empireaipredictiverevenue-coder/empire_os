@@ -121,7 +121,7 @@ def _uuid_or_none(value: Any) -> str | None:
 def _title_has(value: str, term: str) -> bool:
     return bool(
         re.search(
-            rf"(?<!\\w){re.escape(term.lower())}(?!\\w)",
+            rf"(?<!\w){re.escape(term.lower())}(?!\w)",
             value,
         )
     )
@@ -135,7 +135,7 @@ def classify_decision_role(title: Any) -> tuple[str, float]:
     # "Vice President" must be classified before the bare "president"
     # economic-buyer term. Substring matching otherwise overstates VP
     # authority and can incorrectly promote functional leaders.
-    if "vice president" in value or re.search(r"\\bvp\\b", value):
+    if "vice president" in value or re.search(r"\bvp\b", value):
         functional_remits = (
             "sales", "revenue", "growth", "marketing",
             "business development", "corporate development",
@@ -171,7 +171,7 @@ def classify_decision_role(title: Any) -> tuple[str, float]:
     if (
         any(_title_has(value, term) for term in functional_c_suite_phrases)
         or any(
-            re.search(rf"\\b{re.escape(term)}\\b", value)
+            re.search(rf"\b{re.escape(term)}\b", value)
             for term in functional_c_suite_acronyms
         )
     ):
