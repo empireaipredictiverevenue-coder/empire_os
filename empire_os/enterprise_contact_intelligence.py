@@ -225,6 +225,89 @@ def reconcile_verified_enterprise_contact(
     }
 
 
+def _refresh_pending_review(
+    review_id: str,
+    *,
+    contact_name: str,
+    contact_title: str,
+    contact_email: str,
+    decision_score: float,
+    evidence: Mapping[str, Any],
+    request=request_json,
+) -> bool:
+    review_id = _text(review_id)
+    if not review_id:
+        return False
+
+    params = urllib.parse.urlencode({
+        "select": (
+            "id,status,contact_name,contact_title,contact_email,"
+            "decision_score,evidence"
+        ),
+        "id": f"eq.{review_id}",
+        "limit": 1,
+    })
+    rows = _request_with_retry(
+        request,
+        "GET",
+        f"/rest/v1/buyer_candidate_reviews?{params}",
+    ) or []
+    if not isinstance(rows, list) or not rows:
+        return False
+
+    current = rows[0] if isinstance(rows[0], Mapping) else {}
+    if _text(current.get("status")).lower() != "pending":
+        return False
+
+    desired_email = _text(contact_email).lower()
+    desired_title = _text(contact_title)
+    desired_name = _text(contact_name)
+    current_email = _text(current.get("contact_email")).lower()
+    current_title = _text(current.get("contact_title"))
+    current_name = _text(current.get("contact_name"))
+
+    if (
+        current_email == desired_email
+        and current_title == desired_title
+        and current_name == desired_name
+    ):
+        return False
+
+    patch_params = urllib.parse.urlencode({
+        "id": f"eq.{review_id}",
+        "status": "eq.pending",
+    })
+    _request_with_retry(
+        request,
+        "PATCH",
+        f"/rest/v1/buyer_candidate_reviews?{patch_params}",
+        payload={
+            "contact_name": desired_name,
+            "contact_title": desired_title,
+            "contact_email": desired_email,
+            "decision_score": float(decision_score),
+            "evidence": dict(evidence),
+        },
+    )
+
+    verify = _request_with_retry(
+        request,
+        "GET",
+        f"/rest/v1/buyer_candidate_reviews?{params}",
+    ) or []
+    if not isinstance(verify, list) or not verify:
+        raise RuntimeError("pending review reconciliation verification missing")
+    row = verify[0] if isinstance(verify[0], Mapping) else {}
+    if (
+        _text(row.get("status")).lower() != "pending"
+        or _text(row.get("contact_name")) != desired_name
+        or _text(row.get("contact_title")) != desired_title
+        or _text(row.get("contact_email")).lower() != desired_email
+    ):
+        raise RuntimeError("pending review reconciliation did not persist")
+    return True
+
+
 def _fetch_prospect(
     prospect_id: str,
     *,
@@ -344,6 +427,19 @@ def sync_enterprise_activation(
                 )
                 if not review_id:
                     raise RuntimeError("review proposal returned no review_id")
+
+                review_refreshed = _refresh_pending_review(
+                    str(review_id),
+                    contact_name=reconciled["name"],
+                    contact_title=reconciled["title"],
+                    contact_email=reconciled["email"],
+                    decision_score=float(
+                        plan["params"]["p_decision_score"]
+                    ),
+                    evidence=plan["params"]["p_evidence"],
+                    request=request,
+                )
+
                 proposed += 1
                 queue.resolve(
                     prospect_id,
@@ -358,6 +454,7 @@ def sync_enterprise_activation(
                     "contact_title": reconciled["title"],
                     "contact_email": reconciled["email"],
                     "offer_key": offer_key,
+                    "pending_review_refreshed": review_refreshed,
                 })
                 continue
 
