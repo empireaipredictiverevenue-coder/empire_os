@@ -428,17 +428,23 @@ def sync_enterprise_activation(
                 if not review_id:
                     raise RuntimeError("review proposal returned no review_id")
 
-                review_refreshed = _refresh_pending_review(
-                    str(review_id),
-                    contact_name=reconciled["name"],
-                    contact_title=reconciled["title"],
-                    contact_email=reconciled["email"],
-                    decision_score=float(
-                        plan["params"]["p_decision_score"]
-                    ),
-                    evidence=plan["params"]["p_evidence"],
-                    request=request,
-                )
+                review_refreshed = False
+                if (
+                    isinstance(response, Mapping)
+                    and _text(response.get("decision")).lower()
+                    == "existing"
+                ):
+                    review_refreshed = _refresh_pending_review(
+                        str(review_id),
+                        contact_name=reconciled["name"],
+                        contact_title=reconciled["title"],
+                        contact_email=reconciled["email"],
+                        decision_score=float(
+                            plan["params"]["p_decision_score"]
+                        ),
+                        evidence=plan["params"]["p_evidence"],
+                        request=request,
+                    )
 
                 proposed += 1
                 queue.resolve(
