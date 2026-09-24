@@ -79,6 +79,10 @@ def test_runtime_self_heal_units_are_allowlisted_without_outbound_authority():
         "empire-acquisition.timer",
         "empire-qualification.timer",
         "empire-hermes-control.timer",
+        "empire-buyer-deferred-enrichment.service",
+        "empire-buyer-deferred-enrichment.timer",
+        "empire-predictive-revenue-enterprise-activation.service",
+        "empire-predictive-revenue-enterprise-activation.timer",
     }
     assert expected.issubset(ALLOWED_UNITS)
     assert all("outbound" not in unit for unit in ALLOWED_UNITS)
