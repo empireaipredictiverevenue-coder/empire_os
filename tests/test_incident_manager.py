@@ -43,3 +43,19 @@ def test_repairable_findings_are_left_to_healer():
         "repairable": True,
         "commercial_priority": 100,
     }]) == []
+
+
+def test_source_evidence_gap_is_observed_without_escalation():
+    report = build_incident_report({
+        "findings": [{
+            "code": "source_ingest_evidence_unverified",
+            "severity": "info",
+            "component": "source_health",
+            "repairable": False,
+            "commercial_priority": 65,
+        }]
+    })
+    item = report["diagnoses"][0]
+    assert item["label"] == "data_freshness"
+    assert item["playbook"] == "observe_data_evidence"
+    assert item["escalation_required"] is False
