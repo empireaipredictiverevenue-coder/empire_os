@@ -353,6 +353,16 @@ def fetch_canonical_prospects_by_metro(
     return result
 
 
+def _identity_name_key(value: Any) -> str:
+    return " ".join(
+        re.sub(
+            r"[^a-z0-9]+",
+            " ",
+            _clean(value).casefold(),
+        ).split()
+    )
+
+
 def match_canonical_identity(
     parsed: Mapping[str, Any],
     canonical_prospects_by_metro: Mapping[str, Mapping[str, Any]],
@@ -409,10 +419,49 @@ def match_canonical_identity(
     prospect = lookup.get("prospect")
 
     if decision == "matched" and isinstance(prospect, Mapping):
+        canonical_id = _clean(prospect.get("id")) or None
+
+        # Permit phone fields can belong to contractors, managers, filing
+        # agents, or other shared contacts. Phone-only equality is therefore
+        # evidence for review, not sufficient proof that the permit owner and
+        # canonical business are the same entity.
+        if reason == "exact_phone":
+            legacy_name = _identity_name_key(parsed.get("business_name"))
+            canonical_name = _identity_name_key(
+                prospect.get("business_name")
+            )
+            legacy_metro = _clean(parsed.get("metro")).casefold()
+            canonical_metro = _clean(prospect.get("metro")).casefold()
+
+            if (
+                legacy_name
+                and canonical_name
+                and legacy_name == canonical_name
+                and legacy_metro
+                and legacy_metro == canonical_metro
+            ):
+                return {
+                    "match_state": "MATCHED",
+                    "match_reason": "exact_phone_name_metro",
+                    "canonical_prospect_id": canonical_id,
+                    "match_method": "exact_phone_name_metro",
+                    "rows_scanned": rows_scanned,
+                }
+
+            return {
+                "match_state": "PHONE_ONLY_REVIEW",
+                "match_reason": "exact_phone_without_name_corroboration",
+                "canonical_prospect_id": canonical_id,
+                "match_method": "exact_phone_review_only",
+                "rows_scanned": rows_scanned,
+                "legacy_business_name": parsed.get("business_name"),
+                "canonical_business_name": prospect.get("business_name"),
+            }
+
         return {
             "match_state": "MATCHED",
             "match_reason": reason,
-            "canonical_prospect_id": _clean(prospect.get("id")) or None,
+            "canonical_prospect_id": canonical_id,
             "match_method": reason,
             "rows_scanned": rows_scanned,
         }
@@ -463,7 +512,7 @@ def classify_recovery(
     if state == "VERIFIED_CURRENT":
         if identity_state == "MATCHED":
             return "MERGE", "VERIFIED_CURRENT"
-        if identity_state == "AMBIGUOUS":
+        if identity_state in {"AMBIGUOUS", "PHONE_ONLY_REVIEW"}:
             return "MODERNIZE", "IDENTITY_REVIEW_REQUIRED"
         return "REUSE", "VERIFIED_CURRENT"
     if state == "NOT_FOUND":
