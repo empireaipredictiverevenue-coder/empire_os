@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from empire_os.enterprise_contact_intelligence import (
+    _refresh_pending_review,
     current_target_people,
     reconcile_verified_enterprise_contact,
     sync_enterprise_activation,
@@ -299,8 +300,11 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
     }
     calls = {"post": 0}
 
+    review_id = "00000000-0000-0000-0000-000000001222"
+    review_reads = {"count": 0}
+
     def request(method, path, payload=None, **kwargs):
-        if method == "GET":
+        if method == "GET" and "/prospects?" in path:
             return [{
                 "id": prospect_id,
                 "business_name": "Redwood Services",
@@ -310,6 +314,17 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
                 "buy_signal_score": 50,
                 "contact_source": "public_enterprise_target",
             }]
+        if method == "GET" and "/buyer_candidate_reviews?" in path:
+            review_reads["count"] += 1
+            return [{
+                "id": review_id,
+                "status": "pending",
+                "contact_name": "Richard Lewis",
+                "contact_title": "Chief Executive Officer",
+                "contact_email": "richard@redwoodservices.com",
+                "decision_score": 1.0,
+                "evidence": {},
+            }]
         calls["post"] += 1
         if calls["post"] == 1:
             raise RuntimeError(
@@ -318,7 +333,7 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
             )
         return {
             "decision": "existing",
-            "review_id": "00000000-0000-0000-0000-000000001222",
+            "review_id": review_id,
             "status": "pending",
             "actual_revenue": False,
         }
@@ -342,3 +357,80 @@ def test_sync_worker_prints_error_details_for_operator_diagnostics():
         "scripts/run_enterprise_contact_intelligence.py"
     ).read_text()
     assert '"errors": result["errors"]' in source
+
+
+def test_existing_pending_review_refreshes_current_verified_title():
+    review_id = "00000000-0000-0000-0000-000000009001"
+    calls = []
+    reads = {"count": 0}
+
+    def request(method, path, payload=None, **kwargs):
+        calls.append((method, path, payload))
+        if method == "GET":
+            reads["count"] += 1
+            title = (
+                "President"
+                if reads["count"] == 1
+                else "Vice President, Corporate Development"
+            )
+            return [{
+                "id": review_id,
+                "status": "pending",
+                "contact_name": "Kyle Martin",
+                "contact_title": title,
+                "contact_email": "kmartin@sila.com",
+                "decision_score": 0.8,
+                "evidence": {},
+            }]
+        if method == "PATCH":
+            assert payload["contact_title"] == (
+                "Vice President, Corporate Development"
+            )
+            assert payload["contact_email"] == "kmartin@sila.com"
+            assert payload["decision_score"] == 0.8
+            assert payload["evidence"]["source"] == (
+                "enterprise_contact_intelligence.v1"
+            )
+            return None
+        raise AssertionError((method, path))
+
+    refreshed = _refresh_pending_review(
+        review_id,
+        contact_name="Kyle Martin",
+        contact_title="Vice President, Corporate Development",
+        contact_email="kmartin@sila.com",
+        decision_score=0.8,
+        evidence={
+            "source": "enterprise_contact_intelligence.v1",
+            "role_reconciled": True,
+        },
+        request=request,
+    )
+
+    assert refreshed is True
+    assert [call[0] for call in calls] == ["GET", "PATCH", "GET"]
+
+
+def test_existing_non_pending_review_is_not_rewritten():
+    def request(method, path, payload=None, **kwargs):
+        assert method == "GET"
+        return [{
+            "id": "00000000-0000-0000-0000-000000009002",
+            "status": "approved",
+            "contact_name": "Kyle Martin",
+            "contact_title": "President",
+            "contact_email": "kmartin@sila.com",
+            "decision_score": 1.0,
+            "evidence": {},
+        }]
+
+    refreshed = _refresh_pending_review(
+        "00000000-0000-0000-0000-000000009002",
+        contact_name="Kyle Martin",
+        contact_title="Vice President, Corporate Development",
+        contact_email="kmartin@sila.com",
+        decision_score=0.8,
+        evidence={"source": "enterprise_contact_intelligence.v1"},
+        request=request,
+    )
+    assert refreshed is False
