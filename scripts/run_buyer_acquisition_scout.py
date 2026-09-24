@@ -52,7 +52,10 @@ def _canonical_seed_records(
 
     for lane_index, (profile_key, niches) in enumerate(SEED_LANES):
         offset = ((half_hour_slot + lane_index * 7) % 20) * per_lane
-        niche_filter = ",".join(niches)
+        niche_filter = ",".join(
+            '"' + niche.replace('"', '\\"') + '"'
+            for niche in niches
+        )
         params = urllib.parse.urlencode({
             "select": (
                 "id,business_name,niche,website,metro,status,created_at"
