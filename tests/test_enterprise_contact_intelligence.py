@@ -222,6 +222,7 @@ def test_reconciliation_uses_current_first_party_title_when_available():
                 "name": "Kyle Martin",
                 "title": "Vice President, Corporate Development",
                 "url": "https://silaservices.com/leadership/",
+                "source_kind": "visible_text",
             }],
         },
     }
