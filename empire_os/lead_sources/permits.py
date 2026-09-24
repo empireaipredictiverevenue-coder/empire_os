@@ -152,38 +152,75 @@ def _run_nyc(lookback_days: int = 7) -> Iterator[LeadCandidate]:
             if owner_name.strip().casefold() in placeholder_names:
                 continue
 
-            phone = (row.get("permittee_s_phone__") or "").strip()
-            phone = "".join(c for c in phone if c.isdigit())
-            if len(phone) == 10:
-                phone = f"({phone[:3]}) {phone[3:6]}-{phone[6:]}"
-            elif len(phone) == 11 and phone.startswith("1"):
-                phone = f"({phone[1:4]}) {phone[4:7]}-{phone[7:]}"
+            # IMPORTANT IDENTITY SEMANTICS:
+            # NYC DOB labels this contact as the *permittee*, not the property
+            # owner. Never attach the permittee phone to the owner prospect.
+            permittee_biz = (
+                row.get("permittee_s_business_name") or ""
+            ).strip()
+            permittee_first = (
+                row.get("permittee_s_first_name") or ""
+            ).strip()
+            permittee_last = (
+                row.get("permittee_s_last_name") or ""
+            ).strip()
+            permittee_name = (
+                permittee_biz
+                or f"{permittee_first} {permittee_last}".strip()
+            )
+            permittee_phone = (
+                row.get("permittee_s_phone__") or ""
+            ).strip()
+            digits = "".join(c for c in permittee_phone if c.isdigit())
+            if len(digits) == 10:
+                permittee_phone = (
+                    f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+                )
+            elif len(digits) == 11 and digits.startswith("1"):
+                permittee_phone = (
+                    f"({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+                )
 
             borough = row.get("borough", "").title()
             house = row.get("house__", "")
             street = row.get("street_name", "")
             bbl = row.get("bbl", "")
 
-            # Score: phone found = 70+, recent = bump
-            score = 60 + (10 if phone else 0)
+            # Do not score the owner using a permittee contact field.
+            score = 60
             if row.get("residential") == "YES":
                 score += 5
 
+            evidence = dict(row)
+            evidence["_empire_identity_roles"] = {
+                "candidate_name_role": "property_owner",
+                "candidate_phone_role": "none",
+                "permittee_role": "permittee_contractor_or_professional",
+                "permittee_business_name": permittee_biz,
+                "permittee_name": permittee_name,
+                "permittee_phone": permittee_phone,
+            }
+
             yield LeadCandidate(
                 name=f"{owner_name} ({borough})",
-                phone=phone,
+                # The dataset does not identify permittee_s_phone__ as an
+                # owner phone. Keep owner phone unknown instead of conflating
+                # two entities.
+                phone="",
                 niche=niche,
                 metro="NYC",
                 state="NY",
                 details=(
                     f"{job_type}{'.' + work_type if work_type else ''} permit "
                     f"{job_no} issued {row.get('dobrundate', '')[:10]}: "
-                    f"{desc[:160]}. BBL {bbl}. Address: {house} {street}, {borough}"
+                    f"{desc[:160]}. BBL {bbl}. Address: {house} {street}, {borough}. "
+                    f"Permittee: {permittee_name or 'unknown'}; "
+                    f"permittee phone: {permittee_phone or 'unknown'}"
                 ),
                 source="permits_nyc",
                 lead_score=score,
                 url=f"https://a810-biswebportal.nyc.gov/bisweb/PropertyOverflowDetails.jsp?job={job_no}",
-                raw=row,
+                raw=evidence,
             )
 
         if len(rows) < 1000:
