@@ -18,6 +18,7 @@ from empire_os.outbound_provider import (
     OutboundProviderError,
     extract_resend_provider_event,
     extract_resend_reply,
+    resolve_intent_from_recipients,
     verify_resend_inbound,
 )
 from empire_os.outbound_role_transport import (
@@ -41,6 +42,107 @@ def _valid_email(value: Any) -> str:
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         return ""
     return email
+
+
+def _received_visibility_record(
+    event: dict[str, Any],
+    *,
+    fetch_email: Callable[[str], Any],
+    reply_to: str,
+) -> dict[str, Any] | None:
+    if event.get("type") != "email.received":
+        return None
+    data = event.get("data") or {}
+    if not isinstance(data, dict):
+        return None
+    email_id = str(data.get("email_id") or "").strip()
+    if not email_id:
+        return None
+
+    recipients = (
+        data.get("received_for")
+        or data.get("to")
+        or []
+    )
+    intent_id = ""
+    if reply_to:
+        try:
+            intent_id = resolve_intent_from_recipients(
+                recipients,
+                reply_to=reply_to,
+            )
+        except OutboundProviderError:
+            intent_id = ""
+
+    try:
+        fetched = fetch_email(email_id)
+    except Exception:
+        fetched = {}
+    if isinstance(fetched, dict) and isinstance(
+        fetched.get("data"), dict
+    ):
+        fetched = fetched["data"]
+    if not isinstance(fetched, dict):
+        fetched = {}
+
+    return {
+        "provider": "resend",
+        "provider_message_id": email_id,
+        "intent_id": intent_id,
+        "from_contact": _valid_email(
+            fetched.get("from") or data.get("from")
+        ),
+        "subject": str(
+            fetched.get("subject") or data.get("subject") or ""
+        ).strip(),
+        "body_text": str(
+            fetched.get("text") or "[provider body unavailable]"
+        ).strip(),
+        "received_at": str(
+            data.get("created_at")
+            or fetched.get("created_at")
+            or ""
+        ).strip(),
+        "visibility_kind": (
+            "governed_reply" if intent_id else "founder_inbox"
+        ),
+    }
+
+
+def _visibility_recipient_match(
+    event: dict[str, Any],
+    *,
+    reply_to: str,
+    founder_inbox: str,
+) -> bool:
+    if event.get("type") != "email.received":
+        return False
+    data = event.get("data") or {}
+    recipients = (
+        data.get("received_for")
+        or data.get("to")
+        or []
+    )
+    if isinstance(recipients, str):
+        recipients = [recipients]
+    normalized = {
+        _valid_email(value)
+        for value in recipients
+        if _valid_email(value)
+    }
+    founder = _valid_email(founder_inbox)
+    if founder and founder in normalized:
+        return True
+    if reply_to:
+        try:
+            resolve_intent_from_recipients(
+                list(normalized),
+                reply_to=reply_to,
+            )
+            return True
+        except OutboundProviderError:
+            return False
+    return False
 
 
 def _forward_reply_notification(
@@ -77,12 +179,17 @@ def _forward_reply_notification(
     original_from = str(reply.get("from_contact") or "").strip()
     body = str(reply.get("body_text") or "").strip()
 
-    subject = (
-        "[Empire buyer reply] "
-        + (original_subject or "(no subject)")
+    visibility_kind = str(
+        reply.get("visibility_kind") or "governed_reply"
+    ).strip()
+    subject_prefix = (
+        "[Empire inbox] "
+        if visibility_kind == "founder_inbox"
+        else "[Empire buyer reply] "
     )
+    subject = subject_prefix + (original_subject or "(no subject)")
     text = (
-        "EmpireOS buyer reply notification\n\n"
+        "EmpireOS inbound visibility copy\n\n"
         f"From: {original_from or 'unknown'}\n"
         f"Intent: {intent_id or 'unknown'}\n"
         f"Provider message: {provider_message_id or 'unknown'}\n"
@@ -140,6 +247,7 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                reply_to: str | None = None,
                reply_forward_to: str | None = None,
                reply_forward_sender: str | None = None,
+               founder_inbox: str | None = None,
                resend_module: Any | None = None) -> FastAPI:
     app = FastAPI(title="Empire Resend Inbound", docs_url=None, redoc_url=None)
     if verify_webhook is None or fetch_email is None:
@@ -159,6 +267,14 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
         reply_forward_sender
         if reply_forward_sender is not None
         else os.getenv("EMPIRE_OUTBOUND_FROM", "")
+    ).strip()
+    founder_address = (
+        founder_inbox
+        if founder_inbox is not None
+        else os.getenv(
+            "EMPIRE_FOUNDER_INBOX",
+            "founder@empire-ai.co.uk",
+        )
     ).strip()
 
     def inbound_rpc():
@@ -192,6 +308,37 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
         except OutboundProviderError:
             return JSONResponse({"ok": False}, status_code=400)
 
+        forward_result = {
+            "forwarded": False,
+            "reason": "reply_forwarding_disabled",
+        }
+        if (
+            forward_target
+            and _visibility_recipient_match(
+                event,
+                reply_to=reply_base,
+                founder_inbox=founder_address,
+            )
+        ):
+            try:
+                visibility = _received_visibility_record(
+                    event,
+                    fetch_email=fetch_email,
+                    reply_to=reply_base,
+                )
+                if visibility is not None:
+                    forward_result = _forward_reply_notification(
+                        visibility,
+                        target=forward_target,
+                        sender=forward_sender,
+                        resend_module=resend_module,
+                    )
+            except Exception:
+                forward_result = {
+                    "forwarded": False,
+                    "reason": "reply_forward_failed",
+                }
+
         if provider_event is not None:
             try:
                 result = inbound_rpc()("record_outbound_provider_event", {
@@ -216,9 +363,31 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                 event, fetch_email=fetch_email, reply_to=reply_base,
             )
         except OutboundProviderError:
-            return {"ok": True, "ignored": True}
+            return {
+                "ok": True,
+                "ignored": True,
+                "reply_forwarded": bool(
+                    forward_result.get("forwarded")
+                ),
+                "reply_forward_target": (
+                    forward_result.get("target")
+                    if forward_result.get("forwarded")
+                    else None
+                ),
+            }
         if reply is None:
-            return {"ok": True, "ignored": True}
+            return {
+                "ok": True,
+                "ignored": True,
+                "reply_forwarded": bool(
+                    forward_result.get("forwarded")
+                ),
+                "reply_forward_target": (
+                    forward_result.get("target")
+                    if forward_result.get("forwarded")
+                    else None
+                ),
+            }
 
         try:
             rpc = inbound_rpc()
@@ -251,24 +420,6 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                 })
             except Exception:
                 return JSONResponse({"ok": False}, status_code=503)
-
-        forward_result = {
-            "forwarded": False,
-            "reason": "reply_forwarding_disabled",
-        }
-        if forward_target:
-            try:
-                forward_result = _forward_reply_notification(
-                    reply,
-                    target=forward_target,
-                    sender=forward_sender,
-                    resend_module=resend_module,
-                )
-            except Exception:
-                forward_result = {
-                    "forwarded": False,
-                    "reason": "reply_forward_failed",
-                }
 
         return {
             "ok": True,
