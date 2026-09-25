@@ -9,6 +9,8 @@ fi
 ROOT=/srv/empire_os
 PREFIX=/opt/empire/promptfoo
 PACKAGE='promptfoo@0.123.1'
+TARGET_USER="${SUDO_USER:-ubuntu}"
+[[ "$TARGET_USER" == "root" ]] && TARGET_USER=ubuntu
 
 echo "=== PROMPTFOO ARCHITECTURE GATE ==="
 test -f "$ROOT/docs/AGENT_TOOL_EXECUTION_PLANE_ARCHITECTURE.md"
@@ -39,6 +41,9 @@ EOF
 chmod 0755 "$PREFIX/bin/promptfoo"
 
 "$PREFIX/bin/promptfoo" --version
+
+echo "=== PREPARE VERIFICATION STATE ==="
+install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER"   "$ROOT/runtime/execution_plane"   "$ROOT/runtime/execution_plane/promptfoo_requests"   "$ROOT/runtime/execution_plane/promptfoo_results"   "$ROOT/runtime/execution_plane/candidate_patches"   /var/tmp/empire-promptfoo
 
 echo "=== INSTALL WORKER UNITS ==="
 install -m 0644   "$ROOT/deploy/systemd/empire-execution-plane-promptfoo.service"   /etc/systemd/system/empire-execution-plane-promptfoo.service
