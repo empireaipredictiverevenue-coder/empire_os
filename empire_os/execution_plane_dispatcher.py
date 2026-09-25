@@ -23,6 +23,7 @@ from empire_os.agent_tool_runtime import (
     pi_health,
     space_agent_health,
 )
+from empire_os.candidate_verification import verify_candidate_branch
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
 from empire_os.hermes_control import (
@@ -32,7 +33,6 @@ from empire_os.hermes_control import (
 )
 from empire_os.pi_sandbox_runner import PiSandboxJob, run_pi_sandbox_job
 from empire_os.execution_plane_verification import (
-    enqueue_swarm_verification,
     plan_candidate_verification,
 )
 from empire_os.otel_telemetry import build_resilient_telemetry_sink
@@ -307,18 +307,37 @@ def dispatch_execution_request(
                 max_runtime_seconds=request.max_runtime_seconds,
             ),
         )
-        verification_jobs = []
-        if result.get("status") == "PROPOSAL_READY":
-            verification_jobs = enqueue_swarm_verification(
+        candidate_verification = None
+        if (
+            result.get("status") == "PROPOSAL_READY"
+            and result.get("proposal_branch")
+        ):
+            verification_tests = tuple(
+                dict.fromkeys(
+                    request.required_tests
+                    or verification_plan.pytest_targets
+                )
+            )
+            candidate_verification = verify_candidate_branch(
                 root,
-                verification_plan,
+                proposal_branch=str(result["proposal_branch"]),
+                allowed_paths=request.allowed_paths,
+                pytest_targets=verification_tests,
             )
         return {
             **base,
-            "status": result.get("status"),
+            "status": (
+                "CANDIDATE_VERIFIED"
+                if candidate_verification
+                and candidate_verification.get("passed") is True
+                else result.get("status")
+            ),
             "worker": "pi",
             "worker_result": result,
-            "independent_verification_jobs": verification_jobs,
+            "candidate_verification": candidate_verification,
+            "post_merge_swarm_lanes": list(
+                verification_plan.swarm_lanes
+            ),
         }
 
     if worker == "empire_coder":
