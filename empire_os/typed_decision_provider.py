@@ -18,6 +18,8 @@ class TypedDecisionRequest:
     state: Mapping[str, Any]
     allowed_labels: tuple[str, ...]
     risk_class: str = "low"
+    instructions: str | None = None
+    label_criteria: Mapping[str, str] | None = None
 
     def validate(self) -> None:
         if not self.task_key.strip():
@@ -32,6 +34,11 @@ class TypedDecisionRequest:
             raise ValueError("allowed_labels must be unique")
         if self.risk_class not in {"low", "medium", "high", "consequential"}:
             raise ValueError("unsupported risk_class")
+        if self.label_criteria is not None:
+            criteria_keys = set(self.label_criteria)
+            allowed = set(self.allowed_labels)
+            if criteria_keys != allowed:
+                raise ValueError("label_criteria keys must exactly match allowed_labels")
 
 
 @dataclass(frozen=True)
@@ -109,6 +116,12 @@ def review_typed_decision_result(
             "state_ref": request.state_ref,
             "allowed_labels": list(request.allowed_labels),
             "risk_class": request.risk_class,
+            "instructions": request.instructions,
+            "label_criteria": (
+                dict(request.label_criteria)
+                if request.label_criteria is not None
+                else None
+            ),
         },
         "result": result.as_dict(),
         "confidence_threshold": confidence_threshold,
