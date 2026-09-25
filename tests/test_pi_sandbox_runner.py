@@ -27,6 +27,7 @@ def test_pi_systemd_command_hides_production_and_allows_localhost_only(tmp_path)
         prompt="Implement a bounded test.",
         model_id="qwen-test",
         max_runtime_seconds=300,
+        system_prompt="Empire safe coding policy.",
         pi_bin=Path("/opt/empire/pi-agent/bin/pi"),
     )
     joined = "\n".join(argv)
@@ -40,6 +41,7 @@ def test_pi_systemd_command_hides_production_and_allows_localhost_only(tmp_path)
     assert "ReadWritePaths=" in joined
     assert "--no-session" in argv
     assert "PI_TELEMETRY=0" in argv
+    assert "Empire safe coding policy." in argv
 
 
 def test_pi_job_has_no_commercial_authority_fields():
