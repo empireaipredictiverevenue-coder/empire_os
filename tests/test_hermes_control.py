@@ -402,3 +402,11 @@ def test_omniroute_catalog_fanout_is_bounded():
 
     assert len(ranked) == hermes_control.MAX_DISCOVERED_MODEL_CANDIDATES
     assert len(ranked) == 4
+
+
+
+def test_job_schema_preserves_ai_behavior_change():
+    job = HermesJob.from_mapping(
+        base_job(ai_behavior_change=True)
+    )
+    assert job.ai_behavior_change is True
