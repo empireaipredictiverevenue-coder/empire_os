@@ -38,3 +38,14 @@ def test_laya_bootstrap_has_ram_and_disk_gates():
     assert "2800000" in bootstrap
     assert "4000000" in bootstrap
     assert "preload.mjs" in bootstrap
+
+
+def test_laya_bootstrap_is_bounded_and_progress_visible():
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+    preload = PRELOAD.read_text(encoding="utf-8")
+    assert "LAYA_NPM_TIMEOUT" in bootstrap
+    assert "LAYA_PRELOAD_TIMEOUT" in bootstrap
+    assert "timeout --foreground" in bootstrap
+    assert "Empire continues without Laya" in bootstrap
+    assert "onProgress:" in preload
+    assert "laya_download_progress" in preload
