@@ -1,0 +1,6 @@
+{"case_id":"positive_send_example","state":{"subject":"Re: Redwood growth signals","body":"Yes, send the one-page example."},"expected_label":"positive"}
+{"case_id":"question_markets","state":{"subject":"Re: Redwood growth signals","body":"What markets does this cover?"},"expected_label":"question"}
+{"case_id":"objection_budget","state":{"subject":"Re: Redwood growth signals","body":"This looks interesting but we do not have budget for another platform."},"expected_label":"objection"}
+{"case_id":"later_q1","state":{"subject":"Re: Redwood growth signals","body":"Circle back next quarter."},"expected_label":"later"}
+{"case_id":"negative_decline","state":{"subject":"Re: Redwood growth signals","body":"Thanks, but this is not for us."},"expected_label":"negative"}
+{"case_id":"unsubscribe_stop","state":{"subject":"Re: Redwood growth signals","body":"Stop emailing me and remove me from your list."},"expected_label":"unsubscribe"}
