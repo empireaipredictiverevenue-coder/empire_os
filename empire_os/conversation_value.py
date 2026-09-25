@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from empire_os.outreach_message_optimizer import optimise_first_touch
+
 POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
 _PLACEHOLDERS = {
     "", "unknown", "your team", "your market", "local market",
@@ -25,6 +27,8 @@ class ConversationCopy:
     why_now_summary: str | None
     why_now_evidence_ref: str | None
     specific_proof: str | None
+    subject_variants: tuple[str, ...] = ()
+    quality_review: Mapping[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -165,44 +169,39 @@ def build_first_touch_copy(
             "specific outreach evidence required: fresh why-now or public proof"
         )
 
-    if trigger is not None:
-        signal = trigger["signal_type"].replace("_", " ")
-        subject = f"{first} — {metro}: {signal}"
-        reason = (
-            f"One thing stood out in the evidence: {trigger['summary']} "
-            "That is why I’m reaching out now."
-        )
-        quality = "trigger_backed"
-    else:
-        subject = f"{first} — one thing I noticed in {metro}"
-        reason = (
-            f"I noticed {proof}. Rather than send a generic lead pitch, "
-            f"I can show you the first demand, search and competitor checks "
-            f"I’d run for {business} in {metro}."
-        )
-        quality = "proof_backed"
-
+    reason_now = trigger["summary"] if trigger is not None else proof
+    proof_for_copy = proof or reason_now
+    optimised = optimise_first_touch(
+        business_name=business,
+        reason_now=reason_now or "",
+        proof=proof_for_copy or "",
+        contact_title=_usable(review.get("contact_title")) or None,
+        territory=metro,
+    )
+    quality = (
+        "trigger_backed_optimised"
+        if trigger is not None
+        else "proof_backed_optimised"
+    )
     body = (
         f"Hi {first},\n\n"
-        f"I was looking at {business} while mapping {niche} operators in {metro}. "
-        f"{reason}\n\n"
-        "Empire connects market/search intelligence to follow-up and Revenue Pulse, "
-        "so conversations, terms, payments and revenue stay separate from forecasts "
-        "and scores.\n\n"
-        f"If useful, reply “send it” and I’ll send a one-page brief for {business} "
-        "with the three areas I’d investigate first. If the evidence is useful, "
-        "the next step is a bounded pilot rather than a long retainer. No deck.\n\n"
+        f"{optimised['body']}\n\n"
         "Best,\nPhil\nFounder, Empire AI\nempire-ai.co.uk\n\n"
         f"{POSTAL_ADDRESS}\n"
         "If you’d rather not hear from me, reply “opt out”."
     )
     return ConversationCopy(
-        subject=subject,
+        subject=str(optimised["subject"]),
         body=body,
         quality_tier=quality,
         why_now_summary=(trigger["summary"] if trigger else None),
         why_now_evidence_ref=(trigger["evidence_ref"] if trigger else None),
         specific_proof=proof,
+        subject_variants=tuple(
+            str(row["subject"])
+            for row in optimised["subject_variants"]
+        ),
+        quality_review=dict(optimised["quality"]),
     )
 
 
