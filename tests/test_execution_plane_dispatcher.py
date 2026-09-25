@@ -123,3 +123,50 @@ def test_pi_mutation_waits_for_proven_builder(tmp_path):
     assert result["reason"] == "no_mutation_capable_builder_proven"
     assert result["execution_authority"] == "none"
     assert result["production_deploy"] is False
+
+
+def test_pi_mutation_fails_over_to_isolated_empire_coder(tmp_path, monkeypatch):
+    (tmp_path / ".git").mkdir()
+    import empire_os.execution_plane_dispatcher as module
+
+    def capability_ready(worker, capability, *, path):
+        return worker == "empire_coder" and capability == "structured_patch_mutation"
+
+    monkeypatch.setattr(module, "builder_capability_ready", capability_ready)
+    monkeypatch.setattr(
+        module,
+        "run_empire_coder_sandbox_job",
+        lambda *args, **kwargs: {
+            "status": "PROPOSAL_READY",
+            "proposal_branch": "empire-coder/job-parallel-build",
+            "execution_authority": "none",
+            "production_mutation": False,
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "verify_proposal_candidate",
+        lambda *args, **kwargs: {
+            "candidate_gate_passed": True,
+            "awaiting_promptfoo": False,
+        },
+    )
+
+    result = dispatch_execution_request(
+        tmp_path,
+        ExecutionRequest(
+            request_id="parallel-build",
+            capability="parallel_backend_code",
+            department="engineering",
+            objective="Implement bounded internal code change.",
+            authority="internal_write",
+            allowed_paths=("empire_os/example.py",),
+            lease_resources=("domain:test",),
+        ),
+    )
+    assert result["worker"] == "empire_coder"
+    assert result["status"] == "CANDIDATE_GATE_PASSED"
+    assert result["runtime_fallback"]["from"] == "pi"
+    assert result["runtime_fallback"]["to"] == "empire_coder"
+    assert result["production_deploy"] is False
+    assert result["execution_authority"] == "none"
