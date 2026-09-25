@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 from uuid import uuid4
@@ -14,7 +13,11 @@ from typing import Any
 
 REQUEST_ROOT = Path("runtime/execution_plane/promptfoo_requests")
 RESULT_ROOT = Path("runtime/execution_plane/promptfoo_results")
-CANDIDATE_REF_RE = re.compile(r"^[A-Za-z0-9._/-]{1,160}$")
+CANDIDATE_PATCH_ROOT = Path(
+    "runtime/execution_plane/candidate_patches"
+)
+PROMPTFOO_BIN = Path("/opt/empire/promptfoo/bin/promptfoo")
+BASE_BRANCH = "feature/revenue-intelligence-v2"
 
 
 def _now() -> str:
@@ -42,19 +45,38 @@ def _safe_env() -> dict[str, str]:
 
 def _prepare_candidate_clone(
     root: Path,
-    candidate_ref: str,
+    candidate_patch_path: str,
 ) -> Path:
-    if not CANDIDATE_REF_RE.fullmatch(candidate_ref):
-        raise ValueError("invalid candidate_ref")
-    if candidate_ref.startswith("/") or ".." in candidate_ref.split("/"):
-        raise ValueError("unsafe candidate_ref")
+    raw = str(candidate_patch_path or "").strip()
+    if not raw:
+        raise ValueError("candidate_patch_path required")
+
+    patch = (root / raw).resolve()
+    patch_root = (root / CANDIDATE_PATCH_ROOT).resolve()
+    try:
+        patch.relative_to(patch_root)
+    except ValueError as exc:
+        raise ValueError(
+            "candidate patch must live under runtime candidate_patches"
+        ) from exc
+    if not patch.is_file():
+        raise ValueError("candidate patch artifact missing")
 
     work_root = Path("/var/tmp/empire-promptfoo")
     work_root.mkdir(parents=True, exist_ok=True)
     clone = work_root / f"eval-{uuid4().hex}"
 
     cloned = subprocess.run(
-        ["git", "clone", "--no-hardlinks", str(root), str(clone)],
+        [
+            "git",
+            "clone",
+            "--no-hardlinks",
+            "--single-branch",
+            "--branch",
+            BASE_BRANCH,
+            str(root),
+            str(clone),
+        ],
         cwd=str(work_root),
         capture_output=True,
         text=True,
@@ -64,51 +86,18 @@ def _prepare_candidate_clone(
     if cloned.returncode != 0:
         raise RuntimeError("Promptfoo candidate clone failed")
 
-    remote = subprocess.run(
-        ["git", "remote", "get-url", "origin"],
-        cwd=str(root),
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-    remote_url = (remote.stdout or "").strip()
-    if not remote_url:
-        raise RuntimeError("origin remote unavailable")
-
-    subprocess.run(
-        ["git", "remote", "set-url", "origin", remote_url],
-        cwd=str(clone),
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=True,
-    )
-    fetched = subprocess.run(
-        ["git", "fetch", "origin", candidate_ref],
-        cwd=str(clone),
-        capture_output=True,
-        text=True,
-        timeout=180,
-        check=False,
-    )
-    if fetched.returncode != 0:
-        shutil.rmtree(clone, ignore_errors=True)
-        raise RuntimeError("Promptfoo candidate fetch failed")
-
-    checkout = subprocess.run(
-        ["git", "checkout", "--detach", "FETCH_HEAD"],
+    applied = subprocess.run(
+        ["git", "apply", "--index", str(patch)],
         cwd=str(clone),
         capture_output=True,
         text=True,
         timeout=60,
         check=False,
     )
-    if checkout.returncode != 0:
+    if applied.returncode != 0:
         shutil.rmtree(clone, ignore_errors=True)
-        raise RuntimeError("Promptfoo candidate checkout failed")
+        raise RuntimeError("Promptfoo candidate patch apply failed")
     return clone
-
 
 def run_promptfoo_request(
     repo_root: str | Path,
@@ -127,6 +116,9 @@ def run_promptfoo_request(
     raw = json.loads(path.read_text(encoding="utf-8"))
     request_id = str(raw.get("request_id") or "").strip()
     candidate_ref = str(raw.get("candidate_ref") or "").strip()
+    candidate_patch_path = str(
+        raw.get("candidate_patch_path") or ""
+    ).strip()
     config = str(raw.get("config") or "").strip()
     if not request_id:
         raise ValueError("promptfoo request_id required")
@@ -134,6 +126,10 @@ def run_promptfoo_request(
         raise ValueError("unsupported Promptfoo config")
     if not candidate_ref:
         raise ValueError("candidate_ref required")
+    if not candidate_patch_path:
+        raise ValueError("candidate_patch_path required")
+    if not PROMPTFOO_BIN.exists():
+        raise RuntimeError("pinned Promptfoo runtime not installed")
 
     result_dir = root / RESULT_ROOT
     result_dir.mkdir(parents=True, exist_ok=True)
@@ -145,16 +141,19 @@ def run_promptfoo_request(
             return existing
 
     command = [
-        "npm",
-        "run",
-        "eval:empire",
-        "--",
+        str(PROMPTFOO_BIN),
+        "eval",
+        "-c",
+        config,
         "--no-cache",
     ]
     started = _now()
     clone = None
     try:
-        clone = _prepare_candidate_clone(root, candidate_ref)
+        clone = _prepare_candidate_clone(
+            root,
+            candidate_patch_path,
+        )
         completed = subprocess.run(
             command,
             cwd=str(clone),
@@ -185,6 +184,7 @@ def run_promptfoo_request(
         "schema_version": "empire.execution-plane-promptfoo-result.v1",
         "request_id": request_id,
         "candidate_ref": candidate_ref,
+        "candidate_patch_path": candidate_patch_path,
         "config": config,
         "started_at": started,
         "completed_at": _now(),
