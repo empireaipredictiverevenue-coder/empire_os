@@ -100,7 +100,11 @@ cat >"$CONFIG/models.json" <<EOF
             "cacheWrite": 0
           },
           "contextWindow": 8192,
-          "maxTokens": 4096
+          "maxTokens": 4096,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "maxTokensField": "max_tokens"
+          }
         }
       ]
     }
