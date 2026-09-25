@@ -1,0 +1,21 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/",
+    "tests/"
+  ],
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "job_id": "hermes-nemotron-e2e-20260925T175735Z",
+  "kind": "code_task",
+  "lease_resources": [
+    "path:empire_os/hermes_control.py",
+    "path:tests/test_hermes_control.py"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "Implement one small production-quality Hermes observability improvement.\n\nONLY change:\n- empire_os/hermes_control.py\n- tests/test_hermes_control.py\n\nREQUIREMENTS\n\n1. Define named constants for the current governed Hermes limits:\n\n   HERMES_MODEL_CONTEXT_LENGTH = 262144\n   HERMES_MODEL_MAX_OUTPUT_TOKENS = 16384\n\n2. Use those constants in _write_isolated_hermes_config()\n   rather than literal 262144 / 16384 values.\n\n3. Add both values to the result returned by run_hermes():\n\n   model_context_length\n   model_max_tokens\n\n4. Add assertions to tests/test_hermes_control.py proving:\n\n   result[\"model_context_length\"] == 262144\n   result[\"model_max_tokens\"] == 16384\n\n5. Preserve:\n   - openrouter/nvidia/nemotron-3-ultra-550b-a55b:free\n     as the current Hermes model;\n   - OmniRoute;\n   - the existing authority model;\n   - mutation leases;\n   - OBSERVE governance;\n   - model ranking tests;\n   - existing routing behavior.\n\nDo not modify environment files, systemd, deployment files,\ndatabase logic, outbound, payments, recovery/, toop/, or any\nother source file.\n\nRun:\n\nPYTHONPATH=/srv/empire_os /srv/empire_os/.venv/bin/python -m pytest -q tests/test_hermes_control.py --tb=short\n\nKeep the patch minimal.",
+  "pytest_targets": [
+    "tests/test_hermes_control.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
