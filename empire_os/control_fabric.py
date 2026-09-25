@@ -177,6 +177,31 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             600,
         ),
         ComponentSpec(
+            "agent_tool_execution_plane",
+            (
+                "execution_job_requested",
+                "reversible_build_requested",
+                "public_research_requested",
+                "founder_workspace_requested",
+                "verification_requested",
+            ),
+            (
+                "execution_job_routed",
+                "execution_job_blocked",
+                "mutation_lease_acquired",
+                "worker_result_ready",
+                "verification_requested",
+            ),
+            (
+                "astra_executive",
+                "intelligence_router",
+                "empire_coder",
+            ),
+            "internal_write",
+            120,
+            "lease_then_verify",
+        ),
+        ComponentSpec(
             "empire_coder",
             (
                 "implementation_plan_ready",
