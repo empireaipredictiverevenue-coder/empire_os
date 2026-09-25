@@ -202,6 +202,7 @@ class ModelRouter:
         require_vision: bool = False,
         budget_remaining: float | None = None,
         remaining_queries: int | None = None,
+        untrusted_input: bool = False,
     ) -> RouteDecision:
         task = (task or "reasoning").strip().lower()
         stakes = (stakes or "normal").strip().lower()
@@ -254,10 +255,18 @@ class ModelRouter:
                 require_vision=require_vision,
             )
 
+        stakes_rank = {
+            "normal": 0,
+            "high": 1,
+            "critical": 2,
+        }
         candidates = [
             m for m in candidates
             if m.provider.lower() not in self.blocked_providers
             and m.model.lower() not in self.blocked_models
+            and (not untrusted_input or m.allow_untrusted_input)
+            and stakes_rank.get(stakes, 0)
+            <= stakes_rank.get(m.max_stakes, 2)
         ]
 
         if not candidates:
