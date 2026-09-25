@@ -86,6 +86,20 @@ class ExecutionRequest:
             raise ValueError(
                 "mutating code work requires allowed_paths"
             )
+        if (
+            self.authority == "internal_write"
+            and self.capability in {
+                "backend_code",
+                "frontend_code",
+                "refactor",
+                "tests",
+                "documentation",
+            }
+            and not self.lease_resources
+        ):
+            raise ValueError(
+                "mutating code work requires lease_resources"
+            )
         for target in self.required_tests:
             if not target.startswith("tests/") or ".py" not in target:
                 raise ValueError("required_tests must be repository pytest targets")
