@@ -1,0 +1,18 @@
+name: Probe EmpireOS self-hosted runner
+
+on:
+  push:
+    branches:
+      - probe/empireos-self-hosted-runner
+
+jobs:
+  probe:
+    runs-on: self-hosted
+    timeout-minutes: 2
+    steps:
+      - name: Identify runner
+        run: |
+          hostname
+          pwd
+          test -d /srv/empire_os && echo "empire_repo_present=yes" || echo "empire_repo_present=no"
+          test -f /etc/os-release && head -n 5 /etc/os-release || true
