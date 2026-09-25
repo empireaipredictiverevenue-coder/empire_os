@@ -178,7 +178,20 @@ def test_egress_circuit_self_heals_after_successful_probe(monkeypatch, tmp_path)
         raise AssertionError("probe must wait until lease expires")
 
     now[0] = 1061.0
-    assert worker.request_json("GET", "/rest/v1/prospects?limit=1") == []
+    try:
+        worker.request_json("GET", "/rest/v1/prospects?limit=1")
+    except RuntimeError as exc:
+        assert "probe reserved for dedicated egress guard" in str(exc)
+    else:
+        raise AssertionError("ordinary workers must never consume probe slots")
+
+    assert len(calls) == 0
+
+    assert worker.request_json(
+        "GET",
+        "/rest/v1/prospects?limit=1",
+        allow_egress_probe=True,
+    ) == []
     assert len(calls) == 1
 
     state = worker._load_egress_state(worker._EGRESS_STATE_PATH)
