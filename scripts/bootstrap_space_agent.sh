@@ -58,7 +58,7 @@ cd "$SOURCE"
 sudo -u "$TARGET_USER" npm ci --ignore-scripts --no-audit --no-fund
 
 echo "=== CONFIGURE LOOPBACK WORKSPACE ==="
-"$PREFIX/bin/node" "$SOURCE/space.js" set   CUSTOMWARE_PATH="$CUSTOMWARE"   LOGIN_ALLOWED=true   ALLOW_GUEST_USERS=false   CLOUD_SHARE_ALLOWED=false   CUSTOMWARE_GIT_HISTORY=true   HOST=localhost   PORT=3010   WORKERS=1
+"$PREFIX/bin/node" "$SOURCE/space.js" set   CUSTOMWARE_PATH="$CUSTOMWARE"   LOGIN_ALLOWED=true   ALLOW_GUEST_USERS=false   CLOUD_SHARE_ALLOWED=false   CUSTOMWARE_GIT_HISTORY=true   HOST=127.0.0.1   PORT=3010   WORKERS=1
 
 echo "=== CREATE FOUNDER ADMIN IF NEEDED ==="
 if [[ ! -f "$ADMIN_ENV" ]]; then
