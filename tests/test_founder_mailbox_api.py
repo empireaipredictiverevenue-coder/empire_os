@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from empire_os.founder_mailbox_api import (
+    ResendMailboxProvider,
     create_founder_mailbox_router,
     read_mail_identity,
 )
@@ -85,4 +86,22 @@ def test_mail_identity_reads_only_safe_keys(tmp_path, monkeypatch):
         "observed": True,
     }
     assert "secret" not in str(identity).lower()
+
+def test_resend_provider_loads_only_required_keys_from_runtime_file(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("RESEND_RECEIVING_API_KEY", raising=False)
+    path = tmp_path / "outbound.env"
+    path.write_text(
+        "RESEND_API_KEY=send-key\n"
+        "RESEND_RECEIVING_API_KEY=receive-key\n"
+        "EMPIRE_OUTBOUND_SENDER_DSN=must-not-be-loaded\n",
+        encoding="utf-8",
+    )
+    provider = ResendMailboxProvider(secret_env_path=path)
+    assert provider.sending_api_key == "send-key"
+    assert provider.receiving_api_key == "receive-key"
+    assert not hasattr(provider, "sender_dsn")
 
