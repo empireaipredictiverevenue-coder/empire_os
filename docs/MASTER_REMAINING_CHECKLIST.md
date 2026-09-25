@@ -799,8 +799,8 @@ Truth rule: code presence is not production completion. Items below remain unche
 
 - [x] Execution-plane architecture diagrams and authority model
 - [x] Worker-role architecture for Hermes / Pi / Empire Coder / Space Agent / Agent Reach / Swarm / Needle / Laya
-- [ ] Typed worker registry + capability router — CODED; focused runtime test pending
-- [ ] Exclusive domain/path mutation lease manager — CODED; focused runtime test pending
+- [x] Typed worker registry + capability router — focused server regression passed
+- [x] Exclusive domain/path mutation lease manager — focused server regression passed
 - [ ] Hermes central mutation-lease integration — CODED; regression/runtime verification pending
 - [ ] Governed Hermes control-job publisher — CODED; runtime verification pending
 - [ ] Execution-plane dispatcher — CODED; focused/runtime verification pending
@@ -808,10 +808,10 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Agent Reach isolated bootstrap — LIVE; doctor returns bounded source health
 - [x] Agent Reach public sensor adapter — LIVE public observation proven with provenance/no truth authority
 - [ ] Credentialed Agent Reach channels remain disabled pending separate architecture/risk contract
-- [ ] Space Agent pinned loopback service/bootstrap — CODED; live install/health pending
+- [x] Space Agent pinned loopback service/bootstrap — LIVE on 127.0.0.1:3010
 - [ ] Space Agent founder workspace wired to local llama.cpp via authenticated proxy fallback — CODED; live model verification pending
 - [ ] Space Agent Founder/department Mission Control workspace
-- [ ] Founder Execution Plane read API — CODED; service restart/runtime verification pending
+- [x] Founder Execution Plane read API — LIVE; tool-health read surface verified
 - [ ] Founder execution-ledger read API — CODED; service restart/runtime verification pending
 - [ ] Control Fabric execution-plane registration — CODED; regression/runtime verification pending
 - [ ] Swarm V6 verification hook for candidate worker output
@@ -850,7 +850,8 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Install/verify Space Agent runtime — loopback 127.0.0.1:3010 healthy
 - [ ] Verify Founder execution-plane API live
 - [ ] Run first bounded Hermes build through central mutation lease
-- [ ] Run first bounded Pi build through sandbox + independent candidate verification
+- [ ] Run first bounded Pi build through sandbox + independent candidate verification — native Pi mutation demoted on current qwen2.5-coder:1.5b after repeated structured-tool-call probe failure
+- [ ] Empire Coder disposable-clone structured-patch fallback — CODED; live capability probe + proposal proof pending
 - [x] Run first Agent Reach public observation through quality/provenance gate
 - [ ] Build first Space Agent Founder Mission Control workspace from read-only Empire APIs
 - [ ] Verify post-merge Swarm V6 QA on first execution-plane candidate
