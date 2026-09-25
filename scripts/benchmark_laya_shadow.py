@@ -8,6 +8,7 @@ import statistics
 import time
 
 from empire_os.laya_http_provider import LayaHttpTypedDecisionProvider
+from empire_os.laya_reply_specialist import review_laya_reply_specialist
 from empire_os.laya_typed_decision import load_laya_provider
 from empire_os.typed_decision_provider import (
     TypedDecisionRequest,
@@ -74,6 +75,9 @@ def main() -> int:
     unsafe_accepts = 0
     accepted = 0
     escalated = 0
+    specialist_accepted = 0
+    specialist_correct = 0
+    specialist_misses = 0
     latencies = []
     confidences = []
 
@@ -109,6 +113,19 @@ def main() -> int:
         if accepted_now and not raw_ok:
             unsafe_accepts += 1
 
+        specialist = review_laya_reply_specialist(
+            request=request,
+            result=result,
+        )
+        specialist_accept = bool(
+            specialist["accepted_for_shadow_analysis"]
+        )
+        specialist_accepted += int(specialist_accept)
+        if specialist_accept and raw_ok:
+            specialist_correct += 1
+        if specialist_accept and not raw_ok:
+            specialist_misses += 1
+
         print(json.dumps({
             "case_id": case["case_id"],
             "expected_label": case["expected_label"],
@@ -120,6 +137,8 @@ def main() -> int:
             "raw_pass": raw_ok,
             "safe_pass": safe_ok,
             "shadow_only": result.shadow_only,
+            "specialist_accept": specialist_accept,
+            "specialist_reason": specialist["reason"],
         }, sort_keys=True))
 
     total = len(rows)
@@ -134,6 +153,13 @@ def main() -> int:
         "escalated": escalated,
         "escalation_rate": round(escalated / total, 4) if total else 0.0,
         "unsafe_accepts": unsafe_accepts,
+        "specialist_accepted": specialist_accepted,
+        "specialist_correct": specialist_correct,
+        "specialist_precision": (
+            round(specialist_correct / specialist_accepted, 4)
+            if specialist_accepted else None
+        ),
+        "specialist_misses": specialist_misses,
         "confidence_mean": (
             round(statistics.mean(confidences), 4)
             if confidences else None
@@ -153,7 +179,10 @@ def main() -> int:
         "execution_authority": "none",
     }
     print(json.dumps({"summary": summary}, sort_keys=True))
-    return 0 if unsafe_accepts == 0 else 2
+    return 0 if (
+        unsafe_accepts == 0
+        and specialist_misses == 0
+    ) else 2
 
 
 if __name__ == "__main__":
