@@ -1,0 +1,29 @@
+[Unit]
+Description=Empire Laya Shadow System-1 Sidecar
+After=network.target
+ConditionPathExists=/srv/empire_os/tools/laya_node/node_modules/@receptron/laya
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os/tools/laya_node
+Environment=LAYA_HOST=127.0.0.1
+Environment=LAYA_PORT=8769
+Environment=LAYA_CACHE=/srv/empire_os/runtime/laya/cache
+Environment=LAYA_THREADS=4
+ExecStart=/usr/bin/node /srv/empire_os/tools/laya_node/server.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/empire_os/runtime/laya
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=4G
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target
