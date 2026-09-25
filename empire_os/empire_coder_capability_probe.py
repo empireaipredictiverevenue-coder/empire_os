@@ -233,7 +233,7 @@ def probe_empire_coder_structured_patch(
     except Exception as exc:
         result = EmpireCoderProbeResult(
             False,
-            f"probe_error:{type(exc).__name__}",
+            f"probe_error:{type(exc).__name__}:{exc}"[:500],
             model,
             None,
             None,
