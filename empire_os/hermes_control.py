@@ -36,6 +36,7 @@ from empire_os.execution_plane_verification import (
 
 
 SCHEMA_VERSION = "empire.hermes.control_job.v1"
+
 RESULT_SCHEMA_VERSION = "empire.hermes.control_result.v1"
 
 DEFAULT_CONTROL_BRANCH = "ops/hermes-control"
@@ -79,6 +80,10 @@ FORBIDDEN_RESULT_PATH_TOKENS = (
     "/recovery/",
     "/toop/",
 )
+
+# Named constants for governed Hermes model limits
+HERMES_MODEL_CONTEXT_LENGTH = 262144
+HERMES_MODEL_MAX_OUTPUT_TOKENS = 16384
 
 
 class HermesControlError(RuntimeError):
@@ -867,8 +872,8 @@ def _write_isolated_hermes_config(
             # Bound governed worker generations. Older Hermes builds honor
             # max_tokens directly; context_length also prevents an accidental
             # 131k output ceiling from being inferred through custom gateways.
-            "context_length": 262144,
-            "max_tokens": 16384,
+            "context_length": HERMES_MODEL_CONTEXT_LENGTH,
+            "max_tokens": HERMES_MODEL_MAX_OUTPUT_TOKENS,
         }
     }
     if api_key:
@@ -1008,6 +1013,8 @@ def run_hermes(
         "model": model,
         "hermes_home_isolated": isolated_home is not None,
         "model_probe_attempts": model_attempts,
+        "model_context_length": HERMES_MODEL_CONTEXT_LENGTH,
+        "model_max_tokens": HERMES_MODEL_MAX_OUTPUT_TOKENS,
     }
 
 def run_verification(
