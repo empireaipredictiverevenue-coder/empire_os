@@ -24,6 +24,8 @@ echo "=== SPACE AGENT ARCHITECTURE GATE ==="
 test -f "$ROOT/docs/AGENT_TOOL_EXECUTION_PLANE_ARCHITECTURE.md"
 test -f "$ROOT/docs/ARCHITECTURE_FIRST_ENGINEERING_DOCTRINE.md"
 
+systemctl stop empire-space-agent.service >/dev/null 2>&1 || true
+
 echo "=== NODE GATE ==="
 NODE_SOURCE="$(command -v node || true)"
 NPM_SOURCE="$(command -v npm || true)"
