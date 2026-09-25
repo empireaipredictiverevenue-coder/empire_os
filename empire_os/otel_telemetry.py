@@ -7,7 +7,7 @@ Remote observability can never grant execution authority or block business flow.
 from __future__ import annotations
 
 import base64
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
@@ -54,7 +54,7 @@ def _otel_attributes(event: TelemetryEvent) -> dict[str, Any]:
 @dataclass(frozen=True)
 class OtlpSettings:
     endpoint: str
-    headers: Mapping[str, str]
+    headers: Mapping[str, str] = field(repr=False)
     service_name: str = "empire-os"
     environment: str = "production"
 
@@ -160,11 +160,18 @@ class ResilientTelemetrySink:
     ) -> None:
         self.local_sink = local_sink
         self.remote_sink = remote_sink
+        self.local_failures = 0
         self.remote_failures = 0
+        self.last_local_error: str | None = None
         self.last_remote_error: str | None = None
 
     def emit(self, event: TelemetryEvent) -> None:
-        self.local_sink.emit(event)
+        try:
+            self.local_sink.emit(event)
+        except Exception as exc:
+            self.local_failures += 1
+            self.last_local_error = type(exc).__name__
+
         if self.remote_sink is None:
             return
         try:
