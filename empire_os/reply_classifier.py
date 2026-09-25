@@ -35,6 +35,7 @@ OBJECTION_PATTERNS = (
 )
 POSITIVE_PATTERNS = (
     r"\binterested\b",
+    r"\bsounds? interesting\b",
     r"\bsend (?:it|that|the outline|more)\b",
     r"\btell me more\b",
     r"\blet'?s talk\b",
