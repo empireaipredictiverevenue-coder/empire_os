@@ -39,6 +39,9 @@ search-console = [
 ops-mcp = [
     "mcp>=2,<3",
 ]
+needle = [
+    "cactus-needle==3.0.1",
+]
 
 [tool.setuptools.packages.find]
 include = ["empire_os*"]
