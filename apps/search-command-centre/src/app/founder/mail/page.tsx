@@ -390,7 +390,7 @@ export default async function FounderMailPage({
                       </div>
                     </div>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <Meta
                         label="Commercial status"
                         value={selected.commercial_status ?? "Unknown"}
@@ -402,6 +402,14 @@ export default async function FounderMailPage({
                       <Meta
                         label="Delivery"
                         value={selected.delivery_state ?? "Unknown"}
+                      />
+                      <Meta
+                        label="Suppression"
+                        value={
+                          selected.suppressed
+                            ? selected.suppression_origin ?? "Observed"
+                            : "None observed"
+                        }
                       />
                     </div>
                   </div>
