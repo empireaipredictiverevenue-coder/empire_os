@@ -31,6 +31,8 @@ def test_pi_systemd_command_hides_production_and_allows_localhost_only(tmp_path)
         pi_bin=Path("/opt/empire/pi-agent/bin/pi"),
     )
     joined = "\n".join(argv)
+    assert "PrivateUsers=yes" in joined
+    assert "PrivateDevices=yes" not in joined
     assert "ProtectSystem=strict" in joined
     assert "ProtectHome=yes" in joined
     assert "IPAddressDeny=any" in joined
@@ -53,3 +55,12 @@ def test_pi_job_has_no_commercial_authority_fields():
     job.validate()
     assert not hasattr(job, "outbound_authority")
     assert not hasattr(job, "payment_authority")
+
+
+def test_pi_systemd_failure_stage_is_reported():
+    from empire_os.pi_sandbox_runner import _sandbox_failure_stage
+
+    assert _sandbox_failure_stage(218) == "CAPABILITIES"
+    assert _sandbox_failure_stage(226) == "NAMESPACE"
+    assert _sandbox_failure_stage(244) == "BPF"
+    assert _sandbox_failure_stage(1) is None
