@@ -174,7 +174,14 @@ def _commercial_status(events: list[dict[str, Any]]) -> str:
 def build_mailbox(
     sent_rows: Iterable[Mapping[str, Any]],
     received_rows: Iterable[Mapping[str, Any]],
+    suppression_rows: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    suppression_by_email: dict[str, dict[str, Any]] = {}
+    for raw in suppression_rows:
+        email = parseaddr(_text(raw.get("email")))[1].strip().lower()
+        if email:
+            suppression_by_email[email] = dict(raw)
+
     events = [normalise_sent_email(row) for row in sent_rows]
     events.extend(normalise_received_email(row) for row in received_rows)
     events = [row for row in events if row.get("thread_id")]
@@ -190,23 +197,48 @@ def build_mailbox(
         latest = rows[0]
         inbound = next((row for row in rows if row["direction"] == "inbound"), None)
         outbound = next((row for row in rows if row["direction"] == "outbound"), None)
+        contact = (
+            inbound.get("from") if inbound
+            else ((outbound.get("to") or [None])[0] if outbound else None)
+        )
+        contact_email = (
+            (_addresses(inbound.get("from")) or [None])[0]
+            if inbound
+            else ((outbound.get("to") or [None])[0] if outbound else None)
+        )
+        suppression = (
+            suppression_by_email.get(str(contact_email).lower())
+            if contact_email
+            else None
+        )
+        thread_suppressed = any(row.get("suppressed") for row in rows) or suppression is not None
+        next_action = _next_action(rows)
+        if thread_suppressed and next_action != "suppress_and_close":
+            next_action = "suppressed_no_send"
+
         threads.append({
             "thread_id": thread_id,
             "intent_id": latest.get("intent_id"),
             "subject": latest.get("subject"),
-            "contact": (
-                inbound.get("from") if inbound
-                else ((outbound.get("to") or [None])[0] if outbound else None)
-            ),
+            "contact": contact,
+            "contact_email": contact_email,
             "latest_at": latest.get("occurred_at"),
             "latest_direction": latest.get("direction"),
             "delivery_state": (
                 outbound.get("delivery_state") if outbound else "received"
             ),
             "classification": inbound.get("classification") if inbound else None,
-            "commercial_status": _commercial_status(rows),
-            "suppressed": any(row.get("suppressed") for row in rows),
-            "next_action": _next_action(rows),
+            "commercial_status": (
+                "suppressed" if thread_suppressed else _commercial_status(rows)
+            ),
+            "suppressed": thread_suppressed,
+            "suppression_origin": (
+                _text(suppression.get("origin")) if suppression else None
+            ),
+            "suppression_source_id": (
+                _text(suppression.get("source_id")) or None if suppression else None
+            ),
+            "next_action": next_action,
             "event_count": len(rows),
             "events": rows,
         })
