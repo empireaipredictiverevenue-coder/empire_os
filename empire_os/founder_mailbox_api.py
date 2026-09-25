@@ -15,6 +15,28 @@ from empire_os.empire_mailbox import build_mailbox, mailbox_thread
 
 DEFAULT_OUTBOUND_ENV = Path("/srv/empire_os/runtime/secrets/outbound.env")
 _SAFE_IDENTITY_KEYS = {"EMPIRE_OUTBOUND_FROM", "EMPIRE_REPLY_TO"}
+_RESEND_KEY_NAMES = {"RESEND_API_KEY", "RESEND_RECEIVING_API_KEY"}
+
+
+def _read_selected_env_keys(
+    env_path: Path,
+    names: set[str],
+) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not env_path.exists():
+        return values
+    try:
+        for raw in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if key in names:
+                values[key] = value.strip().strip('"').strip("'")
+    except OSError:
+        return {}
+    return values
 
 
 def read_mail_identity(env_path: Path = DEFAULT_OUTBOUND_ENV) -> dict[str, Any]:
@@ -22,18 +44,11 @@ def read_mail_identity(env_path: Path = DEFAULT_OUTBOUND_ENV) -> dict[str, Any]:
         key: os.getenv(key, "").strip()
         for key in _SAFE_IDENTITY_KEYS
     }
-    if (not all(values.values())) and env_path.exists():
-        try:
-            for raw in env_path.read_text(encoding="utf-8").splitlines():
-                line = raw.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, value = line.split("=", 1)
-                key = key.strip()
-                if key in _SAFE_IDENTITY_KEYS and not values.get(key):
-                    values[key] = value.strip().strip('"').strip("'")
-        except OSError:
-            pass
+    if not all(values.values()):
+        from_file = _read_selected_env_keys(env_path, _SAFE_IDENTITY_KEYS)
+        for key in _SAFE_IDENTITY_KEYS:
+            if not values.get(key):
+                values[key] = from_file.get(key, "")
 
     sender = values.get("EMPIRE_OUTBOUND_FROM") or None
     sender_email = parseaddr(sender or "")[1].strip().lower() or None
@@ -67,11 +82,24 @@ class MailboxProvider(Protocol):
 
 
 class ResendMailboxProvider:
-    def __init__(self, api_key: str | None = None, timeout_s: float = 10.0):
-        sending = api_key or os.getenv("RESEND_API_KEY", "").strip()
-        receiving = (
+    def __init__(
+        self,
+        api_key: str | None = None,
+        *,
+        receiving_api_key: str | None = None,
+        secret_env_path: Path = DEFAULT_OUTBOUND_ENV,
+        timeout_s: float = 10.0,
+    ):
+        file_keys = _read_selected_env_keys(secret_env_path, _RESEND_KEY_NAMES)
+        sending = (
             api_key
+            or os.getenv("RESEND_API_KEY", "").strip()
+            or file_keys.get("RESEND_API_KEY", "")
+        )
+        receiving = (
+            receiving_api_key
             or os.getenv("RESEND_RECEIVING_API_KEY", "").strip()
+            or file_keys.get("RESEND_RECEIVING_API_KEY", "")
             or sending
         )
         self.sending_api_key = sending
@@ -140,7 +168,9 @@ def create_founder_mailbox_router(
     *,
     identity_env_path: Path = DEFAULT_OUTBOUND_ENV,
 ) -> APIRouter:
-    source = provider or ResendMailboxProvider()
+    source = provider or ResendMailboxProvider(
+        secret_env_path=identity_env_path,
+    )
     router = APIRouter(prefix="/v1/founder-mailbox", tags=["founder-mailbox"])
     cache: dict[int, tuple[float, dict[str, Any]]] = {}
 
