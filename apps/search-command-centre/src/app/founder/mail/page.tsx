@@ -17,6 +17,9 @@ type MailSearchParams = Promise<{
 
 const FILTERS = [
   { key: "all", label: "All mail" },
+  { key: "inbox", label: "Inbox" },
+  { key: "sent", label: "Sent" },
+  { key: "needs_action", label: "Needs action" },
   { key: "replies", label: "Replies" },
   { key: "positive", label: "Positive" },
   { key: "questions", label: "Questions" },
@@ -42,6 +45,18 @@ function dateTime(value?: string | null) {
 
 function filterThreads(rows: EmpireMailThread[], filter: string) {
   switch (filter) {
+    case "inbox":
+      return rows.filter((row) => row.latest_direction === "inbound");
+    case "sent":
+      return rows.filter((row) => row.latest_direction === "outbound");
+    case "needs_action":
+      return rows.filter(
+        (row) =>
+          row.suppressed !== true &&
+          ["positive", "question", "objection"].includes(
+            row.classification ?? "",
+          ),
+      );
     case "replies":
       return rows.filter((row) => row.commercial_status === "replied");
     case "positive":
@@ -223,8 +238,20 @@ export default async function FounderMailPage({
                   const count =
                     filter.key === "all"
                       ? summary.all
-                      : filter.key === "replies"
-                        ? summary.replies
+                      : filter.key === "inbox"
+                        ? rows.filter((row) => row.latest_direction === "inbound").length
+                        : filter.key === "sent"
+                          ? rows.filter((row) => row.latest_direction === "outbound").length
+                          : filter.key === "needs_action"
+                            ? rows.filter(
+                                (row) =>
+                                  row.suppressed !== true &&
+                                  ["positive", "question", "objection"].includes(
+                                    row.classification ?? "",
+                                  ),
+                              ).length
+                            : filter.key === "replies"
+                              ? summary.replies
                         : filter.key === "positive"
                           ? summary.positive
                           : filter.key === "questions"
