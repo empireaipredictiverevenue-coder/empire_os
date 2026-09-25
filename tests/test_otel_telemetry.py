@@ -48,6 +48,7 @@ def test_langfuse_settings_are_v4_otlp_http_and_do_not_expose_keys():
     rendered = repr(settings)
     assert "pk-test" not in rendered
     assert "sk-test" not in rendered
+    assert "Authorization" not in rendered
 
 
 def test_missing_langfuse_credentials_disables_remote_export():
@@ -119,3 +120,18 @@ def test_factory_falls_back_local_when_otel_package_is_unavailable(
     assert sink.remote_sink is None
     sink.emit(event())
     assert (tmp_path / "events.jsonl").exists()
+
+
+class FailingLocal:
+    def emit(self, _event):
+        raise OSError("disk unavailable")
+
+
+def test_local_failure_also_never_blocks_business_flow():
+    sink = ResilientTelemetrySink(
+        local_sink=FailingLocal(),
+        remote_sink=None,
+    )
+    sink.emit(event())
+    assert sink.local_failures == 1
+    assert sink.last_local_error == "OSError"
