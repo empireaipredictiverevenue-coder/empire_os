@@ -62,7 +62,9 @@ def _normalise_resource(value: str) -> str:
     path = PurePosixPath(raw)
     if path.is_absolute() or ".." in path.parts:
         raise ExecutionLeaseError("unsafe lease path")
-    clean = str(path).lstrip("./")
+    clean = str(path)
+    while clean.startswith("./"):
+        clean = clean[2:]
     if not clean or clean == ".":
         raise ExecutionLeaseError("unsafe lease path")
     if clean in PROTECTED_EXACT:
