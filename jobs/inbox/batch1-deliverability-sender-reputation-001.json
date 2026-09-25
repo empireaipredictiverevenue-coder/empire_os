@@ -1,0 +1,33 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "batch1-deliverability-sender-reputation-001",
+  "kind": "code_task",
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "prompt": "Implement the Deliverability & Sender Reputation Agent strictly from docs/BUSINESS_AGENT_ARCHITECTURE_BATCH_1.md. REUSE outbound_governor, outbound_governor_executor, outbound_provider, outbound_followup_worker, outreach_quality, canonical provider events, suppression/DNC/opt-out evidence. Do not create a duplicate outbound engine or fabricate sender/domain reputation scores. Build observed deliverability state from provider/DNS/bounce/deferral/suppression/send/reply evidence where available, separating temporary deferral from permanent failure. Allow only reversible internal/governor recommendations such as bounded cap reduction, unhealthy-lane pause recommendation, suppression of proven opt-out/hard-failure destinations, and remediation tasks under existing authority. No live send, no DNS mutation, no paid provider commitment, no external authority expansion, no revenue recognition. Unknown stays unknown. Add read-only Founder state if the existing architecture supports it cleanly, plus focused tests.",
+  "allowed_paths": [
+    "empire_os/outbound_governor.py",
+    "empire_os/outbound_governor_executor.py",
+    "empire_os/outbound_provider.py",
+    "empire_os/outbound_followup_worker.py",
+    "empire_os/outreach_quality.py",
+    "empire_os/founder_dashboard_service.py",
+    "empire_os/founder_execution_plane_api.py",
+    "tests/"
+  ],
+  "lease_resources": [
+    "domain:deliverability",
+    "path:empire_os/outbound_governor.py",
+    "path:empire_os/outbound_provider.py",
+    "path:empire_os/outbound_followup_worker.py"
+  ],
+  "pytest_targets": [
+    "tests/test_outbound_governor.py",
+    "tests/test_outbound_governor_executor.py",
+    "tests/test_outbound_provider.py",
+    "tests/test_outbound_followup_worker.py",
+    "tests/test_outreach_quality.py"
+  ],
+  "max_runtime_seconds": 1200,
+  "created_at": "2026-09-25T12:00:00+01:00"
+}
