@@ -805,8 +805,8 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [ ] Governed Hermes control-job publisher — CODED; runtime verification pending
 - [ ] Execution-plane dispatcher — CODED; focused/runtime verification pending
 - [ ] Pi pinned bootstrap + isolated full-clone/systemd sandbox runner — CODED; live install/eval pending
-- [ ] Agent Reach isolated bootstrap — CODED; live install/doctor pending
-- [ ] Agent Reach public sensor adapter: web / YouTube / GitHub / RSS — CODED; live source verification pending
+- [x] Agent Reach isolated bootstrap — LIVE; doctor returns bounded source health
+- [x] Agent Reach public sensor adapter — LIVE public observation proven with provenance/no truth authority
 - [ ] Credentialed Agent Reach channels remain disabled pending separate architecture/risk contract
 - [ ] Space Agent pinned loopback service/bootstrap — CODED; live install/health pending
 - [ ] Space Agent founder workspace wired to local llama.cpp via authenticated proxy fallback — CODED; live model verification pending
@@ -845,15 +845,24 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Static bootstrap/security contract tests
 - [x] Pull execution-plane slice to live EmpireOS server
 - [x] Run full focused architecture/execution-plane test suite on server
-- [ ] Install/verify Pi runtime
-- [ ] Install/verify Agent Reach runtime
-- [ ] Install/verify Space Agent runtime
+- [x] Install/verify Pi runtime — v0.87.1 healthy; coding promotion still gated by structured tool-call probe
+- [x] Install/verify Agent Reach runtime — isolated runtime healthy
+- [x] Install/verify Space Agent runtime — loopback 127.0.0.1:3010 healthy
 - [ ] Verify Founder execution-plane API live
 - [ ] Run first bounded Hermes build through central mutation lease
 - [ ] Run first bounded Pi build through sandbox + independent candidate verification
-- [ ] Run first Agent Reach public observation through quality/provenance gate
+- [x] Run first Agent Reach public observation through quality/provenance gate
 - [ ] Build first Space Agent Founder Mission Control workspace from read-only Empire APIs
 - [ ] Verify post-merge Swarm V6 QA on first execution-plane candidate
 - [ ] Verify Promptfoo gate on first AI-behavior-changing candidate
 - [ ] Record OTel/Langfuse execution-plane traces
 - [ ] Mark execution plane CONNECTED only after all live evidence exists
+
+
+### 2026-09-25 Pi/Space live evidence update
+
+- Pi runtime v0.87.1: LIVE and sandbox smoke green
+- Space Agent: LIVE on loopback 127.0.0.1:3010
+- Agent Reach: LIVE for bounded public sensing
+- Pi local 1.5B tool-calling promotion blocked: model emitted textual pseudo-tool JSON rather than structured tool_calls
+- Mutating Pi jobs must return NO_IMPLEMENTATION until the structured tool-call capability probe and mutation smoke both pass
