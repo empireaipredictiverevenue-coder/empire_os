@@ -29,6 +29,7 @@ MANAGED_TIMERS = (
     "empire-astra-dispatcher.timer",
     "empire-astra-observer.timer",
     "empire-buyer-acquisition-scout.timer",
+    "empire-buyer-acquisition-team.timer",
     "empire-buyer-capacity-readiness.timer",
     "empire-buyer-deferred-enrichment.timer",
     "empire-buyer-review-materializer.timer",
