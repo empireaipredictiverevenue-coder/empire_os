@@ -8,7 +8,8 @@ UNIT = ROOT / "deploy/systemd-user/empire-llama-coder.service"
 def test_llama_coder_uses_proven_chatml_runtime_template():
     text = UNIT.read_text(encoding="utf-8")
     assert "--jinja" in text
-    assert "--chat-template chatml" in text\n    assert "--chat-template-file" not in text
+    assert "--chat-template chatml" in text
+    assert "--chat-template-file" not in text
     assert "--host 127.0.0.1" in text
     assert "--port 11435" in text
 
