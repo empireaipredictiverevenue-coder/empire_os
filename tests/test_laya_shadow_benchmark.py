@@ -37,4 +37,5 @@ def test_laya_benchmark_keeps_shadow_review_gate():
     assert "specialist_precision" in text
     assert "specialist_misses" in text
     assert "review_laya_reply_specialist" in text
-    assert "return 0 if unsafe_accepts == 0 else 2" in text
+    assert "unsafe_accepts == 0" in text
+    assert "specialist_misses == 0" in text
