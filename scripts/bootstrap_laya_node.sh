@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="${ROOT:-/srv/empire_os}"
 SIDE="${ROOT}/tools/laya_node"
 CACHE="${ROOT}/runtime/laya/cache"
+RUNTIME_BIN="${ROOT}/runtime/laya/bin"
 
 echo "=== LAYA NODE/ONNX RESOURCE GATE ==="
 mem_kb="$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)"
@@ -19,6 +20,19 @@ if [[ "${disk_kb:-0}" -lt 4000000 ]]; then
   echo "BLOCKED: need at least ~4 GB free disk for package/cache headroom" >&2
   exit 2
 fi
+
+echo
+echo "=== PIN WORKING NODE BINARY ==="
+NODE_SOURCE="$(command -v node || true)"
+if [[ -z "${NODE_SOURCE}" || ! -x "${NODE_SOURCE}" ]]; then
+  echo "BLOCKED: working node executable not found on operator PATH" >&2
+  exit 5
+fi
+mkdir -p "${RUNTIME_BIN}"
+install -m 0755 "${NODE_SOURCE}" "${RUNTIME_BIN}/node"
+echo "NodeSource=${NODE_SOURCE}"
+echo "NodePinned=${RUNTIME_BIN}/node"
+"${RUNTIME_BIN}/node" --version
 
 echo
 echo "=== INSTALL PINNED NODE SIDECAR ==="
@@ -42,7 +56,7 @@ echo "Model bundle is ~1.7 GB; progress will print below."
 echo "Preload timeout: ${LAYA_PRELOAD_TIMEOUT:-1200}s"
 mkdir -p "${CACHE}"
 set +e
-LAYA_CACHE="${CACHE}" LAYA_THREADS="${LAYA_THREADS:-4}" timeout --foreground "${LAYA_PRELOAD_TIMEOUT:-1200}s"   node "${SIDE}/preload.mjs"
+LAYA_CACHE="${CACHE}" LAYA_THREADS="${LAYA_THREADS:-4}" timeout --foreground "${LAYA_PRELOAD_TIMEOUT:-1200}s"   "${RUNTIME_BIN}/node" "${SIDE}/preload.mjs"
 preload_rc=$?
 set -e
 if [[ "${preload_rc}" -eq 124 ]]; then
