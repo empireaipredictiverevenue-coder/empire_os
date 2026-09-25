@@ -210,6 +210,7 @@ def dispatch_execution_request(
 ) -> dict[str, Any]:
     request.validate()
     root = Path(repo_root).resolve()
+    capability_path = root / RUNTIME_RELATIVE / "builder_capabilities.json"
     routing = route_execution_job(
         ExecutionJob(
             job_id=request.request_id,
