@@ -165,7 +165,6 @@ def default_worker_registry() -> tuple[WorkerSpec, ...]:
             isolation="ephemeral_worktree_sandbox",
             mutates_repo=True,
             preferred_for=(
-                "backend_code",
                 "parallel_backend_code",
                 "frontend_code",
                 "tests",
@@ -187,7 +186,7 @@ def default_worker_registry() -> tuple[WorkerSpec, ...]:
             isolation="governed_local_queue",
             mutates_repo=True,
             preferred_for=("verification",),
-            fallback_for=("backend_code", "tests", "documentation"),
+            fallback_for=("tests", "documentation"),
         ),
         WorkerSpec(
             key="space_agent",
