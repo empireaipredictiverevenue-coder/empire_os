@@ -87,7 +87,7 @@ def pi_health(
 
 def agent_reach_health(
     binary: str | Path = (
-        "/srv/empire_os/runtime/agent_reach/venv/bin/agent-reach"
+        "/opt/empire/agent-reach/venv/bin/agent-reach"
     ),
     *,
     probe: bool = False,
@@ -110,7 +110,14 @@ def agent_reach_health(
     if probe:
         argv.append("--probe")
     try:
-        result = _run(argv, timeout=45 if probe else 20)
+        result = _run(
+            argv,
+            env={
+                **os.environ,
+                "HOME": "/var/lib/empire/agent-reach/home",
+            },
+            timeout=45 if probe else 20,
+        )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {
             "tool": ToolHealth(
@@ -151,7 +158,7 @@ def agent_reach_health(
 
 
 def space_agent_health(
-    source_dir: str | Path = "/srv/empire_os/runtime/space_agent/source",
+    source_dir: str | Path = "/opt/empire/space-agent/source",
 ) -> ToolHealth:
     root = Path(source_dir)
     package = root / "package.json"
