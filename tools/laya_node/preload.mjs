@@ -4,10 +4,25 @@ import { Laya } from "@receptron/laya";
 const cacheDir = process.env.LAYA_CACHE || "/srv/empire_os/runtime/laya/cache";
 const threads = Math.max(1, Number(process.env.LAYA_THREADS || "4"));
 
+let lastProgress = "";
 const model = await Laya.load({
   cacheDir,
   executionProviders: ["cpu"],
   sessionOptions: { intraOpNumThreads: threads },
+  onProgress: ({ file, received, total }) => {
+    const pct = total ? ((received / total) * 100).toFixed(1) : "?";
+    const key = `${file}:${pct}`;
+    if (key !== lastProgress) {
+      lastProgress = key;
+      console.log(JSON.stringify({
+        event: "laya_download_progress",
+        file,
+        received,
+        total: total ?? null,
+        percent: pct,
+      }));
+    }
+  },
 });
 
 const result = await model.systemOne(
