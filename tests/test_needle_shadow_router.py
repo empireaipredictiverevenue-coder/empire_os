@@ -3,6 +3,7 @@ import json
 import pytest
 
 from empire_os.needle_shadow_router import (
+    DEFAULT_EMPIRE_ROUTER_FACTS,
     NeedleRouteRequest,
     NeedleRouterError,
     NeedleShadowRouter,
@@ -147,3 +148,12 @@ def test_tool_schema_requires_object_parameters():
             description="bad schema",
             parameters={"type": "string"},
         ).validate()
+
+
+def test_default_router_policy_prioritizes_reply_analysis():
+    lower = DEFAULT_EMPIRE_ROUTER_FACTS.lower()
+    assert "buyer email or reply" in lower
+    assert "classify_reply" in lower
+    assert "explicitly asks" in lower
+    assert "return no function call" in lower
+    assert "never execute tools" in lower
