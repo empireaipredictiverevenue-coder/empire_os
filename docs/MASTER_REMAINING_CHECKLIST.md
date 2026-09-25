@@ -787,3 +787,37 @@ Current reconciliation truth:
 - [ ] Every bounded extension records an architecture delta before implementation
 - [ ] Mutating builder ownership/lease prevents overlapping edits
 - [ ] Verification/promotion evidence is recorded before checklist DONE
+
+
+## Agent & Tool Execution Plane — ACTIVE BUILD
+
+Canonical architecture:
+- `docs/AGENT_TOOL_EXECUTION_PLANE_ARCHITECTURE.md`
+- `docs/ARCHITECTURE_FIRST_ENGINEERING_DOCTRINE.md`
+
+Truth rule: code presence is not production completion. Items below remain unchecked until focused tests and live runtime verification prove them.
+
+- [x] Execution-plane architecture diagrams and authority model
+- [x] Worker-role architecture for Hermes / Pi / Empire Coder / Space Agent / Agent Reach / Swarm / Needle / Laya
+- [ ] Typed worker registry + capability router — CODED; focused runtime test pending
+- [ ] Exclusive domain/path mutation lease manager — CODED; focused runtime test pending
+- [ ] Hermes central mutation-lease integration — CODED; regression/runtime verification pending
+- [ ] Governed Hermes control-job publisher — CODED; runtime verification pending
+- [ ] Execution-plane dispatcher — CODED; focused/runtime verification pending
+- [ ] Pi pinned bootstrap + isolated full-clone/systemd sandbox runner — CODED; live install/eval pending
+- [ ] Agent Reach isolated bootstrap — CODED; live install/doctor pending
+- [ ] Agent Reach public sensor adapter: web / YouTube / GitHub / RSS — CODED; live source verification pending
+- [ ] Credentialed Agent Reach channels remain disabled pending separate architecture/risk contract
+- [ ] Space Agent pinned loopback service/bootstrap — CODED; live install/health pending
+- [ ] Space Agent founder workspace wired to local llama.cpp via authenticated proxy fallback — CODED; live model verification pending
+- [ ] Space Agent Founder/department Mission Control workspace
+- [ ] Founder Execution Plane read API — CODED; service restart/runtime verification pending
+- [ ] Founder execution-ledger read API — CODED; service restart/runtime verification pending
+- [ ] Control Fabric execution-plane registration — CODED; regression/runtime verification pending
+- [ ] Swarm V6 verification hook for candidate worker output
+- [ ] Promptfoo AI-policy/eval hook for agent-produced behavioral changes
+- [ ] OTEL/Langfuse trace events for queue → route → lease → worker → verify → proposal → live result
+- [ ] Astra/department queue automatic dispatch into the execution plane
+- [ ] Live parallel non-overlapping Hermes/Pi proof
+- [ ] Live collision test proving overlapping mutation leases fail closed
+- [ ] First checklist items completed by the software factory and independently verified
