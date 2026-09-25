@@ -16,7 +16,7 @@ def call_api(prompt, options, context):
     model = (
         os.getenv("EMPIRE_EVAL_MODEL")
         or config.get("model")
-        or "empire-local-eval"
+        or "qwen2.5-coder:1.5b"
     )
     payload = {
         "model": model,
