@@ -598,6 +598,57 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             300,
         ),
         ComponentSpec(
+            "buyer_reply_operations_agent",
+            (
+                "buyer_reply_received",
+                "reply_analysis_requested",
+            ),
+            (
+                "reply_operations_state_ready",
+                "reply_reasoning_required",
+                "reply_suppression_required",
+                "reply_followup_review_required",
+            ),
+            (
+                "conversation_os",
+                "outbound_governor",
+            ),
+            "internal_write",
+            120,
+        ),
+        ComponentSpec(
+            "deliverability_sender_reputation_agent",
+            (
+                "provider_delivery_event_observed",
+                "sender_health_refresh_requested",
+                "dsn_observed",
+            ),
+            (
+                "sender_health_state_ready",
+                "sender_lane_review_required",
+                "suppression_review_required",
+            ),
+            ("outbound_governor",),
+            "observe",
+            300,
+        ),
+        ComponentSpec(
+            "source_reliability_agent",
+            (
+                "source_run_observed",
+                "source_quality_refresh_requested",
+                "source_downstream_outcome_observed",
+            ),
+            (
+                "source_reliability_state_ready",
+                "source_recovery_review_required",
+                "source_sampling_recommendation_ready",
+            ),
+            ("acquisition",),
+            "observe",
+            600,
+        ),
+        ComponentSpec(
             "commercial_terms",
             ("terms_candidate_created",),
             ("commercial_terms_proposed",),
