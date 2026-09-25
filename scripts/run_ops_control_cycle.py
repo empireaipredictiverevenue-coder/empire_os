@@ -13,7 +13,10 @@ from empire_os.incident_manager import build_incident_report
 from empire_os.ops_healer import execute_plan
 from empire_os.ops_sentinel import observe
 from empire_os.runtime_self_heal import run_runtime_self_heal
-from empire_os.supabase_egress_guard import supabase_egress_contained
+from empire_os.supabase_egress_guard import (
+    MANAGED_TIMERS,
+    supabase_egress_contained,
+)
 
 OUTPUT = Path("/srv/empire_os/runtime/ops_control/latest.json")
 
@@ -29,6 +32,47 @@ def unit_state(unit: str) -> str:
     return (result.stdout or "").strip() or "unknown"
 
 
+
+def _apply_egress_containment_context(
+    sentinel: dict,
+    *,
+    contained: bool,
+) -> dict:
+    if not contained:
+        return sentinel
+
+    result = dict(sentinel)
+    findings = list(result.get("findings") or [])
+    repair_plan = list(result.get("repair_plan") or [])
+    managed = set(MANAGED_TIMERS)
+
+    deferred_findings = [
+        row for row in findings
+        if row.get("code") == "critical_timer_down"
+        and row.get("component") in managed
+    ]
+    deferred_repairs = [
+        row for row in repair_plan
+        if row.get("target") in managed
+    ]
+    result["findings"] = [
+        row for row in findings
+        if row not in deferred_findings
+    ]
+    result["repair_plan"] = [
+        row for row in repair_plan
+        if row not in deferred_repairs
+    ]
+    result["intentional_containment"] = {
+        "active": True,
+        "reason": "supabase_egress",
+        "deferred_finding_count": len(deferred_findings),
+        "deferred_repair_count": len(deferred_repairs),
+        "deferred_findings": deferred_findings,
+        "deferred_repairs": deferred_repairs,
+    }
+    return result
+
 def main() -> int:
     mode = os.getenv("EMPIRE_OPS_HEAL_MODE", "OBSERVE").strip().upper()
     if mode not in {"OBSERVE", "GUARDED_EXECUTE"}:
@@ -39,6 +83,10 @@ def main() -> int:
         observe_only=(mode != "GUARDED_EXECUTE" or egress_contained),
     )
     sentinel = observe(unit_state)
+    sentinel = _apply_egress_containment_context(
+        sentinel,
+        contained=egress_contained,
+    )
     repairs = []
     if mode == "GUARDED_EXECUTE" and not egress_contained:
         repairs = execute_plan(sentinel.get("repair_plan") or [], max_actions=3)
