@@ -29,3 +29,8 @@ def test_laya_benchmark_keeps_shadow_review_gate():
     assert "review_typed_decision_result" in text
     assert '"shadow_only": True' in text
     assert '"execution_authority": "none"' in text
+    assert "raw_accuracy" in text
+    assert "safe_accuracy" in text
+    assert "escalation_rate" in text
+    assert "unsafe_accepts" in text
+    assert "return 0 if unsafe_accepts == 0 else 2" in text
