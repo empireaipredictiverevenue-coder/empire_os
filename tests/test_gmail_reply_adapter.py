@@ -176,3 +176,13 @@ def test_unclassified_reply_is_recorded_but_not_auto_applied():
     assert result["classification"] == "other"
     assert result["classification_auto_applied"] is False
     assert [name for name, _ in rpc.calls] == ["ingest_outbound_reply"]
+
+
+def test_missing_received_timestamp_is_not_invented():
+    candidate = message()
+    candidate["email_ts"] = ""
+    result = correlate_gmail_reply(candidate, [intent()])
+    assert result == {
+        "matched": False,
+        "reason": "missing_received_at",
+    }
