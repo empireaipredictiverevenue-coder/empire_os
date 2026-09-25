@@ -867,8 +867,8 @@ def _write_isolated_hermes_config(
             # Bound governed worker generations. Older Hermes builds honor
             # max_tokens directly; context_length also prevents an accidental
             # 131k output ceiling from being inferred through custom gateways.
-            "context_length": 32768,
-            "max_tokens": 4096,
+            "context_length": 262144,
+            "max_tokens": 16384,
         }
     }
     if api_key:
@@ -911,14 +911,15 @@ def run_hermes(
     env["PYTHONUNBUFFERED"] = "1"
 
     base_url = str(env.get("OPENAI_BASE_URL") or "").strip()
-    # OmniRoute is itself the quota-aware routing layer. Do not pre-probe
-    # provider models here: that duplicates routing, consumes free-tier quota,
-    # and can extend provider cooldowns. One governed Hermes request goes to
-    # OmniRoute model=auto and OmniRoute owns provider/model fallback.
+    # OmniRoute remains the governed provider gateway. Do not pre-probe
+    # provider models here: that duplicates routing, consumes provider quota,
+    # and can extend cooldowns. Hermes sends one governed request to the
+    # selected model; provider-level failover remains behind OmniRoute while
+    # EmpireOS owns worker-level fallback.
     model_attempts: list[dict[str, str]] = []
     selected_model = str(
-        os.environ.get("EMPIRE_HERMES_MODEL") or "auto"
-    ).strip() or "auto"
+        os.environ.get("EMPIRE_HERMES_MODEL") or "gemini/gemini-3.1-flash-lite"
+    ).strip() or "gemini/gemini-3.1-flash-lite"
 
     isolated_home = _write_isolated_hermes_config(
         production_repo=production_repo,
@@ -929,7 +930,11 @@ def run_hermes(
         env["HERMES_HOME"] = str(isolated_home)
         provider = "custom"
         model = selected_model
-        endpoint_mode = "isolated_omniroute_auto"
+        endpoint_mode = (
+            "isolated_omniroute_auto"
+            if selected_model == "auto"
+            else "isolated_omniroute_pinned"
+        )
     else:
         provider = str(
             os.environ.get("EMPIRE_HERMES_PROVIDER")
@@ -937,7 +942,7 @@ def run_hermes(
         ).strip()
         model = str(
             os.environ.get("EMPIRE_HERMES_MODEL")
-            or "auto"
+            or "gemini/gemini-3.1-flash-lite"
         ).strip()
         endpoint_mode = "ambient_provider"
 
