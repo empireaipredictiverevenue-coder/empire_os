@@ -1,4 +1,5 @@
 from empire_os.execution_plane_verification import (
+    enqueue_promptfoo_verification,
     plan_candidate_verification,
 )
 
@@ -34,3 +35,33 @@ def test_ai_behavior_change_requires_promptfoo():
     assert plan.promptfoo_config == (
         "evals/empire_core_policy/promptfooconfig.yaml"
     )
+
+
+
+def test_promptfoo_request_is_queued_only_for_ai_behavior_change(tmp_path):
+    plan = plan_candidate_verification(
+        request_id="verify-ai",
+        allowed_paths=("empire_os/closer_reply_worker.py",),
+        required_tests=("tests/test_closer_reply_worker.py",),
+        ai_behavior_change=True,
+    )
+    queued = enqueue_promptfoo_verification(
+        tmp_path,
+        plan,
+        candidate_ref="pi/job-verify-ai",
+    )
+    assert queued is not None
+    assert queued["queued"] is True
+    assert queued["execution_authority"] == "none"
+
+    non_ai = plan_candidate_verification(
+        request_id="verify-code",
+        allowed_paths=("empire_os/example.py",),
+        required_tests=("tests/test_example.py",),
+        ai_behavior_change=False,
+    )
+    assert enqueue_promptfoo_verification(
+        tmp_path,
+        non_ai,
+        candidate_ref="branch",
+    ) is None
