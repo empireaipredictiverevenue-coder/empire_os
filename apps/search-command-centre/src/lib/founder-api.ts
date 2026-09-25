@@ -603,6 +603,8 @@ export type EmpireMailThread = {
   classification?: string | null;
   commercial_status?: string | null;
   suppressed?: boolean;
+  suppression_origin?: string | null;
+  suppression_source_id?: string | null;
   next_action?: string | null;
   event_count?: number;
   events?: EmpireMailEvent[];
