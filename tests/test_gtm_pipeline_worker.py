@@ -31,12 +31,15 @@ def review(review_id="00000000-0000-0000-0000-000000000001"):
 
 def test_build_outbound_payload_is_compliant_and_evidence_safe():
     payload = build_outbound_payload(review(), now=NOW)
-    assert payload["p_subject"] == "Clay — one thing I noticed in Wichita, KS"
+    assert payload["p_subject"] == "Kihle customer signals"
     assert POSTAL_ADDRESS in payload["p_body_text"]
     assert "opt out" in payload["p_body_text"].lower()
     assert "Kihle Roofing" in payload["p_body_text"]
-    assert "generic lead pitch" in payload["p_body_text"]
+    assert "generic lead pitch" not in payload["p_body_text"]
     assert payload["p_metadata"]["conversation_quality"] == "v2"
+    assert payload["p_metadata"]["message_optimizer_version"] == "v1"
+    assert payload["p_metadata"]["subject_variants"]
+    assert payload["p_metadata"]["message_quality_review"]["score"] >= 70
     assert "revenue" not in payload["p_metadata"]
     assert payload["p_proposed_by"] == "empire_gtm_agent_v1"
     assert payload["p_expires_at"].startswith("2026-09-24T16:00:00")
@@ -198,9 +201,7 @@ def test_pipeline_hydrates_missing_context_from_canonical_prospect():
         for method, path, payload in calls
         if path.endswith("propose_reviewed_outbound_intent")
     )
-    assert proposal["p_subject"] == (
-        "Dave — one thing I noticed in san antonio, tx"
-    )
+    assert proposal["p_subject"] == "SewerTV customer signals"
     assert "SewerTV Hydro Jetting and Plumbing" in proposal["p_body_text"]
     assert "4.9★ across 87 reviews" in proposal["p_body_text"]
     assert "your team" not in proposal["p_body_text"]
