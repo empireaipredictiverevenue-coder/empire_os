@@ -55,6 +55,8 @@ def classify_reply_text(body_text: Any, subject: Any = "") -> dict[str, Any]:
 
     if not body:
         return {"classification": "other", "confidence": 0.50, "auto_apply": False}
+    if re.fullmatch(r"stop[.!]?", body, flags=re.IGNORECASE):
+        return {"classification": "unsubscribe", "confidence": 0.99, "auto_apply": True}
     if _match_any(UNSUBSCRIBE_PATTERNS, text):
         return {"classification": "unsubscribe", "confidence": 0.99, "auto_apply": True}
     if _match_any(NEGATIVE_PATTERNS, text):
