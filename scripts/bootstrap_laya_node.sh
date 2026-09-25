@@ -22,7 +22,7 @@ fi
 
 echo
 echo "=== INSTALL PINNED NODE SIDECAR ==="
-npm --prefix "${SIDE}" install --omit=dev --no-audit --no-fund
+npm --prefix "${SIDE}" install --omit=dev --no-audit --no-fund --no-package-lock
 
 echo
 echo "=== PRELOAD MODEL TO LOCAL CACHE ==="
