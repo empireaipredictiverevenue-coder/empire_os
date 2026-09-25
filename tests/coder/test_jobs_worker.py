@@ -338,3 +338,59 @@ def test_worker_retries_transient_model_failure(tmp_path):
     assert result.attempts == 1
     assert result.retry_after
     assert "ollama_request_failed" in (result.error or "")
+
+
+def test_execution_plane_implement_rejects_out_of_scope_target(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = FakeCoder()
+    worker = CoderTaskWorker(coder, queue)
+    job = queue.enqueue(
+        task_id="coder_task_scoped_bad",
+        kind=JobKind.IMPLEMENT,
+        payload={
+            "execution_plane_request_id": "request-scoped-bad",
+            "allowed_paths": ["tests/"],
+            "lease_resources": ["domain:test"],
+            "required_tests": ["tests/test_example.py"],
+        },
+    )
+
+    result = worker.run_once()
+
+    assert result.status is JobStatus.COMPLETED
+    assert result.result["eligible"] is False
+    assert result.result["applied"] is False
+    assert "execution_plane_path_policy_failed" in result.result[
+        "validation_reasons"
+    ]
+    assert not any(
+        call[0] == "apply_structured_patch"
+        for call in coder.calls
+    )
+
+
+def test_execution_plane_implement_uses_scope_lease_and_required_tests(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = FakeCoder()
+    worker = CoderTaskWorker(coder, queue)
+    job = queue.enqueue(
+        task_id="coder_task_scoped_good",
+        kind=JobKind.IMPLEMENT,
+        payload={
+            "execution_plane_request_id": "request-scoped-good",
+            "allowed_paths": ["empire_os/"],
+            "lease_resources": ["domain:test"],
+            "required_tests": ["tests/test_example.py"],
+        },
+    )
+
+    result = worker.run_once()
+
+    assert result.status is JobStatus.COMPLETED
+    assert result.result["eligible"] is True
+    assert result.result["applied"] is True
+    assert result.result["execution_plane_request_id"] == "request-scoped-good"
+    assert result.result["lease_id"]
+    assert worker.execution_leases.active() == []
