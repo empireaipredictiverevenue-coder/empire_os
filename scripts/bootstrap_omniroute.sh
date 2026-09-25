@@ -189,7 +189,7 @@ fi
 echo "=== HERMES -> OMNIROUTE ENV ==="
 cat >/etc/empire_os/omniroute-hermes.env <<EOF
 EMPIRE_HERMES_PROVIDER=openai-api
-EMPIRE_HERMES_MODEL=gemini/gemini-3.1-flash-lite
+EMPIRE_HERMES_MODEL=openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
 OPENAI_BASE_URL=http://127.0.0.1:20128/v1
 OPENAI_API_KEY=$OMNIROUTE_API_KEY_VALUE
 EOF

@@ -213,7 +213,7 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     assert result["returncode"] == 0
     assert result["endpoint_mode"] == "isolated_omniroute_pinned"
     assert result["provider"] == "custom"
-    assert result["model"] == "gemini/gemini-3.1-flash-lite"
+    assert result["model"] == "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
     assert result["model_probe_attempts"] == []
     assert result["hermes_home_isolated"] is True
     assert "local-test-key" not in result["output_tail"]
@@ -223,13 +223,13 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     provider_index = args.index("--provider")
     model_index = args.index("--model")
     assert args[provider_index + 1] == "custom"
-    assert args[model_index + 1] == "gemini/gemini-3.1-flash-lite"
+    assert args[model_index + 1] == "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
 
     hermes_home = repo / "runtime/hermes_control/hermes_home"
     assert captured["env"]["HERMES_HOME"] == str(hermes_home)
     config = (hermes_home / "config.yaml").read_text()
     assert '"provider": "custom"' in config
-    assert '"default": "gemini/gemini-3.1-flash-lite"' in config
+    assert '"default": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"' in config
     assert "http://127.0.0.1:20128/v1" in config
     assert "local-test-key" in config
     assert '"context_length": 262144' in config

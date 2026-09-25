@@ -918,8 +918,8 @@ def run_hermes(
     # EmpireOS owns worker-level fallback.
     model_attempts: list[dict[str, str]] = []
     selected_model = str(
-        os.environ.get("EMPIRE_HERMES_MODEL") or "gemini/gemini-3.1-flash-lite"
-    ).strip() or "gemini/gemini-3.1-flash-lite"
+        os.environ.get("EMPIRE_HERMES_MODEL") or "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
+    ).strip() or "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
 
     isolated_home = _write_isolated_hermes_config(
         production_repo=production_repo,
@@ -942,7 +942,7 @@ def run_hermes(
         ).strip()
         model = str(
             os.environ.get("EMPIRE_HERMES_MODEL")
-            or "gemini/gemini-3.1-flash-lite"
+            or "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
         ).strip()
         endpoint_mode = "ambient_provider"
 
