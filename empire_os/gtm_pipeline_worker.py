@@ -163,6 +163,13 @@ def build_outbound_payload(
             "business_name": business,
             "conversation_quality": "v2",
             "conversation_quality_tier": copy.quality_tier,
+            "message_optimizer_version": "v1",
+            "subject_variants": list(copy.subject_variants),
+            "message_quality_review": (
+                dict(copy.quality_review)
+                if isinstance(copy.quality_review, Mapping)
+                else None
+            ),
             "why_now_summary": copy.why_now_summary,
             "why_now_evidence_ref": copy.why_now_evidence_ref,
             "specific_proof": copy.specific_proof,
