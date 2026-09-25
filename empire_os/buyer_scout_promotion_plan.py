@@ -132,6 +132,7 @@ def build_promotion_plan(
                 str(person.get("title") or "").strip()
                 if person else None
             ),
+            "contact_email": emails[0] if len(emails) == 1 else None,
             "contact_source": (
                 "first_party_site"
                 if person else None

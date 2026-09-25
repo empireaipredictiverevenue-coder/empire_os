@@ -18,7 +18,7 @@ def candidate(**overrides):
             "corridor:v1:roofing:austin_tx:qualified_lead:lead"
         ],
         "site_evidence": {
-            "first_party_phones": ["+15125550123"],
+            "first_party_phones": ["+151****0123"],
             "first_party_emails": ["sales@roof.example"],
             "first_party_people": [
                 {"name": "Jane Smith", "title": "Owner"}
@@ -42,6 +42,7 @@ def test_review_ready_candidate_gets_raw_prospect_proposal():
     assert payload["buy_signal_score"] is None
     assert payload["contact_name"] == "Jane Smith"
     assert payload["contact_title"] == "Owner"
+    assert payload["contact_email"] == "sales@roof.example"
     assert row["first_party_emails_preserved_for_identity_resolution"] == [
         "sales@roof.example"
     ]
@@ -88,7 +89,6 @@ def test_non_review_ready_candidate_is_not_proposed():
     }
 
 
-
 def test_stale_review_ready_generic_name_is_rejected_at_promotion():
     row = candidate(
         business_name="Step 1",
@@ -102,3 +102,45 @@ def test_stale_review_ready_generic_name_is_rejected_at_promotion():
     assert result["blocked_reason_counts"] == {
         "business_name_not_verified": 1
     }
+
+
+def test_exactly_one_first_party_email_becomes_contact_email():
+    result = build_promotion_plan([candidate(
+        site_evidence={
+            "first_party_phones": ["+151****0123"],
+            "first_party_emails": ["contact@roof.example"],
+            "first_party_people": [{"name": "Jane Smith", "title": "Owner"}],
+        }
+    )])
+
+    payload = result["proposals"][0]["proposed_prospect_payload"]
+    assert payload["contact_email"] == "contact@roof.example"
+    assert result["proposals"][0]["first_party_emails_preserved_for_identity_resolution"] == ["contact@roof.example"]
+
+
+def test_multiple_first_party_emails_fail_closed_contact_email_none():
+    result = build_promotion_plan([candidate(
+        site_evidence={
+            "first_party_phones": ["+151****0123"],
+            "first_party_emails": ["a@roof.example", "b@roof.example"],
+            "first_party_people": [{"name": "Jane Smith", "title": "Owner"}],
+        }
+    )])
+
+    payload = result["proposals"][0]["proposed_prospect_payload"]
+    assert payload["contact_email"] is None
+    assert result["proposals"][0]["first_party_emails_preserved_for_identity_resolution"] == ["a@roof.example", "b@roof.example"]
+
+
+def test_no_first_party_email_gives_contact_email_none():
+    result = build_promotion_plan([candidate(
+        site_evidence={
+            "first_party_phones": ["+151****0123"],
+            "first_party_emails": [],
+            "first_party_people": [{"name": "Jane Smith", "title": "Owner"}],
+        }
+    )])
+
+    payload = result["proposals"][0]["proposed_prospect_payload"]
+    assert payload["contact_email"] is None
+    assert result["proposals"][0]["first_party_emails_preserved_for_identity_resolution"] == []
