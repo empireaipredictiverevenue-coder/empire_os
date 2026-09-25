@@ -64,3 +64,40 @@ def test_pi_systemd_failure_stage_is_reported():
     assert _sandbox_failure_stage(226) == "NAMESPACE"
     assert _sandbox_failure_stage(244) == "BPF"
     assert _sandbox_failure_stage(1) is None
+
+
+def test_pi_command_uses_json_event_mode(tmp_path):
+    clone = tmp_path / "clone"
+    clone.mkdir()
+    (clone / ".empire_pi").mkdir()
+    argv = build_pi_systemd_command(
+        clone=clone,
+        prompt="Use a tool.",
+        model_id="qwen-test",
+        max_runtime_seconds=300,
+        system_prompt="Empire safe coding policy.",
+        pi_bin=Path("/opt/empire/pi-agent/bin/pi"),
+    )
+    assert "--mode" in argv
+    mode_index = argv.index("--mode")
+    assert argv[mode_index + 1] == "json"
+    assert "--print" not in argv
+
+
+def test_pi_jobs_require_changes_by_default():
+    job = PiSandboxJob(
+        job_id="implementation-1",
+        prompt="Implement feature.",
+        allowed_paths=("empire_os/",),
+    )
+    assert job.require_changes is True
+
+
+def test_pi_smoke_can_explicitly_allow_no_changes():
+    job = PiSandboxJob(
+        job_id="smoke-1",
+        prompt="Read only.",
+        allowed_paths=("tests/",),
+        require_changes=False,
+    )
+    assert job.require_changes is False
