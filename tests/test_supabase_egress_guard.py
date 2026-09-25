@@ -47,6 +47,11 @@ def test_guard_contains_only_allowlisted_timers_on_egress_block(
     }
     assert set(guard.MANAGED_TIMERS).issubset(stopped)
     assert "empire-buyer-acquisition-team.timer" in stopped
+    assert "empire-revenue-runtime-supervisor.timer" in stopped
+    assert "empire-revenue-pulse.timer" in stopped
+    assert "empire-ops-control.timer" in stopped
+    assert "empire-legacy-permit-recovery.timer" in stopped
+    assert "empire-enterprise-contact-repair.timer" in stopped
     assert "empire-resend-inbound.service" not in stopped
     assert result["inbound_mail_touched"] is False
     assert result["revenue_mutation"] is False
