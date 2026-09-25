@@ -42,6 +42,11 @@ ops-mcp = [
 needle = [
     "cactus-needle==3.0.1",
 ]
+observability = [
+    "opentelemetry-api==1.44.0",
+    "opentelemetry-sdk==1.44.0",
+    "opentelemetry-exporter-otlp-proto-http==1.44.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["empire_os*"]
