@@ -26,4 +26,8 @@ def test_needle_benchmark_remains_shadow_only():
     assert "load_needle_shadow_router" in text
     assert '"tool_executed": False' in text
     assert '"execution_authority": "none"' in text
+    assert "raw_accuracy" in text
+    assert "safe_accuracy" in text
+    assert "unsafe_accepts" in text
+    assert "return 0 if unsafe_accepts == 0 else 2" in text
     assert ".run(" not in text
