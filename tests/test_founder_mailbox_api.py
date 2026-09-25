@@ -105,3 +105,55 @@ def test_resend_provider_loads_only_required_keys_from_runtime_file(
     assert provider.receiving_api_key == "receive-key"
     assert not hasattr(provider, "sender_dsn")
 
+def test_mailbox_draft_preview_uses_existing_closer_logic():
+    client = TestClient(app())
+    thread_id = "11111111-2222-3333-4444-555555555555"
+    response = client.get(
+        "/v1/founder-mailbox/draft-preview",
+        params={"thread_id": thread_id},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["outbound_send_authority"] is False
+    assert payload["execution_authority"] == "none"
+    assert payload["classification"] == "positive"
+    assert payload["unknowns_preserved"] is True
+    assert payload["draft"]["subject"].startswith("Re:")
+    assert "Best," in payload["draft"]["body_text"]
+
+
+def test_mailbox_draft_preview_fails_closed_without_inbound_reply():
+    class NoReplyProvider(FakeProvider):
+        def list_received(self, *, limit):
+            return []
+
+    value = FastAPI()
+    value.include_router(create_founder_mailbox_router(NoReplyProvider()))
+    client = TestClient(value)
+    response = client.get(
+        "/v1/founder-mailbox/draft-preview",
+        params={"thread_id": "11111111-2222-3333-4444-555555555555"},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "inbound_reply_required"
+
+
+def test_mailbox_draft_preview_fails_closed_for_suppressed_recipient():
+    class SuppressedProvider(FakeProvider):
+        def list_suppressions(self, *, limit):
+            return [{
+                "id": "sup-1",
+                "email": "buyer@example.com",
+                "origin": "manual",
+            }]
+
+    value = FastAPI()
+    value.include_router(create_founder_mailbox_router(SuppressedProvider()))
+    client = TestClient(value)
+    response = client.get(
+        "/v1/founder-mailbox/draft-preview",
+        params={"thread_id": "11111111-2222-3333-4444-555555555555"},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "recipient_suppressed"
+
