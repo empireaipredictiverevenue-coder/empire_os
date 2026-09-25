@@ -619,6 +619,12 @@ export type FounderMailbox = {
   read_only?: boolean;
   execution_authority?: string;
   provider?: string;
+  identity?: {
+    sender?: string | null;
+    sender_email?: string | null;
+    reply_to?: string | null;
+    observed?: boolean;
+  };
   thread_count?: number;
   summary?: {
     all?: number;
