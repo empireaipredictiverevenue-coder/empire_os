@@ -111,6 +111,10 @@ def agent_reach_health(
             env={
                 **os.environ,
                 "HOME": "/var/lib/empire/agent-reach/home",
+                "PATH": (
+                    "/opt/empire/agent-reach/venv/bin:"
+                    "/usr/local/bin:/usr/bin:/bin"
+                ),
             },
             timeout=20,
         )
@@ -172,13 +176,13 @@ def space_agent_health(
     except (OSError, json.JSONDecodeError):
         raw = {}
     version = str(raw.get("version") or "").strip() or None
-    node = shutil.which("node")
+    node = Path("/opt/empire/space-agent/bin/node")
     return ToolHealth(
         key="space_agent",
         installed=True,
-        ready=bool(node),
+        ready=node.exists(),
         version=version,
-        detail=None if node else "node_missing",
+        detail=None if node.exists() else "node_missing",
     )
 
 
