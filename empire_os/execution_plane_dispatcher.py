@@ -262,6 +262,7 @@ def dispatch_execution_request(
             ),
             "pytest_targets": list(request.required_tests),
             "max_runtime_seconds": request.max_runtime_seconds,
+            "ai_behavior_change": request.ai_behavior_change,
             "created_at": _now(),
         }
         published = publish_control_job(root, payload)
