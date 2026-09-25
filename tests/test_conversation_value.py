@@ -118,7 +118,8 @@ def test_followup_is_value_led_and_closes_after_step_two():
     }
     first = build_followup_copy(row, step=1, now=NOW)
     final = build_followup_copy(row, step=2, now=NOW)
-    assert "one-page Wichita roofing brief" in first.body
-    assert "reply “send it”" in first.body
-    assert "Closing the loop" in final.body
-    assert "No need for a call first" in final.body
+    assert "The three checks are:" in first.body
+    assert "Competitor Search Gap" in first.body
+    assert "reply “gap”" in first.body
+    assert "Closing the loop on Kihle Roofing" in final.body
+    assert "no need to start with a large engagement" in final.body
