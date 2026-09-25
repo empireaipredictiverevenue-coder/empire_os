@@ -46,7 +46,7 @@ def _run(
 
 
 def pi_health(
-    binary: str | Path = "/srv/empire_os/runtime/pi_agent/node_modules/.bin/pi",
+    binary: str | Path = "/opt/empire/pi-agent/bin/pi",
 ) -> ToolHealth:
     path = Path(binary)
     if not path.exists():
@@ -64,7 +64,7 @@ def pi_health(
                 "PI_OFFLINE": "1",
                 "PI_TELEMETRY": "0",
                 "PI_CODING_AGENT_DIR": (
-                    "/srv/empire_os/runtime/pi_agent/config"
+                    "/etc/empire_os/pi-agent"
                 ),
             },
         )
