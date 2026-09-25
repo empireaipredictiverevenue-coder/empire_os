@@ -46,6 +46,7 @@ def test_guard_contains_only_allowlisted_timers_on_egress_block(
         if len(call) >= 3 and call[1] == "stop"
     }
     assert set(guard.MANAGED_TIMERS).issubset(stopped)
+    assert "empire-buyer-acquisition-team.timer" in stopped
     assert "empire-resend-inbound.service" not in stopped
     assert result["inbound_mail_touched"] is False
     assert result["revenue_mutation"] is False
