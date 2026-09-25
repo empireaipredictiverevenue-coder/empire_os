@@ -668,3 +668,113 @@ Parallel foundation: Predictive Cloud convergence + canonical Data & Decision In
 7. Payment
 8. Fulfilment
 9. Recognized revenue / realized GP
+
+
+## 2026-09-25 Agent / Tool / Business-System Reconciliation
+
+This section extends the existing checklist; it does not replace or close any earlier unchecked item.
+
+Current reconciliation truth:
+- the pre-existing checklist contains 224 unchecked items as of this reconciliation;
+- Blueprint V6 phases 6–18 remain queued/preserved unless independently proven complete;
+- production completion still requires code + tests + live runtime + canonical data + Founder surface where applicable;
+- external frameworks/tools never inherit Empire commercial, payment, outbound, revenue-recognition or authority rights.
+
+### AI decision / safety foundation
+
+- [x] Needle 3 shadow router installed and live-benchmarked
+- [x] Needle routing benchmark: 5/5 raw, 5/5 safe, 0 unsafe accepts, no tool execution
+- [x] Laya ONNX localhost sidecar installed and systemd-active
+- [x] Laya general reply benchmark recorded: 4/6 raw, 6/6 safe, 0 unsafe accepts
+- [x] Laya constrained to high-confidence negative/unsubscribe shadow-specialist lane
+- [x] Laya specialist benchmark: 2 accepted / 2 correct / 0 misses
+- [x] Local Qwen 1.5B restricted from untrusted inbound, revenue truth, payment/funds, identity/contact inference and tool-routing
+- [x] Promptfoo policy regression foundation
+- [ ] Expand Promptfoo into agent/model promotion matrix with adversarial suites and matched-pair evaluation
+- [ ] Matched-pair benchmark stronger candidate models against current local models
+- [ ] Department-specific evidence-backed model routing profiles
+- [ ] Automatic model promotion/demotion from verified quality/cost/latency evidence
+
+### Observability / control foundation
+
+- [x] Provider-neutral W3C-compatible local telemetry primitives
+- [x] Secret-redacting append-only JSONL telemetry sink
+- [x] Fail-open OTLP/Langfuse exporter code
+- [x] Pinned optional OpenTelemetry runtime
+- [x] Observability smoke probe
+- [ ] Live EmpireOS observability smoke verification
+- [ ] Secure Langfuse credentials/environment wiring if chosen
+- [ ] Live remote trace verification without prompt/secret leakage
+- [ ] Agent/model latency, error, cost and evaluation Founder surfaces
+
+### Business agents to build
+
+- [ ] Buyer Reply / Conversation Operations Agent
+- [ ] Deliverability & Sender Reputation Agent
+- [ ] Revenue Truth / Settlement Agent
+- [ ] Data Quality & Source Reliability Agent
+- [ ] Growth & Experiment Agent
+- [ ] Customer Success / Expansion Agent
+- [ ] Cost / Capacity / Unit-Economics Agent
+- [ ] Daily Results / Founder Operating Brief Agent
+
+### Durable operating fabric
+
+- [ ] Temporal durable workflow layer for long-running commercial flows
+- [ ] NATS / JetStream event fabric
+- [ ] OpenFGA authorization layer
+- [ ] Unleash feature flags / kill switches / staged experiments
+- [ ] Preserve Empire evidence/authority gates above all four external layers
+
+### Cross-system integrations
+
+- [ ] Wire Needle into eligible low-risk routing workloads
+- [ ] Wire Laya specialist shadow lane into governed reply-analysis path
+- [ ] Wire stronger reasoning model into positive/question/objection reply analysis
+- [ ] Wire all new agents to OTEL/Langfuse and Promptfoo gates
+- [ ] Wire verified outcomes from new agents into Cortex / Economic Memory
+- [ ] Surface agent state, blockers, evidence and next-safe-action in Founder Console
+
+### Blueprint phases 6–18 preservation
+
+- [ ] Phase 6 — A2A Commerce Network remaining slices
+- [ ] Phase 7 — Conversation OS remaining slices
+- [ ] Phase 8 — Revenue CRM
+- [ ] Phase 9 — Advertising Brain
+- [ ] Phase 10 — Predictive Cloud V3 convergence
+- [ ] Phase 11 — Experiment + Causal Engine
+- [ ] Phase 12 — Demand Genesis
+- [ ] Phase 13 — Revenue Exchange
+- [ ] Phase 14 — Digital Twin
+- [ ] Phase 15 — Capital Allocator
+- [ ] Phase 16 — SaaS / Network Scale
+- [ ] Phase 17 — Enterprise
+- [ ] Phase 18 — Full Autonomous Revenue OS
+
+### Reconciliation / anti-loss controls
+
+- [ ] Generate machine-readable execution ledger from this checklist
+- [ ] Reconcile live runtime against checklist without treating code existence as completion
+- [ ] Reconcile Blueprint V6 phases against live runtime and canonical data
+- [ ] Reconcile recovery/salvage registry against canonical replacements
+- [ ] Mark every major subsystem CONNECTED / NEEDS_WIRING / LEGACY / RETIRED / INCUBATE / FOUNDER_GATE
+- [ ] Founder Console master execution/readiness surface
+- [ ] Require explicit evidence before any item moves to DONE
+
+### Updated execution priority
+
+1. First verified revenue / current buyer-conversation path
+2. Buyer Reply / Conversation Operations Agent
+3. Deliverability & Sender Reputation Agent
+4. Revenue Truth / Settlement Agent
+5. Data Quality & Source Reliability Agent
+6. Revenue Pulse + Storm + Market Sweeps + Opportunity Radar convergence
+7. Founder Console operational surfaces
+8. Predictive/Quant/Cortex/Economic Memory calibration
+9. Search/SEO/AEO/GEO product recovery + monetization
+10. Temporal + NATS + OpenFGA + Unleash durable control fabric
+11. Growth & Experiment Agent
+12. Customer Success / Expansion Agent
+13. Cost / Capacity / Unit-Economics Agent
+14. Remaining verticals, products, media/content and salvage lanes
+15. Blueprint phases 6–18 convergence toward Full Autonomous Revenue OS
