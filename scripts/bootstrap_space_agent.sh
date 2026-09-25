@@ -156,6 +156,7 @@ echo "SpaceModel=$MODEL_ID"
 echo "=== INSTALL SERVICE ==="
 install -m 0644   "$ROOT/deploy/systemd/empire-space-agent.service"   /etc/systemd/system/empire-space-agent.service
 systemctl daemon-reload
+systemctl reset-failed empire-space-agent.service || true
 systemctl enable --now empire-space-agent.service
 
 echo "=== LOOPBACK HEALTH ==="
