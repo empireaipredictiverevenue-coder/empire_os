@@ -202,7 +202,7 @@ def build_subject_variants(
 
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for value in raw:
+    for priority, value in enumerate(raw):
         subject = _text(value)
         key = subject.casefold()
         if not subject or key in seen:
@@ -215,11 +215,13 @@ def build_subject_variants(
             "issues": issues,
             "character_count": len(subject),
             "word_count": len(subject.split()),
+            "priority": priority,
         })
 
     rows.sort(
         key=lambda row: (
             -int(row["score"]),
+            int(row["priority"]),
             abs(int(row["character_count"]) - 24),
             int(row["character_count"]),
         )
