@@ -142,6 +142,7 @@ def run_guard(
         request(
             "GET",
             "/rest/v1/prospects?select=id&limit=1",
+            allow_egress_probe=True,
         )
     except Exception as exc:
         message = str(exc)
