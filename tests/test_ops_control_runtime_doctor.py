@@ -30,3 +30,58 @@ def test_control_fabric_registers_runtime_self_heal():
     healer = by_name["runtime_self_heal"]
     assert healer.authority == "internal_write"
     assert healer.repair_policy == "allowlisted_reversible_only"
+
+
+def test_ops_control_defers_intentionally_contained_repairs():
+    import importlib.util
+
+    path = ROOT / "scripts/run_ops_control_cycle.py"
+    spec = importlib.util.spec_from_file_location(
+        "run_ops_control_cycle_test",
+        path,
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    sentinel = {
+        "findings": [
+            {
+                "code": "critical_timer_down",
+                "component": "empire-acquisition.timer",
+                "severity": "warning",
+            },
+            {
+                "code": "model_provider_degraded",
+                "component": "model_health",
+                "severity": "warning",
+            },
+        ],
+        "repair_plan": [
+            {
+                "action": "restart_unit",
+                "target": "empire-acquisition.timer",
+            },
+            {
+                "action": "restart_unit",
+                "target": "empire-public-gateway.service",
+            },
+        ],
+    }
+
+    result = module._apply_egress_containment_context(
+        sentinel,
+        contained=True,
+    )
+
+    assert [row["component"] for row in result["findings"]] == [
+        "model_health"
+    ]
+    assert [row["target"] for row in result["repair_plan"]] == [
+        "empire-public-gateway.service"
+    ]
+    containment = result["intentional_containment"]
+    assert containment["active"] is True
+    assert containment["reason"] == "supabase_egress"
+    assert containment["deferred_finding_count"] == 1
+    assert containment["deferred_repair_count"] == 1
