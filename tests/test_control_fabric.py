@@ -95,3 +95,24 @@ def test_department_capabilities_route_through_control_fabric():
         })
         assert routes
         assert routes[0]["component"] == component
+
+
+
+def test_execution_plane_routes_reversible_build_work():
+    routes = route_event({
+        "event_type": "reversible_build_requested",
+        "commercial_priority": 85,
+    })
+    names = {row["component"] for row in routes}
+    assert "agent_tool_execution_plane" in names
+    assert "empire_coder" in names
+
+
+def test_execution_plane_routes_public_research_without_external_authority():
+    routes = route_event({
+        "event_type": "public_research_requested",
+        "commercial_priority": 75,
+    })
+    by_name = {row["component"]: row for row in routes}
+    assert "agent_tool_execution_plane" in by_name
+    assert by_name["agent_tool_execution_plane"]["authority"] == "internal_write"
