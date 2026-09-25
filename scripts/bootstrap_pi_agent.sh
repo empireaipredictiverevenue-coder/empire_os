@@ -22,9 +22,19 @@ echo "=== NODE GATE ==="
 NODE_SOURCE="$(command -v node || true)"
 NPM_SOURCE="$(command -v npm || true)"
 if [[ -z "$NODE_SOURCE" || -z "$NPM_SOURCE" ]]; then
+  NVM_BIN="$(
+    find "/home/$TARGET_USER/.nvm/versions/node" -mindepth 2 -maxdepth 2       -type d -name bin -print 2>/dev/null | sort -V | tail -n 1
+  )"
+  if [[ -n "$NVM_BIN" ]]; then
+    [[ -x "$NVM_BIN/node" ]] && NODE_SOURCE="$NVM_BIN/node"
+    [[ -x "$NVM_BIN/npm" ]] && NPM_SOURCE="$NVM_BIN/npm"
+  fi
+fi
+if [[ -z "$NODE_SOURCE" || -z "$NPM_SOURCE" ]]; then
   echo "BLOCKED: node/npm required" >&2
   exit 2
 fi
+NODE_DIR="$(dirname "$NODE_SOURCE")"
 NODE_VERSION="$("$NODE_SOURCE" -p 'process.versions.node')"
 "$NODE_SOURCE" -e '
 const [M,m]=process.versions.node.split(".").map(Number);
@@ -38,7 +48,7 @@ install -d -m 0755 "$PREFIX/bin"
 install -m 0755 "$NODE_SOURCE" "$PREFIX/bin/node"
 install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "$STATE"
 install -d -m 0755 "$CONFIG"
-npm install   --prefix "$PREFIX"   --omit=dev   --ignore-scripts   --no-audit   --no-fund   "$PACKAGE"
+env PATH="$NODE_DIR:/usr/local/bin:/usr/bin:/bin"   "$NPM_SOURCE" install   --prefix "$PREFIX"   --omit=dev   --ignore-scripts   --no-audit   --no-fund   "$PACKAGE"
 
 PI_LINK="$PREFIX/node_modules/.bin/pi"
 test -x "$PI_LINK"
