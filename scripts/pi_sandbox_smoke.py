@@ -20,6 +20,7 @@ def main() -> int:
             lease_resources=("domain:pi_runtime_smoke",),
             pytest_targets=(),
             max_runtime_seconds=180,
+            require_changes=False,
         ),
     )
     print(json.dumps(result, indent=2, sort_keys=True))
