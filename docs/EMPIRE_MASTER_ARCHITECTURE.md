@@ -7,6 +7,10 @@ This document is the top-level architecture reference for the Empire AI business
 
 Canonical organization architecture: `docs/DEPARTMENT_OPERATING_ARCHITECTURE.md`
 
+Canonical engineering doctrine: `docs/ARCHITECTURE_FIRST_ENGINEERING_DOCTRINE.md`
+
+**Mandatory engineering rule: architecture first, implementation second, verification before promotion.**
+
 Canonical intelligence-provider architecture: `docs/INTELLIGENCE_ROUTER_ARCHITECTURE.md`
 It exists to prevent architecture drift, disconnected subsystem builds and repeated
 rediscovery of the same operating model.
