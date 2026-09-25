@@ -14,6 +14,8 @@ def test_pi_bootstrap_is_pinned_and_local_model_only():
     assert "127.0.0.1:11435" in text
     assert "PI_TELEMETRY=0" in text
     assert "/opt/empire/pi-agent/bin/node" in text or 'PREFIX/bin/node' in text
+    assert '"supportsDeveloperRole": false' in text
+    assert '"maxTokensField": "max_tokens"' in text
 
 
 def test_agent_reach_bootstrap_is_pinned_and_does_not_system_install_channels():
