@@ -163,6 +163,8 @@ def main() -> int:
     print(json.dumps(statuses, indent=2))
     good = {
         "CANDIDATE_VERIFIED",
+        "CANDIDATE_GATE_PASSED",
+        "AWAITING_PROMPTFOO",
         "PROPOSAL_READY",
         "COMPLETED_NO_CHANGES",
     }
