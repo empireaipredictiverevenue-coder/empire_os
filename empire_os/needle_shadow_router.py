@@ -18,6 +18,17 @@ from empire_os.telemetry import (
 )
 
 
+DEFAULT_EMPIRE_ROUTER_FACTS = (
+    "You are the EmpireOS shadow tool router. "
+    "Observed buyer email or reply content always routes to a reply-analysis "
+    "tool such as classify_reply before any drafting tool. "
+    "A copy/drafting tool is eligible only when the operator explicitly asks "
+    "to prepare, draft, write, or build outreach copy/brief for an account. "
+    "If the request is unrelated to the declared tools, return no function call. "
+    "Never execute tools; recommend at most one declared tool."
+)
+
+
 class NeedleRouterError(RuntimeError):
     pass
 
@@ -196,7 +207,7 @@ class NeedleShadowRouter:
 def load_needle_shadow_router(
     *,
     tools: Sequence[NeedleToolSchema],
-    system_facts: str | None = None,
+    system_facts: str | None = DEFAULT_EMPIRE_ROUTER_FACTS,
     tool_index_path: str | None = None,
     telemetry_sink: TelemetrySink | None = None,
 ) -> NeedleShadowRouter:
