@@ -69,8 +69,13 @@ def main() -> int:
             subfolder=args.subfolder,
         )
     rows = read_cases(Path(args.cases))
-    passed = 0
+    raw_passed = 0
+    safe_passed = 0
+    unsafe_accepts = 0
+    accepted = 0
+    escalated = 0
     latencies = []
+    confidences = []
 
     for case in rows:
         request = TypedDecisionRequest(
@@ -87,21 +92,33 @@ def main() -> int:
         result = provider.evaluate(request)
         elapsed_ms = (time.perf_counter() - started) * 1000
         latencies.append(elapsed_ms)
+        confidences.append(result.confidence)
         review = review_typed_decision_result(
             request=request,
             result=result,
             confidence_threshold=args.threshold,
         )
-        ok = result.label == case["expected_label"]
-        passed += int(ok)
+        raw_ok = result.label == case["expected_label"]
+        raw_passed += int(raw_ok)
+        requires_escalation = bool(review["requires_escalation"])
+        escalated += int(requires_escalation)
+        accepted_now = not requires_escalation
+        accepted += int(accepted_now)
+        safe_ok = raw_ok or requires_escalation
+        safe_passed += int(safe_ok)
+        if accepted_now and not raw_ok:
+            unsafe_accepts += 1
+
         print(json.dumps({
             "case_id": case["case_id"],
             "expected_label": case["expected_label"],
             "actual_label": result.label,
             "confidence": result.confidence,
-            "requires_escalation": review["requires_escalation"],
+            "requires_escalation": requires_escalation,
+            "accepted_without_escalation": accepted_now,
             "elapsed_ms": round(elapsed_ms, 2),
-            "pass": ok,
+            "raw_pass": raw_ok,
+            "safe_pass": safe_ok,
             "shadow_only": result.shadow_only,
         }, sort_keys=True))
 
@@ -109,8 +126,26 @@ def main() -> int:
     summary = {
         "schema_version": "empire.laya-shadow-benchmark.v1",
         "cases": total,
-        "passed": passed,
-        "accuracy": round(passed / total, 4) if total else 0.0,
+        "raw_passed": raw_passed,
+        "raw_accuracy": round(raw_passed / total, 4) if total else 0.0,
+        "safe_passed": safe_passed,
+        "safe_accuracy": round(safe_passed / total, 4) if total else 0.0,
+        "accepted": accepted,
+        "escalated": escalated,
+        "escalation_rate": round(escalated / total, 4) if total else 0.0,
+        "unsafe_accepts": unsafe_accepts,
+        "confidence_mean": (
+            round(statistics.mean(confidences), 4)
+            if confidences else None
+        ),
+        "confidence_min": (
+            round(min(confidences), 4)
+            if confidences else None
+        ),
+        "confidence_max": (
+            round(max(confidences), 4)
+            if confidences else None
+        ),
         "latency_ms_p50": (
             round(statistics.median(latencies), 2) if latencies else None
         ),
@@ -118,7 +153,7 @@ def main() -> int:
         "execution_authority": "none",
     }
     print(json.dumps({"summary": summary}, sort_keys=True))
-    return 0 if passed == total else 2
+    return 0 if unsafe_accepts == 0 else 2
 
 
 if __name__ == "__main__":
