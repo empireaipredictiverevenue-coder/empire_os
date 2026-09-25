@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+RETIRED_LEGACY_OUTREACH_NOW
+
 Empire OS - outreach-now runner.
 
 Generates 50 prospect leads from our lane_leads database that the
@@ -136,6 +138,10 @@ def write_emails(rows: list, path: Path):
 
 
 def main():
+    raise SystemExit(
+        "RETIRED: scripts/outreach_now.py uses legacy lane/USDC outreach. "
+        "Use scripts/run_gtm_pipeline_worker.py and canonical governed outbound."
+    )
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=50)
     args = ap.parse_args()
