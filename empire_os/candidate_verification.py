@@ -6,6 +6,8 @@ never checked out or mutated. Verification cannot merge or deploy.
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -79,6 +81,8 @@ def verify_candidate_branch(
         "production_merge": False,
         "production_deploy": False,
         "execution_authority": "none",
+        "proposal_commit": None,
+        "candidate_patch_path": None,
     }
 
     try:
@@ -185,6 +189,53 @@ def verify_candidate_branch(
         )
         if not result["checks"]:
             result["passed"] = True
+
+        if result["passed"]:
+            commit = _run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=clone,
+            ).stdout.strip()
+            if not commit:
+                raise CandidateVerificationError(
+                    "candidate commit unavailable"
+                )
+            patch = _run(
+                [
+                    "git",
+                    "diff",
+                    "--binary",
+                    f"origin/{base_branch}...HEAD",
+                ],
+                cwd=clone,
+                timeout=180,
+            )
+            if patch.returncode != 0 or not patch.stdout.strip():
+                raise CandidateVerificationError(
+                    "candidate patch generation failed"
+                )
+            safe_branch = re.sub(
+                r"[^A-Za-z0-9._-]+",
+                "_",
+                proposal_branch,
+            )[:100].strip("_") or "candidate"
+            artifact_dir = (
+                root
+                / "runtime/execution_plane/candidate_patches"
+            )
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            artifact = (
+                artifact_dir
+                / f"{safe_branch}-{commit[:12]}.patch"
+            )
+            tmp = artifact.with_suffix(".patch.tmp")
+            tmp.write_text(patch.stdout, encoding="utf-8")
+            os.chmod(tmp, 0o600)
+            tmp.replace(artifact)
+            os.chmod(artifact, 0o600)
+            result["proposal_commit"] = commit
+            result["candidate_patch_path"] = str(
+                artifact.relative_to(root)
+            )
         return result
     finally:
         shutil.rmtree(clone, ignore_errors=True)
