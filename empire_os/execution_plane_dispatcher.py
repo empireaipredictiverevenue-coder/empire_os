@@ -31,6 +31,16 @@ from empire_os.hermes_control import (
     publish_control_job,
 )
 from empire_os.pi_sandbox_runner import PiSandboxJob, run_pi_sandbox_job
+from empire_os.execution_plane_verification import (
+    enqueue_swarm_verification,
+    plan_candidate_verification,
+)
+from empire_os.otel_telemetry import build_resilient_telemetry_sink
+from empire_os.telemetry import (
+    emit_event,
+    new_trace_context,
+    parse_traceparent,
+)
 
 
 RUNTIME_RELATIVE = Path("runtime/execution_plane")
@@ -53,6 +63,7 @@ class ExecutionRequest:
     priority: int = 50
     max_runtime_seconds: int = 900
     traceparent: str | None = None
+    ai_behavior_change: bool = False
 
     def validate(self) -> None:
         if not self.request_id.strip():
@@ -112,6 +123,45 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _emit_route_event(
+    root: Path,
+    request: ExecutionRequest,
+    worker: str | None,
+    eligible: bool,
+    reason: str,
+) -> None:
+    try:
+        trace = (
+            parse_traceparent(request.traceparent).child()
+            if request.traceparent
+            else new_trace_context()
+        )
+        sink = build_resilient_telemetry_sink(
+            local_path=root / "runtime/telemetry/execution_plane.jsonl",
+        )
+        emit_event(
+            sink,
+            name="execution_plane.routed",
+            trace=trace,
+            attributes={
+                "execution.request_id": request.request_id,
+                "execution.capability": request.capability,
+                "execution.department": request.department,
+                "execution.worker": worker or "",
+                "execution.eligible": eligible,
+                "execution.reason": reason,
+                "execution.risk_class": request.risk_class,
+                "execution.authority_requested": request.authority,
+                "execution.ai_behavior_change": request.ai_behavior_change,
+                "execution_authority": "none",
+                "verification_plan": verification_plan.as_dict(),
+            },
+        )
+    except Exception:
+        # Observability is non-authoritative and must never block work routing.
+        pass
+
+
 def _write_request(
     root: Path,
     lane: str,
@@ -163,11 +213,26 @@ def dispatch_execution_request(
         )
     )
 
+    verification_plan = plan_candidate_verification(
+        request_id=request.request_id,
+        allowed_paths=request.allowed_paths,
+        required_tests=request.required_tests,
+        ai_behavior_change=request.ai_behavior_change,
+    )
+    _emit_route_event(
+        root,
+        request,
+        routing.worker_key,
+        routing.eligible,
+        routing.reason,
+    )
+
     base = {
         "schema_version": "empire.execution-plane-dispatch.v1",
         "request_id": request.request_id,
         "routed_at": _now(),
         "route": routing.as_dict(),
+        "verification_plan": verification_plan.as_dict(),
         "external_send": False,
         "payment_action": False,
         "revenue_recognition": False,
@@ -243,11 +308,18 @@ def dispatch_execution_request(
                 max_runtime_seconds=request.max_runtime_seconds,
             ),
         )
+        verification_jobs = []
+        if result.get("status") == "PROPOSAL_READY":
+            verification_jobs = enqueue_swarm_verification(
+                root,
+                verification_plan,
+            )
         return {
             **base,
             "status": result.get("status"),
             "worker": "pi",
             "worker_result": result,
+            "independent_verification_jobs": verification_jobs,
         }
 
     if worker == "empire_coder":
