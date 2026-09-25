@@ -89,8 +89,6 @@ def agent_reach_health(
     binary: str | Path = (
         "/opt/empire/agent-reach/venv/bin/agent-reach"
     ),
-    *,
-    probe: bool = False,
 ) -> dict[str, Any]:
     path = Path(binary)
     if not path.exists():
@@ -107,8 +105,6 @@ def agent_reach_health(
         }
 
     argv = [str(path), "doctor", "--json"]
-    if probe:
-        argv.append("--probe")
     try:
         result = _run(
             argv,
@@ -116,7 +112,7 @@ def agent_reach_health(
                 **os.environ,
                 "HOME": "/var/lib/empire/agent-reach/home",
             },
-            timeout=45 if probe else 20,
+            timeout=20,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {
@@ -127,7 +123,7 @@ def agent_reach_health(
                 detail=type(exc).__name__,
             ).as_dict(),
             "doctor": None,
-            "probe_performed": probe,
+            "probe_performed": False,
             "truth_authority": "none",
         }
 
@@ -150,7 +146,7 @@ def agent_reach_health(
             ),
         ).as_dict(),
         "doctor": payload if isinstance(payload, dict) else None,
-        "probe_performed": probe,
+        "probe_performed": False,
         "health_is_not_source_truth": True,
         "per_observation_provenance_required": True,
         "truth_authority": "none",
@@ -187,7 +183,7 @@ def space_agent_health(
 
 
 def execution_tool_health_snapshot() -> dict[str, Any]:
-    reach = agent_reach_health(probe=False)
+    reach = agent_reach_health()
     return {
         "schema_version": "empire.execution-tool-health.v1",
         "pi": pi_health().as_dict(),
