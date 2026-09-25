@@ -84,8 +84,13 @@ def _with_egress_lock(fn):
             fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
-def _reserve_supabase_request() -> None:
-    """Fail closed before a runaway REST loop can exhaust hosted egress."""
+def _reserve_supabase_request(*, allow_probe: bool = False) -> None:
+    """Fail closed before a runaway REST loop can exhaust hosted egress.
+
+    Only the dedicated egress guard may set allow_probe=True. Ordinary workers
+    never consume the circuit's recovery probe slot, so a large production
+    request cannot become the health probe by accident.
+    """
     now = _egress_now()
     hourly_budget = _env_int(
         "EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR",
@@ -115,6 +120,11 @@ def _reserve_supabase_request() -> None:
                 raise RuntimeError(
                     "Supabase egress circuit open locally; "
                     f"next probe in {remaining}s"
+                )
+            if not allow_probe:
+                raise RuntimeError(
+                    "Supabase egress circuit open locally; "
+                    "probe reserved for dedicated egress guard"
                 )
             # Reserve the single probe slot before leaving the lock. Other
             # processes fail closed until this probe succeeds or the lease
@@ -280,8 +290,9 @@ def request_json(
     payload: Any | None = None,
     *,
     prefer: str | None = None,
+    allow_egress_probe: bool = False,
 ) -> Any:
-    _reserve_supabase_request()
+    _reserve_supabase_request(allow_probe=allow_egress_probe)
     base, headers = _client()
     if prefer:
         headers["Prefer"] = prefer
