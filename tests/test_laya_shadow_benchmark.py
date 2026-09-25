@@ -33,4 +33,8 @@ def test_laya_benchmark_keeps_shadow_review_gate():
     assert "safe_accuracy" in text
     assert "escalation_rate" in text
     assert "unsafe_accepts" in text
+    assert "specialist_accepted" in text
+    assert "specialist_precision" in text
+    assert "specialist_misses" in text
+    assert "review_laya_reply_specialist" in text
     assert "return 0 if unsafe_accepts == 0 else 2" in text
