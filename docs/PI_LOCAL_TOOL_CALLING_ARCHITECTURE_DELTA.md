@@ -46,3 +46,24 @@ does not count as tool-call capability.
 The local llama.cpp service uses the documented `chatml` fallback template in
 addition to `--jinja`. If the structured probe still fails, the local 1.5B model
 is analysis-only and mutating work routes to another eligible builder.
+
+
+## Qwen native tool-use template correction — 2026-09-25
+
+Observed runtime evidence showed that `--jinja --chat-template chatml` allowed the
+Qwen2.5-Coder model to emit JSON-looking tool requests as ordinary assistant text,
+but llama.cpp did not surface OpenAI-compatible `message.tool_calls`.
+
+Architecture correction:
+- vendor the upstream Qwen 2.5 tool-use Jinja template in EmpireOS;
+- start llama-server with `--jinja --chat-template-file ...Qwen...jinja`;
+- require the direct structured tool-call probe to return a real
+  `message.tool_calls[]` entry with valid JSON arguments;
+- only after that probe passes may Pi run a mutation smoke;
+- only after the mutation smoke changes exactly the permitted disposable path may
+  Pi be promoted to bounded IMPLEMENT jobs;
+- plain text containing JSON, XML, pseudo-tool syntax or tool names does not count
+  as tool execution and must not be promoted.
+
+The inference server remains loopback-only. This delta grants no production,
+outbound, payment, revenue-recognition or authority-expansion capability.
