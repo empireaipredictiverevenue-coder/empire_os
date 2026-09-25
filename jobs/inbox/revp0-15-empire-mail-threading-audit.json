@@ -1,0 +1,24 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "revp0-15-empire-mail-threading-audit",
+  "kind": "code_task",
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "allowed_paths": [
+    "empire_os/",
+    "tests/"
+  ],
+  "lease_resources": [
+    "path:empire_os/mail_sender.py",
+    "path:empire_os/outbound_provider.py",
+    "path:tests/test_mail_sender.py",
+    "path:tests/test_outbound_provider.py"
+  ],
+  "pytest_targets": [
+    "tests/test_mail_sender.py",
+    "tests/test_outbound_provider.py"
+  ],
+  "max_runtime_seconds": 900,
+  "ai_behavior_change": false,
+  "prompt": "Audit and, only if supported by existing outbox data, fix Empire Mail reply-thread correlation for the legacy mail_sender path.\n\nPRODUCTION TRUTH:\n- empire_os/outbound_provider.py already creates intent-specific Reply-To aliases via threaded_reply_address(reply_to, intent_id).\n- empire_os/mail_sender.py is a separate legacy sender path and currently builds outbound messages without explicit intent-aware Reply-To handling.\n- Do not invent an intent id, recipient identity, or threading token.\n- OBSERVE/governed authority remains unchanged.\n\nGOAL:\nMake the legacy sender path consistent with canonical intent-aware reply threading when the outbox item already contains a trustworthy canonical intent identifier.\n\nREQUIREMENTS:\n1. Inspect the actual pending outbox item shape used by mail_sender before changing behavior.\n2. If and only if a canonical intent id is already present in the item, use the existing outbound_provider.threaded_reply_address logic (or the smallest shared helper) to set the Reply-To alias.\n3. If the item does not expose a trustworthy intent id, do not guess, derive, hash, or synthesize one. Preserve existing behavior and add a focused test/documented fail-closed result.\n4. Preserve branded From identity and all existing delivery backends.\n5. Do not change DNS, Resend config, secrets, systemd, migrations, payment logic, suppression semantics, or live outbound authority.\n6. Do not execute any email sends in tests.\n7. Add focused tests for:\n   - intent present -> intent-specific Reply-To;\n   - intent absent -> no fabricated correlation;\n   - existing send result/marking behavior remains intact.\n8. Keep the patch minimal. If the actual outbox contract lives outside allowed paths and cannot be verified, return a candidate with no behavior change plus a precise finding rather than guessing.\n\nVERIFY:\nPYTHONPATH=/srv/empire_os /srv/empire_os/.venv/bin/python -m pytest -q tests/test_mail_sender.py tests/test_outbound_provider.py --tb=short\n\nNo production deployment or live send."
+}
