@@ -804,7 +804,7 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [ ] Hermes central mutation-lease integration — CODED; regression/runtime verification pending
 - [ ] Governed Hermes control-job publisher — CODED; runtime verification pending
 - [ ] Execution-plane dispatcher — CODED; focused/runtime verification pending
-- [ ] Pi pinned bootstrap + isolated full-clone/systemd sandbox runner — CODED; live install/eval pending
+- [x] Pi pinned bootstrap + isolated full-clone/systemd sandbox runner — LIVE; local qwen2.5-coder:1.5b retained as planning-only until native structured tool calls are proven
 - [x] Agent Reach isolated bootstrap — LIVE; doctor returns bounded source health
 - [x] Agent Reach public sensor adapter — LIVE public observation proven with provenance/no truth authority
 - [ ] Credentialed Agent Reach channels remain disabled pending separate architecture/risk contract
@@ -866,3 +866,15 @@ Truth rule: code presence is not production completion. Items below remain unche
 - Agent Reach: LIVE for bounded public sensing
 - Pi local 1.5B tool-calling promotion blocked: model emitted textual pseudo-tool JSON rather than structured tool_calls
 - Mutating Pi jobs must return NO_IMPLEMENTATION until the structured tool-call capability probe and mutation smoke both pass
+
+
+### Batch 1 business-agent implementation — code complete / live verification pending
+
+- [x] Buyer Reply Operations core implemented with deterministic reply classes, opt-out protection, governed reasoning escalation, Laya shadow-only annotation, and zero send/payment/revenue authority
+- [x] Deliverability & Sender Reputation core implemented from observed provider events with explicit rates, suppression candidates, bounded review recommendations, and no fabricated reputation score
+- [x] Source Reliability core implemented with observed health/quality/downstream metrics, unknown economics preserved, bounded scheduler recommendations, and no permanent-retirement/delete authority
+- [x] Batch 1 agents registered in Control Fabric
+- [x] Batch 1 Founder read-only status API coded
+- [ ] Batch 1 focused tests pass on live EmpireOS server
+- [ ] Founder business-agent status endpoint verified live
+- [ ] Builder capability ledger verified live after Pi + Empire Coder probes
