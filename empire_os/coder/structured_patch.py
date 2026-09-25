@@ -337,12 +337,35 @@ class StructuredPatchRefiner:
         if synthesis.error:
             raise StructuredPatchError(synthesis.error)
 
-        proposal = self._parse(synthesis.text)
+        synthesized_text = synthesis.text
+        try:
+            proposal = self._parse(synthesized_text)
+        except StructuredPatchError:
+            repair = self.provider.complete(ModelRequest(
+                task_id=task_id,
+                instruction=(
+                    "Rewrite the candidate below into STRICT JSON ONLY. "
+                    "Do not add prose, markdown explanation or shell commands. "
+                    "Preserve only evidence already present. Use exactly this "
+                    "shape: "
+                    + final_schema
+                    + "\n\nCANDIDATE TO NORMALIZE:\n"
+                    + synthesized_text
+                ),
+                context=context,
+                route=route,
+                max_output_chars=min(max_output_chars, 3_200),
+            ))
+            if repair.error:
+                raise StructuredPatchError(repair.error)
+            synthesized_text = repair.text
+            proposal = self._parse(synthesized_text)
+
         validation = self.validator.validate(proposal)
         return StructuredPatchCandidate(
             tuple(candidates),
             critique.text,
-            synthesis.text,
+            synthesized_text,
             proposal,
             validation,
         )
