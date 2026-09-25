@@ -18,6 +18,12 @@ class MailboxProvider(Protocol):
     def list_received(self, *, limit: int) -> list[dict[str, Any]]:
         ...
 
+    def list_suppressions(self, *, limit: int) -> list[dict[str, Any]]:
+        ...
+
+    def list_suppressions(self, *, limit: int) -> list[dict[str, Any]]:
+        return self._rows(self._get("/suppressions", params={"limit": limit}))
+
     def get_sent(self, email_id: str) -> dict[str, Any]:
         ...
 
@@ -109,12 +115,13 @@ def create_founder_mailbox_router(
         try:
             sent = source.list_sent(limit=limit)
             received = source.list_received(limit=limit)
+            suppressions = source.list_suppressions(limit=100)
         except Exception as exc:
             raise HTTPException(
                 status_code=503,
                 detail=f"mailbox_provider_unavailable:{type(exc).__name__}",
             ) from exc
-        mailbox = build_mailbox(sent, received)
+        mailbox = build_mailbox(sent, received, suppressions)
         cache[limit] = (now + 10.0, mailbox)
         return mailbox
 
