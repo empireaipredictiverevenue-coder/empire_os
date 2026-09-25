@@ -34,6 +34,7 @@ class CoderTaskWorker:
         lease_seconds: int = 240,
         heartbeat_seconds: int = 30,
         max_attempts: int = 3,
+        execution_lease_manager: ExecutionLeaseManager | None = None,
     ) -> None:
         self.coder = coder
         self.queue = queue
@@ -41,6 +42,12 @@ class CoderTaskWorker:
         self.lease_seconds = max(60, int(lease_seconds))
         self.heartbeat_seconds = max(10, int(heartbeat_seconds))
         self.max_attempts = max(1, int(max_attempts))
+        self.execution_leases = (
+            execution_lease_manager
+            or ExecutionLeaseManager(
+                self.queue.workspace / "runtime/execution_plane"
+            )
+        )
 
     @staticmethod
     def _transient_error(exc: Exception) -> bool:
@@ -267,7 +274,7 @@ class CoderTaskWorker:
             lease = None
             try:
                 if lease_resources:
-                    lease = ExecutionLeaseManager().acquire(
+                    lease = self.execution_leases.acquire(
                         owner="empire_coder",
                         job_id=execution_request_id or job.id,
                         resources=lease_resources,
@@ -330,7 +337,7 @@ class CoderTaskWorker:
             finally:
                 if lease is not None:
                     try:
-                        ExecutionLeaseManager().release(lease.lease_id)
+                        self.execution_leases.release(lease.lease_id)
                     except Exception:
                         pass
 
