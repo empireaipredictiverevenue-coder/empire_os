@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 from typing import Any
 
+from empire_os.candidate_verification import verify_candidate_branch
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
 from empire_os.swarm_v6 import LANES
@@ -146,5 +147,48 @@ def enqueue_promptfoo_verification(
         "path": str(path),
         "config": plan.promptfoo_config,
         "candidate_ref": payload["candidate_ref"],
+        "execution_authority": "none",
+    }
+
+
+
+def verify_proposal_candidate(
+    repo_root: str | Path,
+    plan: VerificationPlan,
+    *,
+    proposal_branch: str,
+    allowed_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    """Run the canonical pre-merge gate for any builder proposal."""
+    candidate = verify_candidate_branch(
+        repo_root,
+        proposal_branch=proposal_branch,
+        allowed_paths=allowed_paths,
+        pytest_targets=plan.pytest_targets,
+    )
+    promptfoo_request = None
+    if candidate.get("passed") is True:
+        promptfoo_request = enqueue_promptfoo_verification(
+            repo_root,
+            plan,
+            candidate_ref=proposal_branch,
+        )
+
+    return {
+        "schema_version": "empire.execution-plane-candidate-gate.v1",
+        "proposal_branch": proposal_branch,
+        "candidate_verification": candidate,
+        "promptfoo_required": plan.promptfoo_required,
+        "promptfoo_request": promptfoo_request,
+        "post_merge_swarm_lanes": list(plan.swarm_lanes),
+        "candidate_gate_passed": (
+            candidate.get("passed") is True
+            and not plan.promptfoo_required
+        ),
+        "awaiting_promptfoo": (
+            candidate.get("passed") is True
+            and plan.promptfoo_required
+        ),
+        "production_promotion_allowed": False,
         "execution_authority": "none",
     }
