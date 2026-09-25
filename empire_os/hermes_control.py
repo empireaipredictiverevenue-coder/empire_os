@@ -24,6 +24,12 @@ import urllib.error
 import urllib.request
 from typing import Any, Iterable, Mapping
 
+from empire_os.execution_lease import (
+    ExecutionLeaseError,
+    ExecutionLeaseManager,
+)
+
+
 
 SCHEMA_VERSION = "empire.hermes.control_job.v1"
 RESULT_SCHEMA_VERSION = "empire.hermes.control_result.v1"
@@ -84,6 +90,7 @@ class HermesJob:
     base_branch: str = DEFAULT_BASE_BRANCH
     allowed_paths: tuple[str, ...] = SAFE_EDIT_PREFIXES
     pytest_targets: tuple[str, ...] = ()
+    lease_resources: tuple[str, ...] = ()
     max_runtime_seconds: int = 900
     created_at: str | None = None
 
@@ -147,6 +154,25 @@ class HermesJob:
         else:
             raise HermesControlError("allowed_paths must be a list")
 
+        raw_lease_resources = raw.get("lease_resources")
+        if raw_lease_resources is None:
+            lease_resources = tuple(
+                f"path:{value.rstrip('/')}"
+                for value in allowed_paths
+            )
+        elif isinstance(raw_lease_resources, list):
+            lease_resources = tuple(
+                str(value).strip()
+                for value in raw_lease_resources
+                if str(value).strip()
+            )
+            if not lease_resources:
+                raise HermesControlError(
+                    "lease_resources cannot be empty when supplied"
+                )
+        else:
+            raise HermesControlError("lease_resources must be a list")
+
         raw_targets = raw.get("pytest_targets") or []
         if not isinstance(raw_targets, list):
             raise HermesControlError("pytest_targets must be a list")
@@ -177,6 +203,7 @@ class HermesJob:
             base_branch=base_branch,
             allowed_paths=allowed_paths,
             pytest_targets=tuple(targets),
+            lease_resources=lease_resources,
             max_runtime_seconds=max_runtime,
             created_at=created_at,
         )
@@ -1234,6 +1261,7 @@ def process_job(
     shutil.rmtree(job_root, ignore_errors=True)
     job_root.mkdir(parents=True, exist_ok=True)
 
+    lease = None
     result: dict[str, Any] = {
         "schema_version": RESULT_SCHEMA_VERSION,
         "job_id": job.job_id,
@@ -1248,6 +1276,7 @@ def process_job(
         "changed_paths": [],
         "verification": None,
         "hermes": None,
+        "lease_id": None,
         "founder_gate_required": False,
         "external_commercial_action_performed": False,
         "git_remote_io_performed": True,
@@ -1257,6 +1286,15 @@ def process_job(
     }
 
     try:
+        lease_manager = ExecutionLeaseManager()
+        lease = lease_manager.acquire(
+            owner="hermes",
+            job_id=job.job_id,
+            resources=job.lease_resources,
+            ttl_seconds=job.max_runtime_seconds + 300,
+        )
+        result["lease_id"] = lease.lease_id
+
         fetch_control_refs(
             repo_root,
             control_branch=control_branch,
@@ -1309,12 +1347,20 @@ def process_job(
                 result.update(proposal)
                 result["status"] = "PROPOSAL_READY"
 
+    except ExecutionLeaseError as exc:
+        result["error"] = f"ExecutionLeaseError: {exc}"
+        result["status"] = "LEASE_BLOCKED"
     except Exception as exc:
         result["error"] = (
             f"{type(exc).__name__}: {exc}"
         )[-10_000:]
         result["status"] = "FAILED"
     finally:
+        if lease is not None:
+            try:
+                ExecutionLeaseManager().release(lease.lease_id)
+            except Exception:
+                pass
         result["completed_at"] = _utc_now()
         _git(
             repo_root,
