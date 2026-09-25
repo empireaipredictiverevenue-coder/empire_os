@@ -28,7 +28,7 @@ echo "=== VERIFY TOOL TEMPLATE ARGUMENTS ==="
 EXECSTART="$(systemctl --user show empire-llama-coder.service -p ExecStart --value)"
 printf '%s\n' "$EXECSTART" | grep -F -- "--jinja"
 JINJA_RC=$?
-printf '%s\n' "$EXECSTART" | grep -F -- "--chat-template chatml"
+printf '%s\n' "$EXECSTART" | grep -F -- "--chat-template-file /srv/empire_os/deploy/llama/Qwen-Qwen2.5-Instruct-tool-use.jinja"
 TEMPLATE_RC=$?
 
 echo
