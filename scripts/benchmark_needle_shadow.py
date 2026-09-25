@@ -8,6 +8,7 @@ import statistics
 import time
 
 from empire_os.needle_shadow_router import (
+    DEFAULT_EMPIRE_ROUTER_FACTS,
     NeedleRouteRequest,
     NeedleToolSchema,
     load_needle_shadow_router,
@@ -68,10 +69,7 @@ def main() -> int:
     tools = schemas()
     router = load_needle_shadow_router(
         tools=tools,
-        system_facts=(
-            "assistant: EmpireOS shadow router; "
-            "network: local; user: Empire operator"
-        ),
+        system_facts=DEFAULT_EMPIRE_ROUTER_FACTS,
         tool_index_path=str(ROOT / "runtime/needle/tools.idx"),
     )
     rows = read_cases(Path(args.cases))
