@@ -24,3 +24,13 @@ def test_ambiguous_text_stays_other_and_is_not_auto_applied():
     result = classify_reply_text("Received.")
     assert result["classification"] == "other"
     assert result["auto_apply"] is False
+
+
+def test_standalone_stop_is_unsubscribe():
+    result = classify_reply_text("Stop")
+    assert result == {
+        "classification": "unsubscribe",
+        "confidence": 0.99,
+        "auto_apply": True,
+    }
+
