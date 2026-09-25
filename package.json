@@ -1,9 +1,8 @@
 {
   "devDependencies": {
-    "supabase": "2.117.0",
-    "promptfoo": "0.123.1"
+    "supabase": "2.117.0"
   },
   "scripts": {
-    "eval:empire": "promptfoo eval -c evals/empire_core_policy/promptfooconfig.yaml"
+    "eval:empire": "npx --yes promptfoo@0.123.1 eval -c evals/empire_core_policy/promptfooconfig.yaml"
   }
 }
