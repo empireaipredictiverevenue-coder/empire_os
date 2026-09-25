@@ -55,3 +55,30 @@ def test_unsubscribe_is_visibly_suppressed_and_not_actionable():
     assert row["suppressed"] is True
     assert row["next_action"] == "suppress_and_close"
     assert mailbox_thread(mailbox, row["thread_id"]) is not None
+
+def test_provider_suppression_overrides_message_window_state():
+    mailbox = build_mailbox(
+        [{
+            "id": "sent-2",
+            "to": ["buyer@example.com"],
+            "reply_to": [
+                "reply+bbbbbbbb-cccc-dddd-eeee-ffffffffffff@mail.empire-ai.co.uk"
+            ],
+            "subject": "Pilot",
+            "last_event": "delivered",
+        }],
+        [],
+        [{
+            "id": "sup-1",
+            "email": "buyer@example.com",
+            "origin": "bounce",
+            "source_id": "sent-2",
+        }],
+    )
+    row = mailbox["threads"][0]
+    assert row["suppressed"] is True
+    assert row["commercial_status"] == "suppressed"
+    assert row["suppression_origin"] == "bounce"
+    assert row["suppression_source_id"] == "sent-2"
+    assert row["next_action"] == "suppressed_no_send"
+
