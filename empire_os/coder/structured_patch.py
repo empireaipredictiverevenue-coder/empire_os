@@ -349,8 +349,24 @@ class StructuredPatchRefiner:
 
     @staticmethod
     def _parse(text: str) -> StructuredPatchProposal:
+        value = text.strip()
+        if value.startswith("```"):
+            lines = value.splitlines()
+            if (
+                len(lines) < 3
+                or lines[0].strip().lower() not in {"```", "```json"}
+                or lines[-1].strip() != "```"
+            ):
+                raise StructuredPatchError(
+                    "synthesized patch was not strict JSON"
+                )
+            value = "\n".join(lines[1:-1]).strip()
+        if not value.startswith("{") or not value.endswith("}"):
+            raise StructuredPatchError(
+                "synthesized patch was not strict JSON"
+            )
         try:
-            raw = json.loads(text.strip())
+            raw = json.loads(value)
         except json.JSONDecodeError as exc:
             raise StructuredPatchError(
                 "synthesized patch was not strict JSON"
