@@ -35,6 +35,7 @@ rm -rf "$PREFIX/venv"
 "$PYTHON_BIN" -m venv "$PREFIX/venv"
 "$PREFIX/venv/bin/python" -m pip install --upgrade pip setuptools wheel
 "$PREFIX/venv/bin/pip" install   "git+https://github.com/Panniantong/Agent-Reach.git@$REVISION"
+export PATH="$PREFIX/venv/bin:/usr/local/bin:/usr/bin:/bin"
 
 echo "=== VERSION ==="
 HOME="$HOME_DIR"   "$PREFIX/venv/bin/agent-reach" version
