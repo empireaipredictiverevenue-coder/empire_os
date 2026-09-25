@@ -288,7 +288,7 @@ def test_omniroute_catalog_ranking_excludes_stale_and_paid_discovery():
     ranked = hermes_control._rank_catalog_candidates(
         (
             "openrouter/nvidia/nemotron-3-ultra:free",
-            "gemini/gemini-3.1-flash-lite-flash",
+            "openrouter/z-ai/glm-5.3-flash",
             "openrouter/openrouter/free",
             "gemini/gemini-3.5-flash-lite",
         ),
@@ -302,7 +302,7 @@ def test_omniroute_catalog_ranking_excludes_stale_and_paid_discovery():
     assert "openrouter/nvidia/nemotron-3-ultra:free" in ranked
     assert "gemini/gemini-3.5-flash-lite" not in ranked
     assert "openrouter/deepseek/deepseek-v4-flash-0731:free" not in ranked
-    assert "gemini/gemini-3.1-flash-lite-flash" not in ranked
+    assert "openrouter/z-ai/glm-5.3-flash" not in ranked
 
 
 def test_omniroute_catalog_ranking_requires_opt_in_for_paid_models():
@@ -310,10 +310,10 @@ def test_omniroute_catalog_ranking_requires_opt_in_for_paid_models():
 
     catalog = (
         "openrouter/openrouter/free",
-        "gemini/gemini-3.1-flash-lite-flash",
+        "openrouter/z-ai/glm-5.3-flash",
     )
     preferred = (
-        "gemini/gemini-3.1-flash-lite-flash",
+        "openrouter/z-ai/glm-5.3-flash",
         "openrouter/openrouter/free",
     )
 
@@ -328,7 +328,7 @@ def test_omniroute_catalog_ranking_requires_opt_in_for_paid_models():
     )
 
     assert free_only == ("openrouter/openrouter/free",)
-    assert paid_allowed[0] == "gemini/gemini-3.1-flash-lite-flash"
+    assert paid_allowed[0] == "openrouter/z-ai/glm-5.3-flash"
     assert "openrouter/openrouter/free" in paid_allowed
 
 
