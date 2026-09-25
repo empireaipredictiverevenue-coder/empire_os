@@ -90,3 +90,24 @@ general model quality.
 
 Candidate verification, Swarm QA, Promptfoo where applicable, live verification,
 and canonical data evidence remain separate promotion gates.
+
+
+## Isolated Empire Coder fallback
+
+Observed Pi runtime health does not override a failed mutation-capability probe.
+When Pi code mutation is not proven and Empire Coder structured-patch mutation is
+proven, mutating code work may fail over to Empire Coder only through the
+disposable-clone proposal runner.
+
+Required properties:
+- central domain/path mutation lease;
+- disposable full clone, never direct model edits in `/srv/empire_os`;
+- one machine-checkable structured patch candidate;
+- allowed-path enforcement before and after application;
+- focused tests in the clone;
+- proposal branch only;
+- independent candidate verification before promotion;
+- no production deploy, outbound, payment, revenue or authority expansion.
+
+The local model receives one bounded JSON-normalization retry if its synthesized
+patch is not strict JSON. A second failure remains a capability failure.
