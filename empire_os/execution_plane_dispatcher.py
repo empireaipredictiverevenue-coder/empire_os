@@ -29,6 +29,10 @@ from empire_os.agent_tool_runtime import (
 )
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
+from empire_os.empire_coder_sandbox_runner import (
+    EmpireCoderSandboxJob,
+    run_empire_coder_sandbox_job,
+)
 from empire_os.hermes_control import (
     DEFAULT_BASE_BRANCH,
     SCHEMA_VERSION as HERMES_SCHEMA_VERSION,
@@ -407,18 +411,52 @@ def dispatch_execution_request(
         }
 
     if worker == "empire_coder":
+        if request.authority == "internal_write":
+            result = run_empire_coder_sandbox_job(
+                root,
+                EmpireCoderSandboxJob(
+                    job_id=request.request_id,
+                    objective=request.objective,
+                    department=request.department,
+                    capability=request.capability,
+                    allowed_paths=request.allowed_paths,
+                    lease_resources=request.lease_resources,
+                    pytest_targets=request.required_tests,
+                    max_runtime_seconds=request.max_runtime_seconds,
+                ),
+            )
+            proposal_gate = None
+            if (
+                result.get("status") == "PROPOSAL_READY"
+                and result.get("proposal_branch")
+            ):
+                proposal_gate = verify_proposal_candidate(
+                    root,
+                    verification_plan,
+                    proposal_branch=str(result["proposal_branch"]),
+                    allowed_paths=request.allowed_paths,
+                )
+            if proposal_gate and proposal_gate.get("awaiting_promptfoo"):
+                status = "AWAITING_PROMPTFOO"
+            elif proposal_gate and proposal_gate.get("candidate_gate_passed"):
+                status = "CANDIDATE_GATE_PASSED"
+            else:
+                status = result.get("status")
+            return {
+                **base,
+                "status": status,
+                "worker": "empire_coder",
+                "worker_result": result,
+                "proposal_gate": proposal_gate,
+            }
+
         runtime = root / "runtime/coder"
         coder = EmpireCoder(root, runtime_root=runtime)
         queue = LocalJobQueue(root, runtime_root=runtime)
         task = coder.create_task(request.objective)
-        kind = (
-            JobKind.IMPLEMENT
-            if request.authority == "internal_write"
-            else JobKind.PLAN
-        )
         job = queue.enqueue(
             task_id=task.id,
-            kind=kind,
+            kind=JobKind.PLAN,
             priority=max(0, min(int(request.priority), 100)),
             payload={
                 "execution_plane_request_id": request.request_id,
@@ -442,7 +480,7 @@ def dispatch_execution_request(
             "worker": "empire_coder",
             "coder_task_id": task.id,
             "coder_job_id": job.id,
-            "coder_job_kind": kind.value,
+            "coder_job_kind": JobKind.PLAN.value,
         }
 
     if worker == "space_agent":
