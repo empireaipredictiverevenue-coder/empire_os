@@ -29,9 +29,8 @@ from empire_os.execution_lease import (
     ExecutionLeaseManager,
 )
 from empire_os.execution_plane_verification import (
-    enqueue_promptfoo_verification,
-    enqueue_swarm_verification,
     plan_candidate_verification,
+    verify_proposal_candidate,
 )
 
 
@@ -1457,24 +1456,27 @@ def process_job(
                 result["independent_verification_plan"] = (
                     verification_plan.as_dict()
                 )
-                result["independent_verification_jobs"] = (
-                    enqueue_swarm_verification(
-                        repo_root,
-                        verification_plan,
+                proposal_branch = str(
+                    proposal.get("proposal_branch") or ""
+                ).strip()
+                if not proposal_branch:
+                    raise HermesControlError(
+                        "proposal branch missing after publish"
                     )
+                result["proposal_gate"] = verify_proposal_candidate(
+                    repo_root,
+                    verification_plan,
+                    proposal_branch=proposal_branch,
+                    allowed_paths=tuple(changed),
                 )
-                result["promptfoo_verification"] = (
-                    enqueue_promptfoo_verification(
-                        repo_root,
-                        verification_plan,
-                        candidate_ref=str(
-                            proposal.get("proposal_branch")
-                            or proposal.get("proposal_commit")
-                            or job.job_id
-                        ),
-                    )
-                )
-                result["status"] = "PROPOSAL_READY"
+                if result["proposal_gate"].get("awaiting_promptfoo"):
+                    result["status"] = "AWAITING_PROMPTFOO"
+                elif result["proposal_gate"].get(
+                    "candidate_gate_passed"
+                ):
+                    result["status"] = "CANDIDATE_GATE_PASSED"
+                else:
+                    result["status"] = "CANDIDATE_GATE_FAILED"
 
     except ExecutionLeaseError as exc:
         result["error"] = f"ExecutionLeaseError: {exc}"
