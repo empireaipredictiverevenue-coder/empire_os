@@ -1,7 +1,7 @@
 # Architecture Delta — Pi Local Tool-Calling Compatibility
 
 Date: 2026-09-25
-Status: REQUIRED
+Status: NOT PROMOTED / EVIDENCE CLOSED
 
 ## Problem
 
@@ -67,3 +67,19 @@ Architecture correction:
 
 The inference server remains loopback-only. This delta grants no production,
 outbound, payment, revenue-recognition or authority-expansion capability.
+
+
+## Live conclusion — 2026-09-25
+
+The live qwen2.5-coder:1.5b lane repeatedly returned textual/pseudo tool calls
+instead of OpenAI-compatible `message.tool_calls`. A custom Qwen tool-use Jinja
+template did not change the direct structured capability result.
+
+Therefore:
+- Pi remains installed and healthy;
+- Pi remains useful for non-mutating analysis/sandbox work;
+- native Pi mutation is NOT promoted on this model;
+- the active llama.cpp service uses the proven `chatml` runtime template;
+- mutating work fails over only to a separately proven builder capability;
+- the experimental Qwen tool-use template remains evidence/reference, not an
+  active authority or production-capability claim.
