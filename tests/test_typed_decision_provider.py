@@ -85,3 +85,16 @@ def test_disallowed_label_rejected():
             result=bad,
             confidence_threshold=.8,
         )
+
+
+def test_label_criteria_must_match_allowed_labels():
+    bad = TypedDecisionRequest(
+        task_key="reply_classification",
+        decision_schema_ref="schema:reply:v1",
+        state_ref="state:criteria",
+        state={"text_ref": "message:1"},
+        allowed_labels=("positive", "negative"),
+        label_criteria={"positive": "interest"},
+    )
+    with pytest.raises(ValueError, match="exactly match"):
+        bad.validate()
