@@ -76,7 +76,9 @@ def main() -> int:
     )
     rows = read_cases(Path(args.cases))
     latencies = []
-    passed = 0
+    raw_passed = 0
+    safe_passed = 0
+    unsafe_accepts = 0
 
     for case in rows:
         request = NeedleRouteRequest(
@@ -91,8 +93,15 @@ def main() -> int:
         latencies.append(elapsed_ms)
 
         expected = case.get("expected_tool")
-        ok = result.tool_name == expected
-        passed += int(ok)
+        raw_ok = result.tool_name == expected
+        raw_passed += int(raw_ok)
+
+        accepted = not result.requires_escalation
+        safe_ok = raw_ok or result.requires_escalation
+        safe_passed += int(safe_ok)
+        if accepted and not raw_ok:
+            unsafe_accepts += 1
+
         print(json.dumps({
             "case_id": case["case_id"],
             "expected_tool": expected,
@@ -100,7 +109,9 @@ def main() -> int:
             "confidence": result.confidence,
             "requires_escalation": result.requires_escalation,
             "elapsed_ms": round(elapsed_ms, 2),
-            "pass": ok,
+            "raw_pass": raw_ok,
+            "safe_pass": safe_ok,
+            "accepted_without_escalation": accepted,
             "tool_executed": result.tool_executed,
         }, sort_keys=True))
 
@@ -108,8 +119,11 @@ def main() -> int:
     summary = {
         "schema_version": "empire.needle-shadow-benchmark.v1",
         "cases": total,
-        "passed": passed,
-        "accuracy": round(passed / total, 4) if total else 0.0,
+        "raw_passed": raw_passed,
+        "raw_accuracy": round(raw_passed / total, 4) if total else 0.0,
+        "safe_passed": safe_passed,
+        "safe_accuracy": round(safe_passed / total, 4) if total else 0.0,
+        "unsafe_accepts": unsafe_accepts,
         "latency_ms_p50": (
             round(statistics.median(latencies), 2) if latencies else None
         ),
@@ -118,7 +132,7 @@ def main() -> int:
         "tool_executed": False,
     }
     print(json.dumps({"summary": summary}, sort_keys=True))
-    return 0 if passed == total else 2
+    return 0 if unsafe_accepts == 0 else 2
 
 
 if __name__ == "__main__":
