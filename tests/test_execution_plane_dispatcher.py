@@ -85,3 +85,21 @@ def test_space_request_is_workspace_only(tmp_path):
     }
     assert result["production_deploy"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_dispatch_exposes_promptfoo_requirement_for_ai_change(tmp_path):
+    result = dispatch_execution_request(
+        tmp_path,
+        ExecutionRequest(
+            request_id="workspace-ai-1",
+            capability="founder_workspace",
+            department="strategy",
+            objective="Change internal AI workspace behavior.",
+            authority="internal_write",
+            ai_behavior_change=True,
+        ),
+    )
+    plan = result["verification_plan"]
+    assert plan["promptfoo_required"] is True
+    assert plan["production_promotion_allowed"] is False
