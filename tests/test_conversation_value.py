@@ -28,16 +28,18 @@ def review(**evidence):
 
 def test_first_touch_uses_specific_proof_not_generic_opportunity_pitch():
     copy = build_first_touch_copy(review(), now=NOW)
-    assert copy.quality_tier == "proof_backed"
+    assert copy.quality_tier == "proof_backed_optimised"
     assert "4.8★ across 116 reviews" in copy.body
-    assert "generic lead pitch" in copy.body
+    assert "generic lead pitch" not in copy.body
     assert "small pilot" not in copy.body.lower()
     assert "opportunities in" not in copy.subject.lower()
-    assert "send it" in copy.body.lower()
-    assert "three areas" in copy.body.lower()
-    assert "bounded pilot" in copy.body.lower()
-    assert "three highest-priority signals" not in copy.body.lower()
+    assert "worth sending the concise example?" in copy.body.lower()
+    assert "ranked commercial brief" in copy.body.lower()
+    assert "bounded pilot" not in copy.body.lower()
+    assert copy.subject == "Kihle customer signals"
     assert POSTAL_ADDRESS in copy.body
+    assert copy.subject_variants
+    assert copy.quality_review["score"] >= 70
 
 
 def test_fresh_why_now_wins_over_generic_proof():
@@ -52,7 +54,7 @@ def test_fresh_why_now_wins_over_generic_proof():
         ),
         now=NOW,
     )
-    assert copy.quality_tier == "trigger_backed"
+    assert copy.quality_tier == "trigger_backed_optimised"
     assert "severe hail signal" in copy.body
     assert copy.why_now_evidence_ref == "nws:dfw:signal-1"
 
@@ -69,7 +71,7 @@ def test_stale_trigger_is_not_used_as_why_now():
         ),
         now=NOW,
     )
-    assert copy.quality_tier == "proof_backed"
+    assert copy.quality_tier == "proof_backed_optimised"
     assert "old storm" not in copy.body
 
 
