@@ -57,3 +57,33 @@ def test_vsl_is_outline_and_requires_review():
 def test_unsupported_channel_fails_closed():
     with pytest.raises(ValueError, match="unsupported copy channel"):
         build_copy(brief("made_up_channel"))
+
+
+def test_cold_email_uses_short_subject_variants():
+    draft = build_copy(brief(
+        "cold_email",
+        contact_title="CEO",
+        sender_email="phil@empire-ai.co.uk",
+        brand_domain="empire-ai.co.uk",
+        enterprise_target=True,
+    ))
+    assert draft.subject is not None
+    assert len(draft.subject) <= 40
+    assert 1 <= len(draft.subject_variants) <= 4
+    assert draft.quality_review["c_suite"] is True
+    assert draft.sender_identity["brand_aligned"] is True
+    assert draft.requires_human_review is False
+
+
+def test_enterprise_consumer_sender_requires_review():
+    draft = build_copy(brief(
+        "cold_email",
+        contact_title="Chief Revenue Officer",
+        sender_email="flavag83@gmail.com",
+        brand_domain="empire-ai.co.uk",
+        enterprise_target=True,
+    ))
+    assert draft.requires_human_review is True
+    assert "consumer_mailbox_for_enterprise_target" in (
+        draft.sender_identity["blockers"]
+    )
