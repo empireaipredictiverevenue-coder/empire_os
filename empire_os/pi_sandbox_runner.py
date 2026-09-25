@@ -154,6 +154,7 @@ def build_pi_systemd_command(
     prompt: str,
     model_id: str,
     max_runtime_seconds: int,
+    system_prompt: str,
     pi_bin: Path = DEFAULT_PI_BIN,
 ) -> list[str]:
     config = clone / ".empire_pi"
@@ -198,7 +199,7 @@ def build_pi_systemd_command(
         "--tools",
         "read,grep,find,ls,edit,write,bash",
         "--system-prompt",
-        str(config / "empire-policy.txt"),
+        system_prompt,
         "--print",
         prompt,
     ]
@@ -282,11 +283,15 @@ def run_pi_sandbox_job(
         )
 
         model_id = _model_id(config)
+        system_prompt = (config / "empire-policy.txt").read_text(
+            encoding="utf-8"
+        ).strip()
         command = build_pi_systemd_command(
             clone=clone,
             prompt=job.prompt,
             model_id=model_id,
             max_runtime_seconds=job.max_runtime_seconds,
+            system_prompt=system_prompt,
             pi_bin=pi_bin,
         )
         try:
