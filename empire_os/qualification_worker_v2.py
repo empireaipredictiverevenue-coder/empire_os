@@ -74,9 +74,29 @@ def _write_egress_state(path: Path, state: dict[str, Any]) -> None:
 
 
 def _with_egress_lock(fn):
+    """Serialize shared egress state without assuming lock-file ownership.
+
+    The lock is shared by root- and ubuntu-run EmpireOS services.  A process
+    only needs permission to open and flock an existing lock; attempting to
+    chmod a lock owned by another service account turns harmless ownership
+    drift into a fleet-wide outage.
+
+    Creation mode is controlled temporarily for a newly-created lock. Existing
+    locks are never chmod/chown mutated here.
+    """
     _EGRESS_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with _EGRESS_LOCK_PATH.open("a+", encoding="utf-8") as lock:
-        os.chmod(_EGRESS_LOCK_PATH, 0o666)
+
+    old_umask = os.umask(0)
+    try:
+        fd = os.open(
+            _EGRESS_LOCK_PATH,
+            os.O_RDWR | os.O_CREAT,
+            0o666,
+        )
+    finally:
+        os.umask(old_umask)
+
+    with os.fdopen(fd, "a+", encoding="utf-8") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         try:
             return fn()

@@ -51,7 +51,6 @@ MANAGED_TIMERS = (
     "empire-legacy-permit-recovery.timer",
     "empire-ops-control.timer",
     "empire-revenue-pulse.timer",
-    "empire-revenue-runtime-supervisor.timer",
 )
 
 
