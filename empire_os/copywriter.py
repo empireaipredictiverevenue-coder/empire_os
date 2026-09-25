@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
+from empire_os.outreach_message_optimizer import optimise_first_touch
+
 
 SUPPORTED_CHANNELS = {
     "cold_email",
@@ -47,6 +49,10 @@ class CopyBrief:
     verified_price: str | None = None
     evidence: Mapping[str, Any] | None = None
     expansion_offer: str | None = None
+    contact_title: str | None = None
+    sender_email: str | None = None
+    brand_domain: str | None = None
+    enterprise_target: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -63,6 +69,9 @@ class CopyDraft:
     claims: tuple[str, ...]
     quality_tier: str
     requires_human_review: bool
+    subject_variants: tuple[str, ...] = ()
+    quality_review: Mapping[str, Any] | None = None
+    sender_identity: Mapping[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -185,26 +194,51 @@ def build_copy(brief: CopyBrief) -> CopyDraft:
             )
 
     if brief.channel == "cold_email":
-        subject = f"{business} — one thing I noticed in {metro}"
-        body = (
-            f"I was looking at {business} while mapping "
-            f"{niche or audience} operators in {metro}. "
-            f"{proof}.\n\n"
-            f"Rather than send a generic pitch, I can show you how "
-            f"{product} would turn the strongest observed signals into a "
-            "prioritised commercial brief.\n\n"
-            "If useful, reply “send it” and I’ll send the concise version."
+        email_evidence = (
+            brief.evidence if isinstance(brief.evidence, Mapping) else {}
+        )
+        trigger, _trigger_refs = _trigger(email_evidence)
+        reason_now = trigger or (
+            f"{business} has {proof}"
+            if proof
+            else ""
+        )
+        optimised = optimise_first_touch(
+            business_name=business,
+            reason_now=reason_now,
+            proof=proof,
+            contact_title=_usable(brief.contact_title) or None,
+            territory=metro,
+            sender_email=_usable(brief.sender_email) or None,
+            brand_domain=_usable(brief.brand_domain) or None,
+            enterprise_target=brief.enterprise_target,
+        )
+        subject_variants = tuple(
+            str(row["subject"])
+            for row in optimised["subject_variants"]
+        )
+        sender_identity = optimised.get("sender_identity")
+        requires_review = bool(
+            sender_identity
+            and sender_identity.get("blockers")
         )
         return CopyDraft(
             channel=brief.channel,
             headline=None,
-            subject=subject,
-            body=body,
-            cta="Reply “send it”.",
+            subject=str(optimised["subject"]),
+            body=str(optimised["body"]),
+            cta=str(optimised["cta"]),
             evidence_used=evidence_refs,
             claims=tuple(claims),
-            quality_tier="evidence_backed",
-            requires_human_review=False,
+            quality_tier="evidence_backed_optimised",
+            requires_human_review=requires_review,
+            subject_variants=subject_variants,
+            quality_review=dict(optimised["quality"]),
+            sender_identity=(
+                dict(sender_identity)
+                if isinstance(sender_identity, Mapping)
+                else None
+            ),
         )
 
     if brief.channel == "followup_email":
