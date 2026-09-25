@@ -11,6 +11,7 @@ from empire_os.first_revenue_api import create_first_revenue_router
 from empire_os.founder_dashboard_api import create_founder_dashboard_router
 from empire_os.founder_daily_results_api import create_founder_daily_results_router
 from empire_os.founder_directives_api import create_founder_directives_router
+from empire_os.founder_execution_ledger_api import create_founder_execution_ledger_router
 from empire_os.founder_data_products_api import create_founder_data_products_router
 from empire_os.founder_intelligence_nodes_api import create_founder_intelligence_nodes_router
 from empire_os.founder_objectives_api import create_founder_objectives_router
@@ -30,6 +31,7 @@ app.include_router(create_founder_dashboard_router())
 app.include_router(create_first_revenue_router())
 app.include_router(create_founder_daily_results_router())
 app.include_router(create_founder_directives_router())
+app.include_router(create_founder_execution_ledger_router())
 app.include_router(create_founder_intelligence_nodes_router())
 app.include_router(create_founder_data_products_router())
 app.include_router(create_revenue_pulse_router())
