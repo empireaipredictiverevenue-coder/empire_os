@@ -38,6 +38,9 @@ INTERESTING_LINK_TERMS = (
     "founder",
     "owner",
     "company",
+    "news",
+    "press",
+    "media",
     "service-area",
     "servicearea",
 )
@@ -586,10 +589,19 @@ def _internal_candidates(
                     rank = 1
                 elif "contact" in text:
                     rank = 2
+                elif any(
+                    term in text
+                    for term in ("news", "press", "media")
+                ):
+                    # Executive appointment and corporate press pages often
+                    # contain the strongest first-party person/email evidence.
+                    # Keep them behind team/about/contact pages but ahead of
+                    # generic location and miscellaneous links.
+                    rank = 3
                 elif "location" in text:
                     rank = 4
                 else:
-                    rank = 3
+                    rank = 5
             candidates.append(
                 (rank, url.split("#", 1)[0])
             )

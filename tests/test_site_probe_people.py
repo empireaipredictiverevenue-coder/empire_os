@@ -128,6 +128,34 @@ def test_people_priority_visits_team_before_locations():
     assert urls[2] == "https://acme.test/contact/"
 
 
+def test_people_priority_includes_first_party_news_and_press_links():
+    import empire_os.search_fabric.site_probe as sp
+
+    html = """
+    <a href="/locations/austin/">Austin Location</a>
+    <a href="/contact/">Contact</a>
+    <a href="/news/">News</a>
+    <a href="/news/executive-appointment/">Executive Appointment</a>
+    <a href="/press-center/growth-update/">Growth Update</a>
+    """
+
+    urls = sp._internal_candidates(
+        html,
+        "https://acme.test/",
+        priority="people",
+    )
+
+    assert "https://acme.test/news/" in urls
+    assert "https://acme.test/news/executive-appointment/" in urls
+    assert "https://acme.test/press-center/growth-update/" in urls
+    assert urls.index("https://acme.test/contact/") < urls.index(
+        "https://acme.test/news/"
+    )
+    assert urls.index("https://acme.test/news/") < urls.index(
+        "https://acme.test/locations/austin/"
+    )
+
+
 def test_people_priority_adds_common_first_party_paths():
     import empire_os.search_fabric.site_probe as sp
 
