@@ -27,21 +27,31 @@ class MailboxProvider(Protocol):
 
 class ResendMailboxProvider:
     def __init__(self, api_key: str | None = None, timeout_s: float = 10.0):
-        self.api_key = (
+        sending = api_key or os.getenv("RESEND_API_KEY", "").strip()
+        receiving = (
             api_key
             or os.getenv("RESEND_RECEIVING_API_KEY", "").strip()
-            or os.getenv("RESEND_API_KEY", "").strip()
+            or sending
         )
+        self.sending_api_key = sending
+        self.receiving_api_key = receiving
         self.timeout_s = timeout_s
 
-    def _get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
-        if not self.api_key:
+    def _get(
+        self,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        receiving: bool = False,
+    ) -> Any:
+        key = self.receiving_api_key if receiving else self.sending_api_key
+        if not key:
             raise RuntimeError("resend_api_key_missing")
         response = requests.get(
             "https://api.resend.com" + path,
             params=params,
             headers={
-                "Authorization": f"Bearer {self.api_key}",
+                "Authorization": f"Bearer {key}",
                 "Accept": "application/json",
             },
             timeout=self.timeout_s,
@@ -60,7 +70,7 @@ class ResendMailboxProvider:
 
     def list_received(self, *, limit: int) -> list[dict[str, Any]]:
         rows = self._rows(
-            self._get("/emails/receiving", params={"limit": limit})
+            self._get("/emails/receiving", params={"limit": limit}, receiving=True)
         )
         hydrated: list[dict[str, Any]] = []
         for index, row in enumerate(rows):
@@ -80,7 +90,7 @@ class ResendMailboxProvider:
         return dict(payload) if isinstance(payload, dict) else {}
 
     def get_received(self, email_id: str) -> dict[str, Any]:
-        payload = self._get(f"/emails/receiving/{email_id}")
+        payload = self._get(f"/emails/receiving/{email_id}", receiving=True)
         return dict(payload) if isinstance(payload, dict) else {}
 
 
