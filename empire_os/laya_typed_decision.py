@@ -15,6 +15,14 @@ from empire_os.typed_decision_provider import (
     TypedDecisionRequest,
     TypedDecisionResult,
 )
+from empire_os.telemetry import (
+    NullTelemetrySink,
+    TelemetrySink,
+    TraceContext,
+    emit_event,
+    new_trace_context,
+    typed_decision_attributes,
+)
 
 
 class LayaTypedDecisionError(RuntimeError):
@@ -70,8 +78,14 @@ class LayaTypedDecisionProvider:
     model_key: str = "convaiinnovations/laya"
     provider_key: str = "laya"
     source_ref_prefix: str = "laya:shadow"
+    telemetry_sink: TelemetrySink | None = None
 
-    def evaluate(self, request: TypedDecisionRequest) -> TypedDecisionResult:
+    def evaluate(
+        self,
+        request: TypedDecisionRequest,
+        *,
+        trace: TraceContext | None = None,
+    ) -> TypedDecisionResult:
         request.validate()
         if len(request.allowed_labels) > 20:
             raise LayaTypedDecisionError(
@@ -126,6 +140,23 @@ class LayaTypedDecisionProvider:
             execution_authority="none",
         )
         result.validate(request)
+        active_trace = trace or new_trace_context()
+        sink = self.telemetry_sink or NullTelemetrySink()
+        emit_event(
+            sink,
+            name="ai.typed_decision",
+            trace=active_trace,
+            attributes=typed_decision_attributes(
+                provider_key=result.provider_key,
+                model_key=result.model_key,
+                task_key=result.task_key,
+                label=result.label,
+                confidence=result.confidence,
+                latency_ms=result.latency_ms,
+                shadow_only=result.shadow_only,
+                risk_class=request.risk_class,
+            ),
+        )
         return result
 
 
