@@ -26,6 +26,13 @@ echo "=== NODE GATE ==="
 NODE_SOURCE="$(command -v node || true)"
 NPM_SOURCE="$(command -v npm || true)"
 if [[ -z "$NODE_SOURCE" || -z "$NPM_SOURCE" ]]; then
+  NVM_BIN="$(find "/home/$TARGET_USER/.nvm/versions/node" -mindepth 2 -maxdepth 2 -type d -name bin -print 2>/dev/null | sort -V | tail -n 1)"
+  if [[ -n "$NVM_BIN" ]]; then
+    [[ -x "$NVM_BIN/node" ]] && NODE_SOURCE="$NVM_BIN/node"
+    [[ -x "$NVM_BIN/npm" ]] && NPM_SOURCE="$NVM_BIN/npm"
+  fi
+fi
+if [[ -z "$NODE_SOURCE" || -z "$NPM_SOURCE" ]]; then
   echo "BLOCKED: node/npm required" >&2
   exit 2
 fi
@@ -55,7 +62,7 @@ test "$(git -C "$SOURCE" rev-parse HEAD)" = "$REVISION"
 echo "=== INSTALL DEPENDENCIES ==="
 chown -R "$TARGET_USER:$TARGET_USER" "$SOURCE"
 cd "$SOURCE"
-sudo -u "$TARGET_USER" npm ci --ignore-scripts --no-audit --no-fund
+sudo -u "$TARGET_USER" "$NODE_SOURCE" "$NPM_SOURCE" ci --ignore-scripts --no-audit --no-fund
 
 echo "=== CONFIGURE LOOPBACK WORKSPACE ==="
 "$PREFIX/bin/node" "$SOURCE/space.js" set   CUSTOMWARE_PATH="$CUSTOMWARE"   LOGIN_ALLOWED=true   ALLOW_GUEST_USERS=false   CLOUD_SHARE_ALLOWED=false   CUSTOMWARE_GIT_HISTORY=true   HOST=127.0.0.1   PORT=3010   WORKERS=1
