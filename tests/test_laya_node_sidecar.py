@@ -49,3 +49,15 @@ def test_laya_bootstrap_is_bounded_and_progress_visible():
     assert "Empire continues without Laya" in bootstrap
     assert "onProgress:" in preload
     assert "laya_download_progress" in preload
+
+
+def test_laya_service_uses_empire_pinned_node_and_restart_limit():
+    service = SERVICE.read_text(encoding="utf-8")
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+    assert "ExecStart=/srv/empire_os/runtime/laya/bin/node" in service
+    assert "ConditionPathIsExecutable=/srv/empire_os/runtime/laya/bin/node" in service
+    assert "StartLimitIntervalSec=60" in service
+    assert "StartLimitBurst=3" in service
+    assert "command -v node" in bootstrap
+    assert 'install -m 0755 "${NODE_SOURCE}" "${RUNTIME_BIN}/node"' in bootstrap
+    assert '"${RUNTIME_BIN}/node" --version' in bootstrap
