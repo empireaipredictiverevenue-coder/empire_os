@@ -72,6 +72,20 @@ class ExecutionRequest:
             raise ValueError("unsupported risk class")
         if self.risk_class == "consequential":
             raise ValueError("consequential work requires domain authority gate")
+        if (
+            self.authority == "internal_write"
+            and self.capability in {
+                "backend_code",
+                "frontend_code",
+                "refactor",
+                "tests",
+                "documentation",
+            }
+            and not self.allowed_paths
+        ):
+            raise ValueError(
+                "mutating code work requires allowed_paths"
+            )
         for target in self.required_tests:
             if not target.startswith("tests/") or ".py" not in target:
                 raise ValueError("required_tests must be repository pytest targets")
