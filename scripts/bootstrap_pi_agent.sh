@@ -125,7 +125,13 @@ chmod 0644 "$CONFIG/empire-policy.txt"
 chown root:root "$CONFIG/empire-policy.txt"
 
 echo "=== READ-ONLY MODEL CHECK ==="
-sudo -u "$TARGET_USER" env   PI_CODING_AGENT_DIR="$CONFIG"   PI_OFFLINE=1   PI_TELEMETRY=0   "$PI_BIN" --list-models "$MODEL_ID" | head -20
+CHECK_CONFIG="$STATE/check-config"
+rm -rf "$CHECK_CONFIG"
+install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "$CHECK_CONFIG"
+install -m 0600 -o "$TARGET_USER" -g "$TARGET_USER"   "$CONFIG/models.json" "$CHECK_CONFIG/models.json"
+install -m 0600 -o "$TARGET_USER" -g "$TARGET_USER"   "$CONFIG/empire-policy.txt" "$CHECK_CONFIG/empire-policy.txt"
+sudo -u "$TARGET_USER" env   PI_CODING_AGENT_DIR="$CHECK_CONFIG"   PI_OFFLINE=1   PI_TELEMETRY=0   "$PI_BIN" --list-models "$MODEL_ID" | head -20
+rm -rf "$CHECK_CONFIG"
 
 echo "=== COMPLETE ==="
 echo "PiBinary=$PI_BIN"
