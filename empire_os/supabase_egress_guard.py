@@ -121,6 +121,21 @@ def _restore_units(
     return restored
 
 
+
+def supabase_egress_contained(
+    status_path: Path = STATUS_PATH,
+) -> bool:
+    """Return True only for an explicit persisted containment state."""
+    try:
+        payload = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(payload, dict)
+        and payload.get("state") == "contained"
+        and payload.get("contained") is True
+    )
+
 def _existing_managed() -> list[str]:
     try:
         payload = json.loads(STATUS_PATH.read_text(encoding="utf-8"))
