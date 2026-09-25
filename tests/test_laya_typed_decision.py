@@ -4,6 +4,7 @@ from empire_os.laya_typed_decision import (
     LayaTypedDecisionError,
     LayaTypedDecisionProvider,
 )
+from empire_os.telemetry import JsonlTelemetrySink, new_trace_context
 from empire_os.typed_decision_provider import (
     TypedDecisionRequest,
     review_typed_decision_result,
@@ -140,3 +141,26 @@ def test_laya_high_risk_result_still_escalates_under_empire_policy():
     assert reviewed["requires_escalation"] is True
     assert reviewed["controls_live_route"] is False
     assert reviewed["execution_performed"] is False
+
+
+def test_laya_emits_traceable_shadow_decision(tmp_path):
+    path = tmp_path / "laya.jsonl"
+    trace = new_trace_context()
+    agent = FakeLaya({
+        "choice": "positive",
+        "confidence": 0.88,
+    })
+    provider = LayaTypedDecisionProvider(
+        agent=agent,
+        telemetry_sink=JsonlTelemetrySink(path),
+    )
+
+    provider.evaluate(request(), trace=trace)
+
+    row = __import__("json").loads(path.read_text(encoding="utf-8"))
+    assert row["name"] == "ai.typed_decision"
+    assert row["trace"]["trace_id"] == trace.trace_id
+    assert row["attributes"]["ai.provider"] == "laya"
+    assert row["attributes"]["ai.decision.label"] == "positive"
+    assert row["attributes"]["ai.shadow_only"] is True
+    assert row["attributes"]["execution_authority"] == "none"
