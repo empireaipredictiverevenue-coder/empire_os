@@ -10,6 +10,7 @@ import {
 type MailSearchParams = Promise<{
   filter?: string | string[];
   thread?: string | string[];
+  q?: string | string[];
 }>;
 
 const FILTERS = [
@@ -111,11 +112,19 @@ export default async function FounderMailPage({
   await connection();
   const params = await searchParams;
   const activeFilter = first(params.filter) ?? "all";
+  const query = (first(params.q) ?? "").trim().toLowerCase();
 
   const mailboxResult = await getFounderMailboxThreads(80);
   const mailbox = mailboxResult.data;
   const rows = mailbox?.threads ?? [];
-  const visible = filterThreads(rows, activeFilter);
+  const filtered = filterThreads(rows, activeFilter);
+  const visible = query
+    ? filtered.filter((row) =>
+        [row.contact, row.subject]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query)),
+      )
+    : filtered;
 
   const requestedThread = first(params.thread);
   const selectedId =
@@ -255,19 +264,36 @@ export default async function FounderMailPage({
             </aside>
 
             <section className="border-b border-white/10 bg-[#0b1328]/65 lg:border-b-0 lg:border-r">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    {FILTERS.find((row) => row.key === activeFilter)?.label ??
-                      "All mail"}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-300">
-                    {visible.length} conversations
-                  </p>
+              <div className="border-b border-white/10 px-4 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      {FILTERS.find((row) => row.key === activeFilter)?.label ??
+                        "All mail"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {visible.length} conversations
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1 text-[11px] text-slate-400">
+                    Live truth
+                  </span>
                 </div>
-                <span className="rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1 text-[11px] text-slate-400">
-                  Live truth
-                </span>
+                <form method="get" className="mt-4 flex gap-2">
+                  <input type="hidden" name="filter" value={activeFilter} />
+                  <input
+                    name="q"
+                    defaultValue={first(params.q) ?? ""}
+                    placeholder="Search contact or subject"
+                    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/15 px-3 py-2 text-xs text-white outline-none placeholder:text-slate-600 focus:border-blue-400/40"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-xl border border-blue-400/20 bg-blue-400/10 px-3 py-2 text-xs font-semibold text-blue-100 hover:bg-blue-400/15"
+                  >
+                    Search
+                  </button>
+                </form>
               </div>
 
               <div className="max-h-[720px] overflow-y-auto">
@@ -286,6 +312,7 @@ export default async function FounderMailPage({
                           query: {
                             filter: activeFilter,
                             thread: row.thread_id,
+                            ...(query ? { q: query } : {}),
                           },
                         }}
                         className={[
