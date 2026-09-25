@@ -81,6 +81,61 @@ if [[ ! -f "$ADMIN_MARKER" ]]; then
   chmod 0600 "$ADMIN_MARKER"
 fi
 
+echo "=== CONFIGURE EMPIRE LOCAL MODEL ==="
+MODEL_ID="$(
+  curl -fsS --max-time 3 http://127.0.0.1:11435/v1/models 2>/dev/null     | python3 -c '
+import json,sys
+try:
+    payload=json.load(sys.stdin)
+    rows=payload.get("data") or []
+    print(str((rows[0] if rows else {}).get("id") or ""))
+except Exception:
+    print("")
+' || true
+)"
+if [[ -z "$MODEL_ID" ]]; then
+  echo "BLOCKED: local llama.cpp model not discoverable" >&2
+  exit 3
+fi
+
+FOUNDER_ROOT="$CUSTOMWARE/L2/empire-founder"
+install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER"   "$FOUNDER_ROOT/conf"
+
+cat >"$FOUNDER_ROOT/conf/admin-chat.yaml" <<EOF
+api_endpoint: "http://127.0.0.1:11435/v1/chat/completions"
+api_key: "local-only"
+llm_provider: "api"
+model: "$MODEL_ID"
+max_tokens: 4096
+params: "temperature:0.2"
+supports_vision: false
+custom_system_prompt: |
+  You are the Empire Founder Workspace agent.
+  Architecture first, implementation second, verification before promotion.
+  Treat Empire read APIs as evidence, never as permission to mutate production.
+  Never send outreach, accept terms, move funds, recognize revenue, deploy production,
+  or bypass Control Fabric. Route build requests through the Empire Execution Plane.
+EOF
+
+cat >"$FOUNDER_ROOT/conf/onscreen-agent.yaml" <<EOF
+api_endpoint: "http://127.0.0.1:11435/v1/chat/completions"
+api_key: "local-only"
+llm_provider: "api"
+model: "$MODEL_ID"
+max_tokens: 4096
+params: "temperature:0.2"
+supports_vision: false
+custom_system_prompt: |
+  You are a bounded Empire Founder Workspace assistant.
+  Use workspace tools for presentation and internal UI only.
+  Do not mutate Empire canonical systems directly.
+EOF
+
+chown "$TARGET_USER:$TARGET_USER"   "$FOUNDER_ROOT/conf/admin-chat.yaml"   "$FOUNDER_ROOT/conf/onscreen-agent.yaml"
+chmod 0600   "$FOUNDER_ROOT/conf/admin-chat.yaml"   "$FOUNDER_ROOT/conf/onscreen-agent.yaml"
+
+echo "SpaceModel=$MODEL_ID"
+
 echo "=== INSTALL SERVICE ==="
 install -m 0644   "$ROOT/deploy/systemd/empire-space-agent.service"   /etc/systemd/system/empire-space-agent.service
 systemctl daemon-reload
