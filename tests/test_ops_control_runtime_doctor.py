@@ -7,7 +7,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_ops_control_cycle_owns_runtime_doctor():
     text = (ROOT / "scripts/run_ops_control_cycle.py").read_text()
     assert "run_runtime_self_heal" in text
-    assert 'observe_only=mode != "GUARDED_EXECUTE"' in text
+    assert "supabase_egress_contained()" in text
+    assert 'mode != "GUARDED_EXECUTE" or egress_contained' in text
+    assert 'if mode == "GUARDED_EXECUTE" and not egress_contained' in text
     assert '"runtime_doctor": runtime_doctor' in text
 
 
