@@ -60,6 +60,7 @@ class PiSandboxJob:
     lease_resources: tuple[str, ...] = ()
     base_branch: str = DEFAULT_BRANCH
     max_runtime_seconds: int = 900
+    require_changes: bool = True
 
     def validate(self) -> None:
         if not JOB_ID_RE.fullmatch(self.job_id):
@@ -214,7 +215,8 @@ def build_pi_systemd_command(
         "read,grep,find,ls,edit,write,bash",
         "--system-prompt",
         system_prompt,
-        "--print",
+        "--mode",
+        "json",
         prompt,
     ]
     return argv
@@ -345,7 +347,12 @@ def run_pi_sandbox_job(
         result["changed_paths"] = changed
 
         if not changed:
-            result["status"] = "COMPLETED_NO_CHANGES"
+            result["status"] = (
+                "NO_IMPLEMENTATION"
+                if job.require_changes
+                else "COMPLETED_NO_CHANGES"
+            )
+            result["no_change_allowed"] = not job.require_changes
             return result
 
         checks: list[dict[str, Any]] = []
