@@ -291,11 +291,16 @@ def dispatch_execution_request(
         worker == "pi"
         and request.authority == "internal_write"
         and request.capability in MUTATING_CODE_CAPABILITIES
-        and not builder_capability_ready("pi", "code_mutation")
+        and not builder_capability_ready(
+            "pi",
+            "code_mutation",
+            path=capability_path,
+        )
     ):
         if builder_capability_ready(
             "empire_coder",
             "structured_patch_mutation",
+            path=capability_path,
         ):
             base["runtime_fallback"] = {
                 "from": "pi",
@@ -311,7 +316,9 @@ def dispatch_execution_request(
                 request,
                 extra={
                     "reason": "no_mutation_capable_builder_proven",
-                    "capabilities": builder_capability_snapshot(),
+                    "capabilities": builder_capability_snapshot(
+                        capability_path
+                    ),
                 },
             )
             return {
@@ -320,7 +327,9 @@ def dispatch_execution_request(
                 "worker": "pi",
                 "request_path": str(queued),
                 "reason": "no_mutation_capable_builder_proven",
-                "builder_capabilities": builder_capability_snapshot(),
+                "builder_capabilities": builder_capability_snapshot(
+                    capability_path
+                ),
             }
 
     if worker == "pi":
