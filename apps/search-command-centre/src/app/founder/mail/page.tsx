@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import {
+  getFounderMailboxDraftPreview,
   getFounderMailboxThread,
   getFounderMailboxThreads,
   type EmpireMailEvent,
@@ -11,6 +12,7 @@ type MailSearchParams = Promise<{
   filter?: string | string[];
   thread?: string | string[];
   q?: string | string[];
+  draft?: string | string[];
 }>;
 
 const FILTERS = [
@@ -139,6 +141,14 @@ export default async function FounderMailPage({
     detailResult?.ok && detailResult.data
       ? detailResult.data
       : visible.find((row) => row.thread_id === selectedId) ?? null;
+
+  const draftRequested = first(params.draft) === "1";
+  const draftResult =
+    draftRequested && selectedId
+      ? await getFounderMailboxDraftPreview(selectedId, 80)
+      : null;
+  const draftPreview =
+    draftResult?.ok && draftResult.data ? draftResult.data : null;
 
   const summary = mailbox?.summary ?? {};
 
@@ -483,20 +493,90 @@ export default async function FounderMailPage({
                   </div>
 
                   <div className="border-t border-white/10 bg-[#07101f]/90 px-5 py-4 lg:px-7">
-                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                      <div>
-                        <p className="text-xs font-semibold text-slate-300">
-                          Governed reply path
+                    {draftPreview ? (
+                      <div className="rounded-2xl border border-blue-400/20 bg-blue-400/[0.055] p-4">
+                        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-200">
+                              Governed reply preview
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Deterministic Closer draft · no send authority
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">
+                            Unknowns preserved
+                          </span>
+                        </div>
+                        <p className="mt-4 text-sm font-semibold text-white">
+                          {draftPreview.draft?.subject ?? "Draft subject unavailable"}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Draft/reasoning only. Live send authority is not exposed
-                          by Empire Mail v1.
-                        </p>
+                        <div className="mt-3 max-h-72 overflow-y-auto rounded-xl border border-white/8 bg-black/15 p-4">
+                          <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">
+                            {draftPreview.draft?.body_text ??
+                              "Draft body unavailable."}
+                          </p>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-[11px] text-slate-500">
+                            This preview does not create, approve or send an outbound intent.
+                          </p>
+                          <Link
+                            href={{
+                              pathname: "/founder/mail",
+                              query: {
+                                filter: activeFilter,
+                                thread: selected.thread_id,
+                                ...(query ? { q: query } : {}),
+                              },
+                            }}
+                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/[0.07]"
+                          >
+                            Close preview
+                          </Link>
+                        </div>
                       </div>
-                      <span className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-2 text-xs font-semibold text-slate-400">
-                        Compose coming after read-model verification
-                      </span>
-                    </div>
+                    ) : (
+                      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-300">
+                            Governed reply path
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Preview uses the existing deterministic Closer logic.
+                            It cannot send, approve terms or move funds.
+                          </p>
+                        </div>
+                        {selected.suppressed ||
+                        !["positive", "question", "objection"].includes(
+                          selected.classification ?? "",
+                        ) ? (
+                          <span className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-2 text-xs font-semibold text-slate-500">
+                            Reply preview unavailable
+                          </span>
+                        ) : (
+                          <Link
+                            href={{
+                              pathname: "/founder/mail",
+                              query: {
+                                filter: activeFilter,
+                                thread: selected.thread_id,
+                                draft: "1",
+                                ...(query ? { q: query } : {}),
+                              },
+                            }}
+                            className="rounded-xl border border-blue-400/25 bg-blue-400/10 px-4 py-2 text-xs font-semibold text-blue-100 hover:bg-blue-400/15"
+                          >
+                            Preview governed reply
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                    {draftRequested && !draftPreview && draftResult ? (
+                      <p className="mt-3 text-xs text-amber-300">
+                        Draft unavailable: {draftResult.reason ?? "not eligible"}
+                      </p>
+                    ) : null}
                   </div>
                 </>
               ) : (
