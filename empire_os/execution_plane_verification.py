@@ -119,6 +119,7 @@ def enqueue_promptfoo_verification(
     plan: VerificationPlan,
     *,
     candidate_ref: str,
+    candidate_patch_path: str | None = None,
 ) -> dict[str, Any] | None:
     if not plan.promptfoo_required:
         return None
@@ -131,6 +132,9 @@ def enqueue_promptfoo_verification(
         "schema_version": "empire.execution-plane-promptfoo-request.v1",
         "request_id": plan.request_id,
         "candidate_ref": str(candidate_ref or "").strip(),
+        "candidate_patch_path": (
+            str(candidate_patch_path or "").strip() or None
+        ),
         "config": plan.promptfoo_config,
         "required": True,
         "production_promotion_allowed": False,
@@ -172,6 +176,9 @@ def verify_proposal_candidate(
             repo_root,
             plan,
             candidate_ref=proposal_branch,
+            candidate_patch_path=str(
+                candidate.get("candidate_patch_path") or ""
+            ).strip() or None,
         )
 
     return {
