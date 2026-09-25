@@ -571,3 +571,82 @@ export function getFounderSolarIntelligence(country = "GB") {
     `/v1/founder-source-intelligence/solar?country=${encodeURIComponent(country)}`,
   );
 }
+
+export type EmpireMailEvent = {
+  provider?: string;
+  provider_id?: string | null;
+  message_id?: string | null;
+  thread_id?: string | null;
+  intent_id?: string | null;
+  direction?: "inbound" | "outbound";
+  from?: string | null;
+  to?: string[];
+  reply_to?: string[];
+  subject?: string | null;
+  occurred_at?: string | null;
+  delivery_state?: string | null;
+  body_text?: string | null;
+  classification?: string | null;
+  classification_confidence?: number | null;
+  suppressed?: boolean;
+  untrusted_content?: boolean;
+};
+
+export type EmpireMailThread = {
+  thread_id: string;
+  intent_id?: string | null;
+  subject?: string | null;
+  contact?: string | null;
+  latest_at?: string | null;
+  latest_direction?: string | null;
+  delivery_state?: string | null;
+  classification?: string | null;
+  commercial_status?: string | null;
+  suppressed?: boolean;
+  suppression_origin?: string | null;
+  suppression_source_id?: string | null;
+  next_action?: string | null;
+  event_count?: number;
+  events?: EmpireMailEvent[];
+  read_only?: boolean;
+  execution_authority?: string;
+  email_sends?: boolean;
+};
+
+export type FounderMailbox = {
+  schema_version?: string;
+  mode?: string;
+  read_only?: boolean;
+  execution_authority?: string;
+  provider?: string;
+  identity?: {
+    sender?: string | null;
+    sender_email?: string | null;
+    reply_to?: string | null;
+    observed?: boolean;
+  };
+  thread_count?: number;
+  summary?: {
+    all?: number;
+    replies?: number;
+    positive?: number;
+    questions?: number;
+    objections?: number;
+    bounced_failed?: number;
+    suppressed?: number;
+  };
+  threads?: EmpireMailThread[];
+};
+
+export function getFounderMailboxThreads(limit = 80) {
+  return getFounderRead<FounderMailbox>(
+    `/v1/founder-mailbox/threads?limit=${limit}`,
+  );
+}
+
+export function getFounderMailboxThread(threadId: string, limit = 100) {
+  return getFounderRead<EmpireMailThread>(
+    `/v1/founder-mailbox/threads/${encodeURIComponent(threadId)}?limit=${limit}`,
+  );
+}
+
