@@ -154,7 +154,6 @@ def _emit_route_event(
                 "execution.authority_requested": request.authority,
                 "execution.ai_behavior_change": request.ai_behavior_change,
                 "execution_authority": "none",
-                "verification_plan": verification_plan.as_dict(),
             },
         )
     except Exception:
@@ -345,6 +344,7 @@ def dispatch_execution_request(
                 ],
                 "budget_chars": 8000,
                 "execution_authority": "none",
+                "verification_plan": verification_plan.as_dict(),
             },
         )
         return {
