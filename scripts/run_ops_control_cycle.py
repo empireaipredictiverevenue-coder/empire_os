@@ -13,6 +13,7 @@ from empire_os.incident_manager import build_incident_report
 from empire_os.ops_healer import execute_plan
 from empire_os.ops_sentinel import observe
 from empire_os.runtime_self_heal import run_runtime_self_heal
+from empire_os.supabase_egress_guard import supabase_egress_contained
 
 OUTPUT = Path("/srv/empire_os/runtime/ops_control/latest.json")
 
@@ -33,12 +34,13 @@ def main() -> int:
     if mode not in {"OBSERVE", "GUARDED_EXECUTE"}:
         mode = "OBSERVE"
 
+    egress_contained = supabase_egress_contained()
     runtime_doctor = run_runtime_self_heal(
-        observe_only=mode != "GUARDED_EXECUTE",
+        observe_only=(mode != "GUARDED_EXECUTE" or egress_contained),
     )
     sentinel = observe(unit_state)
     repairs = []
-    if mode == "GUARDED_EXECUTE":
+    if mode == "GUARDED_EXECUTE" and not egress_contained:
         repairs = execute_plan(sentinel.get("repair_plan") or [], max_actions=3)
 
     incident_manager = build_incident_report(sentinel)
@@ -103,6 +105,7 @@ def main() -> int:
         "schema_version": "empire.ops_control_cycle.v1",
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
+        "supabase_egress_contained": egress_contained,
         "runtime_doctor": runtime_doctor,
         "sentinel": sentinel,
         "health_domains": health_domains,
