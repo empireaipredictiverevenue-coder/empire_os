@@ -778,3 +778,12 @@ Current reconciliation truth:
 13. Cost / Capacity / Unit-Economics Agent
 14. Remaining verticals, products, media/content and salvage lanes
 15. Blueprint phases 6–18 convergence toward Full Autonomous Revenue OS
+
+
+## Architecture-first engineering doctrine — REQUIRED
+
+- [x] Architecture-first engineering doctrine documented and bound to Master Architecture
+- [ ] Every new material agent/tool/product/integration gets an architecture contract before implementation
+- [ ] Every bounded extension records an architecture delta before implementation
+- [ ] Mutating builder ownership/lease prevents overlapping edits
+- [ ] Verification/promotion evidence is recorded before checklist DONE
