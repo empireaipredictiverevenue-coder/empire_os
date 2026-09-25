@@ -1,0 +1,21 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "revp0-13-buyer-contact-email-promotion",
+  "kind": "code_task",
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "allowed_paths": [
+    "empire_os/",
+    "tests/"
+  ],
+  "lease_resources": [
+    "path:empire_os/buyer_scout_promotion_plan.py",
+    "path:tests/test_buyer_scout_promotion_plan.py"
+  ],
+  "pytest_targets": [
+    "tests/test_buyer_scout_promotion_plan.py"
+  ],
+  "max_runtime_seconds": 900,
+  "ai_behavior_change": false,
+  "prompt": "Implement one bounded revenue-support improvement in the buyer scout promotion plan.\n\nONLY MODIFY:\n- empire_os/buyer_scout_promotion_plan.py\n- tests/test_buyer_scout_promotion_plan.py\n\nGOAL:\nCarry a single verified first-party email into the proposed canonical prospect payload so reviewed buyer candidates can move from research to contact resolution without manual stitching.\n\nREQUIREMENTS:\n1. In build_promotion_plan(), when site_evidence.first_party_emails contains exactly one nonblank email, set proposed_prospect_payload[\"contact_email\"] to that email.\n2. When there are zero emails or more than one email, contact_email must be None. Unknown stays unknown; do not guess or pick among ambiguous emails.\n3. Preserve first_party_emails_preserved_for_identity_resolution exactly as evidence.\n4. Add tests proving:\n   - exactly one email becomes contact_email;\n   - multiple emails fail closed to contact_email=None;\n   - no email gives contact_email=None.\n5. Preserve all existing behavior:\n   - OBSERVE mode;\n   - buy_signal_score remains None;\n   - outreach_authorized remains False;\n   - no database writes;\n   - no canonical promotion;\n   - no buyer creation;\n   - no fabricated identity data.\n6. Do not touch outbound send logic, payments, database migrations, environment, systemd, recovery/, toop/, or unrelated files.\n\nVERIFY:\nPYTHONPATH=/srv/empire_os /srv/empire_os/.venv/bin/python -m pytest -q tests/test_buyer_scout_promotion_plan.py --tb=short\n\nKeep the patch minimal and production-quality."
+}
