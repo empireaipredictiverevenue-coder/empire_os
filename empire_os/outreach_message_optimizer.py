@@ -336,15 +336,15 @@ def optimise_first_touch(
         body = (
             f"{opener}\n\n"
             "Curious how early that becomes visible in your commercial planning.\n\n"
-            "We turn observed market, demand and operating signals into a ranked "
-            "commercial brief, without treating forecasts as revenue.\n\n"
+            f"For {business}, we turn observed market, demand and operating signals "
+            "into a ranked commercial brief, without treating forecasts as revenue.\n\n"
             "Worth sending the one-page example?"
         )
     else:
         body = (
             f"{opener}\n\n"
-            "We turn those observed signals into a ranked commercial brief so the "
-            "team can review what deserves attention first.\n\n"
+            f"For {business}, we turn those observed signals into a ranked commercial "
+            "brief so the team can review what deserves attention first.\n\n"
             "Worth sending the concise example?"
         )
 
