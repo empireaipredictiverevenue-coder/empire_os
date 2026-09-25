@@ -5,12 +5,16 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
+import shutil
 import subprocess
+from uuid import uuid4
 from typing import Any
 
 
 REQUEST_ROOT = Path("runtime/execution_plane/promptfoo_requests")
 RESULT_ROOT = Path("runtime/execution_plane/promptfoo_results")
+CANDIDATE_REF_RE = re.compile(r"^[A-Za-z0-9._/-]{1,160}$")
 
 
 def _now() -> str:
@@ -36,6 +40,76 @@ def _safe_env() -> dict[str, str]:
     return env
 
 
+def _prepare_candidate_clone(
+    root: Path,
+    candidate_ref: str,
+) -> Path:
+    if not CANDIDATE_REF_RE.fullmatch(candidate_ref):
+        raise ValueError("invalid candidate_ref")
+    if candidate_ref.startswith("/") or ".." in candidate_ref.split("/"):
+        raise ValueError("unsafe candidate_ref")
+
+    work_root = Path("/var/tmp/empire-promptfoo")
+    work_root.mkdir(parents=True, exist_ok=True)
+    clone = work_root / f"eval-{uuid4().hex}"
+
+    cloned = subprocess.run(
+        ["git", "clone", "--no-hardlinks", str(root), str(clone)],
+        cwd=str(work_root),
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+    if cloned.returncode != 0:
+        raise RuntimeError("Promptfoo candidate clone failed")
+
+    remote = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        cwd=str(root),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    remote_url = (remote.stdout or "").strip()
+    if not remote_url:
+        raise RuntimeError("origin remote unavailable")
+
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", remote_url],
+        cwd=str(clone),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    fetched = subprocess.run(
+        ["git", "fetch", "origin", candidate_ref],
+        cwd=str(clone),
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+    if fetched.returncode != 0:
+        shutil.rmtree(clone, ignore_errors=True)
+        raise RuntimeError("Promptfoo candidate fetch failed")
+
+    checkout = subprocess.run(
+        ["git", "checkout", "--detach", "FETCH_HEAD"],
+        cwd=str(clone),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if checkout.returncode != 0:
+        shutil.rmtree(clone, ignore_errors=True)
+        raise RuntimeError("Promptfoo candidate checkout failed")
+    return clone
+
+
 def run_promptfoo_request(
     repo_root: str | Path,
     request_path: str | Path,
@@ -52,11 +126,14 @@ def run_promptfoo_request(
 
     raw = json.loads(path.read_text(encoding="utf-8"))
     request_id = str(raw.get("request_id") or "").strip()
+    candidate_ref = str(raw.get("candidate_ref") or "").strip()
     config = str(raw.get("config") or "").strip()
     if not request_id:
         raise ValueError("promptfoo request_id required")
     if config != "evals/empire_core_policy/promptfooconfig.yaml":
         raise ValueError("unsupported Promptfoo config")
+    if not candidate_ref:
+        raise ValueError("candidate_ref required")
 
     result_dir = root / RESULT_ROOT
     result_dir.mkdir(parents=True, exist_ok=True)
@@ -75,10 +152,12 @@ def run_promptfoo_request(
         "--no-cache",
     ]
     started = _now()
+    clone = None
     try:
+        clone = _prepare_candidate_clone(root, candidate_ref)
         completed = subprocess.run(
             command,
-            cwd=str(root),
+            cwd=str(clone),
             env=_safe_env(),
             capture_output=True,
             text=True,
@@ -98,11 +177,14 @@ def run_promptfoo_request(
         )[-6000:]
         status = "TIMED_OUT"
         error = "PromptfooTimeout"
+    finally:
+        if clone is not None:
+            shutil.rmtree(clone, ignore_errors=True)
 
     result = {
         "schema_version": "empire.execution-plane-promptfoo-result.v1",
         "request_id": request_id,
-        "candidate_ref": str(raw.get("candidate_ref") or "").strip(),
+        "candidate_ref": candidate_ref,
         "config": config,
         "started_at": started,
         "completed_at": _now(),
