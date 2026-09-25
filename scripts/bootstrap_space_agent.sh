@@ -53,8 +53,9 @@ git -C "$SOURCE" checkout --detach "$REVISION"
 test "$(git -C "$SOURCE" rev-parse HEAD)" = "$REVISION"
 
 echo "=== INSTALL DEPENDENCIES ==="
+chown -R "$TARGET_USER:$TARGET_USER" "$SOURCE"
 cd "$SOURCE"
-npm ci --ignore-scripts --no-audit --no-fund
+sudo -u "$TARGET_USER" npm ci --ignore-scripts --no-audit --no-fund
 
 echo "=== CONFIGURE LOOPBACK WORKSPACE ==="
 "$PREFIX/bin/node" "$SOURCE/space.js" set   CUSTOMWARE_PATH="$CUSTOMWARE"   LOGIN_ALLOWED=true   ALLOW_GUEST_USERS=false   CLOUD_SHARE_ALLOWED=false   CUSTOMWARE_GIT_HISTORY=true   HOST=localhost   PORT=3010   WORKERS=1
