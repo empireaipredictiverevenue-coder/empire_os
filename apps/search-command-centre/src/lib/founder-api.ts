@@ -650,3 +650,35 @@ export function getFounderMailboxThread(threadId: string, limit = 100) {
   );
 }
 
+export type EmpireMailDraftPreview = {
+  schema_version?: string;
+  mode?: string;
+  read_only?: boolean;
+  execution_authority?: string;
+  outbound_send_authority?: boolean;
+  thread_id?: string | null;
+  intent_id?: string | null;
+  classification?: string | null;
+  draft?: {
+    subject?: string | null;
+    body_text?: string | null;
+    classification?: string | null;
+  };
+  context?: {
+    business_name?: string | null;
+    market?: string | null;
+    pricing?: string | null;
+    capacity?: string | null;
+  };
+  unknowns_preserved?: boolean;
+};
+
+export function getFounderMailboxDraftPreview(
+  threadId: string,
+  limit = 80,
+) {
+  return getFounderRead<EmpireMailDraftPreview>(
+    `/v1/founder-mailbox/draft-preview?thread_id=${encodeURIComponent(threadId)}&limit=${limit}`,
+  );
+}
+
