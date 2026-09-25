@@ -28,9 +28,10 @@ def test_space_agent_is_pinned_loopback_and_non_guest():
     bootstrap = SPACE_BOOTSTRAP.read_text(encoding="utf-8")
     service = SPACE_SERVICE.read_text(encoding="utf-8")
     assert "10f4ffdaf50a8136cf8450d17c11286178fd58e6" in bootstrap
-    assert "HOST=localhost" in service
+    assert "HOST=127.0.0.1" in service
     assert "ALLOW_GUEST_USERS=false" in service
     assert "CLOUD_SHARE_ALLOWED=false" in service
+    assert "127.0.0.1:11435/v1/chat/completions" in bootstrap
     assert "IPAddressDeny=any" in service
     assert "IPAddressAllow=localhost" in service
     assert "InaccessiblePaths=/etc/empire_os.env" in service
