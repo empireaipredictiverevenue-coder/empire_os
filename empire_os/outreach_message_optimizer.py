@@ -93,6 +93,8 @@ def _topic(reason_now: Any) -> str:
         ("permit", "permit signals"),
         ("storm", "storm demand"),
         ("search", "search demand"),
+        ("public profile", "customer signals"),
+        ("review", "customer signals"),
     ):
         if needle in text:
             return label
