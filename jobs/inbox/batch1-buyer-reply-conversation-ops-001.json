@@ -1,0 +1,48 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "batch1-buyer-reply-conversation-ops-001",
+  "kind": "code_task",
+  "authority": "internal_write",
+  "base_branch": "feature/revenue-intelligence-v2",
+  "prompt": "Implement the Buyer Reply / Conversation Operations Agent strictly from docs/BUSINESS_AGENT_ARCHITECTURE_BATCH_1.md. REUSE existing Gmail reply adapter/runtime, conversation ingest/OS/qualification/timeline/value, closer reply worker/draft, reply classifier, Laya specialist, and outbound governor. Do not create a shadow CRM, shadow buyer store, duplicate conversation state machine, or new commercial truth store. Implement the smallest production-quality orchestration/readiness layer that takes observed inbound reply evidence, preserves provenance, routes negative/unsubscribe through the bounded Laya specialist lane, escalates positive/question/objection/ambiguous replies to the existing governed reasoning path, produces a structured next-action/draft candidate, and surfaces blocker/evidence state read-only for Founder consumption. Unknown stays unknown. Never infer buyer intent without evidence. Never bypass unsubscribe/DNC. Never send outbound, accept terms, move funds, confirm payment, recognize revenue, mutate production data, deploy production, or expand authority. Add focused tests. Architecture first is already satisfied by the referenced canonical contract.",
+  "allowed_paths": [
+    "empire_os/gmail_reply_adapter.py",
+    "empire_os/gmail_reply_runtime.py",
+    "empire_os/conversation_ingest.py",
+    "empire_os/conversation_os.py",
+    "empire_os/conversation_qualification.py",
+    "empire_os/conversation_timeline.py",
+    "empire_os/conversation_value.py",
+    "empire_os/closer_reply_worker.py",
+    "empire_os/closer_reply_draft.py",
+    "empire_os/reply_classifier.py",
+    "empire_os/laya_reply_specialist.py",
+    "empire_os/founder_dashboard_service.py",
+    "empire_os/founder_execution_plane_api.py",
+    "tests/"
+  ],
+  "lease_resources": [
+    "domain:conversation_os",
+    "path:empire_os/gmail_reply_adapter.py",
+    "path:empire_os/gmail_reply_runtime.py",
+    "path:empire_os/conversation_ingest.py",
+    "path:empire_os/conversation_os.py",
+    "path:empire_os/closer_reply_worker.py",
+    "path:empire_os/closer_reply_draft.py"
+  ],
+  "pytest_targets": [
+    "tests/test_gmail_reply_adapter.py",
+    "tests/test_gmail_reply_runtime.py",
+    "tests/test_conversation_ingest.py",
+    "tests/test_conversation_os.py",
+    "tests/test_conversation_qualification.py",
+    "tests/test_conversation_timeline.py",
+    "tests/test_conversation_value.py",
+    "tests/test_closer_reply_worker.py",
+    "tests/test_closer_reply_draft.py",
+    "tests/test_reply_classifier.py",
+    "tests/test_laya_reply_specialist.py"
+  ],
+  "max_runtime_seconds": 1200,
+  "created_at": "2026-09-25T11:59:00+01:00"
+}
