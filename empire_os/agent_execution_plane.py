@@ -165,6 +165,7 @@ def default_worker_registry() -> tuple[WorkerSpec, ...]:
             isolation="ephemeral_worktree_sandbox",
             mutates_repo=True,
             preferred_for=(
+                "backend_code",
                 "parallel_backend_code",
                 "frontend_code",
                 "tests",
