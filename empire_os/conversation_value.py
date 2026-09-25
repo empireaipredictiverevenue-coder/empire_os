@@ -170,7 +170,11 @@ def build_first_touch_copy(
         )
 
     reason_now = trigger["summary"] if trigger is not None else proof
-    proof_for_copy = proof or reason_now
+    proof_for_copy = (
+        reason_now
+        if trigger is not None
+        else proof
+    )
     optimised = optimise_first_touch(
         business_name=business,
         reason_now=reason_now or "",
