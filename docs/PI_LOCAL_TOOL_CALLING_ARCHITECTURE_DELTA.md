@@ -32,3 +32,17 @@ file change inside the disposable clone.
 If the local model still cannot produce real tool calls after `--jinja`, it is
 demoted to non-mutating analysis/boilerplate use and implementation work routes to
 another eligible coding lane.
+
+
+## Structured capability probe
+
+Before any mutating Pi job is allowed to execute, Empire probes
+`/v1/chat/completions` with one inert function schema and requires a real
+`message.tool_calls` structure.
+
+Textual JSON, fenced JSON, prose describing a tool call, or a zero-change result
+does not count as tool-call capability.
+
+The local llama.cpp service uses the documented `chatml` fallback template in
+addition to `--jinja`. If the structured probe still fails, the local 1.5B model
+is analysis-only and mutating work routes to another eligible builder.
