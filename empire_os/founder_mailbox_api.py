@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from time import monotonic
 from typing import Any, Protocol
 
 from fastapi import APIRouter, HTTPException, Query
@@ -62,9 +63,9 @@ class ResendMailboxProvider:
             self._get("/emails/receiving", params={"limit": limit})
         )
         hydrated: list[dict[str, Any]] = []
-        for row in rows:
+        for index, row in enumerate(rows):
             email_id = str(row.get("id") or "").strip()
-            if not email_id:
+            if not email_id or index >= 25:
                 hydrated.append(row)
                 continue
             try:
@@ -88,8 +89,13 @@ def create_founder_mailbox_router(
 ) -> APIRouter:
     source = provider or ResendMailboxProvider()
     router = APIRouter(prefix="/v1/founder-mailbox", tags=["founder-mailbox"])
+    cache: dict[int, tuple[float, dict[str, Any]]] = {}
 
     def snapshot(limit: int) -> dict[str, Any]:
+        cached = cache.get(limit)
+        now = monotonic()
+        if cached is not None and cached[0] > now:
+            return cached[1]
         try:
             sent = source.list_sent(limit=limit)
             received = source.list_received(limit=limit)
@@ -98,7 +104,9 @@ def create_founder_mailbox_router(
                 status_code=503,
                 detail=f"mailbox_provider_unavailable:{type(exc).__name__}",
             ) from exc
-        return build_mailbox(sent, received)
+        mailbox = build_mailbox(sent, received)
+        cache[limit] = (now + 10.0, mailbox)
+        return mailbox
 
     @router.get("/summary")
     def summary(limit: int = Query(default=50, ge=1, le=100)):
