@@ -34,12 +34,22 @@ echo "Node=$NODE_VERSION"
 
 echo "=== INSTALL PINNED PI ==="
 install -d -m 0755 "$PREFIX"
+install -d -m 0755 "$PREFIX/bin"
+install -m 0755 "$NODE_SOURCE" "$PREFIX/bin/node"
 install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "$STATE"
 install -d -m 0755 "$CONFIG"
 npm install   --prefix "$PREFIX"   --omit=dev   --ignore-scripts   --no-audit   --no-fund   "$PACKAGE"
 
-PI_BIN="$PREFIX/node_modules/.bin/pi"
-test -x "$PI_BIN"
+PI_LINK="$PREFIX/node_modules/.bin/pi"
+test -x "$PI_LINK"
+PI_ENTRY="$(readlink -f "$PI_LINK")"
+test -f "$PI_ENTRY"
+cat >"$PREFIX/bin/pi" <<EOF
+#!/usr/bin/env bash
+exec "$PREFIX/bin/node" "$PI_ENTRY" "\$@"
+EOF
+chmod 0755 "$PREFIX/bin/pi"
+PI_BIN="$PREFIX/bin/pi"
 "$PI_BIN" --version
 
 echo "=== DISCOVER LOCAL CODING MODEL ==="
