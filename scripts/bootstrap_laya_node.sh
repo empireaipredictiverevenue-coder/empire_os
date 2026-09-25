@@ -22,12 +22,37 @@ fi
 
 echo
 echo "=== INSTALL PINNED NODE SIDECAR ==="
-npm --prefix "${SIDE}" install --omit=dev --no-audit --no-fund --no-package-lock
+echo "Install timeout: ${LAYA_NPM_TIMEOUT:-180}s"
+set +e
+timeout --foreground "${LAYA_NPM_TIMEOUT:-180}s"   npm --prefix "${SIDE}" install     --omit=dev --no-audit --no-fund --no-package-lock     --loglevel=notice
+npm_rc=$?
+set -e
+if [[ "${npm_rc}" -eq 124 ]]; then
+  echo "SKIPPED: Laya npm install exceeded timeout; Empire continues without Laya." >&2
+  exit 3
+fi
+if [[ "${npm_rc}" -ne 0 ]]; then
+  echo "SKIPPED: Laya npm install failed rc=${npm_rc}; Empire continues without Laya." >&2
+  exit "${npm_rc}"
+fi
 
 echo
 echo "=== PRELOAD MODEL TO LOCAL CACHE ==="
+echo "Model bundle is ~1.7 GB; progress will print below."
+echo "Preload timeout: ${LAYA_PRELOAD_TIMEOUT:-1200}s"
 mkdir -p "${CACHE}"
-LAYA_CACHE="${CACHE}" LAYA_THREADS="${LAYA_THREADS:-4}" node "${SIDE}/preload.mjs"
+set +e
+LAYA_CACHE="${CACHE}" LAYA_THREADS="${LAYA_THREADS:-4}" timeout --foreground "${LAYA_PRELOAD_TIMEOUT:-1200}s"   node "${SIDE}/preload.mjs"
+preload_rc=$?
+set -e
+if [[ "${preload_rc}" -eq 124 ]]; then
+  echo "SKIPPED: Laya model preload exceeded timeout; Empire continues without Laya." >&2
+  exit 4
+fi
+if [[ "${preload_rc}" -ne 0 ]]; then
+  echo "SKIPPED: Laya model preload failed rc=${preload_rc}; Empire continues without Laya." >&2
+  exit "${preload_rc}"
+fi
 
 echo
 echo "=== COMPLETE ==="
