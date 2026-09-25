@@ -101,3 +101,15 @@ def test_pi_smoke_can_explicitly_allow_no_changes():
         require_changes=False,
     )
     assert job.require_changes is False
+
+
+def test_pi_mutation_smoke_can_disable_proposal_publish():
+    job = PiSandboxJob(
+        job_id="mutation-smoke",
+        prompt="Write a marker.",
+        allowed_paths=("tests/marker.txt",),
+        require_changes=True,
+        publish_proposal=False,
+    )
+    assert job.require_changes is True
+    assert job.publish_proposal is False
