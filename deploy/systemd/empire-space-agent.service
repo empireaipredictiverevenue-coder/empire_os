@@ -8,7 +8,7 @@ Type=simple
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/empire/space-agent/source
-ExecStart=/opt/empire/space-agent/bin/node /opt/empire/space-agent/source/space.js serve HOST=localhost PORT=3010 CUSTOMWARE_PATH=/var/lib/empire/space-agent/customware LOGIN_ALLOWED=true ALLOW_GUEST_USERS=false CLOUD_SHARE_ALLOWED=false CUSTOMWARE_GIT_HISTORY=true WORKERS=1
+ExecStart=/opt/empire/space-agent/bin/node /opt/empire/space-agent/source/space.js serve HOST=127.0.0.1 PORT=3010 CUSTOMWARE_PATH=/var/lib/empire/space-agent/customware LOGIN_ALLOWED=true ALLOW_GUEST_USERS=false CLOUD_SHARE_ALLOWED=false CUSTOMWARE_GIT_HISTORY=true WORKERS=1
 Restart=on-failure
 RestartSec=5
 StartLimitIntervalSec=60
