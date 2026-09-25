@@ -11,6 +11,8 @@ PREFIX=/opt/empire/space-agent
 SOURCE="$PREFIX/source"
 STATE=/var/lib/empire/space-agent
 CUSTOMWARE="$STATE/customware"
+AUTH_DATA="$STATE/server-data"
+SERVER_TMP="$STATE/server-tmp"
 CONFIG_DIR=/etc/empire_os
 ADMIN_ENV="$CONFIG_DIR/space-agent-admin.env"
 ADMIN_MARKER="$STATE/.admin_created"
@@ -48,6 +50,8 @@ install -d -m 0755 "$PREFIX/bin"
 install -m 0755 "$NODE_SOURCE" "$PREFIX/bin/node"
 install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "$STATE"
 install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "$CUSTOMWARE"
+install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "$AUTH_DATA"
+install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "$SERVER_TMP"
 install -d -m 0755 "$CONFIG_DIR"
 
 echo "=== PIN SPACE AGENT SOURCE ==="
@@ -58,6 +62,10 @@ fi
 git -C "$SOURCE" fetch --depth=1 origin "$REVISION"
 git -C "$SOURCE" checkout --detach "$REVISION"
 test "$(git -C "$SOURCE" rev-parse HEAD)" = "$REVISION"
+
+echo "=== RELOCATE MUTABLE SERVER STATE ==="
+rm -rf "$SOURCE/server/tmp"
+ln -s "$SERVER_TMP" "$SOURCE/server/tmp"
 
 echo "=== INSTALL DEPENDENCIES ==="
 chown -R "$TARGET_USER:$TARGET_USER" "$SOURCE"
@@ -82,7 +90,7 @@ if [[ ! -f "$ADMIN_MARKER" ]]; then
   set -a
   source "$ADMIN_ENV"
   set +a
-  sudo -u "$TARGET_USER"     "$PREFIX/bin/node" "$SOURCE/space.js" user create       "$SPACE_AGENT_ADMIN_USER"       --password "$SPACE_AGENT_ADMIN_PASSWORD"       --full-name "Empire Founder"       --groups _admin
+  sudo -u "$TARGET_USER" env     SPACE_AUTH_DATA_DIR="$AUTH_DATA"     "$PREFIX/bin/node" "$SOURCE/space.js" user create       "$SPACE_AGENT_ADMIN_USER"       --password "$SPACE_AGENT_ADMIN_PASSWORD"       --full-name "Empire Founder"       --groups _admin
   touch "$ADMIN_MARKER"
   chown "$TARGET_USER:$TARGET_USER" "$ADMIN_MARKER"
   chmod 0600 "$ADMIN_MARKER"
