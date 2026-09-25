@@ -7,6 +7,7 @@ from pathlib import Path
 import statistics
 import time
 
+from empire_os.laya_http_provider import LayaHttpTypedDecisionProvider
 from empire_os.laya_typed_decision import load_laya_provider
 from empire_os.typed_decision_provider import (
     TypedDecisionRequest,
@@ -48,14 +49,25 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cases", default=str(DEFAULT_CASES))
     parser.add_argument("--threshold", type=float, default=0.80)
+    parser.add_argument(
+        "--provider",
+        choices=("http", "python"),
+        default="http",
+    )
+    parser.add_argument("--base-url", default="http://127.0.0.1:8769")
     parser.add_argument("--model", default="convaiinnovations/laya")
     parser.add_argument("--subfolder", default=None)
     args = parser.parse_args()
 
-    provider = load_laya_provider(
-        model_key=args.model,
-        subfolder=args.subfolder,
-    )
+    if args.provider == "http":
+        provider = LayaHttpTypedDecisionProvider(
+            base_url=args.base_url,
+        )
+    else:
+        provider = load_laya_provider(
+            model_key=args.model,
+            subfolder=args.subfolder,
+        )
     rows = read_cases(Path(args.cases))
     passed = 0
     latencies = []
