@@ -124,7 +124,7 @@ export default async function FounderMailPage({
       : visible[0]?.thread_id) ?? null;
 
   const detailResult = selectedId
-    ? await getFounderMailboxThread(selectedId)
+    ? await getFounderMailboxThread(selectedId, 80)
     : null;
   const selected =
     detailResult?.ok && detailResult.data
