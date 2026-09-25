@@ -121,3 +121,17 @@ def test_authority_contract_keeps_empire_authoritative():
 def test_every_registry_entry_validates():
     for worker in default_worker_registry():
         worker.validate()
+
+
+def test_parallel_backend_routes_to_pi():
+    decision = route_execution_job(
+        ExecutionJob(
+            job_id="job-parallel",
+            capability="parallel_backend_code",
+            department="engineering",
+            authority="internal_write",
+            allowed_paths=("empire_os/example.py",),
+        )
+    )
+    assert decision.eligible is True
+    assert decision.worker_key == "pi"
