@@ -23,7 +23,6 @@ from empire_os.agent_tool_runtime import (
     pi_health,
     space_agent_health,
 )
-from empire_os.candidate_verification import verify_candidate_branch
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
 from empire_os.hermes_control import (
@@ -34,6 +33,7 @@ from empire_os.hermes_control import (
 from empire_os.pi_sandbox_runner import PiSandboxJob, run_pi_sandbox_job
 from empire_os.execution_plane_verification import (
     plan_candidate_verification,
+    verify_proposal_candidate,
 )
 from empire_os.otel_telemetry import build_resilient_telemetry_sink
 from empire_os.telemetry import (
@@ -308,37 +308,31 @@ def dispatch_execution_request(
                 max_runtime_seconds=request.max_runtime_seconds,
             ),
         )
-        candidate_verification = None
+        proposal_gate = None
         if (
             result.get("status") == "PROPOSAL_READY"
             and result.get("proposal_branch")
         ):
-            verification_tests = tuple(
-                dict.fromkeys(
-                    request.required_tests
-                    or verification_plan.pytest_targets
-                )
-            )
-            candidate_verification = verify_candidate_branch(
+            proposal_gate = verify_proposal_candidate(
                 root,
+                verification_plan,
                 proposal_branch=str(result["proposal_branch"]),
                 allowed_paths=request.allowed_paths,
-                pytest_targets=verification_tests,
             )
+
+        if proposal_gate and proposal_gate.get("awaiting_promptfoo"):
+            status = "AWAITING_PROMPTFOO"
+        elif proposal_gate and proposal_gate.get("candidate_gate_passed"):
+            status = "CANDIDATE_GATE_PASSED"
+        else:
+            status = result.get("status")
+
         return {
             **base,
-            "status": (
-                "CANDIDATE_VERIFIED"
-                if candidate_verification
-                and candidate_verification.get("passed") is True
-                else result.get("status")
-            ),
+            "status": status,
             "worker": "pi",
             "worker_result": result,
-            "candidate_verification": candidate_verification,
-            "post_merge_swarm_lanes": list(
-                verification_plan.swarm_lanes
-            ),
+            "proposal_gate": proposal_gate,
         }
 
     if worker == "empire_coder":
