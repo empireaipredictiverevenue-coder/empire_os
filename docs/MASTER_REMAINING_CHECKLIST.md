@@ -843,8 +843,8 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Control Fabric execution-plane component registration
 - [x] Execution-plane verification planning with Swarm/Promptfoo hooks
 - [x] Static bootstrap/security contract tests
-- [ ] Pull execution-plane slice to live EmpireOS server
-- [ ] Run full focused architecture/execution-plane test suite on server
+- [x] Pull execution-plane slice to live EmpireOS server
+- [x] Run full focused architecture/execution-plane test suite on server
 - [ ] Install/verify Pi runtime
 - [ ] Install/verify Agent Reach runtime
 - [ ] Install/verify Space Agent runtime
