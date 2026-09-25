@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
+import json
 from typing import Any
 
 from empire_os.coder import EmpireCoder
@@ -109,3 +110,41 @@ def enqueue_swarm_verification(
             "job_id": job.id,
         })
     return queued
+
+
+
+def enqueue_promptfoo_verification(
+    repo_root: str | Path,
+    plan: VerificationPlan,
+    *,
+    candidate_ref: str,
+) -> dict[str, Any] | None:
+    if not plan.promptfoo_required:
+        return None
+
+    root = Path(repo_root).resolve()
+    target = root / "runtime/execution_plane/promptfoo_requests"
+    target.mkdir(parents=True, exist_ok=True)
+    path = target / f"{plan.request_id}.json"
+    payload = {
+        "schema_version": "empire.execution-plane-promptfoo-request.v1",
+        "request_id": plan.request_id,
+        "candidate_ref": str(candidate_ref or "").strip(),
+        "config": plan.promptfoo_config,
+        "required": True,
+        "production_promotion_allowed": False,
+        "execution_authority": "none",
+    }
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+    return {
+        "queued": True,
+        "path": str(path),
+        "config": plan.promptfoo_config,
+        "candidate_ref": payload["candidate_ref"],
+        "execution_authority": "none",
+    }
