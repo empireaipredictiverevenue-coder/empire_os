@@ -10,6 +10,7 @@ from typing import Any, Protocol
 from fastapi import APIRouter, HTTPException, Query
 import requests
 
+from empire_os.closer_reply_draft import build_closer_reply
 from empire_os.empire_mailbox import build_mailbox, mailbox_thread
 
 
@@ -215,6 +216,65 @@ def create_founder_mailbox_router(
                 {key: value for key, value in row.items() if key != "events"}
                 for row in mailbox["threads"]
             ],
+        }
+
+
+    @router.get("/draft-preview")
+    def draft_preview(
+        thread_id: str,
+        limit: int = Query(default=80, ge=1, le=100),
+    ):
+        mailbox = snapshot(limit)
+        row = mailbox_thread(mailbox, thread_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="mail_thread_not_found")
+        if row.get("suppressed") is True:
+            raise HTTPException(status_code=409, detail="recipient_suppressed")
+
+        inbound = next(
+            (
+                event
+                for event in row.get("events") or []
+                if event.get("direction") == "inbound"
+            ),
+            None,
+        )
+        if inbound is None:
+            raise HTTPException(status_code=409, detail="inbound_reply_required")
+
+        classification = str(
+            inbound.get("classification") or ""
+        ).strip().lower()
+        if classification not in {"positive", "question", "objection"}:
+            raise HTTPException(
+                status_code=409,
+                detail="commercial_reply_not_draft_eligible",
+            )
+
+        sender_name = parseaddr(str(inbound.get("from") or ""))[0].strip()
+        draft = build_closer_reply({
+            "classification": classification,
+            "reply_body_text": inbound.get("body_text"),
+            "root_subject": row.get("subject"),
+            "contact_name": sender_name,
+        })
+        return {
+            "schema_version": "empire.mailbox_draft_preview.v1",
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "outbound_send_authority": False,
+            "thread_id": row.get("thread_id"),
+            "intent_id": row.get("intent_id"),
+            "classification": classification,
+            "draft": draft,
+            "context": {
+                "business_name": None,
+                "market": None,
+                "pricing": None,
+                "capacity": None,
+            },
+            "unknowns_preserved": True,
         }
 
     @router.get("/threads/{thread_id:path}")
