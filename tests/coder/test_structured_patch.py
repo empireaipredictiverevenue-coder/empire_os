@@ -251,3 +251,35 @@ def test_json_with_surrounding_prose_is_rejected():
     text = 'Here is the patch: {"operation":"create_file"}'
     with pytest.raises(StructuredPatchError, match="strict JSON"):
         StructuredPatchRefiner._parse(text)
+
+
+def test_invalid_synthesis_gets_one_strict_json_repair(tmp_path):
+    root = make_repo(tmp_path)
+    payload = {
+        "operation": "replace_python_symbol",
+        "target_path": "empire_os/core.py",
+        "symbol": "value",
+        "old_text": None,
+        "new_text": "def value():\n    return 2\n",
+        "rationale": "bounded repair",
+        "expected_tests": ["tests/test_core.py"],
+    }
+    provider = FakeProvider([
+        "{}",
+        "{}",
+        "bounded critique",
+        "not-json",
+        json.dumps(payload),
+    ])
+    candidate = StructuredPatchRefiner(
+        provider,
+        StructuredPatchValidator(root),
+    ).propose(
+        task_id="coder_test",
+        objective="update value",
+        context=context(),
+        route=route(),
+    )
+    assert candidate.eligible is True
+    assert candidate.proposal.symbol == "value"
+    assert len(provider.calls) == 5
