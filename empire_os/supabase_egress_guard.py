@@ -47,6 +47,11 @@ MANAGED_TIMERS = (
     "empire-outbound-governor.timer",
     "empire-department-cycle.timer",
     "empire-closer-reply-worker.timer",
+    "empire-enterprise-contact-repair.timer",
+    "empire-legacy-permit-recovery.timer",
+    "empire-ops-control.timer",
+    "empire-revenue-pulse.timer",
+    "empire-revenue-runtime-supervisor.timer",
 )
 
 
