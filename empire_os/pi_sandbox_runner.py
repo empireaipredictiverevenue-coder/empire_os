@@ -61,6 +61,7 @@ class PiSandboxJob:
     base_branch: str = DEFAULT_BRANCH
     max_runtime_seconds: int = 900
     require_changes: bool = True
+    publish_proposal: bool = True
 
     def validate(self) -> None:
         if not JOB_ID_RE.fullmatch(self.job_id):
@@ -394,6 +395,11 @@ def run_pi_sandbox_job(
         }
         if not verification_passed:
             result["status"] = "VERIFICATION_FAILED"
+            return result
+
+        if not job.publish_proposal:
+            result["status"] = "MUTATION_SMOKE_PASSED"
+            result["proposal_branch"] = None
             return result
 
         branch = f"pi/job-{job.job_id}"
