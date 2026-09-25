@@ -20,6 +20,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+      - name: Prepare CI env path
+        run: |
+          sudo mkdir -p /root/empire_os
+          sudo touch /root/empire_os/.env
+          sudo chmod 755 /root /root/empire_os
+          sudo chmod 644 /root/empire_os/.env
       - name: Verify Empire Mail backend
         run: |
           PYTHONPATH=. python -m pytest -q             tests/test_empire_mailbox.py             tests/test_founder_mailbox_api.py             tests/test_reply_classifier.py             tests/test_resend_webhook_app.py             tests/test_buyer_reply_operations_agent.py             --tb=short
