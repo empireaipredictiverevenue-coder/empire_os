@@ -1224,6 +1224,101 @@ def publish_result(
     )
 
 
+
+def publish_control_job(
+    repo_root: Path,
+    payload: Mapping[str, Any],
+    *,
+    control_branch: str = DEFAULT_CONTROL_BRANCH,
+    remote: str = DEFAULT_REMOTE,
+    runtime_root: Path | None = None,
+) -> dict[str, Any]:
+    """Publish one validated Hermes job onto the governed control branch."""
+    job = HermesJob.from_mapping(payload)
+    runtime = (
+        runtime_root
+        if runtime_root is not None
+        else repo_root / "runtime/hermes_control"
+    )
+    runtime.mkdir(parents=True, exist_ok=True)
+    result_root = Path(
+        tempfile.mkdtemp(
+            prefix="control-job-",
+            dir=runtime,
+        )
+    )
+    worktree = result_root / "worktree"
+    relative = JOB_PATH_PREFIX + f"{job.job_id}.json"
+    try:
+        _git(
+            repo_root,
+            "fetch",
+            remote,
+            f"{control_branch}:refs/remotes/{remote}/{control_branch}",
+        )
+        if control_path_exists(
+            repo_root,
+            relative,
+            control_branch=control_branch,
+            remote=remote,
+        ):
+            return {
+                "published": False,
+                "reason": "job_already_exists",
+                "job_id": job.job_id,
+                "job_path": relative,
+                "execution_authority": "none",
+            }
+        _git(
+            repo_root,
+            "worktree",
+            "add",
+            "--detach",
+            str(worktree),
+            f"{remote}/{control_branch}",
+        )
+        path = worktree / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(dict(payload), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        _git(worktree, "add", "--", relative)
+        _git(
+            worktree,
+            "-c",
+            "user.name=Empire Execution Plane",
+            "-c",
+            "user.email=execution-plane@empire-ai.co.uk",
+            "commit",
+            "-m",
+            f"Queue Hermes job: {job.job_id}",
+        )
+        _git(
+            worktree,
+            "push",
+            remote,
+            f"HEAD:refs/heads/{control_branch}",
+            timeout=180,
+        )
+        return {
+            "published": True,
+            "job_id": job.job_id,
+            "job_path": relative,
+            "execution_authority": "none",
+        }
+    finally:
+        _git(
+            repo_root,
+            "worktree",
+            "remove",
+            "--force",
+            str(worktree),
+            check=False,
+        )
+        shutil.rmtree(result_root, ignore_errors=True)
+
+
 def process_job(
     repo_root: Path,
     job_path: str,
