@@ -90,7 +90,15 @@ def _safe_env(extra: Mapping[str, str] | None = None) -> dict[str, str]:
     for key, value in os.environ.items():
         if SENSITIVE_ENV.search(key):
             continue
-        if key in {"PYTHONPATH", "VIRTUAL_ENV"}:
+        if key in {
+            "PYTHONPATH",
+            "VIRTUAL_ENV",
+            "SSH_AUTH_SOCK",
+            "SSH_AGENT_PID",
+            "GIT_ASKPASS",
+            "SSH_ASKPASS",
+            "GPG_AGENT_INFO",
+        }:
             continue
         base[key] = value
     base.update(dict(extra or {}))
