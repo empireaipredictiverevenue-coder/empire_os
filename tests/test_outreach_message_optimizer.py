@@ -58,7 +58,7 @@ def test_c_suite_first_touch_is_brief_peer_level_and_evidence_led():
     assert result["quality"]["c_suite"] is True
     assert result["quality"]["word_count"] <= 75
     assert "predictive revenue intelligence os" not in result["body"].lower()
-    assert result["body"].count("?") == 2
+    assert result["body"].count("?") == 1
     assert result["invented_claims"] is False
     assert result["sender_identity"]["ready_for_enterprise_send_review"] is True
     assert result["send_enabled"] is False
