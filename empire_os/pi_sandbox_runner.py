@@ -37,6 +37,20 @@ class PiSandboxError(RuntimeError):
     pass
 
 
+SYSTEMD_EXEC_FAILURES = {
+    218: "CAPABILITIES",
+    225: "NETWORK",
+    226: "NAMESPACE",
+    227: "NO_NEW_PRIVILEGES",
+    228: "SECCOMP",
+    244: "BPF",
+}
+
+
+def _sandbox_failure_stage(returncode: int) -> str | None:
+    return SYSTEMD_EXEC_FAILURES.get(int(returncode))
+
+
 @dataclass(frozen=True)
 class PiSandboxJob:
     job_id: str
@@ -167,7 +181,7 @@ def build_pi_systemd_command(
         "--quiet",
         "--property=NoNewPrivileges=yes",
         "--property=PrivateTmp=yes",
-        "--property=PrivateDevices=yes",
+        "--property=PrivateUsers=yes",
         "--property=ProtectSystem=strict",
         "--property=ProtectHome=yes",
         "--property=RestrictSUIDSGID=yes",
@@ -304,6 +318,9 @@ def run_pi_sandbox_job(
             raise PiSandboxError("Pi sandbox timed out") from exc
 
         result["pi_returncode"] = completed.returncode
+        result["sandbox_failure_stage"] = _sandbox_failure_stage(
+            completed.returncode
+        )
         result["pi_output_tail"] = (
             (completed.stdout or "") + "\n" + (completed.stderr or "")
         )[-4000:]
