@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from empire_os.founder_mailbox_api import create_founder_mailbox_router
+from empire_os.founder_mailbox_api import (
+    create_founder_mailbox_router,
+    read_mail_identity,
+)
 
 
 class FakeProvider:
@@ -63,3 +66,23 @@ def test_mailbox_thread_detail_contains_plain_text_timeline_without_send_authori
     assert payload["execution_authority"] == "none"
     assert len(payload["events"]) == 2
     assert payload["events"][0]["untrusted_content"] is True
+
+def test_mail_identity_reads_only_safe_keys(tmp_path, monkeypatch):
+    monkeypatch.delenv("EMPIRE_OUTBOUND_FROM", raising=False)
+    monkeypatch.delenv("EMPIRE_REPLY_TO", raising=False)
+    path = tmp_path / "outbound.env"
+    path.write_text(
+        'EMPIRE_OUTBOUND_FROM="Phil - Founder - Empire AI <phil@mail.empire-ai.co.uk>"\n'
+        'EMPIRE_REPLY_TO=reply@mail.empire-ai.co.uk\n'
+        'RESEND_API_KEY=secret-never-exposed\n',
+        encoding="utf-8",
+    )
+    identity = read_mail_identity(path)
+    assert identity == {
+        "sender": "Phil - Founder - Empire AI <phil@mail.empire-ai.co.uk>",
+        "sender_email": "phil@mail.empire-ai.co.uk",
+        "reply_to": "reply@mail.empire-ai.co.uk",
+        "observed": True,
+    }
+    assert "secret" not in str(identity).lower()
+
