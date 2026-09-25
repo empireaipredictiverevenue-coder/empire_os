@@ -61,6 +61,11 @@ class ModelSpec:
     last_reviewed: str | None = None
     media_tasks: frozenset[str] = frozenset()
 
+    # Runtime safety eligibility. These are policy facts, not model claims.
+    disallowed_tasks: frozenset[str] = frozenset()
+    allow_untrusted_input: bool = True
+    max_stakes: str = "critical"
+
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def quality_for(self, task: str) -> float:
@@ -211,6 +216,17 @@ class ModelRegistry:
                         for value in (item.get("media_tasks") or [])
                         if str(value).strip()
                     ),
+                    disallowed_tasks=frozenset(
+                        str(value).strip().lower()
+                        for value in (item.get("disallowed_tasks") or [])
+                        if str(value).strip()
+                    ),
+                    allow_untrusted_input=bool(
+                        item.get("allow_untrusted_input", True)
+                    ),
+                    max_stakes=str(
+                        item.get("max_stakes") or "critical"
+                    ).strip().lower(),
                     metadata=dict(item.get("metadata", {})),
                 )
                 models[spec.model_id] = spec
@@ -324,7 +340,10 @@ class ModelRegistry:
         required_capabilities = required_capabilities or set()
         out: list[ModelSpec] = []
 
+        normalized_task = str(task or "").strip().lower()
         for model in self.all():
+            if normalized_task in model.disallowed_tasks:
+                continue
             if require_reasoning and not model.reasoning:
                 continue
             if require_vision and not model.vision:
@@ -397,6 +416,9 @@ class ModelRegistry:
                 "last_benchmark": m.last_benchmark,
                 "last_reviewed": m.last_reviewed,
                 "media_tasks": sorted(m.media_tasks),
+                "disallowed_tasks": sorted(m.disallowed_tasks),
+                "allow_untrusted_input": m.allow_untrusted_input,
+                "max_stakes": m.max_stakes,
                 "discovered": bool(m.metadata.get("discovered")),
             }
             for m in self.all()
