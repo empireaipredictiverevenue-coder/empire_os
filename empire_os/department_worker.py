@@ -14,6 +14,10 @@ from typing import Any
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.execution_plane_dispatcher import (
+    ExecutionRequest,
+    dispatch_execution_request,
+)
 from empire_os.department_identity_adapter import (
     resolve_entity_decision_maker,
 )
@@ -142,6 +146,89 @@ def _coder_bridge(repo_root: Path, item: Any) -> dict[str, Any]:
         "external_execution_performed": False,
         "execution_authority": "none",
     }
+
+
+
+def _execution_plane_bridge(
+    repo_root: Path,
+    item: Any,
+) -> dict[str, Any]:
+    raw = (
+        item.intelligence_request.get("execution_plane")
+        if isinstance(item.intelligence_request, dict)
+        else None
+    )
+    if not isinstance(raw, dict):
+        raise ValueError(
+            "execution_plane contract required in intelligence_request"
+        )
+
+    capability = str(raw.get("capability") or "").strip()
+    objective = str(raw.get("objective") or "").strip()
+    if not capability or not objective:
+        raise ValueError(
+            "execution_plane capability and objective are required"
+        )
+
+    request = ExecutionRequest(
+        request_id=item.id,
+        capability=capability,
+        department=(
+            item.department_keys[0]
+            if item.department_keys
+            else "unowned"
+        ),
+        objective=objective,
+        authority=item.authority,
+        risk_class=str(raw.get("risk_class") or "low").strip(),
+        source_ref=f"department_work:{item.id}",
+        allowed_paths=tuple(
+            str(value).strip()
+            for value in (raw.get("allowed_paths") or [])
+            if str(value).strip()
+        ),
+        lease_resources=tuple(
+            str(value).strip()
+            for value in (raw.get("lease_resources") or [])
+            if str(value).strip()
+        ),
+        evidence_domains=tuple(
+            str(value).strip()
+            for value in (raw.get("evidence_domains") or [])
+            if str(value).strip()
+        ),
+        success_condition=(
+            str(raw.get("success_condition") or "").strip()
+            or item.success_condition
+        ),
+        required_tests=tuple(
+            str(value).strip()
+            for value in (raw.get("required_tests") or [])
+            if str(value).strip()
+        ),
+        priority=item.priority,
+        max_runtime_seconds=max(
+            60,
+            min(int(raw.get("max_runtime_seconds") or 900), 1800),
+        ),
+        traceparent=(
+            str(raw.get("traceparent") or "").strip() or None
+        ),
+        ai_behavior_change=bool(raw.get("ai_behavior_change", False)),
+    )
+    result = dispatch_execution_request(
+        repo_root,
+        request,
+        execute_pi=bool(raw.get("execute_pi", True)),
+    )
+    return {
+        "adapter": "agent_tool_execution_plane",
+        "dispatch": result,
+        "implementation_performed": False,
+        "external_execution_performed": False,
+        "execution_authority": "none",
+    }
+
 
 
 def run_one_department_work(
@@ -375,6 +462,38 @@ def run_one_department_work(
             "queue_counts": queue.counts(),
             "execution_authority": "none",
         }
+
+    if item.target_component == "agent_tool_execution_plane":
+        try:
+            result = _execution_plane_bridge(root, item)
+            dispatch = result.get("dispatch") or {}
+            done = queue.complete(
+                item,
+                result,
+                evidence_refs=(
+                    f"execution_plane_request:{item.id}",
+                    f"execution_plane_worker:{dispatch.get('worker') or 'none'}",
+                ),
+            )
+            return {
+                "ok": True,
+                "state": "DONE",
+                "work_id": done.id,
+                "target_component": done.target_component,
+                "result": done.result,
+                "queue_counts": queue.counts(),
+                "execution_authority": "none",
+            }
+        except Exception as exc:
+            failed = queue.fail(item, str(exc))
+            return {
+                "ok": False,
+                "state": "FAILED",
+                "work_id": failed.id,
+                "error": failed.error,
+                "queue_counts": queue.counts(),
+                "execution_authority": "none",
+            }
 
     if item.target_component == "empire_coder":
         try:
