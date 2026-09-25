@@ -12,8 +12,8 @@ import re
 from typing import Any
 
 
-_CHECKBOX = re.compile(r"^- [(?P<mark>[ xX])]s+(?P<item>.+?)s*$")
-_HEADING = re.compile(r"^(?P<level>#{1,6})s+(?P<title>.+?)s*$")
+_CHECKBOX = re.compile(r"^- \\[(?P<mark>[ xX])\\]\\s+(?P<item>.+?)\\s*$")
+_HEADING = re.compile(r"^(?P<level>#{1,6})\\s+(?P<title>.+?)\\s*$")
 
 
 @dataclass(frozen=True)
