@@ -216,6 +216,8 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     assert result["model"] == "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
     assert result["model_probe_attempts"] == []
     assert result["hermes_home_isolated"] is True
+    assert result["model_context_length"] == 262144
+    assert result["model_max_tokens"] == 16384
     assert "local-test-key" not in result["output_tail"]
     assert "[REDACTED]" in result["output_tail"]
 
