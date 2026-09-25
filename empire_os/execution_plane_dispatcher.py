@@ -87,6 +87,7 @@ class ExecutionRequest:
             self.authority == "internal_write"
             and self.capability in {
                 "backend_code",
+                "parallel_backend_code",
                 "frontend_code",
                 "refactor",
                 "tests",
@@ -101,6 +102,7 @@ class ExecutionRequest:
             self.authority == "internal_write"
             and self.capability in {
                 "backend_code",
+                "parallel_backend_code",
                 "frontend_code",
                 "refactor",
                 "tests",
@@ -306,6 +308,17 @@ def dispatch_execution_request(
                 pytest_targets=request.required_tests,
                 lease_resources=request.lease_resources,
                 max_runtime_seconds=request.max_runtime_seconds,
+                require_changes=(
+                    request.authority == "internal_write"
+                    and request.capability in {
+                        "backend_code",
+                        "parallel_backend_code",
+                        "frontend_code",
+                        "refactor",
+                        "tests",
+                        "documentation",
+                    }
+                ),
             ),
         )
         proposal_gate = None
