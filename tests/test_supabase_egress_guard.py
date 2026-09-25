@@ -121,3 +121,34 @@ def test_guard_does_not_contain_on_unrelated_probe_error(
     assert result["state"] == "probe_error"
     assert result["contained"] is False
     assert calls == []
+
+
+
+def test_guard_requests_the_explicit_recovery_probe_slot(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(
+        guard,
+        "STATUS_PATH",
+        tmp_path / "supabase_egress_guard.json",
+    )
+    seen = {}
+
+    def healthy(method, path, **kwargs):
+        seen["method"] = method
+        seen["path"] = path
+        seen.update(kwargs)
+        return []
+
+    result = guard.run_guard(
+        request=healthy,
+        run=lambda args, **_kwargs: _result(args, 1, "disabled\n"),
+        stagger_seconds=0,
+        sleep=lambda _value: None,
+    )
+
+    assert result["state"] == "healthy"
+    assert seen["method"] == "GET"
+    assert seen["path"] == "/rest/v1/prospects?select=id&limit=1"
+    assert seen["allow_egress_probe"] is True
