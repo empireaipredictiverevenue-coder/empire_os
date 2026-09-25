@@ -25,6 +25,9 @@ class FakeProvider:
             "text": "Can you send more?",
         }]
 
+    def list_suppressions(self, *, limit):
+        return []
+
     def get_sent(self, email_id):
         return {"text": "Original message", "message_id": "<sent@example>"}
 
