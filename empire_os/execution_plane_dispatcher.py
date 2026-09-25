@@ -18,6 +18,10 @@ from empire_os.agent_execution_plane import (
     ExecutionJob,
     route_execution_job,
 )
+from empire_os.builder_capabilities import (
+    builder_capability_ready,
+    builder_capability_snapshot,
+)
 from empire_os.agent_tool_runtime import (
     agent_reach_health,
     pi_health,
@@ -44,6 +48,14 @@ from empire_os.telemetry import (
 
 
 RUNTIME_RELATIVE = Path("runtime/execution_plane")
+MUTATING_CODE_CAPABILITIES = frozenset({
+    "backend_code",
+    "parallel_backend_code",
+    "frontend_code",
+    "refactor",
+    "tests",
+    "documentation",
+})
 
 
 @dataclass(frozen=True)
@@ -275,6 +287,42 @@ def dispatch_execution_request(
             "worker_result": published,
         }
 
+    if (
+        worker == "pi"
+        and request.authority == "internal_write"
+        and request.capability in MUTATING_CODE_CAPABILITIES
+        and not builder_capability_ready("pi", "code_mutation")
+    ):
+        if builder_capability_ready(
+            "empire_coder",
+            "structured_patch_mutation",
+        ):
+            base["runtime_fallback"] = {
+                "from": "pi",
+                "to": "empire_coder",
+                "reason": "pi_mutation_capability_not_proven",
+                "execution_authority": "none",
+            }
+            worker = "empire_coder"
+        else:
+            queued = _write_request(
+                root,
+                "builder_wait",
+                request,
+                extra={
+                    "reason": "no_mutation_capable_builder_proven",
+                    "capabilities": builder_capability_snapshot(),
+                },
+            )
+            return {
+                **base,
+                "status": "WAITING_FOR_CAPABLE_BUILDER",
+                "worker": "pi",
+                "request_path": str(queued),
+                "reason": "no_mutation_capable_builder_proven",
+                "builder_capabilities": builder_capability_snapshot(),
+            }
+
     if worker == "pi":
         health = pi_health()
         if not health.ready:
@@ -372,6 +420,10 @@ def dispatch_execution_request(
                 "budget_chars": 8000,
                 "execution_authority": "none",
                 "verification_plan": verification_plan.as_dict(),
+                "allowed_paths": list(request.allowed_paths),
+                "lease_resources": list(request.lease_resources),
+                "required_tests": list(request.required_tests),
+                "ai_behavior_change": request.ai_behavior_change,
             },
         )
         return {
