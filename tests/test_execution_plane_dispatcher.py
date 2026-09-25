@@ -103,3 +103,23 @@ def test_dispatch_exposes_promptfoo_requirement_for_ai_change(tmp_path):
     plan = result["verification_plan"]
     assert plan["promptfoo_required"] is True
     assert plan["production_promotion_allowed"] is False
+
+
+def test_pi_mutation_waits_for_proven_builder(tmp_path):
+    (tmp_path / ".git").mkdir()
+    result = dispatch_execution_request(
+        tmp_path,
+        ExecutionRequest(
+            request_id="parallel-build-wait",
+            capability="parallel_backend_code",
+            department="engineering",
+            objective="Implement bounded internal code change.",
+            authority="internal_write",
+            allowed_paths=("empire_os/example.py",),
+            lease_resources=("domain:test",),
+        ),
+    )
+    assert result["status"] == "WAITING_FOR_CAPABLE_BUILDER"
+    assert result["reason"] == "no_mutation_capable_builder_proven"
+    assert result["execution_authority"] == "none"
+    assert result["production_deploy"] is False
