@@ -12,7 +12,7 @@ from empire_os.execution_plane_dispatcher import (
 def main() -> int:
     request = ExecutionRequest(
         request_id="batch1-data-quality-source-reliability-001",
-        capability="backend_code",
+        capability="parallel_backend_code",
         department="market_opportunity",
         objective=(
             "Implement the Data Quality & Source Reliability Agent strictly from "
