@@ -13,8 +13,8 @@ def test_laya_node_sidecar_is_loopback_only_and_shadow_only():
     server = SERVER.read_text(encoding="utf-8")
     assert '"127.0.0.1"' in server
     assert '"/v1/systemone"' in server
-    assert '"shadow_only": true' in server
-    assert '"execution_authority": "none"' in server
+    assert "shadow_only: true" in server
+    assert 'execution_authority: "none"' in server
     assert ".systemOne(" in server
 
 
