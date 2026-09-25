@@ -305,7 +305,7 @@ def dispatch_execution_request(
         }
 
     if worker == "agent_reach":
-        health = agent_reach_health(probe=False)
+        health = agent_reach_health()
         queued = _write_request(
             root,
             "agent_reach",
