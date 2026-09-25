@@ -28,6 +28,11 @@ from empire_os.execution_lease import (
     ExecutionLeaseError,
     ExecutionLeaseManager,
 )
+from empire_os.execution_plane_verification import (
+    enqueue_promptfoo_verification,
+    enqueue_swarm_verification,
+    plan_candidate_verification,
+)
 
 
 
@@ -92,6 +97,7 @@ class HermesJob:
     pytest_targets: tuple[str, ...] = ()
     lease_resources: tuple[str, ...] = ()
     max_runtime_seconds: int = 900
+    ai_behavior_change: bool = False
     created_at: str | None = None
 
     @classmethod
@@ -193,6 +199,7 @@ class HermesJob:
             ) from exc
         max_runtime = max(60, min(max_runtime, 1800))
 
+        ai_behavior_change = bool(raw.get("ai_behavior_change", False))
         created_at = str(raw.get("created_at") or "").strip() or None
 
         return cls(
@@ -205,6 +212,7 @@ class HermesJob:
             pytest_targets=tuple(targets),
             lease_resources=lease_resources,
             max_runtime_seconds=max_runtime,
+            ai_behavior_change=ai_behavior_change,
             created_at=created_at,
         )
 
@@ -1440,6 +1448,32 @@ def process_job(
                     remote=remote,
                 )
                 result.update(proposal)
+                verification_plan = plan_candidate_verification(
+                    request_id=job.job_id,
+                    allowed_paths=tuple(changed),
+                    required_tests=job.pytest_targets,
+                    ai_behavior_change=job.ai_behavior_change,
+                )
+                result["independent_verification_plan"] = (
+                    verification_plan.as_dict()
+                )
+                result["independent_verification_jobs"] = (
+                    enqueue_swarm_verification(
+                        repo_root,
+                        verification_plan,
+                    )
+                )
+                result["promptfoo_verification"] = (
+                    enqueue_promptfoo_verification(
+                        repo_root,
+                        verification_plan,
+                        candidate_ref=str(
+                            proposal.get("proposal_branch")
+                            or proposal.get("proposal_commit")
+                            or job.job_id
+                        ),
+                    )
+                )
                 result["status"] = "PROPOSAL_READY"
 
     except ExecutionLeaseError as exc:
