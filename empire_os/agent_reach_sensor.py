@@ -274,6 +274,7 @@ def run_public_sensor(
         "schema_version": "empire.agent-reach-observation.v1",
         "observation": observation.as_dict(),
         "source_class": "OBSERVED_PUBLIC",
+        "truth_authority": "none",
         "requires_quality_gate": True,
         "canonical_write_performed": False,
         "outbound_action_performed": False,
