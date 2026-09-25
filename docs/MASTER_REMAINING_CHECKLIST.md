@@ -821,3 +821,39 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [ ] Live parallel non-overlapping Hermes/Pi proof
 - [ ] Live collision test proving overlapping mutation leases fail closed
 - [ ] First checklist items completed by the software factory and independently verified
+
+
+## Agent & Tool Execution Plane — Architecture-First Build
+
+- [x] Canonical architecture diagrams and execution-plane contract
+- [x] Architecture-first engineering doctrine bound to Master Architecture
+- [x] Typed worker registry for Hermes / Pi / Empire Coder / Space Agent / Agent Reach / Swarm / Needle / Laya
+- [x] Capability-based execution router
+- [x] Exclusive domain/path mutation lease manager
+- [x] Protected path lease rejection
+- [x] Hermes central lease integration
+- [x] Pi sandbox runner with disposable clone, localhost-only model access, path policy and focused tests
+- [x] Independent proposal-branch verifier
+- [x] Hermes result reconciliation into independent candidate verification
+- [x] Agent Reach bounded public sensor adapter with provenance and no truth authority
+- [x] Agent Reach pinned isolated bootstrap
+- [x] Space Agent pinned private/loopback Founder workspace bootstrap
+- [x] Space Agent hardened systemd service
+- [x] Founder execution-plane read API
+- [x] Control Fabric execution-plane component registration
+- [x] Execution-plane verification planning with Swarm/Promptfoo hooks
+- [x] Static bootstrap/security contract tests
+- [ ] Pull execution-plane slice to live EmpireOS server
+- [ ] Run full focused architecture/execution-plane test suite on server
+- [ ] Install/verify Pi runtime
+- [ ] Install/verify Agent Reach runtime
+- [ ] Install/verify Space Agent runtime
+- [ ] Verify Founder execution-plane API live
+- [ ] Run first bounded Hermes build through central mutation lease
+- [ ] Run first bounded Pi build through sandbox + independent candidate verification
+- [ ] Run first Agent Reach public observation through quality/provenance gate
+- [ ] Build first Space Agent Founder Mission Control workspace from read-only Empire APIs
+- [ ] Verify post-merge Swarm V6 QA on first execution-plane candidate
+- [ ] Verify Promptfoo gate on first AI-behavior-changing candidate
+- [ ] Record OTel/Langfuse execution-plane traces
+- [ ] Mark execution plane CONNECTED only after all live evidence exists
