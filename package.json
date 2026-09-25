@@ -1,5 +1,9 @@
 {
   "devDependencies": {
-    "supabase": "2.117.0"
+    "supabase": "2.117.0",
+    "promptfoo": "0.123.1"
+  },
+  "scripts": {
+    "eval:empire": "promptfoo eval -c evals/empire_core_policy/promptfooconfig.yaml"
   }
 }
