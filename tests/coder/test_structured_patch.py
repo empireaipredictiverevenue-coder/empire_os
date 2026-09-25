@@ -214,3 +214,40 @@ def test_orchestrator_applies_validated_structured_symbol_patch(tmp_path):
     ).read_text(encoding="utf-8")
     restored = coder.load_task(task.id)
     assert "tests/test_core.py" in restored.tests_required
+
+
+def test_fenced_json_synthesis_is_accepted(tmp_path):
+    root = make_repo(tmp_path)
+    payload = {
+        "operation": "replace_python_symbol",
+        "target_path": "empire_os/core.py",
+        "symbol": "value",
+        "old_text": None,
+        "new_text": "def value():\n    return 2\n",
+        "rationale": "bounded symbol replacement",
+        "expected_tests": ["tests/test_core.py"],
+    }
+    fenced = "```json\n" + json.dumps(payload) + "\n```"
+    provider = FakeProvider([
+        "{}",
+        "{}",
+        "bounded critique",
+        fenced,
+    ])
+    candidate = StructuredPatchRefiner(
+        provider,
+        StructuredPatchValidator(root),
+    ).propose(
+        task_id="coder_test",
+        objective="update value",
+        context=context(),
+        route=route(),
+    )
+    assert candidate.eligible is True
+    assert candidate.proposal.target_path == "empire_os/core.py"
+
+
+def test_json_with_surrounding_prose_is_rejected():
+    text = 'Here is the patch: {"operation":"create_file"}'
+    with pytest.raises(StructuredPatchError, match="strict JSON"):
+        StructuredPatchRefiner._parse(text)
