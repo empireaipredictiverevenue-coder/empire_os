@@ -6,8 +6,22 @@ import sys
 import threading
 from typing import Any
 
+from empire_os.execution_lease import (
+    ExecutionLeaseError,
+    ExecutionLeaseManager,
+)
+
 from .jobs import CoderJob, JobKind, LocalJobQueue
 from .orchestrator import EmpireCoder
+
+
+def _path_allowed(path: str, allowed: tuple[str, ...]) -> bool:
+    clean = str(path or "").strip().replace("\\", "/").lstrip("./")
+    for raw in allowed:
+        prefix = str(raw or "").strip().replace("\\", "/").lstrip("./").rstrip("/")
+        if prefix and (clean == prefix or clean.startswith(prefix + "/")):
+            return True
+    return False
 
 
 class CoderTaskWorker:
@@ -184,6 +198,32 @@ class CoderTaskWorker:
             }
 
         if job.kind is JobKind.IMPLEMENT:
+            execution_request_id = str(
+                job.payload.get("execution_plane_request_id") or ""
+            ).strip()
+            allowed_paths = tuple(
+                str(value).strip()
+                for value in (job.payload.get("allowed_paths") or ())
+                if str(value).strip()
+            )
+            lease_resources = tuple(
+                str(value).strip()
+                for value in (job.payload.get("lease_resources") or ())
+                if str(value).strip()
+            )
+            required_tests = tuple(
+                str(value).strip()
+                for value in (job.payload.get("required_tests") or ())
+                if str(value).strip()
+            )
+            if execution_request_id and (
+                not allowed_paths or not lease_resources
+            ):
+                raise ValueError(
+                    "execution-plane IMPLEMENT requires allowed_paths "
+                    "and lease_resources"
+                )
+
             candidate = self.coder.propose_structured_patch(
                 task.id,
                 (
@@ -210,42 +250,89 @@ class CoderTaskWorker:
                     ),
                 }
 
-            patch_result = self.coder.apply_structured_patch(
-                task.id,
-                candidate,
-            )
-            changed_files = (candidate.proposal.target_path,)
-            expected_tests = tuple(
-                dict.fromkeys(candidate.proposal.expected_tests)
-            )
-            impacted_tests = tuple(
-                self.coder.impacted_tests(changed_files)
-            )
-            tests = tuple(
-                dict.fromkeys(expected_tests + impacted_tests)
-            )
-            commands = (
-                (("pytest", "-q", *tests),)
-                if tests
-                else ()
-            )
-            verification = self.coder.verify(
-                task.id,
-                changed_files=changed_files,
-                commands=commands,
-            )
-            return {
-                "kind": job.kind.value,
-                "eligible": True,
-                "applied": True,
-                "target_path": candidate.proposal.target_path,
-                "operation": candidate.proposal.operation.value,
-                "patch_result": patch_result,
-                "tests": list(tests),
-                "verification": verification.as_dict(),
-                "candidate_commit_required": True,
-                "production_mutation": False,
-            }
+            if allowed_paths and not _path_allowed(
+                candidate.proposal.target_path,
+                allowed_paths,
+            ):
+                return {
+                    "kind": job.kind.value,
+                    "eligible": False,
+                    "applied": False,
+                    "validation_reasons": [
+                        "execution_plane_path_policy_failed"
+                    ],
+                    "target_path": candidate.proposal.target_path,
+                }
+
+            lease = None
+            try:
+                if lease_resources:
+                    lease = ExecutionLeaseManager().acquire(
+                        owner="empire_coder",
+                        job_id=execution_request_id or job.id,
+                        resources=lease_resources,
+                        ttl_seconds=max(
+                            300,
+                            int(job.payload.get("lease_seconds") or 1200),
+                        ),
+                    )
+
+                patch_result = self.coder.apply_structured_patch(
+                    task.id,
+                    candidate,
+                )
+                changed_files = (candidate.proposal.target_path,)
+                expected_tests = tuple(
+                    dict.fromkeys(
+                        candidate.proposal.expected_tests
+                        + required_tests
+                    )
+                )
+                impacted_tests = tuple(
+                    self.coder.impacted_tests(changed_files)
+                )
+                tests = tuple(
+                    dict.fromkeys(expected_tests + impacted_tests)
+                )
+                commands = (
+                    (("pytest", "-q", *tests),)
+                    if tests
+                    else ()
+                )
+                verification = self.coder.verify(
+                    task.id,
+                    changed_files=changed_files,
+                    commands=commands,
+                )
+                return {
+                    "kind": job.kind.value,
+                    "eligible": True,
+                    "applied": True,
+                    "target_path": candidate.proposal.target_path,
+                    "operation": candidate.proposal.operation.value,
+                    "patch_result": patch_result,
+                    "tests": list(tests),
+                    "verification": verification.as_dict(),
+                    "candidate_commit_required": True,
+                    "execution_plane_request_id": execution_request_id or None,
+                    "lease_id": lease.lease_id if lease else None,
+                    "production_mutation": False,
+                }
+            except ExecutionLeaseError as exc:
+                return {
+                    "kind": job.kind.value,
+                    "eligible": False,
+                    "applied": False,
+                    "validation_reasons": [
+                        f"execution_lease_blocked:{exc}"
+                    ],
+                }
+            finally:
+                if lease is not None:
+                    try:
+                        ExecutionLeaseManager().release(lease.lease_id)
+                    except Exception:
+                        pass
 
         if job.kind is JobKind.NEXT_COMMAND:
             proposal = self.coder.propose_next_command(
