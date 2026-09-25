@@ -113,6 +113,7 @@ def agent_reach_health(
                 "HOME": "/var/lib/empire/agent-reach/home",
                 "PATH": (
                     "/opt/empire/agent-reach/venv/bin:"
+                    "/opt/empire/pi-agent/bin:"
                     "/usr/local/bin:/usr/bin:/bin"
                 ),
             },
