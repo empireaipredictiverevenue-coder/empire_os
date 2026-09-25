@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import os
+from email.utils import parseaddr
+from pathlib import Path
 from time import monotonic
 from typing import Any, Protocol
 
@@ -9,6 +11,39 @@ from fastapi import APIRouter, HTTPException, Query
 import requests
 
 from empire_os.empire_mailbox import build_mailbox, mailbox_thread
+
+
+DEFAULT_OUTBOUND_ENV = Path("/srv/empire_os/runtime/secrets/outbound.env")
+_SAFE_IDENTITY_KEYS = {"EMPIRE_OUTBOUND_FROM", "EMPIRE_REPLY_TO"}
+
+
+def read_mail_identity(env_path: Path = DEFAULT_OUTBOUND_ENV) -> dict[str, Any]:
+    values = {
+        key: os.getenv(key, "").strip()
+        for key in _SAFE_IDENTITY_KEYS
+    }
+    if (not all(values.values())) and env_path.exists():
+        try:
+            for raw in env_path.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                if key in _SAFE_IDENTITY_KEYS and not values.get(key):
+                    values[key] = value.strip().strip('"').strip("'")
+        except OSError:
+            pass
+
+    sender = values.get("EMPIRE_OUTBOUND_FROM") or None
+    sender_email = parseaddr(sender or "")[1].strip().lower() or None
+    reply_to = values.get("EMPIRE_REPLY_TO") or None
+    return {
+        "sender": sender,
+        "sender_email": sender_email,
+        "reply_to": reply_to,
+        "observed": bool(sender and reply_to),
+    }
 
 
 class MailboxProvider(Protocol):
@@ -102,6 +137,8 @@ class ResendMailboxProvider:
 
 def create_founder_mailbox_router(
     provider: MailboxProvider | None = None,
+    *,
+    identity_env_path: Path = DEFAULT_OUTBOUND_ENV,
 ) -> APIRouter:
     source = provider or ResendMailboxProvider()
     router = APIRouter(prefix="/v1/founder-mailbox", tags=["founder-mailbox"])
@@ -122,6 +159,7 @@ def create_founder_mailbox_router(
                 detail=f"mailbox_provider_unavailable:{type(exc).__name__}",
             ) from exc
         mailbox = build_mailbox(sent, received, suppressions)
+        mailbox["identity"] = read_mail_identity(identity_env_path)
         cache[limit] = (now + 10.0, mailbox)
         return mailbox
 
@@ -134,6 +172,7 @@ def create_founder_mailbox_router(
             "read_only": True,
             "execution_authority": "none",
             "provider": mailbox["provider"],
+            "identity": mailbox["identity"],
             "summary": mailbox["summary"],
         }
 
