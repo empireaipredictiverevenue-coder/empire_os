@@ -6,6 +6,7 @@ providers:
     label: Empire local/openai-compatible eval target
     config:
       max_tokens: 300
+      pythonExecutable: /srv/empire_os/.venv/bin/python
 
 prompts:
   - "{{case_prompt}}"
