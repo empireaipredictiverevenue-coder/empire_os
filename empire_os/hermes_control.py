@@ -230,7 +230,9 @@ def _normalise_allowed_prefix(value: str) -> str:
     value = value.lstrip("/")
     if value in SAFE_EDIT_EXACT:
         return value
-    return value.rstrip("/") + "/"
+    if value.endswith("/"):
+        return value.rstrip("/") + "/"
+    return value
 
 
 def _allowed_requested_prefix(prefix: str) -> bool:
@@ -265,11 +267,12 @@ def path_is_allowed(path: str, allowed_paths: Iterable[str]) -> bool:
     path = _normalise_repo_path(path)
     if path_is_protected(path):
         return False
-    if path in SAFE_EDIT_EXACT and path in set(allowed_paths):
+    allowed = tuple(allowed_paths)
+    if path in allowed:
         return True
     return any(
         path.startswith(prefix)
-        for prefix in allowed_paths
+        for prefix in allowed
         if prefix.endswith("/")
     )
 
@@ -822,11 +825,7 @@ def _select_omniroute_model(
                 if retry_ok:
                     return model, attempts
                 if cooldown_seconds(retry_reason) is not None:
-                    raise HermesControlError(
-                        "OpenRouter free router remains in model cooldown after "
-                        "one bounded retry; skipped free-model fan-out to avoid "
-                        "extending provider cooldowns"
-                    )
+                    continue
 
     raise HermesControlError(
         "no healthy OmniRoute model candidate; "
@@ -916,15 +915,14 @@ def run_hermes(
     env["PYTHONUNBUFFERED"] = "1"
 
     base_url = str(env.get("OPENAI_BASE_URL") or "").strip()
-    # OmniRoute remains the governed provider gateway. Do not pre-probe
-    # provider models here: that duplicates routing, consumes provider quota,
-    # and can extend cooldowns. Hermes sends one governed request to the
-    # selected model; provider-level failover remains behind OmniRoute while
-    # EmpireOS owns worker-level fallback.
     model_attempts: list[dict[str, str]] = []
-    selected_model = str(
-        os.environ.get("EMPIRE_HERMES_MODEL") or "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
-    ).strip() or "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
+    if base_url:
+        selected_model, model_attempts = _select_omniroute_model(env)
+    else:
+        selected_model = str(
+            os.environ.get("EMPIRE_HERMES_MODEL")
+            or "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
+        ).strip() or "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
 
     isolated_home = _write_isolated_hermes_config(
         production_repo=production_repo,
@@ -935,11 +933,7 @@ def run_hermes(
         env["HERMES_HOME"] = str(isolated_home)
         provider = "custom"
         model = selected_model
-        endpoint_mode = (
-            "isolated_omniroute_auto"
-            if selected_model == "auto"
-            else "isolated_omniroute_pinned"
-        )
+        endpoint_mode = "isolated_omniroute_selected"
     else:
         provider = str(
             os.environ.get("EMPIRE_HERMES_PROVIDER")
@@ -1548,35 +1542,52 @@ def run_worker(
     )
 
     processed: list[dict[str, Any]] = []
+    invalid_jobs: list[dict[str, str]] = []
     skipped = 0
     for path in paths:
-        raw = read_control_json(
-            repo_root,
-            path,
-            control_branch=control_branch,
-            remote=remote,
-        )
-        job_id = str(raw.get("job_id") or "").strip()
-        if (
-            job_id
-            and control_path_exists(
+        try:
+            raw = read_control_json(
                 repo_root,
-                RESULT_PATH_PREFIX + f"{job_id}.json",
+                path,
                 control_branch=control_branch,
                 remote=remote,
             )
+            job = HermesJob.from_mapping(raw)
+        except Exception as exc:
+            invalid_jobs.append({
+                "job_path": path,
+                "reason": f"{type(exc).__name__}: {exc}"[:1000],
+            })
+            skipped += 1
+            continue
+
+        job_id = job.job_id
+        if control_path_exists(
+            repo_root,
+            RESULT_PATH_PREFIX + f"{job_id}.json",
+            control_branch=control_branch,
+            remote=remote,
         ):
             skipped += 1
             continue
-        processed.append(
-            process_job(
-                repo_root,
-                path,
-                runtime_root=runtime_root,
-                control_branch=control_branch,
-                remote=remote,
+        try:
+            processed.append(
+                process_job(
+                    repo_root,
+                    path,
+                    runtime_root=runtime_root,
+                    control_branch=control_branch,
+                    remote=remote,
+                )
             )
-        )
+        except Exception as exc:
+            processed.append({
+                "job_id": job_id,
+                "job_path": path,
+                "status": "WORKER_WRAPPER_FAILED",
+                "error": f"{type(exc).__name__}: {exc}"[:1000],
+                "execution_authority": "none",
+            })
         if len(processed) >= max(1, min(int(max_jobs), 3)):
             break
 
@@ -1588,6 +1599,8 @@ def run_worker(
         "already_completed_count": skipped,
         "processed_count": len(processed),
         "processed": processed,
+        "invalid_job_count": len(invalid_jobs),
+        "invalid_jobs": invalid_jobs,
         "external_commercial_action_performed": False,
         "git_remote_io_performed": True,
         "production_merge_performed": False,
