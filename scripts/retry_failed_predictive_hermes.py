@@ -26,8 +26,40 @@ FAILED = {
 }
 
 
-def _recovery_id(request_id: str) -> str:
-    return f"{request_id}-recovery-v1"
+def _recovery_id(request_id: str) -> tuple[str, int]:
+    for version in range(1, 10):
+        candidate = f"{request_id}-recovery-v{version}"
+        result_path = RESULT_PATH_PREFIX + f"{candidate}.json"
+        job_path = "jobs/inbox/" + f"{candidate}.json"
+
+        if control_path_exists(
+            ROOT,
+            result_path,
+            control_branch=DEFAULT_CONTROL_BRANCH,
+            remote=DEFAULT_REMOTE,
+        ):
+            result = read_control_json(
+                ROOT,
+                result_path,
+                control_branch=DEFAULT_CONTROL_BRANCH,
+                remote=DEFAULT_REMOTE,
+            )
+            status = str(result.get("status") or "").upper()
+            if status not in FAILED:
+                return candidate, version
+            continue
+
+        if control_path_exists(
+            ROOT,
+            job_path,
+            control_branch=DEFAULT_CONTROL_BRANCH,
+            remote=DEFAULT_REMOTE,
+        ):
+            continue
+
+        return candidate, version
+
+    raise RuntimeError("recovery_version_exhausted")
 
 
 def main() -> int:
@@ -57,7 +89,7 @@ def main() -> int:
         if status not in FAILED:
             continue
 
-        recovery_id = _recovery_id(request.request_id)
+        recovery_id, recovery_version = _recovery_id(request.request_id)
         recovery_result_path = (
             RESULT_PATH_PREFIX + f"{recovery_id}.json"
         )
@@ -105,6 +137,7 @@ def main() -> int:
             "max_runtime_seconds": request.max_runtime_seconds,
             "ai_behavior_change": request.ai_behavior_change,
             "recovery_of": request.request_id,
+            "recovery_version": recovery_version,
         }
         published = publish_control_job(ROOT, payload)
         rows.append({
