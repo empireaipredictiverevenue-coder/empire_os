@@ -11,8 +11,8 @@ from uuid import uuid4
 from empire_os.aider_builder import (
     AiderMutationRequest,
     run_aider_mutation,
-    resolved_aider_model,
 )
+from empire_os.aider_model_selector import select_usable_aider_model
 from empire_os.builder_capabilities import record_builder_capability
 
 
@@ -65,7 +65,14 @@ def probe_aider_mutation(
     base = Path(work_root)
     base.mkdir(parents=True, exist_ok=True)
     clone = base / f"probe-{uuid4().hex}"
-    selected_model = resolved_aider_model(model)
+    selection = select_usable_aider_model(
+        preferred=model,
+        timeout_seconds=20,
+        max_candidates=6,
+    )
+    selected_model = str(
+        selection.get("selected") or model or "openai/auto"
+    )
     result = AiderProbeResult(
         False,
         "probe_not_completed",
@@ -74,6 +81,32 @@ def probe_aider_mutation(
         False,
         (),
     )
+
+    if not selection.get("selected"):
+        result = AiderProbeResult(
+            False,
+            str(selection.get("reason") or "no_usable_model"),
+            selected_model,
+            "MODEL_UNAVAILABLE",
+            False,
+            (),
+            output_tail=str(selection.get("attempts") or "")[-4000:] or None,
+        )
+        record_builder_capability(
+            "empire_coder",
+            "aider_mutation",
+            ready=False,
+            reason=result.reason,
+            model=result.model,
+            evidence={
+                "status": result.status,
+                "model_selection": selection,
+                "production_mutation": False,
+                "production_push": False,
+                "model_selection": selection,
+            },
+        )
+        return result
 
     try:
         cloned = _run(
