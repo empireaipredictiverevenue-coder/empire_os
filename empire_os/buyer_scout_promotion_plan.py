@@ -47,6 +47,16 @@ def _primary_person(site_evidence: Mapping[str, Any]) -> dict[str, Any] | None:
     return person
 
 
+def _person_source(person: Mapping[str, Any] | None) -> str | None:
+    if not person:
+        return None
+    for key in ("source", "identity_source"):
+        value = str(person.get(key) or "").strip()
+        if value:
+            return value
+    return "first_party_site"
+
+
 def build_promotion_plan(
     candidates: Iterable[Mapping[str, Any]],
 ) -> dict[str, Any]:
@@ -132,10 +142,7 @@ def build_promotion_plan(
                 str(person.get("title") or "").strip()
                 if person else None
             ),
-            "contact_source": (
-                "first_party_site"
-                if person else None
-            ),
+            "contact_source": _person_source(person),
         }
 
         proposals.append({
