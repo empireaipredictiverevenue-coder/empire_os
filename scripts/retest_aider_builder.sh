@@ -7,25 +7,42 @@ echo "HEAD=$(git rev-parse --short HEAD)"
 
 echo
 echo "=== STATIC TESTS ==="
-PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q   tests/test_aider_builder.py   tests/test_aider_capability_probe.py   tests/test_aider_execution_failover.py   tests/test_empire_coder_sandbox_runner.py   tests/test_execution_plane_dispatcher.py   --tb=short
+PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
+  tests/test_aider_builder.py \
+  tests/test_aider_model_selector.py \
+  tests/test_aider_capability_probe.py \
+  tests/test_aider_execution_failover.py \
+  tests/test_aider_sandbox_regression.py \
+  tests/test_empire_coder_sandbox_runner.py \
+  tests/test_execution_plane_dispatcher.py \
+  --tb=short
 TEST_RC=$?
 echo "TEST_RC=$TEST_RC"
 
 echo
 echo "=== COMPILE ==="
-./.venv/bin/python -m py_compile   empire_os/aider_builder.py   empire_os/aider_capability_probe.py   empire_os/empire_coder_sandbox_runner.py   empire_os/execution_plane_dispatcher.py   scripts/diagnose_aider_gateway.py   scripts/aider_capability_probe.py
+./.venv/bin/python -m py_compile \
+  empire_os/aider_builder.py \
+  empire_os/aider_model_selector.py \
+  empire_os/aider_capability_probe.py \
+  empire_os/empire_coder_sandbox_runner.py \
+  empire_os/execution_plane_dispatcher.py \
+  scripts/diagnose_aider_gateway.py \
+  scripts/aider_capability_probe.py
 COMPILE_RC=$?
 echo "COMPILE_RC=$COMPILE_RC"
 
 echo
 echo "=== AIDER / OMNIROUTE DIAGNOSTIC ==="
-PYTHONPATH=/srv/empire_os   ./.venv/bin/python scripts/diagnose_aider_gateway.py
+PYTHONPATH=/srv/empire_os \
+  ./.venv/bin/python scripts/diagnose_aider_gateway.py
 DIAG_RC=$?
 echo "DIAG_RC=$DIAG_RC"
 
 echo
 echo "=== MUTATION PROBE ==="
-PYTHONPATH=/srv/empire_os   ./.venv/bin/python scripts/aider_capability_probe.py
+PYTHONPATH=/srv/empire_os \
+  ./.venv/bin/python scripts/aider_capability_probe.py
 PROBE_RC=$?
 echo "PROBE_RC=$PROBE_RC"
 
@@ -43,10 +60,11 @@ row = (
     ((data.get("workers") or {}).get("empire_coder") or {})
     .get("aider_mutation")
 )
-print(json.dumps(row or {
-    "ready": False,
-    "reason": "missing",
-}, indent=2, sort_keys=True))
+print(json.dumps(
+    row or {"ready": False, "reason": "missing"},
+    indent=2,
+    sort_keys=True,
+))
 PY
 
 echo
