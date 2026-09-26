@@ -18,6 +18,7 @@ from typing import Any, Mapping
 from empire_os.aider_builder import (
     AiderMutationRequest,
     run_aider_mutation,
+    resolved_aider_model,
 )
 from empire_os.builder_capabilities import builder_capability_ready
 from empire_os.coder import EmpireCoder
@@ -108,8 +109,13 @@ def _changed_paths(clone: Path) -> list[str]:
         value = line[3:].strip()
         if " -> " in value:
             value = value.split(" -> ", 1)[1]
-        if value and not value.startswith("runtime/"):
-            changed.append(value)
+        if not value:
+            continue
+        if value.startswith("runtime/"):
+            continue
+        if value.startswith(".aider.tags.cache."):
+            continue
+        changed.append(value)
     return sorted(dict.fromkeys(changed))
 
 
@@ -228,13 +234,7 @@ def run_empire_coder_sandbox_job(
                     AiderMutationRequest(
                         objective=job.objective,
                         allowed_paths=job.allowed_paths,
-                        model=(
-                            str(
-                                os.getenv("EMPIRE_AIDER_MODEL")
-                                or "openai/auto"
-                            ).strip()
-                            or "openai/auto"
-                        ),
+                        model=resolved_aider_model(),
                         max_runtime_seconds=job.max_runtime_seconds,
                     ),
                 )
@@ -346,11 +346,16 @@ def run_empire_coder_sandbox_job(
             return result
         if not changed:
             result["status"] = "NO_IMPLEMENTATION"
-            result["reason"] = "structured_patch_made_no_repository_change"
+            result["reason"] = "mutation_backend_made_no_repository_change"
             return result
 
+        expected_tests = (
+            tuple(proposal.expected_tests)
+            if proposal is not None
+            else ()
+        )
         tests = tuple(dict.fromkeys(
-            tuple(proposal.expected_tests) + tuple(job.pytest_targets)
+            expected_tests + tuple(job.pytest_targets)
         ))
         checks: list[dict[str, Any]] = []
         if tests:
