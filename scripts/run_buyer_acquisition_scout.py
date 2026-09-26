@@ -93,12 +93,34 @@ def _canonical_seed_records(
 
         params = urllib.parse.urlencode(query_params)
         try:
-            batch = request_json(
+            batch = request(
                 "GET",
                 f"/rest/v1/prospects?{params}",
             ) or []
-        except Exception:
+            if diagnostics is not None:
+                diagnostics.append({
+                    "opportunity_key": opportunity_key,
+                    "niche": niche,
+                    "territory": territory or None,
+                    "state": "OK",
+                    "row_count": (
+                        len(batch) if isinstance(batch, list) else 0
+                    ),
+                    "error": None,
+                })
+        except Exception as exc:
             batch = []
+            if diagnostics is not None:
+                diagnostics.append({
+                    "opportunity_key": opportunity_key,
+                    "niche": niche,
+                    "territory": territory or None,
+                    "state": "ERROR",
+                    "row_count": 0,
+                    "error": (
+                        f"{type(exc).__name__}:{str(exc)[:240]}"
+                    ),
+                })
 
         for raw in batch:
             if not isinstance(raw, dict):
@@ -160,6 +182,8 @@ def _opportunity_validation_seed_records(
     plan: dict,
     *,
     per_target: int = 6,
+    request=request_json,
+    diagnostics: list[dict] | None = None,
 ) -> list[dict]:
     """Recover real canonical prospects for opportunity validation fallback.
 
@@ -256,11 +280,14 @@ def main() -> int:
     args = parser.parse_args()
 
     plan = _load_buyer_plan(args.repo_root)
+    opportunity_seed_diagnostics: list[dict] = []
+    opportunity_seeds = _opportunity_validation_seed_records(
+        plan,
+        per_target=6,
+        diagnostics=opportunity_seed_diagnostics,
+    )
     canonical_seeds = [
-        *_opportunity_validation_seed_records(
-            plan,
-            per_target=6,
-        ),
+        *opportunity_seeds,
         *_canonical_seed_records(per_lane=8),
     ]
 
@@ -283,6 +310,14 @@ def main() -> int:
         "canonical_seed_fallback_used": payload[
             "canonical_seed_fallback_used"
         ],
+        "opportunity_seed_count": len(opportunity_seeds),
+        "opportunity_seed_query_error_count": sum(
+            row.get("state") == "ERROR"
+            for row in opportunity_seed_diagnostics
+        ),
+        "opportunity_seed_query_diagnostics": (
+            opportunity_seed_diagnostics
+        ),
         "candidate_count": payload["candidate_count"],
         "predictive_revenue_enterprise_candidate_count": payload[
             "predictive_revenue_enterprise_candidate_count"
