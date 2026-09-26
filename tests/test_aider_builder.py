@@ -208,6 +208,12 @@ def test_aider_run_reports_bounded_edit(
     )
     assert result["status"] == "EDITED"
     assert result["changed_paths"] == ["empire_os/example.py"]
+    assert (
+        tmp_path / ".git/empire-aider-config.yml"
+    ).read_text(encoding="utf-8") == "{}\n"
+    assert (
+        tmp_path / ".git/empire-aider.env"
+    ).read_text(encoding="utf-8") == ""
     assert result["production_deploy"] is False
     assert result["execution_authority"] == "none"
 
