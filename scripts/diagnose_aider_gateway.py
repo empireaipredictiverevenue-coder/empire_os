@@ -14,6 +14,7 @@ from empire_os.aider_builder import (
     _sanitize_output,
     aider_health,
     build_aider_command,
+    resolved_aider_model,
 )
 
 
@@ -29,14 +30,23 @@ def main() -> int:
         "provider_base_present": bool(base),
         "provider_key_present": bool(key),
         "provider_key_printed": False,
+        "direct_model": str(
+            provider.get("EMPIRE_HERMES_MODEL") or "auto"
+        ),
+        "aider_model": resolved_aider_model(),
     }, indent=2, sort_keys=True))
 
     if not base or not key:
         print("DIAG=PROVIDER_CONFIG_MISSING")
         return 2
 
+    direct_model = str(
+        provider.get("EMPIRE_HERMES_MODEL") or "auto"
+    ).strip() or "auto"
+    aider_model = resolved_aider_model()
+
     payload = json.dumps({
-        "model": "auto",
+        "model": direct_model,
         "messages": [
             {
                 "role": "user",
@@ -135,7 +145,7 @@ def main() -> int:
                     "This is a connectivity diagnostic only."
                 ),
                 allowed_paths=("empire_os/aider_builder.py",),
-                model="openai/auto",
+                model=aider_model,
                 max_runtime_seconds=120,
             ),
             executable=binary,
