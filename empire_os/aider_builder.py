@@ -23,6 +23,7 @@ KNOWN_EXECUTABLES = (
     "/usr/local/bin/aider",
     "/home/ubuntu/.local/bin/aider",
 )
+OMNIROUTE_ENV_PATH = Path("/etc/empire_os/omniroute-hermes.env")
 
 
 @dataclass(frozen=True)
@@ -136,10 +137,33 @@ def aider_health() -> dict[str, Any]:
     }
 
 
+def _protected_omniroute_env(
+    path: Path = OMNIROUTE_ENV_PATH,
+) -> dict[str, str]:
+    allowed = {"OPENAI_BASE_URL", "OPENAI_API_KEY"}
+    values: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return values
+    for line in lines:
+        raw = line.strip()
+        if not raw or raw.startswith("#") or "=" not in raw:
+            continue
+        key, value = raw.split("=", 1)
+        key = key.strip()
+        if key in allowed and value.strip():
+            values[key] = value.strip().strip('"').strip("'")
+    return values
+
+
 def _provider_environment(
     source: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     current = dict(source or os.environ)
+    protected = _protected_omniroute_env()
+    for key, value in protected.items():
+        current.setdefault(key, value)
     base = str(
         current.get("EMPIRE_AIDER_OPENAI_API_BASE")
         or current.get("AIDER_OPENAI_API_BASE")
