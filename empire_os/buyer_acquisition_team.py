@@ -1015,6 +1015,142 @@ def build_buyer_acquisition_plan(
     }
 
 
+COMMERCIAL_VALIDATION_BLOCKERS = {
+    "buyer_intent_normalized_score_required",
+    "demand_normalized_score_required",
+}
+
+
+def build_opportunity_validation_targets(
+    radar: Mapping[str, Any],
+    intake: Mapping[str, Any],
+    routes: Mapping[str, Any],
+    *,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Turn qualified Predictive Cloud opportunities into buyer-research targets.
+
+    These targets collect evidence needed to validate buyer intent/demand. They
+    do not create commercial intent, authorize outbound, or mark an opportunity
+    Factory-ready.
+    """
+    candidates = {
+        _text(row.get("opportunity_key")): row
+        for row in (radar.get("candidates") or [])
+        if isinstance(row, Mapping)
+        and _text(row.get("opportunity_key"))
+    }
+    route_items = {
+        _text(row.get("opportunity_key")): row
+        for row in (routes.get("items") or [])
+        if isinstance(row, Mapping)
+        and _text(row.get("opportunity_key"))
+    }
+
+    targets: list[dict[str, Any]] = []
+    for intake_row in (intake.get("items") or []):
+        if not isinstance(intake_row, Mapping):
+            continue
+        key = _text(intake_row.get("opportunity_key"))
+        if not key:
+            continue
+        candidate = candidates.get(key) or {}
+        route_item = route_items.get(key) or {}
+        lifecycle = route_item.get("lifecycle")
+        lifecycle = lifecycle if isinstance(lifecycle, Mapping) else {}
+        if lifecycle.get("current_stage") != "QUALIFY":
+            continue
+
+        blockers = {
+            _text(value)
+            for value in (intake_row.get("blockers") or [])
+            if _text(value)
+        }
+        commercial_blockers = sorted(
+            blockers & COMMERCIAL_VALIDATION_BLOCKERS
+        )
+        if not commercial_blockers:
+            continue
+
+        niche = _text(candidate.get("niche") or intake_row.get("niche"))
+        territory = _text(candidate.get("metro"))
+        if not niche:
+            continue
+
+        raw_priority = candidate.get("observed_priority_score")
+        try:
+            observed_priority = int(round(float(raw_priority)))
+        except (TypeError, ValueError):
+            observed_priority = 50
+        observed_priority = max(0, min(100, observed_priority))
+
+        slug_niche = re.sub(r"[^a-z0-9]+", "_", niche.casefold()).strip("_")
+        slug_territory = re.sub(
+            r"[^a-z0-9]+", "_", territory.casefold()
+        ).strip("_") or "global"
+
+        normalization = intake_row.get("normalization")
+        normalization = (
+            normalization if isinstance(normalization, Mapping) else {}
+        )
+        targets.append({
+            "corridor_key": (
+                f"opportunity-validation:v1:{slug_niche}:{slug_territory}"
+            ),
+            "opportunity_key": key,
+            "opportunity_class": _text(
+                candidate.get("opportunity_class")
+            ) or None,
+            "niche_family": niche,
+            "territory": territory or None,
+            "product_code": (
+                _text(intake_row.get("offer_key")) or None
+            ),
+            "qualified_inventory_count": 0,
+            "verified_supply_observation_count": 0,
+            "overflow_count": 0,
+            "allocation_candidate_count": 0,
+            "active_remaining_capacity": 0,
+            "blocked_seat_count": 0,
+            "priority_score": 15000 + observed_priority,
+            "buyer_hunt_required": True,
+            "acquisition_should_continue": True,
+            "research_queries": buyer_research_queries(
+                niche_family=niche,
+                territory=territory,
+            ),
+            "preferred_buyer_types": list(TARGET_BUYER_TYPES),
+            "source": "predictive_cloud_opportunity_validation",
+            "lifecycle_stage": "QUALIFY",
+            "next_lifecycle_stage": lifecycle.get("next_stage"),
+            "commercial_validation_blockers": commercial_blockers,
+            "evidence_count": int(
+                intake_row.get("evidence_count") or 0
+            ),
+            "normalized_score_count": int(
+                normalization.get("normalized_score_count") or 0
+            ),
+            "required_commercial_observations": [
+                "genuine_commercial_reply",
+                "verified_commercial_terms",
+                "verified_payment",
+            ],
+            "buyer_intent_inferred": False,
+            "demand_inferred": False,
+            "commercial_ready_claimed": False,
+            "live_outbound_send": False,
+            "execution_authority": "none",
+        })
+
+    targets.sort(
+        key=lambda row: (
+            -int(row["priority_score"]),
+            str(row["opportunity_key"]),
+        )
+    )
+    return targets[:max(1, min(int(limit), 20))]
+
+
 def _read_runtime_snapshot(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     try:
         raw = path.read_text(encoding="utf-8")
@@ -1074,6 +1210,39 @@ def refresh_buyer_acquisition_plan(
         exchange,
         catalog_snapshot=catalog,
     )
+
+    opportunity_radar, opportunity_radar_health = _read_runtime_snapshot(
+        root / "runtime/opportunity_radar/latest.json"
+    )
+    opportunity_intake, opportunity_intake_health = _read_runtime_snapshot(
+        root / "runtime/opportunity_factory/intake_latest.json"
+    )
+    opportunity_routes, opportunity_routes_health = _read_runtime_snapshot(
+        root / "runtime/opportunity_factory/evidence_routes_latest.json"
+    )
+    opportunity_validation_targets = build_opportunity_validation_targets(
+        opportunity_radar,
+        opportunity_intake,
+        opportunity_routes,
+        limit=5,
+    )
+    if opportunity_validation_targets:
+        payload["priority_targets"] = [
+            *opportunity_validation_targets,
+            *list(payload.get("priority_targets") or []),
+        ]
+    payload["opportunity_validation"] = {
+        "status": (
+            "ACTIVE" if opportunity_validation_targets else "NO_QUALIFIED_TARGETS"
+        ),
+        "target_count": len(opportunity_validation_targets),
+        "targets": opportunity_validation_targets,
+        "commercial_validation_required": True,
+        "buyer_intent_inferred": False,
+        "demand_inferred": False,
+        "live_outbound_send": False,
+        "execution_authority": "none",
+    }
 
     permit_inventory, permit_inventory_health = _read_runtime_snapshot(
         root / "runtime/recovery/legacy_permit_inventory_summary.json"
@@ -1239,6 +1408,9 @@ def refresh_buyer_acquisition_plan(
             enterprise_contacts_health
         ),
         "permit_inventory": permit_inventory_health,
+        "opportunity_radar": opportunity_radar_health,
+        "opportunity_factory_intake": opportunity_intake_health,
+        "opportunity_evidence_routes": opportunity_routes_health,
         "degraded": (
             exchange_health["state"] != "OK"
             or catalog_health["state"] != "OK"
