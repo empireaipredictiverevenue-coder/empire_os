@@ -43,6 +43,18 @@ def test_aider_probe_records_exact_bounded_mutation(
 
     recorded = {}
 
+    monkeypatch.setattr(
+        probe_module,
+        "select_usable_aider_model",
+        lambda **kwargs: {
+            "selected": "openai/openrouter/test-coder:free",
+            "selected_direct_model": "openrouter/test-coder:free",
+            "attempts": [],
+            "catalog_observed": False,
+            "reason": "usable_model_selected",
+            "execution_authority": "none",
+        },
+    )
     monkeypatch.setattr(probe_module, "_run", fake_run)
     monkeypatch.setattr(
         probe_module,
@@ -108,6 +120,18 @@ def test_aider_probe_fails_when_extra_path_changes(
         }
 
     recorded = {}
+    monkeypatch.setattr(
+        probe_module,
+        "select_usable_aider_model",
+        lambda **kwargs: {
+            "selected": "openai/openrouter/test-coder:free",
+            "selected_direct_model": "openrouter/test-coder:free",
+            "attempts": [],
+            "catalog_observed": False,
+            "reason": "usable_model_selected",
+            "execution_authority": "none",
+        },
+    )
     monkeypatch.setattr(probe_module, "_run", fake_run)
     monkeypatch.setattr(
         probe_module,
