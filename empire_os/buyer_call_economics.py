@@ -12,6 +12,14 @@ from typing import Any, Mapping
 SCHEMA_VERSION = "empire.buyer_call_economics.v1"
 
 
+def _positive_number(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and value > 0
+
+
+def _non_negative_number(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and value >= 0
+
+
 def build_call_economics(
     *,
     buyer_name: str,
@@ -33,6 +41,10 @@ def build_call_economics(
     buyer = str(buyer_name or "").strip()
     ref = str(program_ref or "").strip()
     svc = str(service or "").strip()
+    geo = str(geography or "").strip() or None
+    currency = str(payout_currency or "").strip().upper() or None
+    traffic = str(traffic_source or "").strip() or None
+    routing = str(routing_mode or "").strip() or None
 
     if not buyer:
         raise ValueError("buyer_name is required")
@@ -43,19 +55,37 @@ def build_call_economics(
 
     blockers: list[str] = []
 
-    if not geography:
+    if not geo:
         blockers.append("geography_unverified")
-    if payout_amount is None or not payout_currency:
+
+    payout_verified = _positive_number(payout_amount) and bool(currency)
+    if payout_amount is None or not currency:
         blockers.append("payout_unverified")
+    elif not _positive_number(payout_amount):
+        blockers.append("payout_invalid")
+
+    qualification_verified = _positive_number(qualification_seconds)
     if qualification_seconds is None:
         blockers.append("qualification_rule_unverified")
+    elif not qualification_verified:
+        blockers.append("qualification_rule_invalid")
+
+    capacity_verified = (
+        not isinstance(daily_cap, bool)
+        and isinstance(daily_cap, int)
+        and daily_cap > 0
+    )
     if daily_cap is None:
         blockers.append("capacity_unverified")
-    if not traffic_source:
+    elif not capacity_verified:
+        blockers.append("capacity_invalid")
+
+    if not traffic:
         blockers.append("traffic_source_unverified")
     if traffic_source_approved is not True:
         blockers.append("traffic_source_not_approved")
-    if not routing_mode:
+
+    if not routing:
         blockers.append("routing_mode_unverified")
     if routing_verified is not True:
         blockers.append("routing_not_verified")
@@ -64,36 +94,48 @@ def build_call_economics(
     if buyer_asset_approved is not True:
         blockers.append("buyer_asset_not_approved")
 
+    acquisition_cost_valid = (
+        estimated_cost_per_call is None
+        or _non_negative_number(estimated_cost_per_call)
+    )
+    if not acquisition_cost_valid:
+        blockers.append("acquisition_cost_invalid")
+
     margin = None
-    if payout_amount is not None and estimated_cost_per_call is not None:
-        margin = round(payout_amount - estimated_cost_per_call, 2)
+    if (
+        payout_verified
+        and estimated_cost_per_call is not None
+        and acquisition_cost_valid
+    ):
+        margin = round(float(payout_amount) - float(estimated_cost_per_call), 2)
 
     return {
         "schema_version": SCHEMA_VERSION,
         "buyer_name": buyer,
         "program_ref": ref,
         "service": svc,
-        "geography": geography,
+        "geography": geo,
         "payout": {
             "amount": payout_amount,
-            "currency": payout_currency,
-            "verified": payout_amount is not None and bool(payout_currency),
+            "currency": currency,
+            "verified": payout_verified,
         },
         "qualification": {
             "connected_call_seconds": qualification_seconds,
-            "verified": qualification_seconds is not None,
+            "verified": qualification_verified,
         },
         "capacity": {
             "daily_cap": daily_cap,
-            "verified": daily_cap is not None,
+            "verified": capacity_verified,
         },
         "acquisition": {
-            "traffic_source": traffic_source,
+            "traffic_source": traffic,
             "buyer_approved": traffic_source_approved is True,
             "estimated_cost_per_call": estimated_cost_per_call,
+            "cost_valid": acquisition_cost_valid,
         },
         "routing": {
-            "mode": routing_mode,
+            "mode": routing,
             "verified": routing_verified is True,
         },
         "tracking": {
