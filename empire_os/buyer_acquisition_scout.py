@@ -290,7 +290,13 @@ def run_buyer_scout(
             if not host:
                 continue
             profile_key = str(row.get("icp_profile_key") or "").strip()
-            if profile_key not in CONTINUOUS_COMMERCIAL_LANE_BY_ICP:
+            opportunity_key = str(
+                row.get("seed_opportunity_key") or ""
+            ).strip()
+            if (
+                profile_key not in CONTINUOUS_COMMERCIAL_LANE_BY_ICP
+                and not opportunity_key
+            ):
                 continue
             canonical_seed_by_domain[host] = row
             seed_pools = [
@@ -306,10 +312,15 @@ def run_buyer_scout(
                     "source": "canonical_prospect_seed",
                     "query": None,
                     "buyer_pool": seed_pool,
-                    "target_kind": "canonical_seed",
+                    "target_kind": (
+                        "opportunity_seed"
+                        if opportunity_key
+                        else "canonical_seed"
+                    ),
                     "corridor_key": row.get("seed_corridor_key"),
+                    "opportunity_key": opportunity_key or None,
                     "product_code": row.get("seed_product_code"),
-                    "icp_profile_key": profile_key,
+                    "icp_profile_key": profile_key or None,
                     "buying_triggers": [],
                     "decision_maker_roles": [],
                     "prospect_id": row.get("id"),
