@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EmpireOS bounded GTM pipeline every five minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=empire-gtm-pipeline.service
+
+[Install]
+WantedBy=timers.target

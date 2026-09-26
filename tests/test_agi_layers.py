@@ -131,7 +131,7 @@ class TestAgiWrapper:
         assert w.name == "test-agent"
         assert w.metrics["cycles"] == 0
 
-    def test_tick_runs_all_three_layers(self):
+    def test_tick_uses_real_outcomes_without_synthetic_augmentation(self):
         base = MagicMock()
         base.llm = MagicMock()
         # Base tick returns a result
@@ -150,7 +150,8 @@ class TestAgiWrapper:
         w = AgiWrapper("test", base)
         result = w.tick()
         assert result["cycle"] == 1
-        assert result["synthetic_examples"] >= 0
+        assert result["synthetic_examples"] == 0
+        assert result["metrics"]["synthetic_generated"] == 0
         # Cycle 1 — not yet ASI reflection (every 5 cycles)
         assert result["asi_strategies"] == []
 

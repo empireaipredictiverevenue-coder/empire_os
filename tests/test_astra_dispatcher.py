@@ -1,0 +1,233 @@
+from empire_os.astra_dispatcher import choose_jobs
+
+
+def test_choose_jobs_drives_internal_launch_pipeline():
+    loop = {
+        "loop_complete": False,
+        "stages": [
+            {"stage": "recognized_revenue", "observed": False},
+            {"stage": "buyer_conversation", "observed": False},
+            {"stage": "commercial_terms", "observed": False},
+        ],
+    }
+    source = {"end_to_end_healthy": True}
+    assert choose_jobs(loop, source) == [
+        "commercial_terms_materializer",
+        "conversion_intelligence_refresh",
+        "commercial_loop_refresh",
+        "astra_executive_refresh",
+        "astra_department_dispatch",
+    ]
+
+
+def test_choose_jobs_adds_source_repair_but_no_duplicate_jobs():
+    loop = {
+        "loop_complete": False,
+        "stages": [
+            {"stage": "recognized_revenue", "observed": False},
+            {"stage": "buyer_conversation", "observed": True},
+            {"stage": "commercial_terms", "observed": False},
+        ],
+    }
+    source = {"end_to_end_healthy": False}
+    assert choose_jobs(loop, source) == [
+        "commercial_terms_materializer",
+        "conversion_intelligence_refresh",
+        "commercial_loop_refresh",
+        "astra_executive_refresh",
+        "astra_department_dispatch",
+    ]
+
+
+def test_complete_commercial_loop_keeps_discovering_next_opportunity():
+    assert choose_jobs(
+        {"loop_complete": True, "stages": []},
+        {"end_to_end_healthy": True},
+    ) == [
+        "astra_executive_refresh",
+        "astra_department_dispatch",
+    ]
+
+
+def test_deferred_enrichment_is_owned_by_dedicated_timer_not_astra():
+    loop = {
+        "loop_complete": False,
+        "stages": [
+            {"stage": "recognized_revenue", "observed": False},
+            {"stage": "buyer_conversation", "observed": False},
+            {"stage": "commercial_terms", "observed": False},
+        ],
+    }
+    source = {"end_to_end_healthy": True}
+    review = {"deferred_enrichment": 4}
+    jobs = choose_jobs(loop, source, review)
+    assert "buyer_deferred_enrichment" not in jobs
+    assert jobs[0] == "commercial_terms_materializer"
+    assert jobs[-2:] == [
+        "astra_executive_refresh",
+        "astra_department_dispatch",
+    ]
+    for timer_owned in (
+        "source_health_refresh",
+        "buyer_review_materializer",
+        "gtm_pipeline",
+        "closer_reply_handoff",
+        "commercial_product_catalog_refresh",
+        "commercial_evidence_auto_verifier",
+        "revenue_pulse_refresh",
+        "opportunity_loop_refresh",
+    ):
+        assert timer_owned not in jobs
+
+
+def test_choose_jobs_does_not_duplicate_timer_owned_workers():
+    jobs = choose_jobs(
+        {
+            "loop_complete": False,
+            "stages": [
+                {"stage": "recognized_revenue", "observed": False},
+                {"stage": "buyer_conversation", "observed": False},
+                {"stage": "commercial_terms", "observed": False},
+            ],
+        },
+        {"end_to_end_healthy": False},
+    )
+    timer_owned = {
+        "source_health_refresh",
+        "buyer_review_materializer",
+        "gtm_pipeline",
+        "closer_reply_handoff",
+        "commercial_product_catalog_refresh",
+        "commercial_evidence_auto_verifier",
+        "revenue_pulse_refresh",
+        "opportunity_loop_refresh",
+    }
+    assert timer_owned.isdisjoint(jobs)
+
+
+def test_dispatch_timeout_does_not_crash_conveyor(monkeypatch, tmp_path):
+    import subprocess
+    import empire_os.astra_dispatcher as module
+
+    monkeypatch.setattr(module, "LOOP", tmp_path / "loop.json")
+    monkeypatch.setattr(module, "SOURCE", tmp_path / "source.json")
+    monkeypatch.setattr(module, "BUYER_REVIEW", tmp_path / "review.json")
+    monkeypatch.setattr(module, "OUTPUT", tmp_path / "dispatch.json")
+    module.LOOP.write_text(
+        '{"loop_complete": false, "stages": ['
+        '{"stage":"recognized_revenue","observed":false},'
+        '{"stage":"buyer_conversation","observed":true},'
+        '{"stage":"commercial_terms","observed":true}]}'
+    )
+    module.SOURCE.write_text('{"end_to_end_healthy": true}')
+    module.BUYER_REVIEW.write_text('{"deferred_enrichment": 1}')
+
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if any(
+            str(part).endswith("refresh_commercial_loop.py")
+            for part in command
+        ):
+            raise subprocess.TimeoutExpired(command, 10)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="ok",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    result = module.dispatch(
+        mode="GUARDED_EXECUTE",
+        timeout_seconds=10,
+    )
+    decisions = [row["decision"] for row in result["executions"]]
+    assert "TIMED_OUT" in decisions
+    assert "DISPATCHED" in decisions
+    timed_out = [
+        row
+        for row in result["executions"]
+        if row["decision"] == "TIMED_OUT"
+    ]
+    assert timed_out[0]["job"] == "commercial_loop_refresh"
+
+
+def test_default_dispatch_timeout_is_bounded(monkeypatch, tmp_path):
+    import subprocess
+    import empire_os.astra_dispatcher as module
+
+    monkeypatch.setattr(module, "LOOP", tmp_path / "loop.json")
+    monkeypatch.setattr(module, "SOURCE", tmp_path / "source.json")
+    monkeypatch.setattr(module, "BUYER_REVIEW", tmp_path / "review.json")
+    monkeypatch.setattr(module, "OUTPUT", tmp_path / "dispatch.json")
+    module.LOOP.write_text(
+        '{"loop_complete": false, "stages": ['
+        '{"stage":"recognized_revenue","observed":true},'
+        '{"stage":"buyer_conversation","observed":false},'
+        '{"stage":"commercial_terms","observed":true}]}'
+    )
+    module.SOURCE.write_text('{"end_to_end_healthy": true}')
+    module.BUYER_REVIEW.write_text('{"deferred_enrichment": 5}')
+
+    seen = []
+
+    def fake_run(command, **kwargs):
+        seen.append(kwargs["timeout"])
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="ok",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    result = module.dispatch(mode="GUARDED_EXECUTE")
+    assert result["executions"]
+    assert all(value == 120 for value in seen)
+    assert all(
+        row["job"] != "buyer_deferred_enrichment"
+        for row in result["executions"]
+    )
+
+
+def test_canonical_opportunity_loop_is_single_internal_safe_job():
+    import empire_os.astra_dispatcher as module
+
+    assert "opportunity_loop_refresh" in module.SAFE_JOBS
+    command = module.SAFE_JOBS["opportunity_loop_refresh"]
+    assert any(
+        str(part).endswith("run_opportunity_loop.py")
+        for part in command
+    )
+
+    retired_direct_dispatch = {
+        "opportunity_radar_refresh",
+        "opportunity_research_refresh",
+        "opportunity_factory_intake_refresh",
+        "opportunity_ai_planner",
+    }
+    assert retired_direct_dispatch.isdisjoint(module.SAFE_JOBS)
+
+
+def test_astra_executive_refresh_is_safe_internal_job():
+    import empire_os.astra_dispatcher as module
+
+    assert "astra_executive_refresh" in module.SAFE_JOBS
+    command = module.SAFE_JOBS["astra_executive_refresh"]
+    assert any(
+        str(part).endswith("build_astra_executive.py")
+        for part in command
+    )
+
+
+def test_astra_department_dispatch_is_safe_internal_job():
+    import empire_os.astra_dispatcher as module
+
+    assert "astra_department_dispatch" in module.SAFE_JOBS
+    command = module.SAFE_JOBS["astra_department_dispatch"]
+    assert any(
+        str(part).endswith("dispatch_astra_departments.py")
+        for part in command
+    )

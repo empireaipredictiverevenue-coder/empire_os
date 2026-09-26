@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EmpireOS canonical lead qualification v2 every 15 minutes
+
+[Timer]
+OnBootSec=7min
+OnUnitActiveSec=15min
+AccuracySec=1min
+Persistent=true
+Unit=empire-qualification.service
+
+[Install]
+WantedBy=timers.target

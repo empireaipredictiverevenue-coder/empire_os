@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Empire Hunter outcome learning every ten minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=10min
+AccuracySec=30s
+Persistent=true
+Unit=empire-hunter-outcome-learning.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=Refresh Empire Tag Intelligence monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=-/etc/empire_os.env
+Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_TAG_MONITOR_URLS=https://empire-ai.co.uk
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_tag_intelligence_monitor.py --repo-root /srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_predictive_cloud_status.py --repo-root /srv/empire_os
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=300

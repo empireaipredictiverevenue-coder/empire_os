@@ -163,29 +163,50 @@ def _store_entries(carrier_slug: str, entries: list[dict]) -> int:
     conn.close()
     return inserted
 
+def _readonly_connection():
+    """Open the legacy roster cache read-only; never create or migrate it."""
+    return sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+
+
 def list_rosters(carrier: Optional[str] = None, limit: int = 100) -> list[dict]:
-    """Query carrier_rosters table."""
-    conn = sqlite3.connect(DB)
-    if carrier:
-        rows = conn.execute(
-            "SELECT id, carrier, company_name, license_no, city, state, "
-            "       scraped_at FROM carrier_rosters WHERE carrier=? ORDER BY id DESC LIMIT ?",
-            (carrier, limit)).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT id, carrier, company_name, license_no, city, state, "
-            "       scraped_at FROM carrier_rosters ORDER BY id DESC LIMIT ?",
-            (limit,)).fetchall()
-    conn.close()
+    """Read the legacy roster cache without mutating SQLite."""
+    try:
+        conn = _readonly_connection()
+    except sqlite3.OperationalError:
+        return []
+    try:
+        if carrier:
+            rows = conn.execute(
+                "SELECT id, carrier, company_name, license_no, city, state, "
+                "       scraped_at FROM carrier_rosters WHERE carrier=? ORDER BY id DESC LIMIT ?",
+                (carrier, limit)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, carrier, company_name, license_no, city, state, "
+                "       scraped_at FROM carrier_rosters ORDER BY id DESC LIMIT ?",
+                (limit,)).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    finally:
+        conn.close()
     return [{"id": r[0], "carrier": r[1], "company_name": r[2], "license_no": r[3],
              "city": r[4], "state": r[5], "scraped_at": r[6]} for r in rows]
 
+
 def roster_stats() -> list[dict]:
-    """Counts by carrier."""
-    conn = sqlite3.connect(DB)
-    rows = conn.execute(
-        "SELECT carrier, COUNT(*) FROM carrier_rosters GROUP BY carrier ORDER BY carrier").fetchall()
-    conn.close()
+    """Read carrier counts from the legacy cache without mutation."""
+    try:
+        conn = _readonly_connection()
+    except sqlite3.OperationalError:
+        return []
+    try:
+        rows = conn.execute(
+            "SELECT carrier, COUNT(*) FROM carrier_rosters GROUP BY carrier ORDER BY carrier"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    finally:
+        conn.close()
     return [{"carrier": r[0], "count": r[1]} for r in rows]
 
 if __name__ == "__main__":

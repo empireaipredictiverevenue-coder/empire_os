@@ -1,0 +1,12 @@
+[Unit]
+Description=Observe Reddit and LinkedIn public intent every fifteen minutes
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=15min
+AccuracySec=60s
+Persistent=true
+Unit=empire-community-intent.service
+
+[Install]
+WantedBy=timers.target

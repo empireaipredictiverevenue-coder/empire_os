@@ -1,0 +1,19 @@
+[Unit]
+Description=Empire Coder llama.cpp planner inference
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/empire_inference/llama.cpp
+ExecStart=/home/ubuntu/empire_inference/llama.cpp/build/bin/llama-server --model /home/ubuntu/empire_inference/models/qwen2.5-coder-1.5b-q4_k_m.gguf --alias qwen2.5-coder:1.5b --host 127.0.0.1 --port 11435 --ctx-size 8192 --jinja --chat-template chatml --threads 6 --threads-batch 6 --parallel 1
+Restart=on-failure
+RestartSec=5
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/empire_inference
+
+[Install]
+WantedBy=default.target

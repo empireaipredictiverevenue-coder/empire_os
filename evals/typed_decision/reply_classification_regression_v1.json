@@ -1,0 +1,182 @@
+{
+  "by_label": {
+    "reply_classification:later": 2,
+    "reply_classification:negative": 2,
+    "reply_classification:objection": 2,
+    "reply_classification:other": 2,
+    "reply_classification:positive": 2,
+    "reply_classification:question": 2,
+    "reply_classification:unsubscribe": 2
+  },
+  "by_task": {
+    "reply_classification": 14
+  },
+  "case_count": 14,
+  "cases": [
+    {
+      "case_id": "r-later-1",
+      "ground_truth": "later",
+      "inputs": {
+        "body_text": "Not right now, check back next quarter."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-later-1",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-later-2",
+      "ground_truth": "later",
+      "inputs": {
+        "body_text": "Try again later."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-later-2",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-neg-1",
+      "ground_truth": "negative",
+      "inputs": {
+        "body_text": "No thanks, not interested."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-neg-1",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-neg-2",
+      "ground_truth": "negative",
+      "inputs": {
+        "body_text": "This is not for us."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-neg-2",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-obj-1",
+      "ground_truth": "objection",
+      "inputs": {
+        "body_text": "This is too expensive."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-obj-1",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-obj-2",
+      "ground_truth": "objection",
+      "inputs": {
+        "body_text": "We already use another provider."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-obj-2",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-other-1",
+      "ground_truth": "other",
+      "inputs": {
+        "body_text": "Thanks for the note."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-other-1",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-other-2",
+      "ground_truth": "other",
+      "inputs": {
+        "body_text": "Received."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-other-2",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-pos-1",
+      "ground_truth": "positive",
+      "inputs": {
+        "body_text": "Interested, tell me more."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-pos-1",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-pos-2",
+      "ground_truth": "positive",
+      "inputs": {
+        "body_text": "Let's talk and book a call."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-pos-2",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-q-1",
+      "ground_truth": "question",
+      "inputs": {
+        "body_text": "How does the pricing work?"
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-q-1",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-q-2",
+      "ground_truth": "question",
+      "inputs": {
+        "body_text": "Can you send more information?"
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-q-2",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-unsub-1",
+      "ground_truth": "unsubscribe",
+      "inputs": {
+        "body_text": "Please unsubscribe me."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-unsub-1",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    },
+    {
+      "case_id": "r-unsub-2",
+      "ground_truth": "unsubscribe",
+      "inputs": {
+        "body_text": "Remove me from this list."
+      },
+      "label_source": "deterministic_regression_fixture",
+      "source_ref": "fixture:r-unsub-2",
+      "synthetic_test_fixture": true,
+      "task_key": "reply_classification"
+    }
+  ],
+  "commercial_evidence": false,
+  "dataset_id": "reply-classification-regression",
+  "eligible_for_production_promotion_evidence": false,
+  "real_labeled_case_count": 0,
+  "schema_version": "typed_decision_dataset_manifest.v1",
+  "sha256": "ab9e2f326d2b6209cce378d87cdb3c7389cc94deb330f2a3412cf98aae0b3ef5",
+  "synthetic_test_fixture_count": 14,
+  "task_keys": [
+    "reply_classification"
+  ],
+  "version": "v1"
+}

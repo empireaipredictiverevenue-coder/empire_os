@@ -1,0 +1,12 @@
+[Unit]
+Description=Run governed EmpireOS Swarm V6 dispatcher every fifteen minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=2min
+Persistent=true
+Unit=empire-swarm-v6.service
+
+[Install]
+WantedBy=timers.target

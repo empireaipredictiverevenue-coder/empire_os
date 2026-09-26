@@ -1,0 +1,172 @@
+from fastapi.testclient import TestClient
+
+import empire_os.self_serve_checkout_api as api
+
+
+def test_checkout_health_defaults_payment_proposal_off(monkeypatch):
+    monkeypatch.delenv(
+        "EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED",
+        raising=False,
+    )
+    client = TestClient(api.app)
+    body = client.get("/health").json()
+    assert body["status"] == "online"
+    assert body["payment_proposal_authorized"] is False
+    assert body["payment_execution"] is False
+
+
+def test_order_endpoint_keeps_proposal_gated(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "prepare_checkout_order",
+        lambda **kwargs: {
+            "order_id": "o-1",
+            "payer_wallet": "0x" + "1" * 40,
+            "product": {"amount_cents": 19900},
+            "actual_revenue": False,
+        },
+    )
+    monkeypatch.setattr(
+        api,
+        "create_payment_request_for_order",
+        lambda order, standing_authority: {
+            **order,
+            "payment_request_created": standing_authority,
+        },
+    )
+    monkeypatch.delenv(
+        "EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED",
+        raising=False,
+    )
+    client = TestClient(api.app)
+    response = client.post(
+        "/v1/orders",
+        json={
+            "product_code": "competitor_search_gap",
+            "business_name": "Example Ltd",
+            "email": "buyer@example.com",
+            "target_domain": "example.com",
+            "payer_wallet": "0x" + "1" * 40,
+            "terms_accepted": True,
+            "idempotency_key": "checkout-test-004",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["payment_request_created"] is False
+
+
+
+def test_exchange_tiers_endpoint_is_non_binding(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "exchange_tier_catalog",
+        lambda: {
+            "products": [{"product_code": "exchange_seat_starter"}],
+            "count": 1,
+            "pricing_binding": False,
+            "actual_revenue": False,
+        },
+    )
+    client = TestClient(api.app)
+    response = client.get("/v1/exchange/tiers")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["pricing_binding"] is False
+    assert body["actual_revenue"] is False
+
+
+def test_exchange_interest_endpoint_records_buyer_request(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "record_exchange_interest",
+        lambda **kwargs: {
+            "decision": "interest_recorded",
+            "candidate_id": "candidate-1",
+            "tier_code": kwargs["tier_code"],
+            "seat_activated": False,
+            "pricing_binding": False,
+            "actual_revenue": False,
+        },
+    )
+    client = TestClient(api.app)
+    response = client.post(
+        "/v1/exchange/interests",
+        json={
+            "tier_code": "exchange_seat_growth",
+            "business_name": "Example Roofing Ltd",
+            "email": "buyer@example.com",
+            "domain": "example.com",
+            "niche": "Roofing",
+            "territory": "Greater Manchester",
+            "daily_capacity": 12,
+            "delivery_preference": "webhook",
+            "exclusivity_interest": False,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["decision"] == "interest_recorded"
+    assert body["seat_activated"] is False
+    assert body["actual_revenue"] is False
+
+
+
+def test_predictive_revenue_products_endpoint(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "predictive_revenue_product_catalog",
+        lambda: {
+            "products": [
+                {
+                    "product_code": "predictive_revenue_diagnostic",
+                    "deployment_price_cents": 2500000,
+                }
+            ],
+            "product_count": 1,
+            "binding_terms_ready": False,
+            "actual_revenue": False,
+        },
+    )
+    client = TestClient(api.app)
+    response = client.get("/v1/predictive-revenue/products")
+
+    assert response.status_code == 200
+    assert response.json()["product_count"] == 1
+    assert response.json()["actual_revenue"] is False
+
+
+def test_predictive_revenue_interest_endpoint(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "record_predictive_revenue_interest",
+        lambda **kwargs: {
+            "decision": "deployment_interest_recorded",
+            "prospect_id": "prospect-1",
+            "product_code": kwargs["product_code"],
+            "binding_commercial_terms": False,
+            "actual_revenue": False,
+        },
+    )
+    client = TestClient(api.app)
+    response = client.post(
+        "/v1/predictive-revenue/interests",
+        json={
+            "product_code": "predictive_revenue_diagnostic",
+            "business_name": "Example Group",
+            "email": "buyer@example.com",
+            "domain": "example.com",
+            "industry": "Roofing",
+            "geography": "UK",
+            "annual_revenue_band": "25m_100m",
+            "desired_outcome": "Improve forecast accuracy.",
+            "systems": ["CRM"],
+            "idempotency_key": "predictive-api-001",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "deployment_interest_recorded"
+    assert response.json()["actual_revenue"] is False

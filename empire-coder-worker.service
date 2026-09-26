@@ -1,0 +1,29 @@
+[Unit]
+Description=EmpireOS Coder Proposal Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Nice=10
+CPUWeight=25
+IOWeight=25
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=-/srv/empire_os/.env.empire_coder
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/empire_coder_worker.py --once
+TimeoutStartSec=30min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/empire_os/runtime
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

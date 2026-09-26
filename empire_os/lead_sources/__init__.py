@@ -2,7 +2,7 @@
 Empire OS v3 — Lead Source Registry
 ====================================
 
-Lead sources that produce LeadCandidate objects, fed into /v1/leads/direct.
+Lead sources that produce LeadCandidate objects for canonical prospect ingest.
 Each source has:
   - name: identifier
   - tier: real | stub (real means actively running, stub means wired but disabled)
@@ -18,13 +18,17 @@ import json
 
 @dataclass
 class LeadCandidate:
-    """A potential lead found by a source. Maps to /v1/leads/direct payload."""
+    """A potential lead found by a real source for canonical prospect ingest."""
     name: str
     email: str = ""
     phone: str = ""
     niche: str = ""
     metro: str = ""
     state: str = ""
+    country_code: str = ""
+    language_code: str = ""
+    source_language: str = ""
+    timezone: str = ""
     details: str = ""
     source: str = ""
     lead_score: int = 50
@@ -96,10 +100,12 @@ def infer_niche(text: str) -> str:
 def _import_sources():
     from empire_os.lead_sources import (
         permits, chicago_311, court_listener, reddit_json,
-        nyc_hpd, storm_alerts, overpass,
+        nyc_hpd, storm_alerts, overpass, business_search, recc_solar,
     )
-    for mod in (permits, chicago_311, court_listener, reddit_json,
-                nyc_hpd, storm_alerts, overpass):
+    for mod in (
+        permits, chicago_311, court_listener, reddit_json,
+        nyc_hpd, storm_alerts, overpass, business_search, recc_solar,
+    ):
         if hasattr(mod, "register_source"):
             mod.register_source(register)
 

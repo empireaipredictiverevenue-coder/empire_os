@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+"""Refresh the Phase 4 Buyer Acquisition Team runtime plan."""
+from __future__ import annotations
+
+import argparse
+import json
+
+from empire_os.buyer_acquisition_team import (
+    refresh_buyer_acquisition_plan,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo-root", default="/srv/empire_os")
+    args = parser.parse_args()
+
+    payload = refresh_buyer_acquisition_plan(args.repo_root)
+    print(json.dumps({
+        "ok": True,
+        "phase": payload["phase"],
+        "demand_gap_count": payload["demand_gap_count"],
+        "priority_target_count": len(payload["priority_targets"]),
+        "product_demand_count": payload["product_demand_count"],
+        "sellable_product_demand_count": payload[
+            "sellable_product_demand_count"
+        ],
+        "market_validate_product_count": payload[
+            "market_validate_product_count"
+        ],
+        "team_role_count": payload["team_role_count"],
+        "buyer_pool_count": len(payload["buyer_pools"]),
+        "icp_priority_target_count": payload[
+            "icp_priority_target_count"
+        ],
+        "predictive_revenue_enterprise_target_count": payload[
+            "predictive_revenue_enterprise_target_count"
+        ],
+        "icp_campaign_target_company_count": payload[
+            "icp_buyer_trigger_intelligence"
+        ]["target_company_count_per_campaign"],
+        "live_outbound_send": payload["automation"]["live_outbound_send"],
+        "execution_authority": payload["execution_authority"],
+    }, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

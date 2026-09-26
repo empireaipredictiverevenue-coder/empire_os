@@ -1,18 +1,12 @@
 """
-Auto-Pilot — runs the full Empire OS pipeline on a schedule.
+Legacy Auto-Pilot compatibility loop — OBSERVE ONLY.
 
-For each cycle:
-  1. Pull all DISCOVERED leads from the funnel
-  2. AGI Sales matches them → writes matched events
-  3. Pull all MATCHED leads → AGI Sales drafts outreach → writes drafted
-  4. Auto-approve drafted (operator override allowed via /v1/decisions)
-  5. AGI Sales advances drafted → sent → replied (simulated reply 30%)
-  6. AGI Closer claims replied prospects
-  7. AGI Closer settles claimed prospects (50% close rate)
+The original implementation mutated the funnel, impersonated operator approval,
+and attempted settlement. Those paths are retired. Canonical Phase 3E/3F
+governed services own approval, sending, settlement evidence and revenue.
 
-Every cycle logs pipeline metrics so the dashboard shows the full funnel
-moving automatically. Designed to be the default operating mode for
-production — operator only intervenes via decision queue overrides.
+This module remains only so older hub imports/status surfaces do not break.
+It never performs a mutating HTTP request.
 """
 from __future__ import annotations
 
@@ -42,7 +36,7 @@ class CycleReport:
 
 
 class AutoPilot:
-    """Drives the funnel through all stages on a fixed cadence."""
+    """Read-only compatibility monitor for the retired legacy funnel."""
 
     def __init__(
         self,
@@ -100,12 +94,7 @@ class AutoPilot:
             return CycleReport(cycle=self.cycle, started_at=datetime.now(timezone.utc).isoformat())
         report = CycleReport(cycle=self.cycle, started_at=datetime.now(timezone.utc).isoformat())
         try:
-            self._stage_match(report)
-            self._stage_draft(report)
-            self._stage_send(report)
-            self._stage_reply(report)
-            self._stage_claim(report)
-            self._stage_settle(report)
+            self._stage_observe(report)
         except Exception as e:
             report.error = str(e)
             logger.exception("cycle %d failed: %s", self.cycle, e)
@@ -128,111 +117,44 @@ class AutoPilot:
         )
         return report
 
-    # ── Pipeline stages ──────────────────────────────────────────
+    # ── Read-only compatibility observation ─────────────────────
+
+    def _stage_observe(self, report: CycleReport):
+        """Read legacy funnel counts without advancing any state."""
+        _, data = self._http("GET", "/v1/funnel/states?state=discovered&limit=1")
+        if data.get("error"):
+            report.error = data["error"]
+        return
 
     def _stage_match(self, report: CycleReport):
-        """Match all DISCOVERED leads via AGI Sales."""
-        _, data = self._http("GET", "/v1/funnel/states?state=discovered&limit=20")
-        leads = data.get("prospects", [])[:self.match_limit]
-        if not leads:
-            return
-        for lead in leads:
-            pid = lead["prospect_id"]
-            status, result = self._http("POST", "/v1/agi/sales/tick")
-            if status == 200:
-                if result.get("result", {}).get("prospect_id"):
-                    report.matched += 1
-                elif result.get("result", {}).get("action") == "match":
-                    report.matched += 1
+        """Legacy match mutation retired."""
+        logger.info("_stage_match: blocked by governed architecture")
+        return
 
     def _stage_draft(self, report: CycleReport):
-        """Generate outreach drafts for MATCHED leads."""
-        _, data = self._http("GET", "/v1/funnel/states?state=matched&limit=20")
-        leads = data.get("prospects", [])[:self.draft_limit]
-        if not leads:
-            return
-        for lead in leads:
-            status, result = self._http("POST", f"/v1/decisions/{lead['prospect_id']}/approve")
-            if status == 200 and result.get("action") == "draft":
-                report.drafted += 1
+        """Legacy draft mutation retired."""
+        logger.info("_stage_draft: blocked by governed architecture")
+        return
 
     def _stage_send(self, report: CycleReport):
-        """Auto-approve drafted → sent."""
-        _, data = self._http("GET", "/v1/funnel/states?state=outreach_drafted&limit=20")
-        leads = data.get("prospects", [])
-        if not leads:
-            return
-        for lead in leads:
-            # Simulate the operator clicking "Approve" via the decision API
-            pid = lead["prospect_id"]
-            # We need a 'send' action — use a direct funnel transition via hub
-            status, result = self._http("POST", f"/v1/decisions/{pid}/approve")
-            # The hub decision API: drafted → sent via approve endpoint
-            if status == 200:
-                report.sent += 1
+        """Legacy send/approval mutation retired."""
+        logger.info("_stage_send: blocked by governed architecture")
+        return
 
     def _stage_reply(self, report: CycleReport):
-        """Detect REAL replies on sent leads.
-
-        NO SIMULATION. Replies are only registered when a genuine inbound
-        reply is observed (email webhook / inbox poll / a2a signal). The
-        old code fabricated replies via random.random() — that inflated
-        pipeline vanity metrics and fed fake leads into the closer,
-        producing $0 real revenue. Replies now come exclusively from the
-        real reply-detection path (see empire_os.reply_detect / inbox
-        poll); this stage is a no-op placeholder so the cycle report still
-        accounts for replied leads counted elsewhere.
-        """
-        # Replies are detected by the real inbound pipeline, not simulated.
-        # Nothing to do here — report.replied is populated by the reply
-        # detector when an actual response lands.
+        """Replies are captured by the real inbound/provider lifecycle only."""
         return
 
     def _stage_claim(self, report: CycleReport):
-        """Claim replied leads via AGI Closer."""
-        _, data = self._http("GET", "/v1/funnel/states?state=replied&limit=20")
-        leads = data.get("prospects", [])
-        if not leads:
-            return
-        for lead in leads:
-            status, result = self._http(
-                "POST", f"/v1/decisions/{lead['prospect_id']}/approve"
-            )
-            if status == 200:
-                report.claimed += 1
+        """Legacy closer claim mutation retired."""
+        logger.info("_stage_claim: blocked by governed architecture")
+        return
 
     def _stage_settle(self, report: CycleReport):
-        """Settle claimed leads. Amount is LLM-priced, fee is split, payout recorded.
+        """Legacy settlement mutation retired."""
+        logger.info("_stage_settle: blocked by governed architecture")
+        return
 
-        NO probabilistic gate. Every claimed lead is attempted for
-        settlement — the charge layer (empire_os.charge) already handles
-        failure gracefully (status=failed, no silent simulation). Gating
-        settlement behind random.random() < settle_rate was silently
-        dropping 60% of billable leads and killing revenue.
-        """
-        _, data = self._http("GET", "/v1/funnel/states?state=claimed&limit=20")
-        leads = data.get("prospects", [])
-        if not leads:
-            return
-        for lead in leads:
-            _, priced = self._http(
-                "POST", "/v1/funnel/price-and-settle",
-                {"prospect_id": lead["prospect_id"], "settle": True},
-            )
-            if priced.get("ok"):
-                amount = priced["amount_cents"]
-                fee = priced.get("fee_cents", 0)
-                self._http(
-                    "POST", "/v1/payouts/create",
-                    {
-                        "settlement_event_id": priced.get("event_id", ""),
-                        "prospect_id": lead["prospect_id"],
-                        "amount_cents": amount,
-                    },
-                )
-                report.settled += 1
-                report.revenue_cents += amount
-                report.fee_cents = report.__dict__.get("fee_cents", 0) + fee
 
     def run_forever(self, interval_seconds: int = 120):
         """Continuous loop — runs every N seconds forever."""

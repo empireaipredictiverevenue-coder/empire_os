@@ -1,0 +1,32 @@
+[Unit]
+Description=EmpireOS Local Ollama Inference
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Nice=12
+CPUWeight=20
+IOWeight=20
+User=ubuntu
+Group=ubuntu
+Environment=HOME=/home/ubuntu
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Environment=OLLAMA_MODELS=/home/ubuntu/.ollama/models
+Environment=OLLAMA_NUM_PARALLEL=1
+Environment=OLLAMA_MAX_LOADED_MODELS=1
+Environment=OLLAMA_KEEP_ALIVE=10m
+ExecStart=/home/ubuntu/.local/bin/ollama serve
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/.ollama
+LockPersonality=true
+RestrictSUIDSGID=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

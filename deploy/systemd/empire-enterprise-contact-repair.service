@@ -1,0 +1,21 @@
+[Unit]
+Description=EmpireOS enterprise contact self-resolution controller
+After=network-online.target empire-ops-privileged-helper.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=/etc/empire_os.env
+Environment=PYTHONPATH=/srv/empire_os
+Environment=PATH=/srv/empire_os/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=EMPIRE_AUTONOMOUS_MODE=OBSERVE
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_enterprise_contact_repair.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os /home/ubuntu/empire_os_repair_worktrees
+TimeoutStartSec=900

@@ -1,0 +1,26 @@
+[Unit]
+Description=Refresh canonical commercial product catalog snapshot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=ubuntu
+UMask=0027
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=/etc/empire_os.env
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/sync_market_pricing.py
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/sync_founder_approved_commercial_pricing.py
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/apply_solar_economics_policy.py
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_solar_economics.py
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_commercial_product_catalog.py --limit 100
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/verify_commercial_pricing_snapshot.py --repo-root /srv/empire_os
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadOnlyPaths=/srv/empire_os/runtime/secrets/intelligence_materializer.env
+ReadWritePaths=/srv/empire_os/runtime/commercial_catalog
+ReadWritePaths=/srv/empire_os/runtime/solar_opportunity_maps
+TimeoutStartSec=120

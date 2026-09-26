@@ -1,0 +1,15 @@
+[Unit]
+Description=Refresh EmpireOS canonical Market Sweeps / Revenue GPS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_market_sweep_snapshot.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=180

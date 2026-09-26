@@ -1,0 +1,11 @@
+[Unit]
+Description=Check due EmpireOS follow-ups hourly using recipient-local windows
+
+[Timer]
+OnCalendar=*-*-* *:00:00
+AccuracySec=5min
+Persistent=true
+Unit=empire-outbound-followup.service
+
+[Install]
+WantedBy=timers.target

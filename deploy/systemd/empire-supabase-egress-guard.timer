@@ -1,0 +1,12 @@
+[Unit]
+Description=Check Supabase egress guard every fifteen minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+AccuracySec=1min
+Persistent=true
+Unit=empire-supabase-egress-guard.service
+
+[Install]
+WantedBy=timers.target

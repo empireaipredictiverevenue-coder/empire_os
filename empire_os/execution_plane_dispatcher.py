@@ -1,0 +1,554 @@
+"""Governed dispatcher for the Empire Agent & Tool Execution Plane.
+
+Architecture contract:
+docs/AGENT_TOOL_EXECUTION_PLANE_ARCHITECTURE.md
+
+The dispatcher routes only observe/internal_write work. Consequential commercial
+actions remain outside this plane.
+"""
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+from typing import Any, Mapping
+
+from empire_os.agent_execution_plane import (
+    ExecutionJob,
+    route_execution_job,
+)
+from empire_os.builder_capabilities import (
+    builder_capability_ready,
+    builder_capability_snapshot,
+)
+from empire_os.agent_tool_runtime import (
+    agent_reach_health,
+    pi_health,
+    space_agent_health,
+)
+from empire_os.coder import EmpireCoder
+from empire_os.coder.jobs import JobKind, LocalJobQueue
+from empire_os.empire_coder_sandbox_runner import (
+    EmpireCoderSandboxJob,
+    run_empire_coder_sandbox_job,
+)
+from empire_os.hermes_control import (
+    DEFAULT_BASE_BRANCH,
+    SCHEMA_VERSION as HERMES_SCHEMA_VERSION,
+    publish_control_job,
+)
+from empire_os.pi_sandbox_runner import PiSandboxJob, run_pi_sandbox_job
+from empire_os.execution_plane_verification import (
+    plan_candidate_verification,
+    verify_proposal_candidate,
+)
+from empire_os.otel_telemetry import build_resilient_telemetry_sink
+from empire_os.telemetry import (
+    emit_event,
+    new_trace_context,
+    parse_traceparent,
+)
+
+
+RUNTIME_RELATIVE = Path("runtime/execution_plane")
+MUTATING_CODE_CAPABILITIES = frozenset({
+    "backend_code",
+    "parallel_backend_code",
+    "frontend_code",
+    "refactor",
+    "tests",
+    "documentation",
+})
+
+
+@dataclass(frozen=True)
+class ExecutionRequest:
+    request_id: str
+    capability: str
+    department: str
+    objective: str
+    authority: str = "observe"
+    risk_class: str = "low"
+    source_ref: str = ""
+    allowed_paths: tuple[str, ...] = ()
+    lease_resources: tuple[str, ...] = ()
+    evidence_domains: tuple[str, ...] = ()
+    success_condition: str = ""
+    required_tests: tuple[str, ...] = ()
+    priority: int = 50
+    max_runtime_seconds: int = 900
+    traceparent: str | None = None
+    ai_behavior_change: bool = False
+
+    def validate(self) -> None:
+        if not self.request_id.strip():
+            raise ValueError("request_id required")
+        if not self.objective.strip():
+            raise ValueError("objective required")
+        if len(self.objective) > 20_000:
+            raise ValueError("objective too long")
+        if self.authority not in {"observe", "internal_write"}:
+            raise ValueError("execution plane allows observe/internal_write only")
+        if self.risk_class not in {
+            "low",
+            "medium",
+            "high",
+            "consequential",
+        }:
+            raise ValueError("unsupported risk class")
+        if self.risk_class == "consequential":
+            raise ValueError("consequential work requires domain authority gate")
+        if (
+            self.authority == "internal_write"
+            and self.capability in {
+                "backend_code",
+                "parallel_backend_code",
+                "frontend_code",
+                "refactor",
+                "tests",
+                "documentation",
+            }
+            and not self.allowed_paths
+        ):
+            raise ValueError(
+                "mutating code work requires allowed_paths"
+            )
+        if (
+            self.authority == "internal_write"
+            and self.capability in {
+                "backend_code",
+                "parallel_backend_code",
+                "frontend_code",
+                "refactor",
+                "tests",
+                "documentation",
+            }
+            and not self.lease_resources
+        ):
+            raise ValueError(
+                "mutating code work requires lease_resources"
+            )
+        for target in self.required_tests:
+            if not target.startswith("tests/") or ".py" not in target:
+                raise ValueError("required_tests must be repository pytest targets")
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _emit_route_event(
+    root: Path,
+    request: ExecutionRequest,
+    worker: str | None,
+    eligible: bool,
+    reason: str,
+) -> None:
+    try:
+        trace = (
+            parse_traceparent(request.traceparent).child()
+            if request.traceparent
+            else new_trace_context()
+        )
+        sink = build_resilient_telemetry_sink(
+            local_path=root / "runtime/telemetry/execution_plane.jsonl",
+        )
+        emit_event(
+            sink,
+            name="execution_plane.routed",
+            trace=trace,
+            attributes={
+                "execution.request_id": request.request_id,
+                "execution.capability": request.capability,
+                "execution.department": request.department,
+                "execution.worker": worker or "",
+                "execution.eligible": eligible,
+                "execution.reason": reason,
+                "execution.risk_class": request.risk_class,
+                "execution.authority_requested": request.authority,
+                "execution.ai_behavior_change": request.ai_behavior_change,
+                "execution_authority": "none",
+            },
+        )
+    except Exception:
+        # Observability is non-authoritative and must never block work routing.
+        pass
+
+
+def _write_request(
+    root: Path,
+    lane: str,
+    request: ExecutionRequest,
+    *,
+    extra: Mapping[str, Any] | None = None,
+) -> Path:
+    target = root / RUNTIME_RELATIVE / "requests" / lane
+    target.mkdir(parents=True, exist_ok=True)
+    path = target / f"{request.request_id}.json"
+    payload = {
+        "schema_version": "empire.execution-plane-request.v1",
+        "queued_at": _now(),
+        "lane": lane,
+        "request": request.as_dict(),
+        "extra": dict(extra or {}),
+        "execution_authority": "none",
+    }
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+    return path
+
+
+def dispatch_execution_request(
+    repo_root: str | Path,
+    request: ExecutionRequest,
+    *,
+    execute_pi: bool = True,
+) -> dict[str, Any]:
+    request.validate()
+    root = Path(repo_root).resolve()
+    capability_path = root / RUNTIME_RELATIVE / "builder_capabilities.json"
+    routing = route_execution_job(
+        ExecutionJob(
+            job_id=request.request_id,
+            capability=request.capability,
+            department=request.department,
+            risk_class=request.risk_class,
+            authority=request.authority,
+            source_ref=request.source_ref,
+            allowed_paths=request.allowed_paths,
+            evidence_domains=request.evidence_domains,
+            success_condition=request.success_condition,
+            required_tests=request.required_tests,
+            traceparent=request.traceparent,
+        )
+    )
+
+    verification_plan = plan_candidate_verification(
+        request_id=request.request_id,
+        allowed_paths=request.allowed_paths,
+        required_tests=request.required_tests,
+        ai_behavior_change=request.ai_behavior_change,
+    )
+    _emit_route_event(
+        root,
+        request,
+        routing.worker_key,
+        routing.eligible,
+        routing.reason,
+    )
+
+    base = {
+        "schema_version": "empire.execution-plane-dispatch.v1",
+        "request_id": request.request_id,
+        "routed_at": _now(),
+        "route": routing.as_dict(),
+        "verification_plan": verification_plan.as_dict(),
+        "external_send": False,
+        "payment_action": False,
+        "revenue_recognition": False,
+        "production_deploy": False,
+        "execution_authority": "none",
+    }
+    if not routing.eligible or not routing.worker_key:
+        return {
+            **base,
+            "status": "BLOCKED",
+            "reason": routing.reason,
+        }
+
+    worker = routing.worker_key
+
+    if worker == "hermes":
+        payload = {
+            "schema_version": HERMES_SCHEMA_VERSION,
+            "job_id": request.request_id,
+            "kind": "code_task",
+            "authority": request.authority,
+            "base_branch": DEFAULT_BASE_BRANCH,
+            "prompt": request.objective,
+            "allowed_paths": list(request.allowed_paths),
+            "lease_resources": list(
+                request.lease_resources
+                or tuple(f"path:{path}" for path in request.allowed_paths)
+            ),
+            "pytest_targets": list(request.required_tests),
+            "max_runtime_seconds": request.max_runtime_seconds,
+            "ai_behavior_change": request.ai_behavior_change,
+            "created_at": _now(),
+        }
+        published = publish_control_job(root, payload)
+        return {
+            **base,
+            "status": "QUEUED" if published["published"] else "EXISTS",
+            "worker": "hermes",
+            "worker_result": published,
+        }
+
+    if (
+        worker == "pi"
+        and request.authority == "internal_write"
+        and request.capability in MUTATING_CODE_CAPABILITIES
+        and not builder_capability_ready(
+            "pi",
+            "code_mutation",
+            path=capability_path,
+        )
+    ):
+        empire_coder_structured_ready = builder_capability_ready(
+            "empire_coder",
+            "structured_patch_mutation",
+            path=capability_path,
+        )
+        empire_coder_aider_ready = builder_capability_ready(
+            "empire_coder",
+            "aider_mutation",
+            path=capability_path,
+        )
+        if (
+            empire_coder_structured_ready
+            or empire_coder_aider_ready
+        ):
+            base["runtime_fallback"] = {
+                "from": "pi",
+                "to": "empire_coder",
+                "reason": "pi_mutation_capability_not_proven",
+                "empire_coder_backends": {
+                    "structured_patch": empire_coder_structured_ready,
+                    "aider": empire_coder_aider_ready,
+                },
+                "execution_authority": "none",
+            }
+            worker = "empire_coder"
+        else:
+            queued = _write_request(
+                root,
+                "builder_wait",
+                request,
+                extra={
+                    "reason": "no_mutation_capable_builder_proven",
+                    "capabilities": builder_capability_snapshot(
+                        capability_path
+                    ),
+                },
+            )
+            return {
+                **base,
+                "status": "WAITING_FOR_CAPABLE_BUILDER",
+                "worker": "pi",
+                "request_path": str(queued),
+                "reason": "no_mutation_capable_builder_proven",
+                "builder_capabilities": builder_capability_snapshot(
+                    capability_path
+                ),
+            }
+
+    if worker == "pi":
+        health = pi_health()
+        if not health.ready:
+            queued = _write_request(
+                root,
+                "pi",
+                request,
+                extra={"tool_health": health.as_dict()},
+            )
+            return {
+                **base,
+                "status": "WAITING_FOR_RUNTIME",
+                "worker": "pi",
+                "request_path": str(queued),
+                "tool_health": health.as_dict(),
+            }
+        if not execute_pi:
+            queued = _write_request(root, "pi", request)
+            return {
+                **base,
+                "status": "QUEUED",
+                "worker": "pi",
+                "request_path": str(queued),
+            }
+        result = run_pi_sandbox_job(
+            root,
+            PiSandboxJob(
+                job_id=request.request_id,
+                prompt=request.objective,
+                allowed_paths=request.allowed_paths,
+                pytest_targets=request.required_tests,
+                lease_resources=request.lease_resources,
+                max_runtime_seconds=request.max_runtime_seconds,
+                require_changes=(
+                    request.authority == "internal_write"
+                    and request.capability in {
+                        "backend_code",
+                        "parallel_backend_code",
+                        "frontend_code",
+                        "refactor",
+                        "tests",
+                        "documentation",
+                    }
+                ),
+            ),
+        )
+        proposal_gate = None
+        if (
+            result.get("status") == "PROPOSAL_READY"
+            and result.get("proposal_branch")
+        ):
+            proposal_gate = verify_proposal_candidate(
+                root,
+                verification_plan,
+                proposal_branch=str(result["proposal_branch"]),
+                allowed_paths=request.allowed_paths,
+            )
+
+        if proposal_gate and proposal_gate.get("awaiting_promptfoo"):
+            status = "AWAITING_PROMPTFOO"
+        elif proposal_gate and proposal_gate.get("candidate_gate_passed"):
+            status = "CANDIDATE_GATE_PASSED"
+        else:
+            status = result.get("status")
+
+        return {
+            **base,
+            "status": status,
+            "worker": "pi",
+            "worker_result": result,
+            "proposal_gate": proposal_gate,
+        }
+
+    if worker == "empire_coder":
+        if request.authority == "internal_write":
+            result = run_empire_coder_sandbox_job(
+                root,
+                EmpireCoderSandboxJob(
+                    job_id=request.request_id,
+                    objective=request.objective,
+                    department=request.department,
+                    capability=request.capability,
+                    allowed_paths=request.allowed_paths,
+                    lease_resources=request.lease_resources,
+                    pytest_targets=request.required_tests,
+                    max_runtime_seconds=request.max_runtime_seconds,
+                ),
+            )
+            proposal_gate = None
+            if (
+                result.get("status") == "PROPOSAL_READY"
+                and result.get("proposal_branch")
+            ):
+                proposal_gate = verify_proposal_candidate(
+                    root,
+                    verification_plan,
+                    proposal_branch=str(result["proposal_branch"]),
+                    allowed_paths=request.allowed_paths,
+                )
+            if proposal_gate and proposal_gate.get("awaiting_promptfoo"):
+                status = "AWAITING_PROMPTFOO"
+            elif proposal_gate and proposal_gate.get("candidate_gate_passed"):
+                status = "CANDIDATE_GATE_PASSED"
+            else:
+                status = result.get("status")
+            return {
+                **base,
+                "status": status,
+                "worker": "empire_coder",
+                "worker_result": result,
+                "proposal_gate": proposal_gate,
+            }
+
+        runtime = root / "runtime/coder"
+        coder = EmpireCoder(root, runtime_root=runtime)
+        queue = LocalJobQueue(root, runtime_root=runtime)
+        task = coder.create_task(request.objective)
+        job = queue.enqueue(
+            task_id=task.id,
+            kind=JobKind.PLAN,
+            priority=max(0, min(int(request.priority), 100)),
+            payload={
+                "execution_plane_request_id": request.request_id,
+                "source_ref": request.source_ref,
+                "terms": [
+                    request.department,
+                    request.capability,
+                ],
+                "budget_chars": 8000,
+                "execution_authority": "none",
+                "verification_plan": verification_plan.as_dict(),
+                "allowed_paths": list(request.allowed_paths),
+                "lease_resources": list(request.lease_resources),
+                "required_tests": list(request.required_tests),
+                "ai_behavior_change": request.ai_behavior_change,
+            },
+        )
+        return {
+            **base,
+            "status": "QUEUED",
+            "worker": "empire_coder",
+            "coder_task_id": task.id,
+            "coder_job_id": job.id,
+            "coder_job_kind": JobKind.PLAN.value,
+        }
+
+    if worker == "space_agent":
+        health = space_agent_health()
+        queued = _write_request(
+            root,
+            "space_agent",
+            request,
+            extra={"tool_health": health.as_dict()},
+        )
+        return {
+            **base,
+            "status": (
+                "WORKSPACE_REQUEST_READY"
+                if health.ready
+                else "WAITING_FOR_RUNTIME"
+            ),
+            "worker": "space_agent",
+            "request_path": str(queued),
+            "tool_health": health.as_dict(),
+        }
+
+    if worker == "agent_reach":
+        health = agent_reach_health()
+        queued = _write_request(
+            root,
+            "agent_reach",
+            request,
+            extra={"tool_health": health},
+        )
+        return {
+            **base,
+            "status": (
+                "SENSOR_REQUEST_READY"
+                if health["tool"]["ready"]
+                else "WAITING_FOR_RUNTIME"
+            ),
+            "worker": "agent_reach",
+            "request_path": str(queued),
+            "tool_health": health,
+            "truth_authority": "none",
+        }
+
+    if worker in {"swarm_v6", "needle", "laya"}:
+        queued = _write_request(root, worker, request)
+        return {
+            **base,
+            "status": "QUEUED",
+            "worker": worker,
+            "request_path": str(queued),
+        }
+
+    return {
+        **base,
+        "status": "BLOCKED",
+        "reason": "worker_adapter_not_implemented",
+        "worker": worker,
+    }

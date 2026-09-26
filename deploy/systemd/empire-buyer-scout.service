@@ -1,0 +1,16 @@
+[Unit]
+Description=Run bounded EmpireOS Buyer Scout research
+After=network-online.target empire-buyer-acquisition-team.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=/etc/empire_os.env
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_scout.py --repo-root /srv/empire_os --max-queries 12 --results-per-query 5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=240

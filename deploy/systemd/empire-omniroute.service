@@ -1,0 +1,30 @@
+[Unit]
+Description=Empire OmniRoute local AI gateway (Docker)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+Before=empire-hermes-control.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=-/home/ubuntu/.omniroute/.env
+EnvironmentFile=-/etc/empire_os/omniroute-providers.env
+ExecStartPre=-/usr/bin/docker rm -f empire-omniroute
+ExecStart=/usr/bin/docker run -d --name empire-omniroute --restart unless-stopped --stop-timeout 40 --env-file /home/ubuntu/.omniroute/.env --env-file /etc/empire_os/omniroute-providers.env -p 127.0.0.1:20128:20128 -v empire-omniroute-data:/app/data diegosouzapw/omniroute:3.8.50
+ExecStop=/usr/bin/docker stop -t 40 empire-omniroute
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

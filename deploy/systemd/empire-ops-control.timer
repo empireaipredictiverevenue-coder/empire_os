@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EmpireOS control fabric health/healing cycle
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=2min
+AccuracySec=20s
+Persistent=true
+Unit=empire-ops-control.service
+
+[Install]
+WantedBy=timers.target
