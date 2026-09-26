@@ -157,3 +157,33 @@ def test_mailbox_draft_preview_fails_closed_for_suppressed_recipient():
     assert response.status_code == 409
     assert response.json()["detail"] == "recipient_suppressed"
 
+
+
+def test_resend_provider_lists_suppressions(monkeypatch):
+    provider = ResendMailboxProvider(
+        api_key="send-key",
+        receiving_api_key="receive-key",
+    )
+    calls = []
+
+    def fake_get(path, *, params=None, receiving=False):
+        calls.append((path, params, receiving))
+        return {
+            "object": "list",
+            "data": [{
+                "id": "sup-1",
+                "email": "buyer@example.com",
+                "origin": "manual",
+            }],
+        }
+
+    monkeypatch.setattr(provider, "_get", fake_get)
+
+    rows = provider.list_suppressions(limit=25)
+
+    assert rows == [{
+        "id": "sup-1",
+        "email": "buyer@example.com",
+        "origin": "manual",
+    }]
+    assert calls == [("/suppressions", {"limit": 25}, False)]
