@@ -51,11 +51,41 @@ def predictive_cloud_coding_team_requests() -> tuple[ExecutionRequest, ...]:
             ai_behavior_change=True,
         ),
         ExecutionRequest(
-            request_id="predictive-action-portfolio-optimizer-v1",
+            request_id="predictive-action-portfolio-design-v1",
             capability="parallel_backend_code",
             department="strategy",
             objective=(
-                "Implement a portfolio Next-Best-Action optimizer in "
+                "Produce an OBSERVE-only implementation design for the portfolio "
+                "Next-Best-Action optimizer. Review the existing Predictive Revenue "
+                "NBA contract, Hybrid Optimization contract and authority boundaries. "
+                "Specify inputs, constraints, deterministic baseline, QUBO/CQM export "
+                "shape, edge cases and required tests. Do not mutate repository files."
+            ),
+            authority="observe",
+            risk_class="medium",
+            source_ref="architecture:agi_predictive_cloud_quantum_v1",
+            evidence_domains=(
+                "predictive_revenue",
+                "next_best_action",
+                "portfolio_optimization",
+            ),
+            success_condition=(
+                "Pi produces a bounded implementation design without repository "
+                "mutation or authority expansion."
+            ),
+            required_tests=(
+                "tests/test_predictive_revenue_formula.py",
+                "tests/test_hybrid_optimization.py",
+            ),
+            priority=91,
+            ai_behavior_change=True,
+        ),
+        ExecutionRequest(
+            request_id="predictive-action-portfolio-implementation-v2",
+            capability="backend_code",
+            department="strategy",
+            objective=(
+                "Implement the portfolio Next-Best-Action optimizer in "
                 "empire_os/action_portfolio_optimization.py with tests in "
                 "tests/test_action_portfolio_optimization.py. Consume only "
                 "evidence-backed expected_incremental_value_cents from the existing "
@@ -89,6 +119,7 @@ def predictive_cloud_coding_team_requests() -> tuple[ExecutionRequest, ...]:
             required_tests=(
                 "tests/test_action_portfolio_optimization.py",
                 "tests/test_predictive_revenue_formula.py",
+                "tests/test_hybrid_optimization.py",
             ),
             priority=90,
             ai_behavior_change=True,
