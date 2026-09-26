@@ -252,6 +252,8 @@ def build_aider_command(
         raise RuntimeError("aider executable unavailable")
 
     history_root = root / ".git"
+    config_path = history_root / "empire-aider-config.yml"
+    env_path = history_root / "empire-aider.env"
     command = [
         binary,
         "--model",
@@ -285,9 +287,9 @@ def build_aider_command(
         "--no-stream",
         "--no-restore-chat-history",
         "--env-file",
-        "/dev/null",
+        str(env_path),
         "--config",
-        "/dev/null",
+        str(config_path),
         "--input-history-file",
         str(history_root / "empire-aider-input.history"),
         "--chat-history-file",
@@ -370,6 +372,16 @@ def run_aider_mutation(
         }
 
     env = _provider_environment(environment)
+    git_dir = root / ".git"
+    git_dir.mkdir(parents=True, exist_ok=True)
+    (git_dir / "empire-aider-config.yml").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+    (git_dir / "empire-aider.env").write_text(
+        "",
+        encoding="utf-8",
+    )
     env["HOME"] = "/var/tmp/empire-aider-home"
     env["XDG_CACHE_HOME"] = "/var/tmp/empire-aider-cache"
     Path(env["HOME"]).mkdir(parents=True, exist_ok=True)
