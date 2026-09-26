@@ -394,6 +394,7 @@ def dispatch_execution_request(
                         "documentation",
                     }
                 ),
+                observe_only=(request.authority == "observe"),
             ),
         )
         proposal_gate = None

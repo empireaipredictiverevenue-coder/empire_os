@@ -62,6 +62,7 @@ class PiSandboxJob:
     max_runtime_seconds: int = 900
     require_changes: bool = True
     publish_proposal: bool = True
+    observe_only: bool = False
 
     def validate(self) -> None:
         if not JOB_ID_RE.fullmatch(self.job_id):
@@ -72,8 +73,12 @@ class PiSandboxJob:
             raise PiSandboxError("prompt too long")
         if self.base_branch != DEFAULT_BRANCH:
             raise PiSandboxError("base branch is pinned")
-        if not self.allowed_paths:
+        if self.require_changes and not self.allowed_paths:
             raise PiSandboxError("allowed_paths required")
+        if self.observe_only and self.require_changes:
+            raise PiSandboxError(
+                "observe-only Pi jobs cannot require repository changes"
+            )
         for target in self.pytest_targets:
             if not target.startswith("tests/") or ".py" not in target:
                 raise PiSandboxError("invalid pytest target")
@@ -172,6 +177,7 @@ def build_pi_systemd_command(
     max_runtime_seconds: int,
     system_prompt: str,
     pi_bin: Path = DEFAULT_PI_BIN,
+    observe_only: bool = False,
 ) -> list[str]:
     config = clone / ".empire_pi"
     argv = [
@@ -191,7 +197,11 @@ def build_pi_systemd_command(
         "--property=IPAddressAllow=localhost",
         "--property=MemoryMax=2G",
         "--property=TasksMax=64",
-        f"--property=ReadWritePaths={clone}",
+        (
+            f"--property=ReadOnlyPaths={clone}"
+            if observe_only
+            else f"--property=ReadWritePaths={clone}"
+        ),
         "--property=ReadOnlyPaths=/opt/empire/pi-agent",
         "--property=InaccessiblePaths=/srv/empire_os",
         "--property=InaccessiblePaths=/etc/empire_os",
@@ -213,7 +223,11 @@ def build_pi_systemd_command(
         "--no-prompt-templates",
         "--no-context-files",
         "--tools",
-        "read,grep,find,ls,edit,write,bash",
+        (
+            "read,grep,find,ls"
+            if observe_only
+            else "read,grep,find,ls,edit,write,bash"
+        ),
         "--system-prompt",
         system_prompt,
         "--mode",
@@ -243,19 +257,21 @@ def run_pi_sandbox_job(
     if not pi_config.exists():
         raise PiSandboxError("Pi configuration not installed")
 
-    lease_resources = job.lease_resources or tuple(
-        f"path:{path}" for path in job.allowed_paths
-    )
+    lease = None
     manager = lease_manager or ExecutionLeaseManager()
-    try:
-        lease = manager.acquire(
-            owner="pi",
-            job_id=job.job_id,
-            resources=lease_resources,
-            ttl_seconds=job.max_runtime_seconds + 300,
+    if not job.observe_only:
+        lease_resources = job.lease_resources or tuple(
+            f"path:{path}" for path in job.allowed_paths
         )
-    except ExecutionLeaseError as exc:
-        raise PiSandboxError(str(exc)) from exc
+        try:
+            lease = manager.acquire(
+                owner="pi",
+                job_id=job.job_id,
+                resources=lease_resources,
+                ttl_seconds=job.max_runtime_seconds + 300,
+            )
+        except ExecutionLeaseError as exc:
+            raise PiSandboxError(str(exc)) from exc
 
     work_root.mkdir(parents=True, exist_ok=True)
     clone = work_root / job.job_id
@@ -264,7 +280,7 @@ def run_pi_sandbox_job(
         "schema_version": "empire.pi-sandbox-result.v1",
         "job_id": job.job_id,
         "status": "FAILED",
-        "lease_id": lease.lease_id,
+        "lease_id": lease.lease_id if lease is not None else None,
         "changed_paths": [],
         "verification": None,
         "proposal_branch": None,
@@ -310,6 +326,7 @@ def run_pi_sandbox_job(
             max_runtime_seconds=job.max_runtime_seconds,
             system_prompt=system_prompt,
             pi_bin=pi_bin,
+            observe_only=job.observe_only,
         )
         try:
             completed = _run(
@@ -336,6 +353,11 @@ def run_pi_sandbox_job(
             for path in _changed_paths(clone)
             if not path.startswith(".empire_pi/")
         ]
+        if job.observe_only and changed:
+            result["status"] = "OBSERVE_MUTATION_DETECTED"
+            result["rejected_paths"] = changed
+            return result
+
         rejected = [
             path
             for path in changed
@@ -444,5 +466,6 @@ def run_pi_sandbox_job(
         result["status"] = "PROPOSAL_READY"
         return result
     finally:
-        manager.release(lease.lease_id)
+        if lease is not None:
+            manager.release(lease.lease_id)
         shutil.rmtree(clone, ignore_errors=True)

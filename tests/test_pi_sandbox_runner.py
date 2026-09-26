@@ -113,3 +113,49 @@ def test_pi_mutation_smoke_can_disable_proposal_publish():
     )
     assert job.require_changes is True
     assert job.publish_proposal is False
+
+
+def test_pi_observe_job_allows_empty_mutation_scope():
+    job = PiSandboxJob(
+        job_id="observe-design-1",
+        prompt="Review architecture and produce design only.",
+        allowed_paths=(),
+        require_changes=False,
+        observe_only=True,
+    )
+    job.validate()
+    assert job.observe_only is True
+
+
+def test_pi_observe_job_rejects_required_mutation():
+    with pytest.raises(Exception, match="observe-only"):
+        PiSandboxJob(
+            job_id="observe-bad-1",
+            prompt="Mutate repository.",
+            allowed_paths=("empire_os/",),
+            require_changes=True,
+            observe_only=True,
+        ).validate()
+
+
+def test_pi_observe_command_removes_mutation_tools(tmp_path):
+    clone = tmp_path / "clone"
+    clone.mkdir()
+    (clone / ".empire_pi").mkdir()
+
+    argv = build_pi_systemd_command(
+        clone=clone,
+        prompt="Review only.",
+        model_id="qwen-test",
+        max_runtime_seconds=300,
+        system_prompt="Empire safe coding policy.",
+        pi_bin=Path("/opt/empire/pi-agent/bin/pi"),
+        observe_only=True,
+    )
+
+    joined = "\n".join(argv)
+
+    tools_index = argv.index("--tools")
+    assert argv[tools_index + 1] == "read,grep,find,ls"
+    assert f"ReadOnlyPaths={clone}" in joined
+    assert f"ReadWritePaths={clone}" not in joined
