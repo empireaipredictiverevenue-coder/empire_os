@@ -66,3 +66,63 @@ def test_buyer_scout_service_labels_pipeline_stages():
         "PROMOTION PLAN",
     ):
         assert stage in text
+
+
+def test_opportunity_validation_seed_materializer_preserves_target(monkeypatch):
+    from scripts.run_buyer_acquisition_scout import (
+        _opportunity_validation_seed_records,
+    )
+
+    seen = []
+
+    def fake_request(method, path):
+        seen.append((method, path))
+        return [{
+            "id": "prospect-1",
+            "business_name": "Denver Roofing Co",
+            "niche": "roofing",
+            "website": "https://denver-roofing.example",
+            "metro": "Denver, CO",
+            "status": "qualified",
+            "created_at": "2026-09-26T12:00:00+00:00",
+        }]
+
+    monkeypatch.setattr(
+        "scripts.run_buyer_acquisition_scout.request_json",
+        fake_request,
+    )
+
+    plan = {
+        "opportunity_validation": {
+            "targets": [{
+                "opportunity_key": "market:roofing:denver, co",
+                "niche_family": "roofing",
+                "territory": "denver, co",
+                "corridor_key": (
+                    "opportunity-validation:v1:roofing:denver_co"
+                ),
+                "product_code": None,
+            }],
+        },
+    }
+
+    rows = _opportunity_validation_seed_records(
+        plan,
+        per_target=4,
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["id"] == "prospect-1"
+    assert row["seed_opportunity_key"] == "market:roofing:denver, co"
+    assert row["seed_corridor_key"] == (
+        "opportunity-validation:v1:roofing:denver_co"
+    )
+    assert row["seed_buyer_pools"] == [
+        "end_service_buyers",
+        "local_and_smb_buyers",
+    ]
+    assert row["icp_profile_key"] == "high_ticket_home_service"
+    assert seen and seen[0][0] == "GET"
+    assert "niche=eq.roofing" in seen[0][1]
+    assert "metro=ilike.%2Adenver%2A" in seen[0][1]
