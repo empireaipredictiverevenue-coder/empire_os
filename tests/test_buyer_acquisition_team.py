@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from empire_os.buyer_acquisition_team import (
     build_buyer_acquisition_plan,
     build_demand_gap_queue,
+    build_opportunity_validation_targets,
     direct_buyer_profile,
     _read_runtime_snapshot,
 )
@@ -450,3 +451,83 @@ def test_refresh_surfaces_enterprise_activation_summary(tmp_path, monkeypatch):
     assert contacts["error_count"] == 0
     assert contacts["live_outbound_send"] is False
     assert contacts["actual_revenue"] is False
+
+
+def test_qualified_opportunity_becomes_buyer_validation_target_without_send():
+    radar = {
+        "candidates": [{
+            "opportunity_key": "market:solar:united kingdom",
+            "opportunity_class": "market_research",
+            "niche": "solar",
+            "metro": "united kingdom",
+            "observed_priority_score": 88,
+        }]
+    }
+    intake = {
+        "items": [{
+            "opportunity_key": "market:solar:united kingdom",
+            "niche": "solar",
+            "offer_key": "managed_service",
+            "evidence_count": 11,
+            "blockers": [
+                "buyer_intent_normalized_score_required",
+                "demand_normalized_score_required",
+                "urgency_normalized_score_required",
+            ],
+            "normalization": {"normalized_score_count": 3},
+        }]
+    }
+    routes = {
+        "items": [{
+            "opportunity_key": "market:solar:united kingdom",
+            "lifecycle": {
+                "current_stage": "QUALIFY",
+                "next_stage": "VALIDATE",
+            },
+        }]
+    }
+
+    targets = build_opportunity_validation_targets(
+        radar, intake, routes
+    )
+
+    assert len(targets) == 1
+    row = targets[0]
+    assert row["opportunity_key"] == "market:solar:united kingdom"
+    assert row["source"] == "predictive_cloud_opportunity_validation"
+    assert row["lifecycle_stage"] == "QUALIFY"
+    assert row["next_lifecycle_stage"] == "VALIDATE"
+    assert row["commercial_validation_blockers"] == [
+        "buyer_intent_normalized_score_required",
+        "demand_normalized_score_required",
+    ]
+    assert "direct_demand_buyers" in row["research_queries"]
+    assert "end_service_buyers" in row["research_queries"]
+    assert any(
+        "buy solar leads" in query
+        for query in row["research_queries"]["direct_demand_buyers"]
+    )
+    assert row["buyer_intent_inferred"] is False
+    assert row["demand_inferred"] is False
+    assert row["commercial_ready_claimed"] is False
+    assert row["live_outbound_send"] is False
+    assert row["execution_authority"] == "none"
+
+
+def test_nonqualified_opportunity_does_not_enter_validation_targets():
+    targets = build_opportunity_validation_targets(
+        {"candidates": [{
+            "opportunity_key": "market:roofing:denver",
+            "niche": "roofing",
+            "metro": "denver",
+        }]},
+        {"items": [{
+            "opportunity_key": "market:roofing:denver",
+            "blockers": ["buyer_intent_normalized_score_required"],
+        }]},
+        {"items": [{
+            "opportunity_key": "market:roofing:denver",
+            "lifecycle": {"current_stage": "DISCOVER"},
+        }]},
+    )
+    assert targets == []
