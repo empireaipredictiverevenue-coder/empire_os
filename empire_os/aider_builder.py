@@ -140,7 +140,11 @@ def aider_health() -> dict[str, Any]:
 def _protected_omniroute_env(
     path: Path = OMNIROUTE_ENV_PATH,
 ) -> dict[str, str]:
-    allowed = {"OPENAI_BASE_URL", "OPENAI_API_KEY"}
+    allowed = {
+        "OPENAI_BASE_URL",
+        "OPENAI_API_KEY",
+        "EMPIRE_HERMES_MODEL",
+    }
     values: dict[str, str] = {}
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -228,6 +232,29 @@ def _sanitize_output(
     return text[-4000:]
 
 
+def resolved_aider_model(
+    requested: str | None = None,
+) -> str:
+    explicit = str(
+        requested
+        or os.getenv("EMPIRE_AIDER_MODEL")
+        or ""
+    ).strip()
+    if explicit and explicit != DEFAULT_MODEL:
+        return explicit
+
+    protected = _protected_omniroute_env()
+    routed = str(
+        protected.get("EMPIRE_HERMES_MODEL") or ""
+    ).strip()
+    if routed:
+        if routed.startswith("openai/"):
+            return routed
+        return "openai/" + routed
+
+    return DEFAULT_MODEL
+
+
 def provider_ready(
     source: Mapping[str, str] | None = None,
 ) -> tuple[bool, str]:
@@ -281,6 +308,10 @@ def build_aider_command(
         "--no-check-update",
         "--no-show-release-notes",
         "--no-cache-prompts",
+        "--map-tokens",
+        "0",
+        "--map-refresh",
+        "manual",
         "--no-gitignore",
         "--no-add-gitignore-files",
         "--no-pretty",
@@ -329,8 +360,13 @@ def _changed_paths(workspace: Path) -> list[str]:
         value = line[3:].strip()
         if " -> " in value:
             value = value.split(" -> ", 1)[1]
-        if value and not value.startswith("runtime/"):
-            changed.append(value)
+        if not value:
+            continue
+        if value.startswith("runtime/"):
+            continue
+        if value.startswith(".aider.tags.cache."):
+            continue
+        changed.append(value)
     return sorted(dict.fromkeys(changed))
 
 
