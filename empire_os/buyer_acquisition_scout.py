@@ -196,6 +196,7 @@ def collect_research_queries(
                         "buyer_pool": str(pool),
                         "target_kind": target_kind,
                         "corridor_key": target.get("corridor_key"),
+                        "opportunity_key": target.get("opportunity_key"),
                         "product_code": target.get("product_code"),
                         "icp_profile_key": target.get("icp_profile_key"),
                         "buying_triggers": list(
@@ -265,6 +266,7 @@ def run_buyer_scout(
                 "buyer_pool": row["buyer_pool"],
                 "target_kind": row["target_kind"],
                 "corridor_key": row.get("corridor_key"),
+                "opportunity_key": row.get("opportunity_key"),
                 "product_code": row.get("product_code"),
                 "icp_profile_key": row.get("icp_profile_key"),
                 "buying_triggers": list(
@@ -437,6 +439,11 @@ def run_buyer_scout(
             for item in provenance[domain]
             if str(item.get("corridor_key") or "")
         })
+        opportunity_keys = sorted({
+            str(item.get("opportunity_key") or "")
+            for item in provenance[domain]
+            if str(item.get("opportunity_key") or "")
+        })
         icp_profiles = sorted({
             str(item.get("icp_profile_key") or "")
             for item in provenance[domain]
@@ -529,6 +536,7 @@ def run_buyer_scout(
             "target_buyer_pools": pools,
             "target_product_codes": products,
             "target_corridor_keys": corridors,
+            "target_opportunity_keys": opportunity_keys,
             "target_icp_profile_keys": icp_profiles,
             "icp_intelligence": icp,
             "predictive_revenue_enterprise_candidate": (
