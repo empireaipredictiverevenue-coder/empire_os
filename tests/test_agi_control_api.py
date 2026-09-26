@@ -113,3 +113,59 @@ def test_intelligence_architecture_and_quant_route_are_nonexecuting():
     assert routed["intelligence_class"] == "deterministic_quant"
     assert routed["authority_inherited_from_intelligence"] is False
     assert routed["execution_authority"] == "none"
+
+
+
+def test_agi_orchestration_preview_is_nonexecuting():
+    response = client().post(
+        "/v1/agi-control/orchestration/preview",
+        json={
+            "task_id": "agi-orch-1",
+            "goal": "Coordinate predictive intelligence",
+            "world_state_ref": "world:latest",
+            "evidence_refs": ["evidence:1"],
+            "predictive_revenue": {
+                "status": "AVAILABLE",
+                "predicted_revenue_cents": 120000,
+                "actual_revenue": False,
+            },
+            "predictive_cloud": {
+                "status": "AVAILABLE",
+                "cloud_operating_score": 82,
+                "constraints": {"state": "CLEAR"},
+                "actual_revenue": False,
+            },
+            "future_trend": {
+                "status": "AVAILABLE",
+                "future_opportunity_status": "AVAILABLE",
+                "direction": "up",
+                "trend_confidence": 0.8,
+                "trend_opportunity_alignment": 0.7,
+                "causal_claim": False,
+            },
+            "quantum_optimization": {
+                "status": "AVAILABLE",
+                "qaoa_ready": True,
+                "model_type": "QUBO",
+                "external_solver_called": False,
+                "quantum_advantage_claimed": False,
+            },
+            "economic_memory": {
+                "status": "OBSERVED",
+                "verified_outcomes_only_for_outcome_conditioned_memory": True,
+                "outcome_conditioned_memory_count": 2,
+                "model_weight_mutation_authorized": False,
+            },
+            "entity_refs": ["buyer:1"],
+            "topic_keys": ["predictive_revenue", "quantum"],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["human_level_agi_claimed"] is False
+    assert body["execution_ready"] is False
+    assert body["external_action_performed"] is False
+    assert body["execution_authority"] == "none"
+    assert body["verification_requirements"][
+        "classical_reference_required_for_quantum_claim"
+    ] is True
