@@ -58,7 +58,7 @@ def test_verified_inputs_make_pilot_ready_but_do_not_authorize_live_traffic():
     economics = _base(
         geography="verified-buyer-geo",
         payout_amount=125.0,
-        payout_currency="USD",
+        payout_currency="usd",
         qualification_seconds=120,
         daily_cap=10,
         traffic_source="search",
@@ -72,6 +72,7 @@ def test_verified_inputs_make_pilot_ready_but_do_not_authorize_live_traffic():
 
     assert economics["blockers"] == []
     assert economics["pilot_ready"] is True
+    assert economics["payout"]["currency"] == "USD"
     assert economics["economics"]["margin_known"] is True
     assert economics["economics"]["gross_margin_per_accepted_call"] == 69.75
     assert economics["live_traffic_authorized"] is False
@@ -101,6 +102,63 @@ def test_margin_stays_unknown_until_acquisition_cost_is_known():
     assert economics["pilot_ready"] is True
     assert economics["economics"]["margin_known"] is False
     assert economics["economics"]["gross_margin_per_accepted_call"] is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "blocker"),
+    [
+        ("payout_amount", 0, "payout_invalid"),
+        ("payout_amount", -10, "payout_invalid"),
+        ("qualification_seconds", 0, "qualification_rule_invalid"),
+        ("qualification_seconds", -1, "qualification_rule_invalid"),
+        ("daily_cap", 0, "capacity_invalid"),
+        ("daily_cap", -1, "capacity_invalid"),
+        ("estimated_cost_per_call", -0.01, "acquisition_cost_invalid"),
+    ],
+)
+def test_invalid_economic_inputs_fail_closed(field, value, blocker):
+    economics = _base(
+        geography="verified-buyer-geo",
+        payout_amount=100.0,
+        payout_currency="USD",
+        qualification_seconds=90,
+        daily_cap=5,
+        traffic_source="search",
+        traffic_source_approved=True,
+        routing_mode="rtb",
+        routing_verified=True,
+        tracking_verified=True,
+        buyer_asset_approved=True,
+        estimated_cost_per_call=50.0,
+        **{field: value},
+    )
+
+    assert blocker in economics["blockers"]
+    assert economics["pilot_ready"] is False
+    assert routing_decision(economics)["decision"] == "hold"
+    assert economics["live_traffic_authorized"] is False
+    assert economics["revenue_recognized"] is False
+
+
+def test_zero_acquisition_cost_is_valid_when_verified():
+    economics = _base(
+        geography="verified-buyer-geo",
+        payout_amount=100.0,
+        payout_currency="USD",
+        qualification_seconds=90,
+        daily_cap=5,
+        traffic_source="search",
+        traffic_source_approved=True,
+        routing_mode="rtb",
+        routing_verified=True,
+        tracking_verified=True,
+        buyer_asset_approved=True,
+        estimated_cost_per_call=0.0,
+    )
+
+    assert economics["pilot_ready"] is True
+    assert economics["acquisition"]["cost_valid"] is True
+    assert economics["economics"]["gross_margin_per_accepted_call"] == 100.0
 
 
 @pytest.mark.parametrize(
