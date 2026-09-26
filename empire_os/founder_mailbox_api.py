@@ -72,9 +72,6 @@ class MailboxProvider(Protocol):
     def list_suppressions(self, *, limit: int) -> list[dict[str, Any]]:
         ...
 
-    def list_suppressions(self, *, limit: int) -> list[dict[str, Any]]:
-        return self._rows(self._get("/suppressions", params={"limit": limit}))
-
     def get_sent(self, email_id: str) -> dict[str, Any]:
         ...
 
@@ -154,6 +151,9 @@ class ResendMailboxProvider:
             except Exception:
                 hydrated.append(row)
         return hydrated
+
+    def list_suppressions(self, *, limit: int) -> list[dict[str, Any]]:
+        return self._rows(self._get("/suppressions", params={"limit": limit}))
 
     def get_sent(self, email_id: str) -> dict[str, Any]:
         payload = self._get(f"/emails/{email_id}")
