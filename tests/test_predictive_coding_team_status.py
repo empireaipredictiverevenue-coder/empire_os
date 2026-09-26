@@ -181,3 +181,57 @@ def test_status_surfaces_hermes_failure(
     assert len(failed) == 1
     assert failed[0]["status"] == "VERIFICATION_FAILED"
     assert failed[0]["reason"] == "test_failure"
+
+
+
+def test_status_exposes_coder_backend_readiness(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        status_module,
+        "_hermes_state",
+        lambda *args, **kwargs: {
+            "queue_state": "NOT_OBSERVED",
+            "status": "UNKNOWN",
+        },
+    )
+    monkeypatch.setattr(
+        status_module,
+        "aider_health",
+        lambda: {
+            "ready": True,
+            "reason": "aider_ready",
+            "version": "aider test",
+            "executable": "/home/ubuntu/.local/bin/aider",
+            "execution_authority": "none",
+        },
+    )
+    _write(
+        tmp_path
+        / "runtime/execution_plane/builder_capabilities.json",
+        {
+            "schema_version": "empire.builder-capabilities.v1",
+            "workers": {
+                "empire_coder": {
+                    "structured_patch_mutation": {
+                        "ready": True,
+                    },
+                    "aider_mutation": {
+                        "ready": True,
+                    },
+                }
+            },
+        },
+    )
+
+    payload = build_predictive_coding_team_status(tmp_path)
+    backends = payload["coder_backends"]
+
+    assert backends["native_structured_patch"]["capability"][
+        "ready"
+    ] is True
+    assert backends["aider"]["health"]["ready"] is True
+    assert backends["aider"]["capability"]["ready"] is True
+    assert backends["openhands"]["workspace_contract_ready"] is True
+    assert backends["openhands"]["mutation_capability_proven"] is False
