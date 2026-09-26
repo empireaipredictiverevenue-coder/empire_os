@@ -12,6 +12,7 @@ from empire_os.agi_control_plane import (
     review_learning_candidate,
 )
 from empire_os.agi_memory import build_memory_query, review_memory_item
+from empire_os.agi_orchestrator import build_agi_orchestration_packet
 from empire_os.agi_capabilities import (
     capability_registry,
     review_capability_request,
@@ -59,6 +60,20 @@ class MemoryItemReviewRequest(BaseModel):
 
 class CapabilityReviewRequest(BaseModel):
     request: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgiOrchestrationRequest(BaseModel):
+    task_id: str
+    goal: str
+    world_state_ref: str
+    evidence_refs: list[str]
+    predictive_revenue: dict[str, Any] = Field(default_factory=dict)
+    predictive_cloud: dict[str, Any] = Field(default_factory=dict)
+    future_trend: dict[str, Any] = Field(default_factory=dict)
+    quantum_optimization: dict[str, Any] = Field(default_factory=dict)
+    economic_memory: dict[str, Any] = Field(default_factory=dict)
+    entity_refs: list[str] = Field(default_factory=list)
+    topic_keys: list[str] = Field(default_factory=list)
 
 
 class IntelligenceRouteRequest(BaseModel):
@@ -117,6 +132,25 @@ def create_agi_control_router() -> APIRouter:
     @router.post("/learning/preview")
     def learning_preview(req: LearningCandidateRequest):
         return review_learning_candidate(req.candidate)
+
+    @router.post("/orchestration/preview")
+    def orchestration_preview(req: AgiOrchestrationRequest):
+        try:
+            return build_agi_orchestration_packet(
+                task_id=req.task_id,
+                goal=req.goal,
+                world_state_ref=req.world_state_ref,
+                evidence_refs=req.evidence_refs,
+                predictive_revenue=req.predictive_revenue,
+                predictive_cloud=req.predictive_cloud,
+                future_trend=req.future_trend,
+                quantum_optimization=req.quantum_optimization,
+                economic_memory=req.economic_memory,
+                entity_refs=req.entity_refs,
+                topic_keys=req.topic_keys,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @router.post("/memory/query/preview")
     def memory_query(req: MemoryQueryRequest):
