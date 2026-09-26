@@ -18,7 +18,7 @@ if [ -z "$UV_BIN" ]; then
 fi
 
 echo "=== INSTALL / UPDATE ISOLATED AIDER TOOL ==="
-"$UV_BIN" tool install --force --python python3.12 aider-chat
+"$UV_BIN" tool install --force --python 3.12 aider-chat
 
 AIDER_BIN="$(command -v aider || true)"
 if [ -z "$AIDER_BIN" ]; then
