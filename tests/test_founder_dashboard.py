@@ -1802,7 +1802,7 @@ def test_dashboard_exposes_modern_phase4_exchange_mrr_products(tmp_path):
     assert rows["exchange_seat_growth"]["corridor_limit"] == 5
     assert rows["exchange_seat_pro"]["corridor_limit"] == 25
     assert rows["exchange_seat_enterprise"]["corridor_limit"] is None
-    assert mrr["pricing_authority"] == "none"
+    assert mrr["pricing_authority"] == "founder_approved_2026_09_24"
     assert mrr["binding_terms_ready"] is False
     assert mrr["canonical_settlement_rail"] == "USDT_BSC"
 
@@ -2103,3 +2103,99 @@ def test_dashboard_exposes_revenue_command_queue(tmp_path):
     assert queue["external_execution_authorized"] is False
     assert queue["payment_authorized"] is False
     assert queue["unknown_stays_unknown"] is True
+
+
+def test_dashboard_exposes_live_opportunity_funnel_and_blockers(tmp_path):
+    root = make_root(tmp_path)
+
+    write_json(
+        root / "runtime/opportunity_radar/loop_latest.json",
+        {
+            "schema_version": (
+                "empire.predictive_cloud.opportunity_loop.v2"
+            ),
+            "mode": "OBSERVE",
+            "ok": True,
+            "finished_at": "2026-09-26T23:15:30+00:00",
+            "radar_candidate_count": 21,
+            "research_candidate_count": 5,
+            "research_observation_count": 28,
+            "candidates_with_any_normalized_score": 6,
+            "total_normalized_scores": 18,
+            "factory_ready_count": 0,
+            "factory_blocked_count": 21,
+            "quant_decision_packet_available_count": 0,
+            "quant_decision_packet_unavailable_count": 21,
+            "opportunity_value_available_count": 0,
+            "ai_plan_queued_count": 0,
+            "opportunity_stage_counts": {
+                "DISCOVER": 2,
+                "QUALIFY": 19,
+            },
+            "next_layer": (
+                "astra_priority_and_safe_internal_execution"
+            ),
+            "automatic_external_execution_allowed": False,
+            "revenue_recognized": False,
+            "execution_authority": "none",
+        },
+    )
+
+    write_json(
+        root / "runtime/opportunity_factory/intake_latest.json",
+        {
+            "candidate_count": 2,
+            "factory_ready_count": 0,
+            "blocked_count": 2,
+            "items": [
+                {
+                    "opportunity_key": "market:roofing:denver",
+                    "opportunity_class": "market_research",
+                    "niche": "roofing",
+                    "evidence_count": 3,
+                    "factory_ready": False,
+                    "blockers": [
+                        "buyer_intent_normalized_score_required",
+                        "urgency_normalized_score_required",
+                    ],
+                    "normalization": {
+                        "normalized_score_count": 3,
+                    },
+                },
+                {
+                    "opportunity_key": "market:solar:london",
+                    "opportunity_class": "market_research",
+                    "niche": "solar",
+                    "evidence_count": 2,
+                    "factory_ready": False,
+                    "blockers": [
+                        "buyer_intent_normalized_score_required",
+                    ],
+                    "normalization": {
+                        "normalized_score_count": 3,
+                    },
+                },
+            ],
+        },
+    )
+
+    result = build_founder_dashboard(root)
+    radar = result["opportunity_radar"]
+
+    assert radar["available"] is True
+    assert radar["radar_candidate_count"] == 21
+    assert radar["research_candidate_count"] == 5
+    assert radar["factory_ready_count"] == 0
+    assert radar["factory_blocked_count"] == 21
+    assert radar["stage_counts"] == {
+        "DISCOVER": 2,
+        "QUALIFY": 19,
+    }
+    assert radar["blocker_counts"][
+        "buyer_intent_normalized_score_required"
+    ] == 2
+    assert radar["highest_priority_evidence_gap"] == (
+        "buyer_intent_normalized_score_required"
+    )
+    assert radar["automatic_external_execution_allowed"] is False
+    assert radar["execution_authority"] == "none"

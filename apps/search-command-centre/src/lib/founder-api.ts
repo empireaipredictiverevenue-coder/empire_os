@@ -21,6 +21,39 @@ export type FounderDashboard = {
     };
     stages?: FounderStage[];
   };
+  opportunity_radar?: {
+    available?: boolean;
+    observed_at?: string | null;
+    intake_observed_at?: string | null;
+    mode?: string;
+    ok?: boolean;
+    radar_candidate_count?: number;
+    research_candidate_count?: number;
+    research_observation_count?: number;
+    candidates_with_any_normalized_score?: number;
+    total_normalized_scores?: number;
+    factory_ready_count?: number;
+    factory_blocked_count?: number;
+    quant_ready_count?: number;
+    quant_blocked_count?: number;
+    opportunity_value_available_count?: number;
+    ai_plan_queued_count?: number;
+    stage_counts?: Record<string, number>;
+    blocker_counts?: Record<string, number>;
+    highest_priority_evidence_gap?: string | null;
+    top_blocked_candidates?: Array<{
+      opportunity_key?: string | null;
+      opportunity_class?: string | null;
+      niche?: string | null;
+      evidence_count?: number | null;
+      normalized_score_count?: number | null;
+      blockers?: string[];
+    }>;
+    next_layer?: string | null;
+    automatic_external_execution_allowed?: boolean;
+    revenue_recognized?: boolean;
+    execution_authority?: string;
+  };
   astra?: {
     available?: boolean;
     mode?: string;

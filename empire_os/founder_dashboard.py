@@ -1,6 +1,7 @@
 """Read-only founder dashboard projection from canonical runtime evidence."""
 from __future__ import annotations
 
+from collections import Counter
 import json
 import re
 from datetime import datetime, timezone
@@ -345,6 +346,140 @@ def _commercial_catalog(
         ),
         "actual_revenue": False,
         "execution_authority": "none",
+    }
+
+
+def _opportunity_radar_runtime(
+    loop_raw: dict[str, Any] | None,
+    loop_path: Path,
+    intake_raw: dict[str, Any] | None,
+    intake_path: Path,
+) -> dict[str, Any]:
+    if loop_raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(loop_path),
+            "mode": "unknown",
+            "candidate_count": 0,
+            "factory_ready_count": 0,
+            "execution_authority": "none",
+        }
+
+    intake_raw = intake_raw or {}
+    items = intake_raw.get("items")
+    items = items if isinstance(items, list) else []
+
+    blockers: Counter[str] = Counter()
+    blocked_candidates: list[dict[str, Any]] = []
+
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+
+        row_blockers = [
+            str(value)
+            for value in (row.get("blockers") or [])
+            if str(value).strip()
+        ]
+        blockers.update(row_blockers)
+
+        if row.get("factory_ready") is not True:
+            normalization = row.get("normalization")
+            normalization = (
+                normalization
+                if isinstance(normalization, dict)
+                else {}
+            )
+            blocked_candidates.append({
+                "opportunity_key": row.get("opportunity_key"),
+                "opportunity_class": row.get("opportunity_class"),
+                "niche": row.get("niche"),
+                "evidence_count": row.get("evidence_count"),
+                "normalized_score_count": normalization.get(
+                    "normalized_score_count"
+                ),
+                "blockers": row_blockers,
+            })
+
+    ranked_blockers = dict(
+        sorted(
+            blockers.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+    )
+    highest = next(iter(ranked_blockers), None)
+
+    stage_counts = loop_raw.get("opportunity_stage_counts")
+    stage_counts = (
+        stage_counts if isinstance(stage_counts, dict) else {}
+    )
+
+    return {
+        "available": True,
+        "observed_at": (
+            loop_raw.get("finished_at")
+            or _mtime_iso(loop_path)
+        ),
+        "intake_observed_at": _mtime_iso(intake_path),
+        "mode": loop_raw.get("mode"),
+        "ok": loop_raw.get("ok") is True,
+        "radar_candidate_count": int(
+            loop_raw.get("radar_candidate_count") or 0
+        ),
+        "research_candidate_count": int(
+            loop_raw.get("research_candidate_count") or 0
+        ),
+        "research_observation_count": int(
+            loop_raw.get("research_observation_count") or 0
+        ),
+        "candidates_with_any_normalized_score": int(
+            loop_raw.get(
+                "candidates_with_any_normalized_score"
+            ) or 0
+        ),
+        "total_normalized_scores": int(
+            loop_raw.get("total_normalized_scores") or 0
+        ),
+        "factory_ready_count": int(
+            loop_raw.get("factory_ready_count") or 0
+        ),
+        "factory_blocked_count": int(
+            loop_raw.get("factory_blocked_count") or 0
+        ),
+        "quant_ready_count": int(
+            loop_raw.get(
+                "quant_decision_packet_available_count"
+            ) or 0
+        ),
+        "quant_blocked_count": int(
+            loop_raw.get(
+                "quant_decision_packet_unavailable_count"
+            ) or 0
+        ),
+        "opportunity_value_available_count": int(
+            loop_raw.get(
+                "opportunity_value_available_count"
+            ) or 0
+        ),
+        "ai_plan_queued_count": int(
+            loop_raw.get("ai_plan_queued_count") or 0
+        ),
+        "stage_counts": stage_counts,
+        "blocker_counts": ranked_blockers,
+        "highest_priority_evidence_gap": highest,
+        "top_blocked_candidates": blocked_candidates[:8],
+        "next_layer": loop_raw.get("next_layer"),
+        "automatic_external_execution_allowed": (
+            loop_raw.get(
+                "automatic_external_execution_allowed"
+            ) is True
+        ),
+        "revenue_recognized": (
+            loop_raw.get("revenue_recognized") is True
+        ),
+        "execution_authority": (
+            loop_raw.get("execution_authority") or "none"
+        ),
     }
 
 
@@ -963,6 +1098,12 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     source_path = runtime / "source_health" / "latest.json"
     conversion_path = runtime / "conversion" / "latest.json"
     catalog_path = runtime / "commercial_catalog" / "latest.json"
+    opportunity_loop_path = (
+        runtime / "opportunity_radar" / "loop_latest.json"
+    )
+    opportunity_intake_path = (
+        runtime / "opportunity_factory" / "intake_latest.json"
+    )
     opportunity_value_path = (
         runtime / "opportunity_factory" / "value_latest.json"
     )
@@ -1036,6 +1177,12 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "commercial_catalog": _commercial_catalog(
             _read_json(catalog_path),
             catalog_path,
+        ),
+        "opportunity_radar": _opportunity_radar_runtime(
+            _read_json(opportunity_loop_path),
+            opportunity_loop_path,
+            _read_json(opportunity_intake_path),
+            opportunity_intake_path,
         ),
         "opportunity_value": _opportunity_value(
             _read_json(opportunity_value_path),

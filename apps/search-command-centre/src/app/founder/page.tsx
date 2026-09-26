@@ -75,6 +75,10 @@ export default async function FounderPage() {
   const repairPlan = ops?.sentinel?.repair_plan ?? [];
   const daily = dailyResult.data;
   const dailyFunnel = daily?.commercial_funnel;
+  const opportunityRadar = data?.opportunity_radar;
+  const opportunityBlockers = Object.entries(
+    opportunityRadar?.blocker_counts ?? {},
+  ).sort((a, b) => b[1] - a[1]);
 
   return (
     <main className="min-h-screen bg-[#07100d] text-slate-100">
@@ -324,6 +328,89 @@ export default async function FounderPage() {
                   evidence remains unknown; no synthetic opportunity value is
                   created.
                 </p>
+
+                <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
+                  <Evidence
+                    label="Radar candidates"
+                    value={int(opportunityRadar?.radar_candidate_count)}
+                  />
+                  <Evidence
+                    label="Researched"
+                    value={int(opportunityRadar?.research_candidate_count)}
+                  />
+                  <Evidence
+                    label="Normalized"
+                    value={int(
+                      opportunityRadar
+                        ?.candidates_with_any_normalized_score,
+                    )}
+                  />
+                  <Evidence
+                    label="Factory ready"
+                    value={int(opportunityRadar?.factory_ready_count)}
+                  />
+                  <Evidence
+                    label="Quant ready"
+                    value={int(opportunityRadar?.quant_ready_count)}
+                  />
+                  <Evidence
+                    label="AI plans"
+                    value={int(opportunityRadar?.ai_plan_queued_count)}
+                  />
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-600">
+                        Primary evidence gap
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-white">
+                        {show(
+                          opportunityRadar
+                            ?.highest_priority_evidence_gap,
+                        ).replaceAll("_", " ")}
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold text-amber-200">
+                      {int(opportunityRadar?.factory_blocked_count)} blocked
+                    </span>
+                  </div>
+
+                  <div className="mt-3 space-y-1">
+                    {opportunityBlockers.length ? (
+                      opportunityBlockers.slice(0, 4).map(
+                        ([blocker, count]) => (
+                          <div
+                            key={blocker}
+                            className="flex justify-between gap-3 text-[11px]"
+                          >
+                            <span className="text-slate-500">
+                              {blocker.replaceAll("_", " ")}
+                            </span>
+                            <span className="font-semibold text-slate-300">
+                              {count}
+                            </span>
+                          </div>
+                        ),
+                      )
+                    ) : (
+                      <p className="text-xs text-slate-500">
+                        No current Factory blocker observed.
+                      </p>
+                    )}
+                  </div>
+
+                  <p className="mt-3 border-t border-white/8 pt-3 text-[11px] text-slate-600">
+                    Stage mix:{" "}
+                    {Object.entries(
+                      opportunityRadar?.stage_counts ?? {},
+                    )
+                      .map(([stage, count]) => `${stage} ${count}`)
+                      .join(" · ") || "Unknown"}
+                  </p>
+                </div>
+
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <Drill href="/opportunities" title="Search opportunities" />
                   <Drill href="/revenue" title="Organic revenue evidence" />
