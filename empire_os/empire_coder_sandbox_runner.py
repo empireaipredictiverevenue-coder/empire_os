@@ -15,6 +15,11 @@ import shutil
 import subprocess
 from typing import Any, Mapping
 
+from empire_os.aider_builder import (
+    AiderMutationRequest,
+    run_aider_mutation,
+)
+from empire_os.builder_capabilities import builder_capability_ready
 from empire_os.coder import EmpireCoder
 from empire_os.coder.models import VerificationVerdict
 from empire_os.execution_lease import ExecutionLeaseError, ExecutionLeaseManager
@@ -165,50 +170,170 @@ def run_empire_coder_sandbox_job(
             result["error_tail"] = (cloned.stderr or cloned.stdout)[-3000:]
             return result
 
-        coder = EmpireCoder(
-            clone,
-            runtime_root=clone / "runtime/coder",
+        capability_path = (
+            root / "runtime/execution_plane/builder_capabilities.json"
         )
-        task = coder.create_task(job.objective)
-        context = coder.build_context(
-            task.id,
-            terms=(job.department, job.capability),
-            budget_chars=8000,
+        ledger_exists = capability_path.exists()
+        aider_ready = builder_capability_ready(
+            "empire_coder",
+            "aider_mutation",
+            path=capability_path,
         )
-        try:
-            candidate = coder.propose_structured_patch(
-                task.id,
-                (
-                    "Implement exactly one smallest safe DEVELOPMENT patch for "
-                    "the task objective. Return only the machine-checkable "
-                    "structured patch requested by Empire Coder. Do not touch "
-                    "deployment, services, production databases, outbound, "
-                    "credentials, payments, funds or revenue truth.\n\nTASK:\n"
-                    + job.objective
-                ),
-                context,
-            )
-        except Exception as exc:
-            result["status"] = "NO_IMPLEMENTATION"
-            result["reason"] = f"{type(exc).__name__}:{exc}"[:1000]
-            return result
+        structured_ready = builder_capability_ready(
+            "empire_coder",
+            "structured_patch_mutation",
+            path=capability_path,
+        )
+        preference = str(
+            os.getenv("EMPIRE_CODER_MUTATION_BACKEND") or "auto"
+        ).strip().lower()
+        if preference not in {"auto", "aider", "structured_patch"}:
+            preference = "auto"
 
-        proposal = candidate.proposal
-        result["candidate"] = {
-            "eligible": candidate.eligible,
-            "target_path": proposal.target_path,
-            "operation": proposal.operation.value,
-            "validation": candidate.validation.as_dict(),
+        if preference == "aider":
+            backend_order = ("aider", "structured_patch")
+        elif preference == "structured_patch":
+            backend_order = ("structured_patch", "aider")
+        elif aider_ready:
+            backend_order = ("aider", "structured_patch")
+        else:
+            backend_order = ("structured_patch", "aider")
+
+        result["mutation_backend_policy"] = {
+            "preference": preference,
+            "aider_ready": aider_ready,
+            "structured_patch_ready": structured_ready,
+            "capability_ledger_observed": ledger_exists,
+            "attempt_order": list(backend_order),
         }
-        if not candidate.eligible:
+        result["backend_attempts"] = []
+
+        mutation_backend = None
+        coder = None
+        task = None
+        candidate = None
+
+        for backend in backend_order:
+            if backend == "aider":
+                if not aider_ready:
+                    result["backend_attempts"].append({
+                        "backend": "aider",
+                        "status": "SKIPPED",
+                        "reason": "aider_mutation_capability_not_proven",
+                    })
+                    continue
+
+                aider_result = run_aider_mutation(
+                    clone,
+                    AiderMutationRequest(
+                        objective=job.objective,
+                        allowed_paths=job.allowed_paths,
+                        model=(
+                            str(
+                                os.getenv("EMPIRE_AIDER_MODEL")
+                                or "openai/auto"
+                            ).strip()
+                            or "openai/auto"
+                        ),
+                        max_runtime_seconds=job.max_runtime_seconds,
+                    ),
+                )
+                result["aider"] = aider_result
+                result["backend_attempts"].append({
+                    "backend": "aider",
+                    "status": aider_result.get("status"),
+                    "reason": aider_result.get("reason"),
+                })
+                if aider_result.get("status") == "EDITED":
+                    mutation_backend = "aider"
+                    break
+                continue
+
+            if backend == "structured_patch":
+                if ledger_exists and not structured_ready:
+                    result["backend_attempts"].append({
+                        "backend": "structured_patch",
+                        "status": "SKIPPED",
+                        "reason": (
+                            "structured_patch_mutation_capability_not_proven"
+                        ),
+                    })
+                    continue
+
+                try:
+                    coder = EmpireCoder(
+                        clone,
+                        runtime_root=clone / "runtime/coder",
+                    )
+                    task = coder.create_task(job.objective)
+                    context = coder.build_context(
+                        task.id,
+                        terms=(job.department, job.capability),
+                        budget_chars=8000,
+                    )
+                    candidate = coder.propose_structured_patch(
+                        task.id,
+                        (
+                            "Implement exactly one smallest safe DEVELOPMENT "
+                            "patch for the task objective. Return only the "
+                            "machine-checkable structured patch requested by "
+                            "Empire Coder. Do not touch deployment, services, "
+                            "production databases, outbound, credentials, "
+                            "payments, funds or revenue truth.\n\nTASK:\n"
+                            + job.objective
+                        ),
+                        context,
+                    )
+                except Exception as exc:
+                    result["backend_attempts"].append({
+                        "backend": "structured_patch",
+                        "status": "FAILED",
+                        "reason": (
+                            f"{type(exc).__name__}:{exc}"
+                        )[:1000],
+                    })
+                    continue
+
+                proposal = candidate.proposal
+                result["candidate"] = {
+                    "eligible": candidate.eligible,
+                    "target_path": proposal.target_path,
+                    "operation": proposal.operation.value,
+                    "validation": candidate.validation.as_dict(),
+                }
+                if not candidate.eligible:
+                    result["backend_attempts"].append({
+                        "backend": "structured_patch",
+                        "status": "INELIGIBLE",
+                        "reason": "candidate_not_eligible",
+                    })
+                    continue
+                if not _path_allowed(
+                    proposal.target_path,
+                    job.allowed_paths,
+                ):
+                    result["backend_attempts"].append({
+                        "backend": "structured_patch",
+                        "status": "PATH_POLICY_FAILED",
+                        "reason": proposal.target_path,
+                    })
+                    continue
+
+                coder.apply_structured_patch(task.id, candidate)
+                mutation_backend = "structured_patch"
+                result["backend_attempts"].append({
+                    "backend": "structured_patch",
+                    "status": "EDITED",
+                    "reason": None,
+                })
+                break
+
+        if mutation_backend is None:
             result["status"] = "NO_IMPLEMENTATION"
-            return result
-        if not _path_allowed(proposal.target_path, job.allowed_paths):
-            result["status"] = "PATH_POLICY_FAILED"
-            result["rejected_paths"] = [proposal.target_path]
+            result["reason"] = "no_proven_mutation_backend_succeeded"
             return result
 
-        coder.apply_structured_patch(task.id, candidate)
+        result["mutation_backend"] = mutation_backend
         changed = _changed_paths(clone)
         rejected = [
             path for path in changed
