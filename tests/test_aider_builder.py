@@ -5,7 +5,9 @@ from empire_os.aider_builder import (
     AiderMutationRequest,
     build_aider_command,
     provider_ready,
+    resolved_aider_model,
     run_aider_mutation,
+    _changed_paths,
     _sanitize_output,
 )
 
@@ -44,6 +46,10 @@ def test_aider_command_is_noncommitting_and_secret_free(
     assert "--no-suggest-shell-commands" in command
     assert "--no-detect-urls" in command
     assert "--no-analytics" in command
+    assert "--map-tokens" in command
+    assert command[command.index("--map-tokens") + 1] == "0"
+    assert "--map-refresh" in command
+    assert command[command.index("--map-refresh") + 1] == "manual"
     assert "--env-file" in command
     assert "--config" in command
     assert any(
@@ -229,3 +235,43 @@ def test_aider_output_redacts_provider_secret():
     )
     assert "secret-value" not in output
     assert "[REDACTED]" in output
+
+
+
+def test_resolved_aider_model_uses_configured_omniroute_model(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        aider_builder,
+        "_protected_omniroute_env",
+        lambda: {
+            "EMPIRE_HERMES_MODEL": (
+                "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
+            )
+        },
+    )
+    assert resolved_aider_model() == (
+        "openai/openrouter/nvidia/"
+        "nemotron-3-ultra-550b-a55b:free"
+    )
+
+
+def test_aider_changed_paths_ignores_repo_map_cache(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        aider_builder.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "?? .aider.tags.cache.v4/aa/bb/cache.val\n"
+                "?? tests/empire_aider_mutation_probe_marker.txt\n"
+            ),
+            stderr="",
+        ),
+    )
+    assert _changed_paths(tmp_path) == [
+        "tests/empire_aider_mutation_probe_marker.txt"
+    ]
