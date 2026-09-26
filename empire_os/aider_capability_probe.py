@@ -10,8 +10,8 @@ from uuid import uuid4
 
 from empire_os.aider_builder import (
     AiderMutationRequest,
-    DEFAULT_MODEL,
     run_aider_mutation,
+    resolved_aider_model,
 )
 from empire_os.builder_capabilities import record_builder_capability
 
@@ -65,11 +65,7 @@ def probe_aider_mutation(
     base = Path(work_root)
     base.mkdir(parents=True, exist_ok=True)
     clone = base / f"probe-{uuid4().hex}"
-    selected_model = (
-        str(model or os.getenv("EMPIRE_AIDER_MODEL") or DEFAULT_MODEL)
-        .strip()
-        or DEFAULT_MODEL
-    )
+    selected_model = resolved_aider_model(model)
     result = AiderProbeResult(
         False,
         "probe_not_completed",
