@@ -84,6 +84,7 @@ FORBIDDEN_RESULT_PATH_TOKENS = (
 # Named constants for governed Hermes model limits
 HERMES_MODEL_CONTEXT_LENGTH = 262144
 HERMES_MODEL_MAX_OUTPUT_TOKENS = 16384
+OMNIROUTE_ENV_PATH = Path("/etc/empire_os/omniroute-hermes.env")
 
 
 class HermesControlError(RuntimeError):
@@ -471,6 +472,30 @@ def _changed_paths(worktree: Path) -> list[str]:
     return paths
 
 
+def _protected_omniroute_env(
+    path: Path = OMNIROUTE_ENV_PATH,
+) -> dict[str, str]:
+    allowed = {
+        "OPENAI_BASE_URL",
+        "OPENAI_API_KEY",
+        "EMPIRE_HERMES_MODEL",
+    }
+    values: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return values
+    for line in lines:
+        raw = line.strip()
+        if not raw or raw.startswith("#") or "=" not in raw:
+            continue
+        key, value = raw.split("=", 1)
+        key = key.strip()
+        if key in allowed and value.strip():
+            values[key] = value.strip().strip('"').strip("'")
+    return values
+
+
 def _hermes_environment() -> dict[str, str]:
     allowed = (
         "PATH",
@@ -494,6 +519,10 @@ def _hermes_environment() -> dict[str, str]:
         for key, value in os.environ.items()
         if key in allowed
     }
+    protected = _protected_omniroute_env()
+    for key in ("OPENAI_BASE_URL", "OPENAI_API_KEY"):
+        if protected.get(key):
+            env.setdefault(key, protected[key])
     env.setdefault("HOME", "/home/ubuntu")
     env.setdefault("USER", "ubuntu")
     env.setdefault("LOGNAME", "ubuntu")
