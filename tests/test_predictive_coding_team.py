@@ -24,9 +24,9 @@ def _route(request):
     )
 
 
-def test_predictive_coding_team_has_four_non_overlapping_lanes():
+def test_predictive_coding_team_has_five_non_overlapping_lanes():
     requests = predictive_cloud_coding_team_requests()
-    assert len(requests) == 4
+    assert len(requests) == 5
 
     ids = [request.request_id for request in requests]
     assert len(set(ids)) == 4
@@ -51,8 +51,12 @@ def test_predictive_coding_team_routes_to_expected_workers():
     ).worker_key == "hermes"
 
     assert _route(
-        requests["predictive-action-portfolio-optimizer-v1"]
+        requests["predictive-action-portfolio-design-v1"]
     ).worker_key == "pi"
+
+    assert _route(
+        requests["predictive-action-portfolio-implementation-v2"]
+    ).worker_key == "hermes"
 
     assert _route(
         requests["predictive-algorithm-verification-hardening-v1"]
