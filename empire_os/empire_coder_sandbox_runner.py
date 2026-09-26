@@ -18,8 +18,8 @@ from typing import Any, Mapping
 from empire_os.aider_builder import (
     AiderMutationRequest,
     run_aider_mutation,
-    resolved_aider_model,
 )
+from empire_os.aider_model_selector import select_usable_aider_model
 from empire_os.builder_capabilities import builder_capability_ready
 from empire_os.coder import EmpireCoder
 from empire_os.coder.models import VerificationVerdict
@@ -230,12 +230,27 @@ def run_empire_coder_sandbox_job(
                     })
                     continue
 
+                model_selection = select_usable_aider_model(
+                    timeout_seconds=20,
+                    max_candidates=6,
+                )
+                selected_model = model_selection.get("selected")
+                if not selected_model:
+                    result["backend_attempts"].append({
+                        "backend": "aider",
+                        "status": "SKIPPED",
+                        "reason": "no_usable_omniroute_model",
+                    })
+                    result["aider_model_selection"] = model_selection
+                    continue
+
+                result["aider_model_selection"] = model_selection
                 aider_result = run_aider_mutation(
                     clone,
                     AiderMutationRequest(
                         objective=job.objective,
                         allowed_paths=job.allowed_paths,
-                        model=resolved_aider_model(),
+                        model=str(selected_model),
                         max_runtime_seconds=job.max_runtime_seconds,
                     ),
                 )
