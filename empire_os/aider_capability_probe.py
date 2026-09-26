@@ -28,6 +28,8 @@ class AiderProbeResult:
     status: str
     exact_marker: bool
     changed_paths: tuple[str, ...]
+    returncode: int | None = None
+    output_tail: str | None = None
     production_mutation: bool = False
     production_push: bool = False
     execution_authority: str = "none"
@@ -142,6 +144,15 @@ def probe_aider_mutation(
             str(mutation.get("status") or "UNKNOWN"),
             exact,
             changed,
+            (
+                None
+                if mutation.get("returncode") is None
+                else int(mutation.get("returncode"))
+            ),
+            (
+                str(mutation.get("output_tail") or "")[-4000:]
+                or None
+            ),
         )
         return result
     except Exception as exc:
@@ -165,6 +176,8 @@ def probe_aider_mutation(
                 "status": result.status,
                 "exact_marker": result.exact_marker,
                 "changed_paths": list(result.changed_paths),
+                "returncode": result.returncode,
+                "output_tail": result.output_tail,
                 "production_mutation": False,
                 "production_push": False,
             },
