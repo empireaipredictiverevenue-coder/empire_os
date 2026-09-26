@@ -93,34 +93,12 @@ def _canonical_seed_records(
 
         params = urllib.parse.urlencode(query_params)
         try:
-            batch = request(
+            batch = request_json(
                 "GET",
                 f"/rest/v1/prospects?{params}",
             ) or []
-            if diagnostics is not None:
-                diagnostics.append({
-                    "opportunity_key": opportunity_key,
-                    "niche": niche,
-                    "territory": territory or None,
-                    "state": "OK",
-                    "row_count": (
-                        len(batch) if isinstance(batch, list) else 0
-                    ),
-                    "error": None,
-                })
-        except Exception as exc:
+        except Exception:
             batch = []
-            if diagnostics is not None:
-                diagnostics.append({
-                    "opportunity_key": opportunity_key,
-                    "niche": niche,
-                    "territory": territory or None,
-                    "state": "ERROR",
-                    "row_count": 0,
-                    "error": (
-                        f"{type(exc).__name__}:{str(exc)[:240]}"
-                    ),
-                })
 
         for raw in batch:
             if not isinstance(raw, dict):
@@ -233,12 +211,34 @@ def _opportunity_validation_seed_records(
 
         params = urllib.parse.urlencode(params_dict)
         try:
-            batch = request_json(
+            batch = request(
                 "GET",
                 f"/rest/v1/prospects?{params}",
             ) or []
-        except Exception:
+            if diagnostics is not None:
+                diagnostics.append({
+                    "opportunity_key": opportunity_key,
+                    "niche": niche,
+                    "territory": territory or None,
+                    "state": "OK",
+                    "row_count": (
+                        len(batch) if isinstance(batch, list) else 0
+                    ),
+                    "error": None,
+                })
+        except Exception as exc:
             batch = []
+            if diagnostics is not None:
+                diagnostics.append({
+                    "opportunity_key": opportunity_key,
+                    "niche": niche,
+                    "territory": territory or None,
+                    "state": "ERROR",
+                    "row_count": 0,
+                    "error": (
+                        f"{type(exc).__name__}:{str(exc)[:240]}"
+                    ),
+                })
 
         for raw in batch:
             if not isinstance(raw, dict):
