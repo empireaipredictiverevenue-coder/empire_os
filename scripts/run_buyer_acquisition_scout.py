@@ -160,7 +160,7 @@ def _opportunity_validation_seed_records(
     plan: dict,
     *,
     per_target: int = 6,
-    request=request_json,
+    request=None,
     diagnostics: list[dict] | None = None,
 ) -> list[dict]:
     """Recover real canonical prospects for opportunity validation fallback.
@@ -170,6 +170,7 @@ def _opportunity_validation_seed_records(
     websites by Buyer Scout before surfacing.
     """
     per_target = max(1, min(int(per_target), 10))
+    request_fn = request or request_json
     validation = plan.get("opportunity_validation")
     validation = validation if isinstance(validation, dict) else {}
     targets = validation.get("targets")
@@ -211,7 +212,7 @@ def _opportunity_validation_seed_records(
 
         params = urllib.parse.urlencode(params_dict)
         try:
-            batch = request(
+            batch = request_fn(
                 "GET",
                 f"/rest/v1/prospects?{params}",
             ) or []
