@@ -45,7 +45,16 @@ def test_aider_command_is_noncommitting_and_secret_free(
     assert "--no-detect-urls" in command
     assert "--no-analytics" in command
     assert "--env-file" in command
-    assert "/dev/null" in command
+    assert "--config" in command
+    assert any(
+        value.endswith(".git/empire-aider.env")
+        for value in command
+    )
+    assert any(
+        value.endswith(".git/empire-aider-config.yml")
+        for value in command
+    )
+    assert "/dev/null" not in command
     assert "--file" in command
     assert "empire_os/example.py" in command
     assert "secret-value" not in joined
