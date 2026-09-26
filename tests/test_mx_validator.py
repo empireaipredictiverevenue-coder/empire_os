@@ -118,3 +118,85 @@ def test_mx_lookup_returns_host_strings_in_preference_order(monkeypatch):
     )
 
     assert hosts == ["mx1.example.com", "mx2.example.com"]
+
+def test_smtp_probe_unavailable_is_not_misreported_as_recipient_rejection(monkeypatch):
+    v = MxValidator(do_smtp_probe=True)
+    monkeypatch.setattr(v, "_mx_lookup", lambda _domain: ["mx.example.com"])
+    monkeypatch.setattr(
+        v,
+        "_smtp_probe",
+        lambda _host, _email: ("unavailable", None, "TimeoutError"),
+    )
+
+    r = v.validate("person@example.com")
+
+    assert r.is_valid is True
+    assert r.has_mx is True
+    assert r.smtp_accepts is False
+    assert r.smtp_status == "unavailable"
+    assert r.smtp_code is None
+    assert r.confidence == 0.75
+    assert r.error == "smtp probe unavailable"
+    assert "smtp:unavailable" in r.checks
+    assert not any(check.startswith("smtp:reject") for check in r.checks)
+
+
+def test_explicit_smtp_5xx_rejection_fails_address(monkeypatch):
+    v = MxValidator(do_smtp_probe=True)
+    monkeypatch.setattr(v, "_mx_lookup", lambda _domain: ["mx.example.com"])
+    monkeypatch.setattr(
+        v,
+        "_smtp_probe",
+        lambda _host, _email: ("rejected", 550, "5.1.1 user unknown"),
+    )
+
+    r = v.validate("person@example.com")
+
+    assert r.is_valid is False
+    assert r.smtp_status == "rejected"
+    assert r.smtp_code == 550
+    assert r.smtp_accepts is False
+    assert r.confidence == 0.5
+    assert r.error == "smtp rejected"
+    assert "smtp:reject:550" in r.checks
+
+
+def test_smtp_temporary_reject_stays_inconclusive_not_invalid(monkeypatch):
+    v = MxValidator(do_smtp_probe=True)
+    monkeypatch.setattr(v, "_mx_lookup", lambda _domain: ["mx.example.com"])
+    monkeypatch.setattr(
+        v,
+        "_smtp_probe",
+        lambda _host, _email: ("temporary_reject", 451, "try again later"),
+    )
+
+    r = v.validate("person@example.com")
+
+    assert r.is_valid is True
+    assert r.smtp_status == "temporary_reject"
+    assert r.smtp_code == 451
+    assert r.smtp_accepts is False
+    assert r.confidence == 0.70
+    assert r.error == "smtp temporarily rejected"
+    assert "smtp:temporary:451" in r.checks
+
+
+def test_smtp_acceptance_raises_confidence(monkeypatch):
+    v = MxValidator(do_smtp_probe=True)
+    monkeypatch.setattr(v, "_mx_lookup", lambda _domain: ["mx.example.com"])
+    monkeypatch.setattr(
+        v,
+        "_smtp_probe",
+        lambda _host, _email: ("accepted", 250, "ok"),
+    )
+
+    r = v.validate("person@example.com")
+
+    assert r.is_valid is True
+    assert r.smtp_status == "accepted"
+    assert r.smtp_code == 250
+    assert r.smtp_accepts is True
+    assert r.confidence == 0.95
+    assert r.error == ""
+    assert "smtp:accept:250" in r.checks
+
