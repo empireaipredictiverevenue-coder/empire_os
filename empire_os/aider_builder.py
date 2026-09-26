@@ -160,10 +160,11 @@ def _protected_omniroute_env(
 def _provider_environment(
     source: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    current = dict(source or os.environ)
-    protected = _protected_omniroute_env()
-    for key, value in protected.items():
-        current.setdefault(key, value)
+    current = dict(os.environ if source is None else source)
+    if source is None:
+        protected = _protected_omniroute_env()
+        for key, value in protected.items():
+            current.setdefault(key, value)
     base = str(
         current.get("EMPIRE_AIDER_OPENAI_API_BASE")
         or current.get("AIDER_OPENAI_API_BASE")
