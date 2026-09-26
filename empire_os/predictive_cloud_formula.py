@@ -151,6 +151,7 @@ def predictive_cloud_formula(
     residual_uncertainty: Any,
     opportunities: Sequence[Mapping[str, Any]],
     constraints: Mapping[str, Any] | None = None,
+    trend_intelligence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Evaluate the enhanced Predictive Cloud formula.
 
@@ -172,6 +173,30 @@ def predictive_cloud_formula(
 
     portfolio = _portfolio_erv(opportunities)
     constraint_review = _constraint_review(constraints)
+    trend = dict(trend_intelligence or {})
+    trend_available = (
+        str(trend.get("status") or "").upper() == "AVAILABLE"
+        and str(
+            trend.get("future_opportunity_status") or ""
+        ).upper() == "AVAILABLE"
+        and trend.get("trend_confidence") is not None
+        and trend.get("trend_opportunity_alignment") is not None
+    )
+    trend_context = {
+        "available": trend_available,
+        "algorithm": "empire.future_trend.v1",
+        "direction": trend.get("direction"),
+        "velocity_per_day": trend.get("velocity_per_day"),
+        "acceleration_per_day": trend.get("acceleration_per_day"),
+        "persistence": trend.get("persistence"),
+        "trend_confidence": trend.get("trend_confidence"),
+        "trend_opportunity_alignment": trend.get(
+            "trend_opportunity_alignment"
+        ),
+        "evidence_refs": list(trend.get("evidence_refs") or []),
+        "forecast_context_only": True,
+        "causal_claim": False,
+    }
 
     if missing:
         return {
@@ -181,6 +206,7 @@ def predictive_cloud_formula(
             "reason": "unknown_cloud_inputs_preserved",
             "portfolio": portfolio,
             "constraints": constraint_review,
+            "future_trend_context": trend_context,
             "unknown_is_zero": False,
             "prediction_only": True,
             "actual_revenue": False,
@@ -217,6 +243,42 @@ def predictive_cloud_formula(
         key=lambda item: (item[1], item[0]),
     )
 
+    forward_outlook = {
+        "status": "UNAVAILABLE",
+        "reason": "future_trend_context_unavailable",
+        "cloud_forward_score": None,
+        "trend_confidence": trend_context["trend_confidence"],
+        "trend_opportunity_alignment": trend_context[
+            "trend_opportunity_alignment"
+        ],
+        "prediction_only": True,
+    }
+    if trend_available:
+        trend_confidence = _probability(
+            trend_context["trend_confidence"],
+            "trend_confidence",
+        )
+        alignment = _probability(
+            trend_context["trend_opportunity_alignment"],
+            "trend_opportunity_alignment",
+        )
+        forward_factor = (
+            (cloud_operating_score / 100.0)
+            * trend_confidence
+            * alignment
+        ) ** (1.0 / 3.0)
+        forward_outlook = {
+            "status": "AVAILABLE",
+            "cloud_forward_score": round(
+                100.0 * forward_factor,
+                4,
+            ),
+            "trend_confidence": trend_confidence,
+            "trend_opportunity_alignment": alignment,
+            "prediction_only": True,
+            "causal_claim": False,
+        }
+
     return {
         "schema_version": "empire.predictive_cloud.formula.v1",
         "status": "AVAILABLE",
@@ -246,6 +308,8 @@ def predictive_cloud_formula(
             "value": weakest[1],
         },
         "constraints": constraint_review,
+        "future_trend_context": trend_context,
+        "forward_outlook": forward_outlook,
         "constraint_clear_for_review": (
             constraint_review["state"] == "CLEAR"
         ),
