@@ -38,8 +38,22 @@ if [ "$CAP_RC" -ne 0 ]; then
 fi
 
 echo
+echo "=== HERMES RECOVERY REGRESSION TESTS ==="
+PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
+  tests/test_hermes_control.py \
+  tests/test_hermes_worker_isolation.py \
+  tests/test_predictive_coding_team_recovery_status.py \
+  --tb=short
+HERMES_TEST_RC=$?
+echo "HERMES_TEST_RC=$HERMES_TEST_RC"
+if [ "$HERMES_TEST_RC" -ne 0 ]; then
+  echo "BACKLOG_RESUME=BLOCKED_HERMES_REGRESSION"
+  exit "$HERMES_TEST_RC"
+fi
+
+echo
 echo "=== REFRESH HERMES CONTROL STATUS ==="
-git fetch origin   ops/hermes-control:refs/remotes/origin/ops/hermes-control
+git fetch origin ops/hermes-control:refs/remotes/origin/ops/hermes-control
 FETCH_RC=$?
 echo "HERMES_FETCH_RC=$FETCH_RC"
 
@@ -115,4 +129,4 @@ echo "DIFF_RC=$DIFF_RC"
 
 echo
 echo "=== RECOVERY RESULT ==="
-echo "retest=$RETEST_RC capability=$CAP_RC queue=$QUEUE_RC hermes_recovery=$HERMES_RECOVERY_RC hermes=$HERMES_RC coder=$CODER_RC swarm=$SWARM_RC diff=$DIFF_RC"
+echo "retest=$RETEST_RC capability=$CAP_RC hermes_tests=$HERMES_TEST_RC queue=$QUEUE_RC hermes_recovery=$HERMES_RECOVERY_RC hermes=$HERMES_RC coder=$CODER_RC swarm=$SWARM_RC diff=$DIFF_RC"
