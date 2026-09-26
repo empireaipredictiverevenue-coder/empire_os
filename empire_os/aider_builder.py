@@ -101,6 +101,7 @@ def aider_health() -> dict[str, Any]:
             "ready": False,
             "reason": "aider_executable_not_found",
             "version": None,
+            "executable": None,
             "execution_authority": "none",
         }
     try:
@@ -117,6 +118,7 @@ def aider_health() -> dict[str, Any]:
             "ready": False,
             "reason": f"aider_health_failed:{type(exc).__name__}",
             "version": None,
+            "executable": executable,
             "execution_authority": "none",
         }
     version = (result.stdout or result.stderr or "").strip()[:300]
@@ -129,6 +131,7 @@ def aider_health() -> dict[str, Any]:
             else f"aider_version_exit:{result.returncode}"
         ),
         "version": version or None,
+        "executable": executable,
         "execution_authority": "none",
     }
 
