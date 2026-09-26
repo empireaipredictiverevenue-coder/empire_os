@@ -549,3 +549,71 @@ def test_status_exposes_media_os_runtime_without_external_authority(tmp_path):
     assert summary["public_publish_authorized"] is False
     assert summary["external_action_performed"] is False
     assert row["execution_authority"] == "none"
+
+
+
+def test_status_exposes_future_trend_algorithm(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/predictive_cloud/future_trend_latest.json",
+        {
+            "generated_at": "2026-09-26T20:00:00+00:00",
+            "status": "AVAILABLE",
+            "direction": "up",
+            "velocity_per_day": 1.5,
+            "acceleration_per_day": 0.2,
+            "persistence": 0.9,
+            "trend_confidence": 0.8,
+            "future_opportunity_status": "AVAILABLE",
+            "trend_opportunity_alignment": 0.7,
+            "causal_claim": False,
+            "execution_authority": "none",
+        },
+    )
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime.fromisoformat("2026-09-26T20:10:00+00:00"),
+    )
+    summary = result["components"]["future_trend_intelligence"]["summary"]
+    assert summary["status"] == "AVAILABLE"
+    assert summary["direction"] == "up"
+    assert summary["trend_confidence"] == 0.8
+    assert summary["trend_opportunity_alignment"] == 0.7
+    assert summary["causal_claim"] is False
+
+
+def test_status_exposes_predictive_cloud_formula_separately(tmp_path):
+    write_json(
+        tmp_path,
+        "runtime/predictive_cloud/formula_latest.json",
+        {
+            "generated_at": "2026-09-26T20:00:00+00:00",
+            "status": "AVAILABLE",
+            "cloud_operating_score": 72.5,
+            "trust_multiplier": 0.81,
+            "residual_uncertainty": 0.15,
+            "cloud_adjusted_portfolio_value_cents": 450000,
+            "weakest_cloud_factor": {
+                "name": "causal_confidence",
+                "value": 0.55,
+            },
+            "constraints": {"state": "CLEAR"},
+            "forward_outlook": {
+                "status": "AVAILABLE",
+                "cloud_forward_score": 75.0,
+            },
+            "actual_revenue": False,
+            "execution_authority": "none",
+        },
+    )
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime.fromisoformat("2026-09-26T20:10:00+00:00"),
+    )
+    summary = result["components"]["predictive_cloud_formula"]["summary"]
+    assert summary["status"] == "AVAILABLE"
+    assert summary["cloud_operating_score"] == 72.5
+    assert summary["constraint_state"] == "CLEAR"
+    assert summary["forward_outlook_status"] == "AVAILABLE"
+    assert summary["cloud_forward_score"] == 75.0
+    assert summary["actual_revenue"] is False
