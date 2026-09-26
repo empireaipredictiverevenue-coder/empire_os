@@ -5,8 +5,9 @@ Checks (in order):
 1. Disposable domain blocklist (Mailcheck-style)
 2. Role address filter (info@, admin@, noreply@ — not decision-makers)
 3. DNS MX record lookup (the receiving domain must accept mail)
-4. SMTP RCPT TO probe (the server must accept the address)
+4. SMTP RCPT TO probe (optional)
    - Closes connection before DATA, never actually sends mail
+   - Distinguishes explicit recipient rejection from transport/probe failure
 
 Free, no API key, no per-validation cost.
 """
@@ -16,7 +17,6 @@ import logging
 import re
 import socket
 from dataclasses import dataclass, field
-from typing import Optional
 
 logger = logging.getLogger("mx_validator")
 
@@ -62,6 +62,9 @@ class MxValidationResult:
     is_role_address: bool = False
     has_mx: bool = False
     smtp_accepts: bool = False
+    smtp_status: str = "not_run"
+    smtp_code: int | None = None
+    smtp_detail: str = ""
     error: str = ""
     checks: list = field(default_factory=list)
 
@@ -111,23 +114,48 @@ class MxValidator:
         result.has_mx = True
         result.checks.append(f"mx:found:{mx_hosts[0]}")
 
+        # DNS + non-role/non-disposable checks establish MX-level validity.
+        result.is_valid = True
+        result.confidence = 0.75
+
         # Check 4: SMTP RCPT TO probe (optional)
         if self.do_smtp_probe:
-            accepts = self._smtp_probe(mx_hosts[0], email)
-            result.smtp_accepts = accepts
-            if accepts:
-                result.checks.append("smtp:accept")
-            else:
-                result.checks.append("smtp:reject")
-                # If SMTP rejects, downgrade confidence but don't fail outright
-                # (some servers intentionally lie to probes)
+            status, code, detail = self._smtp_probe(mx_hosts[0], email)
+            result.smtp_status = status
+            result.smtp_code = code
+            result.smtp_detail = detail
+            result.smtp_accepts = status == "accepted"
+
+            if status == "accepted":
+                result.checks.append(
+                    f"smtp:accept:{code}" if code is not None else "smtp:accept"
+                )
+                result.confidence = 0.95
+            elif status == "rejected":
+                result.checks.append(
+                    f"smtp:reject:{code}" if code is not None else "smtp:reject"
+                )
+                result.is_valid = False
                 result.error = "smtp rejected"
                 result.confidence = 0.5
                 return result
+            elif status == "temporary_reject":
+                result.checks.append(
+                    f"smtp:temporary:{code}"
+                    if code is not None
+                    else "smtp:temporary"
+                )
+                result.error = "smtp temporarily rejected"
+                result.confidence = 0.70
+            else:
+                # Connection failures, blocked outbound port 25, TLS/HELO
+                # problems and similar probe failures do not prove that the
+                # recipient mailbox rejected the address.
+                result.smtp_status = "unavailable"
+                result.checks.append("smtp:unavailable")
+                result.error = "smtp probe unavailable"
+                result.confidence = 0.75
 
-        # Passed all checks
-        result.is_valid = True
-        result.confidence = 0.95 if self.do_smtp_probe else 0.75
         return result
 
     def _mx_lookup(self, domain: str) -> list[str]:
@@ -167,21 +195,38 @@ class MxValidator:
         except Exception:
             return []
 
-    def _smtp_probe(self, mx_host: str, email: str) -> bool:
-        """Connect to SMTP server, send RCPT TO, close before DATA."""
+    def _smtp_probe(
+        self,
+        mx_host: str,
+        email: str,
+    ) -> tuple[str, int | None, str]:
+        """Probe RCPT TO and distinguish rejection from probe unavailability."""
         import smtplib
+
         try:
             with smtplib.SMTP(timeout=self.smtp_timeout) as smtp:
                 smtp.connect(mx_host, 25)
                 smtp.helo("empire-os.local")
                 smtp.mail("probe@empire-os.local")
-                code, _ = smtp.rcpt(email)
+                code, message = smtp.rcpt(email)
                 smtp.quit()
-                # 250 = accepted, 251 = user not local (still accepted)
-                return code in (250, 251)
+
+            detail = (
+                message.decode("utf-8", errors="replace")
+                if isinstance(message, bytes)
+                else str(message or "")
+            ).strip()
+
+            if code in (250, 251):
+                return "accepted", int(code), detail
+            if 400 <= int(code) <= 499:
+                return "temporary_reject", int(code), detail
+            if int(code) >= 500:
+                return "rejected", int(code), detail
+            return "unavailable", int(code), detail
         except Exception as e:
-            logger.debug("SMTP probe failed for %s: %s", email, e)
-            return False
+            logger.debug("SMTP probe unavailable for %s: %s", email, e)
+            return "unavailable", None, type(e).__name__
 
 
 def extract_phones_from_text(text: str) -> list[str]:
