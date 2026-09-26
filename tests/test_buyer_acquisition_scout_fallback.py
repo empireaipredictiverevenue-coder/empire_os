@@ -321,3 +321,70 @@ def test_permit_home_service_seed_preserves_buyer_pool_and_product_fit(
         in row["target_corridor_keys"]
     )
     assert row["outreach_authorized"] is False
+
+
+def test_opportunity_seed_fallback_preserves_opportunity_provenance_without_known_lane(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {query: [] for query in queries},
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda url, **_kwargs: _evidence(
+            url,
+            description=(
+                "Solar installer serving households with free quotations "
+                "and expansion across the region."
+            ),
+            role="Owner",
+        ),
+    )
+
+    plan = {
+        "priority_targets": [{
+            "priority_score": 15047,
+            "corridor_key": "opportunity-validation:v1:solar:united_kingdom",
+            "opportunity_key": "market:solar:united kingdom",
+            "research_queries": {
+                "end_service_buyers": [
+                    '"solar company" "united kingdom"'
+                ],
+            },
+        }],
+        "product_priority_targets": [],
+        "icp_priority_targets": [],
+    }
+
+    result = run_buyer_scout(
+        plan,
+        canonical_seed_records=[{
+            "id": "solar-seed-1",
+            "business_name": "Real Solar Ltd",
+            "niche": "solar",
+            "website": "https://real-solar.example",
+            "seed_opportunity_key": "market:solar:united kingdom",
+            "seed_corridor_key": (
+                "opportunity-validation:v1:solar:united_kingdom"
+            ),
+            "seed_buyer_pools": ["end_service_buyers"],
+        }],
+        max_domains=10,
+        max_probes=10,
+    )
+
+    assert result["search_domain_count"] == 0
+    assert result["canonical_seed_domain_count"] == 1
+    assert result["canonical_seed_fallback_used"] is True
+    assert result["candidate_count"] == 1
+    row = result["candidates"][0]
+    assert row["target_opportunity_keys"] == [
+        "market:solar:united kingdom"
+    ]
+    assert row["query_evidence"][0]["target_kind"] == (
+        "opportunity_seed"
+    )
+    assert row["outreach_authorized"] is False
+    assert result["outbound_sent"] is False
+    assert result["execution_authority"] == "none"
