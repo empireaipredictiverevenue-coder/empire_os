@@ -42,12 +42,29 @@ class CoderTaskWorker:
         self.lease_seconds = max(60, int(lease_seconds))
         self.heartbeat_seconds = max(10, int(heartbeat_seconds))
         self.max_attempts = max(1, int(max_attempts))
-        self.execution_leases = (
-            execution_lease_manager
-            or ExecutionLeaseManager(
-                self.queue.workspace / "runtime/execution_plane"
+        self.execution_leases = execution_lease_manager
+
+    def _execution_lease_manager(self) -> ExecutionLeaseManager:
+        """Resolve the default mutation lease manager only when required.
+
+        PLAN/retry-only workers do not need a workspace-backed mutation lease.
+        Mutation paths still require a real queue workspace unless an explicit
+        lease manager was injected.
+        """
+        if self.execution_leases is not None:
+            return self.execution_leases
+
+        workspace = getattr(self.queue, "workspace", None)
+        if workspace is None:
+            raise RuntimeError(
+                "workspace-backed execution lease manager required "
+                "for mutation jobs"
             )
+
+        self.execution_leases = ExecutionLeaseManager(
+            workspace / "runtime/execution_plane"
         )
+        return self.execution_leases
 
     @staticmethod
     def _transient_error(exc: Exception) -> bool:
@@ -274,7 +291,7 @@ class CoderTaskWorker:
             lease = None
             try:
                 if lease_resources:
-                    lease = self.execution_leases.acquire(
+                    lease = self._execution_lease_manager().acquire(
                         owner="empire_coder",
                         job_id=execution_request_id or job.id,
                         resources=lease_resources,
@@ -337,7 +354,7 @@ class CoderTaskWorker:
             finally:
                 if lease is not None:
                     try:
-                        self.execution_leases.release(lease.lease_id)
+                        self._execution_lease_manager().release(lease.lease_id)
                     except Exception:
                         pass
 
