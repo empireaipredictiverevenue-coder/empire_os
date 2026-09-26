@@ -126,3 +126,37 @@ def test_opportunity_validation_seed_materializer_preserves_target(monkeypatch):
     assert seen and seen[0][0] == "GET"
     assert "niche=eq.roofing" in seen[0][1]
     assert "metro=ilike.%2Adenver%2A" in seen[0][1]
+
+
+def test_opportunity_seed_materializer_surfaces_query_error():
+    from scripts.run_buyer_acquisition_scout import (
+        _opportunity_validation_seed_records,
+    )
+
+    diagnostics = []
+
+    def blocked(*_args, **_kwargs):
+        raise RuntimeError(
+            "Supabase egress circuit open locally; "
+            "probe reserved for dedicated egress guard"
+        )
+
+    rows = _opportunity_validation_seed_records(
+        {
+            "opportunity_validation": {
+                "targets": [{
+                    "opportunity_key": "market:solar:united kingdom",
+                    "niche_family": "solar",
+                    "territory": "united kingdom",
+                }],
+            },
+        },
+        request=blocked,
+        diagnostics=diagnostics,
+    )
+
+    assert rows == []
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["state"] == "ERROR"
+    assert diagnostics[0]["row_count"] == 0
+    assert "egress circuit open locally" in diagnostics[0]["error"]
