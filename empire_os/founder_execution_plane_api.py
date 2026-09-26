@@ -9,9 +9,13 @@ from fastapi import APIRouter
 from empire_os.agent_execution_plane import worker_registry_snapshot
 from empire_os.agent_tool_runtime import execution_tool_health_snapshot
 from empire_os.execution_lease import ExecutionLeaseManager
+from empire_os.predictive_coding_team_status import (
+    build_predictive_coding_team_status,
+)
 
 
 DEFAULT_LEASE_ROOT = Path("/srv/empire_os/runtime/execution_plane")
+DEFAULT_REPO_ROOT = Path("/srv/empire_os")
 
 
 def build_execution_plane_status(
@@ -36,6 +40,7 @@ def build_execution_plane_status(
 
 def create_founder_execution_plane_router(
     lease_root: Path = DEFAULT_LEASE_ROOT,
+    repo_root: Path = DEFAULT_REPO_ROOT,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/founder-execution-plane",
@@ -53,5 +58,9 @@ def create_founder_execution_plane_router(
             "read_only": True,
             "execution_authority": "none",
         }
+
+    @router.get("/coding-team/status")
+    def coding_team_status():
+        return build_predictive_coding_team_status(repo_root)
 
     return router
