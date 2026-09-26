@@ -76,6 +76,16 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 1800,
     },
+    "future_trend_intelligence": {
+        "path": Path("runtime/predictive_cloud/future_trend_latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 3600,
+    },
+    "predictive_cloud_formula": {
+        "path": Path("runtime/predictive_cloud/formula_latest.json"),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 1800,
+    },
     "conversion_intelligence": {
         "path": Path("runtime/conversion/latest.json"),
         "time_keys": ("observed_at", "generated_at"),
@@ -443,6 +453,53 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
             "llm_probability_used": payload.get(
                 "llm_probability_used"
             ),
+        }
+    if name == "future_trend_intelligence":
+        return {
+            "status": payload.get("status"),
+            "direction": payload.get("direction"),
+            "velocity_per_day": payload.get("velocity_per_day"),
+            "acceleration_per_day": payload.get(
+                "acceleration_per_day"
+            ),
+            "persistence": payload.get("persistence"),
+            "trend_confidence": payload.get("trend_confidence"),
+            "future_opportunity_status": payload.get(
+                "future_opportunity_status"
+            ),
+            "trend_opportunity_alignment": payload.get(
+                "trend_opportunity_alignment"
+            ),
+            "causal_claim": payload.get("causal_claim"),
+        }
+    if name == "predictive_cloud_formula":
+        forward = payload.get("forward_outlook")
+        forward = forward if isinstance(forward, Mapping) else {}
+        constraints = payload.get("constraints")
+        constraints = (
+            constraints if isinstance(constraints, Mapping) else {}
+        )
+        return {
+            "status": payload.get("status"),
+            "cloud_operating_score": payload.get(
+                "cloud_operating_score"
+            ),
+            "trust_multiplier": payload.get("trust_multiplier"),
+            "residual_uncertainty": payload.get(
+                "residual_uncertainty"
+            ),
+            "cloud_adjusted_portfolio_value_cents": payload.get(
+                "cloud_adjusted_portfolio_value_cents"
+            ),
+            "weakest_cloud_factor": payload.get(
+                "weakest_cloud_factor"
+            ),
+            "constraint_state": constraints.get("state"),
+            "forward_outlook_status": forward.get("status"),
+            "cloud_forward_score": forward.get(
+                "cloud_forward_score"
+            ),
+            "actual_revenue": payload.get("actual_revenue"),
         }
     if name == "tag_intelligence":
         return {
