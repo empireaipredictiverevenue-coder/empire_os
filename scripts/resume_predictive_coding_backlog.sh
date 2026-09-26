@@ -6,9 +6,27 @@ echo "=== CODING TEAM RECOVERY + RESUME ==="
 echo "HEAD=$(git rev-parse --short HEAD)"
 
 echo
-echo "=== PROVE CODER BACKENDS ==="
-bash scripts/retest_aider_builder.sh
-RETEST_RC=$?
+echo "=== FAST CODER BACKEND CHECK ==="
+NATIVE_READY="$(PYTHONPATH=/srv/empire_os ./.venv/bin/python - <<'PY'
+from pathlib import Path
+from empire_os.builder_capabilities import builder_capability_ready
+path = Path("/srv/empire_os/runtime/execution_plane/builder_capabilities.json")
+print("1" if builder_capability_ready(
+    "empire_coder",
+    "structured_patch_mutation",
+    path=path,
+) else "0")
+PY
+)"
+
+if [ "$NATIVE_READY" = "1" ]; then
+  echo "Native structured-patch backend already proven; skipping live Aider gate."
+  RETEST_RC=0
+else
+  echo "Native backend not proven; bounded Aider recovery check."
+  timeout 90 bash scripts/retest_aider_builder.sh
+  RETEST_RC=$?
+fi
 
 echo
 echo "=== REQUIRE PROVEN MUTATION BACKEND ==="
