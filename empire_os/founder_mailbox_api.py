@@ -16,7 +16,11 @@ from empire_os.empire_mailbox import build_mailbox, mailbox_thread
 
 DEFAULT_OUTBOUND_ENV = Path("/srv/empire_os/runtime/secrets/outbound.env")
 _SAFE_IDENTITY_KEYS = {"EMPIRE_OUTBOUND_FROM", "EMPIRE_REPLY_TO"}
-_RESEND_KEY_NAMES = {"RESEND_API_KEY", "RESEND_RECEIVING_API_KEY"}
+_RESEND_KEY_NAMES = {
+    "RESEND_API_KEY",
+    "RESEND_RECEIVING_API_KEY",
+    "RESEND_MAILBOX_API_KEY",
+}
 
 
 def _read_selected_env_keys(
@@ -85,6 +89,7 @@ class ResendMailboxProvider:
         api_key: str | None = None,
         *,
         receiving_api_key: str | None = None,
+        mailbox_api_key: str | None = None,
         secret_env_path: Path = DEFAULT_OUTBOUND_ENV,
         timeout_s: float = 10.0,
     ):
@@ -100,8 +105,15 @@ class ResendMailboxProvider:
             or file_keys.get("RESEND_RECEIVING_API_KEY", "")
             or sending
         )
+        mailbox = (
+            mailbox_api_key
+            or os.getenv("RESEND_MAILBOX_API_KEY", "").strip()
+            or file_keys.get("RESEND_MAILBOX_API_KEY", "")
+            or sending
+        )
         self.sending_api_key = sending
         self.receiving_api_key = receiving
+        self.mailbox_api_key = mailbox
         self.timeout_s = timeout_s
 
     def _get(
@@ -110,8 +122,17 @@ class ResendMailboxProvider:
         *,
         params: dict[str, Any] | None = None,
         receiving: bool = False,
+        mailbox: bool = False,
     ) -> Any:
-        key = self.receiving_api_key if receiving else self.sending_api_key
+        if receiving and mailbox:
+            raise ValueError("mailbox_and_receiving_are_mutually_exclusive")
+        key = (
+            self.receiving_api_key
+            if receiving
+            else self.mailbox_api_key
+            if mailbox
+            else self.sending_api_key
+        )
         if not key:
             raise RuntimeError("resend_api_key_missing")
         response = requests.get(
@@ -133,7 +154,9 @@ class ResendMailboxProvider:
         return []
 
     def list_sent(self, *, limit: int) -> list[dict[str, Any]]:
-        return self._rows(self._get("/emails", params={"limit": limit}))
+        return self._rows(
+            self._get("/emails", params={"limit": limit}, mailbox=True)
+        )
 
     def list_received(self, *, limit: int) -> list[dict[str, Any]]:
         rows = self._rows(
@@ -153,10 +176,12 @@ class ResendMailboxProvider:
         return hydrated
 
     def list_suppressions(self, *, limit: int) -> list[dict[str, Any]]:
-        return self._rows(self._get("/suppressions", params={"limit": limit}))
+        return self._rows(
+            self._get("/suppressions", params={"limit": limit}, mailbox=True)
+        )
 
     def get_sent(self, email_id: str) -> dict[str, Any]:
-        payload = self._get(f"/emails/{email_id}")
+        payload = self._get(f"/emails/{email_id}", mailbox=True)
         return dict(payload) if isinstance(payload, dict) else {}
 
     def get_received(self, email_id: str) -> dict[str, Any]:

@@ -166,8 +166,8 @@ def test_resend_provider_lists_suppressions(monkeypatch):
     )
     calls = []
 
-    def fake_get(path, *, params=None, receiving=False):
-        calls.append((path, params, receiving))
+    def fake_get(path, *, params=None, receiving=False, mailbox=False):
+        calls.append((path, params, receiving, mailbox))
         return {
             "object": "list",
             "data": [{
@@ -186,4 +186,52 @@ def test_resend_provider_lists_suppressions(monkeypatch):
         "email": "buyer@example.com",
         "origin": "manual",
     }]
-    assert calls == [("/suppressions", {"limit": 25}, False)]
+    assert calls == [
+        ("/suppressions", {"limit": 25}, False, True)
+    ]
+
+def test_resend_provider_uses_separate_mailbox_key(monkeypatch):
+    provider = ResendMailboxProvider(
+        api_key="send-key",
+        receiving_api_key="receive-key",
+        mailbox_api_key="mailbox-key",
+    )
+
+    calls = []
+
+    class Response:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    def fake_requests_get(
+        url,
+        *,
+        params=None,
+        headers=None,
+        timeout=None,
+    ):
+        calls.append({
+            "url": url,
+            "params": params,
+            "authorization": headers.get("Authorization"),
+        })
+        return Response({"data": []})
+
+    monkeypatch.setattr(
+        "empire_os.founder_mailbox_api.requests.get",
+        fake_requests_get,
+    )
+
+    provider.list_sent(limit=5)
+    provider.list_suppressions(limit=5)
+    provider.list_received(limit=5)
+
+    assert calls[0]["authorization"] == "Bearer mailbox-key"
+    assert calls[1]["authorization"] == "Bearer mailbox-key"
+    assert calls[2]["authorization"] == "Bearer receive-key"
