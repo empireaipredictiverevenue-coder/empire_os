@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
-from urllib import request, error
+import tempfile
+from urllib import request
 
 from empire_os.aider_builder import (
     AiderMutationRequest,
@@ -86,40 +87,80 @@ def main() -> int:
         print("DIAG=AIDER_BINARY_MISSING")
         return 5
 
-    command = build_aider_command(
-        REPO_ROOT,
-        AiderMutationRequest(
-            objective=(
-                "Do not edit anything. Reply to the task and exit. "
-                "This is a connectivity diagnostic only."
-            ),
-            allowed_paths=("empire_os/aider_builder.py",),
-            model="openai/auto",
-            max_runtime_seconds=120,
-        ),
-        executable=binary,
-    )
-    command.append("--dry-run")
+    with tempfile.TemporaryDirectory(
+        prefix="empire-aider-diag-",
+        dir="/var/tmp",
+    ) as tmp:
+        clone = Path(tmp) / "repo"
+        cloned = subprocess.run(
+            [
+                "git",
+                "clone",
+                "--no-hardlinks",
+                "--single-branch",
+                "--branch",
+                "feature/revenue-intelligence-v2",
+                str(REPO_ROOT),
+                str(clone),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if cloned.returncode != 0:
+            print(json.dumps({
+                "clone_ready": False,
+                "reason": "diagnostic_clone_failed",
+                "secret_printed": False,
+            }, indent=2, sort_keys=True))
+            print("DIAG=DIAGNOSTIC_CLONE_FAILED")
+            return 5
 
-    env = {
-        "PATH": "/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin",
-        "HOME": "/var/tmp/empire-aider-home",
-        "XDG_CACHE_HOME": "/var/tmp/empire-aider-cache",
-        "OPENAI_API_BASE": base,
-        "AIDER_OPENAI_API_BASE": base,
-        "OPENAI_API_KEY": key,
-        "AIDER_OPENAI_API_KEY": key,
-        "AIDER_ANALYTICS_DISABLE": "true",
-    }
-    run = subprocess.run(
-        command,
-        cwd=str(REPO_ROOT),
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-    )
+        git_dir = clone / ".git"
+        (git_dir / "empire-aider-config.yml").write_text(
+            "{}\n",
+            encoding="utf-8",
+        )
+        (git_dir / "empire-aider.env").write_text(
+            "",
+            encoding="utf-8",
+        )
+
+        command = build_aider_command(
+            clone,
+            AiderMutationRequest(
+                objective=(
+                    "Do not edit anything. Reply to the task and exit. "
+                    "This is a connectivity diagnostic only."
+                ),
+                allowed_paths=("empire_os/aider_builder.py",),
+                model="openai/auto",
+                max_runtime_seconds=120,
+            ),
+            executable=binary,
+        )
+        command.append("--dry-run")
+
+        env = {
+            "PATH": "/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin",
+            "HOME": "/var/tmp/empire-aider-home",
+            "XDG_CACHE_HOME": "/var/tmp/empire-aider-cache",
+            "OPENAI_API_BASE": base,
+            "AIDER_OPENAI_API_BASE": base,
+            "OPENAI_API_KEY": key,
+            "AIDER_OPENAI_API_KEY": key,
+            "AIDER_ANALYTICS_DISABLE": "true",
+        }
+        run = subprocess.run(
+            command,
+            cwd=str(clone),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
     output = _sanitize_output(
         (run.stdout or "") + "\n" + (run.stderr or ""),
         env,
