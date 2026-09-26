@@ -160,3 +160,17 @@ def test_opportunity_seed_materializer_surfaces_query_error():
     assert diagnostics[0]["state"] == "ERROR"
     assert diagnostics[0]["row_count"] == 0
     assert "egress circuit open locally" in diagnostics[0]["error"]
+
+
+def test_legacy_canonical_seed_helper_does_not_use_opportunity_diagnostics(
+    monkeypatch,
+):
+    import scripts.run_buyer_acquisition_scout as runner
+
+    monkeypatch.setattr(
+        runner,
+        "request_json",
+        lambda *_args, **_kwargs: [],
+    )
+
+    assert runner._canonical_seed_records(per_lane=1) == []
