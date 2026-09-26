@@ -8,6 +8,46 @@ def _result(args, code=0, stdout=""):
     return subprocess.CompletedProcess(args, code, stdout=stdout, stderr="")
 
 
+
+def test_shared_egress_lock_does_not_chmod_existing_lock(
+    monkeypatch,
+    tmp_path,
+):
+    """Regression: root-owned/world-writable lock must work for ubuntu worker."""
+    from empire_os import qualification_worker_v2 as worker
+
+    lock_path = tmp_path / "supabase_egress_state.lock"
+    lock_path.touch(mode=0o666)
+
+    monkeypatch.setattr(worker, "_EGRESS_LOCK_PATH", lock_path)
+
+    chmod_calls = []
+
+    def forbidden_chmod(*args, **kwargs):
+        chmod_calls.append((args, kwargs))
+        raise PermissionError("simulated non-owner chmod")
+
+    monkeypatch.setattr(worker.os, "chmod", forbidden_chmod)
+
+    result = worker._with_egress_lock(lambda: "LOCK_OK")
+
+    assert result == "LOCK_OK"
+    assert chmod_calls == []
+
+
+def test_shared_egress_lock_new_file_is_world_writable(
+    monkeypatch,
+    tmp_path,
+):
+    from empire_os import qualification_worker_v2 as worker
+
+    lock_path = tmp_path / "new_supabase_egress_state.lock"
+    monkeypatch.setattr(worker, "_EGRESS_LOCK_PATH", lock_path)
+
+    assert worker._with_egress_lock(lambda: "LOCK_OK") == "LOCK_OK"
+    assert lock_path.exists()
+    assert (lock_path.stat().st_mode & 0o777) == 0o666
+
 def test_guard_contains_only_allowlisted_timers_on_egress_block(
     monkeypatch,
     tmp_path,
@@ -47,7 +87,7 @@ def test_guard_contains_only_allowlisted_timers_on_egress_block(
     }
     assert set(guard.MANAGED_TIMERS).issubset(stopped)
     assert "empire-buyer-acquisition-team.timer" in stopped
-    assert "empire-revenue-runtime-supervisor.timer" in stopped
+    assert "empire-revenue-runtime-supervisor.timer" not in stopped
     assert "empire-revenue-pulse.timer" in stopped
     assert "empire-ops-control.timer" in stopped
     assert "empire-legacy-permit-recovery.timer" in stopped
@@ -158,3 +198,12 @@ def test_guard_requests_the_explicit_recovery_probe_slot(
     assert seen["method"] == "GET"
     assert seen["path"] == "/rest/v1/prospects?select=id&limit=1"
     assert seen["allow_egress_probe"] is True
+
+def test_recovery_supervisor_is_never_egress_contained():
+    """Recovery control plane must survive a Supabase data-plane outage."""
+    from empire_os.supabase_egress_guard import MANAGED_TIMERS
+
+    assert (
+        "empire-revenue-runtime-supervisor.timer"
+        not in MANAGED_TIMERS
+    )

@@ -14,6 +14,21 @@ _CURATED_SKILLS = {
 }
 
 
+def _native_skill_paths() -> dict[str, str]:
+    """Return promoted-document paths from the canonical Empire registry.
+
+    The registry selects knowledge only. Knowledge Garden ACTIVE state still
+    controls whether the document can actually be loaded.
+    """
+    from empire_os.agent_intelligence import SKILLS
+
+    return {
+        name: spec.path
+        for name, spec in SKILLS.items()
+        if spec.path
+    }
+
+
 EMPIRE_CODER_PERSONA = """You are Empire Coder, the governed developer intelligence layer for EmpireOS.
 
 Inspect before modifying. Use Blueprint v6 and repository AGENTS.md as architectural authority.
@@ -56,11 +71,15 @@ class SkillLoader:
         *,
         max_chars: int = 20_000,
     ) -> SkillDocument:
+        catalog = {
+            **_CURATED_SKILLS,
+            **_native_skill_paths(),
+        }
         try:
-            relative = _CURATED_SKILLS[name]
+            relative = catalog[name]
         except KeyError as exc:
             raise KeyError(
-                f"unknown curated Empire Coder skill: {name}"
+                f"unknown governed Empire Coder skill: {name}"
             ) from exc
         if relative not in self.active_knowledge_paths:
             raise PermissionError(
@@ -73,9 +92,13 @@ class SkillLoader:
         return SkillDocument(name, relative, content)
 
     def available(self) -> tuple[str, ...]:
+        catalog = {
+            **_CURATED_SKILLS,
+            **_native_skill_paths(),
+        }
         return tuple(
             name
-            for name, path in sorted(_CURATED_SKILLS.items())
+            for name, path in sorted(catalog.items())
             if path in self.active_knowledge_paths
         )
 

@@ -1,65 +1,94 @@
 from empire_os.buyer_pilot_assets import (
-    PROHIBITED_PATTERNS,
-    SCHEMA_VERSION,
     build_lead_smart_pilot_assets,
     validate_asset_text,
 )
+from empire_os.buyer_supply_policy import lead_smart_observed_policy
 
 
-def test_validator_rejects_guarantees_and_discounts():
-    result = validate_asset_text("Guaranteed lowest price. Save 20% off today.")
-    assert result["passed"] is False
-    categories = {row["category"] for row in result["violations"]}
-    assert "guarantees" in categories
-    assert "discounts" in categories
-    assert "unsubstantiated_claims" in categories
+SOURCE = "gmail:1a0da7880f69e8c6"
 
 
-def test_validator_rejects_promotions():
-    result = validate_asset_text("Limited time special offer and coupon")
-    assert result["passed"] is False
-    assert any(row["category"] == "promotions" for row in result["violations"])
+def policy():
+    return lead_smart_observed_policy(source_ref=SOURCE)
 
 
-def test_recovered_patterns_match_original_categories():
-    assert tuple(PROHIBITED_PATTERNS) == (
-        "promotions",
-        "guarantees",
-        "discounts",
-        "unsubstantiated_claims",
+def test_prohibited_guarantee_is_detected():
+    result = validate_asset_text(
+        "Guaranteed same-day service",
+        prohibited_categories=[
+            "guarantees",
+            "unsubstantiated_claims",
+        ],
+    )
+
+    assert result["compliant"] is False
+    assert any(
+        item["category"] == "guarantees"
+        for item in result["violations"]
     )
 
 
-def test_build_assets_are_generic_unbranded_and_review_only():
-    bundle = build_lead_smart_pilot_assets(service_label="roofing")
-    assert bundle["schema_version"] == SCHEMA_VERSION
-    assert bundle["mode"] == "REVIEW_ONLY"
-    assert bundle["buyer_name"] == "Lead Smart"
-    assert bundle["buyer_asset_review_required"] is True
-    assert bundle["traffic_source_approval_required"] is True
-    assert bundle["buyer_approved"] is False
-    assert bundle["published"] is False
-    assert bundle["campaign_created"] is False
-    assert bundle["budget_authorized"] is False
-    assert bundle["traffic_authorized"] is False
-    assert bundle["commercial_activation_authorized"] is False
-    assert bundle["compliance_passed"] is True
-    assert all(asset["brand"] == "generic_unbranded" for asset in bundle["assets"])
-    assert all(asset["status"] == "REVIEW_ONLY" for asset in bundle["assets"])
+def test_prohibited_discount_is_detected():
+    result = validate_asset_text(
+        "Save 20% with our discount",
+        prohibited_categories=["discounts"],
+    )
+
+    assert result["compliant"] is False
 
 
-def test_assets_do_not_invent_price_payout_cap_or_volume_claims():
-    bundle = build_lead_smart_pilot_assets(service_label="HVAC")
-    text = str(bundle["assets"])
-    assert "$" not in text
-    assert "payout" not in text.lower()
-    assert "daily cap" not in text.lower()
-    assert "guaranteed volume" not in text.lower()
+def test_lead_smart_assets_are_generic_and_unbranded():
+    result = build_lead_smart_pilot_assets(
+        policy(),
+        service_label="Water Damage Restoration",
+    )
+
+    assert result["compliance_passed"] is True
+
+    for asset in result["assets"]:
+        assert asset["brand"] is None
+        assert asset["compliance"]["compliant"] is True
 
 
-def test_supply_blockers_are_preserved_in_asset_bundle():
-    bundle = build_lead_smart_pilot_assets(service_label="plumbing")
-    review = bundle["current_supply_review"]
-    assert review["decision"] == "blocked_pending_buyer_asset_review"
-    assert review["traffic_authorized"] is False
-    assert "payout_unknown" in review["blockers"]
+def test_lead_smart_assets_do_not_invent_commercial_terms():
+    result = build_lead_smart_pilot_assets(
+        policy(),
+        service_label="Water Damage Restoration",
+    )
+
+    asset_text = str(result["assets"]).lower()
+
+    assert "$" not in asset_text
+    assert "payout" not in asset_text
+    assert "daily cap" not in asset_text
+    assert "volume" not in asset_text
+
+
+def test_asset_generation_never_authorizes_execution():
+    result = build_lead_smart_pilot_assets(
+        policy(),
+        service_label="Water Damage Restoration",
+    )
+
+    assert result["mode"] == "REVIEW_ONLY"
+    assert result["published"] is False
+    assert result["campaign_created"] is False
+    assert result["budget_authorized"] is False
+    assert result["traffic_authorized"] is False
+    assert result["commercial_activation_authorized"] is False
+    assert result["buyer_approved"] is False
+
+
+def test_supply_review_remains_blocked_after_asset_generation():
+    result = build_lead_smart_pilot_assets(
+        policy(),
+        service_label="Water Damage Restoration",
+    )
+
+    review = result["current_supply_review"]
+
+    assert review["pilot_ready"] is False
+    assert "sites_reviewed" in review["blockers"]
+    assert "landing_pages_reviewed" in review["blockers"]
+    assert "ads_reviewed" in review["blockers"]
+    assert "traffic_source_buyer_approval" in review["blockers"]
