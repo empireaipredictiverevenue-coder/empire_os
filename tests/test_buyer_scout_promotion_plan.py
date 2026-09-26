@@ -42,12 +42,59 @@ def test_review_ready_candidate_gets_raw_prospect_proposal():
     assert payload["buy_signal_score"] is None
     assert payload["contact_name"] == "Jane Smith"
     assert payload["contact_title"] == "Owner"
+    assert payload["contact_source"] == "first_party_site"
     assert row["first_party_emails_preserved_for_identity_resolution"] == [
         "sales@roof.example"
     ]
     assert row["outreach_authorized"] is False
     assert result["database_write_performed"] is False
     assert result["canonical_promotion_performed"] is False
+
+
+def test_contact_source_preserves_observed_identity_provenance():
+    row = candidate(
+        site_evidence={
+            "first_party_phones": ["+15125550123"],
+            "first_party_emails": [],
+            "first_party_people": [
+                {
+                    "name": "Alex Founder",
+                    "title": "Founder",
+                    "identity_source": "corroborated_public_profile",
+                }
+            ],
+        },
+    )
+
+    result = build_promotion_plan([row])
+    payload = result["proposals"][0]["proposed_prospect_payload"]
+
+    assert payload["contact_name"] == "Alex Founder"
+    assert payload["contact_source"] == "corroborated_public_profile"
+
+
+def test_explicit_person_source_takes_precedence():
+    row = candidate(
+        site_evidence={
+            "first_party_phones": ["+15125550123"],
+            "first_party_emails": [],
+            "first_party_people": [
+                {
+                    "name": "Alex Founder",
+                    "title": "Founder",
+                    "source": "public_company_post_and_first_party_site",
+                    "identity_source": "corroborated_public_profile",
+                }
+            ],
+        },
+    )
+
+    result = build_promotion_plan([row])
+    payload = result["proposals"][0]["proposed_prospect_payload"]
+
+    assert payload["contact_source"] == (
+        "public_company_post_and_first_party_site"
+    )
 
 
 def test_ambiguous_market_and_contact_fail_closed_to_unknown():
@@ -86,7 +133,6 @@ def test_non_review_ready_candidate_is_not_proposed():
     assert result["blocked_reason_counts"] == {
         "not_review_ready": 1
     }
-
 
 
 def test_stale_review_ready_generic_name_is_rejected_at_promotion():
