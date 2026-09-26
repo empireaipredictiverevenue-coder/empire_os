@@ -398,3 +398,56 @@ def test_scout_classifies_insurance_lane(monkeypatch):
     assert row["continuous_lane_candidate"] is True
     assert result["continuous_lane_candidate_counts"]["insurance"] == 1
     assert row["outreach_authorized"] is False
+
+
+def test_opportunity_seed_query_provenance_reaches_candidate(monkeypatch):
+    opportunity_plan = {
+        "priority_targets": [{
+            "priority_score": 15050,
+            "corridor_key": "opportunity-validation:v1:roofing:denver_co",
+            "opportunity_key": "market:roofing:denver, co",
+            "research_queries": {
+                "end_service_buyers": [
+                    '"roofing company" "denver co"'
+                ],
+            },
+        }],
+        "product_priority_targets": [],
+        "icp_priority_targets": [],
+    }
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {
+            query: ["denver-roofer.example"]
+            for query in queries
+        },
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "canonical_url": "https://denver-roofer.example",
+            "final_url": "https://denver-roofer.example",
+            "business_names": ["Denver Roofer"],
+            "title": "Denver Roofer",
+            "description": "Roofing company serving Denver.",
+            "emails": [],
+            "phones": [],
+            "people": [],
+            "pages_checked": [],
+            "evidence_score": 0.8,
+        },
+    )
+
+    result = run_buyer_scout(
+        opportunity_plan,
+        max_queries=5,
+        max_domains=5,
+        max_probes=5,
+    )
+
+    assert result["candidate_count"] == 1
+    assert result["candidates"][0]["target_opportunity_keys"] == [
+        "market:roofing:denver, co"
+    ]
+    assert result["outbound_sent"] is False
