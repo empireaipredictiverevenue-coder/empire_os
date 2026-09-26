@@ -6,14 +6,19 @@ export PATH="/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 
 echo "=== AIDER BUILDER BOOTSTRAP ==="
 
-if ! command -v uv >/dev/null 2>&1; then
-  echo "uv is required for an isolated Aider installation." >&2
-  echo "Install uv, then rerun this bootstrap." >&2
-  exit 2
+UV_BIN="$(command -v uv || true)"
+UV_BOOTSTRAP=""
+if [ -z "$UV_BIN" ]; then
+  echo "=== BOOTSTRAP UV IN DISPOSABLE VENV ==="
+  UV_BOOTSTRAP="/var/tmp/empire-uv-bootstrap"
+  rm -rf "$UV_BOOTSTRAP"
+  python3 -m venv "$UV_BOOTSTRAP"
+  "$UV_BOOTSTRAP/bin/python" -m pip install --upgrade pip uv
+  UV_BIN="$UV_BOOTSTRAP/bin/uv"
 fi
 
 echo "=== INSTALL / UPDATE ISOLATED AIDER TOOL ==="
-uv tool install --force --python python3.12 aider-chat
+"$UV_BIN" tool install --force --python python3.12 aider-chat
 
 AIDER_BIN="$(command -v aider || true)"
 if [ -z "$AIDER_BIN" ]; then
@@ -59,5 +64,9 @@ data = json.loads(path.read_text()) if path.exists() else {}
 row = ((data.get("workers") or {}).get("empire_coder") or {}).get("aider_mutation")
 print(json.dumps(row or {"ready": False, "reason": "missing"}, indent=2, sort_keys=True))
 PY
+
+if [ -n "$UV_BOOTSTRAP" ]; then
+  rm -rf "$UV_BOOTSTRAP"
+fi
 
 echo "=== COMPLETE ==="
