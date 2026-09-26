@@ -50,6 +50,20 @@ QUEUE_RC=$?
 echo "QUEUE_RC=$QUEUE_RC"
 
 echo
+echo "=== REPUBLISH FAILED HERMES TASKS AS RECOVERY JOBS ==="
+PYTHONPATH=/srv/empire_os \
+  ./.venv/bin/python scripts/retry_failed_predictive_hermes.py
+HERMES_RECOVERY_RC=$?
+echo "HERMES_RECOVERY_RC=$HERMES_RECOVERY_RC"
+
+echo
+echo "=== REFRESH HERMES CONTROL AFTER RECOVERY PUBLISH ==="
+git fetch origin \
+  ops/hermes-control:refs/remotes/origin/ops/hermes-control
+RECOVERY_FETCH_RC=$?
+echo "RECOVERY_FETCH_RC=$RECOVERY_FETCH_RC"
+
+echo
 echo "=== HERMES GOVERNED BUILDER ==="
 PYTHONPATH=/srv/empire_os   ./.venv/bin/python scripts/run_hermes_control_worker.py --max-jobs 3
 HERMES_RC=$?
@@ -101,4 +115,4 @@ echo "DIFF_RC=$DIFF_RC"
 
 echo
 echo "=== RECOVERY RESULT ==="
-echo "retest=$RETEST_RC capability=$CAP_RC queue=$QUEUE_RC hermes=$HERMES_RC coder=$CODER_RC swarm=$SWARM_RC diff=$DIFF_RC"
+echo "retest=$RETEST_RC capability=$CAP_RC queue=$QUEUE_RC hermes_recovery=$HERMES_RECOVERY_RC hermes=$HERMES_RC coder=$CODER_RC swarm=$SWARM_RC diff=$DIFF_RC"
