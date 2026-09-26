@@ -29,7 +29,7 @@ def test_predictive_coding_team_has_five_non_overlapping_lanes():
     assert len(requests) == 5
 
     ids = [request.request_id for request in requests]
-    assert len(set(ids)) == 4
+    assert len(set(ids)) == 5
 
     mutating_paths = []
     for request in requests:
