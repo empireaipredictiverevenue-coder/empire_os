@@ -10,6 +10,7 @@ def plan():
             {
                 "priority_score": 100,
                 "corridor_key": "corridor:v1:roofing:austin_tx:qualified_lead:lead",
+                "opportunity_key": "market:roofing:austin_tx",
                 "research_queries": {
                     "local_and_smb_buyers": [
                         '"roofing" "local business" austin tx'
@@ -61,6 +62,11 @@ def test_collect_queries_preserves_pool_and_target_provenance():
         row["buyer_pool"] == "direct_demand_buyers"
         and row["corridor_key"]
         for row in rows
+    )
+    assert any(
+        row["opportunity_key"] == "market:roofing:austin_tx"
+        for row in rows
+        if row["target_kind"] == "corridor"
     )
     assert any(
         row["target_kind"] == "product"
@@ -115,6 +121,9 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
     assert row["first_party_emails"] == ["jane@buyer.example"]
     assert row["first_party_phones"] == ["+15125550123"]
     assert row["first_party_people"][0]["name"] == "Jane Smith"
+    assert row["target_opportunity_keys"] == [
+        "market:roofing:austin_tx"
+    ]
     assert row["target_icp_profile_keys"] == [
         "high_ticket_home_service"
     ]
