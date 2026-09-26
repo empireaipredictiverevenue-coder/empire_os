@@ -129,6 +129,122 @@ def _canonical_seed_records(
     return rows
 
 
+HOME_SERVICE_NICHES = {
+    "plumbing",
+    "general_contractor",
+    "roofing",
+    "residential_roofing",
+    "roof_repair",
+    "restoration",
+    "water_damage_restoration",
+    "hvac",
+    "solar",
+}
+
+
+def _load_buyer_plan(repo_root: str) -> dict:
+    try:
+        value = json.loads(
+            (
+                __import__("pathlib").Path(repo_root)
+                / "runtime/buyer_acquisition/latest.json"
+            ).read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _opportunity_validation_seed_records(
+    plan: dict,
+    *,
+    per_target: int = 6,
+) -> list[dict]:
+    """Recover real canonical prospects for opportunity validation fallback.
+
+    This path is used only when public Search Fabric yields no domains. Rows
+    remain research candidates and are re-probed against their first-party
+    websites by Buyer Scout before surfacing.
+    """
+    per_target = max(1, min(int(per_target), 10))
+    validation = plan.get("opportunity_validation")
+    validation = validation if isinstance(validation, dict) else {}
+    targets = validation.get("targets")
+    targets = targets if isinstance(targets, list) else []
+
+    rows: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for target in targets[:10]:
+        if not isinstance(target, dict):
+            continue
+        opportunity_key = str(
+            target.get("opportunity_key") or ""
+        ).strip()
+        niche = str(target.get("niche_family") or "").strip()
+        territory = str(target.get("territory") or "").strip()
+        if not opportunity_key or not niche:
+            continue
+
+        params_dict = {
+            "select": (
+                "id,business_name,niche,website,metro,status,created_at"
+            ),
+            "niche": "eq." + niche,
+            "website": "not.is.null",
+            "order": "created_at.desc",
+            "limit": str(per_target),
+        }
+        normalized_territory = territory.casefold().strip()
+        if normalized_territory not in {
+            "",
+            "uk",
+            "gb",
+            "great britain",
+            "united kingdom",
+        }:
+            metro_term = territory.split(",", 1)[0].strip()
+            if metro_term:
+                params_dict["metro"] = f"ilike.*{metro_term}*"
+
+        params = urllib.parse.urlencode(params_dict)
+        try:
+            batch = request_json(
+                "GET",
+                f"/rest/v1/prospects?{params}",
+            ) or []
+        except Exception:
+            batch = []
+
+        for raw in batch:
+            if not isinstance(raw, dict):
+                continue
+            website = str(raw.get("website") or "").strip()
+            business_name = str(
+                raw.get("business_name") or ""
+            ).strip()
+            prospect_id = str(raw.get("id") or "").strip()
+            if not website or not business_name or not prospect_id:
+                continue
+            dedup_key = (prospect_id, opportunity_key)
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+
+            row = dict(raw)
+            row["seed_opportunity_key"] = opportunity_key
+            row["seed_corridor_key"] = target.get("corridor_key")
+            row["seed_product_code"] = target.get("product_code")
+            row["seed_buyer_pools"] = [
+                "end_service_buyers",
+                "local_and_smb_buyers",
+            ]
+            if niche.casefold() in HOME_SERVICE_NICHES:
+                row["icp_profile_key"] = "high_ticket_home_service"
+            rows.append(row)
+
+    return rows
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")
@@ -138,15 +254,22 @@ def main() -> int:
     parser.add_argument("--max-probes", type=int, default=20)
     args = parser.parse_args()
 
+    plan = _load_buyer_plan(args.repo_root)
+    canonical_seeds = [
+        *_opportunity_validation_seed_records(
+            plan,
+            per_target=6,
+        ),
+        *_canonical_seed_records(per_lane=8),
+    ]
+
     payload = refresh_buyer_scout(
         args.repo_root,
         max_queries=args.max_queries,
         results_per_query=args.results_per_query,
         max_domains=args.max_domains,
         max_probes=args.max_probes,
-        canonical_seed_records=_canonical_seed_records(
-            per_lane=8,
-        ),
+        canonical_seed_records=canonical_seeds,
     )
     print(json.dumps({
         "ok": True,
