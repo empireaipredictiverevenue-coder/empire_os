@@ -98,6 +98,27 @@ def test_changed_paths_must_match_job_scope():
         allowed,
     )
 
+    exact_job = HermesJob.from_mapping(
+        base_job(
+            allowed_paths=[
+                "empire_os/revenue_exchange_optimization_bridge.py",
+                "tests/test_revenue_exchange_optimization_bridge.py",
+            ]
+        )
+    )
+    assert exact_job.allowed_paths == (
+        "empire_os/revenue_exchange_optimization_bridge.py",
+        "tests/test_revenue_exchange_optimization_bridge.py",
+    )
+    assert path_is_allowed(
+        "empire_os/revenue_exchange_optimization_bridge.py",
+        exact_job.allowed_paths,
+    )
+    assert path_is_allowed(
+        "tests/test_revenue_exchange_optimization_bridge.py",
+        exact_job.allowed_paths,
+    )
+
     with pytest.raises(HermesControlError, match="outside job policy"):
         validate_changed_paths(
             [
@@ -200,6 +221,18 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
             return ("completed with local-test-key", None)
 
     monkeypatch.setattr(hermes_control.subprocess, "Popen", DummyProcess)
+    monkeypatch.setattr(
+        hermes_control,
+        "_select_omniroute_model",
+        lambda env: (
+            "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+            [{
+                "model": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+                "ok": "true",
+                "reason": "ok",
+            }],
+        ),
+    )
     repo = tmp_path / "repo"
     worktree = tmp_path / "worktree"
     worktree.mkdir(parents=True)
@@ -211,10 +244,10 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     )
 
     assert result["returncode"] == 0
-    assert result["endpoint_mode"] == "isolated_omniroute_pinned"
+    assert result["endpoint_mode"] == "isolated_omniroute_selected"
     assert result["provider"] == "custom"
     assert result["model"] == "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
-    assert result["model_probe_attempts"] == []
+    assert result["model_probe_attempts"][0]["ok"] == "true"
     assert result["hermes_home_isolated"] is True
     assert result["model_context_length"] == 262144
     assert result["model_max_tokens"] == 16384
@@ -347,6 +380,8 @@ def test_omniroute_model_selector_retries_free_router_cooldown_once(monkeypatch)
 
     def fake_probe(*, base_url, api_key, model, timeout=15):
         probed.append(model)
+        if model == "openrouter/cohere/north-mini-code:free":
+            return True, "ok"
         return (
             False,
             'http_429:{"error":{"code":"model_cooldown","reset_seconds":24}}',
@@ -369,22 +404,21 @@ def test_omniroute_model_selector_retries_free_router_cooldown_once(monkeypatch)
     )
     monkeypatch.delenv("EMPIRE_HERMES_MODEL_CANDIDATES", raising=False)
 
-    with pytest.raises(
-        HermesControlError,
-        match="skipped free-model fan-out",
-    ):
-        hermes_control._select_omniroute_model(
-            {
-                "OPENAI_BASE_URL": "http://127.0.0.1:20128/v1",
-                "OPENAI_API_KEY": "local-key",
-            }
-        )
+    model, attempts = hermes_control._select_omniroute_model(
+        {
+            "OPENAI_BASE_URL": "http://127.0.0.1:20128/v1",
+            "OPENAI_API_KEY": "local-key",
+        }
+    )
 
+    assert model == "openrouter/cohere/north-mini-code:free"
     assert probed == [
         "openrouter/openrouter/free",
         "openrouter/openrouter/free",
+        "openrouter/cohere/north-mini-code:free",
     ]
     assert sleeps == [25]
+    assert attempts[-1]["ok"] == "true"
 
 
 def test_omniroute_catalog_fanout_is_bounded():
