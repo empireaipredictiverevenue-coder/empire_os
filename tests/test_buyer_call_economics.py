@@ -117,21 +117,22 @@ def test_margin_stays_unknown_until_acquisition_cost_is_known():
     ],
 )
 def test_invalid_economic_inputs_fail_closed(field, value, blocker):
-    economics = _base(
-        geography="verified-buyer-geo",
-        payout_amount=100.0,
-        payout_currency="USD",
-        qualification_seconds=90,
-        daily_cap=5,
-        traffic_source="search",
-        traffic_source_approved=True,
-        routing_mode="rtb",
-        routing_verified=True,
-        tracking_verified=True,
-        buyer_asset_approved=True,
-        estimated_cost_per_call=50.0,
-        **{field: value},
-    )
+    verified = {
+        "geography": "verified-buyer-geo",
+        "payout_amount": 100.0,
+        "payout_currency": "USD",
+        "qualification_seconds": 90,
+        "daily_cap": 5,
+        "traffic_source": "search",
+        "traffic_source_approved": True,
+        "routing_mode": "rtb",
+        "routing_verified": True,
+        "tracking_verified": True,
+        "buyer_asset_approved": True,
+        "estimated_cost_per_call": 50.0,
+    }
+    verified[field] = value
+    economics = _base(**verified)
 
     assert blocker in economics["blockers"]
     assert economics["pilot_ready"] is False
