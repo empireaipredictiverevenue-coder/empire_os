@@ -302,15 +302,28 @@ def dispatch_execution_request(
             path=capability_path,
         )
     ):
-        if builder_capability_ready(
+        empire_coder_structured_ready = builder_capability_ready(
             "empire_coder",
             "structured_patch_mutation",
             path=capability_path,
+        )
+        empire_coder_aider_ready = builder_capability_ready(
+            "empire_coder",
+            "aider_mutation",
+            path=capability_path,
+        )
+        if (
+            empire_coder_structured_ready
+            or empire_coder_aider_ready
         ):
             base["runtime_fallback"] = {
                 "from": "pi",
                 "to": "empire_coder",
                 "reason": "pi_mutation_capability_not_proven",
+                "empire_coder_backends": {
+                    "structured_patch": empire_coder_structured_ready,
+                    "aider": empire_coder_aider_ready,
+                },
                 "execution_authority": "none",
             }
             worker = "empire_coder"
