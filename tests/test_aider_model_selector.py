@@ -27,7 +27,7 @@ def test_selector_falls_back_after_429(monkeypatch):
         lambda: {
             "OPENAI_BASE_URL": "http://127.0.0.1:20128/v1",
             "OPENAI_API_KEY": "secret",
-            "EMPIRE_HERMES_MODEL": "provider/preferred-coder",
+            "EMPIRE_HERMES_MODEL": "openrouter/provider/preferred-coder:free",
         },
     )
 
@@ -38,13 +38,13 @@ def test_selector_falls_back_after_429(monkeypatch):
         if req.full_url.endswith("/models"):
             return _Response({
                 "data": [
-                    {"id": "provider/backup-coder"},
-                    {"id": "provider/general"},
+                    {"id": "openrouter/provider/backup-coder:free"},
+                    {"id": "openrouter/provider/general:free"},
                 ]
             })
         body = json.loads(req.data.decode("utf-8"))
         model = body["model"]
-        if model == "provider/preferred-coder":
+        if model == "openrouter/provider/preferred-coder:free":
             raise HTTPError(
                 req.full_url,
                 429,
@@ -56,7 +56,7 @@ def test_selector_falls_back_after_429(monkeypatch):
             return _Response({
                 "choices": [{"message": {"content": ""}}]
             })
-        if model == "provider/backup-coder":
+        if model == "openrouter/provider/backup-coder:free":
             return _Response({
                 "choices": [{
                     "message": {"content": "EMPIRE_CODER_OK"}
@@ -71,8 +71,8 @@ def test_selector_falls_back_after_429(monkeypatch):
         max_candidates=6,
     )
 
-    assert result["selected_direct_model"] == "provider/backup-coder"
-    assert result["selected"] == "openai/provider/backup-coder"
+    assert result["selected_direct_model"] == "openrouter/provider/backup-coder:free"
+    assert result["selected"] == "openai/openrouter/provider/backup-coder:free"
     assert result["reason"] == "usable_model_selected"
     assert result["attempts"][0]["http_status"] == 429
     assert result["attempts"][-1]["usable"] is True
@@ -107,3 +107,43 @@ def test_selector_fails_closed_when_no_model_usable(monkeypatch):
     assert result["selected"] is None
     assert result["reason"] == "no_usable_model"
     assert result["execution_authority"] == "none"
+
+
+
+def test_selector_excludes_paid_catalog_by_default(monkeypatch):
+    monkeypatch.setattr(
+        selector,
+        "_protected_omniroute_env",
+        lambda: {
+            "OPENAI_BASE_URL": "http://127.0.0.1:20128/v1",
+            "OPENAI_API_KEY": "secret",
+            "EMPIRE_HERMES_MODEL": "openrouter/nvidia/model:free",
+        },
+    )
+    monkeypatch.delenv("EMPIRE_AIDER_ALLOW_PAID_MODELS", raising=False)
+
+    seen = []
+
+    def fake_urlopen(req, timeout=0):
+        if req.full_url.endswith("/models"):
+            return _Response({
+                "data": [
+                    {"id": "openrouter/qwen/qwen3-coder-plus"},
+                    {"id": "openrouter/qwen/qwen3-coder-free:free"},
+                ]
+            })
+        body = json.loads(req.data.decode("utf-8"))
+        seen.append(body["model"])
+        return _Response({
+            "choices": [{"message": {"content": "EMPIRE_CODER_OK"}}]
+        })
+
+    monkeypatch.setattr(selector.urlrequest, "urlopen", fake_urlopen)
+
+    result = selector.select_usable_aider_model(
+        timeout_seconds=1,
+        max_candidates=6,
+    )
+
+    assert result["paid_models_allowed"] is False
+    assert "openrouter/qwen/qwen3-coder-plus" not in seen
