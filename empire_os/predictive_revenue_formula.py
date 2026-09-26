@@ -72,7 +72,7 @@ STATE_EVIDENCE = {
     "revenue_recognized": ("revenue_recognition_evidence_ref",),
     "fulfilled": ("fulfilment_evidence_ref",),
     "retained": ("retention_evidence_ref",),
-)
+}
 
 
 def _number(value: Any, name: str) -> float:
