@@ -14,6 +14,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.aider_builder import aider_health
+from empire_os.builder_capabilities import builder_capability_snapshot
 from empire_os.hermes_control import (
     DEFAULT_CONTROL_BRANCH,
     DEFAULT_REMOTE,
@@ -270,6 +272,31 @@ def build_predictive_coding_team_status(
         )
     ]
 
+    capabilities = builder_capability_snapshot(
+        root / "runtime/execution_plane/builder_capabilities.json"
+    )
+    empire_coder_caps = (
+        (capabilities.get("workers") or {}).get("empire_coder") or {}
+    )
+    coder_backends = {
+        "native_structured_patch": {
+            "capability": empire_coder_caps.get(
+                "structured_patch_mutation"
+            ),
+        },
+        "aider": {
+            "health": aider_health(),
+            "capability": empire_coder_caps.get("aider_mutation"),
+        },
+        "openhands": {
+            "workspace_contract_ready": True,
+            "capability": empire_coder_caps.get(
+                "openhands_workspace"
+            ),
+            "mutation_capability_proven": False,
+        },
+    }
+
     return {
         "schema_version": SCHEMA_VERSION,
         "observed_at": _now(),
@@ -279,6 +306,7 @@ def build_predictive_coding_team_status(
         "blocker_count": len(blockers),
         "blockers": blockers,
         "tasks": tasks,
+        "coder_backends": coder_backends,
         "read_only": True,
         "remote_fetch_performed": False,
         "worker_started": False,
