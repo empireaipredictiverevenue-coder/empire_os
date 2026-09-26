@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
-from urllib import request
 
 from empire_os.aider_builder import (
     AiderMutationRequest,
@@ -14,8 +13,8 @@ from empire_os.aider_builder import (
     _sanitize_output,
     aider_health,
     build_aider_command,
-    resolved_aider_model,
 )
+from empire_os.aider_model_selector import select_usable_aider_model
 
 
 REPO_ROOT = Path("/srv/empire_os")
@@ -30,65 +29,36 @@ def main() -> int:
         "provider_base_present": bool(base),
         "provider_key_present": bool(key),
         "provider_key_printed": False,
-        "direct_model": str(
+        "preferred_model": str(
             provider.get("EMPIRE_HERMES_MODEL") or "auto"
         ),
-        "aider_model": resolved_aider_model(),
     }, indent=2, sort_keys=True))
 
     if not base or not key:
         print("DIAG=PROVIDER_CONFIG_MISSING")
         return 2
 
-    direct_model = str(
-        provider.get("EMPIRE_HERMES_MODEL") or "auto"
-    ).strip() or "auto"
-    aider_model = resolved_aider_model()
-
-    payload = json.dumps({
-        "model": direct_model,
-        "messages": [
-            {
-                "role": "user",
-                "content": "Reply exactly EMPIRE_AIDER_GATEWAY_OK.",
-            }
-        ],
-        "max_tokens": 32,
-    }).encode("utf-8")
-    req = request.Request(
-        base + "/chat/completions",
-        data=payload,
-        headers={
-            "Authorization": "Bearer " + key,
-            "Content-Type": "application/json",
-        },
-        method="POST",
+    selection = select_usable_aider_model(
+        timeout_seconds=20,
+        max_candidates=6,
     )
-    try:
-        with request.urlopen(req, timeout=90) as response:
-            gateway_status = int(response.status)
-            gateway_body = json.load(response)
-    except Exception as exc:
-        print(json.dumps({
-            "gateway_ready": False,
-            "reason": f"{type(exc).__name__}:{exc}",
-            "secret_printed": False,
-        }, indent=2, sort_keys=True))
-        print("DIAG=OMNIROUTE_REQUEST_FAILED")
-        return 3
-
-    content = str(
-        (((gateway_body.get("choices") or [{}])[0].get("message") or {})
-        .get("content") or "")
-    )
-    print(json.dumps({
-        "gateway_ready": gateway_status == 200 and bool(content),
-        "gateway_status": gateway_status,
-        "gateway_response_present": bool(content),
-        "gateway_response": content[:200],
-        "secret_printed": False,
-    }, indent=2, sort_keys=True))
-    if gateway_status != 200 or not content:
+    safe_selection = {
+        "selected": selection.get("selected"),
+        "selected_direct_model": selection.get(
+            "selected_direct_model"
+        ),
+        "attempts": selection.get("attempts"),
+        "catalog_observed": selection.get("catalog_observed"),
+        "reason": selection.get("reason"),
+        "execution_authority": "none",
+    }
+    print(json.dumps(
+        {"model_selection": safe_selection},
+        indent=2,
+        sort_keys=True,
+    ))
+    aider_model = str(selection.get("selected") or "")
+    if not aider_model:
         print("DIAG=OMNIROUTE_NO_USABLE_MODEL")
         return 4
 
