@@ -216,6 +216,18 @@ def _provider_environment(
     return env
 
 
+def _sanitize_output(
+    value: str,
+    environment: Mapping[str, str] | None = None,
+) -> str:
+    text = str(value or "")
+    env = _provider_environment(environment)
+    secret = str(env.get("OPENAI_API_KEY") or "")
+    if secret:
+        text = text.replace(secret, "[REDACTED]")
+    return text[-4000:]
+
+
 def provider_ready(
     source: Mapping[str, str] | None = None,
 ) -> tuple[bool, str]:
@@ -448,9 +460,10 @@ def run_aider_mutation(
         "returncode": run.returncode,
         "changed_paths": changed,
         "rejected_paths": rejected,
-        "output_tail": (
-            (run.stdout or "") + "\n" + (run.stderr or "")
-        )[-4000:],
+        "output_tail": _sanitize_output(
+            (run.stdout or "") + "\n" + (run.stderr or ""),
+            environment,
+        ),
         "production_mutation": False,
         "external_send": False,
         "payment_action": False,
