@@ -218,6 +218,7 @@ def run_empire_coder_sandbox_job(
         coder = None
         task = None
         candidate = None
+        proposal = None
 
         for backend in backend_order:
             if backend == "aider":
