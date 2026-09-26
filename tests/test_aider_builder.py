@@ -6,6 +6,7 @@ from empire_os.aider_builder import (
     build_aider_command,
     provider_ready,
     run_aider_mutation,
+    _sanitize_output,
 )
 
 
@@ -200,3 +201,16 @@ def test_aider_run_reports_bounded_edit(
     assert result["changed_paths"] == ["empire_os/example.py"]
     assert result["production_deploy"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_aider_output_redacts_provider_secret():
+    output = _sanitize_output(
+        "failure token=secret-value",
+        {
+            "OPENAI_API_BASE": "http://127.0.0.1:20128/v1",
+            "OPENAI_API_KEY": "secret-value",
+        },
+    )
+    assert "secret-value" not in output
+    assert "[REDACTED]" in output
