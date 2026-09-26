@@ -6,6 +6,7 @@ chat model. It does not edit files or grant execution authority.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 from urllib import error as urlerror
 from urllib import request as urlrequest
@@ -21,6 +22,14 @@ def _direct_model_id(value: str) -> str:
 def _aider_model_id(value: str) -> str:
     raw = _direct_model_id(value)
     return "openai/" + raw if raw else "openai/auto"
+
+
+def _is_zero_cost_model(model_id: str) -> bool:
+    value = _direct_model_id(model_id).lower()
+    return (
+        value == "openrouter/openrouter/free"
+        or value.endswith(":free")
+    )
 
 
 def _coding_model_score(model_id: str) -> tuple[int, str]:
@@ -75,15 +84,25 @@ def select_usable_aider_model(
         result["reason"] = "omniroute_provider_config_missing"
         return result
 
+    allow_paid = str(
+        os.getenv("EMPIRE_AIDER_ALLOW_PAID_MODELS") or ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    result["paid_models_allowed"] = allow_paid
+
     candidates: list[str] = []
 
     def add(value: str) -> None:
         direct = _direct_model_id(value)
-        if direct and direct not in candidates:
+        if not direct:
+            return
+        if not allow_paid and not _is_zero_cost_model(direct):
+            return
+        if direct not in candidates:
             candidates.append(direct)
 
     add(preferred_model)
-    add("auto")
+    if allow_paid:
+        add("auto")
 
     catalog_req = urlrequest.Request(
         base + "/models",
@@ -109,6 +128,7 @@ def select_usable_aider_model(
             ids = [
                 item for item in ids
                 if _coding_model_score(item)[0] >= 0
+                and (allow_paid or _is_zero_cost_model(item))
             ]
             ids.sort(
                 key=lambda item: _coding_model_score(item),
