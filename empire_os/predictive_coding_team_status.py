@@ -124,20 +124,56 @@ def _hermes_state(
                 control_branch=control_branch,
                 remote=remote,
             )
+            selected = result
+            selected_result_path = result_path
+            recovered_from = None
+            failed_statuses = {
+                "FAILED",
+                "HERMES_FAILED",
+                "VERIFICATION_FAILED",
+                "CANDIDATE_GATE_FAILED",
+                "LEASE_BLOCKED",
+            }
+            if str(result.get("status") or "").upper() in failed_statuses:
+                recovery_id = f"{request_id}-recovery-v1"
+                recovery_result_path = (
+                    RESULT_PATH_PREFIX + f"{recovery_id}.json"
+                )
+                if control_path_exists(
+                    repo_root,
+                    recovery_result_path,
+                    control_branch=control_branch,
+                    remote=remote,
+                ):
+                    selected = read_control_json(
+                        repo_root,
+                        recovery_result_path,
+                        control_branch=control_branch,
+                        remote=remote,
+                    )
+                    selected_result_path = recovery_result_path
+                    recovered_from = {
+                        "request_id": request_id,
+                        "status": result.get("status"),
+                        "result_path": result_path,
+                        "error": result.get("error"),
+                    }
+
             return {
                 "queue_state": "RESULT_AVAILABLE",
                 "job_path": job_path,
-                "result_path": result_path,
-                "status": result.get("status"),
-                "proposal_branch": result.get("proposal_branch"),
-                "proposal_commit": result.get("proposal_commit"),
+                "result_path": selected_result_path,
+                "status": selected.get("status"),
+                "proposal_branch": selected.get("proposal_branch"),
+                "proposal_commit": selected.get("proposal_commit"),
                 "changed_paths": list(
-                    result.get("changed_paths") or []
+                    selected.get("changed_paths") or []
                 ),
-                "verification": result.get("verification"),
-                "proposal_gate": result.get("proposal_gate"),
-                "error": result.get("error"),
-                "finished_at": result.get("finished_at"),
+                "verification": selected.get("verification"),
+                "proposal_gate": selected.get("proposal_gate"),
+                "error": selected.get("error"),
+                "finished_at": selected.get("finished_at"),
+                "recovered_from": recovered_from,
             }
 
         if control_path_exists(
