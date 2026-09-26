@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 import urllib.parse
 
 from empire_os.buyer_acquisition_scout import refresh_buyer_scout
@@ -146,7 +147,7 @@ def _load_buyer_plan(repo_root: str) -> dict:
     try:
         value = json.loads(
             (
-                __import__("pathlib").Path(repo_root)
+                Path(repo_root)
                 / "runtime/buyer_acquisition/latest.json"
             ).read_text(encoding="utf-8")
         )
