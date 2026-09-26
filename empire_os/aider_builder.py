@@ -425,9 +425,10 @@ def run_aider_mutation(
             "reason": str(exc),
             "returncode": run.returncode,
             "changed_paths": [],
-            "output_tail": (
-                (run.stdout or "") + "\n" + (run.stderr or "")
-            )[-4000:],
+            "output_tail": _sanitize_output(
+                (run.stdout or "") + "\n" + (run.stderr or ""),
+                environment,
+            ),
             "production_mutation": False,
             "external_send": False,
             "production_deploy": False,
