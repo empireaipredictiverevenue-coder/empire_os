@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import asdict
 import json
 from pathlib import Path
 from typing import Any
@@ -19,6 +18,7 @@ def build_readiness_snapshot(
     repo_root: str | Path,
     *,
     host_observation: HostObservation | None = None,
+    foundation_contract_verified: bool = False,
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     host = host_observation or observe_local_host("/")
@@ -44,7 +44,10 @@ def build_readiness_snapshot(
             ],
         },
         "gates": {
-            "foundation_contract_verified": True,
+            "foundation_contract_present": (
+                root.joinpath("docs", "EMPIRE_DATA_CLOUD_ARCHITECTURE.md").exists()
+            ),
+            "foundation_contract_verified": bool(foundation_contract_verified),
             "postgres_runtime_verified": False,
             "schema_compatibility_verified": False,
             "backup_restore_verified": False,
