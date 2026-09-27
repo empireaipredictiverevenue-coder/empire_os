@@ -21,6 +21,11 @@ run_step() {
   return 0
 }
 
+systemctl stop empire-data-cloud-backup-observer.service >/dev/null 2>&1 || true
+systemctl reset-failed empire-data-cloud-backup-observer.service >/dev/null 2>&1 || true
+rm -rf /etc/systemd/system/empire-data-cloud-backup-observer.service.d
+rm -f /etc/systemd/system/empire-data-cloud-backup-observer.service
+
 install -m 0644   "$ROOT/deploy/systemd/empire-data-cloud-backup-observer.service"   /etc/systemd/system/empire-data-cloud-backup-observer.service
 
 install -m 0644   "$ROOT/deploy/systemd/empire-founder-dashboard-api.service"   /etc/systemd/system/empire-founder-dashboard-api.service
