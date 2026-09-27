@@ -174,3 +174,55 @@ def test_legacy_canonical_seed_helper_does_not_use_opportunity_diagnostics(
     )
 
     assert runner._canonical_seed_records(per_lane=1) == []
+
+
+def test_local_opportunity_seed_recovery_snapshot_is_bounded(tmp_path):
+    import json
+
+    from scripts.run_buyer_acquisition_scout import (
+        _local_opportunity_seed_records,
+    )
+
+    path = (
+        tmp_path
+        / "runtime/buyer_acquisition/opportunity_seed_recovery.json"
+    )
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps({
+            "mode": "OBSERVE",
+            "seeds": [
+                {
+                    "id": "prospect-1",
+                    "business_name": "Real Solar Ltd",
+                    "niche": "solar",
+                    "metro": "united kingdom",
+                    "website": "https://real-solar.example",
+                    "seed_opportunity_key": (
+                        "market:solar:united kingdom"
+                    ),
+                    "seed_buyer_pools": [
+                        "end_service_buyers",
+                        "local_and_smb_buyers",
+                    ],
+                },
+                {
+                    "id": "missing-opportunity",
+                    "website": "https://ignored.example",
+                },
+            ],
+        }),
+        encoding="utf-8",
+    )
+
+    rows = _local_opportunity_seed_records(tmp_path)
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["id"] == "prospect-1"
+    assert row["seed_opportunity_key"] == (
+        "market:solar:united kingdom"
+    )
+    assert row["recovery_source"] == "admin_read_only_snapshot"
+    assert row["database_write_performed"] is False
+    assert row["outbound_authorized"] is False
