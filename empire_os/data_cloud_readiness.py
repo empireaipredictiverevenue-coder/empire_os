@@ -25,6 +25,10 @@ def build_readiness_snapshot(
     host = host_observation or observe_local_host("/")
 
     findings = discover_vendor_dependencies(root)
+    coupling_findings = discover_vendor_dependencies(
+        root,
+        markers=RUNTIME_COUPLING_MARKERS,
+    )
     marker_counts = Counter(row.marker for row in findings)
     file_counts = Counter(row.path for row in findings)
     classification_counts = Counter(row.classification for row in findings)
@@ -34,10 +38,14 @@ def build_readiness_snapshot(
         "runtime_integration",
     }
     runtime_findings = [
-        row for row in findings if row.classification in runtime_classes
+        row for row in coupling_findings
+        if row.classification in runtime_classes
     ]
     runtime_file_counts = Counter(row.path for row in runtime_findings)
-    requires_review_count = classification_counts.get("requires_review", 0)
+    coupling_classifications = Counter(
+        row.classification for row in coupling_findings
+    )
+    requires_review_count = coupling_classifications.get("requires_review", 0)
 
     return {
         "schema_version": "empire.data-cloud-readiness.v1",
