@@ -452,3 +452,31 @@ def test_stored_acquisition_website_wins_without_live_refresh(monkeypatch):
     )
 
     assert website == "https://stored.example"
+
+
+def test_legacy_autonomous_entrypoint_is_vendor_neutral_v2_wrapper(monkeypatch):
+    import inspect
+    import empire_os.autonomous_qualification_worker as legacy
+
+    source = inspect.getsource(legacy)
+    assert "SUPABASE_URL" not in source
+    assert "SUPABASE_SERVICE_KEY" not in source
+    assert "/rest/v1/" not in source
+    assert "urllib." not in source
+
+    prospect = _prospect()
+    monkeypatch.setattr(legacy, "fetch_prospect", lambda prospect_id: prospect)
+    monkeypatch.setattr(
+        legacy,
+        "qualify_prospect",
+        lambda row: {
+            "prospect_id": row["id"],
+            "qualification_id": "q1",
+            "tier": "warm",
+        },
+    )
+
+    result = legacy.qualify(prospect["id"])
+    assert result["ok"] is True
+    assert result["qualification_id"] == "q1"
+    assert result["scoring_version"] == "v2"
