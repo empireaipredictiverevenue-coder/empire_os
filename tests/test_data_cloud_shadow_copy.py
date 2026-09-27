@@ -9,6 +9,7 @@ from empire_os.data_cloud_shadow_copy import (
     ShadowTable,
     _normalize,
     canonical_row_bytes,
+    plan,
     resolve_tables,
     validate_manifest,
 )
@@ -78,3 +79,37 @@ def test_shadow_runner_contract_has_no_destructive_mode() -> None:
     assert "--mode" in source
     assert 'choices=("plan", "copy")' in source
     assert '"production_cutover_authority": False' in source
+
+
+class _PlanSource:
+    def exact_count(self, table: str, primary_key: str) -> int:
+        return 1
+
+    def page(
+        self,
+        table: str,
+        primary_key: str,
+        *,
+        after: object | None,
+        limit: int,
+        columns=None,
+    ):
+        return [{"id": "00000000-0000-0000-0000-000000000001", "live_only": "x"}]
+
+
+class _PlanTarget:
+    def columns(self, table: str):
+        return [("id", "uuid")]
+
+    def exact_count(self, table: str) -> int:
+        return 0
+
+
+def test_plan_flags_missing_target_columns() -> None:
+    report = plan(
+        _PlanSource(),
+        _PlanTarget(),
+        (ShadowTable("example"),),
+    )
+    assert report["schema_compatible"] is False
+    assert report["tables"][0]["missing_target_columns"] == ["live_only"]
