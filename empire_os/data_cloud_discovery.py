@@ -58,8 +58,10 @@ def _classification_for_path(relative: str) -> str:
     if relative.startswith("docs/"):
         return "documentation"
     if relative in {
+        "empire_os/data_cloud_contract.py",
         "empire_os/data_cloud_discovery.py",
         "empire_os/data_cloud_readiness.py",
+        "empire_os/migrate_prospects.py",
     }:
         return "migration_tooling"
     if relative.endswith((".env.example", ".env.sample")):
