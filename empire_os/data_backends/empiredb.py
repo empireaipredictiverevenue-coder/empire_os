@@ -74,6 +74,59 @@ _RPC_PARAMS: dict[str, tuple[str, ...]] = {
     ),
     "cancel_bsc_payment_request": ("p_request_id", "p_actor", "p_reason"),
     "get_commercial_outcome_feedback": ("p_limit",),
+    "auto_review_buyer_candidate": ("p_review_id", "p_daily_cap"),
+    "auto_verify_buyer_stated_commercial_evidence": ("p_evidence_id",),
+    "auto_verify_commercial_product_version": ("p_version_id",),
+    "ingest_prospect_atomic": (
+        "p_prospect", "p_evidence", "p_ingest_key", "p_identity_keys",
+    ),
+    "list_auto_verifiable_commercial_evidence": ("p_limit",),
+    "list_buyer_reviews_for_outbound": ("p_limit",),
+    "list_due_outbound_followups": ("p_limit",),
+    "propose_buyer_candidate_review": (
+        "p_prospect_id", "p_entity_id", "p_contact_name", "p_contact_title",
+        "p_contact_email", "p_offer_key", "p_company_score",
+        "p_decision_score", "p_evidence", "p_idempotency_key",
+    ),
+    "propose_buyer_scout_candidate": (
+        "p_domain", "p_business_name", "p_website", "p_description",
+        "p_buyer_type", "p_direct_buyer_score",
+        "p_explicit_direct_buyer_evidence", "p_target_buyer_pools",
+        "p_target_product_codes", "p_target_corridor_keys", "p_query_evidence",
+        "p_site_evidence", "p_provenance", "p_actor",
+    ),
+    "propose_call_ready_voice_intent": (
+        "p_prospect_id", "p_recipient", "p_idempotency_key", "p_metadata",
+    ),
+    "propose_commercial_product_version": (
+        "p_product_code", "p_billing_model", "p_currency", "p_price_basis",
+        "p_acquisition_cost_basis", "p_fulfilment_cost_basis",
+        "p_margin_policy", "p_provenance", "p_evidence_refs",
+        "p_effective_from", "p_effective_until", "p_actor",
+    ),
+    "propose_outbound_followup": (
+        "p_root_intent_id", "p_step", "p_subject", "p_body_text",
+        "p_idempotency_key", "p_proposed_by", "p_expires_at",
+    ),
+    "propose_reviewed_outbound_intent": (
+        "p_review_id", "p_subject", "p_body_text", "p_body_html",
+        "p_idempotency_key", "p_proposed_by", "p_expires_at", "p_metadata",
+    ),
+    "record_voice_provider_event": (
+        "p_intent_id", "p_external_call_id", "p_event_type", "p_payload",
+    ),
+    "record_voice_turn": (
+        "p_intent_id", "p_external_call_id", "p_turn_index", "p_direction",
+        "p_body_text", "p_evidence",
+    ),
+    "refresh_pending_buyer_candidate_review": (
+        "p_review_id", "p_contact_name", "p_contact_title", "p_contact_email",
+        "p_decision_score", "p_evidence",
+    ),
+    "register_commercial_product_identity": (
+        "p_product_code", "p_product_name", "p_product_family",
+        "p_billing_model", "p_configuration", "p_provenance", "p_actor",
+    ),
 }
 
 
