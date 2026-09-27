@@ -388,3 +388,81 @@ def test_opportunity_seed_fallback_preserves_opportunity_provenance_without_know
     assert row["outreach_authorized"] is False
     assert result["outbound_sent"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_opportunity_seed_supplements_nonempty_search(monkeypatch):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {
+            query: ["weak-search.example"]
+            for query in queries
+        },
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda url, **_kwargs: _evidence(
+            url,
+            description=(
+                "Roofing company serving Denver with estimates "
+                "and local service coverage."
+            ),
+            role="Owner",
+        ),
+    )
+
+    plan = {
+        "priority_targets": [{
+            "priority_score": 15036,
+            "corridor_key": (
+                "opportunity-validation:v1:roofing:denver_co"
+            ),
+            "opportunity_key": "market:roofing:denver, co",
+            "research_queries": {
+                "end_service_buyers": [
+                    '"roofing company" "denver co"'
+                ],
+            },
+        }],
+        "product_priority_targets": [],
+        "icp_priority_targets": [],
+    }
+
+    result = run_buyer_scout(
+        plan,
+        canonical_seed_records=[{
+            "id": "roof-seed-1",
+            "business_name": "Denver Roof Co",
+            "niche": "roofing",
+            "website": "https://seed-roof.example",
+            "seed_opportunity_key": "market:roofing:denver, co",
+            "seed_corridor_key": (
+                "opportunity-validation:v1:roofing:denver_co"
+            ),
+            "seed_buyer_pools": ["end_service_buyers"],
+            "recovery_source": "admin_read_only_snapshot",
+        }],
+        max_domains=10,
+        max_probes=10,
+    )
+
+    assert result["search_domain_count"] == 1
+    assert result["canonical_seed_domain_count"] == 1
+    assert result["opportunity_seed_domain_count"] == 1
+    assert result["canonical_seed_fallback_used"] is False
+    assert result["opportunity_seed_supplement_used"] is True
+    assert result["candidate_count"] == 2
+
+    by_domain = {
+        row["domain"]: row
+        for row in result["candidates"]
+    }
+    seed = by_domain["seed-roof.example"]
+    assert seed["target_opportunity_keys"] == [
+        "market:roofing:denver, co"
+    ]
+    assert seed["query_evidence"][0]["recovery_source"] == (
+        "admin_read_only_snapshot"
+    )
+    assert seed["outreach_authorized"] is False
+    assert result["outbound_sent"] is False
+    assert result["execution_authority"] == "none"
