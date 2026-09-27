@@ -145,7 +145,7 @@ class SupabaseLegacyProvider:
                         "Legacy data request -> HTTP 402: " + body[:1000]
                     ) from exc
             raise
-        self._egress.success()
+        self._egress.success(recovery_probe=allow_probe)
         return response
 
     def probe(self) -> None:
