@@ -14,11 +14,11 @@ from empire_os.outcome_role_transport import OutcomeTransportError
 
 @pytest.fixture(autouse=True)
 def isolate_egress_guard(monkeypatch):
-    monkeypatch.setattr(legacy, "_reserve_supabase_request", lambda: None)
-    monkeypatch.setattr(legacy, "_close_supabase_egress_circuit", lambda: None)
+    monkeypatch.setattr(legacy, "reserve_legacy_data_request", lambda: None)
+    monkeypatch.setattr(legacy, "close_legacy_data_egress_circuit", lambda: None)
     monkeypatch.setattr(
         legacy,
-        "_open_supabase_egress_circuit",
+        "open_legacy_data_egress_circuit",
         lambda _reason: None,
     )
 
@@ -86,7 +86,7 @@ def test_quota_402_opens_shared_egress_circuit(monkeypatch, tmp_path):
     opened = []
     monkeypatch.setattr(
         legacy,
-        "_open_supabase_egress_circuit",
+        "open_legacy_data_egress_circuit",
         lambda reason: opened.append(reason),
     )
 
