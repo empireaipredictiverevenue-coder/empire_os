@@ -39,7 +39,17 @@ def _eligible(path: Path) -> bool:
     )
 
 
+APPROVED_VENDOR_BOUNDARIES = {
+    "empire_os/canonical_data_gateway.py": "canonical_gateway",
+    "empire_os/data_backends/supabase_legacy.py": "legacy_adapter",
+    "empire_os/supabase_egress_guard.py": "migration_containment",
+    "scripts/run_supabase_egress_guard.py": "migration_containment",
+}
+
+
 def _classification_for_path(relative: str) -> str:
+    if relative in APPROVED_VENDOR_BOUNDARIES:
+        return APPROVED_VENDOR_BOUNDARIES[relative]
     if relative.startswith("tests/"):
         return "test_reference"
     if relative.startswith("docs/"):
