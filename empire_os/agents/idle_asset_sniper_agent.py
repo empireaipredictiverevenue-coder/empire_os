@@ -20,9 +20,11 @@ Guard rails (same as lead_sniper — operator-review mode):
 
 Runs as a daemon via supervisor_daemon.py (empire-agent-idle_asset).
 """
-import os, json, time, urllib.request, xml.etree.ElementTree as ET
+import os, time, urllib.request, xml.etree.ElementTree as ET
 from pathlib import Path
 from datetime import datetime, timezone
+
+from empire_os.idle_asset_repository import IdleAssetRepository
 
 # ── paths / config ────────────────────────────────────────────────────────
 AGENT_HOME = Path(os.environ.get("AGENT_HOME", "/root/empire_os/empire_os/agents"))
@@ -34,7 +36,7 @@ TICK_INTERVAL = int(os.environ.get("IDLE_TICK", "180"))  # 3 min
 # Guard rails
 MAX_PER_CYCLE = int(os.environ.get("IDLE_MAX_PER_CYCLE", "5"))
 DEDUP_HOURS = int(os.environ.get("IDLE_DEDUP_HOURS", "24"))
-REVIEW_TABLE = "empire_tasks"   # Supabase; task_type='idle_asset_review'
+REVIEW_TABLE = "empire_tasks"   # canonical review queue
 _seen_urls = set()
 
 # Scoring weights
@@ -88,40 +90,26 @@ def _load_rules(path=None):
 
 RULES = _load_rules()
 
-# ── Supabase (PostgREST) ────────────────────────────────────────────────────
-SUPABASE_URL = os.environ.get("SUPABASE_URL",
-    "https://owbeinlfcfdtwcwrttjy.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
-_HEADERS = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json"}
+# ── Canonical data boundary ────────────────────────────────────────────────
+def _repository() -> IdleAssetRepository:
+    return IdleAssetRepository.from_environment()
 
 
-def _sb_insert(table, row):
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}/rest/v1/{table}", data=json.dumps(row).encode(),
-        headers=_HEADERS, method="POST")
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return json.loads(r.read())
-
-
-def _already_reviewed(url):
+def _already_reviewed(url, repository=None):
     if not url or url in _seen_urls:
         return True
+    store = repository or _repository()
     try:
-        q = (f"{SUPABASE_URL}/rest/v1/{REVIEW_TABLE}?"
-             f"task_type=eq.idle_asset_review&status=eq.pending"
-             f"&payload->>url=eq.{urllib.parse.quote(url, safe='')}")
-        req = urllib.request.Request(q, headers=_HEADERS)
-        with urllib.request.urlopen(req, timeout=10) as r:
-            return len(json.loads(r.read())) > 0
+        return store.pending_review_exists(url)
     except Exception:
         return False
 
 
-def _queue_review(asset, asset_type, score):
+def _queue_review(asset, asset_type, score, repository=None):
     """Route an idle-asset find to the human-review queue. Never emails."""
+    store = repository or _repository()
     url = asset.get("url", "")
-    if _already_reviewed(url):
+    if _already_reviewed(url, repository=store):
         return {"status": "dup"}
     try:
         row = {
@@ -136,12 +124,11 @@ def _queue_review(asset, asset_type, score):
                 "detected_at": datetime.now(timezone.utc).isoformat(),
             },
         }
-        _sb_insert(REVIEW_TABLE, row)
+        store.queue_review(row)
         _seen_urls.add(url)
         return {"status": "review_queued"}
     except Exception as e:
         return {"status": "error", "error": str(e)[:160]}
-
 
 def _score(asset):
     """Rule-based opportunity score 0..1 (no LLM)."""
@@ -197,7 +184,8 @@ def _scan_feed(name, url):
 
 
 # ── Tick ─────────────────────────────────────────────────────────────────────
-def tick():
+def tick(repository=None):
+    store = repository or _repository()
     queued = 0
     kills = 0
     all_assets = []
@@ -205,17 +193,12 @@ def tick():
         all_assets.extend(_scan_feed(name, url))
     # also pull existing enriched idle assets (real data) as candidates
     try:
-        q = (f"{SUPABASE_URL}/rest/v1/idle_asset_enriched?"
-             f"select=compound_id,business_name,industry,lead_gen_score"
-             f"&lead_gen_score=gte.0.6&limit=20")
-        req = urllib.request.Request(q, headers=_HEADERS)
-        with urllib.request.urlopen(req, timeout=12) as r:
-            for row in json.loads(r.read()):
-                all_assets.append({
-                    "title": f"{row.get('business_name','')} ({row.get('industry','')})",
-                    "url": f"enriched:{row.get('compound_id','')}",
-                    "source": "idle_asset_enriched",
-                })
+        for row in store.enriched_candidates(limit=20):
+            all_assets.append({
+                "title": f"{row.get('business_name','')} ({row.get('industry','')})",
+                "url": f"enriched:{row.get('compound_id','')}",
+                "source": "idle_asset_enriched",
+            })
     except Exception:
         pass
 
@@ -225,7 +208,7 @@ def tick():
         score, atype = _score(asset)
         if score < 0.5:
             continue
-        post = _queue_review(asset, atype, score)
+        post = _queue_review(asset, atype, score, repository=store)
         if post.get("status") == "review_queued":
             queued += 1
             if score >= RULES["kill_threshold"]:
