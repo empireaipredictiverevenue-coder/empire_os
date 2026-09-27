@@ -4,6 +4,7 @@ from empire_os.data_cloud_schema_compat import (
     ForeignKeySpec,
     IndexSpec,
     PolicySpec,
+    RoutineSpec,
     SchemaManifest,
     TableSpec,
     TriggerSpec,
@@ -202,3 +203,47 @@ def test_extra_target_tables_do_not_destroy_source_compatibility():
     )
     assert result["compatible"] is True
     assert result["extra_target_tables"] == ["empire_internal"]
+
+
+def test_trigger_routine_body_drift_blocks_schema_compatibility():
+    source = SchemaManifest(
+        (_table("commercial_events"),),
+        routines=(
+            RoutineSpec(
+                "guard_commercial_events_integrity",
+                "",
+                "CREATE FUNCTION public.guard_commercial_events_integrity() "
+                "RETURNS trigger LANGUAGE plpgsql SET search_path TO '' "
+                "AS $$ BEGIN RAISE EXCEPTION 'append-only'; END; $$",
+            ),
+        ),
+    )
+    target = SchemaManifest(
+        (_table("commercial_events"),),
+        routines=(
+            RoutineSpec(
+                "guard_commercial_events_integrity",
+                "",
+                "CREATE FUNCTION public.guard_commercial_events_integrity() "
+                "RETURNS trigger LANGUAGE plpgsql "
+                "AS $$ BEGIN RETURN NEW; END; $$",
+            ),
+        ),
+    )
+
+    result = compare_schema(source, target)
+
+    assert result["compatible"] is False
+    assert "routine_mismatch" in result["findings"]
+
+
+def test_routine_whitespace_only_drift_is_ignored():
+    source = SchemaManifest(
+        (_table("outbound_events"),),
+        routines=(RoutineSpec("guard_outbound", "", "BEGIN  RETURN NEW; END;"),),
+    )
+    target = SchemaManifest(
+        (_table("outbound_events"),),
+        routines=(RoutineSpec("guard_outbound", "", " BEGIN RETURN NEW; END; "),),
+    )
+    assert compare_schema(source, target)["compatible"] is True
