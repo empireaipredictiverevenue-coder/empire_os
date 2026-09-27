@@ -200,3 +200,48 @@ production truth.
 
 External tools are replaceable implementation capabilities. They never become
 the authority layer simply because they are powerful or convenient.
+
+
+## Founder verification rule
+
+**Every EmpireOS change must be checked before it is called complete.**
+
+This is a standing founder requirement and part of the production Definition of
+Done. It applies to fixes, features, self-healing changes, infrastructure,
+agents, data paths, commercial systems and UI changes.
+
+The mandatory verification sequence is:
+
+1. inspect the complete scoped diff and confirm only intended files changed;
+2. run syntax / compile / static validation appropriate to the changed stack;
+3. run focused tests for the changed behavior;
+4. run adjacent regression tests for existing behavior that could be affected;
+5. test the negative / failure / recovery path, not only the happy path;
+6. verify authority invariants: no accidental outbound, funds, terms, revenue,
+   database mutation or authority expansion;
+7. verify dependency-loss behavior and self-healing / degradation behavior when
+   the change touches an external dependency;
+8. independently verify the live runtime after deployment;
+9. verify canonical data / Founder surface when applicable;
+10. confirm the tracked worktree is clean and the deployed HEAD is the intended
+    commit.
+
+A passing unit test alone is not DONE. A successful build alone is not DONE. A
+commit or push alone is not DONE. A service being active alone is not DONE.
+
+If any verification step fails, promotion stops at that failure point. The
+failure is repaired forward, the affected verification set is rerun, and live
+verification is repeated before the change may be marked complete.
+
+For recovery and self-healing changes specifically, the verifier must prove:
+
+- the original failure is detected;
+- the recovery action is bounded and reversible;
+- the recovery path cannot bypass a deliberate safety circuit;
+- the recovery path survives the dependency failure it is intended to cover;
+- the watchdog responsible for recovery remains alive during that failure;
+- last-known-good local state is not replaced by empty/error state;
+- normal behavior resumes when the dependency becomes healthy;
+- founder-gated actions remain founder-gated.
+
+This rule is permanent unless the founder explicitly changes it.
