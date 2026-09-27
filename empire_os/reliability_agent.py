@@ -27,6 +27,10 @@ from empire_os.buyer_recovery import (
     refresh_last_known_good_snapshot,
     run_local_buyer_recovery,
 )
+from empire_os.founder_console_health import (
+    clear_verified_orphan,
+    observe_founder_console,
+)
 from empire_os.runtime_self_heal import run_runtime_self_heal
 from empire_os.supabase_egress_guard import (
     STATUS_PATH as EGRESS_STATUS_PATH,
@@ -47,6 +51,8 @@ CONTAINMENT_SAFE_REPAIR_UNITS = frozenset({
     "empire-public-gateway.service",
     "empire-self-serve-checkout.service",
     "empire-ops-mcp.service",
+    "empire-founder-console.service",
+    "empire-founder-dashboard-api.service",
 })
 
 
@@ -61,6 +67,10 @@ class ReliabilityObservation:
     recovery_heartbeat_exists: bool
     recovery_heartbeat_age_seconds: float | None
     recovery_heartbeat_state: str | None
+    founder_console_service_state: str
+    founder_console_http_ok: bool
+    founder_console_port_pid: int | None
+    founder_console_orphan_verified: bool
 
 
 @dataclass(frozen=True)
@@ -182,6 +192,7 @@ def observe(
     snapshot_path = root / RECOVERY_SEED_SNAPSHOT
     heartbeat_path = root / RECOVERY_HEARTBEAT
     heartbeat = _load_json(heartbeat_path)
+    founder_console = observe_founder_console()
 
     return ReliabilityObservation(
         observed_at=_iso(current),
@@ -205,6 +216,14 @@ def observe(
             if heartbeat.get("state") is not None
             else None
         ),
+        founder_console_service_state=(
+            founder_console.service_state
+        ),
+        founder_console_http_ok=founder_console.http_ok,
+        founder_console_port_pid=founder_console.port_pid,
+        founder_console_orphan_verified=(
+            founder_console.port_process_verified
+        ),
     )
 
 
@@ -222,6 +241,18 @@ def plan_actions(
             90,
         )
     ]
+
+    if (
+        observation.founder_console_service_state != "active"
+        and observation.founder_console_orphan_verified
+        and observation.founder_console_port_pid is not None
+    ):
+        actions.append(ReliabilityAction(
+            "CLEAR_FOUNDER_CONSOLE_ORPHAN",
+            "Founder Console is unhealthy and a verified stale Next.js "
+            "process owns port 3001",
+            110,
+        ))
 
     if observation.supabase_egress_contained:
         due = (
@@ -271,10 +302,19 @@ def _execute_action(
     self_heal: Callable[..., Mapping[str, Any]],
     refresh_snapshot: Callable[..., Mapping[str, Any]],
     local_recovery: Callable[..., Mapping[str, Any]],
+    clear_console_orphan: Callable[..., Mapping[str, Any]],
     contained: bool,
 ) -> dict[str, Any]:
     try:
-        if action.action == "RUN_BOUNDED_SELF_HEAL":
+        if action.action == "CLEAR_FOUNDER_CONSOLE_ORPHAN":
+            fresh = observe_founder_console()
+            result = dict(clear_console_orphan(fresh))
+            result["fresh_service_state"] = fresh.service_state
+            result["fresh_port_pid"] = fresh.port_pid
+            result["fresh_orphan_verified"] = (
+                fresh.port_process_verified
+            )
+        elif action.action == "RUN_BOUNDED_SELF_HEAL":
             result = dict(self_heal(
                 observe_only=False,
                 repair_unit_allowlist=(
@@ -321,6 +361,14 @@ def _action_verified(row: Mapping[str, Any]) -> bool:
     result = row.get("result")
     result = result if isinstance(result, Mapping) else {}
 
+    if action == "CLEAR_FOUNDER_CONSOLE_ORPHAN":
+        return result.get("state") in {
+            "ORPHAN_TERMINATED",
+            "ORPHAN_KILLED",
+            "NO_ACTION_SERVICE_ACTIVE",
+            "NO_ORPHAN_PORT_OWNER",
+        }
+
     if action == "RUN_BOUNDED_SELF_HEAL":
         return result.get("execution_authority") == "bounded_internal_repair"
 
@@ -359,6 +407,9 @@ def run_cycle(
     local_recovery: Callable[..., Mapping[str, Any]] = (
         run_local_buyer_recovery
     ),
+    clear_console_orphan: Callable[..., Mapping[str, Any]] = (
+        clear_verified_orphan
+    ),
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     current = (now or _now()).astimezone(timezone.utc)
@@ -392,6 +443,7 @@ def run_cycle(
             self_heal=self_heal,
             refresh_snapshot=refresh_snapshot,
             local_recovery=local_recovery,
+            clear_console_orphan=clear_console_orphan,
             contained=before.supabase_egress_contained,
         )
         verified = _action_verified(row)
