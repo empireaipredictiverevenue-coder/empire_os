@@ -4,7 +4,7 @@
 --   * candidate EmpireDB only; does not change canonical backend
 --   * no existing rows are updated/backfilled
 --   * NULL/unknown org ownership remains tenant-inaccessible
---   * tenant role is read-only on explicitly buyer-owned surfaces
+--   * tenant identity comes from trusted DB-role binding, never a caller GUC
 
 SET ROLE empiredb_migrator;
 
@@ -19,29 +19,41 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE FUNCTION public.empire_current_tenant_id()
+CREATE SCHEMA IF NOT EXISTS empire;
+REVOKE CREATE ON SCHEMA empire FROM PUBLIC;
+
+CREATE TABLE IF NOT EXISTS empire.tenant_role_bindings (
+  role_name name PRIMARY KEY,
+  tenant_id uuid NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  evidence_ref text,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+
+REVOKE ALL ON TABLE empire.tenant_role_bindings FROM PUBLIC;
+REVOKE ALL ON TABLE empire.tenant_role_bindings
+  FROM empiredb_app, empiredb_readonly, empiredb_tenant_reader;
+
+CREATE OR REPLACE FUNCTION empire.current_tenant_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
-SECURITY INVOKER
-SET search_path = pg_catalog
+SECURITY DEFINER
+SET search_path = pg_catalog, empire
 AS $$
-  SELECT CASE
-    WHEN NULLIF(
-      btrim(current_setting('empire.tenant_id', true)),
-      ''
-    ) IS NULL
-      THEN NULL
-    ELSE current_setting('empire.tenant_id', true)::uuid
-  END
+  SELECT b.tenant_id
+  FROM empire.tenant_role_bindings AS b
+  WHERE b.role_name = current_user
+    AND b.active
+  LIMIT 1
 $$;
 
-REVOKE ALL ON FUNCTION public.empire_current_tenant_id() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.empire_current_tenant_id()
-TO empiredb_tenant_reader;
+REVOKE ALL ON FUNCTION empire.current_tenant_id() FROM PUBLIC;
+GRANT USAGE ON SCHEMA empire TO empiredb_tenant_reader;
+GRANT EXECUTE ON FUNCTION empire.current_tenant_id()
+  TO empiredb_tenant_reader;
 
--- The tenant reader receives SELECT only. Platform/runtime capability roles
--- retain their existing separate authority.
 GRANT SELECT ON
   public.buyers,
   public.buyer_subscriptions,
@@ -63,7 +75,8 @@ FOR SELECT
 TO empiredb_tenant_reader
 USING (
   org_id IS NOT NULL
-  AND org_id = public.empire_current_tenant_id()
+  AND empire.current_tenant_id() IS NOT NULL
+  AND org_id = empire.current_tenant_id()
 );
 
 DROP POLICY IF EXISTS buyer_subscriptions_tenant_reader_select
@@ -78,7 +91,8 @@ USING (
     FROM public.buyers b
     WHERE b.id = buyer_subscriptions.buyer_id
       AND b.org_id IS NOT NULL
-      AND b.org_id = public.empire_current_tenant_id()
+      AND empire.current_tenant_id() IS NOT NULL
+      AND b.org_id = empire.current_tenant_id()
   )
 );
 
@@ -95,7 +109,8 @@ USING (
     FROM public.buyers b
     WHERE b.id = fulfilment_orders.buyer_id
       AND b.org_id IS NOT NULL
-      AND b.org_id = public.empire_current_tenant_id()
+      AND empire.current_tenant_id() IS NOT NULL
+      AND b.org_id = empire.current_tenant_id()
   )
 );
 
@@ -112,7 +127,8 @@ USING (
     FROM public.buyers b
     WHERE b.id = commercial_events.buyer_id
       AND b.org_id IS NOT NULL
-      AND b.org_id = public.empire_current_tenant_id()
+      AND empire.current_tenant_id() IS NOT NULL
+      AND b.org_id = empire.current_tenant_id()
   )
 );
 
@@ -129,11 +145,14 @@ USING (
     FROM public.buyers b
     WHERE b.id = commercial_evidence_registry.buyer_id
       AND b.org_id IS NOT NULL
-      AND b.org_id = public.empire_current_tenant_id()
+      AND empire.current_tenant_id() IS NOT NULL
+      AND b.org_id = empire.current_tenant_id()
   )
 );
 
-COMMENT ON FUNCTION public.empire_current_tenant_id() IS
-  'Trusted transaction-local tenant context used by read-only tenant RLS. Missing context returns NULL and fails closed.';
+COMMENT ON TABLE empire.tenant_role_bindings IS
+  'Trusted DB-role-to-tenant mapping. Tenant reader cannot mutate this table.';
+COMMENT ON FUNCTION empire.current_tenant_id() IS
+  'Tenant identity resolved from current PostgreSQL role; caller payload/GUC is ignored.';
 
 RESET ROLE;
