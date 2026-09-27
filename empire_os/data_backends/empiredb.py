@@ -74,6 +74,9 @@ class EmpireDbProvider:
     def _connection(self):
         return self._connector._open_connection()
 
+    def _adapt(self, value: Any) -> Any:
+        return self._connector.adapt_value(value)
+
     def select(
         self,
         table: str,
@@ -219,7 +222,10 @@ class EmpireDbProvider:
 
         connection = self._connection()
         try:
-            cursor = connection.execute(sql, tuple(row[name] for name in names))
+            cursor = connection.execute(
+                sql,
+                tuple(self._adapt(row[name]) for name in names),
+            )
             result = _rows(cursor) if return_repr else []
             connection.commit()
             return result
@@ -277,7 +283,10 @@ class EmpireDbProvider:
 
         connection = self._connection()
         try:
-            cursor = connection.execute(sql, tuple(row[name] for name in names))
+            cursor = connection.execute(
+                sql,
+                tuple(self._adapt(row[name]) for name in names),
+            )
             rows = _rows(cursor) if return_repr else []
             connection.commit()
             return rows
@@ -311,7 +320,10 @@ class EmpireDbProvider:
 
         connection = self._connection()
         try:
-            cursor = connection.execute(sql, tuple(row[name] for name in names))
+            cursor = connection.execute(
+                sql,
+                tuple(self._adapt(row[name]) for name in names),
+            )
             rows = _rows(cursor) if return_repr else []
             connection.commit()
             return rows
@@ -341,8 +353,12 @@ class EmpireDbProvider:
             + " AND ".join(f"{_ident(name)} = %s" for name in match_names)
             + " RETURNING *"
         )
-        params = tuple(values[name] for name in value_names) + tuple(
-            match[name] for name in match_names
+        params = tuple(
+            self._adapt(values[name])
+            for name in value_names
+        ) + tuple(
+            self._adapt(match[name])
+            for name in match_names
         )
 
         connection = self._connection()
