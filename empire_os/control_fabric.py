@@ -235,6 +235,31 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             60,
         ),
         ComponentSpec(
+            "empire_data_cloud",
+            (
+                "data_cloud_discovery_requested",
+                "data_cloud_readiness_requested",
+                "data_cloud_shadow_compare_requested",
+                "data_cloud_topology_observed",
+                "data_cloud_backup_observed",
+            ),
+            (
+                "data_cloud_discovery_ready",
+                "data_cloud_readiness_ready",
+                "data_cloud_shadow_compare_ready",
+                "data_cloud_reliability_ready",
+                "founder_gate_required",
+            ),
+            (
+                "control_fabric",
+                "agent_tool_execution_plane",
+                "empire_reliability_agent",
+            ),
+            "observe",
+            300,
+            "verify_before_canonical_promotion",
+        ),
+        ComponentSpec(
             "empire_reliability_agent",
             (
                 "reliability_tick",
