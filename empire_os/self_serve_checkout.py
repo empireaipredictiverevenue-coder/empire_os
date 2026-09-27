@@ -21,7 +21,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 from empire_os.bsc_usdt_verifier import BscUsdtConfig, get_block_anchor
 from empire_os.payment_governance import build_payment_proposal, submit_payment_proposal
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 
 Request = Callable[..., Any]
