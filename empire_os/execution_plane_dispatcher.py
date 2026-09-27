@@ -34,6 +34,7 @@ from empire_os.empire_coder_sandbox_runner import (
     run_empire_coder_sandbox_job,
 )
 from empire_os.hermes_control import (
+    ALLOWED_BASE_BRANCHES,
     DEFAULT_BASE_BRANCH,
     SCHEMA_VERSION as HERMES_SCHEMA_VERSION,
     publish_control_job,
@@ -71,6 +72,7 @@ class ExecutionRequest:
     authority: str = "observe"
     risk_class: str = "low"
     source_ref: str = ""
+    base_branch: str = DEFAULT_BASE_BRANCH
     allowed_paths: tuple[str, ...] = ()
     lease_resources: tuple[str, ...] = ()
     evidence_domains: tuple[str, ...] = ()
@@ -99,6 +101,10 @@ class ExecutionRequest:
             raise ValueError("unsupported risk class")
         if self.risk_class == "consequential":
             raise ValueError("consequential work requires domain authority gate")
+        if self.base_branch not in ALLOWED_BASE_BRANCHES:
+            raise ValueError(
+                "base_branch is outside the governed branch allowlist"
+            )
         if (
             self.authority == "internal_write"
             and self.capability in {
@@ -272,7 +278,7 @@ def dispatch_execution_request(
             "job_id": request.request_id,
             "kind": "code_task",
             "authority": request.authority,
-            "base_branch": DEFAULT_BASE_BRANCH,
+            "base_branch": request.base_branch,
             "prompt": request.objective,
             "allowed_paths": list(request.allowed_paths),
             "lease_resources": list(
@@ -382,6 +388,7 @@ def dispatch_execution_request(
                 allowed_paths=request.allowed_paths,
                 pytest_targets=request.required_tests,
                 lease_resources=request.lease_resources,
+                base_branch=request.base_branch,
                 max_runtime_seconds=request.max_runtime_seconds,
                 require_changes=(
                     request.authority == "internal_write"
@@ -436,6 +443,7 @@ def dispatch_execution_request(
                     allowed_paths=request.allowed_paths,
                     lease_resources=request.lease_resources,
                     pytest_targets=request.required_tests,
+                    base_branch=request.base_branch,
                     max_runtime_seconds=request.max_runtime_seconds,
                 ),
             )
