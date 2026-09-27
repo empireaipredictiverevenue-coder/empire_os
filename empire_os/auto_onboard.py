@@ -3,11 +3,17 @@
 No manual rate-setting. Tier maps to a base_payout floor + fee_rate; seat_corridors
 places them into matching lanes at seat_price = base*fee.
 """
+import os
 import sqlite3, sys, uuid
 from pathlib import Path
+
+from empire_os.auto_onboard_data_repository import AutoOnboardDataRepository
+from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.runtime_env import load_runtime_env
 sys.path.insert(0, "/root/empire_os")
 
 DB = "/root/empire_os/empire_os.db"
+DATA_ENV_PATH = os.environ.get("EMPIRE_ENV_PATH", "/etc/empire_os.env")
 
 # tier -> (base_payout floor USD, fee_rate). Real market rates.
 TIER_RATES = {
@@ -120,6 +126,39 @@ def rate_for_tier(tier: str):
     return TIER_RATES.get((tier or DEFAULT_TIER).lower(), TIER_RATES[DEFAULT_TIER])
 
 
+def _buyer_repository() -> AutoOnboardDataRepository:
+    return AutoOnboardDataRepository(
+        gateway_from_environment(load_runtime_env(DATA_ENV_PATH))
+    )
+
+
+def _mirror_buyer(
+    *,
+    name: str,
+    niche: str,
+    base: float,
+    fee: float,
+    funded: bool,
+    status: str,
+    repository: AutoOnboardDataRepository | None = None,
+) -> bool:
+    repo = repository or _buyer_repository()
+    return repo.record_buyer({
+        "buyer_name": name,
+        "niche": niche,
+        "base_payout": base,
+        "per_lead_rate": base,
+        "fee_rate": fee,
+        "per_call_fee": round(base * fee, 4),
+        "is_active": funded,
+        "status": status,
+        "state_coverage": ["ALL"],
+        "timezone": "America/New_York",
+        "priority": 5,
+        "daily_cap": 0,
+    })
+
+
 def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
             webhook_url: str = "", delivery_email: str = "",
             min_deposit: float = 50.0, source: str = "") -> dict:
@@ -128,7 +167,7 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
     Wires the FULL delivery path:
       1. local si_tenant + si_subscription (lane_* plan, active, payment_ref)
          -> what lead_deliverer.find_matching_buyers() reads
-      2. Supabase buyers row (REAL schema columns)
+      2. optional canonical buyer mirror
       3. seat_corridors.seat_buyers() -> lane occupancy
 
     C (collection gate): requires vault >= min_deposit USDC. If under-funded,
@@ -136,7 +175,7 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
     until funded). Clears our own inventory with min_deposit=0.
     """
     import sqlite3 as _sql, uuid as _uuid
-    from empire_os import tenants as _ten, sb as _sb
+    from empire_os import tenants as _ten
     from empire_os.agents import solana_listener_agent as _sl
 
     base, fee = rate_for_tier(tier)
@@ -177,30 +216,25 @@ def onboard(name: str, niche: str, tier: str = DEFAULT_TIER,
         (source or "direct", tenant.tenant_id),
     )
     store._conn.commit()
-    # 2. Supabase buyers (real columns only) — best-effort mirror.
-    #    Local SQLite (si_tenant/si_subscription) is the delivery path; a
-    #    missing/down Supabase must NOT fail onboarding.
+    # 2. Canonical buyer mirror — best effort only.
+    #    Local SQLite (si_tenant/si_subscription) is the delivery path; an
+    #    unavailable canonical data backend must NOT fail onboarding.
     try:
-        _sb.insert("buyers", {
-            "buyer_name": name,
-            "niche": niche,
-            "base_payout": base,
-            "per_lead_rate": base,
-            "fee_rate": fee,
-            "per_call_fee": round(base * fee, 4),
-            "is_active": funded,
-            "status": sub_status,
-            "state_coverage": ["ALL"],
-            "timezone": "America/New_York",
-            "priority": 5,
-            "daily_cap": 0,
-        })
+        _mirror_buyer(
+            name=name,
+            niche=niche,
+            base=base,
+            fee=fee,
+            funded=funded,
+            status=sub_status,
+        )
     except Exception as e:
-        # Supabase optional — local store already succeeded, keep going.
         import logging
         logging.getLogger("auto_onboard").warning(
-            "Supabase buyer mirror skipped: %s", str(e)[:120])
-    # 3. seat lanes — use local tenant data directly (bypasses Supabase dependency)
+            "canonical buyer mirror skipped: %s",
+            str(e)[:120],
+        )
+    # 3. seat lanes — use local tenant data directly
     seated = _direct_seat(store._conn, name, niche, tier, base, fee)
     _log_seat(name, niche, seated, source)
     # money alert only when funded
