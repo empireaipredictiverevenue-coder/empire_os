@@ -37,9 +37,6 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,6 +46,8 @@ from empire_os.buyer_allocation import (
     allocate_owned_prospect,
     buyer_activation_decision,
 )
+from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
 from empire_os.niche_taxonomy import (
     NICHE_FAMILIES,
     metro_key,
@@ -56,13 +55,6 @@ from empire_os.niche_taxonomy import (
     normalise,
 )
 from empire_os.runtime_env import load_runtime_env
-from empire_os.legacy_data_egress import (
-    close_legacy_data_egress_circuit as _close_supabase_egress_circuit,
-    legacy_data_component_name as _component_name,
-    open_legacy_data_egress_circuit as _open_supabase_egress_circuit,
-    reserve_legacy_data_request as _reserve_supabase_request,
-)
-
 
 ENV_PATH = os.environ.get(
     "EMPIRE_ENV_PATH",
@@ -136,27 +128,13 @@ class BusError(RuntimeError):
 
 
 def load_env() -> dict[str, str]:
-    return load_runtime_env(
-        ENV_PATH,
-        required=("SUPABASE_URL", "SUPABASE_SERVICE_KEY"),
+    return load_runtime_env(ENV_PATH)
+
+
+def _data_repository() -> ExecutionBusDataRepository:
+    return ExecutionBusDataRepository(
+        gateway_from_environment(load_env())
     )
-
-
-ENV = load_env()
-
-SUPABASE_URL = ENV["SUPABASE_URL"].rstrip("/")
-SUPABASE_KEY = ENV["SUPABASE_SERVICE_KEY"]
-
-_COMPONENT = _component_name()
-
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": "Bearer " + SUPABASE_KEY,
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    "User-Agent": f"EmpireOS/{_COMPONENT}",
-    "X-Empire-Component": _COMPONENT,
-}
 
 
 def utc_now() -> str:
@@ -185,37 +163,14 @@ def rpc(
     function_name: str,
     payload: dict[str, Any],
 ) -> Any:
-    query = urllib.parse.quote(
-        f"/rest/v1/rpc/{function_name}",
-        safe="/",
-    )
-
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}{query}",
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-        headers=HEADERS,
-    )
-
-    _reserve_supabase_request()
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            raw = response.read().decode("utf-8")
-            _close_supabase_egress_circuit()
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        if (
-            exc.code == 402
-            and (
-                "exceed_egress_quota" in body
-                or "restricted due to the following violations" in body
-            )
-        ):
-            _open_supabase_egress_circuit("exceed_egress_quota")
+        return _data_repository().rpc(
+            function_name,
+            payload,
+        )
+    except Exception as exc:
         raise BusError(
-            f"RPC {function_name} failed HTTP {exc.code}: "
-            f"{body[:1000]}"
+            f"RPC {function_name} failed: {exc}"
         ) from exc
 
 
@@ -248,36 +203,11 @@ def insert_event(
         "occurred_at": utc_now(),
     }
 
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}/rest/v1/commercial_events",
-        data=json.dumps(body).encode("utf-8"),
-        method="POST",
-        headers={
-            **HEADERS,
-            "Prefer": (
-                "resolution=ignore-duplicates,"
-                "return=minimal"
-            ),
-        },
-    )
-
-    _reserve_supabase_request()
     try:
-        with urllib.request.urlopen(req, timeout=30):
-            _close_supabase_egress_circuit()
-    except urllib.error.HTTPError as exc:
-        body_text = exc.read().decode("utf-8", errors="replace")
-        if (
-            exc.code == 402
-            and (
-                "exceed_egress_quota" in body_text
-                or "restricted due to the following violations" in body_text
-            )
-        ):
-            _open_supabase_egress_circuit("exceed_egress_quota")
+        _data_repository().append_commercial_event(body)
+    except Exception as exc:
         raise BusError(
-            f"commercial event insert failed HTTP {exc.code}: "
-            f"{body_text[:1000]}"
+            f"commercial event insert failed: {exc}"
         ) from exc
 
 
