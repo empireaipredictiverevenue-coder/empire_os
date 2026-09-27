@@ -1,0 +1,185 @@
+import pytest
+
+from empire_os.data_query import ConflictAction, FilterOperator
+from empire_os.qualification_data_repository import QualificationDataRepository
+
+
+class Snapshot:
+    def as_dict(self):
+        return {
+            "primary_backend": "supabase_legacy",
+            "configured": True,
+            "dual_write_enabled": False,
+            "write_fallback_enabled": False,
+        }
+
+
+class FakeGateway:
+    def __init__(self):
+        self.query_results = []
+        self.queries = []
+        self.upserts = []
+        self.inserts = []
+        self.updates = []
+        self._query_index = 0
+
+    def queue_query(self, rows):
+        self.query_results.append(rows)
+
+    def query(self, table, columns="*", *, filters=(), order=(), limit=1000, offset=0):
+        self.queries.append({
+            "table": table,
+            "columns": columns,
+            "filters": tuple(filters),
+            "order": tuple(order),
+            "limit": limit,
+            "offset": offset,
+        })
+        if self._query_index >= len(self.query_results):
+            return []
+        rows = self.query_results[self._query_index]
+        self._query_index += 1
+        return rows
+
+    def upsert(self, table, row, *, conflict_columns, action, return_repr=True):
+        self.upserts.append((table, dict(row), tuple(conflict_columns), action, return_repr))
+        return [dict(row)]
+
+    def insert_ignore_conflicts(self, table, row, *, return_repr=False):
+        self.inserts.append((table, dict(row), return_repr))
+        return []
+
+    def update(self, table, match, values):
+        self.updates.append((table, dict(match), dict(values)))
+        return [{**match, **values}]
+
+    def snapshot(self):
+        return Snapshot()
+
+
+def _prospect(prospect_id):
+    return {
+        "id": prospect_id,
+        "created_at": "2026-09-27T00:00:00+00:00",
+        "business_name": "Example",
+    }
+
+
+def test_pending_prospects_preserve_order_and_exclude_existing_scores():
+    gateway = FakeGateway()
+    gateway.queue_query([_prospect("p3"), _prospect("p2"), _prospect("p1")])
+    gateway.queue_query([{"prospect_id": "p2"}])
+    repository = QualificationDataRepository(gateway)
+
+    rows = repository.fetch_pending_prospects(
+        limit=2,
+        scoring_engine="engine",
+        scoring_version="v2",
+    )
+
+    assert [row["id"] for row in rows] == ["p3", "p1"]
+    filters = gateway.queries[1]["filters"]
+    assert any(
+        item.column == "prospect_id"
+        and item.operator is FilterOperator.IN
+        and item.value == ("p3", "p2", "p1")
+        for item in filters
+    )
+
+
+def test_unlinked_candidates_skip_previously_attempted_identity_and_keep_order():
+    gateway = FakeGateway()
+    gateway.queue_query([
+        {
+            "prospect_id": "attempted",
+            "scored_at": "3",
+            "result_payload": {"identity_resolution": {"attempted": True}},
+        },
+        {"prospect_id": "p2", "scored_at": "2", "result_payload": {}},
+        {"prospect_id": "p1", "scored_at": "1", "result_payload": {}},
+    ])
+    gateway.queue_query([_prospect("p1"), _prospect("p2")])
+    repository = QualificationDataRepository(gateway)
+
+    rows = repository.fetch_unlinked_allocatable_prospects(
+        limit=2,
+        scoring_engine="engine",
+        scoring_version="v2",
+    )
+
+    assert [row["id"] for row in rows] == ["p2", "p1"]
+    filters = gateway.queries[0]["filters"]
+    assert any(
+        item.column == "entity_id"
+        and item.operator is FilterOperator.IS_NULL
+        for item in filters
+    )
+
+
+def test_active_identity_link_fails_on_multiple_active_rows():
+    gateway = FakeGateway()
+    gateway.queue_query([
+        {"prospect_id": "p1", "entity_id": "e1"},
+        {"prospect_id": "p1", "entity_id": "e2"},
+    ])
+    repository = QualificationDataRepository(gateway)
+
+    with pytest.raises(RuntimeError, match="multiple active"):
+        repository.fetch_active_identity_link("p1")
+
+
+def test_identity_writes_are_conflict_ignored_and_verified_externally():
+    gateway = FakeGateway()
+    repository = QualificationDataRepository(gateway)
+
+    repository.insert_identity_entity({"id": "e1"})
+    repository.insert_identity_link({"prospect_id": "p1", "entity_id": "e1"})
+
+    assert gateway.inserts == [
+        ("business_entities", {"id": "e1"}, False),
+        ("prospect_entity_links", {"prospect_id": "p1", "entity_id": "e1"}, False),
+    ]
+
+
+def test_website_promotion_writes_then_verifies():
+    gateway = FakeGateway()
+    gateway.queue_query([{"id": "p1", "website": "https://example.test"}])
+    repository = QualificationDataRepository(gateway)
+
+    result = repository.promote_verified_website(
+        "p1",
+        "https://example.test",
+    )
+
+    assert result == "https://example.test"
+    assert gateway.updates == [
+        ("prospects", {"id": "p1"}, {"website": "https://example.test"}),
+    ]
+
+
+def test_qualification_uses_composite_merge_upsert():
+    gateway = FakeGateway()
+    repository = QualificationDataRepository(gateway)
+    payload = {
+        "prospect_id": "p1",
+        "scoring_engine": "engine",
+        "scoring_version": "v2",
+        "status": "scored",
+    }
+
+    result = repository.upsert_qualification(payload)
+
+    assert result == payload
+    assert gateway.upserts == [(
+        "prospect_qualifications",
+        payload,
+        ("prospect_id", "scoring_engine", "scoring_version"),
+        ConflictAction.MERGE,
+        True,
+    )]
+
+
+def test_repository_snapshot_has_no_dual_write_or_fallback():
+    snapshot = QualificationDataRepository(FakeGateway()).snapshot()
+    assert snapshot["dual_write_enabled"] is False
+    assert snapshot["write_fallback_enabled"] is False
