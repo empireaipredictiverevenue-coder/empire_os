@@ -225,8 +225,8 @@ def _normalize(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, str):
         if _ISO_TIMESTAMP.fullmatch(value):
-            if value.endswith("Z"):
-                return value[:-1] + "+00:00"
+            normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+            return datetime.fromisoformat(normalized).isoformat()
         return value
     if isinstance(value, Mapping):
         return {
@@ -538,29 +538,32 @@ def _source_pk_digest(
     *,
     batch_size: int,
 ) -> tuple[int, str]:
-    count = 0
-    digest = hashlib.sha256()
+    values: list[str] = []
     for batch in source.all_rows(
         item.name,
         item.primary_key,
         limit=batch_size,
         columns=(item.primary_key,),
     ):
-        for row in batch:
-            digest.update(str(row[item.primary_key]).encode("utf-8"))
-            digest.update(b"\n")
-            count += 1
-    return count, digest.hexdigest()
+        values.extend(str(row[item.primary_key]) for row in batch)
+    digest = hashlib.sha256()
+    for value in sorted(values):
+        digest.update(value.encode("utf-8"))
+        digest.update(b"\n")
+    return len(values), digest.hexdigest()
 
 
 def _target_pk_digest(
     target: EmpireDbShadowTarget,
     item: ShadowTable,
 ) -> tuple[int, str]:
-    keys = target.all_primary_keys(item.name, item.primary_key)
+    keys = [str(value) for value in target.all_primary_keys(
+        item.name,
+        item.primary_key,
+    )]
     digest = hashlib.sha256()
-    for value in keys:
-        digest.update(str(value).encode("utf-8"))
+    for value in sorted(keys):
+        digest.update(value.encode("utf-8"))
         digest.update(b"\n")
     return len(keys), digest.hexdigest()
 
