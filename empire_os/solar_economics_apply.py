@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, Callable, Mapping
 
 from empire_os.market_pricing import SOLAR_OPPORTUNITY_MAP_PRICES
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 from empire_os.solar_economics_policy import catalog_economics_basis
 
 
