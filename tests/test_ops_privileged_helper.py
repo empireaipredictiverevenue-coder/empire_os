@@ -93,3 +93,28 @@ def test_runtime_self_heal_units_are_allowlisted_without_outbound_authority():
     assert all("outbound" not in unit for unit in ALLOWED_UNITS)
     assert all("payment" not in unit for unit in ALLOWED_UNITS)
     assert all("settlement" not in unit for unit in ALLOWED_UNITS)
+
+
+
+def test_data_cloud_health_is_fixed_read_only_helper_action():
+    result = execute_request(
+        request("data_cloud_health", "empire-data-cloud"),
+        data_cloud_probe=lambda **_kwargs: {
+            "candidate_runtime_healthy": True,
+            "production_cutover_authority": False,
+            "canonical_backend": "supabase_legacy",
+        },
+    )
+
+    assert result["ok"] is True
+    assert result["action"] == "data_cloud_health"
+    assert result["unit"] == "empire-data-cloud"
+    assert result["health"]["production_cutover_authority"] is False
+
+
+def test_data_cloud_health_rejects_arbitrary_resource():
+    with pytest.raises(
+        PrivilegedHelperPolicyError,
+        match="invalid data cloud resource",
+    ):
+        validate_request(request("data_cloud_health", "ssh.service"))
