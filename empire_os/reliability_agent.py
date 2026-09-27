@@ -374,7 +374,21 @@ def _action_verified(row: Mapping[str, Any]) -> bool:
         }
 
     if action == "RUN_BOUNDED_SELF_HEAL":
-        return result.get("execution_authority") == "bounded_internal_repair"
+        if result.get("execution_authority") != "bounded_internal_repair":
+            return False
+        allowlist = set(result.get("repair_unit_allowlist") or [])
+        for repair in result.get("repairs") or []:
+            if not isinstance(repair, Mapping):
+                continue
+            unit = str(repair.get("unit") or "")
+            decision = str(repair.get("decision") or "")
+            if allowlist and unit not in allowlist:
+                continue
+            if decision == "CONTAINMENT_DEFERRED":
+                continue
+            if repair.get("ok") is False:
+                return False
+        return True
 
     if action == "RUN_LOCAL_BUYER_RECOVERY":
         return (
