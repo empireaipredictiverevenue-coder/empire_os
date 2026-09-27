@@ -17,10 +17,12 @@ def test_digest_query_is_read_only_and_ordered():
         "public.prospects",
         order_columns=("id",),
     )
-    assert query.startswith("SELECT")
+    assert query.startswith("WITH digest_settings")
     assert "FROM public.\"prospects\" AS t" in query
     assert "ORDER BY t.\"id\"" in query
     assert "digest(to_jsonb(t)::text, 'sha256')" in query
+    assert "set_config('TimeZone', 'UTC', true)" in query
+    assert "set_config('bytea_output', 'hex', true)" in query
 
 
 def test_digest_query_rejects_unsafe_identifiers():
