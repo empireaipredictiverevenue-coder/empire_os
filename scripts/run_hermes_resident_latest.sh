@@ -2,7 +2,16 @@
 set -euo pipefail
 
 REPO=/srv/empire_os
-BRANCH=feature/revenue-intelligence-v2
+CURRENT_BRANCH="$(git -C "$REPO" branch --show-current)"
+BRANCH="${EMPIRE_HERMES_WORKER_CODE_BRANCH:-$CURRENT_BRANCH}"
+
+case "$BRANCH" in
+  feature/revenue-intelligence-v2|agent/data-cloud-wave4) ;;
+  *)
+    echo "unsupported Hermes worker code branch: $BRANCH" >&2
+    exit 2
+    ;;
+esac
 REMOTE=origin
 WORKTREE="$REPO/runtime/hermes_control/worker_code"
 
