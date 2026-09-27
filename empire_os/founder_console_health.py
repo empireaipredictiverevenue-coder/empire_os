@@ -225,6 +225,13 @@ def clear_verified_orphan(
     user_unit_stopper: Callable[..., dict[str, Any]] = (
         _stop_legacy_user_unit
     ),
+    process_identity: Callable[[int], dict[str, Any]] = (
+        _process_identity
+    ),
+    process_exists: Callable[[int], bool] = (
+        lambda pid: (Path("/proc") / str(pid)).exists()
+    ),
+    kill_process: Callable[[int, int], None] = os.kill,
 ) -> dict[str, Any]:
     if observation.service_state == "active":
         return {
@@ -256,7 +263,7 @@ def clear_verified_orphan(
             }
 
     pid = int(observation.port_pid)
-    before = _process_identity(pid)
+    before = process_identity(pid)
     if not _verified_console_process(before):
         return {
             "ok": False,
@@ -264,9 +271,9 @@ def clear_verified_orphan(
             "killed": False,
         }
 
-    os.kill(pid, signal.SIGTERM)
+    kill_process(pid, signal.SIGTERM)
     for _ in range(20):
-        if not (Path("/proc") / str(pid)).exists():
+        if not process_exists(pid):
             return {
                 "ok": True,
                 "state": "ORPHAN_TERMINATED",
@@ -276,7 +283,7 @@ def clear_verified_orphan(
             }
         sleep(0.1)
 
-    after = _process_identity(pid)
+    after = process_identity(pid)
     if (
         not _verified_console_process(after)
         or after.get("start_ticks") != before.get("start_ticks")
@@ -288,9 +295,9 @@ def clear_verified_orphan(
             "pid": pid,
         }
 
-    os.kill(pid, signal.SIGKILL)
+    kill_process(pid, signal.SIGKILL)
     sleep(0.1)
-    gone = not (Path("/proc") / str(pid)).exists()
+    gone = not process_exists(pid)
     return {
         "ok": gone,
         "state": (
