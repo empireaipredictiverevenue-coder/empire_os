@@ -302,7 +302,10 @@ class LegacyDataEgressGovernor:
 
         self._with_lock(update)
 
-    def success(self) -> None:
+    def success(self, *, recovery_probe: bool = False) -> None:
+        if not recovery_probe:
+            return
+
         def update() -> None:
             state = self.load_state()
             circuit = state.get("circuit")
