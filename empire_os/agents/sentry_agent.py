@@ -17,8 +17,11 @@ UNITS = ["empire-hub-service", "empire-ppc-router", "empire-agent-lead_deliverer
          "empire-agent-solana_listener", "empire-agent-warehouse-report",
          "empire-agent-outreach_runner", "empire-agent-supervisor",
          "empire-ppc-sentry", "empire-ppc-billing-collector"]
-REQUIRED_ENV = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "SUPABASE_URL",
-                "SUPABASE_SERVICE_KEY", "SOLANA_VAULT_WALLET", "MINIMAX_API_KEY"]
+REQUIRED_ENV = [
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_CHAT_ID",
+    "MINIMAX_API_KEY",
+]
 
 ERR_RE = re.compile(r"(Traceback|Error|Exception|CRITICAL|FATAL)", re.I)
 
