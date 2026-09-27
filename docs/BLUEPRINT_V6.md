@@ -41,7 +41,7 @@ SIGNALS → OPPORTUNITY GRAPH → OPPORTUNITY FOUNDRY → MARKET ENTRY → EXPER
 
 
 ## Canonical Architecture Decisions
-- Truth/data plane: Supabase project `owbeinlfcfdtwcwrttjy` (Empire-AI Database). SQLite is legacy/cache only.
+- Truth/data plane: Supabase project `owbeinlfcfdtwcwrttjy` (Empire-AI Database) remains canonical production truth until independently verified Founder-approved cutover. Empire Data Cloud is the sovereign PostgreSQL replacement path under active architecture/build; EmpireOS business modules must converge on the vendor-neutral Empire Data Fabric boundary rather than new direct vendor coupling. SQLite is legacy/cache only.
 - Operating coordinator: Astra. Deterministic/local first; premium AI only when economically justified.
 - Execution bus: remain OBSERVE until explicit promotion approval.
 - Public domain: `empire-ai.co.uk` through Cloudflare Tunnel `Empire-AI`.
@@ -67,6 +67,7 @@ SIGNALS → OPPORTUNITY GRAPH → OPPORTUNITY FOUNDRY → MARKET ENTRY → EXPER
 - Empire Intelligence Fabric schema is being built as the shared temporal/provenance graph across intelligence domains.
 - Protected untracked `recovery/` and `toop` remain untouched.
 - Empire Ops MCP v0.2.0 foundation is in-repo with audited repo/file operations, allowlisted checks, protected-path enforcement, bearer-token support, founder-directive ingest, acquisition controls and privileged-helper mediated service control. Direct ChatGPT/custom-client registration is transport/client work; it is not allowed to become a dependency of the operating system itself.
+- Empire Data Cloud foundation is under active isolated build: sovereign PostgreSQL-first data plane, private-first API/control plane, tenant/security contracts, HA/backup/PITR readiness, migration discovery and parallel engineering orchestration. No Data Cloud foundation code has production DB authority or canonical cutover authority by default.
 
 ## Autonomous Operating Model — ACTIVE
 
