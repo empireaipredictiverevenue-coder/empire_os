@@ -91,26 +91,32 @@ class PostgresConnector:
     def config_snapshot(self) -> dict[str, Any]:
         return self._config.safe_snapshot()
 
-    def connect(self) -> ConnectionLike:
-        """Open a private application-labelled session.
+    def _open_connection(self) -> ConnectionLike:
+        """Open an internal application-labelled session.
 
-        The DSN is passed only to the driver and is never included in snapshots.
+        Raw sessions are intentionally not part of the public adapter API.
+        Repository implementations may be added inside this backend package
+        without exposing arbitrary SQL through the Data Cloud API.
         """
         connection = self._connect_factory(
             conninfo=self._config.dsn,
             connect_timeout=self._config.connect_timeout_seconds,
             application_name=self._config.application_name,
         )
-        connection.execute(
-            "SELECT set_config('statement_timeout', %s, false)",
-            (str(self._config.statement_timeout_ms),),
-        )
-        return connection
+        try:
+            connection.execute(
+                "SELECT set_config('statement_timeout', %s, false)",
+                (str(self._config.statement_timeout_ms),),
+            )
+            return connection
+        except Exception:
+            connection.close()
+            raise
 
     def health(self) -> dict[str, Any]:
         connection: ConnectionLike | None = None
         try:
-            connection = self.connect()
+            connection = self._open_connection()
             row = connection.execute(
                 "SELECT current_database(), pg_is_in_recovery()"
             ).fetchone()
