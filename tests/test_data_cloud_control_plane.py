@@ -1,6 +1,10 @@
 import pytest
 
-from empire_os.data_cloud_control_plane import (\n    DataCloudProject,\n    ProjectState,\n    transition_project,\n)
+from empire_os.data_cloud_control_plane import (
+    DataCloudProject,
+    ProjectState,
+    transition_project,
+)
 
 
 def test_public_api_cannot_be_enabled_without_approved_state():
