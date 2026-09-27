@@ -30,6 +30,11 @@ def build_table_digest_query(
     order_sql = ", ".join(f't.{_quote_identifier(column)}' for column in columns)
 
     return f"""
+WITH digest_settings AS MATERIALIZED (
+  SELECT
+    set_config('TimeZone', 'UTC', true),
+    set_config('bytea_output', 'hex', true)
+)
 SELECT
   count(*)::bigint AS row_count,
   encode(
@@ -46,6 +51,7 @@ SELECT
     'hex'
   ) AS content_sha256
 FROM public.{quoted_table} AS t
+CROSS JOIN digest_settings
 """.strip()
 
 
