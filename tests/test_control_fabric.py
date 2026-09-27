@@ -116,3 +116,17 @@ def test_execution_plane_routes_public_research_without_external_authority():
     by_name = {row["component"]: row for row in routes}
     assert "agent_tool_execution_plane" in by_name
     assert by_name["agent_tool_execution_plane"]["authority"] == "internal_write"
+
+
+
+def test_registry_has_canonical_reliability_agent():
+    by_name = {
+        spec.name: spec
+        for spec in default_registry()
+    }
+
+    agent = by_name["empire_reliability_agent"]
+    assert agent.authority == "internal_write"
+    assert agent.repair_policy == "agentic_observe_plan_act_verify"
+    assert "runtime_self_heal" in agent.dependencies
+    assert "buyer_acquisition_scout" in agent.dependencies
