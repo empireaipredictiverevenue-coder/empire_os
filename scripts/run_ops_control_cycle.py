@@ -20,6 +20,10 @@ from empire_os.supabase_egress_guard import (
 
 OUTPUT = Path("/srv/empire_os/runtime/ops_control/latest.json")
 
+CONTAINMENT_SAFE_REPAIR_UNITS = frozenset({
+    "empire-buyer-acquisition-local-recovery.timer",
+})
+
 
 def unit_state(unit: str) -> str:
     result = subprocess.run(
@@ -80,7 +84,12 @@ def main() -> int:
 
     egress_contained = supabase_egress_contained()
     runtime_doctor = run_runtime_self_heal(
-        observe_only=(mode != "GUARDED_EXECUTE" or egress_contained),
+        observe_only=(mode != "GUARDED_EXECUTE"),
+        repair_unit_allowlist=(
+            CONTAINMENT_SAFE_REPAIR_UNITS
+            if egress_contained
+            else None
+        ),
     )
     sentinel = observe(unit_state)
     sentinel = _apply_egress_containment_context(
