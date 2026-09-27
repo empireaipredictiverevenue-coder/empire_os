@@ -35,7 +35,12 @@ def _default(value: Any) -> Any:
     return text
 
 
-def _constraint_key(item: dict[str, Any]) -> str:
+def _constraint_key(item: dict[str, Any]) -> str | None:
+    # PostgreSQL 18 catalogs NOT NULL constraints (contype='n') separately;
+    # canonical Supabase is PostgreSQL 17 where they are represented only via
+    # pg_attribute/information_schema. Column nullability is compared elsewhere.
+    if item.get("type") == "n":
+        return None
     clean = {
         "type": item.get("type"),
         "columns": list(item.get("columns") or []),
@@ -65,6 +70,8 @@ def _multiset(items: Iterable[dict[str, Any]], key_fn) -> dict[str, int]:
     result: dict[str, int] = {}
     for item in items:
         key = key_fn(item)
+        if key is None:
+            continue
         result[key] = result.get(key, 0) + 1
     return result
 
@@ -224,6 +231,26 @@ def main() -> int:
             "extra_indexes": len(item.get("extra_indexes", [])),
         }
         print(json.dumps(summary, sort_keys=True))
+        if item.get("structure_differences"):
+            print(json.dumps({
+                "table": item["table"],
+                "structure_differences": item["structure_differences"],
+            }, sort_keys=True))
+        if item.get("default_differences"):
+            print(json.dumps({
+                "table": item["table"],
+                "default_differences": item["default_differences"],
+            }, sort_keys=True))
+        if item.get("missing_indexes"):
+            print(json.dumps({
+                "table": item["table"],
+                "missing_indexes": item["missing_indexes"],
+            }, sort_keys=True))
+        if item.get("missing_constraints"):
+            print(json.dumps({
+                "table": item["table"],
+                "missing_constraints": item["missing_constraints"],
+            }, sort_keys=True))
     return 0
 
 
