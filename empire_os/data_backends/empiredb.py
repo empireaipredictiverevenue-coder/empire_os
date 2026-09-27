@@ -239,13 +239,18 @@ class EmpireDbProvider:
             f"ON CONFLICT ({', '.join(_ident(name) for name in conflicts)}) "
         )
         update_names = [name for name in names if name not in conflicts]
-        if action is ConflictAction.MERGE and update_names:
-            sql += "DO UPDATE SET " + ", ".join(
-                f"{_ident(name)} = EXCLUDED.{_ident(name)}"
-                for name in update_names
-            )
-        else:
+        if action is ConflictAction.MERGE:
+            if update_names:
+                sql += "DO UPDATE SET " + ", ".join(
+                    f"{_ident(name)} = EXCLUDED.{_ident(name)}"
+                    for name in update_names
+                )
+            else:
+                sql += "DO NOTHING"
+        elif action is ConflictAction.IGNORE:
             sql += "DO NOTHING"
+        else:
+            raise ValueError(f"unsupported conflict action: {action!r}")
 
         if return_repr:
             sql += " RETURNING *"
