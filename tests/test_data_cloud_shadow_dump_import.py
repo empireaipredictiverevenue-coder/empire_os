@@ -121,3 +121,11 @@ def test_scan_dump_accepts_quoted_identifiers(tmp_path: Path) -> None:
     blocks = scan_dump(dump, (ShadowTable("example"),))
     assert blocks["example"].row_count == 1
     assert blocks["example"].columns == ("id", "note")
+
+
+def test_importer_source_has_single_module_body() -> None:
+    source = inspect.getsource(module)
+    assert source.count("_COPY_HEADER = re.compile(") == 1
+    assert source.count("class CopyBlock:") == 1
+    assert source.count("def scan_dump(") == 1
+    assert source.count('if __name__ == "__main__":') == 1
