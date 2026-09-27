@@ -93,6 +93,13 @@ AUTO_REPAIR_TIMERS: tuple[ServiceSpec, ...] = (
 
 SNAPSHOTS: tuple[SnapshotSpec, ...] = (
     SnapshotSpec(
+        "buyer_acquisition_local_recovery",
+        "/srv/empire_os/runtime/buyer_acquisition/"
+        "local_recovery_latest.json",
+        1800,
+        "empire-buyer-acquisition-local-recovery.service",
+    ),
+    SnapshotSpec(
         "commercial_catalog",
         "/srv/empire_os/runtime/commercial_catalog/latest.json",
         900,
