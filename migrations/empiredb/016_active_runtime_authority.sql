@@ -3166,4 +3166,85 @@ CREATE TRIGGER guard_commercial_events_integrity
 BEFORE INSERT OR UPDATE OR DELETE ON public.commercial_events
 FOR EACH ROW EXECUTE FUNCTION public.guard_commercial_events_integrity();
 
+-- Materialize RLS policies from already-granted SQL capabilities.
+-- This cannot widen authority: a policy is created only when the role already
+-- owns the corresponding table privilege.
+DO $$
+DECLARE
+  v_role text;
+  v_table text;
+  v_rel text;
+  v_policy text;
+  v_roles constant text[] := ARRAY[
+    'empiredb_app',
+    'empire_outbound_approver',
+    'empire_outbound_sender',
+    'empire_reply_ingest',
+    'empire_closer_observer',
+    'empire_closer_planner',
+    'empire_closer_approver',
+    'empire_payment_approver',
+    'empire_bsc_verifier',
+    'empire_escrow_verifier',
+    'empire_commercial_approver',
+    'empire_outcome_recorder',
+    'empire_revenue_recognizer',
+    'empire_conversation_ingest',
+    'empire_conversation_reader',
+    'empire_revenue_exchange_ingest',
+    'empire_revenue_exchange_reader'
+  ];
+BEGIN
+  FOR v_table IN
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='public'
+      AND c.relkind='r'
+      AND c.relrowsecurity
+  LOOP
+    v_rel := format('public.%I',v_table);
+
+    FOREACH v_role IN ARRAY v_roles LOOP
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname=v_role) THEN
+        IF has_table_privilege(v_role,v_rel,'SELECT') THEN
+          v_policy := left(v_table||'_'||v_role||'_select',63);
+          EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I',v_policy,v_table);
+          EXECUTE format(
+            'CREATE POLICY %I ON public.%I FOR SELECT TO %I USING (true)',
+            v_policy,v_table,v_role
+          );
+        END IF;
+
+        IF has_table_privilege(v_role,v_rel,'INSERT') THEN
+          v_policy := left(v_table||'_'||v_role||'_insert',63);
+          EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I',v_policy,v_table);
+          EXECUTE format(
+            'CREATE POLICY %I ON public.%I FOR INSERT TO %I WITH CHECK (true)',
+            v_policy,v_table,v_role
+          );
+        END IF;
+
+        IF has_table_privilege(v_role,v_rel,'UPDATE') THEN
+          v_policy := left(v_table||'_'||v_role||'_update',63);
+          EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I',v_policy,v_table);
+          EXECUTE format(
+            'CREATE POLICY %I ON public.%I FOR UPDATE TO %I USING (true) WITH CHECK (true)',
+            v_policy,v_table,v_role
+          );
+        END IF;
+
+        IF has_table_privilege(v_role,v_rel,'DELETE') THEN
+          v_policy := left(v_table||'_'||v_role||'_delete',63);
+          EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I',v_policy,v_table);
+          EXECUTE format(
+            'CREATE POLICY %I ON public.%I FOR DELETE TO %I USING (true)',
+            v_policy,v_table,v_role
+          );
+        END IF;
+      END IF;
+    END LOOP;
+  END LOOP;
+END $$;
+
 RESET ROLE;
