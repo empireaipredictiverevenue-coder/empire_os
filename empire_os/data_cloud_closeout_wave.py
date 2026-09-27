@@ -158,6 +158,37 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
             max_runtime_seconds=1200,
         ),
         ExecutionRequest(
+            request_id="empiredb-closeout-runtime-canary",
+            capability="backend_code",
+            department="platform_reliability",
+            objective=(
+                "Build a bounded READ-ONLY production-service canary for the "
+                "EmpireDB candidate through PgBouncer. Reuse the canonical gateway "
+                "and existing application repositories where possible. Verify "
+                "representative read paths and safe transaction-rollback write "
+                "semantics without changing EMPIRE_DATA_BACKEND, moving funds, "
+                "sending outbound, recognizing revenue or leaving persisted canary "
+                "rows. Report exact services/paths proven and UNKNOWN for anything "
+                "not exercised."
+            ),
+            authority="internal_write",
+            risk_class="high",
+            source_ref=SOURCE_REF,
+            allowed_paths=(
+                "empire_os/data_cloud_runtime_canary.py",
+                "tests/test_data_cloud_runtime_canary.py",
+                "docs/EMPIRE_DATA_CLOUD_RUNTIME_CANARY.md",
+            ),
+            lease_resources=("domain:data_cloud_runtime_canary",),
+            success_condition=(
+                "Representative EmpireOS application reads and rollback-only "
+                "writes are proven through PgBouncer with no canonical switch "
+                "and production_cutover_authority=false."
+            ),
+            required_tests=("tests/test_data_cloud_runtime_canary.py",),
+            max_runtime_seconds=1500,
+        ),
+        ExecutionRequest(
             request_id="empiredb-closeout-final-manifest",
             capability="documentation",
             department="platform_reliability",
