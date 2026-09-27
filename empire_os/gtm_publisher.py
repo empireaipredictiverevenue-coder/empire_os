@@ -22,11 +22,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import urllib.error
-import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import Any
+
+from empire_os.gtm_publisher_repository import GTMPublisherRepository
 
 
 ENV_PATH = "/etc/empire_os.env"
@@ -53,37 +52,6 @@ PUBLISH_MODE = os.environ.get(
 BATCH_SIZE = 50
 
 
-def load_env() -> dict[str, str]:
-    env: dict[str, str] = {}
-
-    with open(ENV_PATH, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-
-            if (
-                line
-                and not line.startswith("#")
-                and "=" in line
-            ):
-                key, value = line.split("=", 1)
-                env[key] = value
-
-    return env
-
-
-ENV = load_env()
-
-SUPABASE_URL = ENV["SUPABASE_URL"].rstrip("/")
-SUPABASE_KEY = ENV["SUPABASE_SERVICE_KEY"]
-
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": "Bearer " + SUPABASE_KEY,
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-}
-
-
 def stable_key(*parts: Any) -> str:
     raw = "|".join(
         str(part or "").strip().lower()
@@ -93,43 +61,6 @@ def stable_key(*parts: Any) -> str:
     return hashlib.sha256(
         raw.encode("utf-8")
     ).hexdigest()
-
-
-def request_json(
-    method: str,
-    path: str,
-    payload: Any | None = None,
-    extra_headers: dict[str, str] | None = None,
-) -> Any:
-    body = None
-
-    if payload is not None:
-        body = json.dumps(payload).encode("utf-8")
-
-    headers = {
-        **HEADERS,
-        **(extra_headers or {}),
-    }
-
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}{path}",
-        data=body,
-        method=method,
-        headers=headers,
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            raw = response.read().decode("utf-8")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as exc:
-        text = exc.read().decode(
-            "utf-8",
-            errors="replace",
-        )
-        raise RuntimeError(
-            f"{method} {path} -> HTTP {exc.code}: {text[:1000]}"
-        ) from exc
 
 
 def load_plan() -> dict[str, Any]:
@@ -153,36 +84,26 @@ def load_plan() -> dict[str, Any]:
 def find_opportunity(
     niche: str,
     metro: str,
+    *,
+    repository: GTMPublisherRepository | None = None,
 ) -> dict[str, Any] | None:
-    params = urllib.parse.urlencode(
-        {
-            "select": "id,niche,niche_family,metro",
-            "niche": f"eq.{niche}",
-            "metro": f"eq.{metro}",
-            "limit": 1,
-        }
-    )
-
-    rows = request_json(
-        "GET",
-        f"/rest/v1/gtm_opportunities?{params}",
-    )
-
-    if not rows:
-        return None
-
-    return rows[0]
+    store = repository or GTMPublisherRepository.from_environment()
+    return store.find_opportunity(niche, metro)
 
 
 def publish_opportunity(
     opportunity: dict[str, Any],
+    *,
+    repository: GTMPublisherRepository | None = None,
 ) -> str:
+    store = repository or GTMPublisherRepository.from_environment()
     niche = str(opportunity["niche"])
     metro = str(opportunity["metro"])
 
     existing = find_opportunity(
         niche,
         metro,
+        repository=store,
     )
 
     payload = {
@@ -275,31 +196,11 @@ def publish_opportunity(
     }
 
     if existing:
-        request_json(
-            "PATCH",
-            f"/rest/v1/gtm_opportunities?id=eq.{existing['id']}",
-            payload=payload,
-            extra_headers={
-                "Prefer": "return=representation",
-            },
-        )
+        store.update_opportunity(str(existing["id"]), payload)
         return str(existing["id"])
 
-    rows = request_json(
-        "POST",
-        "/rest/v1/gtm_opportunities",
-        payload=payload,
-        extra_headers={
-            "Prefer": "return=representation",
-        },
-    )
-
-    if not rows:
-        raise RuntimeError(
-            "opportunity insert returned no row"
-        )
-
-    return str(rows[0]["id"])
+    row = store.insert_opportunity(payload)
+    return str(row["id"])
 
 
 def create_job(
@@ -307,7 +208,9 @@ def create_job(
     opportunity_id: str,
     job: dict[str, Any],
     opportunity: dict[str, Any],
+    repository: GTMPublisherRepository | None = None,
 ) -> dict[str, Any]:
+    store = repository or GTMPublisherRepository.from_environment()
     job_type = str(job["job_type"])
     worker_adapter = str(
         job["worker_adapter"]
@@ -352,30 +255,23 @@ def create_job(
         "idempotency_key": idempotency_key,
     }
 
-    rows = request_json(
-        "POST",
-        "/rest/v1/gtm_jobs",
-        payload=payload,
-        extra_headers={
-            "Prefer": (
-                "resolution=ignore-duplicates,"
-                "return=representation"
-            ),
-        },
-    )
+    row = store.insert_job_if_new(payload)
 
     return {
         "job_type": job_type,
         "worker_adapter": worker_adapter,
         "idempotency_key": idempotency_key,
-        "created": bool(rows),
-        "row": rows[0] if rows else None,
+        "created": row is not None,
+        "row": row,
     }
 
 
 def publish_plan(
     plan: dict[str, Any],
+    *,
+    repository: GTMPublisherRepository | None = None,
 ) -> dict[str, Any]:
+    store = repository or GTMPublisherRepository.from_environment()
     opportunities = plan["market"][
         "top_opportunities"
     ][:50]
@@ -443,13 +339,11 @@ def publish_plan(
             continue
 
         opportunity_id = publish_opportunity(
-            opportunity
+            opportunity,
+            repository=store,
         )
 
-        request_json(
-            "POST",
-            "/rest/v1/commercial_events",
-            payload={
+        store.append_event({
                 "event_type": "gtm_opportunity_published",
                 "opportunity_id": opportunity_id,
                 "channel": "gtm",
@@ -467,17 +361,14 @@ def publish_plan(
                     plan.get("generated_at")
                     or "now"
                 ),
-            },
-            extra_headers={
-                "Prefer": "return=minimal",
-            },
-        )
+            })
 
         for job in matching_jobs:
             result = create_job(
                 opportunity_id=opportunity_id,
                 job=job,
                 opportunity=opportunity,
+                repository=store,
             )
 
             job_results.append(result)
