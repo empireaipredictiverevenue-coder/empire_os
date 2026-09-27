@@ -1090,6 +1090,71 @@ def _buyer_scout_observation_runtime(
     }
 
 
+def _data_cloud_runtime(
+    raw: dict[str, Any] | None,
+    path: Path,
+) -> dict[str, Any]:
+    if raw is None:
+        return {
+            "available": False,
+            "observed_at": _mtime_iso(path),
+            "candidate_runtime_healthy": False,
+            "operational_cutover_ready": False,
+            "production_cutover_authority": False,
+            "execution_authority": "none",
+        }
+
+    return {
+        "available": True,
+        "observed_at": raw.get("observed_at") or _mtime_iso(path),
+        "read_only": raw.get("read_only") is True,
+        "canonical_backend": raw.get("canonical_backend"),
+        "canonical_backend_source": raw.get("canonical_backend_source"),
+        "empiredb_candidate_only": raw.get("empiredb_candidate_only") is True,
+        "candidate_runtime_healthy": (
+            raw.get("candidate_runtime_healthy") is True
+        ),
+        "operational_cutover_ready": (
+            raw.get("operational_cutover_ready") is True
+        ),
+        "postgres_service": (
+            raw.get("postgres_service")
+            if isinstance(raw.get("postgres_service"), dict)
+            else {}
+        ),
+        "pgbouncer_service": (
+            raw.get("pgbouncer_service")
+            if isinstance(raw.get("pgbouncer_service"), dict)
+            else {}
+        ),
+        "empiredb_direct": (
+            raw.get("empiredb_direct")
+            if isinstance(raw.get("empiredb_direct"), dict)
+            else {}
+        ),
+        "empiredb_via_pgbouncer": (
+            raw.get("empiredb_via_pgbouncer")
+            if isinstance(raw.get("empiredb_via_pgbouncer"), dict)
+            else {}
+        ),
+        "backup": (
+            raw.get("backup")
+            if isinstance(raw.get("backup"), dict)
+            else {}
+        ),
+        "archive_mode_on": raw.get("archive_mode_on") is True,
+        "pitr_verified": raw.get("pitr_verified") is True,
+        "ha_replica_verified": raw.get("ha_replica_verified") is True,
+        "open_gates": (
+            list(raw.get("open_gates") or [])
+            if isinstance(raw.get("open_gates"), list)
+            else []
+        ),
+        "production_cutover_authority": False,
+        "execution_authority": "none",
+    }
+
+
 def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     loop_path = runtime / "commercial_loop" / "latest.json"
@@ -1146,6 +1211,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     media_os_runtime_path = (
         runtime / "media_os" / "latest.json"
     )
+    data_cloud_runtime_path = (
+        runtime / "data_cloud" / "health_latest.json"
+    )
 
     raw_loop = _read_json(loop_path)
     conveyor = build_conveyor(raw_loop or {"stages": []})
@@ -1155,6 +1223,10 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "side_effects": "none",
         "execution_authority": "none",
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "data_cloud": _data_cloud_runtime(
+            _read_json(data_cloud_runtime_path),
+            data_cloud_runtime_path,
+        ),
         "commercial_loop": _commercial_loop(raw_loop, loop_path),
         "control_conveyor": conveyor,
         "founder_gate": {
