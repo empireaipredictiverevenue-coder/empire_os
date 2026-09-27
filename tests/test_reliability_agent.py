@@ -21,8 +21,8 @@ def _healthy_founder_console():
 def _contained_observation(*, seeds: int = 2, heartbeat_age=2000):
     return reliability.ReliabilityObservation(
         observed_at=NOW.isoformat(),
-        supabase_egress_contained=True,
-        supabase_guard_state="contained",
+        legacy_data_contained=True,
+        legacy_guard_state="contained",
         recovery_snapshot_exists=seeds > 0,
         recovery_seed_count=seeds,
         recovery_snapshot_age_seconds=100.0 if seeds else None,
@@ -57,8 +57,8 @@ def test_contained_plan_escalates_if_last_known_good_seeds_missing():
 def test_healthy_plan_refreshes_stale_recovery_snapshot():
     observation = reliability.ReliabilityObservation(
         observed_at=NOW.isoformat(),
-        supabase_egress_contained=False,
-        supabase_guard_state="healthy",
+        legacy_data_contained=False,
+        legacy_guard_state="healthy",
         recovery_snapshot_exists=True,
         recovery_seed_count=3,
         recovery_snapshot_age_seconds=5000.0,
@@ -134,7 +134,7 @@ def test_run_cycle_uses_containment_safe_tools_only(monkeypatch, tmp_path):
         now=NOW,
         self_heal=fake_self_heal,
         refresh_snapshot=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("Supabase refresh must not run under containment")
+            AssertionError("canonical refresh must not run under containment")
         ),
         local_recovery=fake_local_recovery,
         founder_console_observer=_healthy_founder_console,
@@ -310,3 +310,38 @@ def test_self_heal_action_ignores_expected_containment_deferred_repairs():
     }
 
     assert reliability._action_verified(row) is True
+
+
+def test_reliability_payload_preserves_legacy_status_aliases(tmp_path):
+    root = Path(tmp_path)
+    guard = root / "runtime/control/supabase_egress_guard.json"
+    guard.parent.mkdir(parents=True)
+    guard.write_text(
+        '{"state":"healthy","contained":false}',
+        encoding="utf-8",
+    )
+
+    result = reliability.run_cycle(
+        root,
+        now=NOW,
+        self_heal=lambda **_kwargs: {
+            "status": "HEALTHY",
+            "execution_authority": "bounded_internal_repair",
+        },
+        refresh_snapshot=lambda *_args, **_kwargs: {
+            "ok": True,
+            "state": "PRESERVED_LAST_KNOWN_GOOD",
+            "database_write_performed": False,
+            "outbound_sent": False,
+            "execution_authority": "none",
+        },
+        local_recovery=lambda *_args, **_kwargs: {},
+        founder_console_observer=_healthy_founder_console,
+    )
+
+    assert result["before"]["legacy_data_contained"] is False
+    assert result["before"]["supabase_egress_contained"] is False
+    assert result["before"]["legacy_guard_state"] == "healthy"
+    assert result["before"]["supabase_guard_state"] == "healthy"
+    assert result["data_operating_state"] == "NORMAL"
+    assert result["operating_state"] == "NORMAL"

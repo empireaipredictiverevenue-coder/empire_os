@@ -32,9 +32,11 @@ from empire_os.founder_console_health import (
     observe_founder_console,
 )
 from empire_os.runtime_self_heal import run_runtime_self_heal
-from empire_os.supabase_egress_guard import (
-    STATUS_PATH as EGRESS_STATUS_PATH,
-    supabase_egress_contained,
+from empire_os.legacy_data_containment import (
+    LEGACY_GUARD_STATUS_PATH,
+    legacy_data_contained,
+    legacy_operating_state_alias,
+    legacy_status_aliases,
 )
 
 
@@ -59,8 +61,8 @@ CONTAINMENT_SAFE_REPAIR_UNITS = frozenset({
 @dataclass(frozen=True)
 class ReliabilityObservation:
     observed_at: str
-    supabase_egress_contained: bool
-    supabase_guard_state: str
+    legacy_data_contained: bool
+    legacy_guard_state: str
     recovery_snapshot_exists: bool
     recovery_seed_count: int
     recovery_snapshot_age_seconds: float | None
@@ -188,8 +190,8 @@ def observe(
 ) -> ReliabilityObservation:
     root = Path(repo_root).resolve()
     current = (now or _now()).astimezone(timezone.utc)
-    guard_path = root / EGRESS_STATUS_PATH.relative_to(ROOT)
-    contained = supabase_egress_contained(guard_path)
+    guard_path = root / LEGACY_GUARD_STATUS_PATH.relative_to(ROOT)
+    contained = legacy_data_contained(guard_path)
     guard = _load_json(guard_path)
 
     snapshot_path = root / RECOVERY_SEED_SNAPSHOT
@@ -199,8 +201,8 @@ def observe(
 
     return ReliabilityObservation(
         observed_at=_iso(current),
-        supabase_egress_contained=contained,
-        supabase_guard_state=str(
+        legacy_data_contained=contained,
+        legacy_guard_state=str(
             guard.get("state") or "unknown"
         ),
         recovery_snapshot_exists=snapshot_path.exists(),
@@ -257,7 +259,7 @@ def plan_actions(
             110,
         ))
 
-    if observation.supabase_egress_contained:
+    if observation.legacy_data_contained:
         due = (
             not observation.recovery_heartbeat_exists
             or observation.recovery_heartbeat_state
@@ -269,14 +271,14 @@ def plan_actions(
         if observation.recovery_seed_count > 0 and due:
             actions.append(ReliabilityAction(
                 "RUN_LOCAL_BUYER_RECOVERY",
-                "Supabase contained; continue first-party buyer validation "
+                "Legacy data contained; continue first-party buyer validation "
                 "from last-known-good local seeds",
                 100,
             ))
         elif observation.recovery_seed_count == 0:
             actions.append(ReliabilityAction(
                 "ESCALATE_RECOVERY_SEEDS_MISSING",
-                "Supabase contained and no last-known-good buyer recovery "
+                "Legacy data contained and no last-known-good buyer recovery "
                 "snapshot exists",
                 100,
             ))
@@ -290,7 +292,7 @@ def plan_actions(
         if refresh_due:
             actions.append(ReliabilityAction(
                 "REFRESH_RECOVERY_SNAPSHOT",
-                "Supabase healthy; refresh last-known-good opportunity seeds",
+                "Legacy data healthy; refresh last-known-good opportunity seeds",
                 80,
             ))
 
@@ -471,7 +473,7 @@ def run_cycle(
             local_recovery=local_recovery,
             clear_console_orphan=clear_console_orphan,
             founder_console_observer=founder_console_observer,
-            contained=before.supabase_egress_contained,
+            contained=before.legacy_data_contained,
         )
         verified = _action_verified(row)
         row["verified"] = verified
@@ -514,23 +516,41 @@ def run_cycle(
         or runtime_degraded
     )
 
+    before_payload = asdict(before)
+    before_payload.update(
+        legacy_status_aliases(
+            contained=before.legacy_data_contained,
+            state=before.legacy_guard_state,
+        )
+    )
+    after_payload = asdict(after)
+    after_payload.update(
+        legacy_status_aliases(
+            contained=after.legacy_data_contained,
+            state=after.legacy_guard_state,
+        )
+    )
+
     payload = {
-        "schema_version": "empire.reliability-agent.v1",
+        "schema_version": "empire.reliability-agent.v2",
         "observed_at": before.observed_at,
         "mode": "OBSERVE",
         "loop": "OBSERVE_DIAGNOSE_PLAN_ACT_VERIFY_RECORD",
-        "before": asdict(before),
+        "before": before_payload,
         "planned_actions": [asdict(row) for row in actions],
         "executed_actions": executed,
         "deferred_actions": deferred,
         "verified_action_count": verified_count,
         "failed_action_count": len(failures),
-        "after": asdict(after),
+        "after": after_payload,
         "status": "DEGRADED" if degraded else "HEALTHY",
-        "operating_state": (
-            "SUPABASE_CONTAINED_LOCAL_RECOVERY"
-            if before.supabase_egress_contained
+        "data_operating_state": (
+            "LEGACY_DATA_CONTAINED_LOCAL_RECOVERY"
+            if before.legacy_data_contained
             else "NORMAL"
+        ),
+        "operating_state": legacy_operating_state_alias(
+            before.legacy_data_contained
         ),
         "founder_attention_required": founder_attention_required,
         "authority": {
