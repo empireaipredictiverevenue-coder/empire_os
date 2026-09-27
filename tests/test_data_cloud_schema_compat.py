@@ -1,9 +1,12 @@
 from empire_os.data_cloud_schema_compat import (
+    CheckConstraintSpec,
     ColumnSpec,
     ForeignKeySpec,
     IndexSpec,
+    PolicySpec,
     SchemaManifest,
     TableSpec,
+    TriggerSpec,
     compare_schema,
     manifest_from_rows,
 )
@@ -19,8 +22,8 @@ def _table(name, *, dtype="uuid", nullable=False, rls=True):
 
 
 def test_identical_schema_is_compatible():
-    source = SchemaManifest((_table("prospects"),))
-    target = SchemaManifest((_table("prospects"),))
+    source = SchemaManifest((_table("prospects"),), extensions=(("pgcrypto", "1.3"),))
+    target = SchemaManifest((_table("prospects"),), extensions=(("pgcrypto", "1.3"),))
     result = compare_schema(source, target)
     assert result["compatible"] is True
     assert result["findings"] == []
@@ -50,62 +53,128 @@ def test_type_primary_key_and_rls_drift_are_detected():
     result = compare_schema(source, target)
     assert "type_mismatch:prospects.id" in result["findings"]
     assert "primary_key_mismatch:prospects" in result["findings"]
-    assert "rls_missing:prospects" in result["findings"]
+    assert "rls_state_mismatch:prospects" in result["findings"]
 
 
-def test_defaults_constraints_indexes_and_policies_are_verified():
+def test_payment_protection_semantics_are_all_verified():
     source = SchemaManifest(
         (
             TableSpec(
-                name="outbound_intents",
+                name="bsc_payment_requests",
                 columns=(
                     ColumnSpec("id", "uuid", False, "gen_random_uuid()"),
-                    ColumnSpec("buyer_id", "uuid", False),
+                    ColumnSpec("amount_usdt", "numeric", False),
                 ),
                 primary_key=("id",),
-                unique_constraints=(("buyer_id",),),
+                unique_constraints=(("idempotency_key",),),
+                check_constraints=(
+                    CheckConstraintSpec(
+                        "bsc_payment_requests_amount_usdt_check",
+                        "CHECK (amount_usdt > 0::numeric)",
+                    ),
+                ),
                 foreign_keys=(
                     ForeignKeySpec(
                         ("buyer_id",),
                         "public.buyers",
                         ("id",),
+                        "FOREIGN KEY (buyer_id) REFERENCES buyers(id) ON DELETE RESTRICT",
                     ),
                 ),
-                indexes=(IndexSpec("idx_outbound_buyer", ("buyer_id",)),),
+                indexes=(
+                    IndexSpec(
+                        "bsc_payment_requests_one_open_order_uidx",
+                        ("fulfilment_order_id",),
+                        True,
+                        "CREATE UNIQUE INDEX bsc_payment_requests_one_open_order_uidx "
+                        "ON public.bsc_payment_requests USING btree "
+                        "(fulfilment_order_id) WHERE status = 'pending'::text",
+                    ),
+                ),
                 rls_enabled=True,
-                rls_policies=("tenant_read", "service_insert"),
+                force_rls=True,
+                rls_policies=(
+                    PolicySpec(
+                        "service_insert",
+                        "INSERT",
+                        ("service_role",),
+                        None,
+                        "approved_by IS NOT NULL",
+                    ),
+                ),
+                triggers=(
+                    TriggerSpec(
+                        "payment_audit",
+                        "EXECUTE FUNCTION record_payment_audit()",
+                    ),
+                ),
             ),
-        )
+        ),
+        extensions=(("pgcrypto", "1.3"),),
     )
     target = SchemaManifest(
         (
             TableSpec(
-                name="outbound_intents",
+                name="bsc_payment_requests",
                 columns=(
                     ColumnSpec("id", "uuid", False, None),
-                    ColumnSpec("buyer_id", "uuid", False),
+                    ColumnSpec("amount_usdt", "numeric", False),
                 ),
                 primary_key=("id",),
                 unique_constraints=(),
+                check_constraints=(),
                 foreign_keys=(),
                 indexes=(),
                 rls_enabled=True,
-                rls_policies=("tenant_read",),
+                force_rls=False,
+                rls_policies=(),
+                triggers=(),
             ),
-        )
+        ),
+        extensions=(),
     )
+
     result = compare_schema(source, target)
-    assert "default_mismatch:outbound_intents.id" in result["findings"]
-    assert "unique_constraint_mismatch:outbound_intents" in result["findings"]
-    assert "foreign_key_mismatch:outbound_intents" in result["findings"]
-    assert "index_mismatch:outbound_intents" in result["findings"]
-    assert (
-        "rls_policy_missing:outbound_intents.service_insert"
-        in result["findings"]
+
+    assert "default_mismatch:bsc_payment_requests.id" in result["findings"]
+    assert "unique_constraint_mismatch:bsc_payment_requests" in result["findings"]
+    assert "check_constraint_mismatch:bsc_payment_requests" in result["findings"]
+    assert "foreign_key_mismatch:bsc_payment_requests" in result["findings"]
+    assert "index_mismatch:bsc_payment_requests" in result["findings"]
+    assert "force_rls_mismatch:bsc_payment_requests" in result["findings"]
+    assert "rls_policy_mismatch:bsc_payment_requests" in result["findings"]
+    assert "trigger_mismatch:bsc_payment_requests" in result["findings"]
+    assert result["extension_compatibility_owner"] == "data_cloud_extension_plan"
+
+
+def test_sql_whitespace_and_public_prefix_do_not_create_false_drift():
+    source = TableSpec(
+        name="events",
+        columns=(ColumnSpec("id", "uuid", False),),
+        indexes=(
+            IndexSpec(
+                "events_idx",
+                definition="CREATE INDEX events_idx ON public.events USING btree (id)",
+            ),
+        ),
     )
+    target = TableSpec(
+        name="events",
+        columns=(ColumnSpec("id", "uuid", False),),
+        indexes=(
+            IndexSpec(
+                "events_idx",
+                definition=" CREATE   INDEX events_idx ON events USING btree (id) ",
+            ),
+        ),
+    )
+    assert compare_schema(
+        SchemaManifest((source,)),
+        SchemaManifest((target,)),
+    )["compatible"] is True
 
 
-def test_manifest_builder_normalizes_public_prefix_and_default():
+def test_manifest_builder_normalizes_public_prefix_and_defaults():
     manifest = manifest_from_rows(
         [
             {
@@ -116,6 +185,7 @@ def test_manifest_builder_normalizes_public_prefix_and_default():
                 "column_default": "gen_random_uuid()",
                 "primary_key": True,
                 "rls_enabled": True,
+                "force_rls": False,
             }
         ]
     )
