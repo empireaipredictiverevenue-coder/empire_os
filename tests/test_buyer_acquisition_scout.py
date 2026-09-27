@@ -451,3 +451,62 @@ def test_opportunity_seed_query_provenance_reaches_candidate(monkeypatch):
         "market:roofing:denver, co"
     ]
     assert result["outbound_sent"] is False
+
+
+
+def test_search_disabled_uses_opportunity_seed_without_search_fabric(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Search Fabric must stay disabled")
+        ),
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "canonical_url": "https://roof-recovery.example",
+            "final_url": "https://roof-recovery.example",
+            "business_names": ["Roof Recovery"],
+            "title": "Roof Recovery",
+            "description": "Roofing contractor serving Denver.",
+            "emails": ["owner@roof-recovery.example"],
+            "phones": [],
+            "people": [{"name": "Owner", "title": "Owner"}],
+            "pages_checked": [],
+            "evidence_score": 0.9,
+        },
+    )
+
+    result = run_buyer_scout(
+        {
+            "priority_targets": [],
+            "product_priority_targets": [],
+            "icp_priority_targets": [],
+        },
+        canonical_seed_records=[{
+            "id": "seed-1",
+            "business_name": "Roof Recovery",
+            "niche": "roofing",
+            "website": "https://roof-recovery.example",
+            "seed_opportunity_key": "market:roofing:denver, co",
+            "seed_buyer_pools": ["end_service_buyers"],
+            "icp_profile_key": "high_ticket_home_service",
+        }],
+        search_enabled=False,
+        max_domains=5,
+        max_probes=5,
+    )
+
+    assert result["search_enabled"] is False
+    assert result["search_domain_count"] == 0
+    assert result["opportunity_seed_domain_count"] == 1
+    assert result["candidate_count"] == 1
+    assert result["candidates"][0]["target_opportunity_keys"] == [
+        "market:roofing:denver, co"
+    ]
+    assert result["database_write_performed"] is False
+    assert result["outbound_sent"] is False
+    assert result["execution_authority"] == "none"
