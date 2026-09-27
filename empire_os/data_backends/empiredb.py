@@ -301,6 +301,7 @@ class EmpireDbProvider:
         table: str,
         row: Mapping[str, Any],
         *,
+        conflict_columns: Sequence[str] = (),
         return_repr: bool = False,
     ) -> Sequence[Mapping[str, Any]]:
         if not row:
@@ -309,12 +310,24 @@ class EmpireDbProvider:
         names = [str(name) for name in row]
         for name in names:
             _ident(name)
+        conflicts = tuple(str(name) for name in conflict_columns)
+        for name in conflicts:
+            _ident(name)
+        if any(name not in row for name in conflicts):
+            raise ValueError("conflict columns must be present in insert row")
+
         sql = (
             f"INSERT INTO public.{_ident(table)} "
             f"({', '.join(_ident(name) for name in names)}) "
             f"VALUES ({', '.join('%s' for _ in names)}) "
-            "ON CONFLICT DO NOTHING"
         )
+        if conflicts:
+            sql += (
+                f"ON CONFLICT ({', '.join(_ident(name) for name in conflicts)}) "
+                "DO NOTHING"
+            )
+        else:
+            sql += "ON CONFLICT DO NOTHING"
         if return_repr:
             sql += " RETURNING *"
 
