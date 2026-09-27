@@ -10,7 +10,7 @@ Principles:
 - niche/metro identity-aware buyer matching
 - MRR and visibility remain first-class GTM motions
 - no outreach, campaign launch, invoice creation, fulfilment trigger,
-  or Supabase mutation occurs in this version
+  or canonical data mutation occurs in this version
 """
 
 from __future__ import annotations
@@ -18,14 +18,15 @@ from __future__ import annotations
 import json
 import math
 import os
-import urllib.parse
-import urllib.request
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from empire_os.buyer_allocation import buyer_activation_decision
+from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.gtm_data_repository import GTMDataRepository
+from empire_os.runtime_env import load_runtime_env
 from empire_os.niche_taxonomy import (
     NICHE_FAMILIES,
     metro_key,
@@ -33,7 +34,7 @@ from empire_os.niche_taxonomy import (
     normalise,
 )
 
-ENV_PATH = os.environ.get(
+DATA_ENV_PATH = os.environ.get(
     "EMPIRE_ENV_PATH",
     "/etc/empire_os.env",
 )
@@ -141,65 +142,12 @@ class GTMJob:
 
 
 # ---------------------------------------------------------------------------
-# Supabase
+# Canonical data
 # ---------------------------------------------------------------------------
 
-def load_env() -> dict[str, str]:
-    env: dict[str, str] = {}
-
-    with open(ENV_PATH, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-
-            if (
-                line
-                and not line.startswith("#")
-                and "=" in line
-            ):
-                key, value = line.split("=", 1)
-                env[key] = value
-
-    return env
-
-
-ENV = load_env()
-
-SUPABASE_URL = ENV["SUPABASE_URL"].rstrip("/")
-SUPABASE_KEY = ENV["SUPABASE_SERVICE_KEY"]
-
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": "Bearer " + SUPABASE_KEY,
-    "Accept": "application/json",
-}
-
-
-def supabase_select(
-    table: str,
-    columns: str,
-    *,
-    limit: int = BATCH_SIZE,
-    offset: int = 0,
-    filters: dict[str, str] | None = None,
-) -> list[dict[str, Any]]:
-    params: dict[str, Any] = {
-        "select": columns,
-        "limit": limit,
-        "offset": offset,
-    }
-
-    if filters:
-        params.update(filters)
-
-    query = urllib.parse.urlencode(params)
-
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}/rest/v1/{table}?{query}",
-        headers=HEADERS,
-    )
-
-    with urllib.request.urlopen(req, timeout=30) as response:
-        return json.loads(response.read().decode())
+def _data_repository() -> GTMDataRepository:
+    runtime_env = load_runtime_env(DATA_ENV_PATH)
+    return GTMDataRepository(gateway_from_environment(runtime_env))
 
 
 def fetch_all(
@@ -208,28 +156,11 @@ def fetch_all(
     *,
     batch_size: int = BATCH_SIZE,
 ) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    offset = 0
-
-    while True:
-        batch = supabase_select(
-            table,
-            columns,
-            limit=batch_size,
-            offset=offset,
-        )
-
-        if not batch:
-            break
-
-        rows.extend(batch)
-
-        if len(batch) < batch_size:
-            break
-
-        offset += batch_size
-
-    return rows
+    return _data_repository().fetch_all(
+        table,
+        columns,
+        batch_size=batch_size,
+    )
 
 
 def fetch_prospect_signals() -> list[dict[str, Any]]:
@@ -325,45 +256,15 @@ def load_identity_review_count() -> int:
 
 
 def fetch_identity_counts() -> dict[str, int]:
-    counts: dict[str, int] = {}
-
-    for table in (
-        "business_entities",
-        "prospect_entity_links",
-        "business_entity_conflicts",
-    ):
-        query = urllib.parse.urlencode(
-            {
-                "select": "id",
-                "limit": 1,
-            }
+    repository = _data_repository()
+    return {
+        table: repository.count(table)
+        for table in (
+            "business_entities",
+            "prospect_entity_links",
+            "business_entity_conflicts",
         )
-
-        req = urllib.request.Request(
-            f"{SUPABASE_URL}/rest/v1/{table}?{query}",
-            headers={
-                **HEADERS,
-                "Prefer": "count=exact",
-            },
-        )
-
-        with urllib.request.urlopen(req, timeout=30) as response:
-            content_range = response.headers.get(
-                "Content-Range",
-                "",
-            )
-
-            counts[table] = (
-                int(
-                    content_range.rsplit("/", 1)[1]
-                )
-                if "/"
-                in content_range
-                and content_range.rsplit("/", 1)[1].isdigit()
-                else 0
-            )
-
-    return counts
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1010,7 +911,7 @@ def build_plan() -> dict[str, Any]:
         ),
 
         "source": {
-            "supabase": SUPABASE_URL,
+            "canonical_data": _data_repository().snapshot(),
             "prospects": len(prospects),
             "buyers": len(buyers),
             "active_buyers": len(active_buyers),
@@ -1052,7 +953,7 @@ def build_plan() -> dict[str, Any]:
         },
 
         "execution": {
-            "writes_to_supabase": 0,
+            "writes_to_canonical_data": 0,
             "prospects_modified": 0,
             "outreach_sent": 0,
             "campaigns_launched": 0,
@@ -1141,7 +1042,7 @@ def main() -> None:
         "FULFILMENT CHECKS: "
         f"{plan['jobs']['by_type'].get('fulfilment_capacity_check', 0)}"
     )
-    print("SUPABASE WRITES: 0")
+    print("CANONICAL DATA WRITES: 0")
     print(f"REPORT: {REPORT_PATH}")
 
 
