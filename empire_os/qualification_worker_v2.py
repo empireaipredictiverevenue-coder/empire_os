@@ -34,119 +34,27 @@ def _commercial_event_repository() -> CommercialEventRepository:
 
 
 def fetch_pending_prospects(limit: int = 10) -> list[dict[str, Any]]:
-    limit = max(1, min(int(limit), 25))
-    select = ",".join(
-        (
-            "id", "created_at", "business_name", "niche", "metro",
-            "phone", "website", "address", "rating", "review_count",
-            "buy_signal_score", "runs_ads", "status", "notes",
-            "contact_name", "contact_title", "contact_source",
-        )
+    return _qualification_repository().fetch_pending_prospects(
+        limit=limit,
+        scoring_engine=SCORING_ENGINE,
+        scoring_version=SCORING_VERSION,
     )
-    params = urllib.parse.urlencode(
-        {"select": select, "order": "created_at.desc", "limit": limit * 4}
-    )
-    prospects = request_json("GET", f"/rest/v1/prospects?{params}") or []
-    if not prospects:
-        return []
-
-    ids = [str(row["id"]) for row in prospects if row.get("id")]
-    quoted = ",".join(ids)
-    qparams = urllib.parse.urlencode(
-        {
-            "select": "prospect_id",
-            "scoring_engine": f"eq.{SCORING_ENGINE}",
-            "scoring_version": f"eq.{SCORING_VERSION}",
-            "prospect_id": f"in.({quoted})",
-        }
-    )
-    existing = request_json(
-        "GET", f"/rest/v1/prospect_qualifications?{qparams}"
-    ) or []
-    done = {str(row.get("prospect_id")) for row in existing}
-    return [row for row in prospects if str(row.get("id")) not in done][:limit]
 
 
 def fetch_unlinked_allocatable_prospects(
     limit: int = 10,
 ) -> list[dict[str, Any]]:
-    limit = max(1, min(int(limit), 25))
-    qparams = urllib.parse.urlencode(
-        {
-            "select": "prospect_id,scored_at,result_payload",
-            "scoring_engine": f"eq.{SCORING_ENGINE}",
-            "scoring_version": f"eq.{SCORING_VERSION}",
-            "status": "eq.scored",
-            "tier": "in.(hot,warm)",
-            "entity_id": "is.null",
-            "order": "scored_at.desc",
-            "limit": limit * 5,
-        }
+    return _qualification_repository().fetch_unlinked_allocatable_prospects(
+        limit=limit,
+        scoring_engine=SCORING_ENGINE,
+        scoring_version=SCORING_VERSION,
     )
-    qualifications = request_json(
-        "GET", f"/rest/v1/prospect_qualifications?{qparams}"
-    ) or []
-    ids: list[str] = []
-    for row in qualifications:
-        if not isinstance(row, dict) or not row.get("prospect_id"):
-            continue
-        result_payload = row.get("result_payload")
-        identity_state = (
-            result_payload.get("identity_resolution")
-            if isinstance(result_payload, dict)
-            else None
-        )
-        if (
-            isinstance(identity_state, dict)
-            and identity_state.get("attempted") is True
-        ):
-            continue
-        ids.append(str(row["prospect_id"]))
-        if len(ids) >= limit:
-            break
-
-    if not ids:
-        return []
-
-    select = ",".join(
-        (
-            "id", "created_at", "business_name", "niche", "metro",
-            "phone", "website", "address", "rating", "review_count",
-            "buy_signal_score", "runs_ads", "status", "notes",
-            "contact_name", "contact_title", "contact_source",
-        )
-    )
-    params = urllib.parse.urlencode(
-        {
-            "select": select,
-            "id": f"in.({','.join(ids)})",
-        }
-    )
-    rows = request_json("GET", f"/rest/v1/prospects?{params}") or []
-    by_id = {
-        str(row.get("id")): row
-        for row in rows
-        if isinstance(row, dict) and row.get("id")
-    }
-    return [by_id[pid] for pid in ids if pid in by_id]
 
 
-def fetch_latest_acquisition(prospect_id: str) -> dict[str, Any] | None:
-    params = urllib.parse.urlencode(
-        {
-            "select": "prospect_id,source,source_url,evidence,created_at",
-            "prospect_id": f"eq.{prospect_id}",
-            "order": "created_at.desc",
-            "limit": 1,
-        }
-    )
-    rows = request_json(
-        "GET", f"/rest/v1/prospect_acquisitions?{params}"
-    ) or []
-    if not rows:
-        return None
-    row = rows[0]
-    return row if isinstance(row, dict) else None
+def fetch_latest_acquisition(
+    prospect_id: str,
+) -> dict[str, Any] | None:
+    return _qualification_repository().fetch_latest_acquisition(prospect_id)
 
 
 def acquisition_website(acquisition: dict[str, Any] | None) -> str:
@@ -206,23 +114,18 @@ def resolve_acquisition_website(
     return str(raw.get("business_website") or "").strip()
 
 
-def fetch_active_identity_link(prospect_id: str) -> dict[str, Any] | None:
-    params = urllib.parse.urlencode(
-        {
-            "select": "prospect_id,entity_id,match_method,match_score,active,created_at",
-            "prospect_id": f"eq.{prospect_id}",
-            "active": "eq.true",
-            "order": "created_at.desc",
-            "limit": 2,
-        }
-    )
-    rows = request_json(
-        "GET", f"/rest/v1/prospect_entity_links?{params}"
-    ) or []
-    links = [row for row in rows if isinstance(row, dict)]
-    if len(links) > 1:
-        raise RuntimeError("multiple active identity links")
-    return links[0] if links else None
+def fetch_active_identity_link(
+    prospect_id: str,
+) -> dict[str, Any] | None:
+    return _qualification_repository().fetch_active_identity_link(prospect_id)
+
+
+def _insert_identity_entity(payload: dict[str, Any]) -> None:
+    _qualification_repository().insert_identity_entity(payload)
+
+
+def _insert_identity_link(payload: dict[str, Any]) -> None:
+    _qualification_repository().insert_identity_link(payload)
 
 
 def resolve_identity(
@@ -270,13 +173,7 @@ def resolve_identity(
             "source": plan["source"],
         },
     }
-    entity_params = urllib.parse.urlencode({"on_conflict": "id"})
-    request_json(
-        "POST",
-        f"/rest/v1/business_entities?{entity_params}",
-        payload=entity_payload,
-        prefer="resolution=ignore-duplicates,return=minimal",
-    )
+    _insert_identity_entity(entity_payload)
 
     link_payload = {
         "prospect_id": prospect_id,
@@ -290,15 +187,7 @@ def resolve_identity(
         },
         "active": True,
     }
-    link_params = urllib.parse.urlencode(
-        {"on_conflict": "prospect_id"}
-    )
-    request_json(
-        "POST",
-        f"/rest/v1/prospect_entity_links?{link_params}",
-        payload=link_payload,
-        prefer="resolution=ignore-duplicates,return=minimal",
-    )
+    _insert_identity_link(link_payload)
 
     verified = fetch_active_identity_link(prospect_id)
     verified_id = str(
@@ -354,30 +243,10 @@ def promote_verified_website(
     if not prospect_id:
         raise RuntimeError("prospect id required for website promotion")
 
-    params = urllib.parse.urlencode({"id": f"eq.{prospect_id}"})
-    request_json(
-        "PATCH",
-        f"/rest/v1/prospects?{params}",
-        payload={"website": website},
-        prefer="return=minimal",
+    return _qualification_repository().promote_verified_website(
+        prospect_id,
+        website,
     )
-
-    verify_params = urllib.parse.urlencode({
-        "select": "id,website",
-        "id": f"eq.{prospect_id}",
-        "limit": 1,
-    })
-    rows = request_json(
-        "GET",
-        f"/rest/v1/prospects?{verify_params}",
-    ) or []
-    if (
-        not isinstance(rows, list)
-        or not rows
-        or str(rows[0].get("website") or "").strip() != website
-    ):
-        raise RuntimeError("verified website promotion did not persist")
-    return website
 
 
 def build_evidence_backed_payload(
@@ -419,18 +288,7 @@ def build_evidence_backed_payload(
 
 
 def upsert_qualification(payload: dict[str, Any]) -> dict[str, Any]:
-    params = urllib.parse.urlencode(
-        {"on_conflict": "prospect_id,scoring_engine,scoring_version"}
-    )
-    rows = request_json(
-        "POST",
-        f"/rest/v1/prospect_qualifications?{params}",
-        payload=payload,
-        prefer="resolution=merge-duplicates,return=representation",
-    )
-    if not rows:
-        raise RuntimeError("qualification upsert returned no row")
-    return rows[0]
+    return _qualification_repository().upsert_qualification(payload)
 
 
 def emit_event(
@@ -454,18 +312,7 @@ def emit_event(
         "occurred_at": _now(),
         "idempotency_key": f"prospect:{prospect_id}:qualified:v2",
     }
-    try:
-        request_json(
-            "POST",
-            "/rest/v1/commercial_events",
-            payload=event,
-            prefer="return=minimal",
-        )
-    except RuntimeError as exc:
-        message = str(exc)
-        duplicate = "HTTP 409" in message and '"code":"23505"' in message
-        if not duplicate:
-            raise
+    _commercial_event_repository().append_idempotent(event)
 
 
 def qualify_prospect(prospect: dict[str, Any]) -> dict[str, Any]:
