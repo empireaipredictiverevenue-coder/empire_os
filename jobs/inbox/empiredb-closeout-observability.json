@@ -1,0 +1,36 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/data_cloud_backup_observer.py",
+    "empire_os/data_cloud_runtime_health.py",
+    "empire_os/ops_privileged_helper.py",
+    "empire_os/ops_privileged_client.py",
+    "empire_os/reliability_agent.py",
+    "empire_os/founder_dashboard.py",
+    "deploy/systemd/empire-data-cloud-backup-observer.service",
+    "deploy/systemd/empire-founder-dashboard-api.service",
+    "scripts/install_empire_data_cloud_observability.sh",
+    "tests/test_data_cloud_backup_observer.py",
+    "tests/test_data_cloud_runtime_health.py",
+    "tests/test_ops_privileged_helper.py",
+    "tests/test_reliability_agent.py",
+    "tests/test_founder_dashboard.py"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-09-27T22:46:30.756306+00:00",
+  "job_id": "empiredb-closeout-observability",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:data_cloud_observability"
+  ],
+  "max_runtime_seconds": 1200,
+  "prompt": "Finish Empire Data Cloud observability root-cause work. Verify the postgres-owned pgBackRest observer, the privileged health projection, Reliability Agent ingestion and exactly one canonical Founder Dashboard system service. Fix production code only; do not weaken service hardening, expose credentials, change EMPIRE_DATA_BACKEND, create backups, restore data or perform cutover. Return tests and live-verification commands.",
+  "pytest_targets": [
+    "tests/test_data_cloud_backup_observer.py",
+    "tests/test_data_cloud_runtime_health.py",
+    "tests/test_ops_privileged_helper.py",
+    "tests/test_reliability_agent.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
