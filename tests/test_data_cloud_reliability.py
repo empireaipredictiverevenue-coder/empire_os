@@ -38,3 +38,17 @@ def test_reliability_evaluator_never_grants_destructive_authority():
     )
     assert result["authority"]["destructive_repair"] is False
     assert result["authority"]["automatic_failover_execution"] is False
+
+
+def test_unhealthy_primary_is_not_healthy():
+    nodes = (
+        DataNode("db-1", NodeRole.PRIMARY, "eu-west", False, writable=True),
+        DataNode("db-2", NodeRole.SYNC_REPLICA, "eu-west", True, 0.5),
+        DataNode("db-3", NodeRole.DR_REPLICA, "eu-north", True, 5.0),
+    )
+    result = evaluate_reliability(
+        nodes,
+        BackupState(30.0, True, True, True, True),
+    )
+    assert result["healthy"] is False
+    assert "primary_unhealthy:db-1" in result["findings"]
