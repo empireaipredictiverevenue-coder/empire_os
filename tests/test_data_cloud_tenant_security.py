@@ -11,7 +11,8 @@ def test_tenant_migration_uses_trusted_role_binding():
 
     assert "empiredb_tenant_reader" in sql
     assert "public.empire_tenant_role_bindings" in sql
-    assert "current_user" in sql
+    assert "session_user" in sql
+    assert "b.role_name = session_user" in sql
     assert "public.empire_current_tenant_id()" in sql
     assert "current_setting('empire.tenant_id'" not in sql
     assert "org_id IS NOT NULL" in sql
@@ -63,3 +64,11 @@ def test_tenant_migration_does_not_require_database_schema_create():
 
     assert "CREATE SCHEMA" not in sql
     assert "public.empire_tenant_role_bindings" in sql
+
+
+
+def test_tenant_canary_binds_authenticated_session_user():
+    source = Path(tenant.__file__).read_text(encoding="utf-8")
+
+    assert "SELECT session_user" in source
+    assert "authenticated_db_session_user_binding" in source
