@@ -319,3 +319,27 @@ def test_legacy_write_unwraps_explicit_json_values():
 
     assert '"observed_dimensions": ["market_fit"]' in seen["body"]
     assert "JsonValue" not in seen["body"]
+
+
+def test_targeted_ignore_conflicts_uses_on_conflict_query():
+    seen = {}
+
+    def urlopen(request, timeout):
+        seen["url"] = request.full_url
+        seen["prefer"] = request.get_header("Prefer")
+        return Response(b'')
+
+    provider = SupabaseLegacyProvider(
+        SupabaseLegacyConfig("https://example.supabase.co", "key"),
+        urlopen=urlopen,
+        egress=FakeEgress(),
+    )
+
+    assert provider.insert_ignore_conflicts(
+        "business_entities",
+        {"id": "e1"},
+        conflict_columns=("id",),
+    ) == ()
+
+    assert "on_conflict=id" in seen["url"]
+    assert seen["prefer"] == "resolution=ignore-duplicates,return=minimal"
