@@ -19,11 +19,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import urllib.parse
-import urllib.request
 import uuid
 from pathlib import Path
 from typing import Any
+
+from empire_os.identity_promotion_repository import IdentityPromotionRepository
 
 
 ENV_PATH = "/etc/empire_os.env"
@@ -37,60 +37,6 @@ REPORT_PATH = Path(
 ENTITY_NAMESPACE = uuid.UUID("7f4f5f91-c9e1-4c0e-9d37-7f3cdb6e7f21")
 ENTITY_BATCH = 100
 LINK_BATCH = 200
-
-
-def load_env() -> dict[str, str]:
-    env: dict[str, str] = {}
-    with open(ENV_PATH, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, value = line.split("=", 1)
-                env[key] = value
-    return env
-
-
-ENV = load_env()
-BASE = ENV["SUPABASE_URL"].rstrip("/")
-KEY = ENV["SUPABASE_SERVICE_KEY"]
-
-HEADERS = {
-    "apikey": KEY,
-    "Authorization": "Bearer " + KEY,
-    "Accept": "application/json",
-    "Content-Type": "application/json",
-}
-
-
-def request_json(
-    method: str,
-    table: str,
-    query: str = "",
-    payload: Any | None = None,
-    extra_headers: dict[str, str] | None = None,
-) -> tuple[int, Any]:
-    headers = dict(HEADERS)
-    if extra_headers:
-        headers.update(extra_headers)
-
-    data = None
-    if payload is not None:
-        data = json.dumps(payload).encode()
-
-    req = urllib.request.Request(
-        f"{BASE}/rest/v1/{table}{query}",
-        data=data,
-        headers=headers,
-        method=method,
-    )
-
-    with urllib.request.urlopen(req, timeout=60) as response:
-        raw = response.read().decode()
-
-        if not raw:
-            return response.status, None
-
-        return response.status, json.loads(raw)
 
 
 def deterministic_entity_id(name: str, niche: str, metro: str) -> str:
@@ -135,33 +81,22 @@ def candidates(
 
 def fetch_existing_links(
     prospect_ids: list[str],
+    *,
+    repository: IdentityPromotionRepository | None = None,
 ) -> dict[str, str]:
-    existing: dict[str, str] = {}
-
-    for i in range(0, len(prospect_ids), LINK_BATCH):
-        batch = prospect_ids[i:i + LINK_BATCH]
-        encoded = ",".join(batch)
-
-        query = "?" + urllib.parse.urlencode(
-            {
-                "select": "prospect_id,entity_id",
-                "prospect_id": f"in.({encoded})",
-            }
-        )
-
-        _, rows = request_json(
-            "GET",
-            "prospect_entity_links",
-            query,
-        )
-
-        for row in rows:
-            existing[str(row["prospect_id"])] = str(row["entity_id"])
-
-    return existing
+    store = repository or IdentityPromotionRepository.from_environment()
+    return store.existing_links(
+        prospect_ids,
+        batch_size=LINK_BATCH,
+    )
 
 
-def write_entities(proposals: list[dict[str, Any]]) -> int:
+def write_entities(
+    proposals: list[dict[str, Any]],
+    *,
+    repository: IdentityPromotionRepository | None = None,
+) -> int:
+    store = repository or IdentityPromotionRepository.from_environment()
     inserted_or_existing = 0
 
     for i in range(0, len(proposals), ENTITY_BATCH):
@@ -191,14 +126,8 @@ def write_entities(proposals: list[dict[str, Any]]) -> int:
                 }
             )
 
-        request_json(
-            "POST",
-            "business_entities",
-            payload=payload,
-            extra_headers={
-                "Prefer": "resolution=ignore-duplicates,return=minimal",
-            },
-        )
+        for row in payload:
+            store.ensure_entity(row)
 
         inserted_or_existing += len(payload)
 
@@ -214,7 +143,10 @@ def write_entities(proposals: list[dict[str, Any]]) -> int:
 def write_links(
     proposals: list[dict[str, Any]],
     existing_links: dict[str, str],
+    *,
+    repository: IdentityPromotionRepository | None = None,
 ) -> int:
+    store = repository or IdentityPromotionRepository.from_environment()
     rows: list[dict[str, Any]] = []
 
     for proposal in proposals:
@@ -260,14 +192,8 @@ def write_links(
     for i in range(0, len(rows), LINK_BATCH):
         chunk = rows[i:i + LINK_BATCH]
 
-        request_json(
-            "POST",
-            "prospect_entity_links",
-            payload=chunk,
-            extra_headers={
-                "Prefer": "resolution=ignore-duplicates,return=minimal",
-            },
-        )
+        for row in chunk:
+            store.ensure_link(row)
 
         inserted += len(chunk)
 
@@ -285,7 +211,7 @@ def main() -> None:
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="Perform the controlled Supabase promotion.",
+        help="Perform the controlled canonical identity promotion.",
     )
     args = parser.parse_args()
 
@@ -298,7 +224,11 @@ def main() -> None:
         for pid in proposal.get("prospect_ids", [])
     ]
 
-    existing_links = fetch_existing_links(all_prospect_ids)
+    repository = IdentityPromotionRepository.from_environment()
+    existing_links = fetch_existing_links(
+        all_prospect_ids,
+        repository=repository,
+    )
 
     print("IDENTITY PROMOTER")
     print(f"REPORT: {REPORT_PATH}")
@@ -313,7 +243,7 @@ def main() -> None:
 
     if not args.apply:
         print("MODE: DRY RUN")
-        print("SUPABASE WRITES: 0")
+        print("CANONICAL WRITES: 0")
         return
 
     print("MODE: APPLY")
@@ -321,8 +251,15 @@ def main() -> None:
     print("SOURCE PROSPECT UPDATES: 0")
     print("SOURCE PROSPECT DELETES: 0")
 
-    write_entities(eligible)
-    links = write_links(eligible, existing_links)
+    write_entities(
+        eligible,
+        repository=repository,
+    )
+    links = write_links(
+        eligible,
+        existing_links,
+        repository=repository,
+    )
 
     print("IDENTITY PROMOTION COMPLETE")
     print(f"ENTITIES PROCESSED: {len(eligible)}")
