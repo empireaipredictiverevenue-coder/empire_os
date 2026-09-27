@@ -56,27 +56,6 @@ class CanonicalDataProvider(Protocol):
     ) -> Sequence[Mapping[str, Any]]:
         ...
 
-    def query(
-        self,
-        table: str,
-        columns: str = "*",
-        *,
-        filters: Sequence[DataFilter] = (),
-        order: Sequence[OrderSpec] = (),
-        limit: int = 1000,
-        offset: int = 0,
-    ) -> list[dict[str, Any]]:
-        self._require_provider()
-        rows = self._provider.query(
-            table,
-            columns,
-            filters=filters,
-            order=order,
-            limit=limit,
-            offset=offset,
-        )
-        return [dict(row) for row in rows]
-
     def count(
         self,
         table: str,
@@ -109,6 +88,7 @@ class CanonicalDataProvider(Protocol):
         table: str,
         row: Mapping[str, Any],
         *,
+        conflict_columns: Sequence[str] = (),
         return_repr: bool = False,
     ) -> Sequence[Mapping[str, Any]]:
         ...
@@ -208,6 +188,27 @@ class CanonicalDataGateway:
         )
         return [dict(row) for row in rows]
 
+    def query(
+        self,
+        table: str,
+        columns: str = "*",
+        *,
+        filters: Sequence[DataFilter] = (),
+        order: Sequence[OrderSpec] = (),
+        limit: int = 1000,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        self._require_provider()
+        rows = self._provider.query(
+            table,
+            columns,
+            filters=filters,
+            order=order,
+            limit=limit,
+            offset=offset,
+        )
+        return [dict(row) for row in rows]
+
     def count(
         self,
         table: str,
@@ -255,12 +256,14 @@ class CanonicalDataGateway:
         table: str,
         row: Mapping[str, Any],
         *,
+        conflict_columns: Sequence[str] = (),
         return_repr: bool = False,
     ) -> list[dict[str, Any]]:
         self._require_provider()
         rows = self._provider.insert_ignore_conflicts(
             table,
             row,
+            conflict_columns=conflict_columns,
             return_repr=return_repr,
         )
         return [dict(item) for item in rows]
