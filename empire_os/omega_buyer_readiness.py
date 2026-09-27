@@ -13,7 +13,7 @@ from empire_os.buyer_allocation import (
 )
 from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
 from empire_os.omega_worker import SCORE_TYPE
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 
 class OmegaBuyerReadinessError(RuntimeError):
