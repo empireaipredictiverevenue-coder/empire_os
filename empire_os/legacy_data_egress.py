@@ -342,3 +342,32 @@ class LegacyDataEgressGovernor:
             isinstance(circuit, dict)
             and circuit.get("open") is True
         )
+
+
+
+def reserve_legacy_data_request(*, allow_probe: bool = False) -> None:
+    """Compatibility entrypoint for runtimes not yet behind the legacy adapter."""
+    LegacyDataEgressGovernor.from_environment().reserve(
+        allow_probe=allow_probe
+    )
+
+
+def open_legacy_data_egress_circuit(reason: str) -> None:
+    LegacyDataEgressGovernor.from_environment().open(reason)
+
+
+def close_legacy_data_egress_circuit(
+    *,
+    recovery_probe: bool = False,
+) -> None:
+    LegacyDataEgressGovernor.from_environment().success(
+        recovery_probe=recovery_probe
+    )
+
+
+
+def legacy_data_component_name(
+    environ: Mapping[str, str] | None = None,
+) -> str:
+    source = os.environ if environ is None else environ
+    return _component_name(source)
