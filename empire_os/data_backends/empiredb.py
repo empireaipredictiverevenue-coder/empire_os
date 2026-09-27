@@ -387,7 +387,10 @@ class EmpireDbProvider:
 
         connection = self._connection()
         try:
-            connection.execute(sql, tuple(match[name] for name in names))
+            connection.execute(
+                sql,
+                tuple(self._adapt(match[name]) for name in names),
+            )
             connection.commit()
         except Exception:
             connection.rollback()
