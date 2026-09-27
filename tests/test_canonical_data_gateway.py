@@ -6,6 +6,7 @@ from empire_os.canonical_data_gateway import (
     gateway_from_environment,
 )
 from empire_os.data_cloud_contract import DataBackend
+from empire_os.data_query import ConflictAction, DataFilter, OrderSpec
 
 
 class FakeProvider:
@@ -22,12 +23,24 @@ class FakeProvider:
         self.calls.append(("select", table))
         return [{"id": "1"}]
 
+    def query(self, table, columns="*", *, filters=(), order=(), limit=1000, offset=0):
+        self.calls.append(("query", table, tuple(filters), tuple(order)))
+        return [{"id": "q1"}]
+
     def count(self, table, filters=None):
         self.calls.append(("count", table))
         return 7
 
     def insert(self, table, row, *, return_repr=True):
         self.calls.append(("insert", table))
+        return [dict(row)] if return_repr else []
+
+    def upsert(self, table, row, *, conflict_columns, action, return_repr=True):
+        self.calls.append(("upsert", table, tuple(conflict_columns), action))
+        return [dict(row)] if return_repr else []
+
+    def insert_ignore_conflicts(self, table, row, *, return_repr=False):
+        self.calls.append(("insert_ignore_conflicts", table))
         return [dict(row)] if return_repr else []
 
     def update(self, table, match, values):
@@ -104,3 +117,43 @@ def test_empiredb_selection_fails_closed_until_provider_is_registered():
 def test_unknown_backend_selection_fails_closed():
     with pytest.raises(DataGatewayUnavailable, match="unsupported canonical"):
         gateway_from_environment({"EMPIRE_DATA_BACKEND": "mystery"})
+
+
+def test_gateway_exposes_neutral_query_and_conflict_semantics():
+    provider = FakeProvider()
+    gateway = CanonicalDataGateway(provider)
+
+    filters = (
+        DataFilter.eq("status", "scored"),
+        DataFilter.in_("tier", ("hot", "warm")),
+        DataFilter.is_null("entity_id"),
+    )
+    order = (OrderSpec("scored_at", descending=True),)
+
+    assert gateway.query(
+        "prospect_qualifications",
+        "prospect_id,scored_at",
+        filters=filters,
+        order=order,
+        limit=25,
+    ) == [{"id": "q1"}]
+
+    assert gateway.upsert(
+        "prospect_qualifications",
+        {"prospect_id": "p1", "scoring_engine": "e", "scoring_version": "v2"},
+        conflict_columns=("prospect_id", "scoring_engine", "scoring_version"),
+        action=ConflictAction.MERGE,
+    )[0]["prospect_id"] == "p1"
+
+    assert gateway.insert_ignore_conflicts(
+        "commercial_events",
+        {"idempotency_key": "k1"},
+    ) == []
+
+    assert provider.calls[-3][0] == "query"
+    assert provider.calls[-2][:3] == (
+        "upsert",
+        "prospect_qualifications",
+        ("prospect_id", "scoring_engine", "scoring_version"),
+    )
+    assert provider.calls[-1] == ("insert_ignore_conflicts", "commercial_events")

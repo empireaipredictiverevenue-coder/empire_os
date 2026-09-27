@@ -2,6 +2,7 @@ from empire_os.data_backends.supabase_legacy import (
     SupabaseLegacyConfig,
     SupabaseLegacyProvider,
 )
+from empire_os.data_query import ConflictAction, DataFilter, OrderSpec
 
 
 class Response:
@@ -92,3 +93,86 @@ def test_exact_count_uses_content_range():
 
     assert provider.count("prospects") == 42
     assert seen["prefer"] == "count=exact"
+
+
+def test_neutral_query_maps_to_postgrest_filters_and_order():
+    seen = {}
+
+    def urlopen(request, timeout):
+        seen["url"] = request.full_url
+        return Response(b'[{"prospect_id":"p1"}]')
+
+    provider = SupabaseLegacyProvider(
+        SupabaseLegacyConfig("https://example.supabase.co", "key"),
+        urlopen=urlopen,
+    )
+
+    rows = provider.query(
+        "prospect_qualifications",
+        "prospect_id,scored_at",
+        filters=(
+            DataFilter.eq("status", "scored"),
+            DataFilter.in_("tier", ("hot", "warm")),
+            DataFilter.is_null("entity_id"),
+        ),
+        order=(OrderSpec("scored_at", descending=True),),
+        limit=25,
+    )
+
+    assert rows == [{"prospect_id": "p1"}]
+    assert "status=eq.scored" in seen["url"]
+    assert "tier=in.%28hot%2Cwarm%29" in seen["url"]
+    assert "entity_id=is.null" in seen["url"]
+    assert "order=scored_at.desc" in seen["url"]
+
+
+def test_targeted_merge_upsert_uses_on_conflict_and_prefer():
+    seen = {}
+
+    def urlopen(request, timeout):
+        seen["url"] = request.full_url
+        seen["prefer"] = request.get_header("Prefer")
+        return Response(b'[{"prospect_id":"p1"}]')
+
+    provider = SupabaseLegacyProvider(
+        SupabaseLegacyConfig("https://example.supabase.co", "key"),
+        urlopen=urlopen,
+    )
+
+    rows = provider.upsert(
+        "prospect_qualifications",
+        {
+            "prospect_id": "p1",
+            "scoring_engine": "engine",
+            "scoring_version": "v2",
+        },
+        conflict_columns=("prospect_id", "scoring_engine", "scoring_version"),
+        action=ConflictAction.MERGE,
+        return_repr=True,
+    )
+
+    assert rows[0]["prospect_id"] == "p1"
+    assert "on_conflict=prospect_id%2Cscoring_engine%2Cscoring_version" in seen["url"]
+    assert seen["prefer"] == "resolution=merge-duplicates,return=representation"
+
+
+def test_untargeted_ignore_conflicts_has_no_on_conflict_target():
+    seen = {}
+
+    def urlopen(request, timeout):
+        seen["url"] = request.full_url
+        seen["prefer"] = request.get_header("Prefer")
+        return Response(b'')
+
+    provider = SupabaseLegacyProvider(
+        SupabaseLegacyConfig("https://example.supabase.co", "key"),
+        urlopen=urlopen,
+    )
+
+    assert provider.insert_ignore_conflicts(
+        "commercial_events",
+        {"idempotency_key": "k1"},
+    ) == ()
+
+    assert "on_conflict" not in seen["url"]
+    assert seen["prefer"] == "resolution=ignore-duplicates,return=minimal"
