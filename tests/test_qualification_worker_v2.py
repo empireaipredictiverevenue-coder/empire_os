@@ -1,6 +1,5 @@
+import inspect
 from uuid import uuid4
-import io
-import urllib.error
 
 import empire_os.qualification_worker_v2 as worker
 
@@ -18,203 +17,58 @@ def _prospect():
     }
 
 
-def _isolate_egress_state(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        worker,
-        "_EGRESS_STATE_PATH",
-        tmp_path / "supabase_egress_state.json",
-    )
-    monkeypatch.setattr(
-        worker,
-        "_EGRESS_LOCK_PATH",
-        tmp_path / "supabase_egress_state.lock",
-    )
+def test_worker_has_no_direct_vendor_transport():
+    source = inspect.getsource(worker)
+    assert "SUPABASE_URL" not in source
+    assert "SUPABASE_SERVICE_KEY" not in source
+    assert "/rest/v1/" not in source
+    assert "urllib." not in source
+    assert "request_json" not in source
 
 
-def test_egress_budget_opens_local_circuit_before_runaway(monkeypatch, tmp_path):
-    _isolate_egress_state(monkeypatch, tmp_path)
-    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR", "2")
-    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY", "10")
-    monkeypatch.setattr(worker, "_egress_now", lambda: 3600.0)
+def test_runtime_env_mapping_is_passed_to_gateway(monkeypatch):
+    seen = {}
+    fake_gateway = object()
+    fake_repository = object()
 
-    worker._reserve_supabase_request()
-    worker._reserve_supabase_request()
-
-    try:
-        worker._reserve_supabase_request()
-    except RuntimeError as exc:
-        assert "hourly_request_budget_exceeded" in str(exc)
-    else:
-        raise AssertionError("request budget should fail closed")
-
-    state = worker._load_egress_state(worker._EGRESS_STATE_PATH)
-    assert state["circuit"]["open"] is True
-    assert state["circuit"]["source"] == "local_request_budget"
-
-
-def test_component_request_budget_trips_before_global_budget(monkeypatch, tmp_path):
-    _isolate_egress_state(monkeypatch, tmp_path)
-    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR", "100")
-    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY", "1000")
-    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_COMPONENT_HOUR", "2")
-    monkeypatch.setenv("EMPIRE_COMPONENT", "noisy-worker")
-    monkeypatch.setattr(worker, "_egress_now", lambda: 7200.0)
-
-    worker._reserve_supabase_request()
-    worker._reserve_supabase_request()
-
-    try:
-        worker._reserve_supabase_request()
-    except RuntimeError as exc:
-        assert "component_hourly_request_budget_exceeded:noisy-worker" in str(exc)
-    else:
-        raise AssertionError("component request budget should fail closed")
-
-    state = worker._load_egress_state(worker._EGRESS_STATE_PATH)
-    assert state["counts"]["components"]["noisy-worker"]["hour_count"] == 2
-    assert state["circuit"]["open"] is True
-
-
-def test_egress_402_trips_circuit_and_blocks_repeat_calls(monkeypatch, tmp_path):
-    _isolate_egress_state(monkeypatch, tmp_path)
-    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR", "100")
-    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY", "1000")
-    monkeypatch.setenv("EMPIRE_SUPABASE_EGRESS_PROBE_SECONDS", "1800")
-    now = [7200.0]
-    monkeypatch.setattr(worker, "_egress_now", lambda: now[0])
-    monkeypatch.setattr(
-        worker,
-        "_client",
-        lambda: (
-            "https://example.supabase.co",
-            {
-                "apikey": "test",
-                "Authorization": "Bearer test",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-        ),
-    )
-
-    calls = []
-
-    def quota_error(req, timeout=30):
-        calls.append(req.full_url)
-        raise urllib.error.HTTPError(
-            req.full_url,
-            402,
-            "Payment Required",
-            hdrs=None,
-            fp=io.BytesIO(
-                b'{"message":"restricted due to the following violations: exceed_egress_quota"}'
-            ),
-        )
-
-    monkeypatch.setattr(worker.urllib.request, "urlopen", quota_error)
-
-    try:
-        worker.request_json("GET", "/rest/v1/prospects?limit=1")
-    except RuntimeError as exc:
-        assert "HTTP 402" in str(exc)
-    else:
-        raise AssertionError("402 must surface to the caller")
-
-    assert len(calls) == 1
-
-    try:
-        worker.request_json("GET", "/rest/v1/prospects?limit=1")
-    except RuntimeError as exc:
-        assert "egress circuit open locally" in str(exc)
-    else:
-        raise AssertionError("open circuit must block network retries")
-
-    assert len(calls) == 1
-
-
-def test_egress_circuit_self_heals_after_successful_probe(monkeypatch, tmp_path):
-    _isolate_egress_state(monkeypatch, tmp_path)
-    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_HOUR", "100")
-    monkeypatch.setenv("EMPIRE_SUPABASE_MAX_REQUESTS_PER_DAY", "1000")
-    monkeypatch.setenv("EMPIRE_SUPABASE_EGRESS_PROBE_SECONDS", "60")
-    now = [1000.0]
-    monkeypatch.setattr(worker, "_egress_now", lambda: now[0])
-    monkeypatch.setattr(
-        worker,
-        "_client",
-        lambda: (
-            "https://example.supabase.co",
-            {
-                "apikey": "test",
-                "Authorization": "Bearer test",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-        ),
-    )
-    worker._open_supabase_egress_circuit("exceed_egress_quota")
-
-    class Response:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
-            return False
-
-        def read(self):
-            return b'[]'
-
-    calls = []
-    monkeypatch.setattr(
-        worker.urllib.request,
-        "urlopen",
-        lambda req, timeout=30: (calls.append(req.full_url) or Response()),
-    )
-
-    try:
-        worker.request_json("GET", "/rest/v1/prospects?limit=1")
-    except RuntimeError as exc:
-        assert "egress circuit open locally" in str(exc)
-    else:
-        raise AssertionError("probe must wait until lease expires")
-
-    now[0] = 1061.0
-    try:
-        worker.request_json("GET", "/rest/v1/prospects?limit=1")
-    except RuntimeError as exc:
-        assert "probe reserved for dedicated egress guard" in str(exc)
-    else:
-        raise AssertionError("ordinary workers must never consume probe slots")
-
-    assert len(calls) == 0
-
-    assert worker.request_json(
-        "GET",
-        "/rest/v1/prospects?limit=1",
-        allow_egress_probe=True,
-    ) == []
-    assert len(calls) == 1
-
-    state = worker._load_egress_state(worker._EGRESS_STATE_PATH)
-    assert state["circuit"]["open"] is False
-    assert state["circuit"]["reason"] == "probe_succeeded"
-
-
-def test_client_identifies_empire_component(monkeypatch):
     monkeypatch.setattr(
         worker,
         "load_runtime_env",
-        lambda *_args, **_kwargs: {
-            "SUPABASE_URL": "https://example.supabase.co",
-            "SUPABASE_SERVICE_KEY": "service-key",
-        },
+        lambda path: {"EMPIRE_DATA_BACKEND": "supabase_legacy"},
     )
-    monkeypatch.setenv("EMPIRE_COMPONENT", "empire-gtm-pipeline")
 
-    base, headers = worker._client()
+    def gateway_factory(env):
+        seen["env"] = env
+        return fake_gateway
 
-    assert base == "https://example.supabase.co"
-    assert headers["User-Agent"] == "EmpireOS/empire-gtm-pipeline"
-    assert headers["X-Empire-Component"] == "empire-gtm-pipeline"
+    def repository_factory(gateway):
+        seen["gateway"] = gateway
+        return fake_repository
+
+    monkeypatch.setattr(worker, "gateway_from_environment", gateway_factory)
+    monkeypatch.setattr(worker, "QualificationDataRepository", repository_factory)
+
+    assert worker._qualification_repository() is fake_repository
+    assert seen["env"] == {"EMPIRE_DATA_BACKEND": "supabase_legacy"}
+    assert seen["gateway"] is fake_gateway
+
+
+def test_pending_prospects_delegate_scoring_identity(monkeypatch):
+    seen = {}
+
+    class Repo:
+        def fetch_pending_prospects(self, **kwargs):
+            seen.update(kwargs)
+            return [{"id": "p1"}]
+
+    monkeypatch.setattr(worker, "_qualification_repository", lambda: Repo())
+
+    assert worker.fetch_pending_prospects(7) == [{"id": "p1"}]
+    assert seen == {
+        "limit": 7,
+        "scoring_engine": worker.SCORING_ENGINE,
+        "scoring_version": worker.SCORING_VERSION,
+    }
 
 
 def test_evidence_backed_payload_uses_v2_and_preserves_provenance(monkeypatch):
@@ -308,11 +162,21 @@ def test_existing_identity_link_is_reused_without_writes(monkeypatch):
             "active": True,
         },
     )
+    monkeypatch.setattr(
+        worker,
+        "_insert_identity_entity",
+        lambda payload: (_ for _ in ()).throw(
+            AssertionError("no entity write should occur")
+        ),
+    )
+    monkeypatch.setattr(
+        worker,
+        "_insert_identity_link",
+        lambda payload: (_ for _ in ()).throw(
+            AssertionError("no link write should occur")
+        ),
+    )
 
-    def fail_request(*args, **kwargs):
-        raise AssertionError("no write should occur")
-
-    monkeypatch.setattr(worker, "request_json", fail_request)
     resolved = worker.resolve_identity(_prospect(), None, {})
     assert resolved == entity_id
 
@@ -351,14 +215,18 @@ def test_strict_singleton_identity_is_promoted_idempotently(monkeypatch):
         return None
 
     monkeypatch.setattr(worker, "fetch_active_identity_link", fake_fetch)
+    monkeypatch.setattr(
+        worker,
+        "_insert_identity_entity",
+        lambda payload: writes.append(("entity", payload)),
+    )
 
-    def fake_request(method, path, payload=None, prefer=None):
-        writes.append((method, path, payload, prefer))
-        if "prospect_entity_links" in path and method == "POST":
-            links.append(payload)
-        return None
+    def insert_link(payload):
+        writes.append(("link", payload))
+        links.append(payload)
 
-    monkeypatch.setattr(worker, "request_json", fake_request)
+    monkeypatch.setattr(worker, "_insert_identity_link", insert_link)
+
     resolved = worker.resolve_identity(
         prospect,
         {"source": "overpass_osm"},
@@ -367,11 +235,11 @@ def test_strict_singleton_identity_is_promoted_idempotently(monkeypatch):
 
     assert resolved == entity_id
     assert len(writes) == 2
-    assert "business_entities" in writes[0][1]
-    assert writes[0][2]["id"] == entity_id
-    assert "prospect_entity_links" in writes[1][1]
-    assert writes[1][2]["prospect_id"] == prospect["id"]
-    assert writes[1][2]["entity_id"] == entity_id
+    assert writes[0][0] == "entity"
+    assert writes[0][1]["id"] == entity_id
+    assert writes[1][0] == "link"
+    assert writes[1][1]["prospect_id"] == prospect["id"]
+    assert writes[1][1]["entity_id"] == entity_id
 
 
 def test_identity_plan_rejection_stays_unresolved(monkeypatch):
@@ -393,7 +261,7 @@ def test_identity_plan_rejection_stays_unresolved(monkeypatch):
     assert resolved is None
 
 
-def test_payload_binds_entity_when_identity_is_known(monkeypatch):
+def test_payload_binds_entity_when_identity_is_known():
     entity_id = str(uuid4())
     enrichment = {
         "fields": {},
@@ -409,36 +277,24 @@ def test_payload_binds_entity_when_identity_is_known(monkeypatch):
     assert payload["entity_id"] == entity_id
 
 
-def test_identity_catchup_skips_rows_already_attempted(monkeypatch):
+def test_identity_catchup_delegates_to_repository(monkeypatch):
     pending_id = str(uuid4())
-    attempted_id = str(uuid4())
+    seen = {}
 
-    def fake_request(method, path, payload=None, prefer=None):
-        if "prospect_qualifications" in path:
-            return [
-                {
-                    "prospect_id": attempted_id,
-                    "result_payload": {
-                        "identity_resolution": {"attempted": True}
-                    },
-                },
-                {
-                    "prospect_id": pending_id,
-                    "result_payload": {},
-                },
-            ]
-        if "/rest/v1/prospects?" in path:
-            return [
-                {
-                    **_prospect(),
-                    "id": pending_id,
-                }
-            ]
-        raise AssertionError(path)
+    class Repo:
+        def fetch_unlinked_allocatable_prospects(self, **kwargs):
+            seen.update(kwargs)
+            return [{**_prospect(), "id": pending_id}]
 
-    monkeypatch.setattr(worker, "request_json", fake_request)
+    monkeypatch.setattr(worker, "_qualification_repository", lambda: Repo())
     rows = worker.fetch_unlinked_allocatable_prospects(limit=5)
+
     assert [row["id"] for row in rows] == [pending_id]
+    assert seen == {
+        "limit": 5,
+        "scoring_engine": worker.SCORING_ENGINE,
+        "scoring_version": worker.SCORING_VERSION,
+    }
 
 
 def test_verified_enrichment_website_requires_accepted_guard_and_site():
@@ -478,7 +334,7 @@ def test_verified_website_never_overwrites_existing_canonical_site():
     assert worker.verified_enrichment_website(prospect, enrichment) == ""
 
 
-def test_promote_verified_website_patches_and_verifies(monkeypatch):
+def test_promote_verified_website_delegates_and_preserves_verification(monkeypatch):
     prospect = _prospect()
     website = "https://realroofing.example"
     enrichment = {
@@ -490,19 +346,60 @@ def test_promote_verified_website_patches_and_verifies(monkeypatch):
     }
     calls = []
 
-    def fake_request(method, path, payload=None, prefer=None):
-        calls.append((method, path, payload, prefer))
-        if method == "GET":
-            return [{"id": prospect["id"], "website": website}]
-        return None
+    class Repo:
+        def promote_verified_website(self, prospect_id, value):
+            calls.append((prospect_id, value))
+            return value
 
-    monkeypatch.setattr(worker, "request_json", fake_request)
+    monkeypatch.setattr(worker, "_qualification_repository", lambda: Repo())
+
     result = worker.promote_verified_website(prospect, enrichment)
+
     assert result == website
-    assert calls[0][0] == "PATCH"
-    assert calls[0][2] == {"website": website}
-    assert calls[0][3] == "return=minimal"
-    assert calls[1][0] == "GET"
+    assert calls == [(prospect["id"], website)]
+
+
+def test_qualification_upsert_delegates(monkeypatch):
+    payload = {
+        "prospect_id": "p1",
+        "scoring_engine": worker.SCORING_ENGINE,
+        "scoring_version": worker.SCORING_VERSION,
+    }
+
+    class Repo:
+        def upsert_qualification(self, value):
+            assert value is payload
+            return {**value, "id": "q1"}
+
+    monkeypatch.setattr(worker, "_qualification_repository", lambda: Repo())
+
+    assert worker.upsert_qualification(payload)["id"] == "q1"
+
+
+def test_emit_event_uses_idempotent_commercial_event_repository(monkeypatch):
+    seen = {}
+
+    class Events:
+        def append_idempotent(self, event):
+            seen.update(event)
+            return True
+
+    monkeypatch.setattr(worker, "_commercial_event_repository", lambda: Events())
+    monkeypatch.setattr(worker, "_now", lambda: "2026-09-27T12:00:00+00:00")
+
+    worker.emit_event(
+        prospect_id="p1",
+        qualification_id="q1",
+        payload={
+            "score": 90,
+            "tier": "hot",
+            "evidence_confidence": 0.9,
+        },
+    )
+
+    assert seen["event_type"] == "prospect_qualified_v2"
+    assert seen["idempotency_key"] == "prospect:p1:qualified:v2"
+    assert seen["payload"]["qualification_id"] == "q1"
 
 
 def test_recc_missing_stored_website_refreshes_from_member_page(monkeypatch):
