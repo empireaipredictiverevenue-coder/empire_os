@@ -177,12 +177,24 @@ def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
     )
 
     if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").lower()
+        if "permission denied" in detail:
+            failure = "PgBackRestPermissionDenied"
+        elif "cannot run as root" in detail:
+            failure = "PgBackRestUserContextRejected"
+        elif "no such file" in detail or "not found" in detail:
+            failure = "PgBackRestPathMissing"
+        elif "config" in detail and "error" in detail:
+            failure = "PgBackRestConfigError"
+        else:
+            failure = "PgBackRestInfoFailed"
         return {
             **config,
             "healthy": False,
             "backup_count": 0,
             "latest_label": None,
-            "error_class": "PgBackRestInfoFailed",
+            "error_class": failure,
+            "returncode": int(completed.returncode),
         }
 
     try:
