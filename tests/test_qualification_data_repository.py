@@ -207,3 +207,27 @@ def test_repository_snapshot_has_no_dual_write_or_fallback():
     snapshot = QualificationDataRepository(FakeGateway()).snapshot()
     assert snapshot["dual_write_enabled"] is False
     assert snapshot["write_fallback_enabled"] is False
+
+
+def test_exact_prospect_fetch_is_bounded_and_requires_single_row():
+    gateway = FakeGateway()
+    gateway.queue_query([_prospect("p1")])
+    repository = QualificationDataRepository(gateway)
+
+    row = repository.fetch_prospect("p1")
+
+    assert row["id"] == "p1"
+    query = gateway.queries[0]
+    assert query["table"] == "prospects"
+    assert query["limit"] == 2
+    assert any(
+        item.column == "id"
+        and item.operator is FilterOperator.EQ
+        and item.value == "p1"
+        for item in query["filters"]
+    )
+
+    gateway = FakeGateway()
+    gateway.queue_query([])
+    with pytest.raises(RuntimeError, match="not found or ambiguous"):
+        QualificationDataRepository(gateway).fetch_prospect("missing")
