@@ -17,7 +17,11 @@ import subprocess
 import time
 from typing import Any, Callable
 
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.data_backends.supabase_legacy import (
+    SupabaseLegacyConfig,
+    SupabaseLegacyProvider,
+)
+from empire_os.runtime_env import load_runtime_env
 
 
 STATUS_PATH = Path(
@@ -55,6 +59,34 @@ MANAGED_TIMERS = (
 
 
 Run = Callable[..., subprocess.CompletedProcess]
+ENV_PATH = "/etc/empire_os.env"
+
+
+def _probe_legacy_backend(
+    method: str,
+    path: str,
+    *,
+    allow_egress_probe: bool = False,
+) -> list[dict[str, Any]]:
+    if method != "GET":
+        raise ValueError("legacy egress probe must be GET")
+    if path != "/rest/v1/prospects?select=id&limit=1":
+        raise ValueError("unexpected legacy egress probe path")
+    if not allow_egress_probe:
+        raise ValueError("legacy egress probe slot must be explicit")
+
+    env = load_runtime_env(
+        ENV_PATH,
+        required=("SUPABASE_URL", "SUPABASE_SERVICE_KEY"),
+    )
+    provider = SupabaseLegacyProvider(
+        SupabaseLegacyConfig(
+            url=env["SUPABASE_URL"],
+            service_key=env["SUPABASE_SERVICE_KEY"],
+        )
+    )
+    provider.probe()
+    return []
 
 
 def _now() -> str:
@@ -152,7 +184,7 @@ def _existing_managed() -> list[str]:
 
 def run_guard(
     *,
-    request=request_json,
+    request=_probe_legacy_backend,
     run: Run = subprocess.run,
     sleep: Callable[[float], None] = time.sleep,
     stagger_seconds: float = 5.0,

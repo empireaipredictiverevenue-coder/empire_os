@@ -9,17 +9,35 @@ def _result(args, code=0, stdout=""):
 
 
 
+def _test_governor(tmp_path):
+    from empire_os.legacy_data_egress import (
+        LegacyDataEgressGovernor,
+        LegacyEgressConfig,
+    )
+
+    return LegacyDataEgressGovernor(
+        LegacyEgressConfig(
+            state_path=tmp_path / "state.json",
+            lock_path=tmp_path / "legacy_egress.lock",
+            hourly_budget=100,
+            component_hourly_budget=100,
+            daily_budget=1000,
+            probe_seconds=60,
+        ),
+        environ={"EMPIRE_COMPONENT": "test"},
+        now=lambda: 1000.0,
+    )
+
+
 def test_shared_egress_lock_does_not_chmod_existing_lock(
     monkeypatch,
     tmp_path,
 ):
-    """Regression: root-owned/world-writable lock must work for ubuntu worker."""
-    from empire_os import qualification_worker_v2 as worker
+    """Regression: existing shared lock must not require owner chmod."""
+    from empire_os import legacy_data_egress as egress
 
-    lock_path = tmp_path / "supabase_egress_state.lock"
-    lock_path.touch(mode=0o666)
-
-    monkeypatch.setattr(worker, "_EGRESS_LOCK_PATH", lock_path)
+    governor = _test_governor(tmp_path)
+    governor.lock_path.touch(mode=0o666)
 
     chmod_calls = []
 
@@ -27,26 +45,21 @@ def test_shared_egress_lock_does_not_chmod_existing_lock(
         chmod_calls.append((args, kwargs))
         raise PermissionError("simulated non-owner chmod")
 
-    monkeypatch.setattr(worker.os, "chmod", forbidden_chmod)
+    monkeypatch.setattr(egress.os, "chmod", forbidden_chmod)
 
-    result = worker._with_egress_lock(lambda: "LOCK_OK")
+    result = governor._with_lock(lambda: "LOCK_OK")
 
     assert result == "LOCK_OK"
     assert chmod_calls == []
 
 
-def test_shared_egress_lock_new_file_is_world_writable(
-    monkeypatch,
-    tmp_path,
-):
-    from empire_os import qualification_worker_v2 as worker
+def test_shared_egress_lock_new_file_is_world_writable(tmp_path):
+    governor = _test_governor(tmp_path)
 
-    lock_path = tmp_path / "new_supabase_egress_state.lock"
-    monkeypatch.setattr(worker, "_EGRESS_LOCK_PATH", lock_path)
+    assert governor._with_lock(lambda: "LOCK_OK") == "LOCK_OK"
+    assert governor.lock_path.exists()
+    assert (governor.lock_path.stat().st_mode & 0o777) == 0o666
 
-    assert worker._with_egress_lock(lambda: "LOCK_OK") == "LOCK_OK"
-    assert lock_path.exists()
-    assert (lock_path.stat().st_mode & 0o777) == 0o666
 
 def test_guard_contains_only_allowlisted_timers_on_egress_block(
     monkeypatch,

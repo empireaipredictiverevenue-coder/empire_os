@@ -9,10 +9,12 @@ from dataclasses import dataclass
 import json
 import re
 from typing import Any, Mapping, Sequence
+import urllib.error
 import urllib.parse
 import urllib.request
 
 from empire_os.data_cloud_contract import DataBackend
+from empire_os.legacy_data_egress import LegacyDataEgressGovernor
 from empire_os.data_query import ConflictAction, DataFilter, FilterOperator, OrderSpec
 
 
@@ -89,11 +91,13 @@ class SupabaseLegacyProvider:
         *,
         urlopen: Any = urllib.request.urlopen,
         aliases: Mapping[str, str] | None = None,
+        egress: LegacyDataEgressGovernor | None = None,
     ) -> None:
         config.validate()
         self._config = config
         self._urlopen = urlopen
         self._aliases = dict(aliases or {})
+        self._egress = egress or LegacyDataEgressGovernor.from_environment()
 
     def configured(self) -> bool:
         return bool(
@@ -121,6 +125,37 @@ class SupabaseLegacyProvider:
             f"{self._table(table)}{query}"
         )
 
+    def _open_request(
+        self,
+        request: urllib.request.Request,
+        *,
+        allow_probe: bool = False,
+    ) -> Any:
+        self._egress.reserve(allow_probe=allow_probe)
+        try:
+            response = self._urlopen(
+                request,
+                timeout=self._config.timeout_seconds,
+            )
+        except urllib.error.HTTPError as exc:
+            if exc.code == 402:
+                body = exc.read().decode("utf-8", errors="replace")
+                if self._egress.observe_http_error(exc.code, body):
+                    raise RuntimeError(
+                        "Legacy data request -> HTTP 402: " + body[:1000]
+                    ) from exc
+            raise
+        self._egress.success(recovery_probe=allow_probe)
+        return response
+
+    def probe(self) -> None:
+        req = urllib.request.Request(
+            self._url("prospects", "?select=id&limit=1"),
+            headers=self._headers(),
+        )
+        with self._open_request(req, allow_probe=True) as response:
+            response.read()
+
     def select(
         self,
         table: str,
@@ -141,7 +176,7 @@ class SupabaseLegacyProvider:
             self._url(table, query),
             headers=self._headers(),
         )
-        with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
+        with self._open_request(req) as response:
             return json.loads(response.read().decode("utf-8"))
 
     def query(
@@ -173,7 +208,7 @@ class SupabaseLegacyProvider:
             self._url(table, query),
             headers=self._headers(),
         )
-        with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
+        with self._open_request(req) as response:
             return json.loads(response.read().decode("utf-8"))
 
     def count(
@@ -189,7 +224,7 @@ class SupabaseLegacyProvider:
             self._url(table, query),
             headers=self._headers({"Prefer": "count=exact"}),
         )
-        with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
+        with self._open_request(req) as response:
             content_range = response.headers.get("Content-Range", "")
             if "/" not in content_range:
                 raise RuntimeError("exact count missing Content-Range")
@@ -212,7 +247,7 @@ class SupabaseLegacyProvider:
             headers=self._headers({"Prefer": prefer}),
             method="POST",
         )
-        with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
+        with self._open_request(req) as response:
             if not return_repr:
                 return ()
             return json.loads(response.read().decode("utf-8"))
@@ -250,7 +285,7 @@ class SupabaseLegacyProvider:
             }),
             method="POST",
         )
-        with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
+        with self._open_request(req) as response:
             if not return_repr:
                 return ()
             raw = response.read().decode("utf-8")
@@ -274,7 +309,7 @@ class SupabaseLegacyProvider:
             }),
             method="POST",
         )
-        with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
+        with self._open_request(req) as response:
             if not return_repr:
                 return ()
             raw = response.read().decode("utf-8")
@@ -295,7 +330,7 @@ class SupabaseLegacyProvider:
             headers=self._headers({"Prefer": "return=representation"}),
             method="PATCH",
         )
-        with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
+        with self._open_request(req) as response:
             return json.loads(response.read().decode("utf-8"))
 
     def delete(
@@ -311,7 +346,7 @@ class SupabaseLegacyProvider:
             headers=self._headers(),
             method="DELETE",
         )
-        self._urlopen(req, timeout=self._config.timeout_seconds).close()
+        self._open_request(req).close()
 
     def rpc(
         self,
@@ -324,6 +359,6 @@ class SupabaseLegacyProvider:
             headers=self._headers(),
             method="POST",
         )
-        with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
+        with self._open_request(req) as response:
             raw = response.read().decode("utf-8")
             return json.loads(raw) if raw else None

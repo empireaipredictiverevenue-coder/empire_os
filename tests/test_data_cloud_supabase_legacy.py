@@ -1,8 +1,30 @@
+import io
+import urllib.error
+
 from empire_os.data_backends.supabase_legacy import (
     SupabaseLegacyConfig,
     SupabaseLegacyProvider,
 )
 from empire_os.data_query import ConflictAction, DataFilter, OrderSpec
+from empire_os.legacy_data_egress import (
+    LegacyDataEgressGovernor,
+    LegacyEgressConfig,
+)
+
+
+class FakeEgress:
+    def __init__(self):
+        self.reserved = 0
+        self.successes = 0
+
+    def reserve(self, *, allow_probe=False):
+        self.reserved += 1
+
+    def success(self, *, recovery_probe=False):
+        self.successes += int(bool(recovery_probe))
+
+    def observe_http_error(self, code, body):
+        return False
 
 
 class Response:
@@ -48,6 +70,7 @@ def test_select_preserves_legacy_postgrest_semantics():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
         aliases={"si_outbox": "outbox_messages"},
     )
 
@@ -89,6 +112,7 @@ def test_exact_count_uses_content_range():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
     )
 
     assert provider.count("prospects") == 42
@@ -105,6 +129,7 @@ def test_neutral_query_maps_to_postgrest_filters_and_order():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
     )
 
     rows = provider.query(
@@ -137,6 +162,7 @@ def test_targeted_merge_upsert_uses_on_conflict_and_prefer():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
     )
 
     rows = provider.upsert(
@@ -167,6 +193,7 @@ def test_untargeted_ignore_conflicts_has_no_on_conflict_target():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
     )
 
     assert provider.insert_ignore_conflicts(
@@ -176,3 +203,57 @@ def test_untargeted_ignore_conflicts_has_no_on_conflict_target():
 
     assert "on_conflict" not in seen["url"]
     assert seen["prefer"] == "resolution=ignore-duplicates,return=minimal"
+
+
+def test_402_opens_shared_egress_circuit_and_blocks_repeat_calls(tmp_path):
+    now = [1000.0]
+    governor = LegacyDataEgressGovernor(
+        LegacyEgressConfig(
+            state_path=tmp_path / "state.json",
+            lock_path=tmp_path / "state.lock",
+            hourly_budget=100,
+            component_hourly_budget=100,
+            daily_budget=1000,
+            probe_seconds=60,
+        ),
+        environ={"EMPIRE_COMPONENT": "test"},
+        now=lambda: now[0],
+    )
+    calls = []
+
+    def urlopen(request, timeout):
+        calls.append(request.full_url)
+        raise urllib.error.HTTPError(
+            request.full_url,
+            402,
+            "Payment Required",
+            hdrs=None,
+            fp=io.BytesIO(
+                b'{"message":"restricted due to the following violations: exceed_egress_quota"}'
+            ),
+        )
+
+    provider = SupabaseLegacyProvider(
+        SupabaseLegacyConfig("https://example.supabase.co", "key"),
+        urlopen=urlopen,
+        egress=governor,
+    )
+
+    try:
+        provider.select("prospects", "id", limit=1)
+    except RuntimeError as exc:
+        assert "HTTP 402" in str(exc)
+    else:
+        raise AssertionError("402 must open the shared circuit")
+
+    assert governor.is_contained() is True
+    assert len(calls) == 1
+
+    try:
+        provider.select("prospects", "id", limit=1)
+    except RuntimeError as exc:
+        assert "Legacy data egress circuit open locally" in str(exc)
+    else:
+        raise AssertionError("open circuit must block repeat traffic")
+
+    assert len(calls) == 1
