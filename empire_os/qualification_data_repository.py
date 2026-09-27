@@ -33,6 +33,22 @@ class QualificationDataRepository:
     def __init__(self, gateway: CanonicalDataGateway) -> None:
         self._gateway = gateway
 
+    def fetch_prospect(
+        self,
+        prospect_id: str,
+    ) -> dict[str, Any]:
+        rows = self._gateway.query(
+            "prospects",
+            PROSPECT_COLUMNS,
+            filters=(DataFilter.eq("id", str(prospect_id)),),
+            limit=2,
+        )
+        if len(rows) != 1:
+            raise RuntimeError(
+                f"prospect not found or ambiguous: {prospect_id}"
+            )
+        return dict(rows[0])
+
     def fetch_pending_prospects(
         self,
         *,
