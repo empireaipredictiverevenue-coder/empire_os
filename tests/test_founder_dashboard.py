@@ -2199,3 +2199,64 @@ def test_dashboard_exposes_live_opportunity_funnel_and_blockers(tmp_path):
     )
     assert radar["automatic_external_execution_allowed"] is False
     assert radar["execution_authority"] == "none"
+
+
+
+def test_dashboard_exposes_empire_data_cloud_health(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/data_cloud/health_latest.json",
+        {
+            "schema_version": "empire.data-cloud-runtime-health.v1",
+            "observed_at": "2026-09-27T22:30:00+00:00",
+            "read_only": True,
+            "canonical_backend": "supabase_legacy",
+            "canonical_backend_source": "default_supabase_legacy",
+            "empiredb_candidate_only": True,
+            "candidate_runtime_healthy": True,
+            "operational_cutover_ready": False,
+            "postgres_service": {
+                "unit": "postgresql@18-main",
+                "active": True,
+                "state": "active",
+            },
+            "pgbouncer_service": {
+                "unit": "pgbouncer",
+                "active": True,
+                "state": "active",
+            },
+            "empiredb_direct": {
+                "healthy": True,
+                "database": "empiredb",
+                "in_recovery": False,
+                "prospects_visible": 32899,
+            },
+            "empiredb_via_pgbouncer": {
+                "healthy": True,
+                "database": "empiredb",
+                "in_recovery": False,
+                "prospects_visible": 32899,
+            },
+            "backup": {
+                "healthy": True,
+                "encrypted": True,
+                "off_node_repository_verified": False,
+            },
+            "archive_mode_on": False,
+            "pitr_verified": False,
+            "ha_replica_verified": False,
+            "open_gates": ["off_node_backup", "wal_pitr"],
+            "production_cutover_authority": False,
+        },
+    )
+
+    data_cloud = build_founder_dashboard(root)["data_cloud"]
+
+    assert data_cloud["available"] is True
+    assert data_cloud["canonical_backend"] == "supabase_legacy"
+    assert data_cloud["candidate_runtime_healthy"] is True
+    assert data_cloud["operational_cutover_ready"] is False
+    assert data_cloud["backup"]["encrypted"] is True
+    assert data_cloud["pitr_verified"] is False
+    assert data_cloud["production_cutover_authority"] is False
+    assert data_cloud["execution_authority"] == "none"
