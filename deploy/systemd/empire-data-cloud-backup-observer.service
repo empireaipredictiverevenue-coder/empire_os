@@ -9,6 +9,7 @@ User=postgres
 Group=postgres
 RuntimeDirectory=empire-data-cloud
 RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
 UMask=0027
 ExecStart=/bin/sh -ec '/usr/bin/pgbackrest --config=/etc/pgbackrest/empiredb.conf --stanza=empiredb --log-level-file=off --output=json info > /run/empire-data-cloud/pgbackrest.json.tmp && /bin/mv /run/empire-data-cloud/pgbackrest.json.tmp /run/empire-data-cloud/pgbackrest.json'
 NoNewPrivileges=true
