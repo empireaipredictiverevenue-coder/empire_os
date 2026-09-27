@@ -13,7 +13,7 @@ from typing import Any, Callable, Mapping
 import urllib.parse
 
 from empire_os.buyer_deferred_enrichment import CALL_READY_PATH
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 from empire_os.vonage_call_transport import VonageCallConfig, VonageCallTransport
 
 
