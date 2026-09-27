@@ -314,3 +314,10 @@ def test_containment_repair_allowlist_repairs_only_local_recovery(
     assert by_unit[
         "empire-buyer-acquisition-team.timer"
     ]["repair"]["decision"] == "CONTAINMENT_DEFERRED"
+
+
+
+def test_buyer_local_recovery_service_is_auto_repairable():
+    assert runtime_self_heal.unit_is_auto_repairable(
+        "empire-buyer-acquisition-local-recovery.service"
+    )
