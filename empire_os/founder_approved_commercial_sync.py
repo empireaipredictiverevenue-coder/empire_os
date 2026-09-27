@@ -11,7 +11,7 @@ from typing import Any, Callable, Mapping
 
 from empire_os.phase4_exchange_mrr_products import EXCHANGE_MRR_PRODUCTS
 from empire_os.predictive_revenue_products import PREDICTIVE_REVENUE_PRODUCTS
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 
 Request = Callable[..., Any]
