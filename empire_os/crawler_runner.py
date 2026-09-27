@@ -1,7 +1,7 @@
 """Empire OS v3 — canonical lead-source crawler.
 
 Runs registered REAL lead sources and materializes each LeadCandidate into
-the canonical Supabase prospect inventory.
+the canonical prospect inventory.
 
 Canonical path:
     LeadCandidate
@@ -13,7 +13,7 @@ Canonical path:
 NO FALLBACK:
   - /v1/leads/direct is not used for canonical identity;
   - lane_leads is not written by this crawler;
-  - if canonical Supabase ingest is unavailable, the candidate fails closed.
+  - if canonical ingest is unavailable, the candidate fails closed.
 
 Designed for autonomous execution or one-off CLI runs.
 """
@@ -31,6 +31,7 @@ from empire_os.candidate_quality import (
     assess_candidate,
     enforce_candidate_quality,
 )
+from empire_os.crawler_data_repository import CrawlerProspectRepository
 from empire_os.lead_sources import list_sources, _import_sources
 from empire_os.prospect_ingest import (
     lookup_existing_prospect,
@@ -52,46 +53,6 @@ LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 MAX_RUN_SEC = int(os.environ.get("CRAWLER_TIMEOUT", "1800"))
 
 
-def _bootstrap_runtime_env() -> None:
-    """Load canonical worker credentials for one-off CLI runs.
-
-    Exported shell variables win. The canonical host env is tried first, then
-    the protected outbound worker env used by other production services.
-    Nothing is printed or persisted.
-    """
-    required = ("SUPABASE_URL", "SUPABASE_SERVICE_KEY")
-    if all(os.environ.get(key) for key in required):
-        return
-
-    candidates = [
-        Path(os.environ.get("EMPIRE_ENV_PATH", "/etc/empire_os.env")),
-        Path("/srv/empire_os/runtime/secrets/outbound.env"),
-    ]
-    merged: dict[str, str] = {
-        key: value
-        for key, value in os.environ.items()
-        if value not in (None, "")
-    }
-    for path in candidates:
-        try:
-            loaded = load_runtime_env(path)
-        except Exception:
-            continue
-        for key, value in loaded.items():
-            if value and key not in merged:
-                merged[key] = value
-        if all(merged.get(key) for key in required):
-            break
-
-    for key in required:
-        value = merged.get(key)
-        if value and not os.environ.get(key):
-            os.environ[key] = value
-
-
-_bootstrap_runtime_env()
-
-
 def _die_on_hang(signum, frame):
     log("FATAL", f"crawler exceeded {MAX_RUN_SEC}s global timeout")
     sys.exit(124)
@@ -109,29 +70,27 @@ def log(level, msg, **fields):
     print(json.dumps(event))
 
 
-def _canonical_reader(path: str, params: dict[str, str]):
-    # Lazy import avoids making crawler module import depend on live bus config.
-    from empire_os.autonomous_execution_bus import _rest_json
-    return _rest_json("GET", path, params=params)
-
-
-def _canonical_writer(payload: dict):
-    # The writer calls the migration-003 ingest_prospect_atomic RPC.
-    from empire_os.autonomous_execution_bus import _write_canonical_prospect
-    return _write_canonical_prospect(payload)
-
-
-def ingest_candidate(candidate, *, reader=None, writer=None) -> dict:
+def ingest_candidate(
+    candidate,
+    *,
+    reader=None,
+    writer=None,
+    repository=None,
+) -> dict:
     """Run one candidate through conservative canonical acquisition."""
-    reader = reader or _canonical_reader
-    writer = writer or _canonical_writer
-
     quality = enforce_candidate_quality(candidate)
     prepared = prepare_candidate(candidate)
     prepared.setdefault("evidence", {})["quality"] = quality.to_evidence()
 
-    lookup = lookup_existing_prospect(prepared, reader)
-    return materialize_prospect(prepared, lookup, writer)
+    if reader is not None or writer is not None:
+        if reader is None or writer is None:
+            raise ValueError("reader and writer must be provided together")
+        lookup = lookup_existing_prospect(prepared, reader)
+        return materialize_prospect(prepared, lookup, writer)
+
+    store = repository or CrawlerProspectRepository.from_environment()
+    lookup = store.lookup_existing(prepared)
+    return materialize_prospect(prepared, lookup, store.ingest_atomic)
 
 
 def _required_env_available(src) -> bool:
@@ -354,7 +313,7 @@ def main():
         dry_run=args.dry_run,
         source=args.source,
         max_candidates=args.max_candidates,
-        canonical_store="supabase",
+        canonical_store="canonical_data_gateway",
         timeout_s=MAX_RUN_SEC,
     )
 
