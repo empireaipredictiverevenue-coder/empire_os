@@ -24,7 +24,7 @@ from empire_os.department_identity_adapter import (
 from empire_os.predictive_intelligence import (
     refresh_predictive_intelligence,
 )
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 
 SAFE_COMMANDS = {
