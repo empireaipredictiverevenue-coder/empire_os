@@ -33,6 +33,10 @@ EXCLUDED_PARTS = {
     ".git", ".venv", "__pycache__", "node_modules", "tests", "docs",
     "migrations", "recovery", "toop", "runtime",
 }
+DEDICATED_ROLE_RPCS = {
+    "auto_approve_voice_intent": "empire_outbound_approver",
+}
+
 CLASSIFIED_EXCEPTIONS = {
     "empire_os/activate_idle_leads.py",
     "empire_os/astra_preflight.py",
@@ -101,7 +105,8 @@ def main() -> int:
     mapped_rpcs = set(_RPC_PARAMS)
 
     missing_tables = sorted(tables - existing_tables)
-    unmapped_rpcs = sorted(rpcs - mapped_rpcs)
+    dedicated_rpcs = set(DEDICATED_ROLE_RPCS)
+    unmapped_rpcs = sorted(rpcs - mapped_rpcs - dedicated_rpcs)
 
     report = {
         "schema_version": "empire.cutover-compatibility.v1",
@@ -111,6 +116,10 @@ def main() -> int:
         "compatibility_rpcs_referenced": len(rpcs),
         "missing_empiredb_tables": missing_tables,
         "missing_empiredb_table_count": len(missing_tables),
+        "dedicated_role_rpcs": {
+            name: DEDICATED_ROLE_RPCS[name]
+            for name in sorted(rpcs & dedicated_rpcs)
+        },
         "unmapped_empiredb_rpcs": unmapped_rpcs,
         "unmapped_empiredb_rpc_count": len(unmapped_rpcs),
         "verified": not missing_tables and not unmapped_rpcs,
