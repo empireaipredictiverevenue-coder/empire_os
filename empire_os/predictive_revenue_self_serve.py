@@ -12,7 +12,7 @@ import re
 from typing import Any, Callable, Mapping
 
 from empire_os.predictive_revenue_products import predictive_revenue_product
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 
 Request = Callable[..., Any]
