@@ -37,9 +37,10 @@ def select(
     limit: int = 1000,
     offset: int = 0,
 ) -> list:
-    if not _configured():
+    gateway = _gateway()
+    if not gateway.configured:
         return []
-    return _gateway().select(
+    return gateway.select(
         _table(table),
         columns,
         filters,
@@ -54,9 +55,10 @@ def insert(
     row: dict,
     return_repr: bool = True,
 ) -> list:
-    if not _configured():
+    gateway = _gateway()
+    if not gateway.configured:
         return []
-    return _gateway().insert(
+    return gateway.insert(
         _table(table),
         row,
         return_repr=return_repr,
@@ -68,9 +70,10 @@ def update(
     match: dict,
     values: dict,
 ) -> list:
-    if not _configured():
+    gateway = _gateway()
+    if not gateway.configured:
         return []
-    return _gateway().update(
+    return gateway.update(
         _table(table),
         match,
         values,
@@ -81,9 +84,10 @@ def delete(
     table: str,
     match: dict,
 ) -> None:
-    if not _configured():
+    gateway = _gateway()
+    if not gateway.configured:
         return None
-    _gateway().delete(_table(table), match)
+    gateway.delete(_table(table), match)
     return None
 
 
@@ -91,6 +95,7 @@ def rpc(
     name: str,
     params: dict | None = None,
 ) -> object:
-    if not _configured():
+    gateway = _gateway()
+    if not gateway.configured:
         return None
-    return _gateway().rpc(name, params)
+    return gateway.rpc(name, params)
