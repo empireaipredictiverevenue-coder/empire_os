@@ -476,6 +476,7 @@ class EmpireDbShadowTarget:
         primary_key: str,
         keys: Sequence[object],
         columns: Sequence[str],
+        primary_key_type: str,
     ) -> list[dict[str, Any]]:
         if not keys:
             return []
@@ -493,8 +494,17 @@ class EmpireDbShadowTarget:
             sql.Identifier(primary_key),
             sql.Identifier(primary_key),
         )
+        typed_keys: list[object]
+        if primary_key_type == "uuid":
+            typed_keys = [
+                value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+                for value in keys
+            ]
+        else:
+            typed_keys = list(keys)
+
         with self._connect() as connection:
-            cursor = connection.execute(statement, (list(keys),))
+            cursor = connection.execute(statement, (typed_keys,))
             names = [item.name for item in cursor.description or ()]
             return [
                 dict(zip(names, row, strict=True))
@@ -594,6 +604,7 @@ def copy_table(
             item.primary_key,
             keys,
             source_columns,
+            column_types[item.primary_key],
         )
         expected = sorted(batch, key=lambda row: str(row[item.primary_key]))
         actual = sorted(echoed, key=lambda row: str(row[item.primary_key]))
