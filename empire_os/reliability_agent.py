@@ -67,10 +67,10 @@ class ReliabilityObservation:
     recovery_heartbeat_exists: bool
     recovery_heartbeat_age_seconds: float | None
     recovery_heartbeat_state: str | None
-    founder_console_service_state: str
-    founder_console_http_ok: bool
-    founder_console_port_pid: int | None
-    founder_console_orphan_verified: bool
+    founder_console_service_state: str = "unknown"
+    founder_console_http_ok: bool = False
+    founder_console_port_pid: int | None = None
+    founder_console_orphan_verified: bool = False
 
 
 @dataclass(frozen=True)
@@ -182,6 +182,9 @@ def observe(
     repo_root: str | Path = ROOT,
     *,
     now: datetime | None = None,
+    founder_console_observer: Callable[..., Any] = (
+        observe_founder_console
+    ),
 ) -> ReliabilityObservation:
     root = Path(repo_root).resolve()
     current = (now or _now()).astimezone(timezone.utc)
@@ -192,7 +195,7 @@ def observe(
     snapshot_path = root / RECOVERY_SEED_SNAPSHOT
     heartbeat_path = root / RECOVERY_HEARTBEAT
     heartbeat = _load_json(heartbeat_path)
-    founder_console = observe_founder_console()
+    founder_console = founder_console_observer()
 
     return ReliabilityObservation(
         observed_at=_iso(current),
@@ -303,11 +306,12 @@ def _execute_action(
     refresh_snapshot: Callable[..., Mapping[str, Any]],
     local_recovery: Callable[..., Mapping[str, Any]],
     clear_console_orphan: Callable[..., Mapping[str, Any]],
+    founder_console_observer: Callable[..., Any],
     contained: bool,
 ) -> dict[str, Any]:
     try:
         if action.action == "CLEAR_FOUNDER_CONSOLE_ORPHAN":
-            fresh = observe_founder_console()
+            fresh = founder_console_observer()
             result = dict(clear_console_orphan(fresh))
             result["fresh_service_state"] = fresh.service_state
             result["fresh_port_pid"] = fresh.port_pid
@@ -410,10 +414,17 @@ def run_cycle(
     clear_console_orphan: Callable[..., Mapping[str, Any]] = (
         clear_verified_orphan
     ),
+    founder_console_observer: Callable[..., Any] = (
+        observe_founder_console
+    ),
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     current = (now or _now()).astimezone(timezone.utc)
-    before = observe(root, now=current)
+    before = observe(
+        root,
+        now=current,
+        founder_console_observer=founder_console_observer,
+    )
     actions = plan_actions(before)
 
     state_path = root / STATE_PATH.relative_to(ROOT)
@@ -444,6 +455,7 @@ def run_cycle(
             refresh_snapshot=refresh_snapshot,
             local_recovery=local_recovery,
             clear_console_orphan=clear_console_orphan,
+            founder_console_observer=founder_console_observer,
             contained=before.supabase_egress_contained,
         )
         verified = _action_verified(row)
@@ -458,7 +470,10 @@ def run_cycle(
 
     _atomic_json(state_path, state)
 
-    after = observe(root)
+    after = observe(
+        root,
+        founder_console_observer=founder_console_observer,
+    )
     verified_count = sum(
         row.get("verified") is True
         for row in executed
