@@ -310,3 +310,64 @@ def test_self_heal_action_ignores_expected_containment_deferred_repairs():
     }
 
     assert reliability._action_verified(row) is True
+
+
+
+def test_reliability_agent_records_data_cloud_health_without_credentials(
+    tmp_path,
+):
+    root = Path(tmp_path)
+    guard = root / "runtime/control/supabase_egress_guard.json"
+    guard.parent.mkdir(parents=True)
+    guard.write_text(
+        '{"state":"healthy","contained":false}',
+        encoding="utf-8",
+    )
+
+    from empire_os.buyer_recovery import write_local_recovery_snapshot
+    write_local_recovery_snapshot(
+        root,
+        [{
+            "id": "p1",
+            "business_name": "Roof Co",
+            "website": "https://roof.example",
+            "seed_opportunity_key": "market:roofing:london",
+        }],
+    )
+
+    data_cloud = {
+        "schema_version": "empire.data-cloud-runtime-health.v1",
+        "observed_at": NOW.isoformat(),
+        "read_only": True,
+        "canonical_backend": "supabase_legacy",
+        "candidate_runtime_healthy": True,
+        "operational_cutover_ready": False,
+        "production_cutover_authority": False,
+        "open_gates": ["off_node_backup", "wal_pitr"],
+    }
+
+    result = reliability.run_cycle(
+        root,
+        now=NOW,
+        self_heal=lambda **_kwargs: {
+            "status": "HEALTHY",
+            "execution_authority": "bounded_internal_repair",
+        },
+        refresh_snapshot=lambda *_args, **_kwargs: {
+            "ok": True,
+            "state": "PRESERVED_LAST_KNOWN_GOOD",
+            "database_write_performed": False,
+            "outbound_sent": False,
+            "execution_authority": "none",
+        },
+        local_recovery=lambda *_args, **_kwargs: {},
+        founder_console_observer=_healthy_founder_console,
+        data_cloud_observer=lambda: data_cloud,
+    )
+
+    recorded = json.loads(
+        (root / "runtime/data_cloud/health_latest.json").read_text()
+    )
+    assert result["data_cloud"]["candidate_runtime_healthy"] is True
+    assert recorded["canonical_backend"] == "supabase_legacy"
+    assert recorded["production_cutover_authority"] is False
