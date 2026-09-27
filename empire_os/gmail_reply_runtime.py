@@ -12,7 +12,7 @@ from urllib.parse import quote
 
 from empire_os.gmail_reply_adapter import ingest_gmail_reply
 from empire_os.outbound_role_transport import SupabaseOutboundRpc
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 Request = Callable[..., Any]
 
