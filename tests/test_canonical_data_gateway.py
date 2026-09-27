@@ -39,8 +39,17 @@ class FakeProvider:
         self.calls.append(("upsert", table, tuple(conflict_columns), action))
         return [dict(row)] if return_repr else []
 
-    def insert_ignore_conflicts(self, table, row, *, return_repr=False):
-        self.calls.append(("insert_ignore_conflicts", table))
+    def insert_ignore_conflicts(
+        self,
+        table,
+        row,
+        *,
+        conflict_columns=(),
+        return_repr=False,
+    ):
+        self.calls.append(
+            ("insert_ignore_conflicts", table, tuple(conflict_columns))
+        )
         return [dict(row)] if return_repr else []
 
     def update(self, table, match, values):
@@ -150,10 +159,25 @@ def test_gateway_exposes_neutral_query_and_conflict_semantics():
         {"idempotency_key": "k1"},
     ) == []
 
+    assert gateway.insert_ignore_conflicts(
+        "business_entities",
+        {"id": "e1"},
+        conflict_columns=("id",),
+    ) == []
+
     assert provider.calls[-3][0] == "query"
     assert provider.calls[-2][:3] == (
         "upsert",
         "prospect_qualifications",
         ("prospect_id", "scoring_engine", "scoring_version"),
     )
-    assert provider.calls[-1] == ("insert_ignore_conflicts", "commercial_events")
+    assert provider.calls[-2] == (
+        "insert_ignore_conflicts",
+        "commercial_events",
+        (),
+    )
+    assert provider.calls[-1] == (
+        "insert_ignore_conflicts",
+        "business_entities",
+        ("id",),
+    )
