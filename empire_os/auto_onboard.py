@@ -24,7 +24,7 @@ TIER_RATES = {
 }
 DEFAULT_TIER = "silver"
 
-# ── Direct lane seating (local DB, no Supabase dependency) ────────────
+# ── Direct lane seating (local DB, no cloud dependency) ──────────────
 _SUBS = {}  # populated on first call
 
 
