@@ -18,7 +18,7 @@ import urllib.parse
 import requests
 
 from empire_os.lead_sources.permits import URL as NYC_PERMIT_URL
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 from empire_os.prospect_ingest import match_existing_prospect
 
 
