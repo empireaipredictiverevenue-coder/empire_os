@@ -26,6 +26,17 @@ def build_readiness_snapshot(
     findings = discover_vendor_dependencies(root)
     marker_counts = Counter(row.marker for row in findings)
     file_counts = Counter(row.path for row in findings)
+    classification_counts = Counter(row.classification for row in findings)
+    runtime_classes = {
+        "production_runtime",
+        "application_runtime",
+        "runtime_integration",
+    }
+    runtime_findings = [
+        row for row in findings if row.classification in runtime_classes
+    ]
+    runtime_file_counts = Counter(row.path for row in runtime_findings)
+    requires_review_count = classification_counts.get("requires_review", 0)
 
     return {
         "schema_version": "empire.data-cloud-readiness.v1",
@@ -35,10 +46,24 @@ def build_readiness_snapshot(
             "finding_count": len(findings),
             "file_count": len(file_counts),
             "marker_counts": dict(sorted(marker_counts.items())),
+            "classification_counts": dict(sorted(classification_counts.items())),
+            "runtime_finding_count": len(runtime_findings),
+            "runtime_file_count": len(runtime_file_counts),
+            "requires_review_count": requires_review_count,
+            "runtime_scan_clear": (
+                len(runtime_findings) == 0 and requires_review_count == 0
+            ),
             "top_files": [
                 {"path": path, "finding_count": count}
                 for path, count in sorted(
                     file_counts.items(),
+                    key=lambda item: (-item[1], item[0]),
+                )[:25]
+            ],
+            "runtime_top_files": [
+                {"path": path, "finding_count": count}
+                for path, count in sorted(
+                    runtime_file_counts.items(),
                     key=lambda item: (-item[1], item[0]),
                 )[:25]
             ],
