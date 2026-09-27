@@ -94,3 +94,22 @@ def test_failed_health_is_bounded_and_does_not_leak_dsn():
     assert "secret" not in str(result)
     assert result["authority"]["production_cutover"] is False
     assert fake.closed is True
+
+
+def test_raw_connection_is_not_public_adapter_api():
+    connector = PostgresConnector(
+        PostgresConnectionConfig(dsn="postgresql://private/empire"),
+        connect_factory=lambda **_: FakeConnection(),
+    )
+    assert not hasattr(connector, "connect")
+
+
+def test_failed_session_initialization_closes_connection():
+    fake = FakeConnection(fail=True)
+    connector = PostgresConnector(
+        PostgresConnectionConfig(dsn="postgresql://private/empire"),
+        connect_factory=lambda **_: fake,
+    )
+    result = connector.health()
+    assert result["healthy"] is False
+    assert fake.closed is True
