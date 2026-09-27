@@ -16,8 +16,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from empire_os.data_cloud_runtime_health import collect_data_cloud_health
+
 SOCKET_PATH = Path("/run/empire-ops/privileged.sock")
-ALLOWED_ACTIONS = frozenset({"service_status", "service_restart", "service_start"})
+ALLOWED_ACTIONS = frozenset({"service_status", "service_restart", "service_start", "data_cloud_health"})
+DATA_CLOUD_RESOURCE = "empire-data-cloud"
 ALLOWED_UNITS = frozenset({
     "empire-public-gateway.service",
     "empire-self-serve-checkout.service",
@@ -89,6 +92,10 @@ def validate_request(payload: Mapping[str, Any]) -> HelperRequest:
         raise PrivilegedHelperPolicyError("valid request_id required")
     if action not in ALLOWED_ACTIONS:
         raise PrivilegedHelperPolicyError("action not allowlisted")
+    if action == "data_cloud_health":
+        if unit != DATA_CLOUD_RESOURCE:
+            raise PrivilegedHelperPolicyError("invalid data cloud resource")
+        return HelperRequest(request_id=request_id, action=action, unit=unit)
     if unit not in ALLOWED_UNITS:
         raise PrivilegedHelperPolicyError("unit not allowlisted")
     if action == "service_start" and unit not in START_ONLY_UNITS:
@@ -115,8 +122,18 @@ def execute_request(
     payload: Mapping[str, Any],
     *,
     runner: Callable[..., Any] = subprocess.run,
+    data_cloud_probe: Callable[..., Mapping[str, Any]] = collect_data_cloud_health,
 ) -> dict[str, Any]:
     request = validate_request(payload)
+    if request.action == "data_cloud_health":
+        health = dict(data_cloud_probe(runner=runner))
+        return {
+            "request_id": request.request_id,
+            "action": request.action,
+            "unit": request.unit,
+            "ok": health.get("candidate_runtime_healthy") is True,
+            "health": health,
+        }
     argv = _systemctl_argv(request)
     completed = runner(
         argv,
