@@ -282,10 +282,11 @@ class RestShadowSource:
         url = f"{self.api_url}/{urllib.parse.quote(table)}?{encoded}"
         headers = {
             "apikey": self.api_key,
-            "Authorization": f"Bearer {self.api_key}",
             "Accept": "application/json",
             "User-Agent": "empire-shadow-copy/1",
         }
+        if self.api_key.count(".") == 2:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         if extra_headers:
             headers.update(extra_headers)
         request = urllib.request.Request(url, headers=headers, method="GET")
