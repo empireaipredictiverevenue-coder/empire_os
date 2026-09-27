@@ -81,16 +81,18 @@ def test_pgbackrest_probe_uses_postgres_owned_observer(
 ):
     snapshot = tmp_path / "pgbackrest.json"
     snapshot.write_text(
-        """{
-          "healthy": true,
-          "backup_count": 1,
-          "latest_label": "20260927-202202F",
-          "repo_type": "posix",
-          "repo_path": "/var/backups/empiredb/pgbackrest",
-          "cipher_type": "aes-256-cbc",
-          "encrypted": true,
-          "off_node_repository_verified": false
-        }""",
+        '[{"status":{"code":0},"backup":'
+        '[{"label":"20260927-202202F"}]}]',
+        encoding="utf-8",
+    )
+    config = tmp_path / "empiredb.conf"
+    config.write_text(
+        "[empiredb]\n"
+        "pg1-path=/var/lib/postgresql/18/main\n"
+        "[global]\n"
+        "repo1-type=posix\n"
+        "repo1-path=/var/backups/empiredb/pgbackrest\n"
+        "repo1-cipher-type=aes-256-cbc\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(
@@ -98,6 +100,7 @@ def test_pgbackrest_probe_uses_postgres_owned_observer(
         "PGBACKREST_OBSERVER_SNAPSHOT",
         snapshot,
     )
+    monkeypatch.setattr(health, "PGBACKREST_CONFIG", config)
 
     calls = []
 
@@ -118,6 +121,7 @@ def test_pgbackrest_probe_uses_postgres_owned_observer(
     ]]
     assert result["healthy"] is True
     assert result["backup_count"] == 1
+    assert result["latest_label"] == "20260927-202202F"
     assert result["encrypted"] is True
     assert result["off_node_repository_verified"] is False
 
