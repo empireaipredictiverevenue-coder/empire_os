@@ -23,7 +23,8 @@ BEGIN
     'empire_conversation_ingest',
     'empire_conversation_reader',
     'empire_revenue_exchange_ingest',
-    'empire_revenue_exchange_reader'
+    'empire_revenue_exchange_reader',
+    'empiredb_tenant_reader'
   ] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r) THEN
       EXECUTE format('CREATE ROLE %I NOLOGIN NOINHERIT', r);
@@ -47,7 +48,8 @@ GRANT USAGE ON SCHEMA public TO
   empire_conversation_ingest,
   empire_conversation_reader,
   empire_revenue_exchange_ingest,
-  empire_revenue_exchange_reader;
+  empire_revenue_exchange_reader,
+  empiredb_tenant_reader;
 SQL
 
 echo '{"runtime_capability_roles":"ready","verified":true}'
