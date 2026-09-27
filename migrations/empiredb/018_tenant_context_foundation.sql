@@ -19,10 +19,7 @@ BEGIN
 END
 $$;
 
-CREATE SCHEMA IF NOT EXISTS empire;
-REVOKE CREATE ON SCHEMA empire FROM PUBLIC;
-
-CREATE TABLE IF NOT EXISTS empire.tenant_role_bindings (
+CREATE TABLE IF NOT EXISTS public.empire_tenant_role_bindings (
   role_name name PRIMARY KEY,
   tenant_id uuid NOT NULL,
   active boolean NOT NULL DEFAULT true,
@@ -31,27 +28,26 @@ CREATE TABLE IF NOT EXISTS empire.tenant_role_bindings (
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 
-REVOKE ALL ON TABLE empire.tenant_role_bindings FROM PUBLIC;
-REVOKE ALL ON TABLE empire.tenant_role_bindings
+REVOKE ALL ON TABLE public.empire_tenant_role_bindings FROM PUBLIC;
+REVOKE ALL ON TABLE public.empire_tenant_role_bindings
   FROM empiredb_app, empiredb_readonly, empiredb_tenant_reader;
 
-CREATE OR REPLACE FUNCTION empire.current_tenant_id()
+CREATE OR REPLACE FUNCTION public.empire_current_tenant_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = pg_catalog, empire
+SET search_path = pg_catalog, public
 AS $$
   SELECT b.tenant_id
-  FROM empire.tenant_role_bindings AS b
+  FROM public.empire_tenant_role_bindings AS b
   WHERE b.role_name = current_user
     AND b.active
   LIMIT 1
 $$;
 
-REVOKE ALL ON FUNCTION empire.current_tenant_id() FROM PUBLIC;
-GRANT USAGE ON SCHEMA empire TO empiredb_tenant_reader;
-GRANT EXECUTE ON FUNCTION empire.current_tenant_id()
+REVOKE ALL ON FUNCTION public.empire_current_tenant_id() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.empire_current_tenant_id()
   TO empiredb_tenant_reader;
 
 GRANT SELECT ON
@@ -75,8 +71,8 @@ FOR SELECT
 TO empiredb_tenant_reader
 USING (
   org_id IS NOT NULL
-  AND empire.current_tenant_id() IS NOT NULL
-  AND org_id = empire.current_tenant_id()
+  AND public.empire_current_tenant_id() IS NOT NULL
+  AND org_id = public.empire_current_tenant_id()
 );
 
 DROP POLICY IF EXISTS buyer_subscriptions_tenant_reader_select
@@ -91,8 +87,8 @@ USING (
     FROM public.buyers b
     WHERE b.id = buyer_subscriptions.buyer_id
       AND b.org_id IS NOT NULL
-      AND empire.current_tenant_id() IS NOT NULL
-      AND b.org_id = empire.current_tenant_id()
+      AND public.empire_current_tenant_id() IS NOT NULL
+      AND b.org_id = public.empire_current_tenant_id()
   )
 );
 
@@ -109,8 +105,8 @@ USING (
     FROM public.buyers b
     WHERE b.id = fulfilment_orders.buyer_id
       AND b.org_id IS NOT NULL
-      AND empire.current_tenant_id() IS NOT NULL
-      AND b.org_id = empire.current_tenant_id()
+      AND public.empire_current_tenant_id() IS NOT NULL
+      AND b.org_id = public.empire_current_tenant_id()
   )
 );
 
@@ -127,8 +123,8 @@ USING (
     FROM public.buyers b
     WHERE b.id = commercial_events.buyer_id
       AND b.org_id IS NOT NULL
-      AND empire.current_tenant_id() IS NOT NULL
-      AND b.org_id = empire.current_tenant_id()
+      AND public.empire_current_tenant_id() IS NOT NULL
+      AND b.org_id = public.empire_current_tenant_id()
   )
 );
 
@@ -145,14 +141,14 @@ USING (
     FROM public.buyers b
     WHERE b.id = commercial_evidence_registry.buyer_id
       AND b.org_id IS NOT NULL
-      AND empire.current_tenant_id() IS NOT NULL
-      AND b.org_id = empire.current_tenant_id()
+      AND public.empire_current_tenant_id() IS NOT NULL
+      AND b.org_id = public.empire_current_tenant_id()
   )
 );
 
-COMMENT ON TABLE empire.tenant_role_bindings IS
+COMMENT ON TABLE public.empire_tenant_role_bindings IS
   'Trusted DB-role-to-tenant mapping. Tenant reader cannot mutate this table.';
-COMMENT ON FUNCTION empire.current_tenant_id() IS
+COMMENT ON FUNCTION public.empire_current_tenant_id() IS
   'Tenant identity resolved from current PostgreSQL role; caller payload/GUC is ignored.';
 
 RESET ROLE;
