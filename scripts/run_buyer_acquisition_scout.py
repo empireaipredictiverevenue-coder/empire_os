@@ -161,6 +161,62 @@ RECOVERY_SEED_SNAPSHOT = Path(
 )
 
 
+def _write_local_opportunity_seed_snapshot(
+    repo_root: str | Path,
+    rows: list[dict],
+    *,
+    source: str = "canonical_rest_refresh",
+) -> Path | None:
+    """Atomically refresh the last-known-good local opportunity seed snapshot.
+
+    Empty input never replaces an existing snapshot. This preserves the last
+    usable recovery set when hosted Supabase becomes unavailable.
+    """
+    valid: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for raw in rows[:50]:
+        if not isinstance(raw, dict):
+            continue
+        row = dict(raw)
+        prospect_id = str(row.get("id") or "").strip()
+        website = str(row.get("website") or "").strip()
+        opportunity_key = str(
+            row.get("seed_opportunity_key") or ""
+        ).strip()
+        if not prospect_id or not website or not opportunity_key:
+            continue
+        key = (prospect_id, opportunity_key)
+        if key in seen:
+            continue
+        seen.add(key)
+        row.pop("database_write_performed", None)
+        row.pop("outbound_authorized", None)
+        valid.append(row)
+
+    if not valid:
+        return None
+
+    root = Path(repo_root).resolve()
+    path = root / RECOVERY_SEED_SNAPSHOT
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "empire.opportunity_seed_recovery.v1",
+        "mode": "OBSERVE",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source": source,
+        "database_write_performed": False,
+        "outbound_authorized": False,
+        "seeds": valid,
+    }
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+    return path
+
+
 def _local_opportunity_seed_records(
     repo_root: str | Path,
 ) -> list[dict]:
@@ -336,6 +392,19 @@ def main() -> int:
         per_target=6,
         diagnostics=opportunity_seed_diagnostics,
     )
+    seed_query_has_errors = any(
+        row.get("state") == "ERROR"
+        for row in opportunity_seed_diagnostics
+    )
+    recovery_snapshot_refreshed = False
+    if opportunity_seeds and not seed_query_has_errors:
+        recovery_snapshot_refreshed = bool(
+            _write_local_opportunity_seed_snapshot(
+                args.repo_root,
+                opportunity_seeds,
+            )
+        )
+
     local_recovery_seeds = _local_opportunity_seed_records(
         args.repo_root
     )
@@ -372,6 +441,7 @@ def main() -> int:
         ),
         "opportunity_seed_count": len(opportunity_seeds),
         "local_recovery_seed_count": len(local_recovery_seeds),
+        "recovery_snapshot_refreshed": recovery_snapshot_refreshed,
         "opportunity_seed_query_error_count": sum(
             row.get("state") == "ERROR"
             for row in opportunity_seed_diagnostics
