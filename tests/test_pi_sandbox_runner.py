@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from empire_os.pi_sandbox_runner import (
+    DATA_CLOUD_CLOSEOUT_BRANCH,
     PiSandboxJob,
     build_pi_systemd_command,
 )
@@ -159,3 +160,25 @@ def test_pi_observe_command_removes_mutation_tools(tmp_path):
     assert argv[tools_index + 1] == "read,grep,find,ls"
     assert f"ReadOnlyPaths={clone}" in joined
     assert f"ReadWritePaths={clone}" not in joined
+
+
+
+def test_pi_accepts_governed_data_cloud_closeout_branch():
+    job = PiSandboxJob(
+        job_id="data-cloud-closeout",
+        prompt="Implement bounded closeout work.",
+        allowed_paths=("empire_os/example.py",),
+        base_branch=DATA_CLOUD_CLOSEOUT_BRANCH,
+    )
+    job.validate()
+    assert job.base_branch == DATA_CLOUD_CLOSEOUT_BRANCH
+
+
+def test_pi_rejects_arbitrary_base_branch():
+    with pytest.raises(Exception, match="allowlist"):
+        PiSandboxJob(
+            job_id="bad-branch",
+            prompt="x",
+            allowed_paths=("empire_os/example.py",),
+            base_branch="main",
+        ).validate()
