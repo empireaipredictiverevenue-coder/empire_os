@@ -1,7 +1,8 @@
 """Rollback-only cross-tenant isolation canary for EmpireDB.
 
-Requires migration 018 and EMPIREDB_MIGRATOR_DSN. Test rows exist only inside
-one transaction and are always rolled back.
+Tenant identity is derived from empire.tenant_role_bindings for current_user.
+The tenant reader has no authority to change its own binding. Canary rows and
+temporary bindings exist only inside one transaction and are always rolled back.
 """
 from __future__ import annotations
 
@@ -32,6 +33,30 @@ def _ids(connection, table: str, ids: tuple[uuid.UUID, uuid.UUID]) -> set[str]:
     return {str(row[0]) for row in rows}
 
 
+def _bind_reader(connection, tenant_id: uuid.UUID | None) -> None:
+    if tenant_id is None:
+        connection.execute(
+            "DELETE FROM empire.tenant_role_bindings "
+            "WHERE role_name='empiredb_tenant_reader'"
+        )
+        return
+    connection.execute(
+        """
+        INSERT INTO empire.tenant_role_bindings(
+            role_name, tenant_id, active, evidence_ref
+        )
+        VALUES ('empiredb_tenant_reader', %s, true, 'rollback-canary')
+        ON CONFLICT (role_name)
+        DO UPDATE SET
+            tenant_id=EXCLUDED.tenant_id,
+            active=true,
+            evidence_ref=EXCLUDED.evidence_ref,
+            updated_at=clock_timestamp()
+        """,
+        (tenant_id,),
+    )
+
+
 def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
     org_a = uuid.uuid4()
     org_b = uuid.uuid4()
@@ -41,7 +66,9 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
     event_b = uuid.uuid4()
 
     report: dict[str, Any] = {
-        "schema_version": "empire.data-cloud-tenant-isolation-canary.v1",
+        "schema_version": "empire.data-cloud-tenant-isolation-canary.v2",
+        "identity_source": "trusted_db_role_binding",
+        "caller_tenant_guc_trusted": False,
         "rollback_only": True,
         "production_cutover_authority": False,
     }
@@ -81,12 +108,8 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
             (event_a, buyer_a, event_b, buyer_b),
         )
 
+        _bind_reader(connection, org_a)
         connection.execute("SET ROLE empiredb_tenant_reader")
-
-        connection.execute(
-            "SELECT set_config('empire.tenant_id', %s, true)",
-            (str(org_a),),
-        )
         _require(
             _ids(connection, "buyers", (buyer_a, buyer_b)) == {str(buyer_a)},
             "tenant A could not be isolated on buyers",
@@ -97,10 +120,30 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
             "tenant A could not be isolated on commercial_events",
         )
 
-        connection.execute(
-            "SELECT set_config('empire.tenant_id', %s, true)",
-            (str(org_b),),
+        binding_write_denied = False
+        connection.execute("SAVEPOINT tenant_binding_write_check")
+        try:
+            connection.execute(
+                """
+                UPDATE empire.tenant_role_bindings
+                SET tenant_id=%s
+                WHERE role_name='empiredb_tenant_reader'
+                """,
+                (org_b,),
+            )
+        except psycopg.errors.InsufficientPrivilege:
+            binding_write_denied = True
+            connection.execute(
+                "ROLLBACK TO SAVEPOINT tenant_binding_write_check"
+            )
+        _require(
+            binding_write_denied,
+            "tenant reader can change its own trusted tenant binding",
         )
+
+        connection.execute("RESET ROLE")
+        _bind_reader(connection, org_b)
+        connection.execute("SET ROLE empiredb_tenant_reader")
         _require(
             _ids(connection, "buyers", (buyer_a, buyer_b)) == {str(buyer_b)},
             "tenant B could not be isolated on buyers",
@@ -111,23 +154,19 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
             "tenant B could not be isolated on commercial_events",
         )
 
-        connection.execute(
-            "SELECT set_config('empire.tenant_id', '', true)"
-        )
+        connection.execute("RESET ROLE")
+        _bind_reader(connection, None)
+        connection.execute("SET ROLE empiredb_tenant_reader")
         _require(
             not _ids(connection, "buyers", (buyer_a, buyer_b)),
-            "missing tenant context did not fail closed",
+            "missing trusted tenant binding did not fail closed",
         )
         _require(
             not _ids(connection, "commercial_events", (event_a, event_b)),
-            "missing tenant context exposed linked events",
+            "missing trusted tenant binding exposed linked events",
         )
 
         write_denied = False
-        connection.execute(
-            "SELECT set_config('empire.tenant_id', %s, true)",
-            (str(org_a),),
-        )
         connection.execute("SAVEPOINT tenant_write_check")
         try:
             connection.execute(
@@ -142,16 +181,14 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
         except psycopg.errors.InsufficientPrivilege:
             write_denied = True
             connection.execute("ROLLBACK TO SAVEPOINT tenant_write_check")
-        except Exception:
-            raise
-
         _require(write_denied, "tenant reader unexpectedly has INSERT authority")
 
         report.update({
             "tenant_a_isolated": True,
             "tenant_b_isolated": True,
             "linked_surface_isolated": True,
-            "missing_context_fails_closed": True,
+            "missing_binding_fails_closed": True,
+            "binding_mutation_denied": True,
             "tenant_write_denied": True,
             "verified": True,
         })
