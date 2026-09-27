@@ -60,3 +60,33 @@ def test_marker_matching_is_case_insensitive_and_one_finding_per_line(tmp_path: 
 
     assert len(rows) == 1
     assert rows[0].marker == "SUPABASE_URL"
+
+
+def test_approved_vendor_boundaries_are_not_business_runtime_coupling(tmp_path: Path):
+    (tmp_path / "empire_os" / "data_backends").mkdir(parents=True)
+    (tmp_path / "scripts").mkdir()
+
+    (tmp_path / "empire_os" / "canonical_data_gateway.py").write_text(
+        "SUPABASE_URL",
+        encoding="utf-8",
+    )
+    (tmp_path / "empire_os" / "data_backends" / "supabase_legacy.py").write_text(
+        "supabase.co",
+        encoding="utf-8",
+    )
+    (tmp_path / "empire_os" / "supabase_egress_guard.py").write_text(
+        "Supabase",
+        encoding="utf-8",
+    )
+    (tmp_path / "scripts" / "run_supabase_egress_guard.py").write_text(
+        "Supabase",
+        encoding="utf-8",
+    )
+
+    rows = discover_vendor_dependencies(tmp_path)
+    by_path = {row.path: row.classification for row in rows}
+
+    assert by_path["empire_os/canonical_data_gateway.py"] == "canonical_gateway"
+    assert by_path["empire_os/data_backends/supabase_legacy.py"] == "legacy_adapter"
+    assert by_path["empire_os/supabase_egress_guard.py"] == "migration_containment"
+    assert by_path["scripts/run_supabase_egress_guard.py"] == "migration_containment"
