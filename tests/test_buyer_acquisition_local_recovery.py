@@ -122,3 +122,20 @@ def test_local_recovery_systemd_unit_is_local_only():
     assert "build_buyer_scout_promotion_plan.py" not in service
     assert "ReadWritePaths=/srv/empire_os/runtime" in service
     assert "OnUnitInactiveSec=15min" in timer
+
+
+
+def test_local_recovery_status_heartbeat_is_atomic(tmp_path):
+    payload = {
+        "ok": True,
+        "state": "LOCAL_RECOVERY_EXECUTED",
+        "database_write_performed": False,
+        "outbound_sent": False,
+        "execution_authority": "none",
+    }
+
+    path = recovery._write_status(tmp_path, payload)
+
+    assert path.exists()
+    assert json.loads(path.read_text()) == payload
+    assert not path.with_suffix(".json.tmp").exists()
