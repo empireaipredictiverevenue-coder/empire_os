@@ -130,3 +130,21 @@ def test_registry_has_canonical_reliability_agent():
     assert agent.repair_policy == "agentic_observe_plan_act_verify"
     assert "runtime_self_heal" in agent.dependencies
     assert "buyer_acquisition_scout" in agent.dependencies
+
+
+def test_registry_has_empire_data_cloud_fail_closed():
+    by_name = {spec.name: spec for spec in default_registry()}
+    cloud = by_name["empire_data_cloud"]
+    assert cloud.authority == "observe"
+    assert cloud.repair_policy == "verify_before_canonical_promotion"
+    assert "agent_tool_execution_plane" in cloud.dependencies
+    assert "empire_reliability_agent" in cloud.dependencies
+
+
+def test_data_cloud_readiness_routes_without_write_authority():
+    routes = route_event({
+        "event_type": "data_cloud_readiness_requested",
+        "commercial_priority": 90,
+    })
+    by_name = {row["component"]: row for row in routes}
+    assert by_name["empire_data_cloud"]["authority"] == "observe"
