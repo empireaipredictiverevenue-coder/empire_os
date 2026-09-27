@@ -23,8 +23,8 @@ from empire_os.data_cloud_shadow_copy import SHADOW_TABLES, ShadowTable, validat
 
 
 _COPY_HEADER = re.compile(
-    rb'^COPY (?:"?public"?\\.)"?(?P<table>[A-Za-z_][A-Za-z0-9_]*)"? '
-    rb'\\((?P<columns>[^)]*)\\) FROM stdin;\\r?\\n$'
+    rb'^COPY (?:"?public"?[.])"?(?P<table>[A-Za-z_][A-Za-z0-9_]*)"? '
+    rb'[(](?P<columns>[^)]*)[)] FROM stdin;\r?\n$'
 )
 _COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
