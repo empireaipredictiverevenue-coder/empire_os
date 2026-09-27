@@ -184,18 +184,33 @@ class ExecutionBusDataRepository:
         )
         return dict(rows[0]) if rows else None
 
-    def insert_gtm_job(
+    def ensure_gtm_job(
         self,
         row: dict[str, Any],
-    ) -> dict[str, Any]:
-        rows = self._gateway.insert(
-            "gtm_jobs",
-            row,
-            return_repr=True,
-        )
+    ) -> tuple[dict[str, Any], bool]:
+        idempotency_key = str(row.get("idempotency_key") or "").strip()
+        if not idempotency_key:
+            raise ValueError("gtm job idempotency_key is required")
+
+        existing = self.find_gtm_job(idempotency_key)
+        if existing is not None:
+            return existing, False
+
+        try:
+            rows = self._gateway.insert(
+                "gtm_jobs",
+                row,
+                return_repr=True,
+            )
+        except Exception:
+            existing = self.find_gtm_job(idempotency_key)
+            if existing is not None:
+                return existing, False
+            raise
+
         if not rows:
             raise RuntimeError("gtm job insert returned no row")
-        return dict(rows[0])
+        return dict(rows[0]), True
 
     def prospect_by_id(
         self,
