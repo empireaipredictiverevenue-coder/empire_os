@@ -13,10 +13,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
-import urllib.parse
 
 from empire_os.buyer_discovery import looks_like_person_name
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.gtm_standing_bridge_repository import (
+    CanonicalStandingBridgeRepository,
+    RequestStandingBridgeRepository,
+    StandingBridgeRepository,
+)
 
 
 Request = Callable[..., Any]
@@ -55,41 +58,17 @@ class StandingBridgeResult:
         }
 
 
-def _pending_reviews(
-    request: Request,
-    *,
-    limit: int,
-) -> list[dict[str, Any]]:
-    bounded = max(1, min(int(limit), 50))
-    params = urllib.parse.urlencode({
-        "select": "id,status,offer_key,proposed_at,evidence",
-        "status": "eq.pending",
-        "offer_key": "eq.managed_service",
-        "order": "proposed_at.asc",
-        "limit": bounded,
-    })
-    rows = request(
-        "GET",
-        f"/rest/v1/buyer_candidate_reviews?{params}",
-    ) or []
-    return [row for row in rows if isinstance(row, dict)]
-
-
-def _approved_for_outbound(
-    request: Request,
-    *,
-    limit: int,
-) -> list[dict[str, Any]]:
-    value = request(
-        "POST",
-        "/rest/v1/rpc/list_buyer_reviews_for_outbound",
-        payload={"p_limit": max(1, min(int(limit), 50))},
-    ) or []
-    if isinstance(value, Mapping):
-        value = value.get("result") or value.get("reviews") or []
-    return [row for row in value if isinstance(row, dict)]
-
-
+def _resolve_repository(
+    request: Request | None,
+    repository: StandingBridgeRepository | None,
+) -> StandingBridgeRepository:
+    if request is not None and repository is not None:
+        raise ValueError("provide request or repository, not both")
+    if repository is not None:
+        return repository
+    if request is not None:
+        return RequestStandingBridgeRepository(request)
+    return CanonicalStandingBridgeRepository.from_environment()
 
 def _is_company_routed(review: Mapping[str, Any]) -> bool:
     evidence = review.get("evidence")
@@ -172,8 +151,9 @@ def _message(review: Mapping[str, Any]) -> tuple[str, str]:
 
 
 def run_standing_bridge(
-    request: Request = request_json,
+    request: Request | None = None,
     *,
+    repository: StandingBridgeRepository | None = None,
     review_limit: int = 20,
     outbound_limit: int = 20,
     daily_cap: int = 25,
@@ -182,8 +162,9 @@ def run_standing_bridge(
     cap = max(1, min(int(daily_cap), 50))
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     expires_at = (current + timedelta(hours=24)).isoformat()
+    store = _resolve_repository(request, repository)
 
-    pending = _pending_reviews(request, limit=review_limit)
+    pending = store.pending_reviews(limit=review_limit)
     auto_reviewed = 0
     skipped_company_routed_pending = 0
     review_errors: list[str] = []
@@ -196,13 +177,9 @@ def run_standing_bridge(
         if not review_id:
             continue
         try:
-            result = request(
-                "POST",
-                "/rest/v1/rpc/auto_review_buyer_candidate",
-                payload={
-                    "p_review_id": review_id,
-                    "p_daily_cap": cap,
-                },
+            result = store.auto_review(
+                review_id,
+                daily_cap=cap,
             )
             if (
                 isinstance(result, Mapping)
@@ -214,8 +191,7 @@ def run_standing_bridge(
                 f"{review_id}:{type(exc).__name__}:{str(exc)[:180]}"
             )
 
-    ready = _approved_for_outbound(
-        request,
+    ready = store.approved_for_outbound(
         limit=outbound_limit,
     )
     outbound_proposed = 0
@@ -247,10 +223,7 @@ def run_standing_bridge(
 
         subject, body = _message(review)
         try:
-            result = request(
-                "POST",
-                "/rest/v1/rpc/propose_reviewed_outbound_intent",
-                payload={
+            result = store.propose_outbound_intent({
                     "p_review_id": review_id,
                     "p_subject": subject,
                     "p_body_text": body,
@@ -265,8 +238,7 @@ def run_standing_bridge(
                         "copy_variant": COPY_VARIANT,
                         "automatic_send": False,
                     },
-                },
-            )
+                })
             if (
                 isinstance(result, Mapping)
                 and result.get("intent_id")
