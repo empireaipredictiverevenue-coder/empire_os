@@ -7,7 +7,12 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from empire_os.ops_privileged_helper import ALLOWED_ACTIONS, ALLOWED_UNITS, SOCKET_PATH
+from empire_os.ops_privileged_helper import (
+    ALLOWED_ACTIONS,
+    ALLOWED_UNITS,
+    DATA_CLOUD_RESOURCE,
+    SOCKET_PATH,
+)
 
 
 class PrivilegedHelperUnavailable(RuntimeError):
@@ -25,7 +30,10 @@ def privileged_request(
     unit = str(unit or "").strip()
     if action not in ALLOWED_ACTIONS:
         raise ValueError("action not allowlisted")
-    if unit not in ALLOWED_UNITS:
+    if action == "data_cloud_health":
+        if unit != DATA_CLOUD_RESOURCE:
+            raise ValueError("invalid data cloud resource")
+    elif unit not in ALLOWED_UNITS:
         raise ValueError("unit not allowlisted")
     payload = {
         "request_id": uuid.uuid4().hex,
