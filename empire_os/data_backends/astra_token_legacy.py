@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -145,3 +145,40 @@ class LegacyAstraTokenBackend:
             raise OutcomeTransportError(
                 "token-authenticated Astra RPC returned invalid JSON"
             ) from exc
+
+
+
+def legacy_astra_backend_from_environment(
+    environ: Mapping[str, str],
+    *,
+    opener: Callable[..., Any] | None = None,
+) -> LegacyAstraTokenBackend | None:
+    """Build the migration backend from generic or legacy env names."""
+
+    url = str(
+        environ.get("EMPIRE_ASTRA_LEGACY_URL")
+        or environ.get("EMPIRE_ASTRA_SUPABASE_URL")
+        or ""
+    ).strip()
+    key = str(
+        environ.get("EMPIRE_ASTRA_LEGACY_PUBLISHABLE_KEY")
+        or environ.get("EMPIRE_ASTRA_SUPABASE_PUBLISHABLE_KEY")
+        or ""
+    ).strip()
+    token_file = str(
+        environ.get("EMPIRE_ASTRA_OBSERVER_TOKEN_FILE")
+        or ""
+    ).strip()
+
+    if not (url or key or token_file):
+        return None
+    if not (url and key and token_file):
+        raise OutcomeTransportError(
+            "incomplete token-authenticated Astra RPC config"
+        )
+    return LegacyAstraTokenBackend(
+        url,
+        key,
+        token_file,
+        opener=opener,
+    )
