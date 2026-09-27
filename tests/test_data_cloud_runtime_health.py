@@ -7,7 +7,7 @@ import empire_os.data_cloud_runtime_health as health
 def _runner(argv, **_kwargs):
     if argv[:2] == ["systemctl", "is-active"]:
         return SimpleNamespace(returncode=0, stdout="active\n", stderr="")
-    if argv[:4] == ["runuser", "-u", "postgres", "--"]:
+    if argv and argv[0] == "pgbackrest":
         return SimpleNamespace(
             returncode=0,
             stdout=(
@@ -103,6 +103,7 @@ def test_pgbackrest_probe_uses_dedicated_config(monkeypatch, tmp_path):
 
     result = health._pgbackrest_probe(runner=runner)
 
+    assert calls[0][0] == "pgbackrest"
     assert f"--config={config}" in calls[0]
     assert "--stanza=empiredb" in calls[0]
     assert "--log-level-file=off" in calls[0]
