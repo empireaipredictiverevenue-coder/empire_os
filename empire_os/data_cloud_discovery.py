@@ -14,10 +14,11 @@ SKIP_PARTS = {
     ".git", ".venv", "node_modules", "runtime", "recovery", "toop",
 }
 VENDOR_MARKERS = (
-    "supabase",
-    "SUPABASE_URL",
     "SUPABASE_SERVICE_KEY",
+    "SUPABASE_URL",
     "canonical_supabase",
+    "supabase.co",
+    "supabase",
 )
 
 
@@ -26,7 +27,7 @@ class DependencyFinding:
     path: str
     marker: str
     line_number: int
-    classification: str = "requires_review"
+    classification: str
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -36,6 +37,35 @@ def _eligible(path: Path) -> bool:
     return path.is_file() and path.suffix in TEXT_SUFFIXES and not any(
         part in SKIP_PARTS for part in path.parts
     )
+
+
+def _classification_for_path(relative: str) -> str:
+    if relative.startswith("tests/"):
+        return "test_reference"
+    if relative.startswith("docs/"):
+        return "documentation"
+    if relative in {
+        "empire_os/data_cloud_discovery.py",
+        "empire_os/data_cloud_readiness.py",
+    }:
+        return "migration_tooling"
+    if relative.endswith((".env.example", ".env.sample")):
+        return "configuration_template"
+    if relative.startswith(("deploy/", "scripts/")):
+        return "runtime_integration"
+    if relative.startswith("apps/"):
+        return "application_runtime"
+    if relative.startswith("empire_os/"):
+        return "production_runtime"
+    return "requires_review"
+
+
+def _first_marker(line: str, markers: tuple[str, ...]) -> str | None:
+    lowered = line.lower()
+    for marker in sorted(markers, key=len, reverse=True):
+        if marker.lower() in lowered:
+            return marker
+    return None
 
 
 def discover_vendor_dependencies(
@@ -57,14 +87,17 @@ def discover_vendor_dependencies(
         except (OSError, UnicodeDecodeError):
             continue
         relative = path.relative_to(root).as_posix()
+        classification = _classification_for_path(relative)
         for line_number, line in enumerate(text.splitlines(), start=1):
-            for marker in marker_tuple:
-                if marker in line:
-                    findings.append(
-                        DependencyFinding(
-                            path=relative,
-                            marker=marker,
-                            line_number=line_number,
-                        )
-                    )
+            marker = _first_marker(line, marker_tuple)
+            if marker is None:
+                continue
+            findings.append(
+                DependencyFinding(
+                    path=relative,
+                    marker=marker,
+                    line_number=line_number,
+                    classification=classification,
+                )
+            )
     return tuple(findings)
