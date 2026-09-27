@@ -343,3 +343,12 @@ def test_mapped_rpc_rejects_parameter_shape_drift():
             "get_commercial_product_readiness",
             {"wrong_key": "managed_service"},
         )
+
+
+def test_cutover_safe_rpc_is_mapped_but_voice_auto_approval_is_not():
+    from empire_os.data_backends.empiredb import _RPC_PARAMS
+
+    assert "propose_call_ready_voice_intent" in _RPC_PARAMS
+    assert "ingest_prospect_atomic" in _RPC_PARAMS
+    assert "register_commercial_product_identity" in _RPC_PARAMS
+    assert "auto_approve_voice_intent" not in _RPC_PARAMS
