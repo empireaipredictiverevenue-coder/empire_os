@@ -4,6 +4,7 @@ from empire_os.data_backends.postgres import (
     PostgresConnectionConfig,
     PostgresConnector,
 )
+from empire_os.data_values import JsonValue
 
 
 class FakeResult:
@@ -113,3 +114,22 @@ def test_failed_session_initialization_closes_connection():
     result = connector.health()
     assert result["healthy"] is False
     assert fake.closed is True
+
+
+def test_connector_adapts_dict_and_explicit_json_but_not_sql_array(monkeypatch):
+    connector = PostgresConnector(
+        PostgresConnectionConfig(dsn="postgresql://private/empire"),
+        connect_factory=lambda **_: FakeConnection(),
+    )
+    monkeypatch.setattr(
+        connector,
+        "_jsonb",
+        lambda value: ("jsonb", value),
+    )
+
+    assert connector.adapt_value({"a": 1}) == ("jsonb", {"a": 1})
+    assert connector.adapt_value(JsonValue(["a", "b"])) == (
+        "jsonb",
+        ["a", "b"],
+    )
+    assert connector.adapt_value(["a", "b"]) == ["a", "b"]
