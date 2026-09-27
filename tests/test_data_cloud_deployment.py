@@ -1,4 +1,7 @@
+import pytest
+
 from empire_os.data_cloud_deployment import (
+    DeploymentTarget,
     build_install_plan,
     can_be_production_candidate,
 )
@@ -49,3 +52,11 @@ def test_candidate_requires_every_verification_gate():
         tenant_isolation_verified=True,
         migration_verification_complete=True,
     ) is False
+
+
+def test_public_database_port_is_rejected():
+    with pytest.raises(ValueError, match="public database ports"):
+        build_install_plan(
+            _host(),
+            target=DeploymentTarget(public_database_port_allowed=True),
+        )
