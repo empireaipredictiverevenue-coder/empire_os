@@ -21,11 +21,13 @@ from pydantic import BaseModel
 from typing import Optional
 
 from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.runtime_env import load_runtime_env
 from empire_os.telephony_data_repository import TelephonyDataRepository
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("empire_telephony_webhook")
 
+ENV_PATH = os.environ.get("EMPIRE_ENV_PATH", "/etc/empire_os.env")
 HUB_URL = os.getenv("HUB_URL", "http://127.0.0.1:8000").rstrip("/")
 CRM_API_URL = os.getenv("CRM_API_URL", "")
 CRM_API_KEY = os.getenv("CRM_API_KEY", "")
@@ -111,8 +113,10 @@ async def forward_to_hub(http_client: httpx.AsyncClient, p: TelephonyWebhookPayl
 
 
 def _telephony_repository() -> TelephonyDataRepository:
+    runtime_env = load_runtime_env(ENV_PATH)
+    runtime_env.update(os.environ)
     return TelephonyDataRepository(
-        gateway_from_environment(os.environ)
+        gateway_from_environment(runtime_env)
     )
 
 
