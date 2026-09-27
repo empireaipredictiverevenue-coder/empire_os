@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 from empire_os.canonical_data_gateway import DataGatewayOperationUnsupported
 from empire_os.data_backends.postgres import PostgresConnector
 from empire_os.data_cloud_contract import DataBackend
+from empire_os.data_query import ConflictAction, DataFilter, FilterOperator, OrderSpec
 
 
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -104,6 +105,55 @@ class EmpireDbProvider:
         finally:
             connection.close()
 
+    def query(
+        self,
+        table: str,
+        columns: str = "*",
+        *,
+        filters: Sequence[DataFilter] = (),
+        order: Sequence[OrderSpec] = (),
+        limit: int = 1000,
+        offset: int = 0,
+    ) -> Sequence[Mapping[str, Any]]:
+        limit = max(0, min(int(limit), 10000))
+        offset = max(0, int(offset))
+        params: list[object] = []
+        where_parts: list[str] = []
+
+        for item in filters:
+            column = _ident(item.column)
+            if item.operator is FilterOperator.EQ:
+                where_parts.append(f"{column} = %s")
+                params.append(item.value)
+            elif item.operator is FilterOperator.IS_NULL:
+                where_parts.append(f"{column} IS NULL")
+            elif item.operator is FilterOperator.IN:
+                values = tuple(item.value or ())
+                if not values:
+                    return []
+                placeholders = ", ".join("%s" for _ in values)
+                where_parts.append(f"{column} IN ({placeholders})")
+                params.extend(values)
+            else:
+                raise ValueError(f"unsupported filter operator: {item.operator}")
+
+        sql = f"SELECT {_columns(columns)} FROM public.{_ident(table)}"
+        if where_parts:
+            sql += " WHERE " + " AND ".join(where_parts)
+        if order:
+            sql += " ORDER BY " + ", ".join(
+                f"{_ident(item.column)} {'DESC' if item.descending else 'ASC'}"
+                for item in order
+            )
+        sql += " LIMIT %s OFFSET %s"
+        params.extend((limit, offset))
+
+        connection = self._connection()
+        try:
+            return _rows(connection.execute(sql, tuple(params)))
+        finally:
+            connection.close()
+
     def count(
         self,
         table: str,
@@ -153,6 +203,93 @@ class EmpireDbProvider:
             result = _rows(cursor) if return_repr else []
             connection.commit()
             return result
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def upsert(
+        self,
+        table: str,
+        row: Mapping[str, Any],
+        *,
+        conflict_columns: Sequence[str],
+        action: ConflictAction,
+        return_repr: bool = True,
+    ) -> Sequence[Mapping[str, Any]]:
+        if not row:
+            raise ValueError("upsert row cannot be empty")
+
+        names = [str(name) for name in row]
+        conflicts = tuple(str(name) for name in conflict_columns)
+        if not conflicts:
+            raise ValueError("upsert requires conflict columns")
+        for name in names:
+            _ident(name)
+        for name in conflicts:
+            _ident(name)
+        if any(name not in row for name in conflicts):
+            raise ValueError("conflict columns must be present in upsert row")
+
+        sql = (
+            f"INSERT INTO public.{_ident(table)} "
+            f"({', '.join(_ident(name) for name in names)}) "
+            f"VALUES ({', '.join('%s' for _ in names)}) "
+            f"ON CONFLICT ({', '.join(_ident(name) for name in conflicts)}) "
+        )
+        update_names = [name for name in names if name not in conflicts]
+        if action is ConflictAction.MERGE and update_names:
+            sql += "DO UPDATE SET " + ", ".join(
+                f"{_ident(name)} = EXCLUDED.{_ident(name)}"
+                for name in update_names
+            )
+        else:
+            sql += "DO NOTHING"
+
+        if return_repr:
+            sql += " RETURNING *"
+
+        connection = self._connection()
+        try:
+            cursor = connection.execute(sql, tuple(row[name] for name in names))
+            rows = _rows(cursor) if return_repr else []
+            connection.commit()
+            return rows
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def insert_ignore_conflicts(
+        self,
+        table: str,
+        row: Mapping[str, Any],
+        *,
+        return_repr: bool = False,
+    ) -> Sequence[Mapping[str, Any]]:
+        if not row:
+            raise ValueError("insert row cannot be empty")
+
+        names = [str(name) for name in row]
+        for name in names:
+            _ident(name)
+        sql = (
+            f"INSERT INTO public.{_ident(table)} "
+            f"({', '.join(_ident(name) for name in names)}) "
+            f"VALUES ({', '.join('%s' for _ in names)}) "
+            "ON CONFLICT DO NOTHING"
+        )
+        if return_repr:
+            sql += " RETURNING *"
+
+        connection = self._connection()
+        try:
+            cursor = connection.execute(sql, tuple(row[name] for name in names))
+            rows = _rows(cursor) if return_repr else []
+            connection.commit()
+            return rows
         except Exception:
             connection.rollback()
             raise
