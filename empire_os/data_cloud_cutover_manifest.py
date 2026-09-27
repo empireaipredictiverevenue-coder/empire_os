@@ -17,6 +17,8 @@ ROLLBACK = ROOT / "runtime/data_cloud/rollback_readiness_latest.json"
 RUNTIME_CANARY = ROOT / "runtime/data_cloud/runtime_canary_latest.json"
 TENANT = ROOT / "runtime/data_cloud/tenant_isolation_latest.json"
 RECOVERY = ROOT / "runtime/data_cloud/recovery_proof_latest.json"
+COMPATIBILITY = ROOT / "runtime/data_cloud/compatibility_latest.json"
+VENDOR_COUPLING = ROOT / "runtime/data_cloud/vendor_coupling_latest.json"
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -48,6 +50,8 @@ def build_cutover_manifest(
     runtime_canary: Mapping[str, Any],
     tenant: Mapping[str, Any],
     recovery: Mapping[str, Any],
+    compatibility: Mapping[str, Any],
+    vendor_coupling: Mapping[str, Any],
     founder_approved: bool = False,
 ) -> dict[str, Any]:
     backup = health.get("backup")
@@ -104,6 +108,18 @@ def build_cutover_manifest(
             if recovery else None,
             "runtime/data_cloud/recovery_proof_latest.json",
         ),
+        _gate(
+            "compatibility",
+            compatibility.get("verified") is True
+            if compatibility else None,
+            "runtime/data_cloud/compatibility_latest.json",
+        ),
+        _gate(
+            "vendor_neutrality",
+            vendor_coupling.get("verified") is True
+            if vendor_coupling else None,
+            "runtime/data_cloud/vendor_coupling_latest.json",
+        ),
     ]
 
     technical_ready = all(gate["verified"] for gate in gates)
@@ -139,6 +155,8 @@ def main() -> int:
         runtime_canary=_read(RUNTIME_CANARY),
         tenant=_read(TENANT),
         recovery=_read(RECOVERY),
+        compatibility=_read(COMPATIBILITY),
+        vendor_coupling=_read(VENDOR_COUPLING),
         founder_approved=False,
     )
     print(json.dumps(manifest, indent=2, sort_keys=True))
