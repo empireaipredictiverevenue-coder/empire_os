@@ -70,7 +70,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
         ),
         ExecutionRequest(
             request_id="empiredb-closeout-rollback-proof",
-            capability="parallel_backend_code",
+            capability="backend_code",
             department="platform_reliability",
             objective=(
                 "Build a deterministic READ-ONLY EmpireDB rollback readiness "
@@ -101,7 +101,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
         ),
         ExecutionRequest(
             request_id="empiredb-closeout-tenant-isolation",
-            capability="parallel_backend_code",
+            capability="backend_code",
             department="security_platform",
             objective=(
                 "Design and implement the next additive EmpireDB tenant-security "
@@ -134,7 +134,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
         ),
         ExecutionRequest(
             request_id="empiredb-closeout-recovery-pitr-plan",
-            capability="documentation",
+            capability="backend_code",
             department="platform_reliability",
             objective=(
                 "Produce the production architecture delta and executable proof "
@@ -196,7 +196,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
         ),
         ExecutionRequest(
             request_id="empiredb-closeout-final-manifest",
-            capability="documentation",
+            capability="backend_code",
             department="platform_reliability",
             objective=(
                 "Build a machine-readable final EmpireDB cutover manifest generator "
