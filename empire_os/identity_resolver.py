@@ -2,8 +2,8 @@
 """Empire OS canonical identity resolver.
 
 DRY-RUN BY DEFAULT.
-Reads Supabase prospects and proposes canonical business entities without
-writing anything back to Supabase.
+Reads canonical prospects and proposes canonical business entities without
+writing anything back to the canonical store.
 
 The resolver:
 - preserves every source prospect
@@ -19,11 +19,11 @@ import hashlib
 import json
 import os
 import re
-import urllib.parse
-import urllib.request
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
+
+from empire_os.identity_resolver_repository import IdentityResolverRepository
 
 
 ENV_PATH = "/etc/empire_os.env"
@@ -35,61 +35,11 @@ REPORT_PATH = Path(
 )
 
 
-def load_env() -> dict[str, str]:
-    env: dict[str, str] = {}
-    with open(ENV_PATH, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, value = line.split("=", 1)
-                env[key] = value
-    return env
-
-
-ENV = load_env()
-BASE = ENV["SUPABASE_URL"].rstrip("/")
-KEY = ENV["SUPABASE_SERVICE_KEY"]
-
-HEADERS = {
-    "apikey": KEY,
-    "Authorization": "Bearer " + KEY,
-    "Accept": "application/json",
-}
-
-
-def fetch_prospects() -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    offset = 0
-
-    while True:
-        query = urllib.parse.urlencode(
-            {
-                "select": (
-                    "id,business_name,niche,metro,phone,website,status,created_at"
-                ),
-                "limit": 1000,
-                "offset": offset,
-            }
-        )
-        req = urllib.request.Request(
-            f"{BASE}/rest/v1/prospects?{query}",
-            headers=HEADERS,
-        )
-        with urllib.request.urlopen(req, timeout=30) as response:
-            batch = json.loads(response.read().decode())
-
-        if not batch:
-            break
-
-        rows.extend(batch)
-
-        if len(batch) < 1000:
-            break
-
-        offset += 1000
-
-    return rows
-
+def fetch_prospects(
+    repository: IdentityResolverRepository | None = None,
+) -> list[dict[str, Any]]:
+    store = repository or IdentityResolverRepository.from_environment()
+    return store.fetch_prospects()
 
 def norm(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
@@ -121,7 +71,8 @@ def proposal_id(key: tuple[str, str, str]) -> str:
 
 
 def main() -> None:
-    rows = fetch_prospects()
+    repository = IdentityResolverRepository.from_environment()
+    rows = fetch_prospects(repository)
 
     clusters: defaultdict[tuple[str, str, str], list[dict[str, Any]]] = (
         defaultdict(list)
@@ -219,7 +170,7 @@ def main() -> None:
     report = {
         "schema_version": "identity_resolver.dry_run.v1",
         "dry_run": True,
-        "supabase_url": BASE,
+        "canonical_backend": repository.backend_name,
         "source_table": "prospects",
         "total_prospects": len(rows),
         "identity_complete_rows": len(rows) - singleton_count,
@@ -262,7 +213,7 @@ def main() -> None:
         "CANDIDATE RESOLVED CLUSTERS: "
         f"{report['candidate_resolved_clusters']}"
     )
-    print("SUPABASE WRITES: 0")
+    print("CANONICAL WRITES: 0")
     print("PROSPECT ROWS MODIFIED: 0")
     print(f"REPORT: {REPORT_PATH}")
 
