@@ -36,6 +36,8 @@ def test_manifest_is_private_and_requires_explicit_activation():
     assert manifest["postgresql"]["listen_addresses"] == "127.0.0.1"
     assert manifest["pgbouncer"]["listen_addr"] == "127.0.0.1"
     assert manifest["pgbouncer"]["auth_type"] == "scram-sha-256"
+    assert manifest["postgresql"]["archive_mode"] is False
+    assert manifest["activation_gates"]["wal_archiving_activation_approved"] is False
     assert manifest["activation_gates"]["database_init_approved"] is False
     assert manifest["activation_gates"]["canonical_cutover_approved"] is False
     assert manifest["authority"]["service_start"] is False
