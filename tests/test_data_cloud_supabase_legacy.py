@@ -257,3 +257,39 @@ def test_402_opens_shared_egress_circuit_and_blocks_repeat_calls(tmp_path):
         raise AssertionError("open circuit must block repeat traffic")
 
     assert len(calls) == 1
+
+
+def test_extended_query_operators_preserve_bus_semantics():
+    seen = {}
+
+    def urlopen(request, timeout):
+        seen["url"] = request.full_url
+        return Response(b'[]')
+
+    provider = SupabaseLegacyProvider(
+        SupabaseLegacyConfig("https://example.supabase.co", "key"),
+        urlopen=urlopen,
+        egress=FakeEgress(),
+    )
+
+    provider.query(
+        "prospects",
+        "id,status,metro,buy_signal_score",
+        filters=(
+            DataFilter.ne("status", "archived"),
+            DataFilter.ilike("metro", "denver"),
+            DataFilter.gte("buy_signal_score", 50),
+            DataFilter.not_in("status", ("rejected", "cancelled")),
+        ),
+        order=(
+            OrderSpec("buy_signal_score", descending=True, nulls_last=True),
+            OrderSpec("created_at"),
+        ),
+        limit=5,
+    )
+
+    assert "status=not.eq.archived" in seen["url"]
+    assert "metro=ilike.denver" in seen["url"]
+    assert "buy_signal_score=gte.50" in seen["url"]
+    assert "status=not.in.%28rejected%2Ccancelled%29" in seen["url"]
+    assert "order=buy_signal_score.desc.nullslast%2Ccreated_at.asc" in seen["url"]
