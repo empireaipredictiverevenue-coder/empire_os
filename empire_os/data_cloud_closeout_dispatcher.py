@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+from threading import Lock
 from typing import Any, Callable, Mapping
 
 from empire_os.data_cloud_closeout_wave import closeout_requests
@@ -49,16 +50,30 @@ def dispatch_closeout_wave(
     worker_count = max(1, min(int(max_parallel), 4))
 
     results: list[dict[str, Any]] = []
+    hermes_publish_lock = Lock()
 
     def dispatch_one(request: ExecutionRequest) -> dict[str, Any]:
         try:
-            result = dict(
-                dispatcher(
-                    root,
-                    request,
-                    execute_pi=execute_pi,
+            # Hermes jobs are published onto one Git control branch. Serialize
+            # only that publication boundary to prevent non-fast-forward races;
+            # worker execution remains independently leased and asynchronous.
+            if request.capability == "backend_code":
+                with hermes_publish_lock:
+                    result = dict(
+                        dispatcher(
+                            root,
+                            request,
+                            execute_pi=execute_pi,
+                        )
+                    )
+            else:
+                result = dict(
+                    dispatcher(
+                        root,
+                        request,
+                        execute_pi=execute_pi,
+                    )
                 )
-            )
         except Exception as exc:
             result = {
                 "schema_version": "empire.execution-plane-dispatch.v1",
