@@ -62,6 +62,11 @@ AUTO_REPAIR_SERVICES: tuple[ServiceSpec, ...] = (
     ServiceSpec("public_gateway", "empire-public-gateway.service"),
     ServiceSpec("self_serve_checkout", "empire-self-serve-checkout.service"),
     ServiceSpec("ops_mcp", "empire-ops-mcp.service"),
+    ServiceSpec("founder_console", "empire-founder-console.service"),
+    ServiceSpec(
+        "founder_dashboard_api",
+        "empire-founder-dashboard-api.service",
+    ),
 )
 
 AUTO_REPAIR_TIMERS: tuple[ServiceSpec, ...] = (
@@ -144,6 +149,16 @@ HTTP_CHECKS: tuple[HttpSpec, ...] = (
         "self_serve_checkout_http",
         "http://127.0.0.1:8098/health",
         "empire-self-serve-checkout.service",
+    ),
+    HttpSpec(
+        "founder_console_http",
+        "http://127.0.0.1:3001/founder",
+        "empire-founder-console.service",
+    ),
+    HttpSpec(
+        "founder_dashboard_api_http",
+        "http://127.0.0.1:8766/v1/founder-dashboard/overview",
+        "empire-founder-dashboard-api.service",
     ),
 )
 
