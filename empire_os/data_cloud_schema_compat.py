@@ -1,4 +1,7 @@
-"""Deterministic schema compatibility checks for EmpireDB migration."""
+"""Deterministic schema compatibility checks for EmpireDB migration.
+
+This verifier is structural and read-only. It does not apply DDL.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,6 +13,21 @@ class ColumnSpec:
     name: str
     data_type: str
     nullable: bool
+    default: str | None = None
+
+
+@dataclass(frozen=True)
+class ForeignKeySpec:
+    columns: tuple[str, ...]
+    referenced_table: str
+    referenced_columns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class IndexSpec:
+    name: str
+    columns: tuple[str, ...]
+    unique: bool = False
 
 
 @dataclass(frozen=True)
@@ -17,7 +35,11 @@ class TableSpec:
     name: str
     columns: tuple[ColumnSpec, ...]
     primary_key: tuple[str, ...] = ()
+    unique_constraints: tuple[tuple[str, ...], ...] = ()
+    foreign_keys: tuple[ForeignKeySpec, ...] = ()
+    indexes: tuple[IndexSpec, ...] = ()
     rls_enabled: bool = False
+    rls_policies: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -29,11 +51,39 @@ def _by_table(manifest: SchemaManifest) -> dict[str, TableSpec]:
     return {table.name.removeprefix("public."): table for table in manifest.tables}
 
 
+def _normalized_unique_constraints(
+    constraints: tuple[tuple[str, ...], ...],
+) -> tuple[tuple[str, ...], ...]:
+    return tuple(sorted(tuple(columns) for columns in constraints))
+
+
+def _normalized_foreign_keys(
+    foreign_keys: tuple[ForeignKeySpec, ...],
+) -> tuple[tuple[tuple[str, ...], str, tuple[str, ...]], ...]:
+    return tuple(sorted(
+        (
+            tuple(key.columns),
+            key.referenced_table.removeprefix("public."),
+            tuple(key.referenced_columns),
+        )
+        for key in foreign_keys
+    ))
+
+
+def _normalized_indexes(
+    indexes: tuple[IndexSpec, ...],
+) -> tuple[tuple[str, tuple[str, ...], bool], ...]:
+    return tuple(sorted(
+        (index.name, tuple(index.columns), bool(index.unique))
+        for index in indexes
+    ))
+
+
 def compare_schema(
     source: SchemaManifest,
     target: SchemaManifest,
 ) -> dict[str, object]:
-    """Compare structural compatibility without mutating either database."""
+    """Compare migration-critical structure without mutating either database."""
 
     source_tables = _by_table(source)
     target_tables = _by_table(target)
@@ -57,17 +107,41 @@ def compare_schema(
                 findings.append(f"type_mismatch:{name}.{column_name}")
             if source_column.nullable != target_column.nullable:
                 findings.append(f"nullability_mismatch:{name}.{column_name}")
+            if source_column.default != target_column.default:
+                findings.append(f"default_mismatch:{name}.{column_name}")
 
         if source_table.primary_key != target_table.primary_key:
             findings.append(f"primary_key_mismatch:{name}")
 
+        if _normalized_unique_constraints(source_table.unique_constraints) != (
+            _normalized_unique_constraints(target_table.unique_constraints)
+        ):
+            findings.append(f"unique_constraint_mismatch:{name}")
+
+        if _normalized_foreign_keys(source_table.foreign_keys) != (
+            _normalized_foreign_keys(target_table.foreign_keys)
+        ):
+            findings.append(f"foreign_key_mismatch:{name}")
+
+        if _normalized_indexes(source_table.indexes) != (
+            _normalized_indexes(target_table.indexes)
+        ):
+            findings.append(f"index_mismatch:{name}")
+
         if source_table.rls_enabled and not target_table.rls_enabled:
             findings.append(f"rls_missing:{name}")
+
+        if source_table.rls_enabled:
+            missing_policies = sorted(
+                set(source_table.rls_policies) - set(target_table.rls_policies)
+            )
+            for policy_name in missing_policies:
+                findings.append(f"rls_policy_missing:{name}.{policy_name}")
 
     extra_tables = sorted(set(target_tables) - set(source_tables))
 
     return {
-        "schema_version": "empire.data-cloud-schema-compat.v1",
+        "schema_version": "empire.data-cloud-schema-compat.v2",
         "compatible": not findings,
         "findings": findings,
         "source_table_count": len(source_tables),
@@ -82,10 +156,10 @@ def compare_schema(
 
 
 def manifest_from_rows(rows: Iterable[dict[str, object]]) -> SchemaManifest:
-    """Build a manifest from normalized introspection rows.
+    """Build a column/PK/RLS manifest from normalized introspection rows.
 
-    Expected keys: table_name, column_name, data_type, is_nullable,
-    primary_key, rls_enabled.
+    Rich constraint/index/policy evidence should be attached by the dedicated
+    introspection layer before cutover verification.
     """
     grouped: dict[str, list[dict[str, object]]] = {}
     for row in rows:
@@ -99,6 +173,11 @@ def manifest_from_rows(rows: Iterable[dict[str, object]]) -> SchemaManifest:
                 name=str(item["column_name"]),
                 data_type=str(item["data_type"]),
                 nullable=str(item["is_nullable"]).upper() == "YES",
+                default=(
+                    None
+                    if item.get("column_default") is None
+                    else str(item["column_default"])
+                ),
             )
             for item in items
         )
