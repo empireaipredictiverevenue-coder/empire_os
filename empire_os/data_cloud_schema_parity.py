@@ -4,7 +4,7 @@ import argparse, hashlib, json, os
 from pathlib import Path
 import psycopg
 
-SOURCE = {
+SOURCE = json.loads(r'''{
   "astra_observer_tokens": [
     true,
     false,
@@ -405,7 +405,7 @@ SOURCE = {
     2,
     "86981a327a609d3576b269ffb918dc39"
   ]
-}
+}''')
 
 SQL = r"""
 WITH wanted AS (
