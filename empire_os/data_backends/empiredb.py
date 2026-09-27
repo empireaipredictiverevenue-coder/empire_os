@@ -125,14 +125,24 @@ class EmpireDbProvider:
             if item.operator is FilterOperator.EQ:
                 where_parts.append(f"{column} = %s")
                 params.append(item.value)
+            elif item.operator is FilterOperator.NE:
+                where_parts.append(f"{column} <> %s")
+                params.append(item.value)
+            elif item.operator is FilterOperator.ILIKE:
+                where_parts.append(f"{column} ILIKE %s")
+                params.append(item.value)
+            elif item.operator is FilterOperator.GTE:
+                where_parts.append(f"{column} >= %s")
+                params.append(item.value)
             elif item.operator is FilterOperator.IS_NULL:
                 where_parts.append(f"{column} IS NULL")
-            elif item.operator is FilterOperator.IN:
+            elif item.operator in {FilterOperator.IN, FilterOperator.NOT_IN}:
                 values = tuple(item.value or ())
                 if not values:
                     return []
                 placeholders = ", ".join("%s" for _ in values)
-                where_parts.append(f"{column} IN ({placeholders})")
+                keyword = "IN" if item.operator is FilterOperator.IN else "NOT IN"
+                where_parts.append(f"{column} {keyword} ({placeholders})")
                 params.extend(values)
             else:
                 raise ValueError(f"unsupported filter operator: {item.operator}")
@@ -142,7 +152,17 @@ class EmpireDbProvider:
             sql += " WHERE " + " AND ".join(where_parts)
         if order:
             sql += " ORDER BY " + ", ".join(
-                f"{_ident(item.column)} {'DESC' if item.descending else 'ASC'}"
+                (
+                    f"{_ident(item.column)} "
+                    f"{'DESC' if item.descending else 'ASC'}"
+                    + (
+                        " NULLS LAST"
+                        if item.nulls_last is True
+                        else " NULLS FIRST"
+                        if item.nulls_last is False
+                        else ""
+                    )
+                )
                 for item in order
             )
         sql += " LIMIT %s OFFSET %s"
