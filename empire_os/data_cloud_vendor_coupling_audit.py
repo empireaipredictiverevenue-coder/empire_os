@@ -16,11 +16,15 @@ from pathlib import Path
 
 ROOTS = ("empire_os", "scripts")
 
-PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+HARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("supabase_url_env", re.compile(r"\bSUPABASE_URL\b")),
     ("supabase_service_key_env", re.compile(r"\bSUPABASE_SERVICE_KEY\b")),
     ("supabase_key_symbol", re.compile(r"\bSUPABASE_KEY\b")),
     ("supabase_host", re.compile(r"\.supabase\.co\b", re.I)),
+    ("direct_sb_vendor_attr", re.compile(r"\bsb\.SUPABASE_[A-Z_]+\b")),
+)
+
+COMPAT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("postgrest_path", re.compile(r"/rest/v1/")),
     (
         "direct_sb_import",
@@ -29,7 +33,6 @@ PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"import\s+empire_os\.sb\b)"
         ),
     ),
-    ("direct_sb_vendor_attr", re.compile(r"\bsb\.SUPABASE_[A-Z_]+\b")),
 )
 
 # These files are intentionally outside the canonical business-runtime path.
@@ -41,6 +44,10 @@ CLASSIFIED_EXCEPTIONS = {
     "empire_os/astra_preflight.py": "explicit_legacy_astra_observer",
     "scripts/astra_observer.py": "explicit_legacy_astra_observer",
     "empire_os/data_cloud_vendor_coupling_audit.py": "audit_definition",
+    "empire_os/canonical_data_gateway.py": "canonical_backend_factory",
+    "empire_os/data_cloud_discovery.py": "migration_discovery",
+    "empire_os/supabase_egress_guard.py": "legacy_provider_guard",
+    "empire_os/migrate_prospects.py": "one_time_migration_recovery",
 }
 
 EXCLUDED_PARTS = {
@@ -70,6 +77,7 @@ def iter_files(repo_root: Path):
 
 def audit(repo_root: Path) -> dict[str, object]:
     active_hits: list[dict[str, object]] = []
+    compatibility_hits: list[dict[str, object]] = []
     classified_hits: list[dict[str, object]] = []
 
     for path in iter_files(repo_root):
@@ -84,7 +92,7 @@ def audit(repo_root: Path) -> dict[str, object]:
 
         classification = CLASSIFIED_EXCEPTIONS.get(relative)
         for line_number, line in enumerate(lines, start=1):
-            for kind, pattern in PATTERNS:
+            for kind, pattern in HARD_PATTERNS:
                 if not pattern.search(line):
                     continue
                 item = {
@@ -101,12 +109,31 @@ def audit(repo_root: Path) -> dict[str, object]:
                 else:
                     active_hits.append(item)
 
+            for kind, pattern in COMPAT_PATTERNS:
+                if not pattern.search(line):
+                    continue
+                item = {
+                    "file": relative,
+                    "line": line_number,
+                    "kind": kind,
+                    "excerpt": line.strip()[:220],
+                }
+                if classification:
+                    classified_hits.append({
+                        **item,
+                        "classification": classification,
+                    })
+                else:
+                    compatibility_hits.append(item)
+
     return {
         "schema_version": "empire.vendor-coupling-audit.v1",
         "read_only": True,
         "production_cutover_authority": False,
         "active_direct_vendor_hits": active_hits,
         "active_direct_vendor_count": len(active_hits),
+        "compatibility_debt_hits": compatibility_hits,
+        "compatibility_debt_count": len(compatibility_hits),
         "classified_exception_hits": classified_hits,
         "classified_exception_count": len(classified_hits),
         "classified_exception_files": CLASSIFIED_EXCEPTIONS,
