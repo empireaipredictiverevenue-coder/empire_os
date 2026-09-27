@@ -116,3 +116,34 @@ def test_failed_user_unit_stop_blocks_kill():
     assert result["ok"] is False
     assert result["state"] == "LEGACY_USER_UNIT_STOP_FAILED"
     assert killed == []
+
+
+
+def test_user_unit_stop_that_removes_process_is_success():
+    observation = health.FounderConsoleObservation(
+        service_state="activating",
+        http_ok=True,
+        port_pid=4242,
+        port_process_verified=True,
+        port_process_cwd=str(health.FOUNDER_CONSOLE_APP),
+        port_process_command="next-server",
+        port_process_cgroup=(
+            "0::/user.slice/user-1000.slice/"
+            "user@1000.service/app.slice/"
+            "empire-founder-console.service"
+        ),
+        legacy_user_scope=True,
+    )
+
+    result = health.clear_verified_orphan(
+        observation,
+        user_unit_stopper=lambda: {"ok": True},
+        process_exists=lambda _pid: False,
+        kill_process=lambda *_args: (_ for _ in ()).throw(
+            AssertionError("kill must not run when unit stop removed process")
+        ),
+    )
+
+    assert result["ok"] is True
+    assert result["state"] == "ORPHAN_TERMINATED_BY_USER_UNIT_STOP"
+    assert result["killed"] is False
