@@ -197,3 +197,33 @@ def test_insert_ignore_conflicts_uses_untargeted_postgres_conflict_clause():
     assert "ON CONFLICT (" not in sql
     assert params == ("k1",)
     assert connection.commits == 1
+
+
+def test_extended_query_operators_compile_to_parameterized_sql():
+    connection = FakeConnection()
+    connection.next_cursor = Cursor([], ("id",))
+    provider = EmpireDbProvider(FakeConnector(connection))
+
+    provider.query(
+        "prospects",
+        "id",
+        filters=(
+            DataFilter.ne("status", "archived"),
+            DataFilter.ilike("metro", "denver"),
+            DataFilter.gte("buy_signal_score", 50),
+            DataFilter.not_in("status", ("rejected", "cancelled")),
+        ),
+        order=(
+            OrderSpec("buy_signal_score", descending=True, nulls_last=True),
+            OrderSpec("created_at"),
+        ),
+        limit=5,
+    )
+
+    sql, params = connection.calls[0]
+    assert '"status" <> %s' in sql
+    assert '"metro" ILIKE %s' in sql
+    assert '"buy_signal_score" >= %s' in sql
+    assert '"status" NOT IN (%s, %s)' in sql
+    assert 'ORDER BY "buy_signal_score" DESC NULLS LAST, "created_at" ASC' in sql
+    assert params == ("archived", "denver", 50, "rejected", "cancelled", 5, 0)
