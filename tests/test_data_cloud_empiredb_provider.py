@@ -106,3 +106,13 @@ def test_rpc_fails_closed_until_explicitly_mapped():
     provider = EmpireDbProvider(FakeConnector(FakeConnection()))
     with pytest.raises(DataGatewayOperationUnsupported, match="not mapped"):
         provider.rpc("claim_next_gtm_job")
+
+
+def test_zero_limit_is_preserved():
+    connection = FakeConnection()
+    connection.next_cursor = Cursor([], ("id",))
+    provider = EmpireDbProvider(FakeConnector(connection))
+
+    assert provider.select("prospects", "id", limit=0) == []
+    _, params = connection.calls[0]
+    assert params[-2:] == (0, 0)
