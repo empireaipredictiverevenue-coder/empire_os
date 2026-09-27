@@ -40,6 +40,7 @@ CLASSIFIED_EXCEPTIONS = {
     "empire_os/activate_idle_leads.py": "one_time_migration_recovery",
     "empire_os/astra_preflight.py": "explicit_legacy_astra_observer",
     "scripts/astra_observer.py": "explicit_legacy_astra_observer",
+    "empire_os/data_cloud_vendor_coupling_audit.py": "audit_definition",
 }
 
 EXCLUDED_PARTS = {
