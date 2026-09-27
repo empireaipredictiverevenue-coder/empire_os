@@ -78,3 +78,14 @@ def test_unexpected_target_grants_are_security_drift():
         finding.startswith("unexpected_grant:empire_reader:table:prospects")
         for finding in result["findings"]
     )
+
+
+def test_unexpected_empire_role_is_security_drift():
+    source = (RoleSpec("empire_reader", can_login=False),)
+    target = (
+        RoleSpec("empire_reader", can_login=False),
+        RoleSpec("empire_extra", can_login=False),
+    )
+    result = compare_roles(source, target)
+    assert result["compatible"] is False
+    assert "unexpected_role:empire_extra" in result["findings"]
