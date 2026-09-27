@@ -184,3 +184,75 @@ def test_failed_action_enters_bounded_backoff_and_success_clears_it():
         "REFRESH_RECOVERY_SNAPSHOT",
         now=NOW,
     ) is True
+
+
+
+def test_missing_recovery_seeds_is_degraded_even_when_escalation_succeeds(
+    tmp_path,
+):
+    root = Path(tmp_path)
+    guard = root / "runtime/control/supabase_egress_guard.json"
+    guard.parent.mkdir(parents=True)
+    guard.write_text(
+        '{"state":"contained","contained":true}',
+        encoding="utf-8",
+    )
+
+    result = reliability.run_cycle(
+        root,
+        now=NOW,
+        self_heal=lambda **_kwargs: {
+            "status": "HEALTHY",
+            "execution_authority": "bounded_internal_repair",
+        },
+        refresh_snapshot=lambda *_args, **_kwargs: {},
+        local_recovery=lambda *_args, **_kwargs: {},
+    )
+
+    assert result["status"] == "DEGRADED"
+    assert result["founder_attention_required"] is True
+
+
+def test_backoff_keeps_cycle_degraded_until_retry_allowed(tmp_path):
+    root = Path(tmp_path)
+    guard = root / "runtime/control/supabase_egress_guard.json"
+    guard.parent.mkdir(parents=True)
+    guard.write_text(
+        '{"state":"healthy","contained":false}',
+        encoding="utf-8",
+    )
+
+    state_path = root / "runtime/reliability_agent/state.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps({
+            "action_failures": {
+                "REFRESH_RECOVERY_SNAPSHOT": {
+                    "count": 1,
+                    "next_allowed_at": "2026-09-27T08:01:00+00:00",
+                    "backoff_seconds": 60,
+                },
+            },
+        }),
+        encoding="utf-8",
+    )
+
+    result = reliability.run_cycle(
+        root,
+        now=NOW,
+        self_heal=lambda **_kwargs: {
+            "status": "HEALTHY",
+            "execution_authority": "bounded_internal_repair",
+        },
+        refresh_snapshot=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("backoff must defer refresh")
+        ),
+        local_recovery=lambda *_args, **_kwargs: {},
+    )
+
+    assert result["status"] == "DEGRADED"
+    assert any(
+        row["action"] == "REFRESH_RECOVERY_SNAPSHOT"
+        and row["decision"] == "BACKOFF"
+        for row in result["deferred_actions"]
+    )
