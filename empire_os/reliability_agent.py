@@ -31,6 +31,11 @@ from empire_os.founder_console_health import (
     clear_verified_orphan,
     observe_founder_console,
 )
+from empire_os.ops_privileged_client import (
+    PrivilegedHelperUnavailable,
+    privileged_request,
+)
+from empire_os.ops_privileged_helper import DATA_CLOUD_RESOURCE
 from empire_os.runtime_self_heal import run_runtime_self_heal
 from empire_os.supabase_egress_guard import (
     STATUS_PATH as EGRESS_STATUS_PATH,
@@ -41,6 +46,7 @@ from empire_os.supabase_egress_guard import (
 ROOT = Path("/srv/empire_os")
 LATEST_PATH = ROOT / "runtime/reliability_agent/latest.json"
 STATE_PATH = ROOT / "runtime/reliability_agent/state.json"
+DATA_CLOUD_LATEST_PATH = ROOT / "runtime/data_cloud/health_latest.json"
 
 DEFAULT_INTERVAL_SECONDS = 120
 DEFAULT_RECOVERY_INTERVAL_SECONDS = 900
@@ -71,6 +77,7 @@ class ReliabilityObservation:
     founder_console_http_ok: bool = False
     founder_console_port_pid: int | None = None
     founder_console_orphan_verified: bool = False
+    data_cloud: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -178,12 +185,58 @@ def _age_seconds(path: Path, *, now: datetime) -> float | None:
         return None
 
 
+def _observe_data_cloud_health() -> dict[str, Any]:
+    """Read Data Cloud health through the root-owned narrow helper.
+
+    The Reliability Agent receives only a non-secret health projection. It does
+    not receive EmpireDB or pgBackRest credentials and has no cutover authority.
+    """
+    try:
+        result = privileged_request(
+            "data_cloud_health",
+            DATA_CLOUD_RESOURCE,
+            timeout=10.0,
+        )
+    except (PrivilegedHelperUnavailable, ValueError, OSError) as exc:
+        return {
+            "schema_version": "empire.data-cloud-runtime-health.v1",
+            "observed_at": _iso(_now()),
+            "read_only": True,
+            "available": False,
+            "error_class": type(exc).__name__,
+            "candidate_runtime_healthy": False,
+            "operational_cutover_ready": False,
+            "production_cutover_authority": False,
+        }
+
+    health = result.get("health")
+    if not isinstance(health, Mapping):
+        return {
+            "schema_version": "empire.data-cloud-runtime-health.v1",
+            "observed_at": _iso(_now()),
+            "read_only": True,
+            "available": False,
+            "error_class": "InvalidPrivilegedHealthResponse",
+            "candidate_runtime_healthy": False,
+            "operational_cutover_ready": False,
+            "production_cutover_authority": False,
+        }
+
+    payload = dict(health)
+    payload["available"] = True
+    payload["production_cutover_authority"] = False
+    return payload
+
+
 def observe(
     repo_root: str | Path = ROOT,
     *,
     now: datetime | None = None,
     founder_console_observer: Callable[..., Any] = (
         observe_founder_console
+    ),
+    data_cloud_observer: Callable[[], Mapping[str, Any]] = (
+        _observe_data_cloud_health
     ),
 ) -> ReliabilityObservation:
     root = Path(repo_root).resolve()
@@ -196,6 +249,19 @@ def observe(
     heartbeat_path = root / RECOVERY_HEARTBEAT
     heartbeat = _load_json(heartbeat_path)
     founder_console = founder_console_observer()
+    try:
+        data_cloud = dict(data_cloud_observer())
+    except Exception as exc:
+        data_cloud = {
+            "schema_version": "empire.data-cloud-runtime-health.v1",
+            "observed_at": _iso(current),
+            "read_only": True,
+            "available": False,
+            "error_class": type(exc).__name__,
+            "candidate_runtime_healthy": False,
+            "operational_cutover_ready": False,
+            "production_cutover_authority": False,
+        }
 
     return ReliabilityObservation(
         observed_at=_iso(current),
@@ -227,6 +293,7 @@ def observe(
         founder_console_orphan_verified=(
             founder_console.port_process_verified
         ),
+        data_cloud=data_cloud,
     )
 
 
@@ -432,6 +499,9 @@ def run_cycle(
     founder_console_observer: Callable[..., Any] = (
         observe_founder_console
     ),
+    data_cloud_observer: Callable[[], Mapping[str, Any]] = (
+        _observe_data_cloud_health
+    ),
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     current = (now or _now()).astimezone(timezone.utc)
@@ -439,6 +509,7 @@ def run_cycle(
         root,
         now=current,
         founder_console_observer=founder_console_observer,
+        data_cloud_observer=data_cloud_observer,
     )
     actions = plan_actions(before)
 
@@ -488,7 +559,13 @@ def run_cycle(
     after = observe(
         root,
         founder_console_observer=founder_console_observer,
+        data_cloud_observer=data_cloud_observer,
     )
+    if isinstance(after.data_cloud, Mapping):
+        _atomic_json(
+            root / DATA_CLOUD_LATEST_PATH.relative_to(ROOT),
+            after.data_cloud,
+        )
     verified_count = sum(
         row.get("verified") is True
         for row in executed
@@ -533,6 +610,11 @@ def run_cycle(
             else "NORMAL"
         ),
         "founder_attention_required": founder_attention_required,
+        "data_cloud": (
+            dict(after.data_cloud)
+            if isinstance(after.data_cloud, Mapping)
+            else {}
+        ),
         "authority": {
             "internal_repair": "allowlisted_reversible_only",
             "live_outbound": False,
