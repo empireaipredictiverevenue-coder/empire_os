@@ -23,8 +23,24 @@ from empire_os.data_cloud_shadow_copy import SHADOW_TABLES, ShadowTable, validat
 
 
 _COPY_HEADER = re.compile(
-    rb'^COPY (?:"?public"?\.)"?(?P<table>[A-Za-z_][A-Za-z0-9_]*)"? '
-    rb'\((?P<columns>[^)]*)\) FROM stdin;\r?\n
+    rb'^COPY (?:"?public"?\\.)"?(?P<table>[A-Za-z_][A-Za-z0-9_]*)"? '
+    rb'\\((?P<columns>[^)]*)\\) FROM stdin;\\r?\\n$'
+)
+_COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _safe_column(value: str) -> str:
+    if not _COLUMN.fullmatch(value):
+        raise ValueError(f"unsafe COPY column: {value!r}")
+    return value
+
+
+def _unquote_identifier(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+        value = value[1:-1].replace('""', '"')
+    return _safe_column(value)
+
 
 @dataclass(frozen=True)
 class CopyBlock:
@@ -34,12 +50,6 @@ class CopyBlock:
     data_end: int
     row_count: int
     primary_key_sha256: str
-
-
-def _safe_column(value: str) -> str:
-    if not _COLUMN.fullmatch(value):
-        raise ValueError(f"unsafe COPY column: {value!r}")
-    return value
 
 
 def _decode_copy_text(value: bytes) -> str | None:
