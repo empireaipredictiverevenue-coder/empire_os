@@ -249,3 +249,37 @@ def test_block_anchor_validation_rejects_wrong_escrow_beneficiary():
     }
     with pytest.raises(PaymentGovernanceError, match="escrow beneficiary"):
         validate_review_block_anchor(review, config=EscrowCfg(), rpc_call=lambda *_: None)
+
+
+def test_default_service_database_uses_canonical_gateway(monkeypatch):
+    import empire_os.payment_governance as governance
+
+    plan = proposal()
+    gateway = FakeDb({
+        "decision": "proposed",
+        "request_id": str(uuid4()),
+        "status": "pending",
+        "actual_revenue": False,
+    })
+    gateway.configured = True
+    seen = {}
+
+    monkeypatch.setattr(
+        governance,
+        "load_runtime_env",
+        lambda path: {"EMPIRE_DATA_BACKEND": "empiredb"},
+    )
+    monkeypatch.setattr(
+        governance,
+        "gateway_from_environment",
+        lambda env: seen.setdefault("gateway", gateway),
+    )
+
+    result = submit_payment_proposal(
+        plan,
+        operator_authorized=True,
+    )
+
+    assert result["decision"] == "proposed"
+    assert gateway.calls == [("propose_bsc_payment_request", plan["params"])]
+    assert "gateway" in seen
