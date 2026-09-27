@@ -26,11 +26,17 @@ from typing import Any
 from empire_os.buyer_allocation import buyer_activation_decision
 from empire_os.canonical_data_gateway import gateway_from_environment
 from empire_os.gtm_data_repository import GTMDataRepository
+from empire_os.runtime_env import load_runtime_env
 from empire_os.niche_taxonomy import (
     NICHE_FAMILIES,
     metro_key,
     niche_family,
     normalise,
+)
+
+DATA_ENV_PATH = os.environ.get(
+    "EMPIRE_ENV_PATH",
+    "/etc/empire_os.env",
 )
 
 RUNTIME_ROOT = Path(
@@ -140,7 +146,8 @@ class GTMJob:
 # ---------------------------------------------------------------------------
 
 def _data_repository() -> GTMDataRepository:
-    return GTMDataRepository(gateway_from_environment())
+    runtime_env = load_runtime_env(DATA_ENV_PATH)
+    return GTMDataRepository(gateway_from_environment(runtime_env))
 
 
 def fetch_all(
