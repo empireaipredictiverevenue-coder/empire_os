@@ -17,7 +17,7 @@ def test_ops_control_service_keeps_autonomy_observe_and_uses_helper():
     text = (
         ROOT / "deploy/systemd/empire-ops-control.service"
     ).read_text()
-    assert "EMPIRE_OPS_HEAL_MODE=GUARDED_EXECUTE" in text
+    assert "EMPIRE_OPS_HEAL_MODE=OBSERVE" in text
     assert "EMPIRE_AUTONOMOUS_MODE=OBSERVE" in text
     assert "empire-ops-privileged-helper.service" in text
     assert "ReadWritePaths=/srv/empire_os/runtime" in text
