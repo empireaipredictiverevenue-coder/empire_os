@@ -1,0 +1,12 @@
+[Unit]
+Description=Run buyer local recovery during Supabase containment
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=15min
+AccuracySec=1min
+Persistent=true
+Unit=empire-buyer-acquisition-local-recovery.service
+
+[Install]
+WantedBy=timers.target
