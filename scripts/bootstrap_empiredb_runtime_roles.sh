@@ -24,7 +24,20 @@ BEGIN
       EXECUTE format('CREATE ROLE %I NOLOGIN NOINHERIT', r);
     END IF;
   END LOOP;
-END $$;
+END $;
+
+GRANT USAGE ON SCHEMA public TO
+  empire_payment_approver,
+  empire_bsc_verifier,
+  empire_escrow_verifier,
+  empire_commercial_approver,
+  empire_outcome_recorder,
+  empire_revenue_recognizer,
+  empire_closer_planner,
+  empire_conversation_ingest,
+  empire_conversation_reader,
+  empire_revenue_exchange_ingest,
+  empire_revenue_exchange_reader;
 SQL
 
 echo '{"runtime_capability_roles":"ready","verified":true}'
