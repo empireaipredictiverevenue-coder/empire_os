@@ -50,6 +50,7 @@ GRANT USAGE ON SCHEMA public TO
   empire_revenue_exchange_ingest,
   empire_revenue_exchange_reader,
   empiredb_tenant_reader;
+GRANT empiredb_tenant_reader TO empiredb_migrator;
 SQL
 
 echo '{"runtime_capability_roles":"ready","verified":true}'
