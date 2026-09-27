@@ -1,6 +1,7 @@
 import pytest
 
 from empire_os.data_query import ConflictAction, FilterOperator
+from empire_os.data_values import JsonValue, unwrap_data_value
 from empire_os.qualification_data_repository import QualificationDataRepository
 
 
@@ -43,7 +44,7 @@ class FakeGateway:
 
     def upsert(self, table, row, *, conflict_columns, action, return_repr=True):
         self.upserts.append((table, dict(row), tuple(conflict_columns), action, return_repr))
-        return [dict(row)]
+        return [unwrap_data_value(dict(row))]
 
     def insert_ignore_conflicts(self, table, row, *, return_repr=False):
         self.inserts.append((table, dict(row), return_repr))
@@ -165,14 +166,23 @@ def test_qualification_uses_composite_merge_upsert():
         "scoring_engine": "engine",
         "scoring_version": "v2",
         "status": "scored",
+        "observed_dimensions": ["market_fit"],
+        "unknown_dimensions": ["engagement_potential"],
     }
 
     result = repository.upsert_qualification(payload)
 
     assert result == payload
+    written = gateway.upserts[0][1]
+    assert written["observed_dimensions"] == JsonValue(["market_fit"])
+    assert written["unknown_dimensions"] == JsonValue(["engagement_potential"])
     assert gateway.upserts == [(
         "prospect_qualifications",
-        payload,
+        {
+            **payload,
+            "observed_dimensions": JsonValue(["market_fit"]),
+            "unknown_dimensions": JsonValue(["engagement_potential"]),
+        },
         ("prospect_id", "scoring_engine", "scoring_version"),
         ConflictAction.MERGE,
         True,
