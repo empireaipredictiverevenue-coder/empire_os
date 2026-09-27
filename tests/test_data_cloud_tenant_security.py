@@ -10,9 +10,9 @@ def test_tenant_migration_uses_trusted_role_binding():
     ).read_text(encoding="utf-8")
 
     assert "empiredb_tenant_reader" in sql
-    assert "empire.tenant_role_bindings" in sql
+    assert "public.empire_tenant_role_bindings" in sql
     assert "current_user" in sql
-    assert "empire.current_tenant_id()" in sql
+    assert "public.empire_current_tenant_id()" in sql
     assert "current_setting('empire.tenant_id'" not in sql
     assert "org_id IS NOT NULL" in sql
     assert "GRANT SELECT ON" in sql
@@ -29,7 +29,7 @@ def test_tenant_reader_cannot_mutate_binding_table():
         root / "migrations/empiredb/018_tenant_context_foundation.sql"
     ).read_text(encoding="utf-8")
 
-    assert "REVOKE ALL ON TABLE empire.tenant_role_bindings" in sql
+    assert "REVOKE ALL ON TABLE public.empire_tenant_role_bindings" in sql
     assert "FROM empiredb_app, empiredb_readonly, empiredb_tenant_reader" in sql
 
 
@@ -52,3 +52,14 @@ def test_tenant_canary_is_rollback_only_and_checks_binding_mutation():
     assert "missing_binding_fails_closed" in source
     assert "production_cutover_authority" in source
     assert "SET ROLE empiredb_tenant_reader" in source
+
+
+
+def test_tenant_migration_does_not_require_database_schema_create():
+    root = Path(__file__).resolve().parents[1]
+    sql = (
+        root / "migrations/empiredb/018_tenant_context_foundation.sql"
+    ).read_text(encoding="utf-8")
+
+    assert "CREATE SCHEMA" not in sql
+    assert "public.empire_tenant_role_bindings" in sql
