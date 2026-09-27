@@ -249,3 +249,68 @@ def test_buyer_local_recovery_timer_is_auto_repairable():
     assert runtime_self_heal.unit_is_auto_repairable(
         "empire-buyer-acquisition-local-recovery.timer"
     )
+
+
+
+def test_containment_repair_allowlist_repairs_only_local_recovery(
+    monkeypatch,
+    tmp_path,
+):
+    _clear_runtime(monkeypatch)
+    local = runtime_self_heal.ServiceSpec(
+        "local_recovery",
+        "empire-buyer-acquisition-local-recovery.timer",
+    )
+    blocked = runtime_self_heal.ServiceSpec(
+        "buyer_team",
+        "empire-buyer-acquisition-team.timer",
+    )
+    monkeypatch.setattr(
+        runtime_self_heal,
+        "AUTO_REPAIR_TIMERS",
+        (local, blocked),
+    )
+
+    calls = []
+
+    def repair(action, unit):
+        calls.append((action, unit))
+        return {"ok": True}
+
+    states = {
+        "empire-buyer-acquisition-local-recovery.timer": iter([
+            (False, "inactive"),
+            (True, "active"),
+        ]),
+        "empire-buyer-acquisition-team.timer": iter([
+            (False, "inactive"),
+        ]),
+    }
+
+    payload = runtime_self_heal.run_runtime_self_heal(
+        now=NOW,
+        observe_only=False,
+        service_status=lambda unit: next(states[unit]),
+        repair=repair,
+        repair_unit_allowlist={
+            "empire-buyer-acquisition-local-recovery.timer"
+        },
+        unit_inventory=lambda: [],
+        latest_path=tmp_path / "latest.json",
+        state_path=tmp_path / "state.json",
+    )
+
+    assert calls == [(
+        "service_restart",
+        "empire-buyer-acquisition-local-recovery.timer",
+    )]
+    by_unit = {
+        row["unit"]: row
+        for row in payload["checks"]
+    }
+    assert by_unit[
+        "empire-buyer-acquisition-local-recovery.timer"
+    ]["after_repair"]["healthy"] is True
+    assert by_unit[
+        "empire-buyer-acquisition-team.timer"
+    ]["repair"]["decision"] == "CONTAINMENT_DEFERRED"
