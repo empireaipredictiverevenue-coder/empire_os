@@ -46,8 +46,17 @@ class FakeGateway:
         self.upserts.append((table, dict(row), tuple(conflict_columns), action, return_repr))
         return [unwrap_data_value(dict(row))]
 
-    def insert_ignore_conflicts(self, table, row, *, return_repr=False):
-        self.inserts.append((table, dict(row), return_repr))
+    def insert_ignore_conflicts(
+        self,
+        table,
+        row,
+        *,
+        conflict_columns=(),
+        return_repr=False,
+    ):
+        self.inserts.append(
+            (table, dict(row), tuple(conflict_columns), return_repr)
+        )
         return []
 
     def update(self, table, match, values):
@@ -137,8 +146,13 @@ def test_identity_writes_are_conflict_ignored_and_verified_externally():
     repository.insert_identity_link({"prospect_id": "p1", "entity_id": "e1"})
 
     assert gateway.inserts == [
-        ("business_entities", {"id": "e1"}, False),
-        ("prospect_entity_links", {"prospect_id": "p1", "entity_id": "e1"}, False),
+        ("business_entities", {"id": "e1"}, ("id",), False),
+        (
+            "prospect_entity_links",
+            {"prospect_id": "p1", "entity_id": "e1"},
+            ("prospect_id",),
+            False,
+        ),
     ]
 
 

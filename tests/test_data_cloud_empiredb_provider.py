@@ -271,3 +271,30 @@ def test_delete_match_values_use_connector_adaptation():
 
     _, params = connection.calls[0]
     assert params == (("jsonb", {"id": "x"}),)
+
+
+def test_targeted_ignore_conflicts_uses_explicit_conflict_target():
+    connection = FakeConnection()
+    provider = EmpireDbProvider(FakeConnector(connection))
+
+    assert provider.insert_ignore_conflicts(
+        "business_entities",
+        {"id": "e1", "canonical_name": "Example"},
+        conflict_columns=("id",),
+    ) == []
+
+    sql, params = connection.calls[0]
+    assert 'ON CONFLICT ("id") DO NOTHING' in sql
+    assert params == ("e1", "Example")
+    assert connection.commits == 1
+
+
+def test_targeted_ignore_conflicts_requires_target_columns_in_row():
+    provider = EmpireDbProvider(FakeConnector(FakeConnection()))
+
+    with pytest.raises(ValueError, match="conflict columns must be present"):
+        provider.insert_ignore_conflicts(
+            "business_entities",
+            {"canonical_name": "Example"},
+            conflict_columns=("id",),
+        )

@@ -179,6 +179,7 @@ class QualificationDataRepository:
         self._gateway.insert_ignore_conflicts(
             "business_entities",
             payload,
+            conflict_columns=("id",),
             return_repr=False,
         )
 
@@ -189,6 +190,7 @@ class QualificationDataRepository:
         self._gateway.insert_ignore_conflicts(
             "prospect_entity_links",
             payload,
+            conflict_columns=("prospect_id",),
             return_repr=False,
         )
 
