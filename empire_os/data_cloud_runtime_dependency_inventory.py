@@ -19,7 +19,7 @@ from empire_os.data_cloud_shadow_copy import SHADOW_TABLES
 
 
 COPY_RE = re.compile(
-    r'^COPY public\.(?:"((?:[^"]|"")*)"|([A-Za-z_][A-Za-z0-9_]*))\s*\('
+    r'^COPY\s+(?:"public"|public)\.(?:"((?:[^"]|"")*)"|([A-Za-z_][A-Za-z0-9_]*))\s*\('
 )
 
 ACCESS_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
