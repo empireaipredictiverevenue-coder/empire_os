@@ -41,7 +41,7 @@ SET search_path = pg_catalog, public
 AS $$
   SELECT b.tenant_id
   FROM public.empire_tenant_role_bindings AS b
-  WHERE b.role_name = current_user
+  WHERE b.role_name = session_user
     AND b.active
   LIMIT 1
 $$;
@@ -149,6 +149,6 @@ USING (
 COMMENT ON TABLE public.empire_tenant_role_bindings IS
   'Trusted DB-role-to-tenant mapping. Tenant reader cannot mutate this table.';
 COMMENT ON FUNCTION public.empire_current_tenant_id() IS
-  'Tenant identity resolved from current PostgreSQL role; caller payload/GUC is ignored.';
+  'Tenant identity resolved from authenticated PostgreSQL session_user; SET ROLE and caller payload/GUC cannot change it.';
 
 RESET ROLE;
