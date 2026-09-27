@@ -130,7 +130,6 @@ def _postgres_probe(dsn: str, *, application_name: str) -> dict[str, Any]:
 
 
 def _pgbackrest_config() -> dict[str, Any]:
-    raw = _read_env(PGBACKREST_CONFIG)
     # pgBackRest config is INI-shaped, not env-shaped. Parse only the fixed
     # non-secret keys needed for topology reporting.
     result: dict[str, Any] = {
@@ -167,6 +166,7 @@ def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
             "pgbackrest",
             f"--config={PGBACKREST_CONFIG}",
             f"--stanza={PGBACKREST_STANZA}",
+            "--log-level-file=off",
             "--output=json",
             "info",
         ],
