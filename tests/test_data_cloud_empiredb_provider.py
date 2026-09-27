@@ -2,6 +2,7 @@ import pytest
 
 from empire_os.canonical_data_gateway import DataGatewayOperationUnsupported
 from empire_os.data_backends.empiredb import EmpireDbProvider
+from empire_os.data_query import ConflictAction, DataFilter, OrderSpec
 
 
 class Description:
@@ -129,3 +130,70 @@ def test_count_is_parameterized_and_returns_exact_value():
     assert sql == 'SELECT count(*) AS count FROM public."prospects" WHERE "status" = %s'
     assert params == ("new",)
     assert connection.closed is True
+
+
+def test_neutral_query_compiles_parameterized_in_and_is_null():
+    connection = FakeConnection()
+    connection.next_cursor = Cursor([("p1",)], ("prospect_id",))
+    provider = EmpireDbProvider(FakeConnector(connection))
+
+    rows = provider.query(
+        "prospect_qualifications",
+        "prospect_id",
+        filters=(
+            DataFilter.eq("status", "scored"),
+            DataFilter.in_("tier", ("hot", "warm")),
+            DataFilter.is_null("entity_id"),
+        ),
+        order=(OrderSpec("scored_at", descending=True),),
+        limit=25,
+    )
+
+    assert rows == [{"prospect_id": "p1"}]
+    sql, params = connection.calls[0]
+    assert '"status" = %s' in sql
+    assert '"tier" IN (%s, %s)' in sql
+    assert '"entity_id" IS NULL' in sql
+    assert 'ORDER BY "scored_at" DESC' in sql
+    assert params == ("scored", "hot", "warm", 25, 0)
+
+
+def test_merge_upsert_uses_explicit_composite_conflict_target():
+    connection = FakeConnection()
+    connection.next_cursor = Cursor([("p1",)], ("prospect_id",))
+    provider = EmpireDbProvider(FakeConnector(connection))
+
+    rows = provider.upsert(
+        "prospect_qualifications",
+        {
+            "prospect_id": "p1",
+            "scoring_engine": "engine",
+            "scoring_version": "v2",
+            "status": "scored",
+        },
+        conflict_columns=("prospect_id", "scoring_engine", "scoring_version"),
+        action=ConflictAction.MERGE,
+        return_repr=True,
+    )
+
+    assert rows == [{"prospect_id": "p1"}]
+    sql, _ = connection.calls[0]
+    assert 'ON CONFLICT ("prospect_id", "scoring_engine", "scoring_version")' in sql
+    assert 'DO UPDATE SET "status" = EXCLUDED."status"' in sql
+    assert connection.commits == 1
+
+
+def test_insert_ignore_conflicts_uses_untargeted_postgres_conflict_clause():
+    connection = FakeConnection()
+    provider = EmpireDbProvider(FakeConnector(connection))
+
+    assert provider.insert_ignore_conflicts(
+        "commercial_events",
+        {"idempotency_key": "k1"},
+    ) == []
+
+    sql, params = connection.calls[0]
+    assert "ON CONFLICT DO NOTHING" in sql
+    assert "ON CONFLICT (" not in sql
+    assert params == ("k1",)
+    assert connection.commits == 1
