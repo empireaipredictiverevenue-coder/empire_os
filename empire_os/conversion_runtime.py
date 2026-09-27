@@ -12,7 +12,7 @@ from empire_os.conversion_intelligence import (
     ConversionStageEvidence,
     review_conversion_system,
 )
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 
 Request = Callable[..., Any]
