@@ -14,8 +14,10 @@ from uuid import UUID
 from empire_os.bsc_usdt_verifier import (
     BscUsdtConfig, PaymentVerificationError, _address, get_block_anchor,
 )
+from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.runtime_env import load_runtime_env
 
-CANONICAL_URL = "https://owbeinlfcfdtwcwrttjy.supabase.co"
+ENV_PATH = "/etc/empire_os.env"
 MIN_EXPIRY = timedelta(minutes=10)
 MAX_EXPIRY = timedelta(days=7)
 
@@ -140,10 +142,10 @@ def build_escrow_proposal(*, fulfilment_order_id: Any, amount_usdt: Any,
 def _canonical_service_db(db: Any | None) -> Any:
     if db is not None:
         return db
-    from empire_os import sb
-    if sb.SUPABASE_URL.rstrip("/") != CANONICAL_URL or not sb.SUPABASE_KEY:
-        raise PaymentGovernanceError("canonical Supabase service configuration required")
-    return sb
+    gateway = gateway_from_environment(load_runtime_env(ENV_PATH))
+    if not gateway.configured:
+        raise PaymentGovernanceError("canonical data backend is not configured")
+    return gateway
 
 def _expect_result(value: Any, decisions: set[str]) -> dict[str, Any]:
     if not isinstance(value, dict) or value.get("decision") not in decisions:
