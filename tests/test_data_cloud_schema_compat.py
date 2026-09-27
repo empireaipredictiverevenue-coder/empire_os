@@ -144,7 +144,7 @@ def test_payment_protection_semantics_are_all_verified():
     assert "force_rls_mismatch:bsc_payment_requests" in result["findings"]
     assert "rls_policy_mismatch:bsc_payment_requests" in result["findings"]
     assert "trigger_mismatch:bsc_payment_requests" in result["findings"]
-    assert "extension_mismatch" in result["findings"]
+    assert result["extension_compatibility_owner"] == "data_cloud_extension_plan"
 
 
 def test_sql_whitespace_and_public_prefix_do_not_create_false_drift():
