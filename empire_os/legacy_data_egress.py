@@ -363,3 +363,11 @@ def close_legacy_data_egress_circuit(
     LegacyDataEgressGovernor.from_environment().success(
         recovery_probe=recovery_probe
     )
+
+
+
+def legacy_data_component_name(
+    environ: Mapping[str, str] | None = None,
+) -> str:
+    source = os.environ if environ is None else environ
+    return _component_name(source)
