@@ -5,6 +5,21 @@ from empire_os.data_backends.supabase_legacy import (
 from empire_os.data_query import ConflictAction, DataFilter, OrderSpec
 
 
+class FakeEgress:
+    def __init__(self):
+        self.reserved = 0
+        self.successes = 0
+
+    def reserve(self, *, allow_probe=False):
+        self.reserved += 1
+
+    def success(self):
+        self.successes += 1
+
+    def observe_http_error(self, code, body):
+        return False
+
+
 class Response:
     def __init__(self, payload=b"[]", headers=None):
         self.payload = payload
@@ -48,6 +63,7 @@ def test_select_preserves_legacy_postgrest_semantics():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
         aliases={"si_outbox": "outbox_messages"},
     )
 
@@ -89,6 +105,7 @@ def test_exact_count_uses_content_range():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
     )
 
     assert provider.count("prospects") == 42
@@ -105,6 +122,7 @@ def test_neutral_query_maps_to_postgrest_filters_and_order():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
     )
 
     rows = provider.query(
@@ -137,6 +155,7 @@ def test_targeted_merge_upsert_uses_on_conflict_and_prefer():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
     )
 
     rows = provider.upsert(
@@ -167,6 +186,7 @@ def test_untargeted_ignore_conflicts_has_no_on_conflict_target():
     provider = SupabaseLegacyProvider(
         SupabaseLegacyConfig("https://example.supabase.co", "key"),
         urlopen=urlopen,
+        egress=FakeEgress(),
     )
 
     assert provider.insert_ignore_conflicts(
