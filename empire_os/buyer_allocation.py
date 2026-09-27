@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
 from empire_os.niche_taxonomy import (
@@ -395,28 +395,36 @@ def plan_allocation(
         "candidates": [item.to_rpc_candidate() for item in matches],
     }
 
-Reader = Callable[[str, dict[str, str]], Any]
+class BuyerAllocationReader(Protocol):
+    def latest_qualifications(
+        self,
+        prospect_id: str,
+    ) -> list[dict[str, Any]]:
+        ...
+
+    def active_identity_links(
+        self,
+        prospect_id: str,
+    ) -> list[dict[str, Any]]:
+        ...
+
+    def buyer_page(
+        self,
+        *,
+        page_size: int,
+        offset: int,
+    ) -> list[dict[str, Any]]:
+        ...
+
+
 Allocator = Callable[[dict[str, Any]], Any]
 
 
 def fetch_latest_qualification(
-    reader: Reader,
+    reader: BuyerAllocationReader,
     prospect_id: str,
 ) -> dict[str, Any] | None:
-    rows = reader(
-        "/rest/v1/prospect_qualifications",
-        {
-            "select": (
-                "id,prospect_id,entity_id,score,tier,status,scoring_engine,scoring_version,"
-                "evidence_confidence,observed_dimensions,unknown_dimensions,scored_at"
-            ),
-            "prospect_id": f"eq.{prospect_id}",
-            "scoring_engine": "eq.empire_os.lead_scoring",
-            "scoring_version": "in.(v2,v1)",
-            "order": "scored_at.desc",
-            "limit": "2",
-        },
-    )
+    rows = reader.latest_qualifications(prospect_id)
 
     if not isinstance(rows, list):
         raise BuyerAllocationError("qualification reader returned invalid payload")
@@ -437,16 +445,7 @@ def fetch_active_identity_link(
     reader: Reader,
     prospect_id: str,
 ) -> dict[str, Any] | None:
-    rows = reader(
-        "/rest/v1/prospect_entity_links",
-        {
-            "select": "prospect_id,entity_id,match_score,active,created_at",
-            "prospect_id": f"eq.{prospect_id}",
-            "active": "eq.true",
-            "order": "created_at.desc",
-            "limit": "2",
-        },
-    )
+    rows = reader.active_identity_links(prospect_id)
 
     if not isinstance(rows, list):
         raise BuyerAllocationError(
@@ -474,22 +473,7 @@ def fetch_buyer_rows(
     buyers: list[dict[str, Any]] = []
     offset = 0
     while True:
-        batch = reader(
-            "/rest/v1/buyers",
-            {
-                "select": (
-                    "id,buyer_name,niche,metro,is_active,status,"
-                    "daily_cap,calls_today,base_payout,per_lead_rate,priority,"
-                    "destination_phone,webhook_url,reviewed_at,"
-                    "commercial_activation_state,commercial_activated_at,"
-                    "commercial_terms_source,commercial_terms_reference,"
-                    "commercial_terms_verified_at,capacity_verified_at,"
-                    "delivery_verified_at"
-                ),
-                "limit": str(page_size),
-                "offset": str(offset),
-            },
-        )
+        batch = reader.buyer_page(page_size=page_size, offset=offset)
 
         if not isinstance(batch, list):
             raise BuyerAllocationError("buyer reader returned invalid payload")
