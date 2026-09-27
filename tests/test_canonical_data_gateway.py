@@ -118,9 +118,23 @@ def test_environment_defaults_to_current_legacy_backend():
     assert gateway.backend is DataBackend.SUPABASE_LEGACY
 
 
-def test_empiredb_selection_fails_closed_until_provider_is_registered():
-    with pytest.raises(DataGatewayUnavailable, match="verified runtime provider"):
-        gateway_from_environment({"EMPIRE_DATA_BACKEND": "empiredb"})
+def test_empiredb_selection_uses_registered_provider_factory():
+    class FakeEmpireProvider(FakeProvider):
+        backend = DataBackend.EMPIREDB
+
+    provider = FakeEmpireProvider()
+    gateway = gateway_from_environment(
+        {"EMPIRE_DATA_BACKEND": "empiredb"},
+        empiredb_provider_factory=lambda _: provider,
+    )
+
+    assert gateway.backend is DataBackend.EMPIREDB
+    assert gateway.configured is True
+
+
+def test_empiredb_selection_without_dsn_fails_closed():
+    with pytest.raises(DataGatewayUnavailable, match="runtime provider is not configured"):
+        gateway_from_environment({"EMPIRE_DATA_BACKEND": "empiredb", "EMPIREDB_DSN": ""})
 
 
 def test_unknown_backend_selection_fails_closed():
