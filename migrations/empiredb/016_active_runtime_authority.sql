@@ -3166,6 +3166,216 @@ CREATE TRIGGER guard_commercial_events_integrity
 BEFORE INSERT OR UPDATE OR DELETE ON public.commercial_events
 FOR EACH ROW EXECUTE FUNCTION public.guard_commercial_events_integrity();
 
+
+-- Underlying table rights for SECURITY INVOKER capability roles.
+GRANT SELECT,UPDATE ON public.outbound_intents TO
+  empire_outbound_approver,empire_outbound_sender,empire_reply_ingest;
+GRANT SELECT ON public.outbound_suppressions TO
+  empire_outbound_approver,empire_outbound_sender,empire_reply_ingest;
+GRANT INSERT ON public.outbound_events TO
+  empire_outbound_approver,empire_outbound_sender,empire_reply_ingest;
+GRANT SELECT,INSERT,UPDATE ON public.outbound_replies TO empire_reply_ingest;
+GRANT INSERT ON public.outbound_suppressions TO empire_reply_ingest;
+
+GRANT SELECT ON
+  public.outbound_replies,public.outbound_intents,
+  public.closer_cases,public.closer_recommendations
+TO empire_closer_observer;
+
+GRANT SELECT,INSERT,UPDATE ON public.closer_cases TO empire_closer_planner;
+GRANT SELECT,INSERT ON public.closer_recommendations,public.closer_events
+TO empire_closer_planner;
+GRANT SELECT ON
+  public.outbound_replies,public.outbound_intents,public.outbound_suppressions,
+  public.prospects,public.business_entities,public.buyer_candidate_reviews,
+  public.buyers,public.fulfilment_orders,public.commercial_evidence_registry
+TO empire_closer_planner;
+GRANT INSERT ON public.buyers,public.fulfilment_orders,
+  public.commercial_evidence_registry TO empire_closer_planner;
+GRANT UPDATE ON public.buyers,public.fulfilment_orders,
+  public.commercial_evidence_registry TO empire_closer_planner;
+GRANT SELECT,INSERT,UPDATE ON public.buyer_capacity_intakes TO empire_closer_planner;
+GRANT INSERT ON public.outbound_intents,public.outbound_events TO empire_closer_planner;
+
+GRANT SELECT,UPDATE ON public.closer_cases,public.fulfilment_orders
+TO empire_closer_approver;
+GRANT INSERT ON public.closer_events TO empire_closer_approver;
+
+GRANT SELECT,UPDATE ON public.bsc_payment_requests TO empire_payment_approver;
+GRANT SELECT ON public.fulfilment_orders,public.bsc_payment_evidence
+TO empire_payment_approver;
+GRANT INSERT ON public.bsc_payment_request_events TO empire_payment_approver;
+
+GRANT SELECT ON public.bsc_payment_requests,public.fulfilment_orders,
+  public.bsc_payment_evidence TO empire_bsc_verifier;
+GRANT INSERT ON public.bsc_payment_evidence,public.bsc_payment_request_events
+TO empire_bsc_verifier;
+
+GRANT SELECT ON public.bsc_payment_requests,public.bsc_escrow_agreements,
+  public.bsc_escrow_evidence TO empire_escrow_verifier;
+GRANT INSERT,UPDATE ON public.bsc_escrow_agreements TO empire_escrow_verifier;
+GRANT INSERT ON public.bsc_escrow_evidence TO empire_escrow_verifier;
+
+GRANT SELECT,UPDATE ON public.commercial_terms_reviews,public.fulfilment_orders
+TO empire_commercial_approver;
+GRANT SELECT,INSERT ON public.commercial_terms_events TO empire_commercial_approver;
+
+GRANT SELECT,INSERT ON public.commercial_outcomes TO empire_outcome_recorder;
+GRANT SELECT,UPDATE ON public.fulfilment_orders TO empire_outcome_recorder;
+GRANT INSERT ON public.commercial_events TO empire_outcome_recorder;
+
+GRANT SELECT,UPDATE ON public.fulfilment_orders TO empire_revenue_recognizer;
+GRANT SELECT ON
+  public.bsc_payment_requests,public.bsc_payment_evidence,
+  public.bsc_escrow_agreements,public.bsc_escrow_evidence,
+  public.commercial_outcomes
+TO empire_revenue_recognizer;
+GRANT SELECT,INSERT ON public.commercial_events TO empire_revenue_recognizer;
+
+GRANT SELECT,INSERT,UPDATE ON public.empire_conversations
+TO empire_conversation_ingest;
+GRANT SELECT,INSERT ON public.empire_conversation_events
+TO empire_conversation_ingest;
+GRANT SELECT ON public.empire_conversations,public.empire_conversation_events
+TO empire_conversation_reader;
+
+GRANT SELECT,INSERT ON public.revenue_exchange_observations
+TO empire_revenue_exchange_ingest;
+GRANT SELECT ON public.revenue_exchange_observations
+TO empire_revenue_exchange_reader;
+
+-- Functions default to PUBLIC EXECUTE in PostgreSQL. Revoke that default on the
+-- complete imported runtime authority set, then grant only named capabilities.
+DO $
+DECLARE
+  v_name text;
+  v_proc record;
+  v_names constant text[] := ARRAY[
+    'guard_outbound_events_append_only','propose_outbound_intent',
+    'approve_outbound_intent','claim_outbound_send','record_outbound_delivery',
+    'ingest_outbound_reply','classify_outbound_reply','get_outbound_intent_review',
+    'guard_closer_events_append_only','open_closer_case',
+    'record_closer_recommendation','advance_closer_case','list_closer_work',
+    'provision_buyer_from_closer_case','get_closer_reply_context',
+    'propose_closer_reply_intent','record_buyer_capacity_intake',
+    'prepare_fulfilment_order_from_capacity','propose_commercial_evidence',
+    'verify_commercial_evidence','reject_commercial_evidence',
+    'get_verified_terms_evidence','get_commercial_product_catalog',
+    'get_commercial_product_readiness','guard_commercial_terms_events_append_only',
+    'propose_commercial_terms','decide_commercial_terms',
+    'record_commercial_acceptance','get_commercial_terms_review',
+    'guard_bsc_payment_request','guard_bsc_payment_evidence',
+    'guard_bsc_payment_request_event','propose_bsc_payment_request',
+    'cancel_bsc_payment_request','get_bsc_payment_request_review',
+    'approve_bsc_payment_request','record_bsc_payment_evidence',
+    'guard_bsc_escrow_evidence','propose_bsc_escrow_request',
+    'record_bsc_escrow_creation','record_bsc_escrow_lifecycle',
+    'guard_direct_bsc_payment_mode','get_bsc_escrow_request_review',
+    'guard_empire_conversation_events_append_only',
+    'ingest_conversation_provider_event','record_revenue_exchange_observation',
+    'guard_commercial_outcomes_append_only','guard_commercial_events_integrity',
+    'record_commercial_outcome','recognize_bsc_revenue',
+    'list_revenue_recognition_work','get_commercial_outcome_feedback'
+  ];
+BEGIN
+  FOREACH v_name IN ARRAY v_names LOOP
+    FOR v_proc IN
+      SELECT p.oid::regprocedure AS signature
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='public' AND p.proname=v_name
+    LOOP
+      EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC',v_proc.signature);
+    END LOOP;
+  END LOOP;
+END $;
+
+-- Generic canonical app: proposal/read-only compatibility surface only.
+DO $
+DECLARE v_name text; v_proc record;
+BEGIN
+  FOREACH v_name IN ARRAY ARRAY[
+    'propose_outbound_intent','get_outbound_intent_review',
+    'list_closer_work','open_closer_case','provision_buyer_from_closer_case',
+    'get_closer_reply_context','propose_closer_reply_intent',
+    'record_buyer_capacity_intake','prepare_fulfilment_order_from_capacity',
+    'propose_commercial_evidence','verify_commercial_evidence',
+    'reject_commercial_evidence','record_closer_recommendation',
+    'get_commercial_product_catalog','get_commercial_product_readiness',
+    'get_verified_terms_evidence','propose_commercial_terms',
+    'get_commercial_terms_review','propose_bsc_payment_request',
+    'propose_bsc_escrow_request','cancel_bsc_payment_request',
+    'get_commercial_outcome_feedback'
+  ] LOOP
+    FOR v_proc IN
+      SELECT p.oid::regprocedure AS signature FROM pg_proc p
+      JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='public' AND p.proname=v_name
+    LOOP
+      EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO empiredb_app',v_proc.signature);
+    END LOOP;
+  END LOOP;
+END $;
+
+DO $
+DECLARE v_role text; v_name text; v_proc record;
+BEGIN
+  FOR v_role,v_name IN
+    SELECT * FROM (VALUES
+      ('empire_outbound_approver','approve_outbound_intent'),
+      ('empire_outbound_approver','get_outbound_intent_review'),
+      ('empire_outbound_sender','claim_outbound_send'),
+      ('empire_outbound_sender','record_outbound_delivery'),
+      ('empire_outbound_sender','get_outbound_intent_review'),
+      ('empire_reply_ingest','ingest_outbound_reply'),
+      ('empire_reply_ingest','classify_outbound_reply'),
+
+      ('empire_closer_observer','list_closer_work'),
+      ('empire_closer_planner','list_closer_work'),
+      ('empire_closer_planner','open_closer_case'),
+      ('empire_closer_planner','provision_buyer_from_closer_case'),
+      ('empire_closer_planner','get_closer_reply_context'),
+      ('empire_closer_planner','propose_closer_reply_intent'),
+      ('empire_closer_planner','record_buyer_capacity_intake'),
+      ('empire_closer_planner','prepare_fulfilment_order_from_capacity'),
+      ('empire_closer_planner','propose_commercial_evidence'),
+      ('empire_closer_planner','record_closer_recommendation'),
+      ('empire_closer_approver','advance_closer_case'),
+
+      ('empire_payment_approver','get_bsc_payment_request_review'),
+      ('empire_payment_approver','approve_bsc_payment_request'),
+      ('empire_payment_approver','cancel_bsc_payment_request'),
+      ('empire_bsc_verifier','get_bsc_payment_request_review'),
+      ('empire_bsc_verifier','record_bsc_payment_evidence'),
+      ('empire_escrow_verifier','get_bsc_escrow_request_review'),
+      ('empire_escrow_verifier','record_bsc_escrow_creation'),
+      ('empire_escrow_verifier','record_bsc_escrow_lifecycle'),
+
+      ('empire_commercial_approver','get_commercial_terms_review'),
+      ('empire_commercial_approver','decide_commercial_terms'),
+      ('empire_commercial_approver','record_commercial_acceptance'),
+
+      ('empire_outcome_recorder','record_commercial_outcome'),
+      ('empire_revenue_recognizer','recognize_bsc_revenue'),
+      ('empire_revenue_recognizer','list_revenue_recognition_work'),
+
+      ('empire_conversation_ingest','ingest_conversation_provider_event'),
+      ('empire_revenue_exchange_ingest','record_revenue_exchange_observation')
+    ) AS x(role_name,function_name)
+  LOOP
+    FOR v_proc IN
+      SELECT p.oid::regprocedure AS signature FROM pg_proc p
+      JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='public' AND p.proname=v_name
+    LOOP
+      EXECUTE format(
+        'GRANT EXECUTE ON FUNCTION %s TO %I',
+        v_proc.signature,v_role
+      );
+    END LOOP;
+  END LOOP;
+END $;
+
 -- Materialize RLS policies from already-granted SQL capabilities.
 -- This cannot widen authority: a policy is created only when the role already
 -- owns the corresponding table privilege.
