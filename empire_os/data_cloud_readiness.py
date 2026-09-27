@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from empire_os.data_cloud_discovery import discover_vendor_dependencies
+from empire_os.data_cloud_discovery import RUNTIME_COUPLING_MARKERS, discover_vendor_dependencies
 from empire_os.data_cloud_infrastructure import (
     HostObservation,
     evaluate_foundation_readiness,
