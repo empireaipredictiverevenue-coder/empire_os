@@ -11,6 +11,7 @@ def _evidence(**overrides):
         "encrypted": True,
         "off_node": True,
         "wal_archiving_verified": True,
+        "wal_archive_lag_seconds": 30.0,
         "pitr_restore_verified": True,
         "full_restore_verified": True,
         "restore_duration_seconds": 600.0,
@@ -52,3 +53,12 @@ def test_restore_must_meet_rto():
     )
     assert result["ready"] is False
     assert "restore_exceeds_rto" in result["findings"]
+
+
+def test_wal_archive_lag_must_meet_rpo():
+    result = evaluate_restore_readiness(
+        _evidence(wal_archive_lag_seconds=600.0),
+        policy=BackupPolicy(target_rpo_seconds=300),
+    )
+    assert result["ready"] is False
+    assert "wal_archive_lag_exceeds_rpo" in result["findings"]
