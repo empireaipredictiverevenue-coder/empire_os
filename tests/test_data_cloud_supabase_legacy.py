@@ -5,8 +5,9 @@ from empire_os.data_backends.supabase_legacy import (
 
 
 class Response:
-    def __init__(self, payload=b"[]"):
+    def __init__(self, payload=b"[]", headers=None):
         self.payload = payload
+        self.headers = headers or {}
         self.closed = False
 
     def read(self):
@@ -75,3 +76,19 @@ def test_partial_legacy_config_is_rejected():
         assert "configured together" in str(exc)
     else:
         raise AssertionError("expected partial config rejection")
+
+
+def test_exact_count_uses_content_range():
+    seen = {}
+
+    def urlopen(request, timeout):
+        seen["prefer"] = request.get_header("Prefer")
+        return Response(b'[]', {"Content-Range": "0-0/42"})
+
+    provider = SupabaseLegacyProvider(
+        SupabaseLegacyConfig("https://example.supabase.co", "key"),
+        urlopen=urlopen,
+    )
+
+    assert provider.count("prospects") == 42
+    assert seen["prefer"] == "count=exact"

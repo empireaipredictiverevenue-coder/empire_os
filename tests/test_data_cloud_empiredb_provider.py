@@ -116,3 +116,16 @@ def test_zero_limit_is_preserved():
     assert provider.select("prospects", "id", limit=0) == []
     _, params = connection.calls[0]
     assert params[-2:] == (0, 0)
+
+
+def test_count_is_parameterized_and_returns_exact_value():
+    connection = FakeConnection()
+    connection.next_cursor = Cursor([(42,)], ("count",))
+    provider = EmpireDbProvider(FakeConnector(connection))
+
+    assert provider.count("prospects", {"status": "new"}) == 42
+
+    sql, params = connection.calls[0]
+    assert sql == 'SELECT count(*) AS count FROM public."prospects" WHERE "status" = %s'
+    assert params == ("new",)
+    assert connection.closed is True

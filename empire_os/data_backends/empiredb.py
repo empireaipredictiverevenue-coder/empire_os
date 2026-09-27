@@ -104,6 +104,31 @@ class EmpireDbProvider:
         finally:
             connection.close()
 
+    def count(
+        self,
+        table: str,
+        filters: Mapping[str, object] | None = None,
+    ) -> int:
+        params: list[object] = []
+        where_parts: list[str] = []
+        for key, value in (filters or {}).items():
+            where_parts.append(f"{_ident(str(key))} = %s")
+            params.append(value)
+
+        sql = f"SELECT count(*) AS count FROM public.{_ident(table)}"
+        if where_parts:
+            sql += " WHERE " + " AND ".join(where_parts)
+
+        connection = self._connection()
+        try:
+            cursor = connection.execute(sql, tuple(params))
+            rows = _rows(cursor)
+            if len(rows) != 1 or "count" not in rows[0]:
+                raise RuntimeError("EmpireDB count returned invalid shape")
+            return int(rows[0]["count"])
+        finally:
+            connection.close()
+
     def insert(
         self,
         table: str,

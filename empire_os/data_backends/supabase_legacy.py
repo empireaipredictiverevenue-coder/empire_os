@@ -99,6 +99,28 @@ class SupabaseLegacyProvider:
         with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
 
+    def count(
+        self,
+        table: str,
+        filters: Mapping[str, object] | None = None,
+    ) -> int:
+        params: list[tuple[str, str]] = [("select", "*"), ("limit", "1")]
+        if filters:
+            params.extend((str(k), f"eq.{v}") for k, v in filters.items())
+        query = "?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(
+            self._url(table, query),
+            headers=self._headers({"Prefer": "count=exact"}),
+        )
+        with self._urlopen(req, timeout=self._config.timeout_seconds) as response:
+            content_range = response.headers.get("Content-Range", "")
+            if "/" not in content_range:
+                raise RuntimeError("exact count missing Content-Range")
+            total = content_range.rsplit("/", 1)[1]
+            if not total.isdigit():
+                raise RuntimeError("exact count invalid Content-Range")
+            return int(total)
+
     def insert(
         self,
         table: str,
