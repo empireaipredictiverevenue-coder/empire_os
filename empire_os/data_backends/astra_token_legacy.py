@@ -11,10 +11,10 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from empire_os.outcome_role_transport import OutcomeTransportError
-from empire_os.qualification_worker_v2 import (
-    _close_supabase_egress_circuit,
-    _open_supabase_egress_circuit,
-    _reserve_supabase_request,
+from empire_os.legacy_data_egress import (
+    close_legacy_data_egress_circuit,
+    open_legacy_data_egress_circuit,
+    reserve_legacy_data_request,
 )
 
 
@@ -87,7 +87,7 @@ class LegacyAstraTokenBackend:
         for key in keys:
             payload[key] = params[key]
 
-        _reserve_supabase_request()
+        reserve_legacy_data_request()
 
         request = Request(
             f"{self.base_url}/rest/v1/rpc/{rpc_name}",
@@ -114,7 +114,7 @@ class LegacyAstraTokenBackend:
                 timeout=15,
             ) as response:
                 raw = response.read().decode("utf-8")
-                _close_supabase_egress_circuit()
+                close_legacy_data_egress_circuit()
         except HTTPError as exc:
             body = exc.read().decode(
                 "utf-8",
@@ -128,7 +128,7 @@ class LegacyAstraTokenBackend:
                     in body
                 )
             ):
-                _open_supabase_egress_circuit(
+                open_legacy_data_egress_circuit(
                     "exceed_egress_quota"
                 )
             raise OutcomeTransportError(
