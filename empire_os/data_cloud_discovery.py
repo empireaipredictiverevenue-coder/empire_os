@@ -25,7 +25,7 @@ RUNTIME_COUPLING_MARKERS = (
     "SUPABASE_SERVICE_KEY",
     "SUPABASE_URL",
     "supabase.co",
-    "/rest/v1/",
+    "SUPABASE_KEY",
 )
 
 
