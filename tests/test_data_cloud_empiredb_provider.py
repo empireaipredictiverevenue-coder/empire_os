@@ -298,3 +298,45 @@ def test_targeted_ignore_conflicts_requires_target_columns_in_row():
             {"canonical_name": "Example"},
             conflict_columns=("id",),
         )
+
+
+def test_mapped_rpc_uses_exact_contract_order_and_commits():
+    connection = FakeConnection()
+    connection.next_cursor = Cursor([({"exists": True},)], ("result",))
+    provider = EmpireDbProvider(FakeConnector(connection))
+
+    result = provider.rpc(
+        "get_commercial_product_readiness",
+        {"p_product_code": "managed_service"},
+    )
+
+    assert result == {"exists": True}
+    sql, params = connection.calls[0]
+    assert sql == 'SELECT public."get_commercial_product_readiness"(%s)'
+    assert params == ("managed_service",)
+    assert connection.commits == 1
+    assert connection.closed is True
+
+
+def test_sensitive_payment_rpc_stays_off_generic_gateway():
+    provider = EmpireDbProvider(FakeConnector(FakeConnection()))
+
+    with pytest.raises(DataGatewayOperationUnsupported, match="not mapped"):
+        provider.rpc(
+            "approve_bsc_payment_request",
+            {
+                "p_request_id": "00000000-0000-0000-0000-000000000001",
+                "p_approved_by": "operator",
+                "p_approval_note": "approved",
+            },
+        )
+
+
+def test_mapped_rpc_rejects_parameter_shape_drift():
+    provider = EmpireDbProvider(FakeConnector(FakeConnection()))
+
+    with pytest.raises(ValueError, match="parameters do not match contract"):
+        provider.rpc(
+            "get_commercial_product_readiness",
+            {"wrong_key": "managed_service"},
+        )
