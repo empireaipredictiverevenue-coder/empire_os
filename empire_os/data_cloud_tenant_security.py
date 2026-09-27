@@ -34,10 +34,14 @@ def _ids(connection, table: str, ids: tuple[uuid.UUID, uuid.UUID]) -> set[str]:
 
 
 def _bind_reader(connection, tenant_id: uuid.UUID | None) -> None:
+    login_role = str(
+        connection.execute("SELECT session_user").fetchone()[0]
+    )
     if tenant_id is None:
         connection.execute(
             "DELETE FROM public.empire_tenant_role_bindings "
-            "WHERE role_name='empiredb_tenant_reader'"
+            "WHERE role_name=%s",
+            (login_role,),
         )
         return
     connection.execute(
@@ -45,7 +49,7 @@ def _bind_reader(connection, tenant_id: uuid.UUID | None) -> None:
         INSERT INTO public.empire_tenant_role_bindings(
             role_name, tenant_id, active, evidence_ref
         )
-        VALUES ('empiredb_tenant_reader', %s, true, 'rollback-canary')
+        VALUES (%s, %s, true, 'rollback-canary')
         ON CONFLICT (role_name)
         DO UPDATE SET
             tenant_id=EXCLUDED.tenant_id,
@@ -53,7 +57,7 @@ def _bind_reader(connection, tenant_id: uuid.UUID | None) -> None:
             evidence_ref=EXCLUDED.evidence_ref,
             updated_at=clock_timestamp()
         """,
-        (tenant_id,),
+        (login_role, tenant_id),
     )
 
 
@@ -67,7 +71,7 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
 
     report: dict[str, Any] = {
         "schema_version": "empire.data-cloud-tenant-isolation-canary.v2",
-        "identity_source": "trusted_db_role_binding",
+        "identity_source": "authenticated_db_session_user_binding",
         "caller_tenant_guc_trusted": False,
         "rollback_only": True,
         "production_cutover_authority": False,
@@ -127,7 +131,7 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
                 """
                 UPDATE public.empire_tenant_role_bindings
                 SET tenant_id=%s
-                WHERE role_name='empiredb_tenant_reader'
+                WHERE role_name=session_user
                 """,
                 (org_b,),
             )
