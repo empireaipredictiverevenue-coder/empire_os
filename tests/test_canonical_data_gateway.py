@@ -22,6 +22,10 @@ class FakeProvider:
         self.calls.append(("select", table))
         return [{"id": "1"}]
 
+    def count(self, table, filters=None):
+        self.calls.append(("count", table))
+        return 7
+
     def insert(self, table, row, *, return_repr=True):
         self.calls.append(("insert", table))
         return [dict(row)] if return_repr else []
@@ -52,6 +56,7 @@ def test_gateway_delegates_without_exposing_vendor_details():
     gateway = CanonicalDataGateway(provider)
 
     assert gateway.select("prospects") == [{"id": "1"}]
+    assert gateway.count("prospects") == 7
     assert gateway.insert("prospects", {"id": "2"}) == [{"id": "2"}]
     assert gateway.update("prospects", {"id": "2"}, {"status": "x"}) == [{"status": "x"}]
     gateway.delete("prospects", {"id": "2"})
@@ -59,6 +64,7 @@ def test_gateway_delegates_without_exposing_vendor_details():
 
     assert provider.calls == [
         ("select", "prospects"),
+        ("count", "prospects"),
         ("insert", "prospects"),
         ("update", "prospects"),
         ("delete", "prospects"),
