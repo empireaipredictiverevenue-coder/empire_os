@@ -16,7 +16,7 @@ from typing import Any, Callable, Mapping
 import urllib.parse
 
 from empire_os.buyer_acquisition_scout import refresh_buyer_scout
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 from empire_os.supabase_egress_guard import supabase_egress_contained
 
 
