@@ -22,6 +22,8 @@ ALLOWED_UNITS = frozenset({
     "empire-public-gateway.service",
     "empire-self-serve-checkout.service",
     "empire-ops-mcp.service",
+    "empire-founder-console.service",
+    "empire-founder-dashboard-api.service",
     "empire-revenue-pulse.service",
     "empire-revenue-pulse.timer",
     "empire-conversation-recovery.service",
