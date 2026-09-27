@@ -10,7 +10,7 @@ from pathlib import Path
 import urllib.parse
 from typing import Any, Mapping, Sequence
 
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 from empire_os.solar_fulfilment_observation import (
     materialize_with_resource_observation,
 )
