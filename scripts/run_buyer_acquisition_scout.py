@@ -364,6 +364,12 @@ def main() -> int:
         "canonical_seed_fallback_used": payload[
             "canonical_seed_fallback_used"
         ],
+        "opportunity_seed_domain_count": payload.get(
+            "opportunity_seed_domain_count", 0
+        ),
+        "opportunity_seed_supplement_used": payload.get(
+            "opportunity_seed_supplement_used", False
+        ),
         "opportunity_seed_count": len(opportunity_seeds),
         "local_recovery_seed_count": len(local_recovery_seeds),
         "opportunity_seed_query_error_count": sum(
