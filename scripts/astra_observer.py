@@ -11,7 +11,10 @@ from empire_os.astra_observer import (
     AstraObserverError,
     run_observer_cycle,
 )
-from empire_os.astra_token_transport import SupabaseTokenAstraRpc
+from empire_os.astra_token_transport import AstraTokenRpc
+from empire_os.data_backends.astra_token_legacy import (
+    legacy_astra_backend_from_environment,
+)
 from empire_os.outcome_role_transport import OutcomeTransportError
 
 
@@ -42,15 +45,16 @@ def parser() -> argparse.ArgumentParser:
 
 
 def _rpc_config():
-    url = os.getenv("EMPIRE_ASTRA_SUPABASE_URL", "").strip()
-    key = os.getenv("EMPIRE_ASTRA_SUPABASE_PUBLISHABLE_KEY", "").strip()
-    token_file = os.getenv("EMPIRE_ASTRA_OBSERVER_TOKEN_FILE", "").strip()
-    if url or key or token_file:
-        if not (url and key and token_file):
-            raise AstraObserverError("incomplete token-authenticated Astra RPC config")
+    try:
+        backend = legacy_astra_backend_from_environment(os.environ)
+    except OutcomeTransportError as exc:
+        raise AstraObserverError(str(exc)) from exc
+
+    if backend is not None:
         def factory(_dsn, _role):
-            return SupabaseTokenAstraRpc(url, key, token_file)
+            return AstraTokenRpc(backend)
         return "token-rpc", factory
+
     return os.getenv("EMPIRE_ASTRA_OBSERVER_DSN", ""), None
 
 
