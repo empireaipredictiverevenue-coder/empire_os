@@ -235,11 +235,12 @@ class SupabaseLegacyProvider:
         query = "?" + urllib.parse.urlencode(
             {"on_conflict": ",".join(columns)}
         )
-        resolution = (
-            "merge-duplicates"
-            if action is ConflictAction.MERGE
-            else "ignore-duplicates"
-        )
+        if action is ConflictAction.MERGE:
+            resolution = "merge-duplicates"
+        elif action is ConflictAction.IGNORE:
+            resolution = "ignore-duplicates"
+        else:
+            raise ValueError(f"unsupported conflict action: {action!r}")
         returning = "representation" if return_repr else "minimal"
         req = urllib.request.Request(
             self._url(table, query),
