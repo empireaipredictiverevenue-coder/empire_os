@@ -6,6 +6,7 @@ from empire_os.data_backends.supabase_legacy import (
     SupabaseLegacyProvider,
 )
 from empire_os.data_query import ConflictAction, DataFilter, OrderSpec
+from empire_os.data_values import JsonValue
 from empire_os.legacy_data_egress import (
     LegacyDataEgressGovernor,
     LegacyEgressConfig,
@@ -293,3 +294,28 @@ def test_extended_query_operators_preserve_bus_semantics():
     assert "buy_signal_score=gte.50" in seen["url"]
     assert "status=not.in.%28rejected%2Ccancelled%29" in seen["url"]
     assert "order=buy_signal_score.desc.nullslast%2Ccreated_at.asc" in seen["url"]
+
+
+def test_legacy_write_unwraps_explicit_json_values():
+    seen = {}
+
+    def urlopen(request, timeout):
+        seen["body"] = request.data.decode("utf-8")
+        return Response(b'[{"id":"1"}]')
+
+    provider = SupabaseLegacyProvider(
+        SupabaseLegacyConfig("https://example.supabase.co", "key"),
+        urlopen=urlopen,
+        egress=FakeEgress(),
+    )
+
+    provider.insert(
+        "prospect_qualifications",
+        {
+            "id": "1",
+            "observed_dimensions": JsonValue(["market_fit"]),
+        },
+    )
+
+    assert '"observed_dimensions": ["market_fit"]' in seen["body"]
+    assert "JsonValue" not in seen["body"]

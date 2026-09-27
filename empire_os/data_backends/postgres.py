@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 import os
 from typing import Any, Callable, Mapping, Protocol
 
+from empire_os.data_values import JsonValue
+
 
 class ConnectionLike(Protocol):
     def execute(self, query: str, params: tuple[object, ...] = ()) -> Any:
@@ -112,6 +114,28 @@ class PostgresConnector:
         except Exception:
             connection.close()
             raise
+
+    def adapt_value(self, value: Any) -> Any:
+        """Adapt explicit Data Fabric values for psycopg.
+
+        Dicts are unambiguously JSON objects. Lists remain PostgreSQL arrays
+        unless the caller explicitly wraps them in JsonValue.
+        """
+        if isinstance(value, JsonValue):
+            return self._jsonb(value.value)
+        if isinstance(value, dict):
+            return self._jsonb(value)
+        return value
+
+    @staticmethod
+    def _jsonb(value: Any) -> Any:
+        try:
+            from psycopg.types.json import Jsonb
+        except ImportError as exc:
+            raise RuntimeError(
+                "psycopg is required for EmpireDB JSONB adaptation"
+            ) from exc
+        return Jsonb(value)
 
     def health(self) -> dict[str, Any]:
         connection: ConnectionLike | None = None

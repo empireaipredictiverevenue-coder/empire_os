@@ -3,6 +3,7 @@ import pytest
 from empire_os.canonical_data_gateway import DataGatewayOperationUnsupported
 from empire_os.data_backends.empiredb import EmpireDbProvider
 from empire_os.data_query import ConflictAction, DataFilter, OrderSpec
+from empire_os.data_values import JsonValue
 
 
 class Description:
@@ -46,9 +47,18 @@ class FakeConnector:
 
     def __init__(self, connection):
         self.connection = connection
+        self.adapted = []
 
     def _open_connection(self):
         return self.connection
+
+    def adapt_value(self, value):
+        self.adapted.append(value)
+        if isinstance(value, JsonValue):
+            return ("jsonb", value.value)
+        if isinstance(value, dict):
+            return ("jsonb", value)
+        return value
 
 
 def test_select_is_parameterized_and_identifier_bounded():
@@ -227,3 +237,37 @@ def test_extended_query_operators_compile_to_parameterized_sql():
     assert '"status" NOT IN (%s, %s)' in sql
     assert 'ORDER BY "buy_signal_score" DESC NULLS LAST, "created_at" ASC' in sql
     assert params == ("archived", "denver", 50, "rejected", "cancelled", 5, 0)
+
+
+def test_write_values_use_connector_json_adaptation():
+    connection = FakeConnection()
+    connection.next_cursor = Cursor([("1",)], ("id",))
+    connector = FakeConnector(connection)
+    provider = EmpireDbProvider(connector)
+
+    provider.insert(
+        "commercial_events",
+        {
+            "id": "1",
+            "payload": {"score": 90},
+            "tags": JsonValue(["qualified", "hot"]),
+        },
+    )
+
+    _, params = connection.calls[0]
+    assert params == (
+        "1",
+        ("jsonb", {"score": 90}),
+        ("jsonb", ["qualified", "hot"]),
+    )
+
+
+def test_delete_match_values_use_connector_adaptation():
+    connection = FakeConnection()
+    connector = FakeConnector(connection)
+    provider = EmpireDbProvider(connector)
+
+    provider.delete("events", {"payload_key": JsonValue({"id": "x"})})
+
+    _, params = connection.calls[0]
+    assert params == (("jsonb", {"id": "x"}),)

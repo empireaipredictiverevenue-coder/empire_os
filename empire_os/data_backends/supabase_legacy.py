@@ -16,6 +16,7 @@ import urllib.request
 from empire_os.data_cloud_contract import DataBackend
 from empire_os.legacy_data_egress import LegacyDataEgressGovernor
 from empire_os.data_query import ConflictAction, DataFilter, FilterOperator, OrderSpec
+from empire_os.data_values import unwrap_data_value
 
 
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -260,7 +261,7 @@ class SupabaseLegacyProvider:
         prefer = "return=representation" if return_repr else "return=minimal"
         req = urllib.request.Request(
             self._url(table),
-            data=json.dumps(dict(row)).encode("utf-8"),
+            data=json.dumps(unwrap_data_value(dict(row))).encode("utf-8"),
             headers=self._headers({"Prefer": prefer}),
             method="POST",
         )
@@ -296,7 +297,7 @@ class SupabaseLegacyProvider:
         returning = "representation" if return_repr else "minimal"
         req = urllib.request.Request(
             self._url(table, query),
-            data=json.dumps(dict(row)).encode("utf-8"),
+            data=json.dumps(unwrap_data_value(dict(row))).encode("utf-8"),
             headers=self._headers({
                 "Prefer": f"resolution={resolution},return={returning}"
             }),
@@ -320,7 +321,7 @@ class SupabaseLegacyProvider:
         returning = "representation" if return_repr else "minimal"
         req = urllib.request.Request(
             self._url(table),
-            data=json.dumps(dict(row)).encode("utf-8"),
+            data=json.dumps(unwrap_data_value(dict(row))).encode("utf-8"),
             headers=self._headers({
                 "Prefer": f"resolution=ignore-duplicates,return={returning}"
             }),
@@ -343,7 +344,7 @@ class SupabaseLegacyProvider:
         )
         req = urllib.request.Request(
             self._url(table, query),
-            data=json.dumps(dict(values)).encode("utf-8"),
+            data=json.dumps(unwrap_data_value(dict(values))).encode("utf-8"),
             headers=self._headers({"Prefer": "return=representation"}),
             method="PATCH",
         )
@@ -372,7 +373,9 @@ class SupabaseLegacyProvider:
     ) -> object:
         req = urllib.request.Request(
             f"{self._config.url.rstrip('/')}/rest/v1/rpc/{name}",
-            data=json.dumps(dict(params or {})).encode("utf-8"),
+            data=json.dumps(
+                unwrap_data_value(dict(params or {}))
+            ).encode("utf-8"),
             headers=self._headers(),
             method="POST",
         )
