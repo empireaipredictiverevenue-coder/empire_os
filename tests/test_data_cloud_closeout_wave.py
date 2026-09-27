@@ -10,7 +10,7 @@ def test_closeout_wave_covers_every_remaining_software_gate():
     ids = {request.request_id for request in requests}
 
     assert {
-        "empiredb-closeout-observability",
+        "empiredb-closeout-observability-v2",
         "empiredb-closeout-rollback-proof",
         "empiredb-closeout-tenant-isolation",
         "empiredb-closeout-recovery-pitr-plan",
@@ -83,3 +83,21 @@ def test_recovery_job_keeps_external_infrastructure_unproven():
     objective = request.objective.lower()
     assert "do not pretend a second target exists" in objective
     assert "no infrastructure mutation" in objective
+
+
+
+def test_unfinished_implementation_lanes_route_to_hermes():
+    by_id = {
+        request.request_id: request
+        for request in closeout_requests()
+    }
+
+    for request_id in (
+        "empiredb-closeout-observability-v2",
+        "empiredb-closeout-rollback-proof",
+        "empiredb-closeout-tenant-isolation",
+        "empiredb-closeout-recovery-pitr-plan",
+        "empiredb-closeout-runtime-canary",
+        "empiredb-closeout-final-manifest",
+    ):
+        assert by_id[request_id].capability == "backend_code"
