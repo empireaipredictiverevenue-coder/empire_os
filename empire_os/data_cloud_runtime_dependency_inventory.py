@@ -165,6 +165,15 @@ def main() -> int:
         "unmigrated_runtime_tables": unmigrated,
         "read_only": True,
     }, sort_keys=True))
+    for table in unmigrated:
+        refs = sorted({
+            f"{item['file']}:{item['line']}"
+            for item in hits.get(table, [])
+        })
+        print(json.dumps({
+            "table": table,
+            "references": refs,
+        }, sort_keys=True))
     return 0
 
 
