@@ -149,3 +149,38 @@ def test_systemd_runs_production_module_not_recovery_script():
     assert "-m empire_os.reliability_agent" in text
     assert "run_buyer_acquisition_local_recovery.py" not in text
     assert "Restart=always" in text
+
+
+
+def test_failed_action_enters_bounded_backoff_and_success_clears_it():
+    state = {"action_failures": {}}
+
+    reliability._record_action_result(
+        state,
+        "REFRESH_RECOVERY_SNAPSHOT",
+        ok=False,
+        now=NOW,
+    )
+
+    row = state["action_failures"]["REFRESH_RECOVERY_SNAPSHOT"]
+    assert row["count"] == 1
+    assert row["backoff_seconds"] == 60
+    assert reliability._action_allowed(
+        state,
+        "REFRESH_RECOVERY_SNAPSHOT",
+        now=NOW,
+    ) is False
+
+    reliability._record_action_result(
+        state,
+        "REFRESH_RECOVERY_SNAPSHOT",
+        ok=True,
+        now=NOW,
+    )
+
+    assert "REFRESH_RECOVERY_SNAPSHOT" not in state["action_failures"]
+    assert reliability._action_allowed(
+        state,
+        "REFRESH_RECOVERY_SNAPSHOT",
+        now=NOW,
+    ) is True
