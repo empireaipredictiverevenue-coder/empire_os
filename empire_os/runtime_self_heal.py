@@ -68,6 +68,10 @@ AUTO_REPAIR_TIMERS: tuple[ServiceSpec, ...] = (
     ServiceSpec("commercial_catalog_timer", "empire-commercial-product-catalog.timer"),
     ServiceSpec("commercial_exchange_timer", "empire-commercial-exchange.timer"),
     ServiceSpec("buyer_acquisition_timer", "empire-buyer-acquisition-team.timer"),
+    ServiceSpec(
+        "buyer_acquisition_local_recovery_timer",
+        "empire-buyer-acquisition-local-recovery.timer",
+    ),
     ServiceSpec("source_health_timer", "empire-source-health.timer"),
     ServiceSpec("revenue_pulse_timer", "empire-revenue-pulse.timer"),
     ServiceSpec("acquisition_timer", "empire-acquisition.timer"),
