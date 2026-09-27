@@ -11,7 +11,7 @@ from urllib.parse import quote, urlencode, urlparse, urlunparse
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
 from empire_os.decision_judge import SCHEMA_VERSION as DECISION_JUDGE_SCHEMA_VERSION
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 from empire_os.voice_routing_policy import switchboard_status
 from empire_os.voice_lab import EmpireVoiceLab, VoiceLabConfig, VoiceTurnDetector
 
