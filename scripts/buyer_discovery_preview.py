@@ -1,100 +1,28 @@
 #!/usr/bin/env python3
 """OBSERVE-only canonical buyer discovery preview.
 
-Reads canonical Supabase prospects/entity links, ranks locally, and optionally
-probes a small number of public company websites. Performs no database writes.
+Reads canonical prospects/entity links, ranks locally, and optionally probes a
+small number of public company websites. Performs no database writes.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
-from pathlib import Path
-
 from empire_os.buyer_discovery import (
     accepted_acquisition_website,
     select_candidates,
 )
+from empire_os.buyer_discovery_repository import BuyerDiscoveryRepository
 from empire_os.niche_taxonomy import metro_key, niche_family
-from empire_os.runtime_env import load_runtime_env
-
-ENV_PATH = os.environ.get(
-    "EMPIRE_BUYER_DISCOVERY_ENV_PATH",
-    "/srv/empire_os/runtime/secrets/outbound.env",
-)
 
 
-def _load_env(path: str | Path = ENV_PATH) -> dict[str, str]:
-    return load_runtime_env(
-        path,
-        required=("SUPABASE_URL", "SUPABASE_SERVICE_KEY"),
-    )
-
-
-def _supabase_client():
-    from empire_os import sb
-
-    if sb._configured():
-        return sb
-
-    env = _load_env()
-    sb.SUPABASE_URL = env["SUPABASE_URL"].rstrip("/")
-    sb.SUPABASE_KEY = env["SUPABASE_SERVICE_KEY"]
-    if not sb._configured():
-        raise RuntimeError("canonical Supabase configuration required")
-    return sb
-
-
-def _pages(
-    select_fn,
-    table,
-    columns,
-    *,
-    filters=None,
-    order=None,
-    batch=1000,
-    max_rows=50000,
-):
-    rows = []
-    offset = 0
-    while len(rows) < max_rows:
-        page = select_fn(
-            table,
-            columns=columns,
-            filters=filters,
-            order=order,
-            limit=min(batch, max_rows-len(rows)),
-            offset=offset,
-        )
-        if not page:
-            break
-        rows.extend(page)
-        if len(page) < batch:
-            break
-        offset += len(page)
-    return rows
-
-
-def load_rows():
-    sb = _supabase_client()
-    prospects = _pages(
-        sb.select, "prospects",
-        "id,business_name,niche,metro,phone,website,buy_signal_score,status,notes,contact_name,contact_title,contact_source,contacted_status",
-    )
-    links = _pages(
-        sb.select,
-        "prospect_entity_links",
-        "prospect_id,entity_id,match_score,active",
-        filters={"active": "true"},
-    )
-    acquisitions = _pages(
-        sb.select,
-        "prospect_acquisitions",
-        "prospect_id,evidence,created_at",
-        order="created_at.desc",
-    )
+def load_rows(repository=None):
+    store = repository or BuyerDiscoveryRepository.from_environment()
+    prospects = store.prospects()
+    links = store.active_entity_links()
+    acquisitions = store.acquisitions()
     entity_by_prospect = {
         str(row["prospect_id"]): str(row["entity_id"])
         for row in links
