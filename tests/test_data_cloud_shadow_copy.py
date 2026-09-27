@@ -57,6 +57,9 @@ def test_canonical_normalization_ignores_numeric_scale() -> None:
 
 def test_canonical_normalization_aligns_utc_z_timestamp() -> None:
     assert _normalize("2026-09-27T18:30:00Z") == "2026-09-27T18:30:00+00:00"
+    assert _normalize("2026-09-27T18:30:00.000000+00:00") == (
+        "2026-09-27T18:30:00+00:00"
+    )
 
 
 def test_shadow_manifest_contains_no_duplicate_names() -> None:
@@ -71,6 +74,7 @@ def test_shadow_runner_contract_has_no_destructive_mode() -> None:
     source = inspect.getsource(module)
     assert "DELETE FROM" not in source.upper()
     assert "TRUNCATE " not in source.upper()
+    assert "SUPABASE_" not in source
     assert "--mode" in source
     assert 'choices=("plan", "copy")' in source
     assert '"production_cutover_authority": False' in source
