@@ -75,6 +75,11 @@ def compare_roles(
             findings.append(f"role_mismatch:{name}")
 
     extra_roles = sorted(set(target_by_name) - set(source_by_name))
+    findings.extend(
+        f"unexpected_role:{name}"
+        for name in extra_roles
+        if name.startswith("empire_")
+    )
 
     return {
         "schema_version": "empire.data-cloud-role-parity.v1",
