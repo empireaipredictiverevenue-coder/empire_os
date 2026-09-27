@@ -105,3 +105,22 @@ def test_approved_vendor_boundaries_are_not_business_runtime_coupling(tmp_path: 
     assert by_path["empire_os/reliability_agent.py"] == "migration_observer"
     assert by_path["empire_os/astra_token_transport.py"] == "legacy_observer_adapter"
     assert by_path["scripts/run_supabase_egress_guard.py"] == "migration_containment"
+
+
+def test_data_cloud_contract_and_csv_migration_are_migration_tooling(tmp_path: Path):
+    (tmp_path / "empire_os").mkdir()
+
+    (tmp_path / "empire_os" / "data_cloud_contract.py").write_text(
+        "SUPABASE_RETIRED",
+        encoding="utf-8",
+    )
+    (tmp_path / "empire_os" / "migrate_prospects.py").write_text(
+        "Supabase migration",
+        encoding="utf-8",
+    )
+
+    rows = discover_vendor_dependencies(tmp_path)
+    by_path = {row.path: row.classification for row in rows}
+
+    assert by_path["empire_os/data_cloud_contract.py"] == "migration_tooling"
+    assert by_path["empire_os/migrate_prospects.py"] == "migration_tooling"
