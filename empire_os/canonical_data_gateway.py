@@ -14,6 +14,7 @@ import os
 from typing import Any, Mapping, Protocol, Sequence
 
 from empire_os.data_cloud_contract import DataBackend
+from empire_os.data_query import ConflictAction, DataFilter, OrderSpec
 
 
 class DataGatewayUnavailable(RuntimeError):
@@ -43,6 +44,39 @@ class CanonicalDataProvider(Protocol):
     ) -> Sequence[Mapping[str, Any]]:
         ...
 
+    def query(
+        self,
+        table: str,
+        columns: str = "*",
+        *,
+        filters: Sequence[DataFilter] = (),
+        order: Sequence[OrderSpec] = (),
+        limit: int = 1000,
+        offset: int = 0,
+    ) -> Sequence[Mapping[str, Any]]:
+        ...
+
+    def query(
+        self,
+        table: str,
+        columns: str = "*",
+        *,
+        filters: Sequence[DataFilter] = (),
+        order: Sequence[OrderSpec] = (),
+        limit: int = 1000,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        self._require_provider()
+        rows = self._provider.query(
+            table,
+            columns,
+            filters=filters,
+            order=order,
+            limit=limit,
+            offset=offset,
+        )
+        return [dict(row) for row in rows]
+
     def count(
         self,
         table: str,
@@ -56,6 +90,26 @@ class CanonicalDataProvider(Protocol):
         row: Mapping[str, Any],
         *,
         return_repr: bool = True,
+    ) -> Sequence[Mapping[str, Any]]:
+        ...
+
+    def upsert(
+        self,
+        table: str,
+        row: Mapping[str, Any],
+        *,
+        conflict_columns: Sequence[str],
+        action: ConflictAction,
+        return_repr: bool = True,
+    ) -> Sequence[Mapping[str, Any]]:
+        ...
+
+    def insert_ignore_conflicts(
+        self,
+        table: str,
+        row: Mapping[str, Any],
+        *,
+        return_repr: bool = False,
     ) -> Sequence[Mapping[str, Any]]:
         ...
 
@@ -171,6 +225,40 @@ class CanonicalDataGateway:
     ) -> list[dict[str, Any]]:
         self._require_provider()
         rows = self._provider.insert(
+            table,
+            row,
+            return_repr=return_repr,
+        )
+        return [dict(item) for item in rows]
+
+    def upsert(
+        self,
+        table: str,
+        row: Mapping[str, Any],
+        *,
+        conflict_columns: Sequence[str],
+        action: ConflictAction,
+        return_repr: bool = True,
+    ) -> list[dict[str, Any]]:
+        self._require_provider()
+        rows = self._provider.upsert(
+            table,
+            row,
+            conflict_columns=conflict_columns,
+            action=action,
+            return_repr=return_repr,
+        )
+        return [dict(item) for item in rows]
+
+    def insert_ignore_conflicts(
+        self,
+        table: str,
+        row: Mapping[str, Any],
+        *,
+        return_repr: bool = False,
+    ) -> list[dict[str, Any]]:
+        self._require_provider()
+        rows = self._provider.insert_ignore_conflicts(
             table,
             row,
             return_repr=return_repr,
