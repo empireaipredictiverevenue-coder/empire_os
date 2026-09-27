@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from empire_os.intelligence.omega import MODEL_VERSION, analyze
 from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 SCORE_TYPE = "omega_opportunity"
 
