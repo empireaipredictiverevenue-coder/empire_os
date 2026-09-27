@@ -256,3 +256,44 @@ def test_backoff_keeps_cycle_degraded_until_retry_allowed(tmp_path):
         and row["decision"] == "BACKOFF"
         for row in result["deferred_actions"]
     )
+
+
+
+def test_self_heal_action_fails_verification_when_allowed_repair_fails():
+    row = {
+        "action": "RUN_BOUNDED_SELF_HEAL",
+        "result": {
+            "execution_authority": "bounded_internal_repair",
+            "repair_unit_allowlist": [
+                "empire-founder-console.service",
+            ],
+            "repairs": [{
+                "unit": "empire-founder-console.service",
+                "decision": "AUTO_REPAIR",
+                "executed": True,
+                "ok": False,
+            }],
+        },
+    }
+
+    assert reliability._action_verified(row) is False
+
+
+def test_self_heal_action_ignores_expected_containment_deferred_repairs():
+    row = {
+        "action": "RUN_BOUNDED_SELF_HEAL",
+        "result": {
+            "execution_authority": "bounded_internal_repair",
+            "repair_unit_allowlist": [
+                "empire-founder-console.service",
+            ],
+            "repairs": [{
+                "unit": "empire-commercial-exchange.timer",
+                "decision": "CONTAINMENT_DEFERRED",
+                "executed": False,
+                "ok": True,
+            }],
+        },
+    }
+
+    assert reliability._action_verified(row) is True
