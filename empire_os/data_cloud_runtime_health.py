@@ -163,11 +163,12 @@ def _pgbackrest_config() -> dict[str, Any]:
 
 
 def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
-    """Refresh and read the postgres-owned backup observation.
+    """Refresh and read pgBackRest status from a postgres-owned oneshot.
 
-    The privileged helper starts only this fixed read-only oneshot service.
-    pgBackRest itself runs as postgres in that separate systemd sandbox, so the
-    helper never changes UID/GID and never receives backup repository secrets.
+    The observer service executes pgBackRest directly as the postgres OS user
+    and writes its raw JSON status under /run. The privileged helper only starts
+    that fixed service and sanitizes the resulting status. No UID switching,
+    backup creation, restore, WAL mutation or credential projection occurs here.
     """
     completed = runner(
         ["systemctl", "start", PGBACKREST_OBSERVER_UNIT],
@@ -176,9 +177,10 @@ def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
         timeout=30,
         check=False,
     )
+    config = _pgbackrest_config()
     if completed.returncode != 0:
         return {
-            **_pgbackrest_config(),
+            **config,
             "healthy": False,
             "backup_count": 0,
             "latest_label": None,
@@ -188,12 +190,12 @@ def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
         }
 
     try:
-        payload = json.loads(
+        raw = json.loads(
             PGBACKREST_OBSERVER_SNAPSHOT.read_text(encoding="utf-8")
         )
     except FileNotFoundError:
         return {
-            **_pgbackrest_config(),
+            **config,
             "healthy": False,
             "backup_count": 0,
             "latest_label": None,
@@ -202,7 +204,7 @@ def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
         }
     except (OSError, json.JSONDecodeError):
         return {
-            **_pgbackrest_config(),
+            **config,
             "healthy": False,
             "backup_count": 0,
             "latest_label": None,
@@ -210,9 +212,10 @@ def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
             "off_node_repository_verified": False,
         }
 
-    if not isinstance(payload, Mapping):
+    stanza = raw[0] if isinstance(raw, list) and raw else {}
+    if not isinstance(stanza, Mapping):
         return {
-            **_pgbackrest_config(),
+            **config,
             "healthy": False,
             "backup_count": 0,
             "latest_label": None,
@@ -220,19 +223,24 @@ def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
             "off_node_repository_verified": False,
         }
 
-    # Re-project only the bounded non-secret fields consumed by health state.
+    status = stanza.get("status")
+    backups = stanza.get("backup")
+    status = status if isinstance(status, Mapping) else {}
+    backups = backups if isinstance(backups, list) else []
+    latest = backups[-1] if backups else {}
+    status_code = status.get("code")
+
     return {
-        "repo_type": payload.get("repo_type"),
-        "repo_path": payload.get("repo_path"),
-        "cipher_type": payload.get("cipher_type"),
-        "healthy": payload.get("healthy") is True,
-        "backup_count": int(payload.get("backup_count") or 0),
-        "latest_label": payload.get("latest_label"),
-        "encrypted": payload.get("encrypted") is True,
-        "off_node_repository_verified": (
-            payload.get("off_node_repository_verified") is True
+        **config,
+        "healthy": status_code == 0 and bool(backups),
+        "status_code": status_code,
+        "backup_count": len(backups),
+        "latest_label": (
+            latest.get("label") if isinstance(latest, Mapping) else None
         ),
-        "error_class": payload.get("error_class"),
+        "encrypted": config.get("cipher_type") == "aes-256-cbc",
+        "off_node_repository_verified": False,
+        "error_class": None if status_code == 0 else "PgBackRestStatusError",
     }
 
 
