@@ -27,7 +27,7 @@ def _uuid(value):
 def _one(db, table, identity):
     columns = (
         "id,buyer_id,fulfilment_order_id,status,approved_by,approved_at,expires_at,"
-        "commercial_terms_sha256,amount_usdt::text,min_block_number,payer_address,treasury_address"
+        "commercial_terms_sha256,amount_usdt,min_block_number,payer_address,treasury_address"
     ) if table == "bsc_payment_requests" else "*"
     rows = db.select(table, columns=columns, filters={"id": identity}, limit=2)
     if not isinstance(rows, list) or len(rows) != 1:
@@ -74,9 +74,12 @@ def preview_payment(request_id, transaction_hash, *, db=None, config=None,
     if order.get("commercial_payload", {}).get("commercial_terms_sha256") != terms:
         raise PaymentVerificationError("order commercial terms mismatch")
     try:
-        if not isinstance(request["amount_usdt"], str):
-            raise ValueError("amount must be lossless text")
-        amount = Decimal(request["amount_usdt"])
+        raw_amount = request["amount_usdt"]
+        if isinstance(raw_amount, bool) or isinstance(raw_amount, float):
+            raise ValueError("amount must be lossless decimal")
+        if not isinstance(raw_amount, (str, Decimal, int)):
+            raise ValueError("amount must be lossless decimal")
+        amount = Decimal(str(raw_amount))
         floor = request["min_block_number"]
         if not amount.is_finite() or amount <= 0:
             raise ValueError("amount")
