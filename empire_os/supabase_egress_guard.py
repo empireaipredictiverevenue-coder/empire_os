@@ -49,7 +49,6 @@ MANAGED_TIMERS = (
     "empire-closer-reply-worker.timer",
     "empire-enterprise-contact-repair.timer",
     "empire-legacy-permit-recovery.timer",
-    "empire-ops-control.timer",
     "empire-revenue-pulse.timer",
 )
 
