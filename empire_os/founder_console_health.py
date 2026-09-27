@@ -37,6 +37,7 @@ class FounderConsoleObservation:
     port_process_cwd: str | None
     port_process_command: str | None
     port_process_cgroup: str | None
+    legacy_user_scope: bool
 
 
 def _service_state(
@@ -133,17 +134,31 @@ def _process_identity(pid: int) -> dict[str, Any]:
     }
 
 
+def _legacy_user_scope(identity: dict[str, Any]) -> bool:
+    cgroup = str(identity.get("cgroup") or "")
+    return bool(
+        "/user.slice/" in cgroup
+        and FOUNDER_CONSOLE_UNIT in cgroup
+    )
+
+
+def _canonical_system_scope(identity: dict[str, Any]) -> bool:
+    cgroup = str(identity.get("cgroup") or "")
+    return (
+        f"/system.slice/{FOUNDER_CONSOLE_UNIT}" in cgroup
+    )
+
+
 def _verified_console_process(
     identity: dict[str, Any],
 ) -> bool:
     command = str(identity.get("command") or "").casefold()
-    cgroup = str(identity.get("cgroup") or "")
     return bool(
         identity.get("exists")
         and identity.get("uid") == os.getuid()
         and identity.get("cwd") == str(FOUNDER_CONSOLE_APP)
         and ("next-server" in command or "next" in command)
-        and FOUNDER_CONSOLE_UNIT not in cgroup
+        and not _canonical_system_scope(identity)
     )
 
 
@@ -166,13 +181,50 @@ def observe_founder_console(
         port_process_cwd=identity.get("cwd"),
         port_process_command=identity.get("command"),
         port_process_cgroup=identity.get("cgroup"),
+        legacy_user_scope=_legacy_user_scope(identity),
     )
+
+
+def _stop_legacy_user_unit(
+    *,
+    runner: Callable[..., Any] = subprocess.run,
+) -> dict[str, Any]:
+    uid = os.getuid()
+    runtime_dir = f"/run/user/{uid}"
+    env = dict(os.environ)
+    env["XDG_RUNTIME_DIR"] = runtime_dir
+    env["DBUS_SESSION_BUS_ADDRESS"] = (
+        f"unix:path={runtime_dir}/bus"
+    )
+    completed = runner(
+        [
+            "systemctl",
+            "--user",
+            "disable",
+            "--now",
+            FOUNDER_CONSOLE_UNIT,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+        env=env,
+    )
+    return {
+        "ok": completed.returncode == 0,
+        "returncode": int(completed.returncode),
+        "stdout": (completed.stdout or "")[-2000:],
+        "stderr": (completed.stderr or "")[-2000:],
+    }
 
 
 def clear_verified_orphan(
     observation: FounderConsoleObservation,
     *,
     sleep: Callable[[float], None] = time.sleep,
+    user_unit_stopper: Callable[..., dict[str, Any]] = (
+        _stop_legacy_user_unit
+    ),
 ) -> dict[str, Any]:
     if observation.service_state == "active":
         return {
@@ -192,6 +244,16 @@ def clear_verified_orphan(
             "state": "PORT_OWNER_NOT_VERIFIED",
             "killed": False,
         }
+
+    if observation.legacy_user_scope:
+        stopped = user_unit_stopper()
+        if stopped.get("ok") is not True:
+            return {
+                "ok": False,
+                "state": "LEGACY_USER_UNIT_STOP_FAILED",
+                "killed": False,
+                "legacy_user_unit_stop": stopped,
+            }
 
     pid = int(observation.port_pid)
     before = _process_identity(pid)
