@@ -200,3 +200,62 @@ production truth.
 
 External tools are replaceable implementation capabilities. They never become
 the authority layer simply because they are powerful or convenient.
+
+
+## Production-code-first rule
+
+**Do not layer patches onto production behavior. Fix the owning production
+component and the root cause.**
+
+Durable capability belongs in `empire_os/` production modules with explicit
+contracts, tests, observability and recovery behavior. Shell/Python scripts may
+exist only as thin operator or compatibility entrypoints around those modules;
+scripts must not become the canonical decision-making or orchestration layer.
+
+When a defect reveals a missing architectural capability, implement the durable
+capability in the canonical owner rather than accumulating special-case repair
+scripts. Refactoring or replacing an incorrect internal design is preferred to
+stacking another workaround on top of it.
+
+## Agentic orchestration rule
+
+Long-running EmpireOS coordination should use bounded agentic control loops:
+
+**OBSERVE -> DIAGNOSE -> PLAN -> ACT -> VERIFY -> RECORD -> REPEAT**
+
+Agentic orchestration does not grant open-ended production authority. Agents
+select only from explicit deterministic tools allowed by Control Fabric.
+Consequential actions remain founder-gated.
+
+Reliability, recovery and autonomous-operation agents must:
+
+- preserve last-known-good state before attempting recovery;
+- classify dependency loss explicitly;
+- choose from an allowlisted action set;
+- use bounded retries/backoff and avoid restart loops;
+- verify the effect of every action before advancing;
+- degrade locally when an external dependency fails;
+- escalate rather than bypass a deliberate circuit breaker;
+- persist heartbeat, evidence and decision traces;
+- automatically resume the normal path when dependencies recover.
+
+## Founder verification rule
+
+**Every EmpireOS change is checked before it is called complete.**
+
+The production Definition of Done is:
+
+1. inspect the complete scoped diff;
+2. compile/static-check the changed stack;
+3. run focused tests;
+4. run adjacent regressions;
+5. run negative/failure/recovery-path tests;
+6. verify authority invariants;
+7. verify external-dependency loss and recovery where applicable;
+8. deploy only after those gates pass;
+9. independently verify the live runtime and canonical data/Founder surface;
+10. confirm intended deployed HEAD and a clean tracked worktree.
+
+A passing test, build, commit, service state or push by itself is never DONE.
+If a verification step fails, promotion stops, the root cause is corrected in
+production code, and the complete affected verification set is rerun.
