@@ -56,11 +56,11 @@ from empire_os.niche_taxonomy import (
     normalise,
 )
 from empire_os.runtime_env import load_runtime_env
-from empire_os.qualification_worker_v2 import (
-    _close_supabase_egress_circuit,
-    _component_name,
-    _open_supabase_egress_circuit,
-    _reserve_supabase_request,
+from empire_os.legacy_data_egress import (
+    close_legacy_data_egress_circuit as _close_supabase_egress_circuit,
+    legacy_data_component_name as _component_name,
+    open_legacy_data_egress_circuit as _open_supabase_egress_circuit,
+    reserve_legacy_data_request as _reserve_supabase_request,
 )
 
 
