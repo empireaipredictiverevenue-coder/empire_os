@@ -235,6 +235,31 @@ def default_registry() -> tuple[ComponentSpec, ...]:
             60,
         ),
         ComponentSpec(
+            "empire_reliability_agent",
+            (
+                "reliability_tick",
+                "component_degraded",
+                "supabase_egress_contained",
+                "supabase_egress_healthy",
+                "buyer_recovery_due",
+            ),
+            (
+                "reliability_cycle_verified",
+                "recovery_snapshot_refreshed",
+                "local_buyer_recovery_refreshed",
+                "runtime_repair_verified",
+                "founder_gate_required",
+            ),
+            (
+                "control_fabric",
+                "runtime_self_heal",
+                "buyer_acquisition_scout",
+            ),
+            "internal_write",
+            120,
+            "agentic_observe_plan_act_verify",
+        ),
+        ComponentSpec(
             "runtime_self_heal",
             (
                 "runtime_health_tick",
