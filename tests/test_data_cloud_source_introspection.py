@@ -15,6 +15,7 @@ def test_introspection_covers_migration_critical_semantics():
         "indexes",
         "policies",
         "triggers",
+        "trigger_routines",
         "extensions",
     }
     assert "relrowsecurity" in queries["tables"]
@@ -22,6 +23,7 @@ def test_introspection_covers_migration_critical_semantics():
     assert "indexdef" in queries["indexes"]
     assert "with_check" in queries["policies"]
     assert "information_schema.triggers" in queries["triggers"]
+    assert "pg_get_functiondef" in queries["trigger_routines"]
 
 
 def test_introspection_queries_are_read_only():
