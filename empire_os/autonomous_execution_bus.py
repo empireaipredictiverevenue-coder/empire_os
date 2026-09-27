@@ -662,43 +662,23 @@ def _materialize_qualification_jobs(
         }
 
         try:
-            existing_job = _data_repository().find_gtm_job(
-                idempotency_key
+            created_row, created = _data_repository().ensure_gtm_job(
+                row
             )
         except Exception as exc:
             raise BusError(
-                f"qualification child job lookup failed: {exc}"
+                f"qualification child job ensure failed: {exc}"
             ) from exc
-
-        if existing_job is not None:
-            jobs_existing += 1
-            continue
-
-        try:
-            created_row = _data_repository().insert_gtm_job(
-                row
-            )
-        except BusError as exc:
-            message = str(exc)
-
-            duplicate_child = (
-                "HTTP 409" in message
-                and '"code":"23505"' in message
-                and "idempotency_key" in message
-            )
-
-            if not duplicate_child:
-                raise
-
-            jobs_existing += 1
-            continue
 
         if not isinstance(created_row, dict):
             raise BusError(
-                "qualification child job insert returned invalid row"
+                "qualification child job ensure returned invalid row"
             )
 
-        jobs_created += 1
+        if created:
+            jobs_created += 1
+        else:
+            jobs_existing += 1
 
     return {
         "ok": True,
@@ -919,19 +899,6 @@ def _materialize_allocation_jobs(
         qualification = prospect.get("_qualification") or {}
         idempotency_key = f"allocation:{prospect_id}:v1"
 
-        try:
-            existing_job = _data_repository().find_gtm_job(
-                idempotency_key
-            )
-        except Exception as exc:
-            raise BusError(
-                f"allocation child job lookup failed: {exc}"
-            ) from exc
-
-        if existing_job is not None:
-            jobs_existing += 1
-            continue
-
         row = {
             "opportunity_id": job.opportunity_id,
             "job_type": "prospect_buyer_allocation",
@@ -957,27 +924,23 @@ def _materialize_allocation_jobs(
         }
 
         try:
-            created = _data_repository().insert_gtm_job(
+            ensured_row, created = _data_repository().ensure_gtm_job(
                 row
             )
-        except BusError as exc:
-            message = str(exc)
-            duplicate = (
-                "HTTP 409" in message
-                and '"code":"23505"' in message
-                and "idempotency_key" in message
-            )
-            if not duplicate:
-                raise
-            jobs_existing += 1
-            continue
-
-        if not isinstance(created, dict):
+        except Exception as exc:
             raise BusError(
-                "allocation child job insert returned invalid row"
+                f"allocation child job ensure failed: {exc}"
+            ) from exc
+
+        if not isinstance(ensured_row, dict):
+            raise BusError(
+                "allocation child job ensure returned invalid row"
             )
 
-        jobs_created += 1
+        if created:
+            jobs_created += 1
+        else:
+            jobs_existing += 1
 
     return {
         "ok": True,
