@@ -17,6 +17,7 @@ install_unit "deploy/systemd/empire-ops-control.service"
 install_unit "deploy/systemd/empire-ops-control.timer"
 install_unit "deploy/systemd/empire-commercial-product-catalog.service"
 install_unit "deploy/systemd/empire-commercial-product-catalog.timer"
+install_unit "deploy/systemd/empire-reliability-agent.service"
 
 systemctl daemon-reload
 
@@ -40,6 +41,10 @@ if [ "$READY" -ne 1 ]; then
   journalctl -u empire-ops-privileged-helper.service -n 100 --no-pager || true
   exit 1
 fi
+
+systemctl enable empire-reliability-agent.service
+systemctl reset-failed empire-reliability-agent.service || true
+systemctl restart empire-reliability-agent.service
 
 echo "EmpireOS ops self-heal control plane installed."
 echo "Privileged helper: active"
