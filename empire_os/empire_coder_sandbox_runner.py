@@ -28,6 +28,8 @@ from empire_os.execution_lease import ExecutionLeaseError, ExecutionLeaseManager
 
 JOB_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
 DEFAULT_BRANCH = "feature/revenue-intelligence-v2"
+DATA_CLOUD_CLOSEOUT_BRANCH = "agent/data-cloud-wave4"
+ALLOWED_BASE_BRANCHES = frozenset({DEFAULT_BRANCH, DATA_CLOUD_CLOSEOUT_BRANCH})
 DEFAULT_WORK_ROOT = Path("/var/tmp/empire-coder-sandbox")
 
 
@@ -54,8 +56,10 @@ class EmpireCoderSandboxJob:
             raise EmpireCoderSandboxError("objective required")
         if len(self.objective) > 20_000:
             raise EmpireCoderSandboxError("objective too long")
-        if self.base_branch != DEFAULT_BRANCH:
-            raise EmpireCoderSandboxError("base branch is pinned")
+        if self.base_branch not in ALLOWED_BASE_BRANCHES:
+            raise EmpireCoderSandboxError(
+                "base branch is outside the governed branch allowlist"
+            )
         if not self.allowed_paths:
             raise EmpireCoderSandboxError("allowed_paths required")
         if not self.lease_resources:
