@@ -109,3 +109,15 @@ def test_dump_importer_has_no_destructive_authority() -> None:
     assert "SUPABASE_" not in source
     assert '"production_cutover_authority": False' in source
     assert 'choices=("plan", "copy")' in source
+
+
+def test_scan_dump_accepts_quoted_identifiers(tmp_path: Path) -> None:
+    dump = tmp_path / "quoted.sql"
+    dump.write_bytes(
+        b'COPY "public"."example" ("id", "note") FROM stdin;\n'
+        b'00000000-0000-0000-0000-000000000001\tquoted\n'
+        b'\\.\n'
+    )
+    blocks = scan_dump(dump, (ShadowTable("example"),))
+    assert blocks["example"].row_count == 1
+    assert blocks["example"].columns == ("id", "note")
