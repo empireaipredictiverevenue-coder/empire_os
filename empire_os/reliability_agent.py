@@ -415,6 +415,22 @@ def run_cycle(
         row for row in executed
         if row.get("verified") is not True
     ]
+    founder_attention_required = any(
+        row.get("action") == "ESCALATE_RECOVERY_SEEDS_MISSING"
+        for row in executed
+    )
+    runtime_degraded = any(
+        row.get("action") == "RUN_BOUNDED_SELF_HEAL"
+        and isinstance(row.get("result"), Mapping)
+        and row["result"].get("status") not in {None, "HEALTHY"}
+        for row in executed
+    )
+    degraded = bool(
+        failures
+        or deferred
+        or founder_attention_required
+        or runtime_degraded
+    )
 
     payload = {
         "schema_version": "empire.reliability-agent.v1",
@@ -428,16 +444,13 @@ def run_cycle(
         "verified_action_count": verified_count,
         "failed_action_count": len(failures),
         "after": asdict(after),
-        "status": "HEALTHY" if not failures else "DEGRADED",
+        "status": "DEGRADED" if degraded else "HEALTHY",
         "operating_state": (
             "SUPABASE_CONTAINED_LOCAL_RECOVERY"
             if before.supabase_egress_contained
             else "NORMAL"
         ),
-        "founder_attention_required": any(
-            row.get("action") == "ESCALATE_RECOVERY_SEEDS_MISSING"
-            for row in executed
-        ),
+        "founder_attention_required": founder_attention_required,
         "authority": {
             "internal_repair": "allowlisted_reversible_only",
             "live_outbound": False,
