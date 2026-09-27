@@ -166,3 +166,52 @@ def test_stale_vendor_labels_do_not_block_runtime_readiness(tmp_path: Path):
     assert inventory["finding_count"] == 2
     assert inventory["runtime_finding_count"] == 0
     assert inventory["runtime_scan_clear"] is True
+
+
+def test_rest_shaped_compatibility_calls_do_not_block_node1_readiness(tmp_path: Path):
+    (tmp_path / "empire_os").mkdir()
+    (tmp_path / "empire_os" / "compat_worker.py").write_text(
+        'path = "/rest/v1/prospects"\n',
+        encoding="utf-8",
+    )
+    host = HostObservation(
+        cpu_count=8,
+        memory_bytes=16 * GIB,
+        disk_total_bytes=500 * GIB,
+        disk_free_bytes=250 * GIB,
+        postgres_available=True,
+        pgbouncer_available=True,
+        patroni_available=True,
+        pgbackrest_available=True,
+    )
+
+    result = build_readiness_snapshot(tmp_path, host_observation=host)
+
+    inventory = result["dependency_inventory"]
+    assert inventory["runtime_finding_count"] == 0
+    assert inventory["runtime_scan_clear"] is True
+
+
+def test_direct_vendor_key_ownership_still_blocks_node1_readiness(tmp_path: Path):
+    (tmp_path / "empire_os").mkdir()
+    marker = "SUPABASE" + "_KEY"
+    (tmp_path / "empire_os" / "direct_client.py").write_text(
+        marker + " = 'placeholder'\n",
+        encoding="utf-8",
+    )
+    host = HostObservation(
+        cpu_count=8,
+        memory_bytes=16 * GIB,
+        disk_total_bytes=500 * GIB,
+        disk_free_bytes=250 * GIB,
+        postgres_available=True,
+        pgbouncer_available=True,
+        patroni_available=True,
+        pgbackrest_available=True,
+    )
+
+    result = build_readiness_snapshot(tmp_path, host_observation=host)
+
+    inventory = result["dependency_inventory"]
+    assert inventory["runtime_finding_count"] == 1
+    assert inventory["runtime_scan_clear"] is False
