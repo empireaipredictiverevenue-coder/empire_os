@@ -19,6 +19,9 @@ class Cursor:
     def fetchall(self):
         return list(self._rows)
 
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
 
 class FakeConnection:
     def __init__(self):
