@@ -48,9 +48,10 @@ def _rows(value: object) -> list[dict[str, Any]]:
     if value is None:
         return []
     if isinstance(value, Mapping):
-        nested = value.get("result") or value.get("reviews")
-        if nested is not None:
-            value = nested
+        if "result" in value:
+            value = value.get("result") or []
+        elif "reviews" in value:
+            value = value.get("reviews") or []
         else:
             return [dict(value)]
     if isinstance(value, Sequence) and not isinstance(
