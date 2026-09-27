@@ -352,11 +352,13 @@ def run_coder_supervisor(
             row = ready[0]
             task = coder.create_task(
                 (
-                    "Implement this already-planned Founder Directive as the "
-                    "smallest safe DEVELOPMENT patch inside the existing EmpireOS "
-                    "architecture. Reuse existing modules; do not create duplicate "
-                    "systems. Include focused tests/observability where the narrow "
-                    "patch supports them. Do not deploy, touch production databases, "
+                    "Implement this already-planned Founder Directive as "
+                    "production-quality code inside the canonical EmpireOS architecture. "
+                    "Fix root causes rather than layering symptom patches. Reuse or "
+                    "refactor existing modules instead of creating duplicate systems. "
+                    "Include focused tests, adjacent regressions, failure-path coverage "
+                    "and observability appropriate to the production change. Do not "
+                    "deploy, touch production databases, "
                     "send outbound, accept terms, move funds, recognize revenue, "
                     "edit protected paths, or widen authority. Directive: "
                     + row.text
