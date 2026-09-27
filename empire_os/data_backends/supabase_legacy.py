@@ -314,13 +314,20 @@ class SupabaseLegacyProvider:
         table: str,
         row: Mapping[str, Any],
         *,
+        conflict_columns: Sequence[str] = (),
         return_repr: bool = False,
     ) -> Sequence[Mapping[str, Any]]:
         if not row:
             raise ValueError("insert row cannot be empty")
+        columns = tuple(_ident(str(column)) for column in conflict_columns)
+        query = (
+            "?" + urllib.parse.urlencode({"on_conflict": ",".join(columns)})
+            if columns
+            else ""
+        )
         returning = "representation" if return_repr else "minimal"
         req = urllib.request.Request(
-            self._url(table),
+            self._url(table, query),
             data=json.dumps(unwrap_data_value(dict(row))).encode("utf-8"),
             headers=self._headers({
                 "Prefer": f"resolution=ignore-duplicates,return={returning}"
