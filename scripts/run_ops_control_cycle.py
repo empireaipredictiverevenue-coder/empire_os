@@ -22,6 +22,7 @@ OUTPUT = Path("/srv/empire_os/runtime/ops_control/latest.json")
 
 CONTAINMENT_SAFE_REPAIR_UNITS = frozenset({
     "empire-buyer-acquisition-local-recovery.timer",
+    "empire-buyer-acquisition-local-recovery.service",
 })
 
 
