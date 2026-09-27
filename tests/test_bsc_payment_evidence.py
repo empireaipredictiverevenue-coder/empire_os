@@ -150,3 +150,51 @@ def test_weak_confirmation_configuration_is_rejected(setup):
                                 min_confirmations=1),
         )
     assert not calls
+
+
+def test_empiredb_decimal_amount_is_lossless(setup):
+    from decimal import Decimal
+    db, calls, _ = setup
+    db.rows["bsc_payment_requests"][0]["amount_usdt"] = Decimal(
+        "100.000000000000000001"
+    )
+
+    result = run(db)
+
+    assert result["recorded"] is False
+    assert calls[0][1] == Decimal("100.000000000000000001")
+
+
+def test_default_database_uses_canonical_gateway(monkeypatch, setup):
+    db, _, _ = setup
+
+    class Gateway:
+        configured = True
+        def select(self, *args, **kwargs):
+            return db.select(*args, **kwargs)
+
+    seen = {}
+    monkeypatch.setattr(
+        adapter,
+        "load_runtime_env",
+        lambda path: {"EMPIRE_DATA_BACKEND": "empiredb"},
+    )
+    monkeypatch.setattr(
+        adapter,
+        "gateway_from_environment",
+        lambda env: seen.setdefault("gateway", Gateway()),
+    )
+
+    result = adapter.preview_payment(
+        REQUEST,
+        TX,
+        now=NOW,
+        config=BscUsdtConfig(
+            "https://example.invalid",
+            TREASURY,
+            BSC_USDT_CONTRACT,
+        ),
+    )
+
+    assert result["recorded"] is False
+    assert "gateway" in seen
