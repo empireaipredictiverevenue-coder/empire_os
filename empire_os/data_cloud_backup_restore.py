@@ -21,6 +21,7 @@ class RestoreEvidence:
     encrypted: bool
     off_node: bool
     wal_archiving_verified: bool
+    wal_archive_lag_seconds: float | None
     pitr_restore_verified: bool
     full_restore_verified: bool
     restore_duration_seconds: float | None
@@ -47,6 +48,11 @@ def evaluate_restore_readiness(
         findings.append("wal_archiving_unverified")
     if policy.pitr_required and not evidence.pitr_restore_verified:
         findings.append("pitr_restore_unverified")
+    if policy.pitr_required:
+        if evidence.wal_archive_lag_seconds is None:
+            findings.append("wal_archive_lag_unknown")
+        elif evidence.wal_archive_lag_seconds > policy.target_rpo_seconds:
+            findings.append("wal_archive_lag_exceeds_rpo")
     if not evidence.full_restore_verified:
         findings.append("full_restore_unverified")
     if not evidence.restored_integrity_verified:
