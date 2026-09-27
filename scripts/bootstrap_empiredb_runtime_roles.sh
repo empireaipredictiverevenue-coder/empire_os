@@ -29,7 +29,7 @@ BEGIN
       EXECUTE format('CREATE ROLE %I NOLOGIN NOINHERIT', r);
     END IF;
   END LOOP;
-END $;
+END $$;
 
 GRANT USAGE ON SCHEMA public TO
   empire_outbound_approver,
