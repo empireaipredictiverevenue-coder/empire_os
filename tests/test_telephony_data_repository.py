@@ -100,3 +100,39 @@ def test_unconfigured_optional_mirror_is_noop(monkeypatch):
     )
 
     webhook.write_to_canonical_data(payload)
+
+
+def test_telephony_repository_uses_protected_runtime_env(monkeypatch):
+    seen = {}
+    fake_gateway = object()
+
+    monkeypatch.setattr(
+        webhook,
+        "load_runtime_env",
+        lambda path: {"EMPIRE_DATA_BACKEND": "supabase_legacy"},
+    )
+    monkeypatch.setattr(
+        webhook.os,
+        "environ",
+        {"HUB_URL": "http://127.0.0.1:8000"},
+    )
+
+    def gateway_factory(env):
+        seen["env"] = dict(env)
+        return fake_gateway
+
+    monkeypatch.setattr(
+        webhook,
+        "gateway_from_environment",
+        gateway_factory,
+    )
+    monkeypatch.setattr(
+        webhook,
+        "TelephonyDataRepository",
+        lambda gateway: seen.setdefault("gateway", gateway) or object(),
+    )
+
+    webhook._telephony_repository()
+
+    assert seen["env"]["EMPIRE_DATA_BACKEND"] == "supabase_legacy"
+    assert seen["gateway"] is fake_gateway
