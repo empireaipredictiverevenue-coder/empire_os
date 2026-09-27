@@ -79,7 +79,8 @@ def proposal_id(key: tuple[str, str, str]) -> str:
 
 
 def main() -> None:
-    rows = fetch_prospects()
+    repository = _repository()
+    rows = fetch_prospects(repository)
 
     clusters: defaultdict[tuple[str, str, str], list[dict[str, Any]]] = (
         defaultdict(list)
@@ -177,7 +178,7 @@ def main() -> None:
     report = {
         "schema_version": "identity_resolver.dry_run.v1",
         "dry_run": True,
-        "data_source": _repository().snapshot(),
+        "data_source": repository.snapshot(),
         "source_table": "prospects",
         "total_prospects": len(rows),
         "identity_complete_rows": len(rows) - singleton_count,
