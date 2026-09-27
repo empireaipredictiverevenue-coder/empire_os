@@ -20,6 +20,10 @@ ROLE_FUNCTIONS = {
             "select public.cancel_outbound_intent(%s,%s,%s)",
             ("p_intent_id", "p_cancelled_by", "p_reason"),
         ),
+        "auto_approve_voice_intent": (
+            "select public.auto_approve_voice_intent(%s,%s)",
+            ("p_intent_id", "p_daily_cap"),
+        ),
     },
     "empire_outbound_sender": {
         "get_outbound_intent_review": (
