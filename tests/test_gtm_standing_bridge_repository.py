@@ -74,3 +74,15 @@ def test_standing_bridge_business_module_has_no_vendor_transport_dependency():
     assert "/rest/v1/" not in source
     assert "SUPABASE_" not in source
     assert "urllib" not in source
+
+
+def test_standing_bridge_repository_preserves_empty_wrapped_result():
+    class EmptyGateway(FakeGateway):
+        def rpc(self, name, params=None):
+            if name == "list_buyer_reviews_for_outbound":
+                return {"result": []}
+            return super().rpc(name, params)
+
+    repository = CanonicalStandingBridgeRepository(EmptyGateway())
+
+    assert repository.approved_for_outbound(limit=20) == []
