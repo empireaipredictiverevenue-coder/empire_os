@@ -42,6 +42,7 @@ def _eligible(path: Path) -> bool:
 APPROVED_VENDOR_BOUNDARIES = {
     "empire_os/canonical_data_gateway.py": "canonical_gateway",
     "empire_os/data_backends/supabase_legacy.py": "legacy_adapter",
+    "empire_os/data_backends/astra_token_legacy.py": "legacy_adapter",
     "empire_os/supabase_egress_guard.py": "migration_containment",
     "scripts/run_supabase_egress_guard.py": "migration_containment",
 }
