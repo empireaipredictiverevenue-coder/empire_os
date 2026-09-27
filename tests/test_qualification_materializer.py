@@ -63,6 +63,53 @@ def candidate():
     }
 
 
+class FakeRepository:
+    def __init__(self):
+        self.candidates = [candidate()]
+        self.existing_ids = set()
+        self.ensure_result = ({"id": "child-1"}, True)
+        self.ensure_calls = []
+        self.ingest_calls = []
+
+    def qualification_candidates(self, *, aliases, metro, limit):
+        return list(self.candidates)
+
+    def existing_qualification_ids(
+        self,
+        prospect_ids,
+        *,
+        scoring_engine,
+        scoring_version,
+    ):
+        self.scoring_engine = scoring_engine
+        self.scoring_version = scoring_version
+        self.prospect_ids = tuple(prospect_ids)
+        return set(self.existing_ids)
+
+    def ensure_gtm_job(self, row):
+        self.ensure_calls.append(dict(row))
+        return self.ensure_result
+
+    def ingest_prospect_atomic(
+        self,
+        *,
+        prospect,
+        evidence,
+        ingest_key,
+        identity_keys,
+    ):
+        self.ingest_calls.append({
+            "prospect": prospect,
+            "evidence": evidence,
+            "ingest_key": ingest_key,
+            "identity_keys": list(identity_keys),
+        })
+        return {
+            "decision": "created",
+            "prospect": {"id": "prospect-1"},
+        }
+
+
 def test_materializer_fails_closed_without_batch_size():
     with pytest.raises(
         bus.BusError,
@@ -86,34 +133,16 @@ def test_materializer_rejects_batch_above_hard_limit():
 def test_materializer_checks_real_scoring_engine(
     monkeypatch,
 ):
-    seen = {}
-
-    def fake_rest(method, path, **kwargs):
-        params = kwargs.get("params") or {}
-
-        if path == "/rest/v1/prospects":
-            return [candidate()]
-
-        if path == "/rest/v1/prospect_qualifications":
-            seen["scoring_engine"] = params.get(
-                "scoring_engine"
-            )
-            return [{"prospect_id": "prospect-1"}]
-
-        raise AssertionError(
-            f"unexpected request: {method} {path}"
-        )
-
-    monkeypatch.setattr(bus, "_rest_json", fake_rest)
+    repository = FakeRepository()
+    repository.existing_ids = {"prospect-1"}
+    monkeypatch.setattr(bus, "_data_repository", lambda: repository)
 
     result = bus._materialize_qualification_jobs(
         claimed_job(target_payload(1))
     )
 
-    assert (
-        seen["scoring_engine"]
-        == "eq.empire_os.lead_scoring"
-    )
+    assert repository.scoring_engine == "empire_os.lead_scoring"
+    assert repository.scoring_version == "v1"
     assert result["already_qualified"] == 1
     assert result["jobs_created"] == 0
 
@@ -121,30 +150,9 @@ def test_materializer_checks_real_scoring_engine(
 def test_existing_child_job_not_counted_created(
     monkeypatch,
 ):
-    post_calls = []
-
-    def fake_rest(method, path, **kwargs):
-        if path == "/rest/v1/prospects":
-            return [candidate()]
-
-        if path == "/rest/v1/prospect_qualifications":
-            return []
-
-        if (
-            path == "/rest/v1/gtm_jobs"
-            and method == "GET"
-        ):
-            return [{"id": "existing-child"}]
-
-        if method == "POST":
-            post_calls.append((path, kwargs))
-            return [{"id": "unexpected"}]
-
-        raise AssertionError(
-            f"unexpected request: {method} {path}"
-        )
-
-    monkeypatch.setattr(bus, "_rest_json", fake_rest)
+    repository = FakeRepository()
+    repository.ensure_result = ({"id": "existing-child"}, False)
+    monkeypatch.setattr(bus, "_data_repository", lambda: repository)
 
     result = bus._materialize_qualification_jobs(
         claimed_job(target_payload(1))
@@ -153,39 +161,15 @@ def test_existing_child_job_not_counted_created(
     assert result["jobs_considered"] == 1
     assert result["jobs_existing"] == 1
     assert result["jobs_created"] == 0
-    assert post_calls == []
+    assert len(repository.ensure_calls) == 1
 
 
 def test_new_child_counted_only_after_insert(
     monkeypatch,
 ):
-    inserted = {}
-
-    def fake_rest(method, path, **kwargs):
-        if path == "/rest/v1/prospects":
-            return [candidate()]
-
-        if path == "/rest/v1/prospect_qualifications":
-            return []
-
-        if (
-            path == "/rest/v1/gtm_jobs"
-            and method == "GET"
-        ):
-            return []
-
-        if (
-            path == "/rest/v1/gtm_jobs"
-            and method == "POST"
-        ):
-            inserted.update(kwargs["payload"])
-            return [{"id": "new-child"}]
-
-        raise AssertionError(
-            f"unexpected request: {method} {path}"
-        )
-
-    monkeypatch.setattr(bus, "_rest_json", fake_rest)
+    repository = FakeRepository()
+    repository.ensure_result = ({"id": "new-child"}, True)
+    monkeypatch.setattr(bus, "_data_repository", lambda: repository)
 
     result = bus._materialize_qualification_jobs(
         claimed_job(target_payload(1))
@@ -194,11 +178,11 @@ def test_new_child_counted_only_after_insert(
     assert result["jobs_existing"] == 0
     assert result["jobs_created"] == 1
 
+    inserted = repository.ensure_calls[0]
     assert (
         inserted["idempotency_key"]
         == "qualification:prospect-1:v1"
     )
-
     assert inserted["status"] == "queued"
 
 
@@ -248,46 +232,15 @@ def test_gtm_engine_emits_explicit_bounded_batch():
 def test_child_insert_race_duplicate_is_idempotent(
     monkeypatch,
 ):
-    post_attempts = 0
-
-    def fake_rest(method, path, **kwargs):
-        nonlocal post_attempts
-
-        if path == "/rest/v1/prospects":
-            return [candidate()]
-
-        if path == "/rest/v1/prospect_qualifications":
-            return []
-
-        if (
-            path == "/rest/v1/gtm_jobs"
-            and method == "GET"
-        ):
-            return []
-
-        if (
-            path == "/rest/v1/gtm_jobs"
-            and method == "POST"
-        ):
-            post_attempts += 1
-            raise bus.BusError(
-                'REST POST /rest/v1/gtm_jobs failed HTTP 409: '
-                '{"code":"23505","details":'
-                '"Key (idempotency_key)=(qualification:'
-                'prospect-1:v1) already exists."}'
-            )
-
-        raise AssertionError(
-            f"unexpected request: {method} {path}"
-        )
-
-    monkeypatch.setattr(bus, "_rest_json", fake_rest)
+    repository = FakeRepository()
+    repository.ensure_result = ({"id": "existing-child"}, False)
+    monkeypatch.setattr(bus, "_data_repository", lambda: repository)
 
     result = bus._materialize_qualification_jobs(
         claimed_job(target_payload(1))
     )
 
-    assert post_attempts == 1
+    assert len(repository.ensure_calls) == 1
     assert result["jobs_considered"] == 1
     assert result["jobs_existing"] == 1
     assert result["jobs_created"] == 0
@@ -304,18 +257,8 @@ def test_materializer_rejects_non_integer_batch():
 
 
 def test_atomic_prospect_writer_calls_ingest_rpc(monkeypatch):
-    seen = {}
-
-    def fake_rest(method, path, **kwargs):
-        seen["method"] = method
-        seen["path"] = path
-        seen["payload"] = kwargs.get("payload")
-        return {
-            "decision": "created",
-            "prospect": {"id": "prospect-1"},
-        }
-
-    monkeypatch.setattr(bus, "_rest_json", fake_rest)
+    repository = FakeRepository()
+    monkeypatch.setattr(bus, "_data_repository", lambda: repository)
 
     payload = {
         "prospect": {
@@ -334,11 +277,9 @@ def test_atomic_prospect_writer_calls_ingest_rpc(monkeypatch):
     result = bus._write_canonical_prospect(payload)
 
     assert result["decision"] == "created"
-    assert seen["method"] == "POST"
-    assert seen["path"] == "/rest/v1/rpc/ingest_prospect_atomic"
-    assert seen["payload"] == {
-        "p_prospect": payload["prospect"],
-        "p_evidence": payload["evidence"],
-        "p_ingest_key": payload["ingest_key"],
-        "p_identity_keys": payload["identity_keys"],
-    }
+    assert repository.ingest_calls == [{
+        "prospect": payload["prospect"],
+        "evidence": payload["evidence"],
+        "ingest_key": payload["ingest_key"],
+        "identity_keys": payload["identity_keys"],
+    }]

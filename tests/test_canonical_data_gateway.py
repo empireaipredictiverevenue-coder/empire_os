@@ -165,8 +165,8 @@ def test_gateway_exposes_neutral_query_and_conflict_semantics():
         conflict_columns=("id",),
     ) == []
 
-    assert provider.calls[-3][0] == "query"
-    assert provider.calls[-2][:3] == (
+    assert provider.calls[-4][0] == "query"
+    assert provider.calls[-3][:3] == (
         "upsert",
         "prospect_qualifications",
         ("prospect_id", "scoring_engine", "scoring_version"),

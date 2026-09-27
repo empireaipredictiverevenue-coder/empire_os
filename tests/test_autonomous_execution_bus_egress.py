@@ -1,63 +1,69 @@
 import importlib
-import json
+import inspect
 import sys
-
-
-class FakeResponse:
-    def __init__(self, payload):
-        self.payload = payload
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_args):
-        return False
-
-    def read(self):
-        return json.dumps(self.payload).encode("utf-8")
 
 
 def _load_bus(monkeypatch, tmp_path):
     env = tmp_path / "empire.env"
     env.write_text(
+        "EMPIRE_DATA_BACKEND=supabase_legacy\n"
         "SUPABASE_URL=https://example.supabase.co\n"
         "SUPABASE_SERVICE_KEY=test-service-key\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("EMPIRE_ENV_PATH", str(env))
-    monkeypatch.setenv("EMPIRE_COMPONENT", "crawler-acquisition")
     sys.modules.pop("empire_os.autonomous_execution_bus", None)
     return importlib.import_module("empire_os.autonomous_execution_bus")
 
 
-def test_execution_bus_rest_uses_shared_egress_guard(monkeypatch, tmp_path):
+def test_execution_bus_contains_no_direct_vendor_transport(monkeypatch, tmp_path):
     bus = _load_bus(monkeypatch, tmp_path)
-    events = []
-    monkeypatch.setattr(
-        bus,
-        "_reserve_supabase_request",
-        lambda: events.append("reserve"),
-    )
-    monkeypatch.setattr(
-        bus,
-        "_close_supabase_egress_circuit",
-        lambda: events.append("close"),
-    )
-    requests = []
+    source = inspect.getsource(bus)
 
-    def opener(req, timeout=30):
-        requests.append(req)
-        return FakeResponse([{"id": "p1"}])
+    assert "SUPABASE_URL" not in source
+    assert "SUPABASE_SERVICE_KEY" not in source
+    assert "/rest/v1/" not in source
+    assert "urllib.request" not in source
+    assert "_rest_json" not in source
 
-    monkeypatch.setattr(bus.urllib.request, "urlopen", opener)
 
-    result = bus._rest_json(
-        "GET",
-        "/rest/v1/prospects",
-        params={"select": "id", "limit": "1"},
-    )
+def test_execution_bus_runtime_env_is_passed_to_gateway(monkeypatch, tmp_path):
+    bus = _load_bus(monkeypatch, tmp_path)
+    seen = {}
+    fake_gateway = object()
+    fake_repo = object()
 
-    assert result == [{"id": "p1"}]
-    assert events == ["reserve", "close"]
-    assert requests[0].headers["User-agent"] == "EmpireOS/crawler-acquisition"
-    assert requests[0].headers["X-empire-component"] == "crawler-acquisition"
+    def gateway_factory(env):
+        seen["env"] = env
+        return fake_gateway
+
+    def repository_factory(gateway):
+        seen["gateway"] = gateway
+        return fake_repo
+
+    monkeypatch.setattr(bus, "gateway_from_environment", gateway_factory)
+    monkeypatch.setattr(bus, "ExecutionBusDataRepository", repository_factory)
+
+    result = bus._data_repository()
+
+    assert seen["env"]["EMPIRE_DATA_BACKEND"] == "supabase_legacy"
+    assert seen["gateway"] is fake_gateway
+    assert result is fake_repo
+
+
+def test_execution_bus_rpc_wraps_repository_failure(monkeypatch, tmp_path):
+    bus = _load_bus(monkeypatch, tmp_path)
+
+    class Repo:
+        def rpc(self, name, payload):
+            raise RuntimeError("backend unavailable")
+
+    monkeypatch.setattr(bus, "_data_repository", lambda: Repo())
+
+    try:
+        bus.rpc("claim_next_gtm_job", {})
+    except bus.BusError as exc:
+        assert "claim_next_gtm_job" in str(exc)
+        assert "backend unavailable" in str(exc)
+    else:
+        raise AssertionError("repository failure must be wrapped as BusError")

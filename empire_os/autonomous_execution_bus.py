@@ -37,9 +37,6 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,6 +46,8 @@ from empire_os.buyer_allocation import (
     allocate_owned_prospect,
     buyer_activation_decision,
 )
+from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
 from empire_os.niche_taxonomy import (
     NICHE_FAMILIES,
     metro_key,
@@ -56,13 +55,6 @@ from empire_os.niche_taxonomy import (
     normalise,
 )
 from empire_os.runtime_env import load_runtime_env
-from empire_os.legacy_data_egress import (
-    close_legacy_data_egress_circuit as _close_supabase_egress_circuit,
-    legacy_data_component_name as _component_name,
-    open_legacy_data_egress_circuit as _open_supabase_egress_circuit,
-    reserve_legacy_data_request as _reserve_supabase_request,
-)
-
 
 ENV_PATH = os.environ.get(
     "EMPIRE_ENV_PATH",
@@ -136,27 +128,13 @@ class BusError(RuntimeError):
 
 
 def load_env() -> dict[str, str]:
-    return load_runtime_env(
-        ENV_PATH,
-        required=("SUPABASE_URL", "SUPABASE_SERVICE_KEY"),
+    return load_runtime_env(ENV_PATH)
+
+
+def _data_repository() -> ExecutionBusDataRepository:
+    return ExecutionBusDataRepository(
+        gateway_from_environment(load_env())
     )
-
-
-ENV = load_env()
-
-SUPABASE_URL = ENV["SUPABASE_URL"].rstrip("/")
-SUPABASE_KEY = ENV["SUPABASE_SERVICE_KEY"]
-
-_COMPONENT = _component_name()
-
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": "Bearer " + SUPABASE_KEY,
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    "User-Agent": f"EmpireOS/{_COMPONENT}",
-    "X-Empire-Component": _COMPONENT,
-}
 
 
 def utc_now() -> str:
@@ -185,37 +163,14 @@ def rpc(
     function_name: str,
     payload: dict[str, Any],
 ) -> Any:
-    query = urllib.parse.quote(
-        f"/rest/v1/rpc/{function_name}",
-        safe="/",
-    )
-
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}{query}",
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-        headers=HEADERS,
-    )
-
-    _reserve_supabase_request()
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            raw = response.read().decode("utf-8")
-            _close_supabase_egress_circuit()
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        if (
-            exc.code == 402
-            and (
-                "exceed_egress_quota" in body
-                or "restricted due to the following violations" in body
-            )
-        ):
-            _open_supabase_egress_circuit("exceed_egress_quota")
+        return _data_repository().rpc(
+            function_name,
+            payload,
+        )
+    except Exception as exc:
         raise BusError(
-            f"RPC {function_name} failed HTTP {exc.code}: "
-            f"{body[:1000]}"
+            f"RPC {function_name} failed: {exc}"
         ) from exc
 
 
@@ -248,36 +203,11 @@ def insert_event(
         "occurred_at": utc_now(),
     }
 
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}/rest/v1/commercial_events",
-        data=json.dumps(body).encode("utf-8"),
-        method="POST",
-        headers={
-            **HEADERS,
-            "Prefer": (
-                "resolution=ignore-duplicates,"
-                "return=minimal"
-            ),
-        },
-    )
-
-    _reserve_supabase_request()
     try:
-        with urllib.request.urlopen(req, timeout=30):
-            _close_supabase_egress_circuit()
-    except urllib.error.HTTPError as exc:
-        body_text = exc.read().decode("utf-8", errors="replace")
-        if (
-            exc.code == 402
-            and (
-                "exceed_egress_quota" in body_text
-                or "restricted due to the following violations" in body_text
-            )
-        ):
-            _open_supabase_egress_circuit("exceed_egress_quota")
+        _data_repository().append_commercial_event(body)
+    except Exception as exc:
         raise BusError(
-            f"commercial event insert failed HTTP {exc.code}: "
-            f"{body_text[:1000]}"
+            f"commercial event insert failed: {exc}"
         ) from exc
 
 
@@ -515,59 +445,6 @@ def execute_lead_generation(job: ClaimedJob) -> dict[str, Any]:
     )
 
 
-def _rest_json(
-    method: str,
-    path: str,
-    *,
-    payload: dict[str, Any] | None = None,
-    params: dict[str, str] | None = None,
-    prefer: str | None = None,
-) -> Any:
-    query = ""
-    if params:
-        query = "?" + urllib.parse.urlencode(params)
-
-    body = (
-        json.dumps(payload).encode("utf-8")
-        if payload is not None
-        else None
-    )
-
-    headers = dict(HEADERS)
-    if prefer:
-        headers["Prefer"] = prefer
-
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}{path}{query}",
-        data=body,
-        method=method,
-        headers=headers,
-    )
-
-    _reserve_supabase_request()
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            raw = response.read().decode("utf-8")
-            _close_supabase_egress_circuit()
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as exc:
-        body_text = exc.read().decode("utf-8", errors="replace")
-        if (
-            exc.code == 402
-            and (
-                "exceed_egress_quota" in body_text
-                or "restricted due to the following violations" in body_text
-            )
-        ):
-            _open_supabase_egress_circuit("exceed_egress_quota")
-        raise BusError(
-            f"REST {method} {path} failed HTTP {exc.code}: "
-            f"{body_text[:1000]}"
-        ) from exc
-
-
-
-
 def _write_canonical_prospect(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
@@ -592,16 +469,17 @@ def _write_canonical_prospect(
     ):
         raise BusError("canonical prospect writer missing identity_keys")
 
-    result = _rest_json(
-        "POST",
-        "/rest/v1/rpc/ingest_prospect_atomic",
-        payload={
-            "p_prospect": prospect,
-            "p_evidence": evidence,
-            "p_ingest_key": ingest_key,
-            "p_identity_keys": identity_keys,
-        },
-    )
+    try:
+        result = _data_repository().ingest_prospect_atomic(
+            prospect=prospect,
+            evidence=evidence,
+            ingest_key=ingest_key,
+            identity_keys=identity_keys,
+        )
+    except Exception as exc:
+        raise BusError(
+            f"canonical prospect ingest failed: {exc}"
+        ) from exc
 
     if not isinstance(result, dict):
         raise BusError(
@@ -630,25 +508,16 @@ def _qualification_candidates(
     if not aliases:
         aliases = [normalise(family)]
 
-    rows = _rest_json(
-        "GET",
-        "/rest/v1/prospects",
-        params={
-            "select": (
-                "id,business_name,niche,metro,status,"
-                "buy_signal_score,phone,website,address,"
-                "rating,review_count,contact_name,"
-                "contact_title,contact_source,contacted_status"
-            ),
-            "niche": "in.(" + ",".join(aliases) + ")",
-            "metro": "ilike." + metro,
-            "status": "not.eq.archived",
-            "order": "buy_signal_score.desc.nullslast,created_at.asc",
-            "limit": str(limit),
-        },
-    )
-
-    return rows if isinstance(rows, list) else []
+    try:
+        return _data_repository().qualification_candidates(
+            aliases=aliases,
+            metro=metro,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise BusError(
+            f"qualification candidate query failed: {exc}"
+        ) from exc
 
 
 def _materialize_qualification_jobs(
@@ -729,27 +598,16 @@ def _materialize_qualification_jobs(
     existing: set[str] = set()
 
     if prospect_ids:
-        rows = _rest_json(
-            "GET",
-            "/rest/v1/prospect_qualifications",
-            params={
-                "select": "prospect_id",
-                "prospect_id": (
-                    "in.(" + ",".join(prospect_ids) + ")"
-                ),
-                "scoring_engine": (
-                    "eq.empire_os.lead_scoring"
-                ),
-                "scoring_version": "eq.v1",
-            },
-        )
-
-        if isinstance(rows, list):
-            existing = {
-                str(row["prospect_id"])
-                for row in rows
-                if row.get("prospect_id")
-            }
+        try:
+            existing = _data_repository().existing_qualification_ids(
+                prospect_ids,
+                scoring_engine="empire_os.lead_scoring",
+                scoring_version="v1",
+            )
+        except Exception as exc:
+            raise BusError(
+                f"existing qualification query failed: {exc}"
+            ) from exc
 
     jobs_created = 0
     jobs_existing = 0
@@ -803,57 +661,24 @@ def _materialize_qualification_jobs(
             "idempotency_key": idempotency_key,
         }
 
-        existing_jobs = _rest_json(
-            "GET",
-            "/rest/v1/gtm_jobs",
-            params={
-                "select": "id",
-                "idempotency_key": (
-                    f"eq.{idempotency_key}"
-                ),
-                "limit": "1",
-            },
-        )
-
-        if (
-            isinstance(existing_jobs, list)
-            and existing_jobs
-        ):
-            jobs_existing += 1
-            continue
-
         try:
-            created_rows = _rest_json(
-                "POST",
-                "/rest/v1/gtm_jobs",
-                payload=row,
-                prefer="return=representation",
+            created_row, created = _data_repository().ensure_gtm_job(
+                row
             )
-        except BusError as exc:
-            message = str(exc)
-
-            duplicate_child = (
-                "HTTP 409" in message
-                and '"code":"23505"' in message
-                and "idempotency_key" in message
-            )
-
-            if not duplicate_child:
-                raise
-
-            jobs_existing += 1
-            continue
-
-        if not (
-            isinstance(created_rows, list)
-            and created_rows
-        ):
+        except Exception as exc:
             raise BusError(
-                "qualification child job insert "
-                "returned no row"
+                f"qualification child job ensure failed: {exc}"
+            ) from exc
+
+        if not isinstance(created_row, dict):
+            raise BusError(
+                "qualification child job ensure returned invalid row"
             )
 
-        jobs_created += 1
+        if created:
+            jobs_created += 1
+        else:
+            jobs_existing += 1
 
     return {
         "ok": True,
@@ -931,22 +756,16 @@ def _allocation_candidates(
         limit,
     )
 
-    prospects = _rest_json(
-        "GET",
-        "/rest/v1/prospects",
-        params={
-            "select": (
-                "id,business_name,niche,metro,status,"
-                "buy_signal_score,phone,website,address,"
-                "contact_source,contacted_status"
-            ),
-            "niche": "in.(" + ",".join(aliases) + ")",
-            "metro": "ilike." + metro,
-            "status": "not.eq.archived",
-            "order": "buy_signal_score.desc.nullslast,created_at.asc",
-            "limit": str(scan_limit),
-        },
-    )
+    try:
+        prospects = _data_repository().allocation_market_prospects(
+            aliases=aliases,
+            metro=metro,
+            limit=scan_limit,
+        )
+    except Exception as exc:
+        raise BusError(
+            f"allocation prospect query failed: {exc}"
+        ) from exc
 
     if not isinstance(prospects, list) or not prospects:
         return []
@@ -960,20 +779,14 @@ def _allocation_candidates(
     if not prospect_ids:
         return []
 
-    qualifications = _rest_json(
-        "GET",
-        "/rest/v1/prospect_qualifications",
-        params={
-            "select": "prospect_id,score,tier,status,scored_at",
-            "prospect_id": "in.(" + ",".join(prospect_ids) + ")",
-            "status": "eq.scored",
-            "tier": "in.(hot,warm)",
-            "score": "gte.50",
-            "scoring_engine": "eq.empire_os.lead_scoring",
-            "scoring_version": "eq.v1",
-            "order": "score.desc,scored_at.asc",
-        },
-    )
+    try:
+        qualifications = _data_repository().allocation_qualifications(
+            prospect_ids
+        )
+    except Exception as exc:
+        raise BusError(
+            f"allocation qualification query failed: {exc}"
+        ) from exc
 
     if not isinstance(qualifications, list):
         raise BusError(
@@ -1004,26 +817,14 @@ def _allocation_candidates(
 
     qualified_ids = [str(row["id"]) for row in qualified]
 
-    existing_orders = _rest_json(
-        "GET",
-        "/rest/v1/fulfilment_orders",
-        params={
-            "select": "prospect_id",
-            "prospect_id": "in.(" + ",".join(qualified_ids) + ")",
-            "state": "not.in.(rejected,cancelled)",
-        },
-    )
-
-    if not isinstance(existing_orders, list):
-        raise BusError(
-            "allocation fulfilment query returned invalid payload"
+    try:
+        allocated = _data_repository().active_fulfilment_prospect_ids(
+            qualified_ids
         )
-
-    allocated = {
-        str(row.get("prospect_id"))
-        for row in existing_orders
-        if isinstance(row, dict) and row.get("prospect_id")
-    }
+    except Exception as exc:
+        raise BusError(
+            f"allocation fulfilment query failed: {exc}"
+        ) from exc
 
     available = [
         row for row in qualified
@@ -1098,20 +899,6 @@ def _materialize_allocation_jobs(
         qualification = prospect.get("_qualification") or {}
         idempotency_key = f"allocation:{prospect_id}:v1"
 
-        existing_jobs = _rest_json(
-            "GET",
-            "/rest/v1/gtm_jobs",
-            params={
-                "select": "id",
-                "idempotency_key": f"eq.{idempotency_key}",
-                "limit": "1",
-            },
-        )
-
-        if isinstance(existing_jobs, list) and existing_jobs:
-            jobs_existing += 1
-            continue
-
         row = {
             "opportunity_id": job.opportunity_id,
             "job_type": "prospect_buyer_allocation",
@@ -1137,30 +924,23 @@ def _materialize_allocation_jobs(
         }
 
         try:
-            created = _rest_json(
-                "POST",
-                "/rest/v1/gtm_jobs",
-                payload=row,
-                prefer="return=representation",
+            ensured_row, created = _data_repository().ensure_gtm_job(
+                row
             )
-        except BusError as exc:
-            message = str(exc)
-            duplicate = (
-                "HTTP 409" in message
-                and '"code":"23505"' in message
-                and "idempotency_key" in message
-            )
-            if not duplicate:
-                raise
-            jobs_existing += 1
-            continue
-
-        if not isinstance(created, list) or not created:
+        except Exception as exc:
             raise BusError(
-                "allocation child job insert returned no row"
+                f"allocation child job ensure failed: {exc}"
+            ) from exc
+
+        if not isinstance(ensured_row, dict):
+            raise BusError(
+                "allocation child job ensure returned invalid row"
             )
 
-        jobs_created += 1
+        if created:
+            jobs_created += 1
+        else:
+            jobs_existing += 1
 
     return {
         "ok": True,
@@ -1188,37 +968,25 @@ def execute_buyer_allocation(
     if not prospect_id:
         raise BusError("buyer allocation job missing prospect_id")
 
-    rows = _rest_json(
-        "GET",
-        "/rest/v1/prospects",
-        params={
-            "select": (
-                "id,business_name,niche,metro,status,buy_signal_score,"
-                "phone,website,address,contact_source,contacted_status"
-            ),
-            "id": f"eq.{prospect_id}",
-            "limit": "1",
-        },
-    )
+    repository = _data_repository()
+    try:
+        prospect = repository.prospect_by_id(prospect_id)
+    except Exception as exc:
+        raise BusError(
+            f"buyer allocation prospect query failed: {exc}"
+        ) from exc
 
-    if not isinstance(rows, list) or len(rows) != 1:
+    if prospect is None:
         raise BusError("buyer allocation prospect not found")
 
-    prospect = rows[0]
     if normalise(prospect.get("status")) in {"archived", "rejected"}:
         raise BusError("buyer allocation prospect is not active")
-
-    def reader(path: str, params: dict[str, str]) -> Any:
-        return _rest_json("GET", path, params=params)
-
-    def allocator(payload: dict[str, Any]) -> Any:
-        return rpc("allocate_prospect_atomic", payload)
 
     try:
         result = allocate_owned_prospect(
             prospect,
-            reader,
-            allocator,
+            repository.buyer_allocation,
+            repository.buyer_allocation.allocate_atomic,
         )
     except BuyerAllocationError as exc:
         raise BusError(f"buyer allocation failed: {exc}") from exc
@@ -1285,22 +1053,15 @@ def _capacity_buyer_rows() -> list[dict[str, Any]]:
     offset = 0
 
     while True:
-        batch = _rest_json(
-            "GET",
-            "/rest/v1/buyers",
-            params={
-                "select": (
-                    "id,buyer_name,niche,metro,is_active,status,"
-                    "daily_cap,calls_today,destination_phone,webhook_url,"
-                    "reviewed_at,commercial_activation_state,"
-                    "commercial_activated_at,commercial_terms_source,"
-                    "commercial_terms_reference,commercial_terms_verified_at,"
-                    "capacity_verified_at,delivery_verified_at"
-                ),
-                "limit": str(CAPACITY_BUYER_PAGE_SIZE),
-                "offset": str(offset),
-            },
-        )
+        try:
+            batch = _data_repository().capacity_buyer_page(
+                page_size=CAPACITY_BUYER_PAGE_SIZE,
+                offset=offset,
+            )
+        except Exception as exc:
+            raise BusError(
+                f"capacity buyer query failed: {exc}"
+            ) from exc
 
         if not isinstance(batch, list):
             raise BusError(
@@ -1725,7 +1486,7 @@ def print_status() -> None:
             {
                 "worker_id": WORKER_ID,
                 "execution_mode": EXECUTION_MODE,
-                "supabase": SUPABASE_URL,
+                "canonical_data": _data_repository().snapshot(),
                 "lease_seconds": DEFAULT_LEASE_SECONDS,
                 "heartbeat_seconds": DEFAULT_HEARTBEAT_SECONDS,
                 "max_jobs_per_cycle": MAX_JOBS_PER_CYCLE,

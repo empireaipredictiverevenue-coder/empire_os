@@ -15,13 +15,22 @@ class Snapshot:
 
 
 class FakeGateway:
-    def __init__(self, rows=None):
-        self.rows = [] if rows is None else rows
-        self.calls = []
+    def __init__(self):
+        self.existing = []
+        self.insert_rows = [{"id": "e1"}]
+        self.insert_error = None
+        self.queries = []
+        self.inserts = []
 
-    def insert_ignore_conflicts(self, table, row, *, return_repr=False):
-        self.calls.append((table, dict(row), return_repr))
-        return list(self.rows)
+    def query(self, table, columns="*", *, filters=(), order=(), limit=1000, offset=0):
+        self.queries.append((table, columns, tuple(filters), limit))
+        return list(self.existing)
+
+    def insert(self, table, row, *, return_repr=True):
+        self.inserts.append((table, dict(row), return_repr))
+        if self.insert_error is not None:
+            raise self.insert_error
+        return list(self.insert_rows)
 
     def snapshot(self):
         return Snapshot()
@@ -36,21 +45,54 @@ def _event():
     }
 
 
-def test_append_uses_untargeted_conflict_ignore():
-    gateway = FakeGateway(rows=[{"id": "e1"}])
+def test_append_inserts_after_exact_idempotency_check():
+    gateway = FakeGateway()
     repository = CommercialEventRepository(gateway)
 
     inserted = repository.append_idempotent(_event())
 
     assert inserted is True
-    assert gateway.calls == [
+    assert gateway.inserts == [
         ("commercial_events", _event(), True),
     ]
+    assert len(gateway.queries) == 1
 
 
 def test_existing_idempotency_key_is_successful_noop():
-    repository = CommercialEventRepository(FakeGateway(rows=[]))
+    gateway = FakeGateway()
+    gateway.existing = [{"id": "e1", "idempotency_key": _event()["idempotency_key"]}]
+    repository = CommercialEventRepository(gateway)
+
     assert repository.append_idempotent(_event()) is False
+    assert gateway.inserts == []
+
+
+def test_insert_race_is_only_idempotent_when_exact_key_now_exists():
+    gateway = FakeGateway()
+    repository = CommercialEventRepository(gateway)
+    gateway.insert_error = RuntimeError("unique violation")
+
+    calls = {"count": 0}
+
+    def query(table, columns="*", *, filters=(), order=(), limit=1000, offset=0):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return []
+        return [{"id": "e1", "idempotency_key": _event()["idempotency_key"]}]
+
+    gateway.query = query
+
+    assert repository.append_idempotent(_event()) is False
+    assert calls["count"] == 2
+
+
+def test_unrelated_insert_failure_is_not_swallowed():
+    gateway = FakeGateway()
+    gateway.insert_error = RuntimeError("check constraint failed")
+    repository = CommercialEventRepository(gateway)
+
+    with pytest.raises(RuntimeError, match="check constraint"):
+        repository.append_idempotent(_event())
 
 
 @pytest.mark.parametrize("field", ["event_type", "actor", "idempotency_key"])
