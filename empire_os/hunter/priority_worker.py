@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.hunter.prioritization import rank_enrichment_candidates
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 
 def _get(path: str, params: dict[str, str]) -> list[dict[str, Any]]:
