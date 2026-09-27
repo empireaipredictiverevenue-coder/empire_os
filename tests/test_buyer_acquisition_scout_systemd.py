@@ -226,3 +226,45 @@ def test_local_opportunity_seed_recovery_snapshot_is_bounded(tmp_path):
     assert row["recovery_source"] == "admin_read_only_snapshot"
     assert row["database_write_performed"] is False
     assert row["outbound_authorized"] is False
+
+
+
+def test_recovery_snapshot_refresh_is_atomic_and_empty_safe(tmp_path):
+    import json
+
+    from scripts.run_buyer_acquisition_scout import (
+        _write_local_opportunity_seed_snapshot,
+    )
+
+    row = {
+        "id": "prospect-1",
+        "business_name": "Roof Co",
+        "niche": "roofing",
+        "metro": "denver, co",
+        "website": "https://roof.example",
+        "seed_opportunity_key": "market:roofing:denver, co",
+        "seed_buyer_pools": ["end_service_buyers"],
+    }
+
+    path = _write_local_opportunity_seed_snapshot(
+        tmp_path,
+        [row],
+    )
+
+    assert path is not None
+    payload = json.loads(path.read_text())
+    assert payload["mode"] == "OBSERVE"
+    assert payload["database_write_performed"] is False
+    assert payload["outbound_authorized"] is False
+    assert payload["source"] == "canonical_rest_refresh"
+    assert payload["seeds"][0]["id"] == "prospect-1"
+
+    before = path.read_text()
+    assert (
+        _write_local_opportunity_seed_snapshot(
+            tmp_path,
+            [],
+        )
+        is None
+    )
+    assert path.read_text() == before
