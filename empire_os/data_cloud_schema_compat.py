@@ -227,9 +227,6 @@ def compare_schema(
         ):
             findings.append(f"trigger_mismatch:{name}")
 
-    if tuple(sorted(source.extensions)) != tuple(sorted(target.extensions)):
-        findings.append("extension_mismatch")
-
     extra_tables = sorted(set(target_tables) - set(source_tables))
 
     return {
@@ -239,6 +236,9 @@ def compare_schema(
         "source_table_count": len(source_tables),
         "target_table_count": len(target_tables),
         "extra_target_tables": extra_tables,
+        "source_extension_count": len(source.extensions),
+        "target_extension_count": len(target.extensions),
+        "extension_compatibility_owner": "data_cloud_extension_plan",
         "authority": {
             "schema_mutation": False,
             "drop_table": False,
