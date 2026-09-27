@@ -41,6 +41,8 @@ RESULT_SCHEMA_VERSION = "empire.hermes.control_result.v1"
 
 DEFAULT_CONTROL_BRANCH = "ops/hermes-control"
 DEFAULT_BASE_BRANCH = "feature/revenue-intelligence-v2"
+DATA_CLOUD_CLOSEOUT_BRANCH = "agent/data-cloud-wave4"
+ALLOWED_BASE_BRANCHES = frozenset({DEFAULT_BASE_BRANCH, DATA_CLOUD_CLOSEOUT_BRANCH})
 DEFAULT_REMOTE = "origin"
 
 JOB_PATH_PREFIX = "jobs/inbox/"
@@ -138,9 +140,9 @@ class HermesJob:
         base_branch = str(
             raw.get("base_branch") or DEFAULT_BASE_BRANCH
         ).strip()
-        if base_branch != DEFAULT_BASE_BRANCH:
+        if base_branch not in ALLOWED_BASE_BRANCHES:
             raise HermesControlError(
-                "base_branch is pinned to the canonical working branch"
+                "base_branch is outside the governed branch allowlist"
             )
 
         requested_paths = raw.get("allowed_paths")
