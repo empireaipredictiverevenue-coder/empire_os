@@ -33,6 +33,10 @@ def _commercial_event_repository() -> CommercialEventRepository:
     return CommercialEventRepository(gateway_from_environment(env))
 
 
+def fetch_prospect(prospect_id: str) -> dict[str, Any]:
+    return _qualification_repository().fetch_prospect(prospect_id)
+
+
 def fetch_pending_prospects(limit: int = 10) -> list[dict[str, Any]]:
     return _qualification_repository().fetch_pending_prospects(
         limit=limit,
