@@ -46,6 +46,7 @@ CLASSIFIED_EXCEPTIONS = {
     "empire_os/data_cloud_vendor_coupling_audit.py": "audit_definition",
     "empire_os/canonical_data_gateway.py": "canonical_backend_factory",
     "empire_os/data_cloud_discovery.py": "migration_discovery",
+    "empire_os/data_cloud_rollback_readiness.py": "rollback_readiness_verifier",
     "empire_os/supabase_egress_guard.py": "legacy_provider_guard",
     "empire_os/migrate_prospects.py": "one_time_migration_recovery",
 }
