@@ -20,6 +20,10 @@ EMPIREDB_ENV = Path("/etc/empiredb.env")
 EMPIRE_OS_ENV = Path("/etc/empire_os.env")
 PGBACKREST_CONFIG = Path("/etc/pgbackrest/empiredb.conf")
 PGBACKREST_STANZA = "empiredb"
+PGBACKREST_OBSERVER_UNIT = "empire-data-cloud-backup-observer.service"
+PGBACKREST_OBSERVER_SNAPSHOT = Path(
+    "/run/empire-data-cloud/pgbackrest.json"
+)
 
 POSTGRES_UNIT = "postgresql@18-main"
 PGBOUNCER_UNIT = "pgbouncer"
@@ -159,75 +163,76 @@ def _pgbackrest_config() -> dict[str, Any]:
 
 
 def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
-    config = _pgbackrest_config()
+    """Refresh and read the postgres-owned backup observation.
+
+    The privileged helper starts only this fixed read-only oneshot service.
+    pgBackRest itself runs as postgres in that separate systemd sandbox, so the
+    helper never changes UID/GID and never receives backup repository secrets.
+    """
     completed = runner(
-        [
-            "pgbackrest",
-            f"--config={PGBACKREST_CONFIG}",
-            f"--stanza={PGBACKREST_STANZA}",
-            "--log-level-file=off",
-            "--output=json",
-            "info",
-        ],
+        ["systemctl", "start", PGBACKREST_OBSERVER_UNIT],
         capture_output=True,
         text=True,
-        timeout=20,
+        timeout=30,
         check=False,
-        user="postgres",
-        group="postgres",
     )
-
     if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "").lower()
-        if "permission denied" in detail:
-            failure = "PgBackRestPermissionDenied"
-        elif "cannot run as root" in detail:
-            failure = "PgBackRestUserContextRejected"
-        elif "no such file" in detail or "not found" in detail:
-            failure = "PgBackRestPathMissing"
-        elif "config" in detail and "error" in detail:
-            failure = "PgBackRestConfigError"
-        else:
-            failure = "PgBackRestInfoFailed"
         return {
-            **config,
+            **_pgbackrest_config(),
             "healthy": False,
             "backup_count": 0,
             "latest_label": None,
-            "error_class": failure,
+            "error_class": "PgBackRestObserverServiceFailed",
             "returncode": int(completed.returncode),
+            "off_node_repository_verified": False,
         }
 
     try:
-        payload = json.loads(completed.stdout or "[]")
-    except json.JSONDecodeError:
+        payload = json.loads(
+            PGBACKREST_OBSERVER_SNAPSHOT.read_text(encoding="utf-8")
+        )
+    except FileNotFoundError:
         return {
-            **config,
+            **_pgbackrest_config(),
             "healthy": False,
             "backup_count": 0,
             "latest_label": None,
-            "error_class": "InvalidPgBackRestJson",
+            "error_class": "PgBackRestObserverSnapshotMissing",
+            "off_node_repository_verified": False,
+        }
+    except (OSError, json.JSONDecodeError):
+        return {
+            **_pgbackrest_config(),
+            "healthy": False,
+            "backup_count": 0,
+            "latest_label": None,
+            "error_class": "PgBackRestObserverSnapshotInvalid",
+            "off_node_repository_verified": False,
         }
 
-    stanza = payload[0] if isinstance(payload, list) and payload else {}
-    status = stanza.get("status") if isinstance(stanza, Mapping) else {}
-    backups = stanza.get("backup") if isinstance(stanza, Mapping) else []
-    backups = backups if isinstance(backups, list) else []
-    latest = backups[-1] if backups else {}
-    status_code = status.get("code") if isinstance(status, Mapping) else None
+    if not isinstance(payload, Mapping):
+        return {
+            **_pgbackrest_config(),
+            "healthy": False,
+            "backup_count": 0,
+            "latest_label": None,
+            "error_class": "PgBackRestObserverSnapshotInvalid",
+            "off_node_repository_verified": False,
+        }
 
+    # Re-project only the bounded non-secret fields consumed by health state.
     return {
-        **config,
-        "healthy": status_code == 0 and bool(backups),
-        "status_code": status_code,
-        "backup_count": len(backups),
-        "latest_label": (
-            latest.get("label") if isinstance(latest, Mapping) else None
+        "repo_type": payload.get("repo_type"),
+        "repo_path": payload.get("repo_path"),
+        "cipher_type": payload.get("cipher_type"),
+        "healthy": payload.get("healthy") is True,
+        "backup_count": int(payload.get("backup_count") or 0),
+        "latest_label": payload.get("latest_label"),
+        "encrypted": payload.get("encrypted") is True,
+        "off_node_repository_verified": (
+            payload.get("off_node_repository_verified") is True
         ),
-        "encrypted": config.get("cipher_type") == "aes-256-cbc",
-        # Current repository is deliberately local. Never infer off-node
-        # durability from a successful local backup.
-        "off_node_repository_verified": False,
+        "error_class": payload.get("error_class"),
     }
 
 
