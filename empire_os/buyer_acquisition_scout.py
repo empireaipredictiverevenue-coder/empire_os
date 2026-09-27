@@ -278,6 +278,7 @@ def run_buyer_scout(
             })
 
     search_domain_count = len(provenance)
+    search_has_domains = search_domain_count > 0
     seed_domain_count = 0
     opportunity_seed_domain_count = 0
     canonical_seed_by_domain: dict[str, dict[str, Any]] = {}
@@ -303,7 +304,7 @@ def run_buyer_scout(
         # search results without claiming buyer intent or authorizing send.
         if opportunity_key:
             opportunity_seed_domains.add(host)
-        elif provenance:
+        elif search_has_domains:
             continue
         elif profile_key not in CONTINUOUS_COMMERCIAL_LANE_BY_ICP:
             continue
