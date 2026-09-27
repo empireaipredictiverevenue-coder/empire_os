@@ -170,3 +170,103 @@ def test_pi_mutation_fails_over_to_isolated_empire_coder(tmp_path, monkeypatch):
     assert result["runtime_fallback"]["to"] == "empire_coder"
     assert result["production_deploy"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_dispatch_carries_data_cloud_base_branch_to_hermes(
+    tmp_path,
+    monkeypatch,
+):
+    import empire_os.execution_plane_dispatcher as module
+
+    captured = {}
+
+    def publish(_root, payload):
+        captured.update(payload)
+        return {"published": True}
+
+    monkeypatch.setattr(module, "publish_control_job", publish)
+
+    result = dispatch_execution_request(
+        tmp_path,
+        ExecutionRequest(
+            request_id="data-cloud-hermes",
+            capability="backend_code",
+            department="platform",
+            objective="Implement bounded Data Cloud code.",
+            authority="internal_write",
+            base_branch="agent/data-cloud-wave4",
+            allowed_paths=("empire_os/example.py",),
+            lease_resources=("domain:data_cloud_example",),
+        ),
+    )
+
+    assert result["worker"] == "hermes"
+    assert result["status"] == "QUEUED"
+    assert captured["base_branch"] == "agent/data-cloud-wave4"
+
+
+def test_dispatch_carries_data_cloud_base_branch_to_pi(
+    tmp_path,
+    monkeypatch,
+):
+    import empire_os.execution_plane_dispatcher as module
+
+    class Health:
+        ready = True
+
+        def as_dict(self):
+            return {"ready": True}
+
+    captured = {}
+
+    monkeypatch.setattr(
+        module,
+        "builder_capability_ready",
+        lambda worker, capability, *, path: (
+            worker == "pi" and capability == "code_mutation"
+        ),
+    )
+    monkeypatch.setattr(module, "pi_health", lambda: Health())
+
+    def run_pi(_root, job):
+        captured["base_branch"] = job.base_branch
+        return {
+            "status": "PROPOSAL_READY",
+            "proposal_branch": None,
+            "execution_authority": "none",
+            "production_mutation": False,
+        }
+
+    monkeypatch.setattr(module, "run_pi_sandbox_job", run_pi)
+
+    result = dispatch_execution_request(
+        tmp_path,
+        ExecutionRequest(
+            request_id="data-cloud-pi",
+            capability="parallel_backend_code",
+            department="platform",
+            objective="Implement bounded parallel Data Cloud code.",
+            authority="internal_write",
+            base_branch="agent/data-cloud-wave4",
+            allowed_paths=("empire_os/example.py",),
+            lease_resources=("domain:data_cloud_parallel",),
+        ),
+    )
+
+    assert result["worker"] == "pi"
+    assert captured["base_branch"] == "agent/data-cloud-wave4"
+
+
+def test_execution_request_rejects_unapproved_base_branch():
+    with pytest.raises(ValueError, match="allowlist"):
+        ExecutionRequest(
+            request_id="bad-base",
+            capability="backend_code",
+            department="platform",
+            objective="x",
+            authority="internal_write",
+            base_branch="main",
+            allowed_paths=("empire_os/example.py",),
+            lease_resources=("domain:data_cloud_example",),
+        ).validate()
