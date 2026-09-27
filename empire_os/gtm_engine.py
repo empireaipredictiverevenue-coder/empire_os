@@ -953,7 +953,7 @@ def build_plan() -> dict[str, Any]:
         },
 
         "execution": {
-            "writes_to_supabase": 0,
+            "writes_to_canonical_data": 0,
             "prospects_modified": 0,
             "outreach_sent": 0,
             "campaigns_launched": 0,
@@ -1042,7 +1042,7 @@ def main() -> None:
         "FULFILMENT CHECKS: "
         f"{plan['jobs']['by_type'].get('fulfilment_capacity_check', 0)}"
     )
-    print("SUPABASE WRITES: 0")
+    print("CANONICAL DATA WRITES: 0")
     print(f"REPORT: {REPORT_PATH}")
 
 
