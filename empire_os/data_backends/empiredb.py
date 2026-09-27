@@ -18,6 +18,65 @@ from empire_os.data_query import ConflictAction, DataFilter, FilterOperator, Ord
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
+# Explicit compatibility RPC surface. This mirrors only legacy service-role
+# proposal/read authority. Sensitive approval, verifier, sender and revenue
+# recognition functions remain available only through dedicated role transports.
+_RPC_PARAMS: dict[str, tuple[str, ...]] = {
+    "propose_outbound_intent": (
+        "p_entity_id", "p_prospect_id", "p_buyer_id", "p_opportunity_id",
+        "p_channel", "p_recipient", "p_subject", "p_body_text", "p_body_html",
+        "p_offer_key", "p_idempotency_key", "p_proposed_by", "p_expires_at",
+        "p_metadata",
+    ),
+    "get_outbound_intent_review": ("p_intent_id",),
+    "list_closer_work": ("p_limit",),
+    "open_closer_case": ("p_reply_id",),
+    "provision_buyer_from_closer_case": ("p_case_id", "p_actor"),
+    "get_closer_reply_context": ("p_case_id", "p_reply_id"),
+    "propose_closer_reply_intent": (
+        "p_case_id", "p_reply_id", "p_subject", "p_body_text",
+        "p_idempotency_key", "p_proposed_by", "p_expires_at",
+    ),
+    "record_buyer_capacity_intake": (
+        "p_case_id", "p_reply_id", "p_territory", "p_daily_cap",
+        "p_delivery_route", "p_delivery_reference", "p_evidence", "p_actor",
+    ),
+    "prepare_fulfilment_order_from_capacity": ("p_case_id", "p_actor"),
+    "propose_commercial_evidence": (
+        "p_evidence_kind", "p_buyer_id", "p_closer_case_id",
+        "p_fulfilment_order_id", "p_niche", "p_metro", "p_amount_cents",
+        "p_unit", "p_source_type", "p_source_reference", "p_evidence",
+        "p_observed_at", "p_valid_until",
+    ),
+    "verify_commercial_evidence": ("p_evidence_id", "p_actor"),
+    "reject_commercial_evidence": ("p_evidence_id", "p_actor", "p_reason"),
+    "record_closer_recommendation": (
+        "p_case_id", "p_type", "p_confidence", "p_rationale",
+        "p_message", "p_model_key",
+    ),
+    "get_commercial_product_catalog": ("p_product_code", "p_limit"),
+    "get_commercial_product_readiness": ("p_product_code",),
+    "get_verified_terms_evidence": ("p_fulfilment_order_id",),
+    "propose_commercial_terms": (
+        "p_fulfilment_order_id", "p_price_cents", "p_acquisition_cost_cents",
+        "p_fulfilment_cost_cents", "p_terms", "p_idempotency_key", "p_actor",
+    ),
+    "get_commercial_terms_review": ("p_review_id",),
+    "propose_bsc_payment_request": (
+        "p_fulfilment_order_id", "p_amount_usdt", "p_payer_address",
+        "p_treasury_address", "p_min_block_number", "p_expires_at",
+        "p_idempotency_key", "p_actor",
+    ),
+    "propose_bsc_escrow_request": (
+        "p_fulfilment_order_id", "p_amount_usdt", "p_payer_address",
+        "p_beneficiary_address", "p_min_block_number", "p_expires_at",
+        "p_idempotency_key", "p_actor",
+    ),
+    "cancel_bsc_payment_request": ("p_request_id", "p_actor", "p_reason"),
+    "get_commercial_outcome_feedback": ("p_limit",),
+}
+
+
 def _ident(value: str) -> str:
     if not _IDENT.fullmatch(value):
         raise ValueError(f"unsafe SQL identifier: {value!r}")
@@ -416,6 +475,38 @@ class EmpireDbProvider:
         name: str,
         params: Mapping[str, Any] | None = None,
     ) -> object:
-        raise DataGatewayOperationUnsupported(
-            f"EmpireDB RPC is not mapped: {name}"
+        rpc_name = str(name or "").strip()
+        keys = _RPC_PARAMS.get(rpc_name)
+        if keys is None:
+            raise DataGatewayOperationUnsupported(
+                f"EmpireDB RPC is not mapped: {rpc_name}"
+            )
+
+        supplied = dict(params or {})
+        if set(supplied) != set(keys):
+            raise ValueError(
+                f"EmpireDB RPC parameters do not match contract: {rpc_name}"
+            )
+
+        sql = (
+            f"SELECT public.{_ident(rpc_name)}("
+            + ", ".join("%s" for _ in keys)
+            + ")"
         )
+        values = tuple(self._adapt(supplied[key]) for key in keys)
+
+        connection = self._connection()
+        try:
+            cursor = connection.execute(sql, values)
+            row = cursor.fetchone()
+            if not row or len(row) != 1:
+                raise RuntimeError(
+                    f"EmpireDB RPC returned invalid shape: {rpc_name}"
+                )
+            connection.commit()
+            return row[0]
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
