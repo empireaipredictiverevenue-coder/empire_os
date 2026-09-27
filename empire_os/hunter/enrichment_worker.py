@@ -11,7 +11,7 @@ from empire_os.hunter.domain_intelligence import analyze_domain
 from empire_os.hunter.evidence_graph import build_evidence_plan
 from empire_os.hunter.materializer import SupabaseHunterMaterializer
 from empire_os.hunter.priority_worker import build_priority_queue
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 
 
 DEPTH_PAGES = {
