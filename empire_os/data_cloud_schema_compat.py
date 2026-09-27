@@ -12,10 +12,17 @@ from typing import Iterable
 _WHITESPACE = re.compile(r"\s+")
 
 
-def _normalize_sql(value: str | None) -> str | None:
+def _normalize_sql(
+    value: str | None,
+    *,
+    strip_public_schema: bool = False,
+) -> str | None:
     if value is None:
         return None
-    return _WHITESPACE.sub(" ", value.strip()).replace("public.", "")
+    normalized = _WHITESPACE.sub(" ", value.strip())
+    if strip_public_schema:
+        normalized = normalized.replace("public.", "")
+    return normalized
 
 
 @dataclass(frozen=True)
@@ -64,6 +71,13 @@ class TriggerSpec:
 
 
 @dataclass(frozen=True)
+class RoutineSpec:
+    name: str
+    identity_arguments: str
+    definition: str
+
+
+@dataclass(frozen=True)
 class TableSpec:
     name: str
     columns: tuple[ColumnSpec, ...]
@@ -82,6 +96,7 @@ class TableSpec:
 class SchemaManifest:
     tables: tuple[TableSpec, ...]
     extensions: tuple[tuple[str, str], ...] = ()
+    routines: tuple[RoutineSpec, ...] = ()
 
 
 def _by_table(manifest: SchemaManifest) -> dict[str, TableSpec]:
@@ -111,7 +126,7 @@ def _normalized_foreign_keys(
             tuple(key.columns),
             key.referenced_table.removeprefix("public."),
             tuple(key.referenced_columns),
-            _normalize_sql(key.definition),
+            _normalize_sql(key.definition, strip_public_schema=True),
         )
         for key in foreign_keys
     ))
@@ -125,7 +140,7 @@ def _normalized_indexes(
             index.name,
             tuple(index.columns),
             bool(index.unique),
-            _normalize_sql(index.definition),
+            _normalize_sql(index.definition, strip_public_schema=True),
         )
         for index in indexes
     ))
@@ -152,6 +167,19 @@ def _normalized_triggers(
     return tuple(sorted(
         (trigger.name, _normalize_sql(trigger.definition))
         for trigger in triggers
+    ))
+
+
+def _normalized_routines(
+    routines: tuple[RoutineSpec, ...],
+) -> tuple[tuple[str, str, str | None], ...]:
+    return tuple(sorted(
+        (
+            routine.name,
+            routine.identity_arguments,
+            _normalize_sql(routine.definition),
+        )
+        for routine in routines
     ))
 
 
@@ -227,10 +255,13 @@ def compare_schema(
         ):
             findings.append(f"trigger_mismatch:{name}")
 
+    if _normalized_routines(source.routines) != _normalized_routines(target.routines):
+        findings.append("routine_mismatch")
+
     extra_tables = sorted(set(target_tables) - set(source_tables))
 
     return {
-        "schema_version": "empire.data-cloud-schema-compat.v3",
+        "schema_version": "empire.data-cloud-schema-compat.v4",
         "compatible": not findings,
         "findings": findings,
         "source_table_count": len(source_tables),
@@ -239,6 +270,8 @@ def compare_schema(
         "source_extension_count": len(source.extensions),
         "target_extension_count": len(target.extensions),
         "extension_compatibility_owner": "data_cloud_extension_plan",
+        "source_routine_count": len(source.routines),
+        "target_routine_count": len(target.routines),
         "authority": {
             "schema_mutation": False,
             "drop_table": False,
