@@ -215,3 +215,8 @@ def test_local_buyer_recovery_survives_egress_containment():
         "empire-buyer-acquisition-local-recovery.timer"
         not in guard.MANAGED_TIMERS
     )
+
+
+
+def test_ops_control_survives_egress_containment():
+    assert "empire-ops-control.timer" not in guard.MANAGED_TIMERS
