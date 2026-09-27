@@ -22,30 +22,69 @@ cols AS (
           'char_max',c.character_maximum_length,
           'precision',c.numeric_precision,'scale',c.numeric_scale
         ) ORDER BY c.ordinal_position) AS items
- FROM information_schema.columns c JOIN wanted w USING(table_name)
- WHERE c.table_schema='public' GROUP BY c.table_name
+ FROM information_schema.columns c
+ JOIN wanted w USING(table_name)
+ WHERE c.table_schema='public'
+ GROUP BY c.table_name
 ),
 cons AS (
  SELECT cl.relname AS table_name,
         jsonb_agg(jsonb_build_object(
-          'name',con.conname,'type',con.contype,
-          'definition',pg_get_constraintdef(con.oid,true)
-        ) ORDER BY con.conname) AS items
+          'type',con.contype::text,
+          'columns',coalesce((
+             SELECT jsonb_agg(att.attname ORDER BY u.ord)
+             FROM unnest(con.conkey) WITH ORDINALITY u(attnum,ord)
+             JOIN pg_attribute att
+               ON att.attrelid=con.conrelid AND att.attnum=u.attnum
+          ),'[]'::jsonb),
+          'ref_table',
+             CASE WHEN con.confrelid=0 THEN NULL
+                  ELSE con.confrelid::regclass::text END,
+          'ref_columns',coalesce((
+             SELECT jsonb_agg(att.attname ORDER BY u.ord)
+             FROM unnest(con.confkey) WITH ORDINALITY u(attnum,ord)
+             JOIN pg_attribute att
+               ON att.attrelid=con.confrelid AND att.attnum=u.attnum
+          ),'[]'::jsonb),
+          'delete_action',con.confdeltype::text,
+          'update_action',con.confupdtype::text,
+          'expr',CASE WHEN con.contype='c'
+                      THEN pg_get_expr(con.conbin,con.conrelid,true)
+                      ELSE NULL END
+        ) ORDER BY con.contype::text, con.conname) AS items
  FROM pg_constraint con
  JOIN pg_class cl ON cl.oid=con.conrelid
  JOIN pg_namespace n ON n.oid=cl.relnamespace
  JOIN wanted w ON w.table_name=cl.relname
- WHERE n.nspname='public' GROUP BY cl.relname
+ WHERE n.nspname='public'
+ GROUP BY cl.relname
 ),
 idx AS (
- SELECT i.tablename AS table_name,
-        jsonb_agg(jsonb_build_object('name',i.indexname,'definition',i.indexdef)
-                  ORDER BY i.indexname) AS items
- FROM pg_indexes i JOIN wanted w ON w.table_name=i.tablename
- WHERE i.schemaname='public' GROUP BY i.tablename
+ SELECT cl.relname AS table_name,
+        jsonb_agg(jsonb_build_object(
+          'unique',i.indisunique,
+          'primary',i.indisprimary,
+          'keys',(
+             SELECT jsonb_agg(
+               pg_get_indexdef(i.indexrelid,s.n,true)
+               ORDER BY s.n
+             )
+             FROM generate_series(1,i.indnkeyatts) s(n)
+          ),
+          'predicate',pg_get_expr(i.indpred,i.indrelid,true)
+        ) ORDER BY i.indisprimary DESC,i.indisunique DESC,i.indexrelid) AS items
+ FROM pg_index i
+ JOIN pg_class cl ON cl.oid=i.indrelid
+ JOIN pg_namespace n ON n.oid=cl.relnamespace
+ JOIN wanted w ON w.table_name=cl.relname
+ WHERE n.nspname='public'
+ GROUP BY cl.relname
 )
-SELECT w.table_name,c.relrowsecurity,c.relforcerowsecurity,
-       coalesce(cols.items,'[]'::jsonb),coalesce(cons.items,'[]'::jsonb),
+SELECT w.table_name,
+       c.relrowsecurity,
+       c.relforcerowsecurity,
+       coalesce(cols.items,'[]'::jsonb),
+       coalesce(cons.items,'[]'::jsonb),
        coalesce(idx.items,'[]'::jsonb)
 FROM wanted w
 JOIN pg_class c ON c.relname=w.table_name
