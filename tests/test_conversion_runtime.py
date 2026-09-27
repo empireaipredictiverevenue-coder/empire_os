@@ -72,7 +72,7 @@ def test_runtime_builds_only_canonical_observed_boundaries():
         min_sample_size=1,
     )
 
-    assert result["source"] == "canonical_supabase"
+    assert result["source"] == "canonical_data"
     assert result["counts"]["buyer_review_to_delivered_outreach"] == {
         "entered": 4,
         "converted": 3,
