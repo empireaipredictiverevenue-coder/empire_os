@@ -1,6 +1,6 @@
 """Rollback-only cross-tenant isolation canary for EmpireDB.
 
-Tenant identity is derived from empire.tenant_role_bindings for current_user.
+Tenant identity is derived from public.empire_tenant_role_bindings for current_user.
 The tenant reader has no authority to change its own binding. Canary rows and
 temporary bindings exist only inside one transaction and are always rolled back.
 """
@@ -36,13 +36,13 @@ def _ids(connection, table: str, ids: tuple[uuid.UUID, uuid.UUID]) -> set[str]:
 def _bind_reader(connection, tenant_id: uuid.UUID | None) -> None:
     if tenant_id is None:
         connection.execute(
-            "DELETE FROM empire.tenant_role_bindings "
+            "DELETE FROM public.empire_tenant_role_bindings "
             "WHERE role_name='empiredb_tenant_reader'"
         )
         return
     connection.execute(
         """
-        INSERT INTO empire.tenant_role_bindings(
+        INSERT INTO public.empire_tenant_role_bindings(
             role_name, tenant_id, active, evidence_ref
         )
         VALUES ('empiredb_tenant_reader', %s, true, 'rollback-canary')
@@ -125,7 +125,7 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
         try:
             connection.execute(
                 """
-                UPDATE empire.tenant_role_bindings
+                UPDATE public.empire_tenant_role_bindings
                 SET tenant_id=%s
                 WHERE role_name='empiredb_tenant_reader'
                 """,
