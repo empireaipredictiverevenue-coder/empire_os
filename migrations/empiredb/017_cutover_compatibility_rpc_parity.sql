@@ -92,7 +92,7 @@ BEGIN
     'actual_revenue',false
   );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.auto_review_buyer_candidate(p_review_id uuid, p_daily_cap integer DEFAULT 10)
@@ -247,7 +247,7 @@ BEGIN
       'actual_revenue',false
     );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.auto_verify_buyer_stated_commercial_evidence(p_evidence_id uuid)
@@ -365,7 +365,7 @@ BEGIN
     'commercial-evidence-standing-authority'
   );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.auto_verify_commercial_product_version(p_version_id uuid)
@@ -418,7 +418,7 @@ BEGIN
     'revenue_recognition',false
   );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.list_auto_verifiable_commercial_evidence(p_limit integer DEFAULT 25)
@@ -449,7 +449,7 @@ AS $function$
     ORDER BY created_at,id
     LIMIT LEAST(GREATEST(COALESCE(p_limit,25),1),100)
   ) e;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.list_buyer_reviews_for_outbound(p_limit integer DEFAULT 25)
@@ -504,7 +504,7 @@ AS $function$
     ORDER BY r.reviewed_at,r.id
     LIMIT LEAST(GREATEST(COALESCE(p_limit,25),1),100)
   ) q;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.list_due_outbound_followups(p_limit integer DEFAULT 25)
@@ -666,7 +666,7 @@ FROM (
     ORDER BY delivered_at,root_intent_id
     LIMIT LEAST(GREATEST(COALESCE(p_limit,25),1),100)
 ) h;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.propose_buyer_candidate_review(p_prospect_id uuid, p_entity_id uuid, p_contact_name text, p_contact_title text, p_contact_email text, p_offer_key text, p_company_score numeric, p_decision_score numeric, p_evidence jsonb, p_idempotency_key text)
@@ -779,7 +779,7 @@ BEGIN
     'actual_revenue',false
   );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.propose_call_ready_voice_intent(p_prospect_id uuid, p_recipient text, p_idempotency_key text, p_metadata jsonb DEFAULT '{}'::jsonb)
@@ -865,7 +865,7 @@ BEGIN
   );
   RETURN result;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.decide_commercial_product_version(p_version_id uuid, p_decision text, p_actor text, p_reason text DEFAULT NULL::text)
@@ -1051,7 +1051,7 @@ BEGIN
     'actual_revenue',false
   );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_commercial_product_version_review(p_version_id uuid)
@@ -1084,7 +1084,7 @@ AS $function$
   FROM public.commercial_product_versions v
   JOIN public.commercial_products p ON p.id=v.product_id
   WHERE v.id=p_version_id;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.propose_commercial_product_version(p_product_code text, p_billing_model text, p_currency text, p_price_basis jsonb, p_acquisition_cost_basis jsonb, p_fulfilment_cost_basis jsonb, p_margin_policy jsonb, p_provenance jsonb, p_evidence_refs jsonb, p_effective_from timestamp with time zone, p_effective_until timestamp with time zone, p_actor text)
@@ -1206,7 +1206,7 @@ BEGIN
     'actual_revenue',false
   );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.propose_outbound_followup(p_root_intent_id uuid, p_step integer, p_subject text, p_body_text text, p_idempotency_key text, p_proposed_by text, p_expires_at timestamp with time zone)
@@ -1378,7 +1378,7 @@ BEGIN
         'sequence_kind','followup'
     );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.propose_reviewed_outbound_intent(p_review_id uuid, p_subject text, p_body_text text, p_body_html text, p_idempotency_key text, p_proposed_by text, p_expires_at timestamp with time zone, p_metadata jsonb DEFAULT '{}'::jsonb)
@@ -1453,7 +1453,7 @@ BEGIN
       'buyer_candidate_review_id',r.id
     );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.record_voice_provider_event(p_intent_id uuid, p_external_call_id text, p_event_type text, p_payload jsonb DEFAULT '{}'::jsonb)
@@ -1549,7 +1549,7 @@ BEGIN
     'conversation_id',c.id,'event_type',v_type,'actual_revenue',false
   );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.record_voice_turn(p_intent_id uuid, p_external_call_id text, p_turn_index integer, p_direction text, p_body_text text, p_evidence jsonb DEFAULT '{}'::jsonb)
@@ -1638,7 +1638,7 @@ BEGIN
     'actual_revenue',false
   );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.refresh_pending_buyer_candidate_review(p_review_id uuid, p_contact_name text, p_contact_title text, p_contact_email text, p_decision_score numeric, p_evidence jsonb)
@@ -1727,7 +1727,7 @@ begin
     'actual_revenue',false
   );
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.register_commercial_product_identity(p_product_code text, p_product_name text, p_product_family text, p_billing_model text, p_configuration jsonb, p_provenance jsonb, p_actor text)
@@ -1819,7 +1819,7 @@ begin
     'actual_revenue',false
   );
 end;
-$function$
+$function$;
 
 
 -- PostgreSQL grants EXECUTE to PUBLIC by default. Remove it from every imported
@@ -1857,7 +1857,7 @@ BEGIN
       EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC',v_proc.signature);
     END LOOP;
   END LOOP;
-END
+END;
 $empire_compat$;
 
 -- Guarded compatibility surface: read/proposal/deterministic-verification and
@@ -1892,7 +1892,7 @@ BEGIN
       EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO empiredb_app',v_proc.signature);
     END LOOP;
   END LOOP;
-END
+END;
 $empire_compat$;
 
 -- Catalog helpers are internal dependencies of the guarded verifier.
@@ -1912,7 +1912,7 @@ BEGIN
       EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO empiredb_app',v_proc.signature);
     END LOOP;
   END LOOP;
-END
+END;
 $empire_compat$;
 
 -- Voice approval is explicitly bound to outbound approval capability.
@@ -1930,7 +1930,7 @@ BEGIN
       v_proc.signature
     );
   END LOOP;
-END
+END;
 $empire_compat$;
 
 -- SECURITY INVOKER underlying table capability required by voice standing
@@ -1967,7 +1967,7 @@ BEGIN
       );
     END IF;
   END LOOP;
-END
+END;
 $empire_compat$;
 
 RESET ROLE;
