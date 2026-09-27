@@ -651,16 +651,33 @@ def plan(
     tables: Sequence[ShadowTable],
 ) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
+    all_compatible = True
     for item in tables:
         target_columns = target.columns(item.name)
+        target_names = [name for name, _ in target_columns]
+        source_count = source.exact_count(item.name, item.primary_key)
+        sample = source.page(
+            item.name,
+            item.primary_key,
+            after=None,
+            limit=1,
+        )
+        source_names = list(sample[0]) if sample else []
+        missing_target = sorted(set(source_names) - set(target_names))
+        schema_compatible = not missing_target
+        all_compatible = all_compatible and schema_compatible
         rows.append(
             {
                 "table": item.name,
                 "primary_key": item.primary_key,
                 "parents": list(item.parents),
-                "source_count": source.exact_count(item.name, item.primary_key),
+                "source_count": source_count,
                 "target_count": target.exact_count(item.name),
-                "target_columns": len(target_columns),
+                "source_schema_observed": bool(sample),
+                "source_columns": len(source_names),
+                "target_columns": len(target_names),
+                "missing_target_columns": missing_target,
+                "schema_compatible": schema_compatible,
             }
         )
     return {
@@ -669,6 +686,7 @@ def plan(
         "source_delete_authority": False,
         "target_truncate_authority": False,
         "production_cutover_authority": False,
+        "schema_compatible": all_compatible,
         "tables": rows,
     }
 
