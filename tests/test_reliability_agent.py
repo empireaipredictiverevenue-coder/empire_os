@@ -1,11 +1,21 @@
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import empire_os.reliability_agent as reliability
 
 
 NOW = datetime(2026, 9, 27, 8, 0, tzinfo=timezone.utc)
+
+
+def _healthy_founder_console():
+    return SimpleNamespace(
+        service_state="active",
+        http_ok=True,
+        port_pid=1234,
+        port_process_verified=False,
+    )
 
 
 def _contained_observation(*, seeds: int = 2, heartbeat_age=2000):
@@ -127,6 +137,7 @@ def test_run_cycle_uses_containment_safe_tools_only(monkeypatch, tmp_path):
             AssertionError("Supabase refresh must not run under containment")
         ),
         local_recovery=fake_local_recovery,
+        founder_console_observer=_healthy_founder_console,
     )
 
     self_heal_call = next(row for row in calls if row[0] == "self_heal")
@@ -207,6 +218,7 @@ def test_missing_recovery_seeds_is_degraded_even_when_escalation_succeeds(
         },
         refresh_snapshot=lambda *_args, **_kwargs: {},
         local_recovery=lambda *_args, **_kwargs: {},
+        founder_console_observer=_healthy_founder_console,
     )
 
     assert result["status"] == "DEGRADED"
@@ -248,6 +260,7 @@ def test_backoff_keeps_cycle_degraded_until_retry_allowed(tmp_path):
             AssertionError("backoff must defer refresh")
         ),
         local_recovery=lambda *_args, **_kwargs: {},
+        founder_console_observer=_healthy_founder_console,
     )
 
     assert result["status"] == "DEGRADED"
