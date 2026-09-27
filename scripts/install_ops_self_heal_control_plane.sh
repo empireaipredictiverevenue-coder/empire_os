@@ -46,6 +46,22 @@ systemctl enable empire-reliability-agent.service
 systemctl reset-failed empire-reliability-agent.service || true
 systemctl restart empire-reliability-agent.service
 
+AGENT_READY=0
+for _ in $(seq 1 20); do
+  if [ "$(systemctl is-active empire-reliability-agent.service 2>/dev/null || true)" = "active" ]; then
+    AGENT_READY=1
+    break
+  fi
+  sleep 0.5
+done
+
+if [ "$AGENT_READY" -ne 1 ]; then
+  echo "ERROR: Empire Reliability Agent did not become ready"
+  systemctl status empire-reliability-agent.service --no-pager -l || true
+  journalctl -u empire-reliability-agent.service -n 100 --no-pager || true
+  exit 1
+fi
+
 echo "EmpireOS ops self-heal control plane installed."
 echo "Privileged helper: active"
 echo "Socket: /run/empire-ops/privileged.sock"
