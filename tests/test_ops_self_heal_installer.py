@@ -50,3 +50,15 @@ def test_control_plane_installer_installs_required_timers():
 
     assert 'deploy/systemd/empire-ops-control.timer' in text
     assert 'deploy/systemd/empire-commercial-product-catalog.timer' in text
+
+
+
+def test_control_plane_installer_owns_reliability_agent():
+    text = (
+        ROOT / "scripts/install_ops_self_heal_control_plane.sh"
+    ).read_text()
+
+    assert 'deploy/systemd/empire-reliability-agent.service' in text
+    assert "systemctl restart empire-reliability-agent.service" in text
+    assert "systemctl is-active empire-reliability-agent.service" in text
+    assert "journalctl -u empire-reliability-agent.service" in text
