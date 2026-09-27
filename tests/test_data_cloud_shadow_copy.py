@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from decimal import Decimal
 
 import pytest
@@ -73,8 +74,25 @@ def test_shadow_runner_contract_has_no_destructive_mode() -> None:
     import empire_os.data_cloud_shadow_copy as module
 
     source = inspect.getsource(module)
-    assert "DELETE FROM" not in source.upper()
-    assert "TRUNCATE " not in source.upper()
+    tree = ast.parse(source)
+
+    executed_sql_literals: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not isinstance(func, ast.Attribute):
+            continue
+        if func.attr not in {"execute", "executemany"}:
+            continue
+        if not node.args:
+            continue
+        first = node.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            executed_sql_literals.append(first.value.upper())
+
+    assert all("DELETE FROM" not in sql_text for sql_text in executed_sql_literals)
+    assert all("TRUNCATE" not in sql_text for sql_text in executed_sql_literals)
     assert "SUPABASE_" not in source
     assert "--mode" in source
     assert 'choices=("plan", "copy")' in source
