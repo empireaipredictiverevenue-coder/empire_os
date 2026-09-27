@@ -33,3 +33,30 @@ class DataCloudProject:
         payload = asdict(self)
         payload["state"] = self.state.value
         return payload
+
+
+def transition_project(
+    project: DataCloudProject,
+    target: ProjectState,
+    *,
+    founder_public_api_approved: bool = False,
+) -> DataCloudProject:
+    """Return a validated state transition without provisioning side effects."""
+
+    project.validate()
+    if (
+        target is ProjectState.PUBLIC_API_APPROVED
+        and not founder_public_api_approved
+    ):
+        raise PermissionError("public API activation requires founder approval")
+
+    public_enabled = target is ProjectState.PUBLIC_API_APPROVED
+    result = DataCloudProject(
+        project_id=project.project_id,
+        tenant_id=project.tenant_id,
+        state=target,
+        region=project.region,
+        public_api_enabled=public_enabled,
+    )
+    result.validate()
+    return result
