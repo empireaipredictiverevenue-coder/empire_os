@@ -239,6 +239,7 @@ def run_buyer_scout(
     max_domains: int = 40,
     max_probes: int = 20,
     canonical_seed_records: list[Mapping[str, Any]] | None = None,
+    search_enabled: bool = True,
 ) -> dict[str, Any]:
     queries = collect_research_queries(
         plan,
@@ -251,7 +252,7 @@ def run_buyer_scout(
             query_text,
             num=max(1, min(results_per_query, 20)),
         )
-        if query_text
+        if query_text and search_enabled
         else {}
     )
 
@@ -622,6 +623,7 @@ def run_buyer_scout(
         "mode": "OBSERVE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "query_count": len(queries),
+        "search_enabled": bool(search_enabled),
         "search_domain_count": search_domain_count,
         "canonical_seed_domain_count": seed_domain_count,
         "opportunity_seed_domain_count": opportunity_seed_domain_count,
