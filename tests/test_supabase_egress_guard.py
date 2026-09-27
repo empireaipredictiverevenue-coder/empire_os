@@ -207,3 +207,11 @@ def test_recovery_supervisor_is_never_egress_contained():
         "empire-revenue-runtime-supervisor.timer"
         not in MANAGED_TIMERS
     )
+
+
+
+def test_local_buyer_recovery_survives_egress_containment():
+    assert (
+        "empire-buyer-acquisition-local-recovery.timer"
+        not in guard.MANAGED_TIMERS
+    )
