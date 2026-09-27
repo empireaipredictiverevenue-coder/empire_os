@@ -64,7 +64,7 @@ def test_successful_probe_closes_circuit(tmp_path: Path):
     now[0] = 1061.0
     governor.reserve(allow_probe=True)
 
-    governor.success()
+    governor.success(recovery_probe=True)
 
     state = governor.load_state()
     assert state["circuit"]["open"] is False
@@ -100,3 +100,13 @@ def test_new_environment_names_override_legacy_compatibility_names(tmp_path: Pat
 
     assert config.state_path == tmp_path / "new-state.json"
     assert config.hourly_budget == 12
+
+
+def test_normal_success_cannot_close_independently_opened_circuit(tmp_path: Path):
+    now = [1000.0]
+    governor = _governor(tmp_path, now)
+    governor.open("exceed_egress_quota")
+
+    governor.success(recovery_probe=False)
+
+    assert governor.is_contained() is True
