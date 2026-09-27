@@ -128,6 +128,7 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
             "SELECT set_config('empire.tenant_id', %s, true)",
             (str(org_a),),
         )
+        connection.execute("SAVEPOINT tenant_write_check")
         try:
             connection.execute(
                 """
@@ -144,11 +145,6 @@ def run_tenant_isolation_canary(dsn: str) -> dict[str, Any]:
         except Exception:
             raise
 
-        # The failed INSERT aborts the transaction unless isolated by savepoint.
-        # If permission was denied before a savepoint existed, recover by
-        # reporting through a fresh transaction is impossible without losing
-        # canary rows. Therefore perform the write check in a savepoint below
-        # in production code revisions; keep fail-closed if not denied.
         _require(write_denied, "tenant reader unexpectedly has INSERT authority")
 
         report.update({
