@@ -5,7 +5,8 @@
 -- RLS policy porting is intentionally deferred to the EmpireDB security migration;
 -- enabling RLS here without equivalent portable policies would fail closed for app roles.
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- PostgreSQL extensions are provisioned by Node infrastructure, not by the migrator role.
+-- This migration assumes required extensions/functions have passed infrastructure preflight.
 
 CREATE TABLE IF NOT EXISTS public.prospects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
