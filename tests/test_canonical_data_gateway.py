@@ -3,6 +3,7 @@ import pytest
 from empire_os.canonical_data_gateway import (
     CanonicalDataGateway,
     DataGatewayUnavailable,
+    gateway_from_environment,
 )
 from empire_os.data_cloud_contract import DataBackend
 
@@ -78,3 +79,22 @@ def test_expected_backend_mismatch_is_rejected():
             FakeProvider(),
             expected_backend=DataBackend.EMPIREDB,
         )
+
+
+def test_environment_defaults_to_current_legacy_backend():
+    provider = FakeProvider()
+    gateway = gateway_from_environment(
+        {"SUPABASE_URL": "https://example.supabase.co", "SUPABASE_SERVICE_KEY": "key"},
+        legacy_provider_factory=lambda _: provider,
+    )
+    assert gateway.backend is DataBackend.SUPABASE_LEGACY
+
+
+def test_empiredb_selection_fails_closed_until_provider_is_registered():
+    with pytest.raises(DataGatewayUnavailable, match="verified runtime provider"):
+        gateway_from_environment({"EMPIRE_DATA_BACKEND": "empiredb"})
+
+
+def test_unknown_backend_selection_fails_closed():
+    with pytest.raises(DataGatewayUnavailable, match="unsupported canonical"):
+        gateway_from_environment({"EMPIRE_DATA_BACKEND": "mystery"})
