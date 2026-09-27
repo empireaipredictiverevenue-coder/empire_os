@@ -242,3 +242,56 @@ def test_enterprise_contact_intelligence_units_are_auto_repairable():
     assert runtime_self_heal.unit_is_auto_repairable(
         "empire-enterprise-contact-repair.service"
     )
+
+
+
+def test_repair_allowlist_defers_nonallowed_units(monkeypatch, tmp_path):
+    _clear_runtime(monkeypatch)
+    allowed = runtime_self_heal.ServiceSpec(
+        "gateway",
+        "empire-public-gateway.service",
+    )
+    blocked = runtime_self_heal.ServiceSpec(
+        "buyer_team",
+        "empire-buyer-acquisition-team.timer",
+    )
+    monkeypatch.setattr(
+        runtime_self_heal,
+        "AUTO_REPAIR_SERVICES",
+        (allowed,),
+    )
+    monkeypatch.setattr(
+        runtime_self_heal,
+        "AUTO_REPAIR_TIMERS",
+        (blocked,),
+    )
+
+    calls = []
+    states = {
+        allowed.unit: iter([(False, "inactive"), (True, "active")]),
+        blocked.unit: iter([(False, "inactive")]),
+    }
+
+    payload = runtime_self_heal.run_runtime_self_heal(
+        now=NOW,
+        observe_only=False,
+        service_status=lambda unit: next(states[unit]),
+        repair=lambda action, unit: (
+            calls.append((action, unit))
+            or {"ok": True}
+        ),
+        repair_unit_allowlist={allowed.unit},
+        unit_inventory=lambda: [],
+        latest_path=tmp_path / "latest.json",
+        state_path=tmp_path / "state.json",
+    )
+
+    assert calls == [("service_restart", allowed.unit)]
+    by_unit = {
+        row["unit"]: row
+        for row in payload["checks"]
+    }
+    assert by_unit[allowed.unit]["after_repair"]["healthy"] is True
+    assert by_unit[blocked.unit]["repair"]["decision"] == (
+        "CONTAINMENT_DEFERRED"
+    )
