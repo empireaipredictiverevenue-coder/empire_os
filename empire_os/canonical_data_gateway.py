@@ -43,6 +43,13 @@ class CanonicalDataProvider(Protocol):
     ) -> Sequence[Mapping[str, Any]]:
         ...
 
+    def count(
+        self,
+        table: str,
+        filters: Mapping[str, object] | None = None,
+    ) -> int:
+        ...
+
     def insert(
         self,
         table: str,
@@ -146,6 +153,14 @@ class CanonicalDataGateway:
             offset,
         )
         return [dict(row) for row in rows]
+
+    def count(
+        self,
+        table: str,
+        filters: Mapping[str, object] | None = None,
+    ) -> int:
+        self._require_provider()
+        return int(self._provider.count(table, filters))
 
     def insert(
         self,
