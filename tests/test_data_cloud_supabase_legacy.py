@@ -20,8 +20,8 @@ class FakeEgress:
     def reserve(self, *, allow_probe=False):
         self.reserved += 1
 
-    def success(self):
-        self.successes += 1
+    def success(self, *, recovery_probe=False):
+        self.successes += int(bool(recovery_probe))
 
     def observe_http_error(self, code, body):
         return False
