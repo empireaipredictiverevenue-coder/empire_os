@@ -10,6 +10,7 @@ commercial truth.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import Any, Mapping, Protocol, Sequence
 
 from empire_os.data_cloud_contract import DataBackend
@@ -186,3 +187,54 @@ class CanonicalDataGateway:
     ) -> object:
         self._require_provider()
         return self._provider.rpc(name, params)
+
+
+
+def gateway_from_environment(
+    environ: Mapping[str, str] | None = None,
+    *,
+    legacy_provider_factory: Any | None = None,
+) -> CanonicalDataGateway:
+    """Build the canonical gateway from explicit backend selection.
+
+    Default remains the currently canonical legacy backend during migration.
+    Selecting EmpireDB before its verified provider is registered fails closed.
+    """
+
+    source = os.environ if environ is None else environ
+    raw_backend = str(
+        source.get("EMPIRE_DATA_BACKEND")
+        or DataBackend.SUPABASE_LEGACY.value
+    ).strip()
+
+    try:
+        backend = DataBackend(raw_backend)
+    except ValueError as exc:
+        raise DataGatewayUnavailable(
+            f"unsupported canonical data backend: {raw_backend}"
+        ) from exc
+
+    if backend is DataBackend.EMPIREDB:
+        raise DataGatewayUnavailable(
+            "EmpireDB selected before the verified runtime provider is registered"
+        )
+
+    if legacy_provider_factory is None:
+        from empire_os.data_backends.supabase_legacy import (
+            SupabaseLegacyConfig,
+            SupabaseLegacyProvider,
+        )
+
+        provider = SupabaseLegacyProvider(
+            SupabaseLegacyConfig(
+                url=str(source.get("SUPABASE_URL") or ""),
+                service_key=str(source.get("SUPABASE_SERVICE_KEY") or ""),
+            )
+        )
+    else:
+        provider = legacy_provider_factory(source)
+
+    return CanonicalDataGateway(
+        provider,
+        expected_backend=DataBackend.SUPABASE_LEGACY,
+    )
