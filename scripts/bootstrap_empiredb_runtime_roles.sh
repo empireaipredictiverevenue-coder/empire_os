@@ -8,6 +8,11 @@ DO $$
 DECLARE r text;
 BEGIN
   FOREACH r IN ARRAY ARRAY[
+    'empire_outbound_approver',
+    'empire_outbound_sender',
+    'empire_reply_ingest',
+    'empire_closer_observer',
+    'empire_closer_approver',
     'empire_payment_approver',
     'empire_bsc_verifier',
     'empire_escrow_verifier',
@@ -27,6 +32,11 @@ BEGIN
 END $;
 
 GRANT USAGE ON SCHEMA public TO
+  empire_outbound_approver,
+  empire_outbound_sender,
+  empire_reply_ingest,
+  empire_closer_observer,
+  empire_closer_approver,
   empire_payment_approver,
   empire_bsc_verifier,
   empire_escrow_verifier,
