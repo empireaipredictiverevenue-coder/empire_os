@@ -16,6 +16,7 @@ from empire_os.execution_plane_dispatcher import ExecutionRequest
 
 
 SOURCE_REF = "empiredb-closeout-2026-09-27"
+CLOSEOUT_BASE_BRANCH = "agent/data-cloud-wave4"
 
 
 def closeout_requests() -> tuple[ExecutionRequest, ...]:
@@ -36,6 +37,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
             authority="internal_write",
             risk_class="high",
             source_ref=SOURCE_REF,
+            base_branch=CLOSEOUT_BASE_BRANCH,
             allowed_paths=(
                 "empire_os/data_cloud_backup_observer.py",
                 "empire_os/data_cloud_runtime_health.py",
@@ -82,6 +84,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
             authority="internal_write",
             risk_class="high",
             source_ref=SOURCE_REF,
+            base_branch=CLOSEOUT_BASE_BRANCH,
             allowed_paths=(
                 "empire_os/data_cloud_rollback_readiness.py",
                 "tests/test_data_cloud_rollback_readiness.py",
@@ -113,6 +116,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
             authority="internal_write",
             risk_class="high",
             source_ref=SOURCE_REF,
+            base_branch=CLOSEOUT_BASE_BRANCH,
             allowed_paths=(
                 "migrations/empiredb/018_tenant_context_foundation.sql",
                 "empire_os/data_cloud_tenant_security.py",
@@ -144,6 +148,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
             authority="internal_write",
             risk_class="medium",
             source_ref=SOURCE_REF,
+            base_branch=CLOSEOUT_BASE_BRANCH,
             allowed_paths=(
                 "docs/EMPIRE_DATA_CLOUD_RECOVERY_PITR.md",
                 "tests/test_data_cloud_recovery_contract.py",
@@ -174,6 +179,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
             authority="internal_write",
             risk_class="high",
             source_ref=SOURCE_REF,
+            base_branch=CLOSEOUT_BASE_BRANCH,
             allowed_paths=(
                 "empire_os/data_cloud_runtime_canary.py",
                 "tests/test_data_cloud_runtime_canary.py",
@@ -203,6 +209,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
             authority="internal_write",
             risk_class="high",
             source_ref=SOURCE_REF,
+            base_branch=CLOSEOUT_BASE_BRANCH,
             allowed_paths=(
                 "empire_os/data_cloud_cutover_manifest.py",
                 "tests/test_data_cloud_cutover_manifest.py",
@@ -231,6 +238,7 @@ def closeout_requests() -> tuple[ExecutionRequest, ...]:
             authority="observe",
             risk_class="high",
             source_ref=SOURCE_REF,
+            base_branch=CLOSEOUT_BASE_BRANCH,
             evidence_domains=(
                 "data_cloud_observability",
                 "data_cloud_rollback",
