@@ -1,7 +1,10 @@
 from pathlib import Path
 
 from empire_os.data_cloud_infrastructure import GIB, HostObservation
-from empire_os.data_cloud_readiness import build_readiness_snapshot
+from empire_os.data_cloud_readiness import (
+    build_readiness_snapshot,
+    compact_readiness_snapshot,
+)
 
 
 def test_readiness_snapshot_combines_host_and_dependency_inventory(tmp_path: Path):
@@ -111,3 +114,30 @@ def test_docs_and_tests_do_not_count_as_runtime_coupling(tmp_path: Path):
     assert inventory["finding_count"] == 2
     assert inventory["runtime_finding_count"] == 0
     assert inventory["runtime_scan_clear"] is True
+
+
+def test_compact_readiness_keeps_operator_output_bounded(tmp_path: Path):
+    (tmp_path / "empire_os").mkdir()
+    (tmp_path / "empire_os" / "worker.py").write_text(
+        "SUPABASE_URL = 'x'\n",
+        encoding="utf-8",
+    )
+    host = HostObservation(
+        cpu_count=8,
+        memory_bytes=16 * GIB,
+        disk_total_bytes=500 * GIB,
+        disk_free_bytes=250 * GIB,
+        postgres_available=False,
+        pgbouncer_available=False,
+        patroni_available=False,
+        pgbackrest_available=False,
+    )
+
+    snapshot = build_readiness_snapshot(tmp_path, host_observation=host)
+    compact = compact_readiness_snapshot(snapshot)
+
+    assert compact["cpu_count"] == 8
+    assert compact["memory_gib"] == 16.0
+    assert compact["runtime_vendor_findings"] == 1
+    assert len(compact["runtime_top_files"]) <= 10
+    assert "repo_root" not in compact
