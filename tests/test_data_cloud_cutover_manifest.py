@@ -17,6 +17,8 @@ def _green():
         "runtime_canary": {"verified": True},
         "tenant": {"verified": True},
         "recovery": {"verified": True},
+        "compatibility": {"verified": True},
+        "vendor_coupling": {"verified": True},
     }
 
 
@@ -29,6 +31,8 @@ def test_manifest_is_technically_ready_but_never_infers_founder_approval():
         runtime_canary=g["runtime_canary"],
         tenant=g["tenant"],
         recovery=g["recovery"],
+        compatibility=g["compatibility"],
+        vendor_coupling=g["vendor_coupling"],
         founder_approved=False,
     )
 
@@ -50,6 +54,8 @@ def test_manifest_fails_closed_when_off_node_backup_is_open():
         runtime_canary=g["runtime_canary"],
         tenant=g["tenant"],
         recovery=g["recovery"],
+        compatibility=g["compatibility"],
+        vendor_coupling=g["vendor_coupling"],
     )
 
     gates = {row["name"]: row for row in manifest["technical_gates"]}
@@ -65,6 +71,8 @@ def test_manifest_marks_missing_evidence_unknown():
         runtime_canary={},
         tenant={},
         recovery={},
+        compatibility={},
+        vendor_coupling={},
     )
 
     assert all(
@@ -73,3 +81,25 @@ def test_manifest_marks_missing_evidence_unknown():
     )
     assert manifest["technical_ready_for_founder_approval"] is False
     assert manifest["production_cutover_authority"] is False
+
+
+
+def test_manifest_requires_compatibility_and_vendor_neutrality():
+    g = _green()
+    g["compatibility"]["verified"] = False
+    g["vendor_coupling"]["verified"] = False
+
+    manifest = build_cutover_manifest(
+        health=g["health"],
+        rollback=g["rollback"],
+        runtime_canary=g["runtime_canary"],
+        tenant=g["tenant"],
+        recovery=g["recovery"],
+        compatibility=g["compatibility"],
+        vendor_coupling=g["vendor_coupling"],
+    )
+
+    gates = {row["name"]: row for row in manifest["technical_gates"]}
+    assert gates["compatibility"]["status"] == "OPEN"
+    assert gates["vendor_neutrality"]["status"] == "OPEN"
+    assert manifest["technical_ready_for_founder_approval"] is False
