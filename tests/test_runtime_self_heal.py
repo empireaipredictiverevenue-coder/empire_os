@@ -242,3 +242,10 @@ def test_enterprise_contact_intelligence_units_are_auto_repairable():
     assert runtime_self_heal.unit_is_auto_repairable(
         "empire-enterprise-contact-repair.service"
     )
+
+
+
+def test_buyer_local_recovery_timer_is_auto_repairable():
+    assert runtime_self_heal.unit_is_auto_repairable(
+        "empire-buyer-acquisition-local-recovery.timer"
+    )
