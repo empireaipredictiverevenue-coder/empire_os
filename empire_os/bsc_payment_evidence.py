@@ -11,8 +11,10 @@ from uuid import UUID
 from empire_os.bsc_usdt_verifier import (
     BscUsdtConfig, PaymentVerificationError, verify_payment, _address, _tx_hash,
 )
+from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.runtime_env import load_runtime_env
 
-CANONICAL_URL = "https://owbeinlfcfdtwcwrttjy.supabase.co"
+ENV_PATH = "/etc/empire_os.env"
 
 
 def _uuid(value):
@@ -37,10 +39,9 @@ def preview_payment(request_id, transaction_hash, *, db=None, config=None,
                     rpc_call=None, now=None):
     """Return unrecorded evidence only; injected dependencies are for offline tests."""
     if db is None:
-        from empire_os import sb
-        if sb.SUPABASE_URL.rstrip("/") != CANONICAL_URL or not sb.SUPABASE_KEY:
-            raise PaymentVerificationError("canonical Supabase configuration required")
-        db = sb
+        db = gateway_from_environment(load_runtime_env(ENV_PATH))
+        if not db.configured:
+            raise PaymentVerificationError("canonical data backend is not configured")
     request_id = _uuid(request_id)
     transaction_hash = _tx_hash(transaction_hash)
     request = _one(db, "bsc_payment_requests", request_id)
