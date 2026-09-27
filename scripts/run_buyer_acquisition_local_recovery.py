@@ -12,6 +12,24 @@ from scripts.run_buyer_acquisition_scout import (
 )
 
 
+LOCAL_RECOVERY_STATUS = Path(
+    "runtime/buyer_acquisition/local_recovery_latest.json"
+)
+
+
+def _write_status(repo_root: str | Path, payload: dict) -> Path:
+    root = Path(repo_root).resolve()
+    path = root / LOCAL_RECOVERY_STATUS
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+    return path
+
+
 def run_local_recovery(repo_root: str | Path) -> dict:
     root = Path(repo_root).resolve()
     guard_path = root / "runtime/control/supabase_egress_guard.json"
@@ -80,6 +98,7 @@ def main() -> int:
     args = parser.parse_args()
 
     payload = run_local_recovery(args.repo_root)
+    _write_status(args.repo_root, payload)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
