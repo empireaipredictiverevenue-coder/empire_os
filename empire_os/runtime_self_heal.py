@@ -491,6 +491,7 @@ def run_runtime_self_heal(
     http_check: Callable[[str, int], tuple[bool, str]] = _http_ok,
     repair: Callable[[str, str], Mapping[str, Any]] = privileged_request,
     unit_inventory: Callable[[], list[dict[str, Any]]] = _discover_empire_units,
+    repair_unit_allowlist: set[str] | frozenset[str] | None = None,
     latest_path: Path = LATEST_PATH,
     state_path: Path = STATE_PATH,
 ) -> dict[str, Any]:
@@ -547,6 +548,20 @@ def run_runtime_self_heal(
 
     def maybe_repair(key: str, unit: str, action: str) -> dict[str, Any]:
         nonlocal repair_count
+        if (
+            repair_unit_allowlist is not None
+            and unit not in repair_unit_allowlist
+        ):
+            result = {
+                "key": key,
+                "unit": unit,
+                "decision": "CONTAINMENT_DEFERRED",
+                "executed": False,
+                "ok": True,
+                "reason": "unit_not_in_repair_allowlist",
+            }
+            repairs.append(result)
+            return result
         if repair_count >= max_repairs_per_run:
             result = {
                 "key": key,
@@ -684,6 +699,11 @@ def run_runtime_self_heal(
         "unresolved_count": unresolved,
         "repair_count": repair_count,
         "repair_budget": max_repairs_per_run,
+        "repair_unit_allowlist": (
+            sorted(repair_unit_allowlist)
+            if repair_unit_allowlist is not None
+            else None
+        ),
         "system_unit_count": len(inventory),
         "system_unit_policy_counts": dict(sorted(policy_counts.items())),
         "system_units": inventory,
