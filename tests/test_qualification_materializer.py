@@ -66,7 +66,7 @@ def candidate():
 class FakeRepository:
     def __init__(self):
         self.candidates = [candidate()]
-        self.existing_qualification_ids = set()
+        self.existing_ids = set()
         self.ensure_result = ({"id": "child-1"}, True)
         self.ensure_calls = []
         self.ingest_calls = []
@@ -84,7 +84,7 @@ class FakeRepository:
         self.scoring_engine = scoring_engine
         self.scoring_version = scoring_version
         self.prospect_ids = tuple(prospect_ids)
-        return set(self.existing_qualification_ids)
+        return set(self.existing_ids)
 
     def ensure_gtm_job(self, row):
         self.ensure_calls.append(dict(row))
@@ -134,7 +134,7 @@ def test_materializer_checks_real_scoring_engine(
     monkeypatch,
 ):
     repository = FakeRepository()
-    repository.existing_qualification_ids = {"prospect-1"}
+    repository.existing_ids = {"prospect-1"}
     monkeypatch.setattr(bus, "_data_repository", lambda: repository)
 
     result = bus._materialize_qualification_jobs(
