@@ -1,19 +1,31 @@
 """Append-only commercial event repository.
 
-Consequential event history is inserted through the Canonical Data Gateway.
-Idempotent appends use untargeted conflict-ignore so partial unique indexes
-(such as commercial_events.idempotency_key WHERE NOT NULL) remain enforceable.
+Idempotency is verified by exact key lookup. Unrelated constraint failures are
+never swallowed as duplicates.
 """
 from __future__ import annotations
 
 from typing import Any, Mapping
 
 from empire_os.canonical_data_gateway import CanonicalDataGateway
+from empire_os.data_query import DataFilter
 
 
 class CommercialEventRepository:
     def __init__(self, gateway: CanonicalDataGateway) -> None:
         self._gateway = gateway
+
+    def _existing(
+        self,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        rows = self._gateway.query(
+            "commercial_events",
+            "id,idempotency_key",
+            filters=(DataFilter.eq("idempotency_key", idempotency_key),),
+            limit=1,
+        )
+        return dict(rows[0]) if rows else None
 
     def append_idempotent(
         self,
@@ -30,14 +42,23 @@ class CommercialEventRepository:
         if not idempotency_key:
             raise ValueError("commercial event idempotency_key is required")
 
-        rows = self._gateway.insert_ignore_conflicts(
-            "commercial_events",
-            dict(event),
-            return_repr=True,
-        )
-        # PostgreSQL/PostgREST conflict-ignore returns no representation for an
-        # existing idempotency key. Either outcome is successful/idempotent.
-        return bool(rows)
+        if self._existing(idempotency_key) is not None:
+            return False
+
+        try:
+            rows = self._gateway.insert(
+                "commercial_events",
+                dict(event),
+                return_repr=True,
+            )
+        except Exception:
+            if self._existing(idempotency_key) is not None:
+                return False
+            raise
+
+        if not rows:
+            raise RuntimeError("commercial event insert returned no row")
+        return True
 
     def snapshot(self) -> dict[str, object]:
         backend = self._gateway.snapshot().as_dict()
