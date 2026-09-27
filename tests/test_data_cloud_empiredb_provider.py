@@ -260,3 +260,14 @@ def test_write_values_use_connector_json_adaptation():
         ("jsonb", {"score": 90}),
         ("jsonb", ["qualified", "hot"]),
     )
+
+
+def test_delete_match_values_use_connector_adaptation():
+    connection = FakeConnection()
+    connector = FakeConnector(connection)
+    provider = EmpireDbProvider(connector)
+
+    provider.delete("events", {"payload_key": JsonValue({"id": "x"})})
+
+    _, params = connection.calls[0]
+    assert params == (("jsonb", {"id": "x"}),)
