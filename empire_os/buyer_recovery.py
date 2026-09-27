@@ -1,7 +1,7 @@
 """Production buyer-recovery capability for EmpireOS.
 
 This module owns the last-known-good opportunity seed snapshot and the bounded
-local buyer-recovery action used when hosted Supabase egress is contained.
+local buyer-recovery action used when legacy hosted-data egress is contained.
 
 It never writes canonical database state, sends outbound, accepts terms, moves
 funds, recognizes revenue, or expands authority. Buyer Scout must still re-probe
@@ -13,10 +13,13 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any, Callable, Mapping
-import urllib.parse
 
 from empire_os.buyer_acquisition_scout import refresh_buyer_scout
-from empire_os.sb import request_json
+from empire_os.buyer_recovery_repository import (
+    BuyerRecoveryRepository,
+    CanonicalBuyerRecoveryRepository,
+    RequestBuyerRecoveryRepository,
+)
 from empire_os.supabase_egress_guard import supabase_egress_contained
 
 
@@ -153,7 +156,8 @@ def query_opportunity_validation_seeds(
     plan: Mapping[str, Any],
     *,
     per_target: int = 6,
-    request: Callable[..., Any] = request_json,
+    request: Callable[..., Any] | None = None,
+    repository: BuyerRecoveryRepository | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Read canonical prospects for qualified opportunities.
 
@@ -165,6 +169,15 @@ def query_opportunity_validation_seeds(
     targets = validation.get("targets")
     targets = targets if isinstance(targets, list) else []
     per_target = max(1, min(int(per_target), 10))
+    if request is not None and repository is not None:
+        raise ValueError("provide request or repository, not both")
+    store = (
+        repository
+        if repository is not None
+        else RequestBuyerRecoveryRepository(request)
+        if request is not None
+        else CanonicalBuyerRecoveryRepository.from_environment()
+    )
 
     rows: list[dict[str, Any]] = []
     diagnostics: list[dict[str, Any]] = []
@@ -181,30 +194,12 @@ def query_opportunity_validation_seeds(
         if not opportunity_key or not niche:
             continue
 
-        params: dict[str, str] = {
-            "select": (
-                "id,business_name,niche,website,metro,status,created_at"
-            ),
-            "niche": "eq." + niche,
-            "website": "not.is.null",
-            "order": "created_at.desc",
-            "limit": str(per_target),
-        }
-        normalized = territory.casefold().strip()
-        if normalized not in {
-            "",
-            "uk",
-            "gb",
-            "great britain",
-            "united kingdom",
-        }:
-            metro_term = territory.split(",", 1)[0].strip()
-            if metro_term:
-                params["metro"] = f"ilike.*{metro_term}*"
-
-        path = "/rest/v1/prospects?" + urllib.parse.urlencode(params)
         try:
-            batch = request("GET", path) or []
+            batch = store.prospects_for_target(
+                niche=niche,
+                territory=territory,
+                limit=per_target,
+            )
         except Exception as exc:
             diagnostics.append({
                 "opportunity_key": opportunity_key,
@@ -216,7 +211,6 @@ def query_opportunity_validation_seeds(
             })
             continue
 
-        batch = batch if isinstance(batch, list) else []
         diagnostics.append({
             "opportunity_key": opportunity_key,
             "niche": niche,
@@ -259,13 +253,15 @@ def query_opportunity_validation_seeds(
 def refresh_last_known_good_snapshot(
     repo_root: str | Path,
     *,
-    request: Callable[..., Any] = request_json,
+    request: Callable[..., Any] | None = None,
+    repository: BuyerRecoveryRepository | None = None,
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     plan = load_buyer_plan(root)
     rows, diagnostics = query_opportunity_validation_seeds(
         plan,
         request=request,
+        repository=repository,
     )
     errors = [
         row for row in diagnostics
