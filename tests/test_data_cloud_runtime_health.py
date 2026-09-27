@@ -105,6 +105,7 @@ def test_pgbackrest_probe_uses_dedicated_config(monkeypatch, tmp_path):
 
     assert f"--config={config}" in calls[0]
     assert "--stanza=empiredb" in calls[0]
+    assert "--log-level-file=off" in calls[0]
     assert result["healthy"] is True
     assert result["encrypted"] is True
     assert result["off_node_repository_verified"] is False
