@@ -1,0 +1,15 @@
+[Unit]
+Description=Verify bounded buyer-stated commercial evidence
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=/etc/empire_os.env
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_commercial_evidence_auto_verifier.py --limit 50
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+TimeoutStartSec=120

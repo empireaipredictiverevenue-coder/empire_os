@@ -1,0 +1,67 @@
+{
+  "schema_version": "empire.competitor_market_seed_config.v1",
+  "market_key": "denver-co-roofing",
+  "market_query": "Denver CO roofing",
+  "niche": "roofing",
+  "metro": "denver, co",
+  "source_observed_at": "2026-09-22",
+  "source_refs": [
+    "https://bestcoloradoroofers.com/denver/"
+  ],
+  "competitors": [
+    {
+      "competitor_key": "elite-roofing-solar",
+      "competitor_name": "Elite Roofing & Solar",
+      "competitor_domain": "elite-roofs.com"
+    },
+    {
+      "competitor_key": "core-roofing-solar",
+      "competitor_name": "Core Roofing + Solar",
+      "competitor_domain": "coreroofing.com"
+    },
+    {
+      "competitor_key": "bold-brothers-roofing",
+      "competitor_name": "Bold Brothers Roofing",
+      "competitor_domain": "boldbrothersroofing.com"
+    },
+    {
+      "competitor_key": "peak-to-peak-roofing",
+      "competitor_name": "Peak to Peak Roofing & Exteriors",
+      "competitor_domain": "peaktopeakroofing.com"
+    },
+    {
+      "competitor_key": "valor-roof-solar",
+      "competitor_name": "VALOR Roof and Solar",
+      "competitor_domain": "valorroofandsolar.com"
+    },
+    {
+      "competitor_key": "formula-roofing",
+      "competitor_name": "Formula Roofing & Remodeling",
+      "competitor_domain": "formularoofing.com"
+    },
+    {
+      "competitor_key": "horn-brothers-roofing",
+      "competitor_name": "Horn Brothers Roofing",
+      "competitor_domain": "hornbrothersroofing.com"
+    },
+    {
+      "competitor_key": "sol-vista-roofing",
+      "competitor_name": "Sol Vista Roofing",
+      "competitor_domain": "solvistaroofing.com"
+    },
+    {
+      "competitor_key": "gen-3-roofing",
+      "competitor_name": "Gen 3 Roofing",
+      "competitor_domain": "gen3roofing.com"
+    }
+  ],
+  "guardrails": {
+    "public_evidence_only": true,
+    "buyer_intent_inferred": false,
+    "commercial_intent_inferred": false,
+    "prospect_creation": false,
+    "outreach_enabled": false,
+    "market_share_inferred": false,
+    "execution_authority": "none"
+  }
+}

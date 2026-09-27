@@ -227,17 +227,6 @@ class ApiClient:
                     "stripped": stripped[:500]}
 
 
-# ── Auto-select: API vs Ollama ────────────────────────────────────────
-# When MINIMAX_API_KEY is set, replace OllamaClient with the API-backed
-# version so all existing agent code (which imports OllamaClient) gets
-# the fast external-API path without any import changes.
-
-if os.environ.get("MINIMAX_API_KEY"):
-    _ollama_base = OllamaClient
-    OllamaClient = ApiClient
-    logger.info("MINIMAX_API_KEY detected — agents will use API backend (%s)", os.environ.get("LLM_MODEL", "MiniMax-M2.7-highspeed"))
-
-
 # ── Agent Base Class ─────────────────────────────────────────────────
 
 @dataclass
@@ -367,9 +356,9 @@ class Agent(ABC):
 # OpenRouter RATE-LIMITS the free tier (HTTP 429). This client handles that
 # with exponential backoff + jitter so North-mini can "work freely" on a
 # loop without silently dying. Key is read from
-# /root/.empire_secrets/openrouter.env (600 perms), never hardcoded.
+# /etc/empire_os/llm_secrets/openrouter.env (600 perms), never hardcoded.
 
-_OPENROUTER_ENV = Path("/root/.empire_secrets/openrouter.env")
+_OPENROUTER_ENV = Path("/etc/empire_os/llm_secrets/openrouter.env")
 _OPENROUTER_MODELS = {
     "north-mini": "cohere/north-mini-code:free",
     "north_mini": "cohere/north-mini-code:free",
@@ -498,7 +487,7 @@ class OpenCodeZenClient:
     """OpenAI-compatible client for OpenCode Zen (free-tier deepseek etc).
 
     Base: https://opencode.ai/zen/v1  (chat/completions)
-    Key:  /root/.empire_secrets/opencode_zen.env (OPENCODE_ZEN_API_KEY)
+    Key:  /etc/empire_os/llm_secrets/opencode_zen.env (OPENCODE_ZEN_API_KEY)
     Same chat() interface + 429/empty-content backoff as OpenRouterClient.
     Free tier (deepseek-v4-flash-free) is rate-limited; degrade gracefully.
     """
@@ -507,7 +496,7 @@ class OpenCodeZenClient:
                  api_key: Optional[str] = None,
                  base: Optional[str] = None,
                  max_retries: int = 5, timeout: int = 45):
-        p = Path("/root/.empire_secrets/opencode_zen.env")
+        p = Path("/etc/empire_os/llm_secrets/opencode_zen.env")
         env = {}
         if p.exists():
             for ln in p.read_text().splitlines():

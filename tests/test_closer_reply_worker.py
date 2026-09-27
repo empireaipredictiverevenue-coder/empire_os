@@ -1,0 +1,289 @@
+from empire_os.closer_reply_worker import run_closer_reply_worker
+
+
+class FakeRpc:
+    def __init__(self, rows):
+        self.rows = rows
+        self.calls = []
+
+    def __call__(self, name, params):
+        self.calls.append((name, params))
+        if name == "list_closer_work":
+            return self.rows
+        if name == "open_closer_case":
+            return {
+                "decision": "opened",
+                "case_id": "00000000-0000-0000-0000-000000000002",
+                "state": "engaged",
+            }
+        if name == "provision_buyer_from_closer_case":
+            return {
+                "decision": (
+                    "existing"
+                    if params["p_case_id"].endswith("0010")
+                    else "provisioned"
+                ),
+                "buyer_id": "00000000-0000-0000-0000-000000000004",
+            }
+        if name == "get_closer_reply_context":
+            row = next(
+                item for item in self.rows
+                if item["reply_id"] == params["p_reply_id"]
+            )
+            return {
+                "case_id": params["p_case_id"],
+                "classification": row["classification"],
+                "reply_body_text": (
+                    "What does it cost?"
+                    if row["classification"] == "question"
+                    else "Yes, interested"
+                ),
+                "root_subject": "Roofing opportunities",
+                "business_name": "Acme Roofing",
+                "niche": "roofing",
+                "metro": "Austin",
+                "contact_name": "Jane Smith",
+            }
+        if name == "record_buyer_capacity_intake":
+            complete = bool(
+                params.get("p_territory")
+                and params.get("p_daily_cap")
+                and params.get("p_delivery_route")
+            )
+            return {
+                "decision": "recorded",
+                "state": "complete" if complete else "partial",
+            }
+        if name == "prepare_fulfilment_order_from_capacity":
+            return {
+                "decision": "prepared",
+                "fulfilment_order_id": "00000000-0000-0000-0000-000000000006",
+                "state": "qualified",
+            }
+        if name == "propose_commercial_evidence":
+            return {
+                "decision": "proposed",
+                "evidence_id": "00000000-0000-0000-0000-000000000007",
+                "status": "pending",
+            }
+        if name == "record_closer_recommendation":
+            return {
+                "decision": "recorded",
+                "recommendation_id": "00000000-0000-0000-0000-000000000003",
+            }
+        if name == "propose_closer_reply_intent":
+            return {
+                "decision": "proposed",
+                "intent_id": "00000000-0000-0000-0000-000000000005",
+            }
+        raise AssertionError(name)
+
+
+def test_opens_case_and_records_deterministic_recommendation():
+    rpc = FakeRpc([
+        {
+            "reply_id": "00000000-0000-0000-0000-000000000001",
+            "classification": "positive",
+            "confidence": 0.9,
+            "case_id": None,
+        }
+    ])
+    result = run_closer_reply_worker(rpc, limit=25)
+    assert result.cases_opened == 1
+    assert result.recommendations_recorded == 1
+    assert result.buyers_provisioned == 1
+    assert result.reply_intents_proposed == 1
+    assert result.existing_cases_reused == 0
+    assert result.capacity_intakes_recorded == 0
+    assert result.fulfilment_orders_prepared == 0
+    assert result.errors == ()
+    assert [name for name, _ in rpc.calls] == [
+        "list_closer_work",
+        "open_closer_case",
+        "provision_buyer_from_closer_case",
+        "get_closer_reply_context",
+        "record_closer_recommendation",
+        "propose_closer_reply_intent",
+    ]
+    recommendation = rpc.calls[-2][1]
+    assert recommendation["p_type"] == "qualify"
+    assert recommendation["p_confidence"] == 0.9
+    assert "how many qualified opportunities per day" in recommendation["p_message"]
+
+
+def test_existing_case_is_reused_for_later_reply():
+    rpc = FakeRpc([
+        {
+            "reply_id": "00000000-0000-0000-0000-000000000011",
+            "classification": "question",
+            "confidence": 0.8,
+            "case_id": "00000000-0000-0000-0000-000000000010",
+            "case_origin": "threaded",
+        }
+    ])
+    result = run_closer_reply_worker(rpc)
+    assert result.cases_opened == 0
+    assert result.existing_cases_reused == 1
+    assert result.recommendations_recorded == 1
+    assert result.buyers_provisioned == 0
+    assert result.reply_intents_proposed == 1
+    assert result.capacity_intakes_recorded == 0
+    assert result.fulfilment_orders_prepared == 0
+    assert result.skipped_existing == 0
+    assert [name for name, _ in rpc.calls] == [
+        "list_closer_work",
+        "provision_buyer_from_closer_case",
+        "get_closer_reply_context",
+        "record_closer_recommendation",
+        "propose_closer_reply_intent",
+    ]
+    assert rpc.calls[-1][1]["p_reply_id"].endswith("0011")
+
+
+def test_noncommercial_reply_is_ignored():
+    rpc = FakeRpc([
+        {
+            "reply_id": "00000000-0000-0000-0000-000000000001",
+            "classification": "negative",
+            "confidence": 0.95,
+            "case_id": None,
+        }
+    ])
+    result = run_closer_reply_worker(rpc)
+    assert result.cases_opened == 0
+    assert result.recommendations_recorded == 0
+    assert result.buyers_provisioned == 0
+    assert result.reply_intents_proposed == 0
+    assert result.existing_cases_reused == 0
+    assert result.capacity_intakes_recorded == 0
+    assert result.fulfilment_orders_prepared == 0
+    assert result.errors == ()
+
+
+def test_complete_capacity_reply_prepares_nonbinding_order_shell():
+    class CapacityRpc(FakeRpc):
+        def __call__(self, name, params):
+            if name == "get_closer_reply_context":
+                self.calls.append((name, params))
+                return {
+                    "case_id": params["p_case_id"],
+                    "classification": "positive",
+                    "reply_body_text": (
+                        "We cover Austin and Round Rock. "
+                        "We can handle 10 leads per day. "
+                        "Webhook is preferred: https://acme.test/leads"
+                    ),
+                    "root_subject": "Roofing opportunities",
+                    "business_name": "Acme Roofing",
+                    "niche": "roofing",
+                    "metro": "Austin",
+                    "contact_name": "Jane Smith",
+                }
+            return super().__call__(name, params)
+
+    rpc = CapacityRpc([
+        {
+            "reply_id": "00000000-0000-0000-0000-000000000021",
+            "classification": "positive",
+            "confidence": 0.95,
+            "case_id": "00000000-0000-0000-0000-000000000010",
+            "case_origin": "threaded",
+        }
+    ])
+    result = run_closer_reply_worker(rpc)
+    assert result.existing_cases_reused == 1
+    assert result.capacity_intakes_recorded == 1
+    assert result.fulfilment_orders_prepared == 1
+    assert result.reply_intents_proposed == 1
+    names = [name for name, _ in rpc.calls]
+    assert "record_buyer_capacity_intake" in names
+    assert "prepare_fulfilment_order_from_capacity" in names
+    capacity = next(
+        params for name, params in rpc.calls
+        if name == "record_buyer_capacity_intake"
+    )
+    assert capacity["p_territory"] == "Austin and Round Rock"
+    assert capacity["p_daily_cap"] == 10
+    assert capacity["p_delivery_route"] == "webhook"
+
+
+def test_literal_buyer_price_creates_pending_evidence_proposal_only():
+    class PriceRpc(FakeRpc):
+        def __call__(self, name, params):
+            if name == "get_closer_reply_context":
+                self.calls.append((name, params))
+                return {
+                    "case_id": params["p_case_id"],
+                    "classification": "positive",
+                    "reply_body_text": (
+                        "We cover Austin. We can handle 10 leads per day. "
+                        "We pay $75 per lead. "
+                        "Email leads to ops@acme.test."
+                    ),
+                    "received_at": "2026-09-21T18:00:00+00:00",
+                    "buyer_id": "00000000-0000-0000-0000-000000000004",
+                    "root_subject": "Roofing opportunities",
+                    "business_name": "Acme Roofing",
+                    "niche": "roofing",
+                    "metro": "Austin",
+                    "contact_name": "Jane Smith",
+                }
+            return super().__call__(name, params)
+
+    rpc = PriceRpc([{
+        "reply_id": "00000000-0000-0000-0000-000000000031",
+        "classification": "positive",
+        "confidence": 0.95,
+        "case_id": "00000000-0000-0000-0000-000000000010",
+        "case_origin": "threaded",
+    }])
+    result = run_closer_reply_worker(rpc)
+    assert result.commercial_evidence_proposed == 1
+    proposal = next(
+        params for name, params in rpc.calls
+        if name == "propose_commercial_evidence"
+    )
+    assert proposal["p_evidence_kind"] == "price"
+    assert proposal["p_amount_cents"] == 7500
+    assert proposal["p_unit"] == "per_lead"
+    assert proposal["p_source_type"] == "buyer_stated"
+    assert proposal["p_source_reference"].endswith(":price")
+    assert proposal["p_evidence"]["reply_id"].endswith("0031")
+    assert proposal["p_evidence"]["binding"] is False
+    assert proposal["p_valid_until"] is None
+
+
+def test_ambiguous_buyer_prices_do_not_propose_evidence():
+    class AmbiguousPriceRpc(FakeRpc):
+        def __call__(self, name, params):
+            if name == "get_closer_reply_context":
+                self.calls.append((name, params))
+                return {
+                    "case_id": params["p_case_id"],
+                    "classification": "positive",
+                    "reply_body_text": (
+                        "We pay $70 per lead for one service and "
+                        "$90 per lead for another."
+                    ),
+                    "received_at": "2026-09-21T18:00:00+00:00",
+                    "buyer_id": "00000000-0000-0000-0000-000000000004",
+                    "root_subject": "Roofing opportunities",
+                    "business_name": "Acme Roofing",
+                    "niche": "roofing",
+                    "metro": "Austin",
+                    "contact_name": "Jane Smith",
+                }
+            return super().__call__(name, params)
+
+    rpc = AmbiguousPriceRpc([{
+        "reply_id": "00000000-0000-0000-0000-000000000041",
+        "classification": "positive",
+        "confidence": 0.95,
+        "case_id": "00000000-0000-0000-0000-000000000010",
+    }])
+    result = run_closer_reply_worker(rpc)
+    assert result.commercial_evidence_proposed == 0
+    assert not any(
+        name == "propose_commercial_evidence"
+        for name, _params in rpc.calls
+    )

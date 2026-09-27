@@ -1,13 +1,9 @@
 """
-Waterfall — Data Provider Orchestrator for Empire OS v3.
+Waterfall — Empire-owned contact intelligence orchestrator.
 
-Iterates through a configured chain of data providers (Apollo, People Data
-Labs, Hunter, Clearbit, etc.) until one returns a high-confidence contact
-result. Every result is run through a validation gate (ZeroBounce, SMTP
-check) before it can be used for outreach.
-
-Built as an in-hub abstraction so we own the data, pay provider-direct
-pricing, and can tune the waterfall per vertical (roofing, hvac, mass tort).
+The active production chain uses only Empire-owned/public-evidence sources.
+Legacy third-party provider classes remain as inert compatibility tombstones
+so historical imports fail closed rather than silently calling external APIs.
 """
 from __future__ import annotations
 
@@ -85,60 +81,36 @@ class DataProvider:
         return self.is_configured
 
 
-# ── Built-in providers (stubs — wire real APIs as keys arrive) ──────
+# ── Retired external-provider compatibility tombstones ───────────────
 
-class ApolloProvider(DataProvider):
-    """Apollo.io — primary B2B contact source."""
+class _RetiredExternalProvider(DataProvider):
+    """Historical import compatibility; never active in production."""
+
+    def is_available(self) -> bool:
+        return False
+
+    def search(self, lead_info: dict) -> Optional[LeadContact]:
+        return None
+
+
+class ApolloProvider(_RetiredExternalProvider):
     name = "apollo"
-    cost_cents = 8
-    api_key_env = "APOLLO_API_KEY"
-
-    def search(self, lead_info: dict) -> Optional[LeadContact]:
-        if not self.is_configured:
-            return None
-        # Real implementation: POST to Apollo's people/match endpoint
-        # Stub: returns a synthetic confidence to drive the waterfall logic
-        return LeadContact(
-            email=f"contact@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            phone=lead_info.get("phone", ""),
-            source=self.name,
-            confidence=0.92,
-            raw={"stub": True, "lead": lead_info},
-        )
+    cost_cents = 0
+    api_key_env = ""
 
 
-class PeopleDataLabsProvider(DataProvider):
-    """People Data Labs — fallback B2B enrichment."""
+class PeopleDataLabsProvider(_RetiredExternalProvider):
     name = "pdl"
-    cost_cents = 5
-    api_key_env = "PDL_API_KEY"
-
-    def search(self, lead_info: dict) -> Optional[LeadContact]:
-        if not self.is_configured:
-            return None
-        return LeadContact(
-            email=f"lead@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            source=self.name,
-            confidence=0.78,
-            raw={"stub": True, "lead": lead_info},
-        )
+    cost_cents = 0
+    api_key_env = ""
 
 
-class HunterProvider(DataProvider):
-    """Hunter.io — email finding + verification."""
+class HunterProvider(_RetiredExternalProvider):
+    """Retired Hunter.io adapter. Empire Hunter is the native replacement."""
+
     name = "hunter"
-    cost_cents = 4
-    api_key_env = "HUNTER_API_KEY"
-
-    def search(self, lead_info: dict) -> Optional[LeadContact]:
-        if not self.is_configured:
-            return None
-        return LeadContact(
-            email=f"info@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            source=self.name,
-            confidence=0.81,
-            raw={"stub": True, "lead": lead_info},
-        )
+    cost_cents = 0
+    api_key_env = ""
 
 
 class InternalScraperProvider(DataProvider):
@@ -148,16 +120,11 @@ class InternalScraperProvider(DataProvider):
     api_key_env = ""  # no key needed
 
     def is_available(self) -> bool:
-        return True  # always available
+        return False
 
     def search(self, lead_info: dict) -> Optional[LeadContact]:
-        # Always returns a low-confidence result
-        return LeadContact(
-            email=f"unknown@{lead_info.get('company', 'example.com').lower().replace(' ', '')}.com",
-            source=self.name,
-            confidence=0.45,
-            raw={"stub": True, "lead": lead_info},
-        )
+        # Disabled until a real evidence-backed scraper exists.
+        return None
 
 
 # ── Self-built providers (no API keys required) ─────────────────────
@@ -242,7 +209,8 @@ class SiteCrawlerProvider(DataProvider):
                     company=lead_info.get("company", ""),
                     source=self.name,
                     confidence=0.55,
-                    raw={"crawl": {"pages": result.pages_crawled,
+                    raw={"bound_to_decision_maker": False,
+                         "crawl": {"pages": result.pages_crawled,
                                    "rejected_email": best.email}},
                 )
             confidence = validation.confidence
@@ -252,8 +220,67 @@ class SiteCrawlerProvider(DataProvider):
             company=lead_info.get("company", ""),
             source=self.name,
             confidence=confidence,
-            raw={"crawl": {"pages": result.pages_crawled,
+            raw={"bound_to_decision_maker": False,
+                 "crawl": {"pages": result.pages_crawled,
                            "source_url": best.source_url}},
+        )
+
+
+
+
+class EmpireHunterProvider(DataProvider):
+    """Empire-owned first-party decision-maker contact intelligence."""
+
+    name = "empire_hunter"
+    cost_cents = 0
+    api_key_env = ""
+
+    def is_available(self) -> bool:
+        return True
+
+    def search(self, lead_info: dict) -> Optional[LeadContact]:
+        website = str(
+            lead_info.get("website")
+            or lead_info.get("domain")
+            or ""
+        ).strip()
+        if not website:
+            return None
+
+        from empire_os.hunter.domain_intelligence import analyze_domain
+
+        report = analyze_domain(website)
+        confirmed = report.confirmed_contacts
+        if not confirmed:
+            return None
+
+        best = max(
+            confirmed,
+            key=lambda item: item.confidence,
+        )
+        parts = str(best.person_name or "").split()
+        first_name = parts[0] if parts else ""
+        last_name = parts[-1] if len(parts) > 1 else ""
+        return LeadContact(
+            email=best.email,
+            first_name=first_name,
+            last_name=last_name,
+            title=str(best.person_title or ""),
+            company=str(
+                lead_info.get("company")
+                or lead_info.get("business_name")
+                or ""
+            ),
+            source=self.name,
+            confidence=best.confidence,
+            raw={
+                "bound_to_decision_maker": best.person_bound,
+                "verification_state": best.state.value,
+                "first_party": best.first_party,
+                "source_url": best.source_url,
+                "reasons": list(best.reasons),
+                "domain_pattern": report.pattern.as_dict(),
+            },
         )
 
 
@@ -264,34 +291,26 @@ class SocialScraperProvider(DataProvider):
     api_key_env = ""
 
     def is_available(self) -> bool:
-        return True
+        return False
 
     def search(self, lead_info: dict) -> Optional[LeadContact]:
-        # Stub — real implementation would query LinkedIn's public search,
-        # Facebook's Graph API (no key needed for public pages), etc.
-        # For now: return a low-confidence result so the waterfall can
-        # try the next provider.
-        return LeadContact(
-            phone=lead_info.get("phone", ""),
-            company=lead_info.get("company", ""),
-            source=self.name,
-            confidence=0.4,
-            raw={"stub": True, "note": "social scraping not yet implemented"},
-        )
+        return None
 
 
 # ── Validation gate ──────────────────────────────────────────────────
 
 class ValidationGate:
-    """Post-processing step that verifies a LeadContact before use.
+    """Post-processing gate for evidence-backed contact records.
 
-    In production this calls ZeroBounce, SMTP check, or similar. Here we
-    provide a confidence-based gate that rejects results below threshold.
+    A contact must meet the confidence floor and, by default, carry explicit
+    decision-maker binding evidence. Generic or fabricated addresses fail closed.
     """
 
-    def __init__(self, min_confidence: float = 0.7, require_email: bool = True):
+    def __init__(self, min_confidence: float = 0.7, require_email: bool = True,
+                 require_bound_contact: bool = True):
         self.min_confidence = min_confidence
         self.require_email = require_email
+        self.require_bound_contact = require_bound_contact
 
     def validate(self, contact: LeadContact) -> bool:
         if contact is None:
@@ -301,6 +320,8 @@ class ValidationGate:
         if "@" not in contact.email:
             return False
         if contact.confidence < self.min_confidence:
+            return False
+        if self.require_bound_contact and contact.raw.get("bound_to_decision_maker") is not True:
             return False
         return True
 
@@ -379,21 +400,17 @@ class Waterfall:
 # ── Factory ──────────────────────────────────────────────────────────
 
 def build_default_waterfall() -> Waterfall:
-    """Build the default Empire OS waterfall.
-
-    Order is self-built-first so we don't pay SaaS markups unless the
-    self-built providers fail. When API keys are added (Apollo, PDL,
-    Hunter), they auto-enable at their configured positions.
-    """
+    """Build the production Empire-owned contact waterfall."""
     return Waterfall(
         providers=[
-            RegistryScraperProvider(),  # 1. Free: BBB + SunBiz (authoritative)
-            SiteCrawlerProvider(),      # 2. Free: company site crawl + MX check
-            ApolloProvider(),           # 3. Paid fallback: if APOLLO_API_KEY set
-            PeopleDataLabsProvider(),   # 4. Paid fallback: if PDL_API_KEY set
-            HunterProvider(),           # 5. Paid fallback: if HUNTER_API_KEY set
-            SocialScraperProvider(),    # 6. Free last resort: social profiles
-            InternalScraperProvider(),  # 7. Always-on internal scraper
+            RegistryScraperProvider(),
+            SiteCrawlerProvider(),
+            EmpireHunterProvider(),
         ],
-        gate=ValidationGate(min_confidence=0.7),
+        gate=ValidationGate(
+            min_confidence=0.90,
+            require_email=True,
+            require_bound_contact=True,
+        ),
+        max_attempts=3,
     )

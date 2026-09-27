@@ -1,0 +1,12 @@
+[Unit]
+Description=Check EmpireOS revenue runtime every two minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=empire-revenue-runtime-supervisor.service
+
+[Install]
+WantedBy=timers.target

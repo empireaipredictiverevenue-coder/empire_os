@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh EmpireOS buyer capacity readiness every 15 minutes
+
+[Timer]
+OnActiveSec=1min
+OnUnitInactiveSec=15min
+AccuracySec=1min
+Persistent=true
+Unit=empire-buyer-capacity-readiness.service
+
+[Install]
+WantedBy=timers.target

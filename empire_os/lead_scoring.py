@@ -23,31 +23,16 @@ import math
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from empire_os.niche_taxonomy import NICHE_FAMILIES, niche_family, normalise
+
 logger = logging.getLogger("lead_scoring")
 
-# ── Target niches (what we qualify for) ─────────────────────────────
+# ── Target niches ────────────────────────────────────────────────────
+# Single source of truth: the canonical Empire niche taxonomy.
 TARGET_NICHES = {
-    "roof_repair",
-    "residential_roofing",
-    "commercial_roofing",
-    "roofing",
-    "hvac",
-    "hvac_repair",
-    "plumbing",
-    "electrical",
-    "solar",
-    "solar_installation",
-    "general_contractor",
-    "home_improvement",
-    "siding",
-    "windows",
-    "gutter",
-    "paving",
-    "concrete",
-    "landscaping",
-    "pest_control",
-    "painting",
-    "flooring",
+    normalise(alias)
+    for aliases in NICHE_FAMILIES.values()
+    for alias in aliases
 }
 
 # Weights for each scoring dimension
@@ -101,14 +86,21 @@ def score_business_presence(lead: dict) -> float:
 
 
 def score_market_fit(lead: dict) -> float:
-    """How well does this lead fit our target niches?"""
-    niche = (lead.get("niche") or "").lower().strip()
+    """How well does this lead fit the canonical Empire niche taxonomy?"""
+    niche = normalise(lead.get("niche"))
+    family = niche_family(niche)
+
+    if family in NICHE_FAMILIES:
+        return 100.0
+
     if niche in TARGET_NICHES:
         return 100.0
-    # Partial match
+
+    # Conservative partial match for unfamiliar but clearly related labels.
     for target in TARGET_NICHES:
-        if target in niche or niche in target:
+        if target and (target in niche or niche in target):
             return 75.0
+
     # Check business_name for keywords
     name = (lead.get("business_name") or "").lower()
     roofing_keywords = {"roof", "shingle", "gutter", "siding", "storm", "restoration"}

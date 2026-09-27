@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+RETIRED_LEGACY_OUTREACH_NOW
+
 Empire OS - outreach-now runner.
 
 Generates 50 prospect leads from our lane_leads database that the
@@ -22,7 +24,7 @@ DB  = os.environ.get("HUB_DB_PATH",
      # If on host and DB doesn't exist, will be picked up via
      # /v1/leads/sample endpoint on hub.
 HUB = os.environ.get("HUB_URL", "http://10.118.155.218:8081")
-OUT = Path("/root/empire_os/outreach_pack"); OUT.mkdir(parents=True, exist_ok=True)
+OUT = Path("/root/empire_os/outreach_pack")
 
 
 def fetch_prospects(db_path: str, limit: int) -> list:
@@ -136,6 +138,10 @@ def write_emails(rows: list, path: Path):
 
 
 def main():
+    raise SystemExit(
+        "RETIRED: scripts/outreach_now.py uses legacy lane/USDC outreach. "
+        "Use scripts/run_gtm_pipeline_worker.py and canonical governed outbound."
+    )
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=50)
     args = ap.parse_args()

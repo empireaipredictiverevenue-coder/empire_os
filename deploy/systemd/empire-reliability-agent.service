@@ -1,0 +1,24 @@
+[Unit]
+Description=EmpireOS Reliability Agent
+After=network-online.target empire-ops-privileged-helper.service
+Wants=network-online.target empire-ops-privileged-helper.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=-/etc/empire_os.env
+Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_AUTONOMOUS_MODE=OBSERVE
+ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.reliability_agent --repo-root /srv/empire_os --interval-seconds 120
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

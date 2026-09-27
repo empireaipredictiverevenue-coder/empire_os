@@ -1,0 +1,12 @@
+[Unit]
+Description=Continuously refill Empire Coder work
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=empire-coder-supervisor.service
+
+[Install]
+WantedBy=timers.target

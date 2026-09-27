@@ -45,7 +45,12 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import requests
 
-ROLE_DIR = Path("/root/hermes_gateway")
+ROLE_DIR = Path(
+    os.getenv(
+        "HERMES_GATEWAY_DIR",
+        "/srv/empire_os/runtime/hermes_gateway",
+    )
+)
 ROLE_DIR.mkdir(parents=True, exist_ok=True)
 LOG_PATH = ROLE_DIR / "outbound.jsonl"
 LOG_PATH.touch(exist_ok=True)

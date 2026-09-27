@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh EmpireOS Private Capital intelligence hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=1min
+Persistent=true
+Unit=empire-private-capital-snapshot.service
+
+[Install]
+WantedBy=timers.target

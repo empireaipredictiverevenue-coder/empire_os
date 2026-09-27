@@ -1,0 +1,165 @@
+from empire_os.buyer_scout_review_readiness import (
+    materialize_review_readiness,
+    review_readiness,
+)
+
+
+def candidate(**overrides):
+    row = {
+        "id": "candidate-1",
+        "domain": "buyer.example",
+        "business_name": "Buyer Co",
+        "website": "https://buyer.example",
+        "reconciliation_state": "NEW_EXTERNAL_BUYER_CANDIDATE",
+        "review_state": "discovered",
+        "target_buyer_pools": ["local_and_smb_buyers"],
+        "query_evidence": [{"query": "roofing local business"}],
+        "site_evidence": {
+            "site_evidence_score": 0.8,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        },
+        "explicit_direct_buyer_evidence": False,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_local_smb_candidate_can_be_review_ready_without_direct_buyer_claim():
+    assert review_readiness(candidate()) == (True, "review_ready")
+
+
+def test_direct_demand_candidate_requires_explicit_buying_evidence():
+    row = candidate(
+        target_buyer_pools=["direct_demand_buyers"],
+        explicit_direct_buyer_evidence=False,
+    )
+    assert review_readiness(row) == (
+        False,
+        "direct_buyer_evidence_missing",
+    )
+
+
+def test_first_party_contact_path_is_required():
+    row = candidate(
+        site_evidence={
+            "site_evidence_score": 0.9,
+            "first_party_email_count": 0,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        }
+    )
+    assert review_readiness(row) == (
+        False,
+        "first_party_contact_path_missing",
+    )
+
+
+def test_materializer_only_updates_holding_review_state():
+    calls = []
+
+    result = materialize_review_readiness(
+        [candidate()],
+        patch_call=lambda method, path, body: calls.append(
+            (method, path, body)
+        ) or [],
+    )
+
+    assert result["review_ready_count"] == 1
+    assert result["canonical_promotion_performed"] is False
+    assert result["outbound_sent"] is False
+    method, path, body = calls[0]
+    assert method == "PATCH"
+    assert "buyer_scout_candidates" in path
+    assert body["review_state"] == "review_ready"
+    assert body["reconciliation_state"] == "REVIEW_READY"
+
+
+def test_generic_about_us_business_name_is_rejected():
+    row = candidate(
+        business_name="About us",
+        site_evidence={
+            "business_name_source": "first_party_business_name",
+            "site_evidence_score": 0.9,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        },
+    )
+
+    assert review_readiness(row) == (
+        False,
+        "business_name_not_verified",
+    )
+
+
+def test_home_title_fallback_is_rejected():
+    row = candidate(
+        business_name="Home - Acme Roofing",
+        site_evidence={
+            "business_name_source": "page_title_fallback",
+            "site_evidence_score": 0.9,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        },
+    )
+
+    assert review_readiness(row) == (
+        False,
+        "business_name_not_verified",
+    )
+
+
+def test_permit_buyer_requires_first_party_nyc_territory():
+    row = candidate(
+        target_product_codes=["permit_intelligence"],
+        site_evidence={
+            "business_name_source": "first_party_site_identity",
+            "permit_territory_state": "NYC_NOT_OBSERVED",
+            "site_evidence_score": 0.9,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        },
+    )
+    assert review_readiness(row) == (
+        False,
+        "permit_territory_not_verified",
+    )
+
+
+def test_permit_buyer_rejects_unconfirmed_seed_identity():
+    row = candidate(
+        target_product_codes=["permit_intelligence"],
+        site_evidence={
+            "business_name_source": "canonical_prospect_seed",
+            "canonical_seed_identity_corroborated": False,
+            "permit_territory_state": "NYC_FIRST_PARTY_EVIDENCE",
+            "site_evidence_score": 0.9,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 0,
+            "people_count": 0,
+        },
+    )
+    assert review_readiness(row) == (
+        False,
+        "permit_business_identity_unconfirmed",
+    )
+
+
+def test_permit_buyer_can_be_review_ready_with_site_identity_and_nyc():
+    row = candidate(
+        business_name="VIP Fire Sprinklers Inc",
+        target_product_codes=["permit_intelligence"],
+        site_evidence={
+            "business_name_source": "first_party_site_identity",
+            "permit_territory_state": "NYC_FIRST_PARTY_EVIDENCE",
+            "site_evidence_score": 0.85,
+            "first_party_email_count": 1,
+            "first_party_phone_count": 2,
+            "people_count": 0,
+        },
+    )
+    assert review_readiness(row) == (True, "review_ready")

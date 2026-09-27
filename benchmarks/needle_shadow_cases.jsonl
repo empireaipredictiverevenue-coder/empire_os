@@ -1,0 +1,5 @@
+{"case_id":"reply_positive_1","query":"Buyer replied: Yes, send the one-page example.","expected_tool":"classify_reply","arguments":{"message_ref":"case:reply_positive_1"}}
+{"case_id":"reply_question_1","query":"Buyer replied: What markets does this cover?","expected_tool":"classify_reply","arguments":{"message_ref":"case:reply_question_1"}}
+{"case_id":"reply_optout_1","query":"Buyer replied: Stop emailing me and remove me from this list.","expected_tool":"classify_reply","arguments":{"message_ref":"case:reply_optout_1"}}
+{"case_id":"copy_brief_1","query":"Prepare a drafting brief for account acct:redwood using observed evidence only.","expected_tool":"build_copy_brief","arguments":{"account_ref":"acct:redwood"}}
+{"case_id":"off_topic_1","query":"What is the weather in Paris?","expected_tool":null,"arguments":{}}

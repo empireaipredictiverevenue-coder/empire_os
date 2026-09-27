@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EmpireOS Control Fabric observer every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=empire-ops-observer.service
+
+[Install]
+WantedBy=timers.target

@@ -3,7 +3,7 @@
 
 Problems this fixes:
   - 65 agents exist but most are library stubs, never started as processes.
-  - Some generate SIMULATED data (_seed_damage, synthetic_*). NO-SIM policy.
+  - NO-SIM policy: production paths must fail closed rather than fabricate data.
   - Nothing tracks run-state -> dead-by-morning (agents silently stop).
   - No single source of truth for what should be running.
 
@@ -49,13 +49,13 @@ REGISTRY_DATA = {
                             "note": "Plans ppc. Must wire invoice writes."},
     "outreach_runner":    {"file": "outreach_runner.py", "mode": "daemon",
                             "sim_risk": "low", "enabled": True},
-    "solana_listener":    {"file": "solana_listener_agent.py", "mode": "daemon",
-                            "sim_risk": "low", "enabled": True,
-                            "note": "USDC collection listener. Online 2h+."},
+    "solana_listener":    {"file": "solana_listener_agent.py", "mode": "tool",
+                            "sim_risk": "high", "enabled": False,
+                            "note": "RETIRED: legacy Solana/USDC rail; canonical settlement is BSC USDT."},
     # ── SATELLITE / STORM (daemons, but SIM until real source) ──
     "satellite_damage":   {"file": "satellite_damage_agent.py", "mode": "daemon",
                             "sim_risk": "high", "enabled": False,
-                            "note": "USES _seed_damage (synthetic grid). DISABLED until real source."},
+                            "note": "NO-SIM: fail-closed until real imagery and parcel source are wired."},
     "satellite_strike":   {"file": "satellite_strike_agent.py", "mode": "daemon",
                             "sim_risk": "medium", "enabled": True,
                             "note": "NWS storm cells. Null-geom crash fixed."},
@@ -112,8 +112,8 @@ def launch_daemon(agent, spec):
     """Launch an enabled daemon as a systemd unit (survives reboot)."""
     if spec["mode"] != "daemon" or not spec.get("enabled"):
         return
-    if spec["sim_risk"] == "high" and not os.environ.get("ALLOW_SIM"):
-        print(f"  SKIP {agent}: sim_risk=high (no-sim gate). Set ALLOW_SIM=1 to force.")
+    if spec["sim_risk"] == "high":
+        print(f"  SKIP {agent}: sim_risk=high (production no-sim policy).")
         return
     uname = unit_name(agent)
     venv_py = "/root/empire_os/venv/bin/python3"

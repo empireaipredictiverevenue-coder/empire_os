@@ -1,0 +1,11 @@
+[Unit]
+Description=Run EmpireOS Legacy Permit Recovery Observer every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=15min
+Persistent=true
+Unit=empire-legacy-permit-recovery.service
+
+[Install]
+WantedBy=timers.target

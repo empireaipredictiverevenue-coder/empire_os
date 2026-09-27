@@ -51,12 +51,12 @@ def discover_one(
     typically handles this automatically, but this is the low-level API
     for direct use.
     """
-    # Upsert consent
+    # Discovery is not consent. Preserve provenance without asserting opt-in.
     backend.execute(
         """INSERT OR REPLACE INTO si_prospect_consent
            (prospect_id, opted_in, opted_in_at, niche, source)
-           VALUES (?, 1, ?, ?, ?)""",
-        (prospect.prospect_id, prospect.discovered_at, prospect.niche, prospect.source),
+           VALUES (?, 0, NULL, ?, ?)""",
+        (prospect.prospect_id, prospect.niche, prospect.source),
     )
 
     eid = transition(

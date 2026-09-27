@@ -1,0 +1,30 @@
+[Unit]
+Description=EmpireOS narrow privileged operations helper
+After=local-fs.target
+Before=empire-ops-mcp.service
+
+[Service]
+Type=simple
+User=root
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.ops_privileged_helper --socket /run/empire-ops/privileged.sock --allowed-user ubuntu
+RuntimeDirectory=empire-ops
+RuntimeDirectoryMode=0750
+UMask=0007
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

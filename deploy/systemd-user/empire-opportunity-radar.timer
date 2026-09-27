@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh Predictive Cloud Opportunity Radar every fifteen minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+AccuracySec=30s
+Persistent=true
+Unit=empire-opportunity-radar.service
+
+[Install]
+WantedBy=timers.target

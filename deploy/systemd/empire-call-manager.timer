@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh EmpireOS call manager work every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=20s
+Persistent=true
+Unit=empire-call-manager.service
+
+[Install]
+WantedBy=timers.target

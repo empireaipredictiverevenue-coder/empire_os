@@ -1,0 +1,24 @@
+[Unit]
+Description=Empire Media OS internal runtime refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_LLM_TIMEOUT=30
+Environment=EMPIRE_LLM_RETRIES=0
+ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_media_empire_bridge.py --repo-root /srv/empire_os --git-limit 30
+ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_media_research_bridge.py --repo-root /srv/empire_os
+ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_media_claim_verification.py --repo-root /srv/empire_os --max-packs 2 --max-claims-per-pack 4 --max-sources-per-pack 3
+ExecStartPre=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_media_content_pipeline.py --repo-root /srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_media_os_runtime.py --repo-root /srv/empire_os
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=300

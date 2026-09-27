@@ -1,0 +1,108 @@
+{
+  "schema_version": "empire.verified-buyer-public-evidence.v1",
+  "observed_on": "2026-09-24",
+  "domain": "vipfiresprinkler.com",
+  "business_name": "VIP Fire Sprinklers Inc",
+  "evidence": [
+    {
+      "source_type": "official_public_record",
+      "source_name": "NYC Doing Business Search",
+      "url": "https://www.nyc.gov/assets/mocs/downloads/pdf/DBDB_Reports/rpt_DBDB_People_Report.pdf",
+      "claims": [
+        {
+          "name": "Thomas A. Petronis",
+          "role": "Officer, Owner"
+        },
+        {
+          "name": "Maureen Petronis",
+          "role": "Owner"
+        },
+        {
+          "name": "Matthew R. Petronis",
+          "role": "Officer, CT Mgr"
+        },
+        {
+          "name": "Michael Rubenstein",
+          "role": "Officer"
+        }
+      ]
+    },
+    {
+      "source_type": "business_directory",
+      "source_name": "Better Business Bureau",
+      "url": "https://www.bbb.org/us/ny/brooklyn/profile/fire-sprinklers/vip-fire-sprinklers-inc-0121-159783",
+      "claims": [
+        {
+          "name": "Matthew Petronis",
+          "role": "VP"
+        }
+      ]
+    },
+    {
+      "source_type": "first_party_website",
+      "source_name": "VIP Fire Sprinklers contact page",
+      "url": "https://vipfiresprinkler.com/contact-us-nyc-fire-sprinkler-company/",
+      "claims": [
+        {
+          "company_email": "vipfiresprinkler@aol.com"
+        },
+        {
+          "company_phone": "718-596-5086"
+        },
+        {
+          "company_phone_fallback": "718-945-3315"
+        },
+        {
+          "address": "700 Columbia Street, Brooklyn, NY 11231"
+        }
+      ]
+    }
+  ],
+  "decision_maker_priority": [
+    {
+      "name": "Thomas A. Petronis",
+      "role": "Officer, Owner",
+      "confidence": "official_public_record",
+      "person_bound_email": null,
+      "person_bound_phone": null
+    },
+    {
+      "name": "Matthew R. Petronis",
+      "role": "Officer, CT Mgr; BBB lists VP",
+      "confidence": "official_public_record_plus_business_directory",
+      "person_bound_email": null,
+      "person_bound_phone": null
+    },
+    {
+      "name": "Maureen Petronis",
+      "role": "Owner",
+      "confidence": "official_public_record",
+      "person_bound_email": null,
+      "person_bound_phone": null
+    }
+  ],
+  "contact_route": {
+    "type": "company_route",
+    "email": "vipfiresprinkler@aol.com",
+    "phone": "718-596-5086",
+    "fallback_phone": "718-945-3315",
+    "person_bound": false
+  },
+  "excluded_false_positive_people": [
+    {
+      "name": "April D.",
+      "reason": "customer testimonial; 'small business owner' refers to testimonial author, not VIP ownership"
+    },
+    {
+      "name": "New York",
+      "reason": "geography label, not a person"
+    }
+  ],
+  "authority": {
+    "outbound_send": false,
+    "commercial_terms_acceptance": false,
+    "buyer_activation": false,
+    "payment": false,
+    "revenue": false
+  }
+}

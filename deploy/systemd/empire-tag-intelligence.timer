@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh Empire Tag Intelligence every six hours
+
+[Timer]
+OnBootSec=12min
+OnUnitInactiveSec=6h
+AccuracySec=5min
+Persistent=true
+Unit=empire-tag-intelligence.service
+
+[Install]
+WantedBy=timers.target

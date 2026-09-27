@@ -1,0 +1,21 @@
+[Unit]
+Description=EmpireOS read-only Founder Dashboard API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/uvicorn empire_os.founder_dashboard_service:app --host 127.0.0.1 --port 8766
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadOnlyPaths=/srv/empire_os
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=30
+
+[Install]
+WantedBy=default.target

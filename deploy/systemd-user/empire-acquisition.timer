@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EmpireOS adaptive acquisition every ten minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+AccuracySec=1min
+Persistent=true
+Unit=empire-acquisition.service
+
+[Install]
+WantedBy=timers.target

@@ -220,7 +220,7 @@ CREATE INDEX IF NOT EXISTS idx_lane_leads_status ON lane_leads(status);
 
 
 def ensure_schema(backend) -> None:
-    """Create lane tables if they don't exist."""
+    """Create lane tables and add missing columns to legacy lane_leads."""
     for stmt in SCHEMA.strip().split(";"):
         stmt = stmt.strip()
         if stmt:
@@ -228,6 +228,32 @@ def ensure_schema(backend) -> None:
                 backend.execute(stmt)
             except Exception:
                 pass  # table may already exist
+
+    # Additive migration for older lane_leads schemas.
+    # Never rebuild/drop the table: historical rows must survive intact.
+    existing = {
+        row["name"]
+        for row in backend.execute("PRAGMA table_info(lane_leads)").fetchall()
+    }
+
+    migrations = [
+        ("name", "TEXT"),
+        ("email", "TEXT"),
+        ("phone", "TEXT"),
+        ("source", "TEXT"),
+        ("metro", "TEXT"),
+        ("state", "TEXT"),
+        ("details", "TEXT"),
+        ("niche", "TEXT"),
+        ("updated_at", "TEXT"),
+    ]
+
+    for column, column_type in migrations:
+        if column not in existing:
+            backend.execute(
+                f"ALTER TABLE lane_leads ADD COLUMN {column} {column_type}"
+            )
+
     backend.commit()
 
 

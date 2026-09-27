@@ -67,15 +67,18 @@ SCOUT_SYSTEM_PROMPT = """You are the AGI Scout for Empire OS v3 — an autonomou
 Your role:
 1. Analyze current lead pipeline data across all niches
 2. Decide which markets need more scanning effort
-3. Generate synthetic market intelligence when real data is thin
-4. Prioritize high-opportunity niches
+3. Use only real source scanners and observed evidence
+4. Prioritize high-opportunity niches without fabricating records
 
 You are data-driven and strategic. Think like a senior market analyst.
-Output your decision as JSON with keys: action, niches (list), reasoning, synthetic_count."""
+Output JSON with keys: action, niches (list), reasoning, source_mode.
+source_mode must be "real_only"."""
 
 HERMES_GATEWAY_URL = os.environ.get(
     "HERMES_GATEWAY_URL", "http://10.118.155.156:9100")
-SCOUT_LOG_PATH = Path("/root/feedback/scout_log.jsonl")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+RUNTIME_DIR = Path(os.environ.get("EMPIRE_RUNTIME_DIR", str(REPO_ROOT / "runtime")))
+SCOUT_LOG_PATH = RUNTIME_DIR / "feedback" / "scout_log.jsonl"
 SCOUT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -606,7 +609,7 @@ class AgiScoutAgent(Agent):
 
 Pick up to {self.max_niches_per_cycle} niches to scan this cycle.
 Output JSON: {{"action": "scan", "niches": ["..."], "reasoning": "...",
-"synthetic_count": N}}
+"source_mode": "real_only"}}
 
 If all niches have >= 5 fresh leads, output action="skip".
 """
@@ -628,7 +631,6 @@ If all niches have >= 5 fresh leads, output action="skip".
                 "action": "scan",
                 "niches": stale,
                 "reasoning": "LLM unavailable; picked most-stale niches heuristically",
-                "synthetic_count": 0,
             })
 
         # Normalize: ensure "niches" is a list
@@ -639,7 +641,6 @@ If all niches have >= 5 fresh leads, output action="skip".
                 self.max_niches_per_cycle)
         result.setdefault("action", "scan")
         result.setdefault("reasoning", "(no reasoning)")
-        result.setdefault("synthetic_count", 0)
         return json.dumps(result)
 
     def act(self, decision: str) -> dict:
@@ -664,33 +665,9 @@ If all niches have >= 5 fresh leads, output action="skip".
         }
 
         if action == "synthetic":
-            # v1's generate_synthetic_leads was removed from
-            # synthetic_intelligence; fall back to LLM-generated
-            # candidates inline so the action still does something useful.
-            from empire_os.synthetic_intelligence import SyntheticIntelligence
-            niche_target = niches[0] if niches else self.niches[0]
-            syn = SyntheticIntelligence(llm=self.llm, n_synthetic=3)
-            examples = syn.augment(
-                observed_state={"niche": niche_target,
-                                "by_state": state.get("by_state", {})},
-                last_decision={"action": "synthetic", "niche": niche_target},
-            )
-            registered = 0
-            for ex in examples:
-                out = ex.expected_output if hasattr(ex, "expected_output") else {}
-                if not isinstance(out, dict):
-                    continue
-                lead = {
-                    "business_name": out.get("business_name", ""),
-                    "phone":         out.get("phone", ""),
-                    "zip":           out.get("zip", ""),
-                    "details":       out,
-                }
-                registered += self._register_synthetic([lead], niche_target)
-            result["synthetic_generated"] = len(examples)
-            result["registered"] = registered
-            result["summary"] = (f"Synthetic: {len(examples)} generated, "
-                                 f"{registered} registered for {niche_target}")
+            result["ok"] = False
+            result["blocked_reason"] = "synthetic_runtime_disabled"
+            result["summary"] = "Synthetic lead generation is disabled; use real scanners."
             self._log_cycle(d, result)
             return result
 
@@ -783,32 +760,6 @@ If all niches have >= 5 fresh leads, output action="skip".
 
         self._log_cycle(d, result)
         return result
-
-    def _register_synthetic(self, leads: list, niche: str) -> int:
-        from empire_os.traffic_specialist import (
-            DiscoveredProspect, discover_one)
-        registered = 0
-        for lead in leads:
-            try:
-                p = DiscoveredProspect(
-                    prospect_id=lead.get(
-                        "business_name",
-                        f"syn-{niche}-{registered}").replace(
-                        " ", "-").lower(),
-                    niche=niche,
-                    source="agi-scout-synthetic",
-                    discovered_at=datetime.now(
-                        timezone.utc).isoformat(),
-                    name=lead.get("business_name", ""),
-                    phone=lead.get("phone", ""),
-                    zip_code=lead.get("zip", ""),
-                    details=json.dumps(lead),
-                )
-                discover_one(self.backend, p, actor="agi-scout")
-                registered += 1
-            except Exception as e:
-                logger.warning("register synthetic failed: %s", e)
-        return registered
 
     # ── health snapshot (exposed via /state) ───────────────────────
 

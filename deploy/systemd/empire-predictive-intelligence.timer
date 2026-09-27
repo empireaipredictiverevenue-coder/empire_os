@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh verified-cohort Predictive Intelligence every five minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=empire-predictive-intelligence.service
+
+[Install]
+WantedBy=timers.target

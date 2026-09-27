@@ -1,0 +1,583 @@
+"""OBSERVE-only Strategy Department API."""
+from __future__ import annotations
+
+from typing import Any
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+from empire_os.strategy_operating_system import (
+    rank_keyword_portfolio,
+    review_ai_capability,
+    review_market_thesis,
+    review_strategic_bet,
+)
+from empire_os.market_domination import (
+    analyse_market_capture,
+    compare_adjacent_corridors,
+    rank_market_portfolio,
+)
+from empire_os.competitive_intelligence import (
+    build_competitive_landscape,
+    observed_ai_citation_share,
+    observed_search_presence_share,
+    review_competitor_profile,
+)
+from empire_os.keyword_universe import (
+    build_asset_backlog,
+    build_keyword_universe,
+    keyword_coverage_matrix,
+    review_keyword_record,
+)
+from empire_os.ai_strategy_portfolio import (
+    ai_portfolio_gaps,
+    build_ai_capability_portfolio,
+    compare_ai_options,
+    review_ai_portfolio_item,
+)
+from empire_os.strategic_scenarios import (
+    build_scenario_set,
+    review_scenario,
+    scenario_gaps,
+    stress_test_strategy,
+)
+from empire_os.jev_strategy import (
+    CANDIDATE_TASKS as JEV_CANDIDATE_TASKS,
+    build_jev_eval_plan,
+    compare_decision_providers,
+    review_jev_use_case,
+)
+from empire_os.typed_decision_eval import (
+    build_shadow_decision,
+    compare_eval_reports,
+    evaluate_provider_outputs,
+    summarize_shadow_records,
+)
+from empire_os.category_strategy import (
+    category_gap_plan,
+    compare_category_snapshots,
+    review_category_position,
+)
+from empire_os.strategic_partnerships import (
+    build_partnership_portfolio,
+    partnership_gap_map,
+    review_partner_candidate,
+)
+from empire_os.strategy_control_tower import (
+    build_strategy_brief,
+    build_strategy_control_tower,
+)
+from empire_os.typed_decision_dataset import (
+    dataset_readiness,
+    freeze_dataset,
+    verify_frozen_dataset,
+)
+from empire_os.typed_decision_shadow_collector import (
+    build_label_review_queue,
+    collect_shadow_candidates,
+    shadow_collection_summary,
+)
+from empire_os.typed_decision_readiness import (
+    build_readiness_board,
+    next_evidence_actions,
+    review_task_readiness,
+)
+
+
+class DataRequest(BaseModel):
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class KeywordPortfolioRequest(BaseModel):
+    keywords: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class MarketPortfolioRequest(BaseModel):
+    markets: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AdjacentCorridorRequest(BaseModel):
+    current: dict[str, Any] = Field(default_factory=dict)
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CompetitiveLandscapeRequest(BaseModel):
+    competitor_profiles: list[dict[str, Any]] = Field(default_factory=list)
+    search_observations: list[dict[str, Any]] = Field(default_factory=list)
+    ai_citation_observations: list[dict[str, Any]] = Field(default_factory=list)
+    empire_domains: list[str] = Field(default_factory=list)
+
+
+class PresenceShareRequest(BaseModel):
+    observations: list[dict[str, Any]] = Field(default_factory=list)
+    empire_domains: list[str] = Field(default_factory=list)
+    competitor_domains: list[str] = Field(default_factory=list)
+
+
+class KeywordUniverseRequest(BaseModel):
+    keywords: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AiPortfolioRequest(BaseModel):
+    capabilities: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AiOptionComparisonRequest(BaseModel):
+    capability_key: str
+    options: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ScenarioSetRequest(BaseModel):
+    scenarios: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class StressTestRequest(BaseModel):
+    baseline: dict[str, Any] = Field(default_factory=dict)
+    scenarios: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class BenchmarkRowsRequest(BaseModel):
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class JevUseCasesRequest(BaseModel):
+    use_cases: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class EvalRowsRequest(BaseModel):
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    minimum_samples: int = 20
+
+
+class EvalReportsRequest(BaseModel):
+    reports: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ShadowRowsRequest(BaseModel):
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CategoryRowsRequest(BaseModel):
+    categories: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class PartnerRowsRequest(BaseModel):
+    partners: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class StrategyControlTowerRequest(BaseModel):
+    market_portfolio: dict[str, Any] = Field(default_factory=dict)
+    category_portfolio: dict[str, Any] = Field(default_factory=dict)
+    keyword_portfolio: dict[str, Any] = Field(default_factory=dict)
+    competitive_landscape: dict[str, Any] = Field(default_factory=dict)
+    ai_portfolio: dict[str, Any] = Field(default_factory=dict)
+    partnership_portfolio: dict[str, Any] = Field(default_factory=dict)
+    scenario_set: dict[str, Any] = Field(default_factory=dict)
+    max_brief_items: int = 7
+
+
+class DatasetFreezeRequest(BaseModel):
+    dataset_id: str
+    version: str
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DatasetReadinessRequest(BaseModel):
+    manifest: dict[str, Any] = Field(default_factory=dict)
+    minimum_per_label: int = 20
+
+
+class ShadowCollectRequest(BaseModel):
+    task_key: str
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ShadowSummaryRequest(BaseModel):
+    batches: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ReadinessBoardRequest(BaseModel):
+    tasks: list[dict[str, Any]] = Field(default_factory=list)
+
+
+def create_strategy_router() -> APIRouter:
+    router = APIRouter(prefix="/v1/strategy", tags=["strategy-department"])
+
+    @router.get("/health")
+    def health():
+        return {
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "market_entry_execution": False,
+            "publishing_enabled": False,
+            "capital_commitment": False,
+            "model_promotion": False,
+        }
+
+    @router.post("/market-thesis/review")
+    def market_thesis(req: DataRequest):
+        try:
+            return review_market_thesis(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/bets/review")
+    def strategic_bet(req: DataRequest):
+        try:
+            return review_strategic_bet(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/keywords/rank/preview")
+    def keywords(req: KeywordPortfolioRequest):
+        try:
+            return rank_keyword_portfolio(req.keywords)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/ai-capability/review")
+    def ai_capability(req: DataRequest):
+        try:
+            return review_ai_capability(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/market-domination/review")
+    def market_domination(req: DataRequest):
+        try:
+            return analyse_market_capture(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/market-domination/portfolio/preview")
+    def market_domination_portfolio(req: MarketPortfolioRequest):
+        try:
+            return rank_market_portfolio(req.markets)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/market-domination/adjacent/preview")
+    def market_domination_adjacent(req: AdjacentCorridorRequest):
+        try:
+            return compare_adjacent_corridors(
+                current=req.current,
+                candidates=req.candidates,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/competitive/profile/review")
+    def competitive_profile(req: DataRequest):
+        try:
+            return review_competitor_profile(req.data)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/competitive/search-presence/preview")
+    def competitive_search_presence(req: PresenceShareRequest):
+        try:
+            return observed_search_presence_share(
+                req.observations,
+                empire_domains=req.empire_domains,
+                competitor_domains=req.competitor_domains,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/competitive/ai-citation-share/preview")
+    def competitive_ai_citations(req: PresenceShareRequest):
+        try:
+            return observed_ai_citation_share(
+                req.observations,
+                empire_domains=req.empire_domains,
+                competitor_domains=req.competitor_domains,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/competitive/landscape/preview")
+    def competitive_landscape(req: CompetitiveLandscapeRequest):
+        try:
+            return build_competitive_landscape(
+                competitor_profiles=req.competitor_profiles,
+                search_observations=req.search_observations,
+                ai_citation_observations=req.ai_citation_observations,
+                empire_domains=req.empire_domains,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/keyword-universe/review")
+    def keyword_review(req: DataRequest):
+        try:
+            return review_keyword_record(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/keyword-universe/preview")
+    def keyword_universe(req: KeywordUniverseRequest):
+        try:
+            return build_keyword_universe(req.keywords)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/keyword-universe/coverage/preview")
+    def keyword_coverage(req: KeywordUniverseRequest):
+        try:
+            return keyword_coverage_matrix(req.keywords)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/keyword-universe/assets/preview")
+    def keyword_assets(req: KeywordUniverseRequest):
+        try:
+            return build_asset_backlog(req.keywords)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/ai-portfolio/item/review")
+    def ai_portfolio_item(req: DataRequest):
+        try:
+            return review_ai_portfolio_item(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/ai-portfolio/preview")
+    def ai_portfolio(req: AiPortfolioRequest):
+        try:
+            return build_ai_capability_portfolio(req.capabilities)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/ai-portfolio/gaps/preview")
+    def ai_portfolio_gap_review(req: AiPortfolioRequest):
+        try:
+            return ai_portfolio_gaps(req.capabilities)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/ai-portfolio/options/compare/preview")
+    def ai_option_compare(req: AiOptionComparisonRequest):
+        try:
+            return compare_ai_options(
+                capability_key=req.capability_key,
+                options=req.options,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/scenarios/review")
+    def scenario_review(req: DataRequest):
+        try:
+            return review_scenario(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/scenarios/set/preview")
+    def scenario_set(req: ScenarioSetRequest):
+        try:
+            return build_scenario_set(req.scenarios)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/scenarios/stress-test/preview")
+    def scenario_stress(req: StressTestRequest):
+        try:
+            return stress_test_strategy(
+                baseline=req.baseline,
+                scenarios=req.scenarios,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/scenarios/gaps/preview")
+    def scenario_gap_review(req: ScenarioSetRequest):
+        try:
+            return scenario_gaps(req.scenarios)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/jev/task-catalog")
+    def jev_tasks():
+        return {
+            "schema_version": "jev_task_catalog.v1",
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "candidate_tasks": sorted(JEV_CANDIDATE_TASKS),
+            "provider_activation": False,
+        }
+
+    @router.post("/jev/use-case/review")
+    def jev_use_case(req: DataRequest):
+        return review_jev_use_case(req.data)
+
+    @router.post("/jev/eval-plan/preview")
+    def jev_eval_plan(req: JevUseCasesRequest):
+        try:
+            return build_jev_eval_plan(req.use_cases)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/jev/providers/compare/preview")
+    def jev_provider_compare(req: BenchmarkRowsRequest):
+        try:
+            return compare_decision_providers(req.rows)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/eval/preview")
+    def typed_decision_eval(req: EvalRowsRequest):
+        try:
+            return evaluate_provider_outputs(
+                req.rows,
+                minimum_samples=req.minimum_samples,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/eval/compare/preview")
+    def typed_decision_eval_compare(req: EvalReportsRequest):
+        try:
+            return compare_eval_reports(req.reports)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/shadow/review")
+    def typed_decision_shadow(req: DataRequest):
+        try:
+            return build_shadow_decision(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/shadow/summary/preview")
+    def typed_decision_shadow_summary(req: ShadowRowsRequest):
+        try:
+            return summarize_shadow_records(req.rows)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/category/review")
+    def category_review(req: DataRequest):
+        try:
+            return review_category_position(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/category/gaps/preview")
+    def category_gaps(req: DataRequest):
+        try:
+            return category_gap_plan(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/category/portfolio/preview")
+    def category_portfolio(req: CategoryRowsRequest):
+        try:
+            return compare_category_snapshots(req.categories)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/partnership/review")
+    def partnership_review(req: DataRequest):
+        try:
+            return review_partner_candidate(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/partnership/portfolio/preview")
+    def partnership_portfolio(req: PartnerRowsRequest):
+        try:
+            return build_partnership_portfolio(req.partners)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/partnership/gaps/preview")
+    def partnership_gaps(req: PartnerRowsRequest):
+        try:
+            return partnership_gap_map(req.partners)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/control-tower/preview")
+    def strategy_control_tower(req: StrategyControlTowerRequest):
+        try:
+            tower = build_strategy_control_tower(
+                market_portfolio=req.market_portfolio,
+                category_portfolio=req.category_portfolio,
+                keyword_portfolio=req.keyword_portfolio,
+                competitive_landscape=req.competitive_landscape,
+                ai_portfolio=req.ai_portfolio,
+                partnership_portfolio=req.partnership_portfolio,
+                scenario_set=req.scenario_set,
+            )
+            return {
+                "control_tower": tower,
+                "brief": build_strategy_brief(
+                    tower,
+                    max_items=req.max_brief_items,
+                ),
+            }
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/dataset/freeze/preview")
+    def typed_decision_dataset_freeze(req: DatasetFreezeRequest):
+        try:
+            return freeze_dataset(
+                req.rows,
+                dataset_id=req.dataset_id,
+                version=req.version,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/dataset/verify")
+    def typed_decision_dataset_verify(req: DataRequest):
+        try:
+            return verify_frozen_dataset(req.data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/dataset/readiness/preview")
+    def typed_decision_dataset_readiness(req: DatasetReadinessRequest):
+        try:
+            return dataset_readiness(
+                req.manifest,
+                minimum_per_label=req.minimum_per_label,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/shadow-candidates/collect/preview")
+    def typed_decision_shadow_collect(req: ShadowCollectRequest):
+        try:
+            batch = collect_shadow_candidates(
+                req.rows,
+                task_key=req.task_key,
+            )
+            return {
+                "batch": batch,
+                "label_review_queue": build_label_review_queue(batch),
+            }
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/typed-decision/shadow-candidates/summary/preview")
+    def typed_decision_shadow_collect_summary(req: ShadowSummaryRequest):
+        return shadow_collection_summary(req.batches)
+
+    @router.post("/typed-decision/readiness/review")
+    def typed_decision_readiness_review(req: DataRequest):
+        return review_task_readiness(req.data)
+
+    @router.post("/typed-decision/readiness/board/preview")
+    def typed_decision_readiness_board(req: ReadinessBoardRequest):
+        try:
+            board = build_readiness_board(req.tasks)
+            return {
+                "board": board,
+                "next_evidence_actions": next_evidence_actions(board),
+            }
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return router

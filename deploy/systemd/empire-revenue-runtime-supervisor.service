@@ -1,0 +1,13 @@
+[Unit]
+Description=EmpireOS revenue runtime supervisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /srv/empire_os/scripts/revenue_runtime_supervisor.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/run /srv/empire_os/runtime
+TimeoutStartSec=30

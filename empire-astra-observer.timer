@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Empire AI Phase 4 Astra observer every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=15s
+Persistent=true
+Unit=empire-astra-observer.service
+
+[Install]
+WantedBy=timers.target

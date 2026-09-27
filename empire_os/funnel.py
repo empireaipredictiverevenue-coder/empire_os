@@ -74,7 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_funnel_prospect
 
 CREATE TABLE IF NOT EXISTS si_prospect_consent (
     prospect_id TEXT PRIMARY KEY,
-    opted_in    INTEGER NOT NULL DEFAULT 1,
+    opted_in    INTEGER NOT NULL DEFAULT 0,
     opted_in_at TEXT,
     niche       TEXT,
     source      TEXT

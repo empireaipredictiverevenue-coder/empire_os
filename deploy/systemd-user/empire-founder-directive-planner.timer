@@ -1,0 +1,12 @@
+[Unit]
+Description=Plan new EmpireOS Founder Directives
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=20s
+Persistent=true
+Unit=empire-founder-directive-planner.service
+
+[Install]
+WantedBy=timers.target

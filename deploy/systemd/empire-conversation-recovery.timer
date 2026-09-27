@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh EmpireOS conversation recovery hourly
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1h
+AccuracySec=2min
+Persistent=true
+Unit=empire-conversation-recovery.service
+
+[Install]
+WantedBy=timers.target

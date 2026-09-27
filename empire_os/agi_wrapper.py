@@ -19,14 +19,13 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from empire_os.agent_core import OllamaClient
-from empire_os.synthetic_intelligence import SyntheticIntelligence
 from empire_os.asi import ASILayer
 
 logger = logging.getLogger("agi_wrapper")
 
 
 class AgiWrapper:
-    """Combines base agent + synthetic intel + ASI meta-reasoning."""
+    """Combines a base agent with ASI reflection over real outcomes."""
 
     def __init__(
         self,
@@ -39,7 +38,6 @@ class AgiWrapper:
         self.name = name
         self.base = base_agent
         self.llm = llm or getattr(base_agent, "llm", None) or OllamaClient()
-        self.synthetic = SyntheticIntelligence(self.llm, n_synthetic=synthetic_n)
         self.asi = ASILayer(self.llm, window=asi_window)
         self.metrics = {
             "cycles": 0,
@@ -48,7 +46,7 @@ class AgiWrapper:
         }
 
     def tick(self) -> dict:
-        """Run one full cycle: base → synthetic → ASI reflect."""
+        """Run one full cycle: base → evidence-backed ASI reflection."""
         # Layer 1: base agent cycle
         base_result = self.base.tick()
         self.metrics["cycles"] += 1
@@ -56,12 +54,10 @@ class AgiWrapper:
         decision = base_result.get("decision_preview", "")
         result = base_result.get("result", {})
 
-        # Layer 2: synthetic augmentation
-        observed = self.base.observe() if hasattr(self.base, "observe") else {}
-        synthetic_examples = self.synthetic.augment(observed, result)
-        self.metrics["synthetic_generated"] += len(synthetic_examples)
+        # Synthetic augmentation is disabled in production runtime.
+        synthetic_examples = []
 
-        # Layer 3: ASI reflection (only every 5 cycles to save LLM calls)
+        # ASI reflection (only every 5 cycles to save LLM calls)
         asi_strategies = []
         if cycle % 5 == 0:
             self.asi.record(

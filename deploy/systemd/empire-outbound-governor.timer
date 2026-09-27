@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EmpireOS governed outbound worker every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=empire-outbound-governor.service
+
+[Install]
+WantedBy=timers.target

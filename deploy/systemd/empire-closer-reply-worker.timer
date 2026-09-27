@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EmpireOS closer reply handoff every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=20s
+Persistent=true
+Unit=empire-closer-reply-worker.service
+
+[Install]
+WantedBy=timers.target

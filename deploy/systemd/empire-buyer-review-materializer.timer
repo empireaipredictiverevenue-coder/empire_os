@@ -1,0 +1,12 @@
+[Unit]
+Description=Run first-party buyer materialization every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=empire-buyer-review-materializer.service
+
+[Install]
+WantedBy=timers.target

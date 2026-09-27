@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd /srv/empire_os
+
+echo "=================================================="
+echo "ENTERPRISE CONTACT INTELLIGENCE — DEPLOY"
+echo "=================================================="
+
+echo
+echo "=== TEST ==="
+TEST_LOG="$(mktemp)"
+set +e
+PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
+  tests/test_buyer_discovery.py \
+  tests/test_site_probe_people.py \
+  tests/test_buyer_probe_worker.py \
+  tests/test_enterprise_contact_intelligence.py \
+  tests/test_enterprise_contact_refresh_rpc_migration.py \
+  tests/test_enterprise_targeted_retry.py \
+  tests/test_enterprise_contact_repair.py \
+  tests/test_enterprise_contact_sync_systemd.py \
+  tests/test_enterprise_contact_intelligence_installer.py \
+  tests/test_predictive_revenue_enterprise_activation.py \
+  tests/test_predictive_revenue_enterprise_activation_systemd.py \
+  tests/test_buyer_acquisition_team.py \
+  tests/test_runtime_self_heal.py \
+  tests/test_ops_privileged_helper.py \
+  tests/test_buyer_deferred_identity_timeout.py \
+  2>&1 | tee "$TEST_LOG"
+TEST_RC="${PIPESTATUS[0]}"
+set -e
+
+if [ "$TEST_RC" -ne 0 ]; then
+  PYTHONPATH=/srv/empire_os \
+  ./.venv/bin/python scripts/run_enterprise_contact_repair.py \
+    --record-test-log "$TEST_LOG" \
+    --kind "test_failure" \
+    --command "enterprise contact deployment pytest" \
+    --returncode "$TEST_RC" || true
+
+  rm -f "$TEST_LOG"
+
+  REENTRY_COUNT="${EMPIRE_CONTACT_DEPLOY_REENTRY:-0}"
+  if [ "$REENTRY_COUNT" -ge 1 ]; then
+    echo "STOP: repaired deployment already retried once; incident remains."
+    exit "$TEST_RC"
+  fi
+
+  if systemctl cat empire-enterprise-contact-repair.service \
+      >/dev/null 2>&1; then
+    echo
+    echo "=== AUTOMATIC REPAIR ATTEMPT ==="
+    sudo systemctl reset-failed \
+      empire-enterprise-contact-repair.service 2>/dev/null || true
+    sudo systemctl start \
+      empire-enterprise-contact-repair.service || true
+
+    REPAIR_STATUS="$(
+      ./.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+path = Path(
+    "runtime/predictive_revenue/"
+    "enterprise_contact_repair_latest.json"
+)
+try:
+    payload = json.loads(path.read_text())
+except Exception:
+    payload = {}
+print(payload.get("status") or "UNKNOWN")
+PY
+    )"
+
+    echo "Repair controller status: $REPAIR_STATUS"
+
+    if [ "$REPAIR_STATUS" = "CODER_REPAIR_FAILED" ]; then
+      ./.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+path = Path(
+    "runtime/predictive_revenue/"
+    "enterprise_contact_repair_latest.json"
+)
+try:
+    payload = json.loads(path.read_text())
+except Exception:
+    payload = {}
+error = str(payload.get("error") or "").strip()
+if error:
+    print("Repair controller error:", error)
+PY
+    fi
+
+    case "$REPAIR_STATUS" in
+      RESOLVED_AND_PUSHED|RESOLVED_BY_CONCURRENT_CHANGE)
+        echo "Verified repair integrated. Retrying deployment once."
+        EMPIRE_CONTACT_DEPLOY_REENTRY=1 \
+          exec bash scripts/deploy_enterprise_contact_intelligence.sh
+        ;;
+    esac
+  fi
+
+  echo "STOP: unsafe deployment blocked; repair incident retained."
+  exit "$TEST_RC"
+fi
+rm -f "$TEST_LOG"
+
+echo
+echo "=== COMPILE ==="
+PYTHONPATH=/srv/empire_os ./.venv/bin/python -m py_compile \
+  empire_os/buyer_discovery.py \
+  empire_os/search_fabric/site_probe.py \
+  empire_os/buyer_probe_worker.py \
+  empire_os/buyer_deferred_enrichment.py \
+  empire_os/enterprise_contact_intelligence.py \
+  empire_os/enterprise_contact_repair.py \
+  empire_os/runtime_self_heal.py \
+  empire_os/ops_privileged_helper.py \
+  scripts/run_buyer_deferred_enrichment.py \
+  scripts/run_enterprise_contact_intelligence.py \
+  scripts/run_enterprise_contact_sync_cycle.py \
+  scripts/verify_enterprise_contact_intelligence.py \
+  scripts/run_enterprise_contact_repair.py
+
+echo
+echo "=== INSTALL AUTOMATION ==="
+sudo bash scripts/install_enterprise_contact_intelligence.sh /srv/empire_os
+
+echo
+echo "=== SYNC + VERIFY THROUGH CANONICAL SYSTEMD ENV ==="
+sudo systemctl reset-failed empire-enterprise-contact-sync.service \
+  2>/dev/null || true
+
+set +e
+sudo systemctl start empire-enterprise-contact-sync.service
+SYNC_RC="$?"
+set -e
+
+SYNC_RESULT="$(
+  systemctl show empire-enterprise-contact-sync.service \
+    -p Result --value 2>/dev/null || true
+)"
+
+echo "Enterprise contact sync result: ${SYNC_RESULT:-unknown}"
+
+if [ "$SYNC_RC" -ne 0 ] || [ "$SYNC_RESULT" != "success" ]; then
+  echo "Canonical-env sync did not complete cleanly."
+  echo "Repair controller has been triggered by systemd OnFailure."
+
+  sudo systemctl start --no-block \
+    empire-enterprise-contact-repair.service || true
+
+  sudo journalctl \
+    -u empire-enterprise-contact-sync.service \
+    -n 80 \
+    --no-pager || true
+
+  echo
+  echo "STOP: canonical enterprise contact sync is not healthy."
+  echo "LIVE banner suppressed; incident retained for repair."
+  exit "${SYNC_RC:-1}"
+else
+  echo "Canonical-env sync + Buyer Acquisition refresh + verification: success"
+
+  sudo systemctl start empire-enterprise-contact-repair.service || true
+
+  if [ -f runtime/predictive_revenue/enterprise_contact_intelligence_latest.json ]; then
+    ./.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+path = Path(
+    "runtime/predictive_revenue/"
+    "enterprise_contact_intelligence_latest.json"
+)
+payload = json.loads(path.read_text())
+
+print("Contact intelligence:")
+print("  proposed reviews:", payload.get("proposed_review_count"))
+print(
+    "  targeted retries queued:",
+    payload.get("targeted_retry_queued_count"),
+)
+print("  errors:", payload.get("error_count"))
+print("  live outbound:", payload.get("live_outbound_send"))
+print("  actual revenue:", payload.get("actual_revenue"))
+PY
+  fi
+fi
+
+echo
+echo "=== START TARGETED RETRIES ASYNC ==="
+sudo systemctl reset-failed empire-buyer-deferred-enrichment.service || true
+sudo systemctl start --no-block empire-buyer-deferred-enrichment.service
+
+echo
+echo "=== TIMERS ==="
+printf '%-58s %s\n'   "empire-buyer-deferred-enrichment.timer"   "$(systemctl is-active empire-buyer-deferred-enrichment.timer)"
+printf '%-58s %s\n'   "empire-predictive-revenue-enterprise-activation.timer"   "$(systemctl is-active empire-predictive-revenue-enterprise-activation.timer)"
+printf '%-58s %s\n'   "empire-ops-control.timer"   "$(systemctl is-active empire-ops-control.timer)"
+printf '%-58s %s\n'   "empire-enterprise-contact-repair.timer"   "$(systemctl is-active empire-enterprise-contact-repair.timer)"
+
+echo
+echo "=================================================="
+echo "ENTERPRISE CONTACT INTELLIGENCE LIVE"
+echo "HEAD: $(git rev-parse --short HEAD)"
+echo "Verified contacts -> pending buyer review: AUTOMATIC"
+echo "Unresolved contacts -> target-aware retry: AUTOMATIC"
+echo "Company fallback evidence: PRESERVED"
+echo "Daily leadership/contact refresh: ACTIVE"
+echo "10-minute deferred retry loop: ACTIVE"
+echo "Self-heal: ACTIVE"
+echo "Contact failure diagnosis/repair: ACTIVE"
+echo "Live outbound: OFF"
+echo "Payment/revenue mutation: OFF"
+echo "=================================================="

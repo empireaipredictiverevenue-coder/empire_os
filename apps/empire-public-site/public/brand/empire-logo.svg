@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 128" role="img" aria-labelledby="title desc">
+  <title id="title">Empire AI</title>
+  <desc id="desc">Empire AI Predictive Revenue logo.</desc>
+  <defs>
+    <linearGradient id="empire-g" x1="18" y1="18" x2="108" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#93C5FD"/>
+      <stop offset=".48" stop-color="#4F8CFF"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <radialGradient id="empire-core" cx="50%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#EAF6FF"/>
+      <stop offset=".28" stop-color="#7DD3FC"/>
+      <stop offset=".72" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#0A1E46"/>
+    </radialGradient>
+  </defs>
+  <g>
+    <path d="M64 7 114 36v56L64 121 14 92V36L64 7Z" fill="#020817"/>
+    <path d="M64 13 108 39v50l-44 26-44-26V39l44-26Z" fill="none" stroke="url(#empire-g)" stroke-width="3.2" opacity=".72"/>
+    <path d="M39 37h51l-8 12H54v10h24l-8 12H54v10h36L82 93H39V37Z" fill="url(#empire-g)"/>
+    <path d="M39 37h15v56H39z" fill="#DCEBFF" opacity=".9"/>
+    <circle cx="64" cy="65" r="6.2" fill="url(#empire-core)"/>
+    <circle cx="64" cy="65" r="12.5" fill="none" stroke="#60A5FA" stroke-width="1.5" opacity=".55"/>
+    <path d="M64 50V28M64 102V80" stroke="#7DD3FC" stroke-width="2.4" stroke-linecap="round" opacity=".8"/>
+  </g>
+  <g transform="translate(145 30)">
+    <text x="0" y="33" fill="#F8FBFF" font-family="Arial, Helvetica, sans-serif" font-size="38" font-weight="700" letter-spacing="5">EMPIRE AI</text>
+    <text x="2" y="67" fill="#7F91AD" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="600" letter-spacing="4.2">PREDICTIVE REVENUE</text>
+    <path d="M0 82h298" stroke="#4F8CFF" stroke-width="1" opacity=".22"/>
+  </g>
+</svg>

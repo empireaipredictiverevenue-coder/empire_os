@@ -1,0 +1,12 @@
+[Unit]
+Description=Run governed Empire Voice Lab outbound every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+AccuracySec=20s
+Persistent=true
+Unit=empire-voice-outbound.service
+
+[Install]
+WantedBy=timers.target

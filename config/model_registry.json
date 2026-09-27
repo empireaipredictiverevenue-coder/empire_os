@@ -1,0 +1,305 @@
+{
+  "models": [
+    {
+      "model_id": "gemini-3.8-flash",
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "capabilities": [
+        "general",
+        "reasoning",
+        "classification",
+        "extraction",
+        "summarization",
+        "coding",
+        "research",
+        "agentic"
+      ],
+      "reasoning": true,
+      "vision": true,
+      "quality": {
+        "default": 0.88,
+        "reasoning": 0.9,
+        "coding": 0.91,
+        "research": 0.89,
+        "classification": 0.87,
+        "extraction": 0.87,
+        "summarization": 0.89
+      },
+      "cost_per_1k_input": 0.00075,
+      "cost_per_1k_output": 0.00375,
+      "free": false,
+      "enabled": true,
+      "priority": 100,
+      "metadata": {
+        "context_tokens": 1048576,
+        "output_tokens": 65536,
+        "thinking": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "paid_input_per_1m_usd": 0.75,
+        "paid_output_per_1m_usd": 3.75,
+        "free_tier": true,
+        "stable": true,
+        "source": "google_gemini"
+      }
+    },
+    {
+      "model_id": "gemini-3.1-pro",
+      "provider": "gemini",
+      "model": "gemini-3.1-pro-preview",
+      "capabilities": [
+        "general",
+        "reasoning",
+        "coding",
+        "research",
+        "agentic"
+      ],
+      "reasoning": true,
+      "vision": true,
+      "quality": {
+        "default": 0.95,
+        "reasoning": 0.98,
+        "coding": 0.97,
+        "research": 0.97
+      },
+      "cost_per_1k_input": 0.002,
+      "cost_per_1k_output": 0.012,
+      "free": false,
+      "enabled": true,
+      "priority": 110,
+      "metadata": {
+        "context_tokens": 1048576,
+        "output_tokens": 65536,
+        "input_per_1m_usd_le_200k": 2,
+        "output_per_1m_usd_le_200k": 12,
+        "input_per_1m_usd_gt_200k": 4,
+        "output_per_1m_usd_gt_200k": 18,
+        "preview": true,
+        "source": "google_gemini"
+      }
+    },
+    {
+      "model_id": "gemini-3.1-flash-lite",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "capabilities": [
+        "general",
+        "classification",
+        "extraction",
+        "summarization",
+        "agentic"
+      ],
+      "reasoning": false,
+      "vision": true,
+      "quality": {
+        "default": 0.76,
+        "classification": 0.8,
+        "extraction": 0.81,
+        "summarization": 0.8
+      },
+      "cost_per_1k_input": 0.00025,
+      "cost_per_1k_output": 0.0015,
+      "free": false,
+      "enabled": true,
+      "priority": 90,
+      "metadata": {
+        "context_tokens": 1048576,
+        "free_tier": true,
+        "paid_input_per_1m_usd": 0.25,
+        "paid_output_per_1m_usd": 1.5,
+        "source": "google_gemini"
+      }
+    },
+    {
+      "model_id": "nemotron-3-ultra-free",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "capabilities": [
+        "general",
+        "reasoning",
+        "coding",
+        "research",
+        "agentic",
+        "orchestration"
+      ],
+      "reasoning": true,
+      "vision": false,
+      "quality": {
+        "default": 0.82,
+        "reasoning": 0.87,
+        "coding": 0.86,
+        "research": 0.84
+      },
+      "cost_per_1k_input": 0,
+      "cost_per_1k_output": 0,
+      "free": true,
+      "enabled": true,
+      "priority": 95,
+      "metadata": {
+        "context_tokens": 1000000,
+        "output_tokens": 65536,
+        "rate_limited": true,
+        "source": "openrouter"
+      }
+    },
+    {
+      "model_id": "opencode-free",
+      "provider": "opencode",
+      "model": "nemotron-3-ultra-free",
+      "capabilities": [
+        "general",
+        "reasoning",
+        "coding",
+        "research",
+        "agentic",
+        "orchestration"
+      ],
+      "reasoning": true,
+      "vision": false,
+      "quality": {
+        "default": 0.82,
+        "reasoning": 0.87,
+        "coding": 0.86,
+        "research": 0.84
+      },
+      "cost_per_1k_input": 0,
+      "cost_per_1k_output": 0,
+      "free": true,
+      "enabled": true,
+      "priority": 70,
+      "metadata": {
+        "context_tokens": 1000000,
+        "output_tokens": 65536,
+        "rate_limited": true,
+        "source": "opencode_zen"
+      }
+    },
+    {
+      "model_id": "openrouter-free-code",
+      "provider": "openrouter",
+      "model": "cohere/north-mini-code:free",
+      "capabilities": [
+        "general",
+        "classification",
+        "extraction",
+        "summarization",
+        "coding"
+      ],
+      "reasoning": false,
+      "vision": false,
+      "quality": {
+        "default": 0.5,
+        "coding": 0.58,
+        "classification": 0.52
+      },
+      "cost_per_1k_input": 0,
+      "cost_per_1k_output": 0,
+      "free": true,
+      "enabled": true,
+      "priority": 65
+    },
+    {
+      "model_id": "ollama-local-fallback",
+      "provider": "ollama",
+      "model": "qwen2.5:7b",
+      "capabilities": [
+        "general",
+        "classification",
+        "extraction",
+        "summarization",
+        "coding"
+      ],
+      "reasoning": false,
+      "vision": false,
+      "quality": {
+        "default": 0.45,
+        "coding": 0.5
+      },
+      "cost_per_1k_input": 0,
+      "cost_per_1k_output": 0,
+      "free": true,
+      "enabled": true,
+      "priority": 10,
+      "metadata": {
+        "local_fallback": true,
+        "commercial_decision_eligible": false,
+        "policy_basis": "uncalibrated local fallback; fail closed"
+      },
+      "disallowed_tasks": [
+        "untrusted_inbound",
+        "revenue_truth",
+        "payment",
+        "funds",
+        "identity_inference",
+        "contact_inference",
+        "tool_routing"
+      ],
+      "allow_untrusted_input": false,
+      "max_stakes": "normal"
+    },
+    {
+      "model_id": "local-qwen25-coder-1.5b",
+      "provider": "llamacpp",
+      "model": "qwen2.5-coder:1.5b",
+      "capabilities": [
+        "general",
+        "coding",
+        "summarization"
+      ],
+      "reasoning": false,
+      "vision": false,
+      "quality": {
+        "default": 0.35,
+        "coding": 0.5,
+        "summarization": 0.42
+      },
+      "cost_per_1k_input": 0,
+      "cost_per_1k_output": 0,
+      "free": true,
+      "enabled": true,
+      "priority": 12,
+      "pricing_known": true,
+      "available": true,
+      "health": "local_verified",
+      "deployment": "local",
+      "disallowed_tasks": [
+        "untrusted_inbound",
+        "revenue_truth",
+        "payment",
+        "funds",
+        "identity_inference",
+        "contact_inference",
+        "tool_routing"
+      ],
+      "allow_untrusted_input": false,
+      "max_stakes": "normal",
+      "metadata": {
+        "local_endpoint": "http://127.0.0.1:11435",
+        "context_tokens": 8192,
+        "parameter_count": 1543714304,
+        "quantization": "Q4_K_M",
+        "observed_policy_eval": "2026-09-25",
+        "observed_policy_eval_passed": 4,
+        "observed_policy_eval_total": 6,
+        "observed_prompt_injection_failure": true,
+        "commercial_decision_eligible": false,
+        "policy_basis": "local Empire policy eval; untrusted inbound failure"
+      }
+    }
+  ],
+  "policy": {
+    "blocked_providers": [
+      "minimax"
+    ],
+    "blocked_models": [
+      "minimax-m3",
+      "minimax-m2.7",
+      "minimax-m2.5"
+    ],
+    "unknown_pricing_policy": "do_not_select_for_paid_routes",
+    "unknown_quality_policy": "treat_as_uncalibrated_prior",
+    "discovery_policy": "availability_does_not_imply_quality"
+  }
+}

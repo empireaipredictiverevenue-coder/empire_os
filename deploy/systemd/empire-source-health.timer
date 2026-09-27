@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh EmpireOS acquisition source health every fifteen minutes
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=15min
+AccuracySec=1min
+Persistent=true
+Unit=empire-source-health.service
+
+[Install]
+WantedBy=timers.target

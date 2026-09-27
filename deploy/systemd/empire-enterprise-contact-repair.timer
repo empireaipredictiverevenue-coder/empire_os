@@ -1,0 +1,12 @@
+[Unit]
+Description=Run enterprise contact self-resolution every 10 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+AccuracySec=1min
+Persistent=true
+Unit=empire-enterprise-contact-repair.service
+
+[Install]
+WantedBy=timers.target

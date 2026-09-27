@@ -32,7 +32,12 @@ logger = logging.getLogger("satellite_scanner")
 
 
 USER_AGENT = "Empire-AI-SatelliteScanner/1.0"
-DEFAULT_CACHE_DIR = Path("/root/.empire/satellite_cache")
+DEFAULT_CACHE_DIR = Path(
+    os.environ.get(
+        "EMPIRE_SATELLITE_CACHE_DIR",
+        str(Path.home() / ".cache" / "empire" / "satellite"),
+    )
+)
 
 
 @dataclass

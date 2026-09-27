@@ -58,31 +58,35 @@ class TestAgiCloserAgent:
         assert state["settled_count"] == 0
         assert state["snapshot_count"] == 3
 
-    def test_act_skip(self, agent):
-        result = agent.act('{"action": "skip", "reasoning": "Nothing to do"}')
-        assert result["action"] == "skip"
-        assert "Skipped" in result["summary"]
-
-    def test_act_claim(self, backend, agent):
-        transition(backend, "p1", FunnelState.REPLIED.value, "system", notes="niche=roofing")
-        result = agent.act('{"action": "claim", "prospect_id": "p1", "reasoning": "interested"}')
-        assert result["action"] == "claim"
-        assert result.get("event_id", 0) > 0
-
-    def test_act_settle(self, backend, agent):
-        transition(backend, "p1", FunnelState.CLAIMED.value, "closer", notes="niche=roofing")
-        result = agent.act(
-            '{"action": "settle", "prospect_id": "p1", "amount_cents": 250000, "reasoning": "deal done"}'
+    def test_act_never_mutates_legacy_funnel(self, backend, agent):
+        transition(
+            backend, "p1", FunnelState.REPLIED.value, "system",
+            notes="niche=roofing",
         )
-        assert result["action"] == "settle"
-        assert result["amount_cents"] == 250000
+        before = agent.observe()
 
-    def test_act_follow_up(self, backend, agent):
-        transition(backend, "p1", FunnelState.OUTREACH_SENT.value, "sales", notes="niche=roofing")
-        result = agent.act(
-            '{"action": "follow_up", "prospect_id": "p1", "angle": "urgency", "reasoning": "cold prospect"}'
-        )
-        assert result["action"] == "follow_up"
+        for decision in (
+            '{"action":"claim","prospect_id":"p1","reasoning":"interested"}',
+            '{"action":"settle","prospect_id":"p1","amount_cents":250000,"reasoning":"deal done"}',
+            '{"action":"follow_up","prospect_id":"p1","angle":"urgency","reasoning":"cold"}',
+        ):
+            result = agent.act(decision)
+            assert result["action"] == "recommendation_only"
+            assert result["execution_allowed"] is False
+            assert result["canonical_path"] == "supabase_closer_state_machine"
+            assert "event_id" not in result
+            assert "amount_cents" not in result
+
+        after = agent.observe()
+        assert after["replied_count"] == before["replied_count"] == 1
+        assert after["claimed_count"] == before["claimed_count"] == 0
+        assert after["settled_count"] == before["settled_count"] == 0
+
+    def test_act_parse_failure_is_still_non_executable(self, agent):
+        result = agent.act("not-json")
+        assert result["action"] == "recommendation_only"
+        assert result["requested_action"] == "skip"
+        assert result["execution_allowed"] is False
 
     def test_tick(self, agent):
         result = agent.tick()

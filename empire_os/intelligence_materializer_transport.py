@@ -1,0 +1,1369 @@
+"""Least-privilege PostgreSQL writer for Intelligence Fabric materialization."""
+from __future__ import annotations
+
+import json
+import os
+from typing import Any, Callable
+from uuid import UUID
+
+from empire_os.intelligence_materializer import (
+    PROSPECT_SOURCE_KEY,
+    MaterializationPlan,
+    build_materialization_plan,
+)
+
+
+ROLE = "empire_intelligence_materializer"
+
+
+class IntelligenceMaterializerTransportError(RuntimeError):
+    """Dedicated materializer transport failed safely."""
+
+
+def _uuid(value: str, *, field: str) -> str:
+    try:
+        return str(UUID(str(value)))
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise IntelligenceMaterializerTransportError(
+            f"invalid {field}"
+        ) from exc
+
+
+class PostgresIntelligenceMaterializer:
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        connect_factory: Callable | None = None,
+    ) -> None:
+        self.dsn = str(dsn or "").strip()
+        if not self.dsn:
+            raise IntelligenceMaterializerTransportError(
+                "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN is required"
+            )
+        if connect_factory is None:
+            try:
+                import psycopg
+            except ImportError as exc:
+                raise IntelligenceMaterializerTransportError(
+                    "psycopg is required for materializer transport"
+                ) from exc
+            connect_factory = psycopg.connect
+        self._connect = connect_factory
+
+    @classmethod
+    def from_env(cls) -> "PostgresIntelligenceMaterializer":
+        return cls(
+            os.getenv(
+                "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN",
+                "",
+            )
+        )
+
+    @staticmethod
+    def _row(cursor) -> dict[str, Any] | None:
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        names = [item.name for item in cursor.description]
+        return dict(zip(names, row, strict=True))
+
+    @staticmethod
+    def _rows(cursor) -> list[dict[str, Any]]:
+        names = [item.name for item in cursor.description]
+        return [
+            dict(zip(names, row, strict=True))
+            for row in cursor.fetchall()
+        ]
+
+    def _fetch_inputs(
+        self,
+        cursor,
+        prospect_id: str,
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        pid = _uuid(prospect_id, field="prospect id")
+
+        cursor.execute(
+            """
+            SELECT
+              id,created_at,business_name,niche,metro,phone,address,
+              rating,review_count,runs_ads
+            FROM public.prospects
+            WHERE id=%s
+            LIMIT 1
+            """,
+            (pid,),
+        )
+        prospect = self._row(cursor)
+        if prospect is None:
+            raise IntelligenceMaterializerTransportError(
+                "prospect not found"
+            )
+
+        cursor.execute(
+            """
+            SELECT prospect_id,entity_id,match_score,active
+            FROM public.prospect_entity_links
+            WHERE prospect_id=%s AND active=true
+            ORDER BY created_at DESC
+            LIMIT 2
+            """,
+            (pid,),
+        )
+        links = self._rows(cursor)
+        if len(links) != 1:
+            raise IntelligenceMaterializerTransportError(
+                "prospect must have exactly one active identity link"
+            )
+
+        cursor.execute(
+            """
+            SELECT
+              id,prospect_id,score,tier,
+              data_completeness_score,business_presence_score,
+              market_fit_score,engagement_potential_score,
+              enrichment_quality_score,recommended_action,
+              scoring_engine,scoring_version,evidence_confidence,
+              observed_dimensions,unknown_dimensions,scored_at
+            FROM public.prospect_qualifications
+            WHERE prospect_id=%s
+              AND scoring_engine='empire_os.lead_scoring'
+              AND scoring_version IN ('v2','v1')
+            ORDER BY
+              CASE scoring_version WHEN 'v2' THEN 0 ELSE 1 END,
+              scored_at DESC
+            LIMIT 1
+            """,
+            (pid,),
+        )
+        qualification = self._row(cursor)
+        if qualification is None:
+            raise IntelligenceMaterializerTransportError(
+                "compatible qualification not found"
+            )
+
+        return prospect, links[0], qualification
+
+    def _source_id(self, cursor, source_key: str) -> str:
+        cursor.execute(
+            """
+            SELECT id
+            FROM public.intelligence_sources
+            WHERE source_key=%s
+            LIMIT 1
+            """,
+            (source_key,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise IntelligenceMaterializerTransportError(
+                "required intelligence source is missing"
+            )
+        return str(row[0])
+
+    def _apply_plan(
+        self,
+        cursor,
+        plan: MaterializationPlan,
+    ) -> dict[str, Any]:
+        prospect_source_id = self._source_id(
+            cursor,
+            PROSPECT_SOURCE_KEY,
+        )
+
+        facts_inserted = 0
+        facts_existing = 0
+        for fact in plan.fact_rows:
+            if fact.source_key != PROSPECT_SOURCE_KEY:
+                raise IntelligenceMaterializerTransportError(
+                    "unexpected fact source"
+                )
+            cursor.execute(
+                """
+                INSERT INTO public.intelligence_facts(
+                  entity_type,entity_id,fact_key,fact_value,
+                  source_id,confidence,first_seen_at,last_seen_at,
+                  evidence_hash
+                )
+                VALUES(
+                  'company',%s,%s,%s::jsonb,
+                  %s,%s,%s,%s,%s
+                )
+                ON CONFLICT (evidence_hash)
+                WHERE evidence_hash IS NOT NULL
+                DO NOTHING
+                RETURNING id
+                """,
+                (
+                    plan.entity_id,
+                    fact.fact_key,
+                    json.dumps(fact.fact_value, sort_keys=True),
+                    prospect_source_id,
+                    fact.confidence,
+                    fact.first_seen_at,
+                    fact.last_seen_at,
+                    fact.evidence_hash,
+                ),
+            )
+            if cursor.fetchone() is None:
+                facts_existing += 1
+            else:
+                facts_inserted += 1
+
+        scores_inserted = 0
+        scores_existing = 0
+        for score in plan.score_rows:
+            cursor.execute(
+                """
+                INSERT INTO public.intelligence_scores(
+                  entity_type,entity_id,score_type,score,confidence,
+                  model_key,features,explanation,scored_at
+                )
+                VALUES(
+                  'company',%s,%s,%s,%s,
+                  %s,%s::jsonb,%s::jsonb,%s
+                )
+                ON CONFLICT(
+                  entity_type,entity_id,score_type,model_key,scored_at
+                )
+                DO NOTHING
+                RETURNING id
+                """,
+                (
+                    plan.entity_id,
+                    score.score_type,
+                    score.score,
+                    score.confidence,
+                    score.model_key,
+                    json.dumps(score.features, sort_keys=True),
+                    json.dumps(score.explanation, sort_keys=True),
+                    score.scored_at,
+                ),
+            )
+            if cursor.fetchone() is None:
+                scores_existing += 1
+            else:
+                scores_inserted += 1
+
+        return {
+            "prospect_id": plan.prospect_id,
+            "entity_id": plan.entity_id,
+            "facts_inserted": facts_inserted,
+            "facts_existing": facts_existing,
+            "scores_inserted": scores_inserted,
+            "scores_existing": scores_existing,
+            "skipped_fields": list(plan.skipped_fields),
+        }
+
+    def materialize(self, prospect_id: str) -> dict[str, Any]:
+        pid = _uuid(prospect_id, field="prospect id")
+        try:
+            with self._connect(self.dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL ROLE " + ROLE)
+                    prospect, link, qualification = (
+                        self._fetch_inputs(cursor, pid)
+                    )
+                    plan = build_materialization_plan(
+                        prospect=prospect,
+                        identity_link=link,
+                        qualification=qualification,
+                    )
+                    return self._apply_plan(cursor, plan)
+        except IntelligenceMaterializerTransportError:
+            raise
+        except Exception as exc:
+            raise IntelligenceMaterializerTransportError(
+                "dedicated Intelligence materializer failed"
+            ) from exc
+
+
+COMPETITOR_AUDIENCE_SOURCE_KEY = "empire.competitor_audience.public.v1"
+
+
+def _competitor_evidence_refs(payload: dict[str, Any]) -> tuple[str, ...]:
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, list) or not evidence:
+        raise IntelligenceMaterializerTransportError(
+            "competitor audience evidence is required"
+        )
+
+    refs = []
+    for item in evidence:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid competitor audience evidence"
+            )
+        ref = str(item.get("source_ref") or "").strip()
+        if not ref:
+            raise IntelligenceMaterializerTransportError(
+                "competitor audience source_ref is required"
+            )
+        refs.append(ref)
+
+    return tuple(sorted(set(refs)))
+
+
+def _competitor_evidence_fingerprints(
+    payload: dict[str, Any],
+) -> tuple[str, ...]:
+    """Stable evidence identity across repeated sweeps.
+
+    observed_at is deliberately excluded so revisiting the same public source
+    does not create a duplicate signal. competitor_key and evidence_type stay
+    in the fingerprint so separate relationships found on one page remain
+    distinct evidence.
+    """
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, list) or not evidence:
+        raise IntelligenceMaterializerTransportError(
+            "competitor audience evidence is required"
+        )
+
+    fingerprints = []
+    for item in evidence:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid competitor audience evidence"
+            )
+
+        source_ref = str(item.get("source_ref") or "").strip()
+        competitor_key = str(item.get("competitor_key") or "").strip()
+        evidence_type = str(item.get("evidence_type") or "").strip()
+
+        if not source_ref:
+            raise IntelligenceMaterializerTransportError(
+                "competitor audience source_ref is required"
+            )
+        if not competitor_key:
+            raise IntelligenceMaterializerTransportError(
+                "competitor audience competitor_key is required"
+            )
+        if not evidence_type:
+            raise IntelligenceMaterializerTransportError(
+                "competitor audience evidence_type is required"
+            )
+
+        fingerprints.append(
+            "|".join((competitor_key, evidence_type, source_ref))
+        )
+
+    return tuple(sorted(set(fingerprints)))
+
+
+def persist_competitor_audience_signal(
+    writer: PostgresIntelligenceMaterializer,
+    signal: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist one resolved competitor-audience signal safely.
+
+    This writes Intelligence Fabric evidence only. It cannot create prospects,
+    infer buyer intent, enable outreach, or grant execution authority.
+    """
+    if signal.get("signal_type") != "competitor_audience_evidence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected competitor signal type"
+        )
+    if signal.get("signal_domain") != "competitive_intelligence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected competitor signal domain"
+        )
+    if signal.get("execution_authority") != "none":
+        raise IntelligenceMaterializerTransportError(
+            "competitor signal has execution authority"
+        )
+    if signal.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "competitor signal cannot enable outreach"
+        )
+    if signal.get("buyer_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "competitor signal cannot infer buyer intent"
+        )
+    if signal.get("commercial_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "competitor signal cannot infer commercial intent"
+        )
+
+    entity_id = _uuid(signal.get("entity_id"), field="entity id")
+    observed_at = str(signal.get("observed_at") or "").strip()
+    if not observed_at:
+        raise IntelligenceMaterializerTransportError(
+            "observed_at is required"
+        )
+
+    try:
+        strength = float(signal.get("strength"))
+        confidence = float(signal.get("confidence"))
+    except (TypeError, ValueError) as exc:
+        raise IntelligenceMaterializerTransportError(
+            "invalid competitor signal confidence"
+        ) from exc
+
+    if not 0.0 <= strength <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "strength must be between 0 and 1"
+        )
+    if not 0.0 <= confidence <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "confidence must be between 0 and 1"
+        )
+
+    payload = signal.get("payload")
+    if not isinstance(payload, dict):
+        raise IntelligenceMaterializerTransportError(
+            "competitor signal payload is required"
+        )
+
+    evidence_refs = _competitor_evidence_refs(payload)
+    evidence_fingerprints = _competitor_evidence_fingerprints(payload)
+
+    try:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET LOCAL ROLE {ROLE}")
+
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_AUDIENCE_SOURCE_KEY,
+                )
+
+                supplied_source_id = _uuid(
+                    signal.get("source_id"),
+                    field="source id",
+                )
+                if supplied_source_id != _uuid(
+                    source_id,
+                    field="canonical source id",
+                ):
+                    raise IntelligenceMaterializerTransportError(
+                        "competitor signal source mismatch"
+                    )
+
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM public.intelligence_signals
+                    WHERE entity_id=%s
+                      AND signal_type='competitor_audience_evidence'
+                      AND signal_domain='competitive_intelligence'
+                      AND source_id=%s
+                    """,
+                    (entity_id, source_id),
+                )
+
+                for row in cursor.fetchall():
+                    existing_payload = row[0]
+                    if isinstance(existing_payload, str):
+                        existing_payload = json.loads(existing_payload)
+                    if not isinstance(existing_payload, dict):
+                        continue
+                    try:
+                        existing_fingerprints = (
+                            _competitor_evidence_fingerprints(
+                                existing_payload
+                            )
+                        )
+                    except IntelligenceMaterializerTransportError:
+                        continue
+                    if existing_fingerprints == evidence_fingerprints:
+                        return {
+                            "entity_id": entity_id,
+                            "signal_type": "competitor_audience_evidence",
+                            "inserted": False,
+                            "existing": True,
+                            "evidence_refs": list(evidence_refs),
+                            "execution_authority": "none",
+                        }
+
+                cursor.execute(
+                    """
+                    INSERT INTO public.intelligence_signals(
+                      entity_id,signal_type,signal_domain,observed_at,
+                      source_id,strength,confidence,payload
+                    )
+                    VALUES(
+                      %s,'competitor_audience_evidence',
+                      'competitive_intelligence',%s,%s,%s,%s,%s::jsonb
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        entity_id,
+                        observed_at,
+                        source_id,
+                        strength,
+                        confidence,
+                        json.dumps(payload, sort_keys=True),
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise IntelligenceMaterializerTransportError(
+                        "competitor signal insert failed"
+                    )
+
+                return {
+                    "id": str(row[0]),
+                    "entity_id": entity_id,
+                    "signal_type": "competitor_audience_evidence",
+                    "inserted": True,
+                    "existing": False,
+                    "evidence_refs": list(evidence_refs),
+                    "execution_authority": "none",
+                }
+
+    except IntelligenceMaterializerTransportError:
+        raise
+    except Exception as exc:
+        raise IntelligenceMaterializerTransportError(
+            "competitor audience signal persistence failed"
+        ) from exc
+
+
+
+COMPETITOR_ECOSYSTEM_SOURCE_KEY = "empire.competitor_ecosystem.public.v1"
+
+
+def _ecosystem_evidence_fingerprints(
+    payload: dict[str, Any],
+) -> tuple[str, ...]:
+    surfaces = payload.get("surfaces")
+    if not isinstance(surfaces, list) or not surfaces:
+        raise IntelligenceMaterializerTransportError(
+            "competitor ecosystem surfaces are required"
+        )
+
+    fingerprints: list[str] = []
+    for item in surfaces:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid competitor ecosystem surface"
+            )
+        source_ref = str(item.get("source_ref") or "").strip()
+        categories = item.get("categories")
+        if not source_ref or not isinstance(categories, list) or not categories:
+            raise IntelligenceMaterializerTransportError(
+                "ecosystem source_ref and categories are required"
+            )
+        fingerprints.append(
+            "surface|"
+            + source_ref
+            + "|"
+            + ",".join(sorted(str(x).strip() for x in categories if str(x).strip()))
+        )
+
+    for item in payload.get("external_relationship_candidates", []) or []:
+        if not isinstance(item, dict):
+            continue
+        source_ref = str(item.get("source_ref") or "").strip()
+        external_domain = str(item.get("external_domain") or "").strip()
+        category = str(item.get("category") or "").strip()
+        if source_ref and external_domain and category:
+            fingerprints.append(
+                "|".join(("external", category, external_domain, source_ref))
+            )
+
+    return tuple(sorted(set(fingerprints)))
+
+
+def persist_competitor_ecosystem_signal(
+    writer: PostgresIntelligenceMaterializer,
+    signal: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist one append-only public ecosystem evidence signal."""
+    if signal.get("signal_type") != "competitor_ecosystem_evidence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected ecosystem signal type"
+        )
+    if signal.get("signal_domain") != "competitive_intelligence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected ecosystem signal domain"
+        )
+    if signal.get("execution_authority") != "none":
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal has execution authority"
+        )
+    if signal.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal cannot enable outreach"
+        )
+    if signal.get("buyer_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal cannot infer buyer intent"
+        )
+    if signal.get("commercial_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal cannot infer commercial intent"
+        )
+
+    entity_id = _uuid(signal.get("entity_id"), field="entity id")
+    observed_at = str(signal.get("observed_at") or "").strip()
+    if not observed_at:
+        raise IntelligenceMaterializerTransportError(
+            "observed_at is required"
+        )
+
+    try:
+        strength = float(signal.get("strength"))
+        confidence = float(signal.get("confidence"))
+    except (TypeError, ValueError) as exc:
+        raise IntelligenceMaterializerTransportError(
+            "invalid ecosystem signal confidence"
+        ) from exc
+    if not 0.0 <= strength <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "strength must be between 0 and 1"
+        )
+    if not 0.0 <= confidence <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "confidence must be between 0 and 1"
+        )
+
+    payload = signal.get("payload")
+    if not isinstance(payload, dict):
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem signal payload is required"
+        )
+
+    if payload.get("customer_relationship_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot infer customer relationship"
+        )
+    if payload.get("partner_relationship_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot infer partner relationship"
+        )
+    if payload.get("buyer_intent") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot infer buyer intent"
+        )
+    if payload.get("commercial_intent") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot infer commercial intent"
+        )
+    if payload.get("prospect_created") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot create prospect"
+        )
+    if payload.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "ecosystem payload cannot enable outreach"
+        )
+
+    fingerprints = _ecosystem_evidence_fingerprints(payload)
+
+    try:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET LOCAL ROLE {ROLE}")
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_ECOSYSTEM_SOURCE_KEY,
+                )
+
+                supplied_source_id = _uuid(
+                    signal.get("source_id"),
+                    field="source id",
+                )
+                if supplied_source_id != _uuid(
+                    source_id,
+                    field="canonical source id",
+                ):
+                    raise IntelligenceMaterializerTransportError(
+                        "ecosystem signal source mismatch"
+                    )
+
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM public.intelligence_signals
+                    WHERE entity_id=%s
+                      AND signal_type='competitor_ecosystem_evidence'
+                      AND signal_domain='competitive_intelligence'
+                      AND source_id=%s
+                    """,
+                    (entity_id, source_id),
+                )
+                for row in cursor.fetchall():
+                    existing_payload = row[0]
+                    if isinstance(existing_payload, str):
+                        existing_payload = json.loads(existing_payload)
+                    if not isinstance(existing_payload, dict):
+                        continue
+                    try:
+                        existing = _ecosystem_evidence_fingerprints(
+                            existing_payload
+                        )
+                    except IntelligenceMaterializerTransportError:
+                        continue
+                    if existing == fingerprints:
+                        return {
+                            "entity_id": entity_id,
+                            "signal_type": "competitor_ecosystem_evidence",
+                            "inserted": False,
+                            "existing": True,
+                            "execution_authority": "none",
+                        }
+
+                cursor.execute(
+                    """
+                    INSERT INTO public.intelligence_signals(
+                      entity_id,signal_type,signal_domain,observed_at,
+                      source_id,strength,confidence,payload
+                    )
+                    VALUES(
+                      %s,'competitor_ecosystem_evidence',
+                      'competitive_intelligence',%s,%s,%s,%s,%s::jsonb
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        entity_id,
+                        observed_at,
+                        source_id,
+                        strength,
+                        confidence,
+                        json.dumps(payload, sort_keys=True),
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise IntelligenceMaterializerTransportError(
+                        "ecosystem signal insert failed"
+                    )
+                return {
+                    "id": str(row[0]),
+                    "entity_id": entity_id,
+                    "signal_type": "competitor_ecosystem_evidence",
+                    "inserted": True,
+                    "existing": False,
+                    "execution_authority": "none",
+                }
+    except IntelligenceMaterializerTransportError:
+        raise
+    except Exception as exc:
+        raise IntelligenceMaterializerTransportError(
+            "competitor ecosystem signal persistence failed"
+        ) from exc
+
+
+
+COMPETITOR_PUBLIC_REVIEW_SOURCE_KEY = (
+    "empire.competitor_public_reviews.public.v1"
+)
+
+
+def _public_review_fingerprints(
+    payload: dict[str, Any],
+) -> tuple[str, ...]:
+    profiles = payload.get("profiles")
+    if not isinstance(profiles, list) or not profiles:
+        raise IntelligenceMaterializerTransportError(
+            "public review profiles are required"
+        )
+
+    fingerprints: list[str] = []
+    for item in profiles:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid public review profile"
+            )
+        platform = str(item.get("platform") or "").strip()
+        profile_url = str(item.get("profile_url") or "").strip()
+        source_ref = str(item.get("source_ref") or "").strip()
+        if not platform or not profile_url or not source_ref:
+            raise IntelligenceMaterializerTransportError(
+                "public review platform/profile/source_ref required"
+            )
+        fingerprints.append(
+            "|".join((platform, profile_url, source_ref))
+        )
+    return tuple(sorted(set(fingerprints)))
+
+
+def persist_competitor_public_review_signal(
+    writer: PostgresIntelligenceMaterializer,
+    signal: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist append-only public review-platform presence evidence."""
+    if signal.get("signal_type") != "competitor_public_review_presence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected public review signal type"
+        )
+    if signal.get("signal_domain") != "competitive_intelligence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected public review signal domain"
+        )
+    if signal.get("execution_authority") != "none":
+        raise IntelligenceMaterializerTransportError(
+            "public review signal has execution authority"
+        )
+    if signal.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review signal cannot enable outreach"
+        )
+    if signal.get("buyer_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review signal cannot infer buyer intent"
+        )
+    if signal.get("commercial_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review signal cannot infer commercial intent"
+        )
+
+    entity_id = _uuid(signal.get("entity_id"), field="entity id")
+    observed_at = str(signal.get("observed_at") or "").strip()
+    if not observed_at:
+        raise IntelligenceMaterializerTransportError(
+            "observed_at is required"
+        )
+
+    try:
+        strength = float(signal.get("strength"))
+        confidence = float(signal.get("confidence"))
+    except (TypeError, ValueError) as exc:
+        raise IntelligenceMaterializerTransportError(
+            "invalid public review signal confidence"
+        ) from exc
+    if not 0.0 <= strength <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "strength must be between 0 and 1"
+        )
+    if not 0.0 <= confidence <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "confidence must be between 0 and 1"
+        )
+
+    payload = signal.get("payload")
+    if not isinstance(payload, dict):
+        raise IntelligenceMaterializerTransportError(
+            "public review signal payload is required"
+        )
+    if payload.get("review_sentiment_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot infer sentiment"
+        )
+    if payload.get("buyer_intent") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot infer buyer intent"
+        )
+    if payload.get("commercial_intent") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot infer commercial intent"
+        )
+    if payload.get("prospect_created") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot create prospect"
+        )
+    if payload.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public review payload cannot enable outreach"
+        )
+
+    fingerprints = _public_review_fingerprints(payload)
+
+    try:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET LOCAL ROLE {ROLE}")
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_PUBLIC_REVIEW_SOURCE_KEY,
+                )
+
+                supplied_source_id = _uuid(
+                    signal.get("source_id"),
+                    field="source id",
+                )
+                if supplied_source_id != _uuid(
+                    source_id,
+                    field="canonical source id",
+                ):
+                    raise IntelligenceMaterializerTransportError(
+                        "public review signal source mismatch"
+                    )
+
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM public.intelligence_signals
+                    WHERE entity_id=%s
+                      AND signal_type='competitor_public_review_presence'
+                      AND signal_domain='competitive_intelligence'
+                      AND source_id=%s
+                    """,
+                    (entity_id, source_id),
+                )
+                for row in cursor.fetchall():
+                    existing_payload = row[0]
+                    if isinstance(existing_payload, str):
+                        existing_payload = json.loads(existing_payload)
+                    if not isinstance(existing_payload, dict):
+                        continue
+                    try:
+                        existing = _public_review_fingerprints(
+                            existing_payload
+                        )
+                    except IntelligenceMaterializerTransportError:
+                        continue
+                    if existing == fingerprints:
+                        return {
+                            "entity_id": entity_id,
+                            "signal_type": (
+                                "competitor_public_review_presence"
+                            ),
+                            "inserted": False,
+                            "existing": True,
+                            "execution_authority": "none",
+                        }
+
+                cursor.execute(
+                    """
+                    INSERT INTO public.intelligence_signals(
+                      entity_id,signal_type,signal_domain,observed_at,
+                      source_id,strength,confidence,payload
+                    )
+                    VALUES(
+                      %s,'competitor_public_review_presence',
+                      'competitive_intelligence',%s,%s,%s,%s,%s::jsonb
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        entity_id,
+                        observed_at,
+                        source_id,
+                        strength,
+                        confidence,
+                        json.dumps(payload, sort_keys=True),
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise IntelligenceMaterializerTransportError(
+                        "public review signal insert failed"
+                    )
+                return {
+                    "id": str(row[0]),
+                    "entity_id": entity_id,
+                    "signal_type": "competitor_public_review_presence",
+                    "inserted": True,
+                    "existing": False,
+                    "execution_authority": "none",
+                }
+    except IntelligenceMaterializerTransportError:
+        raise
+    except Exception as exc:
+        raise IntelligenceMaterializerTransportError(
+            "public review signal persistence failed"
+        ) from exc
+
+
+
+COMPETITOR_SEARCH_PRESENCE_SOURCE_KEY = (
+    "empire.competitor_search_presence.public.v1"
+)
+
+
+def _search_presence_fingerprints(
+    payload: dict[str, Any],
+) -> tuple[str, ...]:
+    observations = payload.get("observations")
+    if not isinstance(observations, list) or not observations:
+        raise IntelligenceMaterializerTransportError(
+            "search presence observations are required"
+        )
+
+    fingerprints: list[str] = []
+    for item in observations:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid search presence observation"
+            )
+        query = str(item.get("query") or "").strip()
+        domain = str(item.get("domain") or "").strip()
+        url = str(item.get("url") or "").strip()
+        position = str(item.get("position") or "").strip()
+        if not query or not domain or not url or not position:
+            raise IntelligenceMaterializerTransportError(
+                "search query/domain/url/position required"
+            )
+        fingerprints.append(
+            "|".join((query, domain, url, position))
+        )
+    return tuple(sorted(set(fingerprints)))
+
+
+def persist_competitor_search_presence_signal(
+    writer: PostgresIntelligenceMaterializer,
+    signal: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist append-only observed SERP presence evidence."""
+    if signal.get("signal_type") != "competitor_search_presence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected search presence signal type"
+        )
+    if signal.get("signal_domain") != "search_intelligence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected search presence signal domain"
+        )
+    if signal.get("execution_authority") != "none":
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal has execution authority"
+        )
+    if signal.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal cannot enable outreach"
+        )
+    if signal.get("buyer_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal cannot infer buyer intent"
+        )
+    if signal.get("commercial_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal cannot infer commercial intent"
+        )
+    if signal.get("market_share_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal cannot infer market share"
+        )
+
+    entity_id = _uuid(signal.get("entity_id"), field="entity id")
+    observed_at = str(signal.get("observed_at") or "").strip()
+    if not observed_at:
+        raise IntelligenceMaterializerTransportError(
+            "observed_at is required"
+        )
+
+    try:
+        strength = float(signal.get("strength"))
+        confidence = float(signal.get("confidence"))
+    except (TypeError, ValueError) as exc:
+        raise IntelligenceMaterializerTransportError(
+            "invalid search presence signal confidence"
+        ) from exc
+    if not 0.0 <= strength <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "strength must be between 0 and 1"
+        )
+    if not 0.0 <= confidence <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "confidence must be between 0 and 1"
+        )
+
+    payload = signal.get("payload")
+    if not isinstance(payload, dict):
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal payload is required"
+        )
+    for key, label in (
+        ("market_share_inferred", "market share"),
+        ("demand_inferred", "demand"),
+        ("buyer_intent", "buyer intent"),
+        ("commercial_intent", "commercial intent"),
+        ("prospect_created", "prospect creation"),
+        ("outreach_enabled", "outreach"),
+    ):
+        if payload.get(key) is not False:
+            raise IntelligenceMaterializerTransportError(
+                f"search presence payload cannot infer/enable {label}"
+            )
+
+    fingerprints = _search_presence_fingerprints(payload)
+
+    try:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET LOCAL ROLE {ROLE}")
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_SEARCH_PRESENCE_SOURCE_KEY,
+                )
+
+                supplied_source_id = _uuid(
+                    signal.get("source_id"),
+                    field="source id",
+                )
+                if supplied_source_id != _uuid(
+                    source_id,
+                    field="canonical source id",
+                ):
+                    raise IntelligenceMaterializerTransportError(
+                        "search presence signal source mismatch"
+                    )
+
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM public.intelligence_signals
+                    WHERE entity_id=%s
+                      AND signal_type='competitor_search_presence'
+                      AND signal_domain='search_intelligence'
+                      AND source_id=%s
+                    """,
+                    (entity_id, source_id),
+                )
+                for row in cursor.fetchall():
+                    existing_payload = row[0]
+                    if isinstance(existing_payload, str):
+                        existing_payload = json.loads(existing_payload)
+                    if not isinstance(existing_payload, dict):
+                        continue
+                    try:
+                        existing = _search_presence_fingerprints(
+                            existing_payload
+                        )
+                    except IntelligenceMaterializerTransportError:
+                        continue
+                    if existing == fingerprints:
+                        return {
+                            "entity_id": entity_id,
+                            "signal_type": "competitor_search_presence",
+                            "inserted": False,
+                            "existing": True,
+                            "execution_authority": "none",
+                        }
+
+                cursor.execute(
+                    """
+                    INSERT INTO public.intelligence_signals(
+                      entity_id,signal_type,signal_domain,observed_at,
+                      source_id,strength,confidence,payload
+                    )
+                    VALUES(
+                      %s,'competitor_search_presence',
+                      'search_intelligence',%s,%s,%s,%s,%s::jsonb
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        entity_id,
+                        observed_at,
+                        source_id,
+                        strength,
+                        confidence,
+                        json.dumps(payload, sort_keys=True),
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise IntelligenceMaterializerTransportError(
+                        "search presence signal insert failed"
+                    )
+                return {
+                    "id": str(row[0]),
+                    "entity_id": entity_id,
+                    "signal_type": "competitor_search_presence",
+                    "inserted": True,
+                    "existing": False,
+                    "execution_authority": "none",
+                }
+    except IntelligenceMaterializerTransportError:
+        raise
+    except Exception as exc:
+        raise IntelligenceMaterializerTransportError(
+            "search presence signal persistence failed"
+        ) from exc
+
+
+
+COMPETITOR_PUBLIC_ACTIVITY_SOURCE_KEY = (
+    "empire.competitor_public_activity.public.v1"
+)
+
+
+def _public_activity_fingerprints(
+    payload: dict[str, Any],
+) -> tuple[str, ...]:
+    observations = payload.get("observations")
+    if not isinstance(observations, list) or not observations:
+        raise IntelligenceMaterializerTransportError(
+            "public activity observations are required"
+        )
+
+    fingerprints: list[str] = []
+    for item in observations:
+        if not isinstance(item, dict):
+            raise IntelligenceMaterializerTransportError(
+                "invalid public activity observation"
+            )
+        category = str(item.get("category") or "").strip()
+        source_ref = str(item.get("source_ref") or "").strip()
+        evidence_key = str(item.get("evidence_key") or "").strip()
+        if not category or not source_ref or not evidence_key:
+            raise IntelligenceMaterializerTransportError(
+                "public activity category/source_ref/evidence_key required"
+            )
+        fingerprints.append(
+            "|".join((category, evidence_key, source_ref))
+        )
+    return tuple(sorted(set(fingerprints)))
+
+
+def persist_competitor_public_activity_signal(
+    writer: PostgresIntelligenceMaterializer,
+    signal: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist append-only public company activity evidence."""
+    if signal.get("signal_type") != "competitor_public_activity":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected public activity signal type"
+        )
+    if signal.get("signal_domain") != "competitive_intelligence":
+        raise IntelligenceMaterializerTransportError(
+            "unexpected public activity signal domain"
+        )
+    if signal.get("execution_authority") != "none":
+        raise IntelligenceMaterializerTransportError(
+            "public activity signal has execution authority"
+        )
+    if signal.get("outreach_enabled") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public activity signal cannot enable outreach"
+        )
+    if signal.get("buyer_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public activity signal cannot infer buyer intent"
+        )
+    if signal.get("commercial_intent_inferred") is not False:
+        raise IntelligenceMaterializerTransportError(
+            "public activity signal cannot infer commercial intent"
+        )
+
+    entity_id = _uuid(signal.get("entity_id"), field="entity id")
+    observed_at = str(signal.get("observed_at") or "").strip()
+    if not observed_at:
+        raise IntelligenceMaterializerTransportError(
+            "observed_at is required"
+        )
+
+    try:
+        strength = float(signal.get("strength"))
+        confidence = float(signal.get("confidence"))
+    except (TypeError, ValueError) as exc:
+        raise IntelligenceMaterializerTransportError(
+            "invalid public activity signal confidence"
+        ) from exc
+
+    if not 0.0 <= strength <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "strength must be between 0 and 1"
+        )
+    if not 0.0 <= confidence <= 1.0:
+        raise IntelligenceMaterializerTransportError(
+            "confidence must be between 0 and 1"
+        )
+
+    payload = signal.get("payload")
+    if not isinstance(payload, dict):
+        raise IntelligenceMaterializerTransportError(
+            "public activity signal payload is required"
+        )
+
+    for key, label in (
+        ("buyer_intent", "buyer intent"),
+        ("commercial_intent", "commercial intent"),
+        ("prospect_created", "prospect creation"),
+        ("outreach_enabled", "outreach"),
+    ):
+        if payload.get(key) is not False:
+            raise IntelligenceMaterializerTransportError(
+                f"public activity payload cannot infer/enable {label}"
+            )
+
+    fingerprints = _public_activity_fingerprints(payload)
+
+    try:
+        with writer._connect(writer.dsn) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET LOCAL ROLE {ROLE}")
+                source_id = writer._source_id(
+                    cursor,
+                    COMPETITOR_PUBLIC_ACTIVITY_SOURCE_KEY,
+                )
+
+                supplied_source_id = _uuid(
+                    signal.get("source_id"),
+                    field="source id",
+                )
+                if supplied_source_id != _uuid(
+                    source_id,
+                    field="canonical source id",
+                ):
+                    raise IntelligenceMaterializerTransportError(
+                        "public activity signal source mismatch"
+                    )
+
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM public.intelligence_signals
+                    WHERE entity_id=%s
+                      AND signal_type='competitor_public_activity'
+                      AND signal_domain='competitive_intelligence'
+                      AND source_id=%s
+                    """,
+                    (entity_id, source_id),
+                )
+                for row in cursor.fetchall():
+                    existing_payload = row[0]
+                    if isinstance(existing_payload, str):
+                        existing_payload = json.loads(existing_payload)
+                    if not isinstance(existing_payload, dict):
+                        continue
+                    try:
+                        existing = _public_activity_fingerprints(
+                            existing_payload
+                        )
+                    except IntelligenceMaterializerTransportError:
+                        continue
+                    if existing == fingerprints:
+                        return {
+                            "entity_id": entity_id,
+                            "signal_type": "competitor_public_activity",
+                            "inserted": False,
+                            "existing": True,
+                            "execution_authority": "none",
+                        }
+
+                cursor.execute(
+                    """
+                    INSERT INTO public.intelligence_signals(
+                      entity_id,signal_type,signal_domain,observed_at,
+                      source_id,strength,confidence,payload
+                    )
+                    VALUES(
+                      %s,'competitor_public_activity',
+                      'competitive_intelligence',%s,%s,%s,%s,%s::jsonb
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        entity_id,
+                        observed_at,
+                        source_id,
+                        strength,
+                        confidence,
+                        json.dumps(payload, sort_keys=True),
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise IntelligenceMaterializerTransportError(
+                        "public activity signal insert failed"
+                    )
+                return {
+                    "id": str(row[0]),
+                    "entity_id": entity_id,
+                    "signal_type": "competitor_public_activity",
+                    "inserted": True,
+                    "existing": False,
+                    "execution_authority": "none",
+                }
+    except IntelligenceMaterializerTransportError:
+        raise
+    except Exception as exc:
+        raise IntelligenceMaterializerTransportError(
+            "public activity signal persistence failed"
+        ) from exc

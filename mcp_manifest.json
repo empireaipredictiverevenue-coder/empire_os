@@ -1,21 +1,29 @@
 {
-  "name": "empire-lead-marketplace",
-  "version": "2.0.0",
-  "description": "Empire OS Lead Marketplace MCP — machine-readable supply layer for verified home-services / B2B leads. Agents pull leads by vertical, get USDC settle quotes, and close deals via Empire Vault (Solana USDC, no Stripe/KYC).",
-  "transport": "http",
-  "url": "http://216.128.149.56:9000",
-  "protocol": "jsonrpc-2.0",
-  "auth": "none",
-  "tools": [
-    "search_leads", "settle_quote", "get_pricing", "register_lead_buyer",
-    "detect_triggers", "customer_analysis", "self_influence", "copilot_route",
-    "aeo_monitor", "generate_aeo", "aeo_refresh", "list_business", "verify_business"
-  ],
+  "name": "empire-legacy-lead-marketplace",
+  "version": "3.0.0",
+  "status": "retired",
+  "retired_reason": "Legacy lead-marketplace MCP advertised retired Solana/USDC settlement and non-canonical runtime paths.",
+  "canonical_runtime": {
+    "public_base_url": "https://empire-ai.co.uk",
+    "agent_web_capabilities": "https://empire-ai.co.uk/agent-web/capabilities",
+    "webmcp_manifest": "https://empire-ai.co.uk/agent-web/webmcp-manifest.json",
+    "a2a_agent_card": "https://empire-ai.co.uk/.well-known/agent-card.json",
+    "a2a_discovery": "https://empire-ai.co.uk/a2a/v1/discovery",
+    "ops_mcp": "loopback://127.0.0.1:8765/mcp"
+  },
   "settlement": {
-    "currency": "USDC",
-    "chain": "solana",
-    "vault": "EmpireVaultUSDCSolana",
-    "endpoint": "POST http://216.128.149.56:8000/v1/a2a/negotiate"
+    "currency": "USDT",
+    "chain": "BSC",
+    "canonical": true,
+    "payment_proposal_authorized": false,
+    "payment_execution": false,
+    "revenue_recognition": false,
+    "public_execution_exposed": false
+  },
+  "governance": {
+    "execution_mode": "OBSERVE",
+    "privileged_actions_exposed": false,
+    "consequential_actions_require_governed_approval": true
   },
   "contact": "founder@empire-ai.co.uk"
 }

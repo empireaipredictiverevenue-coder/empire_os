@@ -1,13 +1,12 @@
 """
-Empire OS — switchboard (AGI layer + SyntheticIntelligence)
+Empire OS — switchboard (evidence-backed AGI routing)
 ============================================================
 
 TwiML handles media. We handle routing+billing+AGI reasoning.
 
 AGI layer:
   Before each call: Agent.observe(state) -> reason() -> act()
-  SyntheticIntelligence.augment(state, decision) returns synthetic
-  examples to prepend next prompt so the model improves over time.
+  Runtime learning uses only real routing state and recorded outcomes.
 
   LLM endpoint: http://10.218.156.211:11434 (qwen2.5:7b on
   ornith-agent). 180s timeout — keep AGI moves small.
@@ -34,7 +33,6 @@ from pathlib import Path
 sys.path.insert(0, "/root/empire_os")
 
 from empire_os.agent_core        import Agent, AgentContext
-from empire_os.synthetic_intelligence import SyntheticIntelligence
 
 
 # ── config ──
@@ -63,16 +61,12 @@ def _agi():
     return Agent(context=ctx, llm={"url": OLLAMA_URL, "model": LLM_MODEL,
                                    "timeout": LLM_TIMEOUT})
 
-_synth = SyntheticIntelligence(llm={"url": OLLAMA_URL, "model": LLM_MODEL,
-                                    "timeout": LLM_TIMEOUT},
-                               n_synthetic=3)
-
 
 def agi_decide(state: dict, decision: dict) -> dict:
     """Reason over state + decision. Returns augmented reasoning block.
 
     Agent API: act(decision: str) -> dict
-    SyntheticIntelligence API: augment(state, decision) -> examples
+    No fabricated examples are generated.
     """
     decision_str = (f"{decision.get('action','?')}: "
                     f"{json.dumps(decision)[:160]}")
@@ -85,12 +79,13 @@ def agi_decide(state: dict, decision: dict) -> dict:
     except Exception as e:
         raw = {"ok": False, "error": str(e)[:160],
                "fallback": "use greedy: highest active bid wins"}
-    try:
-        examples = _synth.augment(state=state, decision=decision)
-    except Exception as e:
-        examples = {"error": str(e)[:160]}
-    out = {"ts": now_iso(), "state": state, "decision": decision,
-           "agi": raw, "synth": examples}
+    out = {
+        "ts": now_iso(),
+        "state": state,
+        "decision": decision,
+        "agi": raw,
+        "learning": {"mode": "real_observations_only"},
+    }
     DEC_HIST.appendleft(out)
     FEEDBACK.mkdir(parents=True, exist_ok=True)
     with open(DECISIONS, "a") as f:

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run bounded Astra launch dispatcher every thirty minutes
+
+[Timer]
+OnActiveSec=1min
+OnUnitInactiveSec=30min
+AccuracySec=1min
+Persistent=true
+Unit=empire-astra-dispatcher.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=EmpireOS signed Resend inbound webhook
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=/srv/empire_os/runtime/secrets/outbound.env
+ExecStart=/srv/empire_os/.venv/bin/python -m uvicorn empire_os.resend_webhook_app:app --host 127.0.0.1 --port 8097 --workers 1
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+
+[Install]
+WantedBy=default.target
