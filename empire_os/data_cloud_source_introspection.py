@@ -115,6 +115,21 @@ join critical x on x.table_name = t.event_object_table
 where t.trigger_schema = 'public'
 order by event_object_table, trigger_name, event_manipulation
 """.strip(),
+        "trigger_routines": f"""
+{cte}
+select distinct
+  p.proname as routine_name,
+  pg_get_function_identity_arguments(p.oid) as identity_arguments,
+  pg_get_functiondef(p.oid) as definition
+from pg_trigger trg
+join pg_class cls on cls.oid = trg.tgrelid
+join pg_namespace ns on ns.oid = cls.relnamespace
+join pg_proc p on p.oid = trg.tgfoid
+join critical x on x.table_name = cls.relname
+where ns.nspname = 'public'
+  and not trg.tgisinternal
+order by p.proname, identity_arguments
+""".strip(),
         "extensions": """
 select extname, extversion
 from pg_extension
