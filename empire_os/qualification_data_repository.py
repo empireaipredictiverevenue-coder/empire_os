@@ -5,6 +5,7 @@ from typing import Any
 
 from empire_os.canonical_data_gateway import CanonicalDataGateway
 from empire_os.data_query import ConflictAction, DataFilter, OrderSpec
+from empire_os.data_values import JsonValue
 
 
 PROSPECT_COLUMNS = ",".join((
@@ -221,9 +222,14 @@ class QualificationDataRepository:
         self,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
+        prepared = dict(payload)
+        for field in ("observed_dimensions", "unknown_dimensions"):
+            if field in prepared:
+                prepared[field] = JsonValue(prepared[field])
+
         rows = self._gateway.upsert(
             "prospect_qualifications",
-            payload,
+            prepared,
             conflict_columns=(
                 "prospect_id",
                 "scoring_engine",
