@@ -162,7 +162,6 @@ def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
     config = _pgbackrest_config()
     completed = runner(
         [
-            "runuser", "-u", "postgres", "--",
             "pgbackrest",
             f"--config={PGBACKREST_CONFIG}",
             f"--stanza={PGBACKREST_STANZA}",
@@ -174,6 +173,8 @@ def _pgbackrest_probe(*, runner: Runner = subprocess.run) -> dict[str, Any]:
         text=True,
         timeout=20,
         check=False,
+        user="postgres",
+        group="postgres",
     )
 
     if completed.returncode != 0:
