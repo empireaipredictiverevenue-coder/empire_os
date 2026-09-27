@@ -18,7 +18,7 @@ import re
 from pathlib import Path
 
 from empire_os.data_backends.empiredb import _RPC_PARAMS
-from empire_os.data_backends.postgres import EmpirePostgresConnector
+from empire_os.data_backends.postgres import PostgresConnectionConfig, PostgresConnector
 
 
 TABLE_RE = re.compile(
@@ -79,8 +79,8 @@ def discover(root: Path) -> tuple[set[str], set[str]]:
 
 
 def empiredb_tables() -> set[str]:
-    connector = EmpirePostgresConnector.from_environment()
-    connection = connector.connect()
+    connector = PostgresConnector(PostgresConnectionConfig.from_env())
+    connection = connector._open_connection()
     try:
         rows = connection.execute(
             """
