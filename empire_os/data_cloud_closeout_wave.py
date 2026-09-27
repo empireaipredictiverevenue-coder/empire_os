@@ -22,7 +22,7 @@ CLOSEOUT_BASE_BRANCH = "agent/data-cloud-wave4"
 def closeout_requests() -> tuple[ExecutionRequest, ...]:
     return (
         ExecutionRequest(
-            request_id="empiredb-closeout-observability",
+            request_id="empiredb-closeout-observability-v2",
             capability="backend_code",
             department="platform_reliability",
             objective=(
