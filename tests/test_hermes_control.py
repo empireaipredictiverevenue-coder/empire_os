@@ -3,6 +3,7 @@ import subprocess
 import pytest
 
 from empire_os.hermes_control import (
+    DATA_CLOUD_CLOSEOUT_BRANCH,
     DEFAULT_BASE_BRANCH,
     _prepare_worktree_slot,
     HermesControlError,
@@ -60,8 +61,15 @@ def test_job_schema_rejects_consequential_authority(authority):
         )
 
 
+def test_job_schema_accepts_governed_data_cloud_closeout_branch():
+    job = HermesJob.from_mapping(
+        base_job(base_branch=DATA_CLOUD_CLOSEOUT_BRANCH)
+    )
+    assert job.base_branch == DATA_CLOUD_CLOSEOUT_BRANCH
+
+
 def test_job_schema_rejects_arbitrary_base_branch():
-    with pytest.raises(HermesControlError, match="pinned"):
+    with pytest.raises(HermesControlError, match="allowlist"):
         HermesJob.from_mapping(
             base_job(base_branch="main")
         )
