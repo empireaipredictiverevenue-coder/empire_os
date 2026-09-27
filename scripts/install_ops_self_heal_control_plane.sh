@@ -17,10 +17,13 @@ install_unit "deploy/systemd/empire-ops-control.service"
 install_unit "deploy/systemd/empire-ops-control.timer"
 install_unit "deploy/systemd/empire-commercial-product-catalog.service"
 install_unit "deploy/systemd/empire-commercial-product-catalog.timer"
+install_unit "deploy/systemd/empire-buyer-acquisition-local-recovery.service"
+install_unit "deploy/systemd/empire-buyer-acquisition-local-recovery.timer"
 
 systemctl daemon-reload
 
 systemctl enable empire-ops-privileged-helper.service
+systemctl enable --now empire-buyer-acquisition-local-recovery.timer
 systemctl reset-failed empire-ops-privileged-helper.service || true
 systemctl restart empire-ops-privileged-helper.service
 
