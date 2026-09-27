@@ -156,6 +156,55 @@ def _load_buyer_plan(repo_root: str) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+RECOVERY_SEED_SNAPSHOT = Path(
+    "runtime/buyer_acquisition/opportunity_seed_recovery.json"
+)
+
+
+def _local_opportunity_seed_records(
+    repo_root: str | Path,
+) -> list[dict]:
+    """Load a bounded admin-recovered seed snapshot from local runtime.
+
+    The snapshot is recovery input only. Buyer Scout must still re-probe each
+    first-party website before surfacing a candidate. No database write,
+    buyer-intent claim, or outbound authority is created here.
+    """
+    path = Path(repo_root).resolve() / RECOVERY_SEED_SNAPSHOT
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    raw_rows = payload.get("seeds")
+    if not isinstance(raw_rows, list):
+        return []
+
+    rows: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for raw in raw_rows[:50]:
+        if not isinstance(raw, dict):
+            continue
+        row = dict(raw)
+        prospect_id = str(row.get("id") or "").strip()
+        website = str(row.get("website") or "").strip()
+        opportunity_key = str(
+            row.get("seed_opportunity_key") or ""
+        ).strip()
+        if not prospect_id or not website or not opportunity_key:
+            continue
+        key = (prospect_id, opportunity_key)
+        if key in seen:
+            continue
+        seen.add(key)
+        row["recovery_source"] = "admin_read_only_snapshot"
+        row["database_write_performed"] = False
+        row["outbound_authorized"] = False
+        rows.append(row)
+    return rows
+
+
 def _opportunity_validation_seed_records(
     plan: dict,
     *,
@@ -287,8 +336,12 @@ def main() -> int:
         per_target=6,
         diagnostics=opportunity_seed_diagnostics,
     )
+    local_recovery_seeds = _local_opportunity_seed_records(
+        args.repo_root
+    )
     canonical_seeds = [
         *opportunity_seeds,
+        *local_recovery_seeds,
         *_canonical_seed_records(per_lane=8),
     ]
 
@@ -312,6 +365,7 @@ def main() -> int:
             "canonical_seed_fallback_used"
         ],
         "opportunity_seed_count": len(opportunity_seeds),
+        "local_recovery_seed_count": len(local_recovery_seeds),
         "opportunity_seed_query_error_count": sum(
             row.get("state") == "ERROR"
             for row in opportunity_seed_diagnostics
