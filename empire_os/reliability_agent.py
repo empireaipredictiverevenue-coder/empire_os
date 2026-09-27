@@ -96,6 +96,71 @@ def _load_json(path: Path) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _load_state(path: Path) -> dict[str, Any]:
+    value = _load_json(path)
+    failures = value.get("action_failures")
+    if not isinstance(failures, dict):
+        value["action_failures"] = {}
+    return value
+
+
+def _parse_time(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(
+            str(value).replace("Z", "+00:00")
+        )
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _action_allowed(
+    state: Mapping[str, Any],
+    action: str,
+    *,
+    now: datetime,
+) -> bool:
+    failures = state.get("action_failures")
+    failures = failures if isinstance(failures, Mapping) else {}
+    row = failures.get(action)
+    row = row if isinstance(row, Mapping) else {}
+    next_at = _parse_time(row.get("next_allowed_at"))
+    return next_at is None or now >= next_at
+
+
+def _record_action_result(
+    state: dict[str, Any],
+    action: str,
+    *,
+    ok: bool,
+    now: datetime,
+) -> None:
+    failures = state.setdefault("action_failures", {})
+    if ok:
+        failures.pop(action, None)
+        return
+
+    previous = failures.get(action)
+    previous = previous if isinstance(previous, Mapping) else {}
+    count = int(previous.get("count") or 0) + 1
+    delay = min(1800, 60 * (2 ** min(count - 1, 5)))
+    failures[action] = {
+        "count": count,
+        "last_failed_at": _iso(now),
+        "next_allowed_at": _iso(
+            datetime.fromtimestamp(
+                now.timestamp() + delay,
+                tz=timezone.utc,
+            )
+        ),
+        "backoff_seconds": delay,
+    }
+
+
 def _age_seconds(path: Path, *, now: datetime) -> float | None:
     try:
         return max(0.0, now.timestamp() - path.stat().st_mtime)
@@ -161,6 +226,8 @@ def plan_actions(
     if observation.supabase_egress_contained:
         due = (
             not observation.recovery_heartbeat_exists
+            or observation.recovery_heartbeat_state
+            != "LOCAL_RECOVERY_EXECUTED"
             or observation.recovery_heartbeat_age_seconds is None
             or observation.recovery_heartbeat_age_seconds
             >= max(60, int(recovery_interval_seconds))
@@ -267,7 +334,8 @@ def _action_verified(row: Mapping[str, Any]) -> bool:
 
     if action == "REFRESH_RECOVERY_SNAPSHOT":
         return (
-            result.get("database_write_performed") is False
+            result.get("ok") is True
+            and result.get("database_write_performed") is False
             and result.get("outbound_sent") is False
             and result.get("execution_authority") == "none"
             and result.get("state")
@@ -293,11 +361,32 @@ def run_cycle(
     ),
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
-    before = observe(root, now=now)
+    current = (now or _now()).astimezone(timezone.utc)
+    before = observe(root, now=current)
     actions = plan_actions(before)
 
-    executed = [
-        _execute_action(
+    state_path = root / STATE_PATH.relative_to(ROOT)
+    state = _load_state(state_path)
+    executed: list[dict[str, Any]] = []
+    deferred: list[dict[str, Any]] = []
+
+    for action in actions:
+        if not _action_allowed(
+            state,
+            action.action,
+            now=current,
+        ):
+            deferred.append({
+                **asdict(action),
+                "decision": "BACKOFF",
+                "failure_state": (
+                    state.get("action_failures", {})
+                    .get(action.action)
+                ),
+            })
+            continue
+
+        row = _execute_action(
             action,
             root=root,
             self_heal=self_heal,
@@ -305,14 +394,26 @@ def run_cycle(
             local_recovery=local_recovery,
             contained=before.supabase_egress_contained,
         )
-        for action in actions
-    ]
+        verified = _action_verified(row)
+        row["verified"] = verified
+        executed.append(row)
+        _record_action_result(
+            state,
+            action.action,
+            ok=verified,
+            now=current,
+        )
+
+    _atomic_json(state_path, state)
 
     after = observe(root)
-    verified_count = sum(_action_verified(row) for row in executed)
+    verified_count = sum(
+        row.get("verified") is True
+        for row in executed
+    )
     failures = [
         row for row in executed
-        if not _action_verified(row)
+        if row.get("verified") is not True
     ]
 
     payload = {
@@ -323,10 +424,16 @@ def run_cycle(
         "before": asdict(before),
         "planned_actions": [asdict(row) for row in actions],
         "executed_actions": executed,
+        "deferred_actions": deferred,
         "verified_action_count": verified_count,
         "failed_action_count": len(failures),
         "after": asdict(after),
         "status": "HEALTHY" if not failures else "DEGRADED",
+        "operating_state": (
+            "SUPABASE_CONTAINED_LOCAL_RECOVERY"
+            if before.supabase_egress_contained
+            else "NORMAL"
+        ),
         "founder_attention_required": any(
             row.get("action") == "ESCALATE_RECOVERY_SEEDS_MISSING"
             for row in executed
