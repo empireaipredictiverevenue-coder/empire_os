@@ -30,6 +30,7 @@ def test_backup_observer_writes_only_ephemeral_runtime_status():
     ).read_text(encoding="utf-8")
 
     assert "RuntimeDirectory=empire-data-cloud" in text
+    assert "RuntimeDirectoryPreserve=yes" in text
     assert "/run/empire-data-cloud/pgbackrest.json" in text
     assert "/var/backups/empiredb/pgbackrest" not in text
 
