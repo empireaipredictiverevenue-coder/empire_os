@@ -7,8 +7,8 @@ NOT sign Solana transactions — money movement stays inside the hub's
 verified billing path (solana_listener + billing_collector). This keeps the
 hot-wallet out of the webhook path (watchdog rule: no unverified payout).
 
-Optional: mirror the event to Supabase call_logs + a CRM webhook if those
-env vars are set. These are ledger/CRM writes only — no chain signing.
+Optional: mirror the event to the canonical call_logs store + a CRM webhook.
+These are ledger/CRM writes only — no chain signing.
 
 Run: uvicorn empire_os.telephony_webhook:app --port 9100
 """
@@ -20,14 +20,14 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 
+from empire_os.telephony_event_repository import TelephonyEventRepository
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("empire_telephony_webhook")
 
 HUB_URL = os.getenv("HUB_URL", "http://127.0.0.1:8000").rstrip("/")
 CRM_API_URL = os.getenv("CRM_API_URL", "")
 CRM_API_KEY = os.getenv("CRM_API_KEY", "")
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 # Shared secret the carrier uses to sign webhooks (HMAC-SHA256 over raw body).
 # When unset, signature checks are skipped (local/dev only).
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
@@ -109,19 +109,16 @@ async def forward_to_hub(http_client: httpx.AsyncClient, p: TelephonyWebhookPayl
         logger.error("hub forward failed for %s: %s", p.call_sid, e)
 
 
-async def write_to_supabase(http_client: httpx.AsyncClient, p: TelephonyWebhookPayload):
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        return
-    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}",
-               "Content-Type": "application/json", "Prefer": "return=minimal"}
+async def write_to_canonical_data(p: TelephonyWebhookPayload):
     data = {"call_sid": p.call_sid, "caller_number": p.caller_number,
             "destination_number": p.destination_number, "duration": p.duration,
             "status": p.status, "payout": p.payout,
             "recording_url": p.recording_url}
     try:
-        await http_client.post(f"{SUPABASE_URL}/rest/v1/call_logs", json=data, headers=headers)
+        repository = TelephonyEventRepository.from_environment()
+        await asyncio.to_thread(repository.record_call, data)
     except Exception as e:
-        logger.error("supabase write failed: %s", e)
+        logger.error("canonical call-log mirror failed: %s", e)
 
 
 async def write_to_crm(http_client: httpx.AsyncClient, p: TelephonyWebhookPayload):
@@ -149,7 +146,7 @@ async def receive_carrier_webhook(request: Request, p: TelephonyWebhookPayload, 
     # Hub ledger is the source of truth for billing — do it first.
     background_tasks.add_task(forward_to_hub, http_client, p)
     # Optional mirrors (no chain signing).
-    background_tasks.add_task(write_to_supabase, http_client, p)
+    background_tasks.add_task(write_to_canonical_data, p)
     background_tasks.add_task(write_to_crm, http_client, p)
     return {"status": "processing", "call_sid": p.call_sid}
 
