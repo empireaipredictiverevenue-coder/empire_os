@@ -1,0 +1,22 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/data_cloud_runtime_canary.py",
+    "tests/test_data_cloud_runtime_canary.py",
+    "docs/EMPIRE_DATA_CLOUD_RUNTIME_CANARY.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-09-27T22:46:35.391125+00:00",
+  "job_id": "empiredb-closeout-runtime-canary",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:data_cloud_runtime_canary"
+  ],
+  "max_runtime_seconds": 1500,
+  "prompt": "Build a bounded READ-ONLY production-service canary for the EmpireDB candidate through PgBouncer. Reuse the canonical gateway and existing application repositories where possible. Verify representative read paths and safe transaction-rollback write semantics without changing EMPIRE_DATA_BACKEND, moving funds, sending outbound, recognizing revenue or leaving persisted canary rows. Report exact services/paths proven and UNKNOWN for anything not exercised.",
+  "pytest_targets": [
+    "tests/test_data_cloud_runtime_canary.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
