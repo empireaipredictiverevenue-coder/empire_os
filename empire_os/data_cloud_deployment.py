@@ -29,6 +29,14 @@ class DeploymentTarget:
     pgbackrest_required: bool = True
     public_database_port_allowed: bool = False
 
+    def validate(self) -> None:
+        if self.postgres_major != 18:
+            raise ValueError("Empire Data Cloud v1 requires PostgreSQL 18")
+        if not self.private_bind_required:
+            raise ValueError("private database bind is required")
+        if self.public_database_port_allowed:
+            raise ValueError("public database ports are forbidden")
+
 
 def build_install_plan(
     observation: HostObservation,
@@ -37,6 +45,7 @@ def build_install_plan(
 ) -> dict[str, Any]:
     """Describe missing components and safety invariants without installing."""
 
+    target.validate()
     missing: list[str] = []
     if not observation.postgres_available:
         missing.append("postgresql")
