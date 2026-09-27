@@ -279,54 +279,67 @@ def run_buyer_scout(
 
     search_domain_count = len(provenance)
     seed_domain_count = 0
+    opportunity_seed_domain_count = 0
     canonical_seed_by_domain: dict[str, dict[str, Any]] = {}
+    opportunity_seed_domains: set[str] = set()
 
-    if not provenance:
-        for raw in canonical_seed_records or []:
-            if not isinstance(raw, Mapping):
-                continue
-            row = dict(raw)
-            host = _host(str(row.get("website") or ""))
-            if not host:
-                continue
-            profile_key = str(row.get("icp_profile_key") or "").strip()
-            opportunity_key = str(
-                row.get("seed_opportunity_key") or ""
-            ).strip()
-            if (
-                profile_key not in CONTINUOUS_COMMERCIAL_LANE_BY_ICP
-                and not opportunity_key
-            ):
-                continue
-            canonical_seed_by_domain[host] = row
-            seed_pools = [
-                str(value).strip()
-                for value in (row.get("seed_buyer_pools") or [])
-                if str(value).strip()
-            ]
-            if not seed_pools:
-                seed_pools = ["enterprise_and_data_buyers"]
+    for raw in canonical_seed_records or []:
+        if not isinstance(raw, Mapping):
+            continue
+        row = dict(raw)
+        host = _host(str(row.get("website") or ""))
+        if not host:
+            continue
 
-            for seed_pool in seed_pools:
-                provenance.setdefault(host, []).append({
-                    "source": "canonical_prospect_seed",
-                    "query": None,
-                    "buyer_pool": seed_pool,
-                    "target_kind": (
-                        "opportunity_seed"
-                        if opportunity_key
-                        else "canonical_seed"
-                    ),
-                    "corridor_key": row.get("seed_corridor_key"),
-                    "opportunity_key": opportunity_key or None,
-                    "product_code": row.get("seed_product_code"),
-                    "icp_profile_key": profile_key or None,
-                    "buying_triggers": [],
-                    "decision_maker_roles": [],
-                    "prospect_id": row.get("id"),
-                    "canonical_niche": row.get("niche"),
-                })
-        seed_domain_count = len(canonical_seed_by_domain)
+        profile_key = str(row.get("icp_profile_key") or "").strip()
+        opportunity_key = str(
+            row.get("seed_opportunity_key") or ""
+        ).strip()
+
+        # Preserve the existing generic fallback contract: ordinary
+        # canonical seeds are only considered when Search Fabric returned
+        # nothing. Opportunity-linked seeds are narrower recovery evidence
+        # for an already-qualified opportunity, so they may supplement
+        # search results without claiming buyer intent or authorizing send.
+        if opportunity_key:
+            opportunity_seed_domains.add(host)
+        elif provenance:
+            continue
+        elif profile_key not in CONTINUOUS_COMMERCIAL_LANE_BY_ICP:
+            continue
+
+        canonical_seed_by_domain[host] = row
+        seed_pools = [
+            str(value).strip()
+            for value in (row.get("seed_buyer_pools") or [])
+            if str(value).strip()
+        ]
+        if not seed_pools:
+            seed_pools = ["enterprise_and_data_buyers"]
+
+        for seed_pool in seed_pools:
+            provenance.setdefault(host, []).append({
+                "source": "canonical_prospect_seed",
+                "recovery_source": row.get("recovery_source"),
+                "query": None,
+                "buyer_pool": seed_pool,
+                "target_kind": (
+                    "opportunity_seed"
+                    if opportunity_key
+                    else "canonical_seed"
+                ),
+                "corridor_key": row.get("seed_corridor_key"),
+                "opportunity_key": opportunity_key or None,
+                "product_code": row.get("seed_product_code"),
+                "icp_profile_key": profile_key or None,
+                "buying_triggers": [],
+                "decision_maker_roles": [],
+                "prospect_id": row.get("id"),
+                "canonical_niche": row.get("niche"),
+            })
+
+    seed_domain_count = len(canonical_seed_by_domain)
+    opportunity_seed_domain_count = len(opportunity_seed_domains)
 
     ranked_domains = sorted(
         provenance,
@@ -610,8 +623,12 @@ def run_buyer_scout(
         "query_count": len(queries),
         "search_domain_count": search_domain_count,
         "canonical_seed_domain_count": seed_domain_count,
+        "opportunity_seed_domain_count": opportunity_seed_domain_count,
         "canonical_seed_fallback_used": bool(
             seed_domain_count and search_domain_count == 0
+        ),
+        "opportunity_seed_supplement_used": bool(
+            opportunity_seed_domain_count and search_domain_count > 0
         ),
         "domain_count": len(ranked_domains),
         "probed_domain_count": min(len(ranked_domains), max_probes),
