@@ -82,7 +82,7 @@ class EmpireDbProvider:
         limit: int = 1000,
         offset: int = 0,
     ) -> Sequence[Mapping[str, Any]]:
-        limit = max(1, min(int(limit), 10000))
+        limit = max(0, min(int(limit), 10000))
         offset = max(0, int(offset))
         params: list[object] = []
         where_parts: list[str] = []
