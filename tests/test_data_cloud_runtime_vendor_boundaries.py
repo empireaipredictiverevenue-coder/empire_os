@@ -58,3 +58,28 @@ def test_buyer_discovery_preview_has_no_database_vendor_transport():
     assert "SUPABASE_SERVICE_KEY" not in source
     assert "supabase.co" not in source
     assert "/rest/v1/" not in source
+
+
+def test_identity_promoter_has_no_database_vendor_transport():
+    source = _source("empire_os/identity_promoter.py")
+
+    assert "SUPABASE_URL" not in source
+    assert "SUPABASE_SERVICE_KEY" not in source
+    assert "supabase.co" not in source
+    assert "/rest/v1/" not in source
+
+
+def test_crawler_runner_has_no_legacy_backend_bootstrap():
+    source = _source("empire_os/crawler_runner.py")
+
+    assert "SUPABASE_URL" not in source
+    assert "SUPABASE_SERVICE_KEY" not in source
+    assert "canonical_supabase" not in source
+
+
+def test_buyer_recovery_business_module_has_no_rest_shaped_data_query():
+    source = _source("empire_os/buyer_recovery.py")
+
+    assert "SUPABASE_URL" not in source
+    assert "SUPABASE_SERVICE_KEY" not in source
+    assert "/rest/v1/" not in source
