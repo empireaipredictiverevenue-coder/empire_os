@@ -51,12 +51,16 @@ def test_runtime_env_mapping_is_passed_to_gateway(monkeypatch):
     fake_repo = object()
 
     monkeypatch.setattr(gtm, "load_runtime_env", lambda path: {"X": "1"})
-    monkeypatch.setattr(
-        gtm,
-        "gateway_from_environment",
-        lambda env: seen.setdefault("env", env) or fake_gateway,
-    )
-    monkeypatch.setattr(gtm, "GTMDataRepository", lambda gateway: seen.setdefault("gateway", gateway) or fake_repo)
+    def gateway_factory(env):
+        seen["env"] = env
+        return fake_gateway
+
+    def repository_factory(gateway):
+        seen["gateway"] = gateway
+        return fake_repo
+
+    monkeypatch.setattr(gtm, "gateway_from_environment", gateway_factory)
+    monkeypatch.setattr(gtm, "GTMDataRepository", repository_factory)
 
     result = gtm._data_repository()
 
