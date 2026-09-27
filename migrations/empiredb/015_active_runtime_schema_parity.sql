@@ -5,27 +5,7 @@
 
 SET ROLE empiredb_migrator;
 
-DO $$
-DECLARE r text;
-BEGIN
-  FOREACH r IN ARRAY ARRAY[
-    'empire_payment_approver',
-    'empire_bsc_verifier',
-    'empire_escrow_verifier',
-    'empire_commercial_approver',
-    'empire_outcome_recorder',
-    'empire_revenue_recognizer',
-    'empire_closer_planner',
-    'empire_conversation_ingest',
-    'empire_conversation_reader',
-    'empire_revenue_exchange_ingest',
-    'empire_revenue_exchange_reader'
-  ] LOOP
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r) THEN
-      EXECUTE format('CREATE ROLE %I NOLOGIN NOINHERIT', r);
-    END IF;
-  END LOOP;
-END $$;
+-- Capability roles are provisioned by scripts/bootstrap_empiredb_runtime_roles.sh.
 
 GRANT USAGE ON SCHEMA public TO
   empire_payment_approver,
