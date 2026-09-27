@@ -21,6 +21,34 @@ PROSPECT_ID = "11111111-1111-4111-8111-111111111111"
 ENTITY_ID = "22222222-2222-4222-8222-222222222222"
 
 
+class FakeAllocationReader:
+    def __init__(
+        self,
+        *,
+        qualifications=None,
+        links=None,
+        buyer_pages=None,
+    ):
+        self.qualifications = list(qualifications or [])
+        self.links = list(links or [])
+        self.buyer_pages = dict(buyer_pages or {})
+        self.qualification_calls = []
+        self.link_calls = []
+        self.buyer_calls = []
+
+    def latest_qualifications(self, prospect_id):
+        self.qualification_calls.append(prospect_id)
+        return list(self.qualifications)
+
+    def active_identity_links(self, prospect_id):
+        self.link_calls.append(prospect_id)
+        return list(self.links)
+
+    def buyer_page(self, *, page_size, offset):
+        self.buyer_calls.append((page_size, offset))
+        return list(self.buyer_pages.get(offset, []))
+
+
 def prospect(**overrides):
     row = {
         "id": PROSPECT_ID,
@@ -143,12 +171,8 @@ def test_v2_qualification_requires_evidence_confidence_floor():
 
 
 def test_fetch_latest_qualification_prefers_v2_with_v1_fallback():
-    calls = []
-
-    def reader(path, params):
-        assert path == "/rest/v1/prospect_qualifications"
-        calls.append(dict(params))
-        return [
+    reader = FakeAllocationReader(
+        qualifications=[
             qualification(scoring_version="v1", score=99),
             qualification(
                 scoring_version="v2",
@@ -156,13 +180,13 @@ def test_fetch_latest_qualification_prefers_v2_with_v1_fallback():
                 evidence_confidence=0.55,
             ),
         ]
+    )
 
     row = fetch_latest_qualification(reader, PROSPECT_ID)
+
     assert row["scoring_version"] == "v2"
     assert row["score"] == 86.3
-    assert calls[0]["scoring_version"] == "in.(v2,v1)"
-    assert "id,prospect_id" in calls[0]["select"]
-    assert calls[0]["limit"] == "2"
+    assert reader.qualification_calls == [PROSPECT_ID]
 
 
 def test_identity_binding_is_fail_closed_and_v2_is_entity_bound():
@@ -213,17 +237,12 @@ def test_v1_identity_binding_allows_null_entity_only_as_compatibility():
 
 
 def test_fetch_active_identity_link_requires_exactly_one_active_link():
-    calls = []
-
-    def reader(path, params):
-        assert path == "/rest/v1/prospect_entity_links"
-        calls.append(dict(params))
-        return [identity_link()]
+    reader = FakeAllocationReader(links=[identity_link()])
 
     row = fetch_active_identity_link(reader, PROSPECT_ID)
+
     assert row["entity_id"] == ENTITY_ID
-    assert calls[0]["active"] == "eq.true"
-    assert calls[0]["limit"] == "2"
+    assert reader.link_calls == [PROSPECT_ID]
 
 
 def test_buyer_activation_gate_rejects_auto_created_capacity():
@@ -303,35 +322,26 @@ def test_allocation_key_is_stable_and_exclusive():
 
 
 def test_fetch_buyer_rows_paginates():
-    calls = []
-
-    def reader(path, params):
-        assert path == "/rest/v1/buyers"
-        calls.append(dict(params))
-        offset = int(params["offset"])
-        if offset == 0:
-            return [buyer("a"), buyer("b")]
-        if offset == 2:
-            return [buyer("c")]
-        return []
+    reader = FakeAllocationReader(
+        buyer_pages={
+            0: [buyer("a"), buyer("b")],
+            2: [buyer("c")],
+        }
+    )
 
     rows = fetch_buyer_rows(reader, page_size=2)
 
     assert [row["id"] for row in rows] == ["a", "b", "c"]
-    assert [call["offset"] for call in calls] == ["0", "2"]
+    assert reader.buyer_calls == [(2, 0), (2, 2)]
 
 
 def test_allocate_owned_prospect_calls_atomic_allocator_once():
     allocator_calls = []
-
-    def reader(path, params):
-        if path == "/rest/v1/prospect_qualifications":
-            return [qualification()]
-        if path == "/rest/v1/prospect_entity_links":
-            return [identity_link()]
-        if path == "/rest/v1/buyers":
-            return [buyer("buyer-1")]
-        raise AssertionError(path)
+    reader = FakeAllocationReader(
+        qualifications=[qualification()],
+        links=[identity_link()],
+        buyer_pages={0: [buyer("buyer-1")]},
+    )
 
     def allocator(payload):
         allocator_calls.append(payload)
@@ -361,15 +371,11 @@ def test_allocate_owned_prospect_calls_atomic_allocator_once():
 
 def test_unqualified_prospect_never_calls_allocator():
     called = False
-
-    def reader(path, params):
-        if path == "/rest/v1/prospect_qualifications":
-            return [qualification(score=30, tier="cold")]
-        if path == "/rest/v1/prospect_entity_links":
-            return [identity_link()]
-        if path == "/rest/v1/buyers":
-            return [buyer("buyer-1")]
-        raise AssertionError(path)
+    reader = FakeAllocationReader(
+        qualifications=[qualification(score=30, tier="cold")],
+        links=[identity_link()],
+        buyer_pages={0: [buyer("buyer-1")]},
+    )
 
     def allocator(payload):
         nonlocal called
@@ -384,20 +390,16 @@ def test_unqualified_prospect_never_calls_allocator():
 
 def test_missing_identity_link_never_calls_allocator():
     called = False
-
-    def reader(path, params):
-        if path == "/rest/v1/prospect_qualifications":
-            return [
-                qualification(
-                    scoring_version="v2",
-                    evidence_confidence=0.55,
-                )
-            ]
-        if path == "/rest/v1/prospect_entity_links":
-            return []
-        if path == "/rest/v1/buyers":
-            return [buyer("buyer-1")]
-        raise AssertionError(path)
+    reader = FakeAllocationReader(
+        qualifications=[
+            qualification(
+                scoring_version="v2",
+                evidence_confidence=0.55,
+            )
+        ],
+        links=[],
+        buyer_pages={0: [buyer("buyer-1")]},
+    )
 
     def allocator(payload):
         nonlocal called
@@ -411,14 +413,11 @@ def test_missing_identity_link_never_calls_allocator():
 
 
 def test_allocator_unknown_decision_fails_closed():
-    def reader(path, params):
-        if path == "/rest/v1/prospect_qualifications":
-            return [qualification()]
-        if path == "/rest/v1/prospect_entity_links":
-            return [identity_link()]
-        if path == "/rest/v1/buyers":
-            return [buyer("buyer-1")]
-        raise AssertionError(path)
+    reader = FakeAllocationReader(
+        qualifications=[qualification()],
+        links=[identity_link()],
+        buyer_pages={0: [buyer("buyer-1")]},
+    )
 
     with pytest.raises(
         BuyerAllocationError,
