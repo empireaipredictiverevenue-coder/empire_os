@@ -11,6 +11,7 @@ def test_ops_control_cycle_owns_runtime_doctor():
     assert 'observe_only=(mode != "GUARDED_EXECUTE")' in text
     assert "CONTAINMENT_SAFE_REPAIR_UNITS" in text
     assert '"empire-buyer-acquisition-local-recovery.timer"' in text
+    assert '"empire-buyer-acquisition-local-recovery.service"' in text
     assert 'if mode == "GUARDED_EXECUTE" and not egress_contained' in text
     assert '"runtime_doctor": runtime_doctor' in text
 
