@@ -3246,7 +3246,7 @@ TO empire_revenue_exchange_reader;
 
 -- Functions default to PUBLIC EXECUTE in PostgreSQL. Revoke that default on the
 -- complete imported runtime authority set, then grant only named capabilities.
-DO $
+DO $empire_authority$
 DECLARE
   v_name text;
   v_proc record;
@@ -3288,10 +3288,10 @@ BEGIN
       EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC',v_proc.signature);
     END LOOP;
   END LOOP;
-END $;
+END $empire_authority$;
 
 -- Generic canonical app: proposal/read-only compatibility surface only.
-DO $
+DO $empire_authority$
 DECLARE v_name text; v_proc record;
 BEGIN
   FOREACH v_name IN ARRAY ARRAY[
@@ -3315,9 +3315,9 @@ BEGIN
       EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO empiredb_app',v_proc.signature);
     END LOOP;
   END LOOP;
-END $;
+END $empire_authority$;
 
-DO $
+DO $empire_authority$
 DECLARE v_role text; v_name text; v_proc record;
 BEGIN
   FOR v_role,v_name IN
@@ -3374,7 +3374,7 @@ BEGIN
       );
     END LOOP;
   END LOOP;
-END $;
+END $empire_authority$;
 
 -- Materialize RLS policies from already-granted SQL capabilities.
 -- This cannot widen authority: a policy is created only when the role already
