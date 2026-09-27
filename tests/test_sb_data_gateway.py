@@ -70,3 +70,17 @@ def test_unconfigured_backend_preserves_compatibility_noop(monkeypatch):
     assert sb.delete("prospects", {"id": "1"}) is None
     assert sb.rpc("anything") is None
     assert gateway.calls == []
+
+
+def test_each_sb_operation_selects_gateway_once(monkeypatch):
+    gateway = FakeGateway()
+    calls = {"count": 0}
+
+    def factory():
+        calls["count"] += 1
+        return gateway
+
+    monkeypatch.setattr(sb, "_gateway", factory)
+    sb.select("prospects")
+
+    assert calls["count"] == 1
