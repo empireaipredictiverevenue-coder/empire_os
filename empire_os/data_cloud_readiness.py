@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import Counter
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
 from empire_os.data_cloud_discovery import discover_vendor_dependencies
@@ -89,9 +90,32 @@ def build_readiness_snapshot(
     }
 
 
+def compact_readiness_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    host = snapshot["host"]
+    inventory = snapshot["dependency_inventory"]
+    observed = host["host"]
+    gib = 1024 ** 3
+    return {
+        "capacity_ready": host["capacity_ready"],
+        "cpu_count": observed["cpu_count"],
+        "memory_gib": round(observed["memory_bytes"] / gib, 2),
+        "disk_free_gib": round(observed["disk_free_bytes"] / gib, 2),
+        "missing_packages": host["missing_packages"],
+        "runtime_vendor_findings": inventory["runtime_finding_count"],
+        "runtime_vendor_files": inventory["runtime_file_count"],
+        "requires_review": inventory["requires_review_count"],
+        "runtime_scan_clear": inventory["runtime_scan_clear"],
+        "runtime_top_files": inventory["runtime_top_files"][:10],
+    }
+
+
 def main() -> int:
     snapshot = build_readiness_snapshot(Path.cwd())
-    print(json.dumps(snapshot, indent=2, sort_keys=True))
+    if "--full-json" in sys.argv[1:]:
+        payload = snapshot
+    else:
+        payload = compact_readiness_snapshot(snapshot)
+    print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
 
