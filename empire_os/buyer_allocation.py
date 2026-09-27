@@ -442,7 +442,7 @@ def fetch_latest_qualification(
 
 
 def fetch_active_identity_link(
-    reader: Reader,
+    reader: BuyerAllocationReader,
     prospect_id: str,
 ) -> dict[str, Any] | None:
     rows = reader.active_identity_links(prospect_id)
@@ -463,7 +463,7 @@ def fetch_active_identity_link(
 
 
 def fetch_buyer_rows(
-    reader: Reader,
+    reader: BuyerAllocationReader,
     *,
     page_size: int = BUYER_PAGE_SIZE,
 ) -> list[dict[str, Any]]:
@@ -493,7 +493,7 @@ def fetch_buyer_rows(
 
 def allocate_owned_prospect(
     prospect: dict[str, Any],
-    reader: Reader,
+    reader: BuyerAllocationReader,
     allocator: Allocator,
 ) -> dict[str, Any]:
     prospect_id, _, _ = _prospect_market(prospect)
