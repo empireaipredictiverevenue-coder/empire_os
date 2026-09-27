@@ -66,6 +66,8 @@ def test_runtime_self_heal_units_are_allowlisted_without_outbound_authority():
 
     expected = {
         "empire-self-serve-checkout.service",
+        "empire-founder-console.service",
+        "empire-founder-dashboard-api.service",
         "empire-ops-mcp.service",
         "empire-commercial-product-catalog.service",
         "empire-commercial-product-catalog.timer",
