@@ -65,6 +65,7 @@ def dispatch_closeout_wave(
                 "request_id": request.request_id,
                 "status": "DISPATCH_EXCEPTION",
                 "error_class": type(exc).__name__,
+                "error_detail": str(exc)[-1000:],
                 "execution_authority": "none",
                 "production_deploy": False,
             }
@@ -117,6 +118,7 @@ def dispatch_closeout_wave(
         "request_count": len(requests),
         "execute_pi": bool(execute_pi),
         "max_parallel": worker_count,
+        "hermes_queue_mode": "serial_control_branch_publication",
         "status_counts": dict(sorted(statuses.items())),
         "dispatch_failure_count": len(dispatch_failures),
         "results": results,
