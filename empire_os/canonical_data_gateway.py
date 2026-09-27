@@ -300,6 +300,7 @@ def gateway_from_environment(
     environ: Mapping[str, str] | None = None,
     *,
     legacy_provider_factory: Any | None = None,
+    empiredb_provider_factory: Any | None = None,
 ) -> CanonicalDataGateway:
     """Build the canonical gateway from explicit backend selection.
 
@@ -321,8 +322,29 @@ def gateway_from_environment(
         ) from exc
 
     if backend is DataBackend.EMPIREDB:
-        raise DataGatewayUnavailable(
-            "EmpireDB selected before the verified runtime provider is registered"
+        try:
+            if empiredb_provider_factory is None:
+                from empire_os.data_backends.empiredb import EmpireDbProvider
+                from empire_os.data_backends.postgres import (
+                    PostgresConnectionConfig,
+                    PostgresConnector,
+                )
+
+                provider = EmpireDbProvider(
+                    PostgresConnector(
+                        PostgresConnectionConfig.from_env(source)
+                    )
+                )
+            else:
+                provider = empiredb_provider_factory(source)
+        except (ValueError, RuntimeError) as exc:
+            raise DataGatewayUnavailable(
+                "EmpireDB selected but its runtime provider is not configured"
+            ) from exc
+
+        return CanonicalDataGateway(
+            provider,
+            expected_backend=DataBackend.EMPIREDB,
         )
 
     if legacy_provider_factory is None:
