@@ -7,12 +7,10 @@ Wants=postgresql@18-main.service
 Type=oneshot
 User=postgres
 Group=postgres
-WorkingDirectory=/srv/empire_os
-Environment=PYTHONPATH=/srv/empire_os
-ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.data_cloud_backup_observer --output /run/empire-data-cloud/pgbackrest.json
 RuntimeDirectory=empire-data-cloud
 RuntimeDirectoryMode=0750
 UMask=0027
+ExecStart=/bin/sh -ec '/usr/bin/pgbackrest --config=/etc/pgbackrest/empiredb.conf --stanza=empiredb --log-level-file=off --output=json info > /run/empire-data-cloud/pgbackrest.json.tmp && /bin/mv /run/empire-data-cloud/pgbackrest.json.tmp /run/empire-data-cloud/pgbackrest.json'
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
@@ -22,4 +20,3 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
