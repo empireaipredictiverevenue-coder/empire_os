@@ -32,4 +32,4 @@ echo "worker_code_sha=$WORKER_SHA"
 
 export PYTHONPATH="$WORKTREE"
 
-exec "$REPO/.venv/bin/python"   "$WORKTREE/scripts/run_hermes_control_worker.py"   --repo-root "$REPO"   --control-branch ops/hermes-control   --max-jobs 1
+exec "$REPO/.venv/bin/python"   "$WORKTREE/scripts/run_hermes_control_worker.py"   --repo-root "$REPO"   --control-branch ops/hermes-control   --max-jobs 3
