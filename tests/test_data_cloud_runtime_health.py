@@ -75,18 +75,29 @@ def test_collect_health_is_read_only_and_keeps_supabase_canonical(
     assert "wal_pitr" in result["open_gates"]
 
 
-def test_pgbackrest_probe_uses_dedicated_config(monkeypatch, tmp_path):
-    config = tmp_path / "empiredb.conf"
-    config.write_text(
-        "[empiredb]\n"
-        "pg1-path=/var/lib/postgresql/18/main\n"
-        "[global]\n"
-        "repo1-type=posix\n"
-        "repo1-path=/var/backups/empiredb/pgbackrest\n"
-        "repo1-cipher-type=aes-256-cbc\n",
+def test_pgbackrest_probe_uses_postgres_owned_observer(
+    monkeypatch,
+    tmp_path,
+):
+    snapshot = tmp_path / "pgbackrest.json"
+    snapshot.write_text(
+        """{
+          "healthy": true,
+          "backup_count": 1,
+          "latest_label": "20260927-202202F",
+          "repo_type": "posix",
+          "repo_path": "/var/backups/empiredb/pgbackrest",
+          "cipher_type": "aes-256-cbc",
+          "encrypted": true,
+          "off_node_repository_verified": false
+        }""",
         encoding="utf-8",
     )
-    monkeypatch.setattr(health, "PGBACKREST_CONFIG", config)
+    monkeypatch.setattr(
+        health,
+        "PGBACKREST_OBSERVER_SNAPSHOT",
+        snapshot,
+    )
 
     calls = []
 
@@ -94,19 +105,31 @@ def test_pgbackrest_probe_uses_dedicated_config(monkeypatch, tmp_path):
         calls.append(argv)
         return SimpleNamespace(
             returncode=0,
-            stdout=(
-                '[{"status":{"code":0},"backup":'
-                '[{"label":"20260927-202202F"}]}]'
-            ),
+            stdout="",
             stderr="",
         )
 
     result = health._pgbackrest_probe(runner=runner)
 
-    assert calls[0][0] == "pgbackrest"
-    assert f"--config={config}" in calls[0]
-    assert "--stanza=empiredb" in calls[0]
-    assert "--log-level-file=off" in calls[0]
+    assert calls == [[
+        "systemctl",
+        "start",
+        "empire-data-cloud-backup-observer.service",
+    ]]
     assert result["healthy"] is True
+    assert result["backup_count"] == 1
     assert result["encrypted"] is True
     assert result["off_node_repository_verified"] is False
+
+
+def test_pgbackrest_probe_fails_closed_if_observer_service_fails():
+    result = health._pgbackrest_probe(
+        runner=lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr="failed",
+        )
+    )
+
+    assert result["healthy"] is False
+    assert result["error_class"] == "PgBackRestObserverServiceFailed"
