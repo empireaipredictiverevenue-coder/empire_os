@@ -32,9 +32,12 @@ def evaluate_reliability(
     validate_topology(nodes)
     findings: list[str] = []
 
+    primary = next(n for n in nodes if n.role is NodeRole.PRIMARY)
     sync = [n for n in nodes if n.role is NodeRole.SYNC_REPLICA]
     dr = [n for n in nodes if n.role is NodeRole.DR_REPLICA]
 
+    if not primary.healthy:
+        findings.append(f"primary_unhealthy:{primary.node_id}")
     if not sync:
         findings.append("sync_replica_missing")
     if not dr:
