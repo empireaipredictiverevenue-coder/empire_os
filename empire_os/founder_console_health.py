@@ -263,6 +263,17 @@ def clear_verified_orphan(
             }
 
     pid = int(observation.port_pid)
+
+    # systemctl --user disable --now may terminate the stale process itself.
+    # That is already the desired bounded recovery outcome.
+    if not process_exists(pid):
+        return {
+            "ok": True,
+            "state": "ORPHAN_TERMINATED_BY_USER_UNIT_STOP",
+            "killed": False,
+            "pid": pid,
+        }
+
     before = process_identity(pid)
     if not _verified_console_process(before):
         return {
