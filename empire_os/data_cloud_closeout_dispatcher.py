@@ -70,13 +70,28 @@ def dispatch_closeout_wave(
             }
         return result
 
-    with ThreadPoolExecutor(max_workers=worker_count) as pool:
-        futures = {
-            pool.submit(dispatch_one, request): request
-            for request in requests
-        }
-        for future in as_completed(futures):
-            results.append(future.result())
+    hermes_requests = [
+        request
+        for request in requests
+        if request.capability == "backend_code"
+    ]
+    parallel_requests = [
+        request
+        for request in requests
+        if request.capability != "backend_code"
+    ]
+
+    for request in hermes_requests:
+        results.append(dispatch_one(request))
+
+    if parallel_requests:
+        with ThreadPoolExecutor(max_workers=worker_count) as pool:
+            futures = {
+                pool.submit(dispatch_one, request): request
+                for request in parallel_requests
+            }
+            for future in as_completed(futures):
+                results.append(future.result())
 
     results.sort(key=lambda row: str(row.get("request_id") or ""))
     statuses: dict[str, int] = {}
