@@ -13,7 +13,11 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Mapping
 
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.market_pricing_repository import (
+    MarketPricingRepository,
+    PricingRepository,
+    RequestMarketPricingRepository,
+)
 
 
 Request = Callable[..., Any]
@@ -204,20 +208,10 @@ def pricing_matrix() -> dict[str, Any]:
 
 
 def _catalog_rows(
-    request: Request,
+    repository: PricingRepository,
     product_code: str,
 ) -> list[dict[str, Any]]:
-    rows = request(
-        "POST",
-        "/rest/v1/rpc/get_commercial_product_catalog",
-        payload={
-            "p_product_code": product_code,
-            "p_limit": 1,
-        },
-    ) or []
-    if isinstance(rows, Mapping):
-        rows = [rows]
-    return [dict(row) for row in rows if isinstance(row, Mapping)]
+    return repository.catalog_rows(product_code, limit=1)
 
 
 def _matching_price_version(
@@ -247,12 +241,31 @@ def _matching_price_version(
     )
 
 
+def _resolve_repository(
+    *,
+    repository: PricingRepository | None,
+    request: Request | None,
+) -> PricingRepository:
+    if repository is not None and request is not None:
+        raise ValueError("provide repository or request, not both")
+    if repository is not None:
+        return repository
+    if request is not None:
+        return RequestMarketPricingRepository(request)
+    return MarketPricingRepository.from_environment()
+
+
 def sync_market_price(
     price: MarketPrice,
     *,
-    request: Request = request_json,
+    request: Request | None = None,
+    repository: PricingRepository | None = None,
 ) -> dict[str, Any]:
-    existing = _catalog_rows(request, price.product_code)
+    store = _resolve_repository(
+        repository=repository,
+        request=request,
+    )
+    existing = _catalog_rows(store, price.product_code)
     if existing and _matching_price_version(existing[0], price):
         return {
             "product_code": price.product_code,
@@ -269,86 +282,78 @@ def sync_market_price(
             "actual_revenue": False,
         }
 
-    identity = request(
-        "POST",
-        "/rest/v1/rpc/register_commercial_product_identity",
-        payload={
-            "p_product_code": price.product_code,
-            "p_product_name": (
-                f"Solar Opportunity Map — {price.country_code}"
-            ),
-            "p_product_family": "search_intelligence",
-            "p_billing_model": "one_time",
-            "p_configuration": {
-                "parent_product_code": BASE_PRODUCT_CODE,
-                "country_code": price.country_code,
-                "currency": price.currency,
-                "locale": price.locale,
-                "delivery": "evidence_backed_opportunity_map",
-                "pricing_scope": "market_localized",
-            },
-            "p_provenance": {
-                "source": "empire_os.market_pricing",
-                "price_source_type": price.source_type,
-                "approval_state": price.approval_state,
-                "fx_conversion_used": False,
-            },
-            "p_actor": "market-pricing-sync",
+    identity = store.register_product_identity({
+        "p_product_code": price.product_code,
+        "p_product_name": (
+            f"Solar Opportunity Map — {price.country_code}"
+        ),
+        "p_product_family": "search_intelligence",
+        "p_billing_model": "one_time",
+        "p_configuration": {
+            "parent_product_code": BASE_PRODUCT_CODE,
+            "country_code": price.country_code,
+            "currency": price.currency,
+            "locale": price.locale,
+            "delivery": "evidence_backed_opportunity_map",
+            "pricing_scope": "market_localized",
         },
-    ) or {}
+        "p_provenance": {
+            "source": "empire_os.market_pricing",
+            "price_source_type": price.source_type,
+            "approval_state": price.approval_state,
+            "fx_conversion_used": False,
+        },
+        "p_actor": "market-pricing-sync",
+    })
 
     price_state = (
         "VERIFIED"
         if price.approval_state == "FOUNDER_APPROVED"
         else "PROPOSED"
     )
-    version = request(
-        "POST",
-        "/rest/v1/rpc/propose_commercial_product_version",
-        payload={
-            "p_product_code": price.product_code,
-            "p_billing_model": "one_time",
-            "p_currency": price.currency,
-            "p_price_basis": {
-                "state": price_state,
-                "amount_cents": price.amount_minor,
-                "currency": price.currency,
-                "unit": "per_map",
-                "billing_model": "one_time",
-                "source_type": price.source_type,
-                "approval_state": price.approval_state,
-                "rationale": price.rationale,
-            },
-            "p_acquisition_cost_basis": {
-                "state": "UNKNOWN",
-                "reason": "market_acquisition_cost_not_yet_verified",
-            },
-            "p_fulfilment_cost_basis": {
-                "state": "UNKNOWN",
-                "reason": "market_fulfilment_cost_not_yet_verified",
-            },
-            "p_margin_policy": {
-                "state": "UNKNOWN",
-                "reason": "market_margin_policy_not_yet_verified",
-            },
-            "p_provenance": {
-                "source": "empire_os.market_pricing",
-                "country_code": price.country_code,
-                "approval_state": price.approval_state,
-                "fx_conversion_used": False,
-                "binding_terms_ready": False,
-            },
-            "p_evidence_refs": [
-                (
-                    f"market_price:{BASE_PRODUCT_CODE}:"
-                    f"{price.country_code}:{price.approval_state}"
-                ),
-            ],
-            "p_effective_from": None,
-            "p_effective_until": None,
-            "p_actor": "market-pricing-sync",
+    version = store.propose_product_version({
+        "p_product_code": price.product_code,
+        "p_billing_model": "one_time",
+        "p_currency": price.currency,
+        "p_price_basis": {
+            "state": price_state,
+            "amount_cents": price.amount_minor,
+            "currency": price.currency,
+            "unit": "per_map",
+            "billing_model": "one_time",
+            "source_type": price.source_type,
+            "approval_state": price.approval_state,
+            "rationale": price.rationale,
         },
-    ) or {}
+        "p_acquisition_cost_basis": {
+            "state": "UNKNOWN",
+            "reason": "market_acquisition_cost_not_yet_verified",
+        },
+        "p_fulfilment_cost_basis": {
+            "state": "UNKNOWN",
+            "reason": "market_fulfilment_cost_not_yet_verified",
+        },
+        "p_margin_policy": {
+            "state": "UNKNOWN",
+            "reason": "market_margin_policy_not_yet_verified",
+        },
+        "p_provenance": {
+            "source": "empire_os.market_pricing",
+            "country_code": price.country_code,
+            "approval_state": price.approval_state,
+            "fx_conversion_used": False,
+            "binding_terms_ready": False,
+        },
+        "p_evidence_refs": [
+            (
+                f"market_price:{BASE_PRODUCT_CODE}:"
+                f"{price.country_code}:{price.approval_state}"
+            ),
+        ],
+        "p_effective_from": None,
+        "p_effective_until": None,
+        "p_actor": "market-pricing-sync",
+    })
 
     return {
         "product_code": price.product_code,
@@ -365,13 +370,24 @@ def sync_market_price(
 
 
 def sync_solar_market_pricing(
-    request: Request = request_json,
+    request: Request | None = None,
+    *,
+    repository: PricingRepository | None = None,
 ) -> dict[str, Any]:
+    store = _resolve_repository(
+        repository=repository,
+        request=request,
+    )
     results = []
     errors = []
     for price in SOLAR_OPPORTUNITY_MAP_PRICES.values():
         try:
-            results.append(sync_market_price(price, request=request))
+            results.append(
+                sync_market_price(
+                    price,
+                    repository=store,
+                )
+            )
         except Exception as exc:
             errors.append({
                 "country_code": price.country_code,
