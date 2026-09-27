@@ -50,14 +50,21 @@ def _filter_param(item: DataFilter) -> tuple[str, str]:
     column = _ident(item.column)
     if item.operator is FilterOperator.EQ:
         return column, f"eq.{_postgrest_scalar(item.value)}"
+    if item.operator is FilterOperator.NE:
+        return column, f"not.eq.{_postgrest_scalar(item.value)}"
+    if item.operator is FilterOperator.ILIKE:
+        return column, f"ilike.{_postgrest_scalar(item.value)}"
+    if item.operator is FilterOperator.GTE:
+        return column, f"gte.{_postgrest_scalar(item.value)}"
     if item.operator is FilterOperator.IS_NULL:
         return column, "is.null"
-    if item.operator is FilterOperator.IN:
+    if item.operator in {FilterOperator.IN, FilterOperator.NOT_IN}:
         values = tuple(item.value or ())
         if not values:
             raise ValueError("IN filter requires at least one value")
         encoded = ",".join(_postgrest_scalar(value) for value in values)
-        return column, f"in.({encoded})"
+        prefix = "in." if item.operator is FilterOperator.IN else "not.in."
+        return column, f"{prefix}({encoded})"
     raise ValueError(f"unsupported filter operator: {item.operator}")
 
 
@@ -195,7 +202,17 @@ class SupabaseLegacyProvider:
             params.append((
                 "order",
                 ",".join(
-                    f"{_ident(item.column)}.{('desc' if item.descending else 'asc')}"
+                    (
+                        f"{_ident(item.column)}."
+                        f"{'desc' if item.descending else 'asc'}"
+                        + (
+                            ".nullslast"
+                            if item.nulls_last is True
+                            else ".nullsfirst"
+                            if item.nulls_last is False
+                            else ""
+                        )
+                    )
                     for item in order
                 ),
             ))
