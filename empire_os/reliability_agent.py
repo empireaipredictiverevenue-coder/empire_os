@@ -369,6 +369,7 @@ def _action_verified(row: Mapping[str, Any]) -> bool:
         return result.get("state") in {
             "ORPHAN_TERMINATED",
             "ORPHAN_KILLED",
+            "ORPHAN_TERMINATED_BY_USER_UNIT_STOP",
             "NO_ACTION_SERVICE_ACTIVE",
             "NO_ORPHAN_PORT_OWNER",
         }
