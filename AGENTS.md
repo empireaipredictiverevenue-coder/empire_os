@@ -1,3 +1,47 @@
+## PRODUCTION OVERRIDE — 2026-09-28
+
+This section overrides any conflicting historical wording below.
+
+- Blueprint V6 and the verified live runtime are production truth.
+- EmpireDB PostgreSQL is the canonical production business database.
+- `EMPIRE_DATA_BACKEND=empiredb`.
+- Supabase is legacy/recovery evidence only and must not become canonical again.
+- Unknown stays unknown. Never fabricate production data or evidence.
+- Default autonomous authority remains OBSERVE.
+- Existing approved bounded revenue schedules may continue operating.
+- New authority expansion remains founder-gated.
+- Generic `empiredb_app` must never inherit sensitive sender, payment,
+  commercial-approval or revenue-recognition authority.
+- Dedicated runtime roles must remain least privilege.
+- Migration 018 is HELD and must not be changed or applied without explicit
+  founder approval.
+
+Migration 018:
+
+`migrations/empiredb/018_tenant_context_foundation.sql`
+
+Required SHA256:
+
+`e7edcfe1d0f94c3898437e68db0714557370b7b86f9b21ee76cc04be60bc3c21`
+
+Engineering sequence:
+
+DIAGRAM → ARCHITECTURE CONTRACT / DELTA → WORKER ASSIGNMENT → IMPLEMENT
+→ INDEPENDENT VERIFY → LIVE VERIFY → CHECKLIST DONE
+
+Recovery sequence:
+
+OBSERVE → DIAGNOSE → CLASSIFY → PLAN → ACT → VERIFY → RECORD → RESUME
+
+Never use `git add .`.
+Never blindly `git reset --hard` or `git clean -fd`.
+Do not mutate `recovery/` or `toop/` without explicit recovery scope.
+
+Codex, Hermes, Pi and Empire Coder are implementation workers, not business
+authorities. They cannot grant themselves production authority.
+
+---
+
 # Empire OS — Codex Repository Instructions
 
 These instructions apply to the entire repository unless a deeper `AGENTS.md` overrides them.
@@ -8,7 +52,7 @@ Empire OS is the execution platform for Empire AI / Predictive Revenue. Treat da
 
 ## Source-of-truth architecture
 
-- Supabase/Postgres is the canonical business-data store.
+- EmpireDB PostgreSQL is the canonical business-data store.
 - `prospects` is the canonical owned prospect inventory.
 - `prospect_qualifications` contains scoring and intelligence.
 - `fulfilment_orders` controls commercial allocation and delivery lifecycle.
@@ -33,7 +77,7 @@ Rules:
 
 1. Never fabricate prospect identities.
 2. Never create timestamp-derived `prospect_*` IDs as canonical identity.
-3. Never silently fall back to SQLite when canonical Supabase acquisition fails.
+3. Never silently fall back to SQLite or Supabase when canonical EmpireDB acquisition fails.
 4. Ambiguous identity must fail closed or require manual resolution.
 5. Preserve source evidence/provenance. A source URL is not automatically a verified business website.
 6. Deduplication/identity claims must remain race-safe and idempotent.
@@ -63,7 +107,7 @@ Do not modify, stage, delete, move, or use as implementation source material unl
 
 Do not perform any of the following without explicit human approval in the current task:
 
-- apply database migrations to live Supabase;
+- apply live database migrations;
 - restart production services;
 - enable or switch autonomous execution to live mode;
 - execute queued jobs;

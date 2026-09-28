@@ -110,6 +110,143 @@ class PostgresOutboundRpc:
         return row[0]
 
 
+class PostgresStandingAuthorityApproverRpc:
+    """Dedicated EmpireDB standing-authority transport.
+
+    Exposes only the existing approve_outbound_intent interface expected by
+    the Governor executor, but routes through the correct bounded database
+    standing-authority function according to sequence_kind.
+    """
+
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        daily_cap: int = 10,
+        connect_factory: Callable | None = None,
+    ) -> None:
+        self.dsn = str(dsn or "").strip()
+        self.daily_cap = max(1, min(int(daily_cap), 50))
+
+        if not self.dsn:
+            raise OutboundProviderError(
+                "dedicated outbound approver database DSN required"
+            )
+
+        if connect_factory is None:
+            try:
+                import psycopg
+            except ImportError as exc:
+                raise OutboundProviderError(
+                    "psycopg is required for outbound role transport"
+                ) from exc
+
+            connect_factory = psycopg.connect
+
+        self._connect = connect_factory
+
+    def __call__(
+        self,
+        name: str,
+        params: dict[str, Any],
+    ) -> Any:
+        if name != "approve_outbound_intent":
+            raise OutboundProviderError(
+                "standing-authority transport only supports "
+                "outbound approval"
+            )
+
+        expected = {
+            "p_intent_id",
+            "p_approved_by",
+            "p_note",
+        }
+
+        if not isinstance(params, dict) or set(params) != expected:
+            raise OutboundProviderError(
+                "unexpected standing-authority approval parameters"
+            )
+
+        intent_id = params["p_intent_id"]
+
+        try:
+            with self._connect(self.dsn) as connection:
+                with connection.cursor() as cursor:
+
+                    cursor.execute(
+                        "SET LOCAL ROLE empire_outbound_approver"
+                    )
+
+                    cursor.execute(
+                        """
+                        SELECT metadata
+                        FROM public.outbound_intents
+                        WHERE id=%s
+                        """,
+                        (intent_id,),
+                    )
+
+                    row = cursor.fetchone()
+
+                    if not row:
+                        raise OutboundProviderError(
+                            "outbound intent not found"
+                        )
+
+                    metadata = row[0] or {}
+
+                    if not isinstance(metadata, dict):
+                        metadata = {}
+
+                    sequence_kind = metadata.get(
+                        "sequence_kind"
+                    )
+
+                    if sequence_kind == "followup":
+                        rpc_name = (
+                            "auto_approve_outbound_followup"
+                        )
+                    elif sequence_kind == "closer_reply":
+                        rpc_name = (
+                            "auto_approve_closer_reply_intent"
+                        )
+                    else:
+                        rpc_name = (
+                            "auto_approve_outbound_intent"
+                        )
+
+                    cursor.execute(
+                        f"SELECT public.{rpc_name}(%s,%s)",
+                        (
+                            intent_id,
+                            self.daily_cap,
+                        ),
+                    )
+
+                    result = cursor.fetchone()
+
+        except OutboundProviderError:
+            raise
+        except Exception as exc:
+            sqlstate = getattr(exc, "sqlstate", None)
+
+            if sqlstate == "P0001":
+                raise OutboundProviderError(
+                    f"standing authority blocked: {exc}"
+                ) from exc
+
+            raise OutboundProviderError(
+                f"dedicated standing-authority RPC failed: {exc}"
+            ) from exc
+
+        if not result or len(result) != 1:
+            raise OutboundProviderError(
+                "standing-authority RPC returned no result"
+            )
+
+        return result[0]
+
+
 class SupabaseOutboundRpc:
     """Narrow PostgREST transport using the existing protected service key.
 

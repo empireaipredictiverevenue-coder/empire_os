@@ -41,7 +41,7 @@ SIGNALS → OPPORTUNITY GRAPH → OPPORTUNITY FOUNDRY → MARKET ENTRY → EXPER
 
 
 ## Canonical Architecture Decisions
-- Truth/data plane: Supabase project `owbeinlfcfdtwcwrttjy` (Empire-AI Database) remains canonical production truth until independently verified Founder-approved cutover. Empire Data Cloud is the sovereign PostgreSQL replacement path under active architecture/build; EmpireOS business modules must converge on the vendor-neutral Empire Data Fabric boundary rather than new direct vendor coupling. SQLite is legacy/cache only.
+- Truth/data plane: EmpireDB PostgreSQL is the canonical production business-data store. `EMPIRE_DATA_BACKEND=empiredb` is the active runtime authority. Historical Supabase project `owbeinlfcfdtwcwrttjy` is legacy/recovery evidence only and must not become a silent production fallback. EmpireOS business modules converge on the vendor-neutral Empire Data Fabric boundary. SQLite remains legacy/cache only.
 - Operating coordinator: Astra. Deterministic/local first; premium AI only when economically justified.
 - Execution bus: remain OBSERVE until explicit promotion approval.
 - Public domain: `empire-ai.co.uk` through Cloudflare Tunnel `Empire-AI`.
@@ -56,7 +56,7 @@ SIGNALS → OPPORTUNITY GRAPH → OPPORTUNITY FOUNDRY → MARKET ENTRY → EXPER
 ## Current Live State
 - Domain/tunnel restored and reboot-persistent.
 - Public Agent Web health, A2A Agent Card and WebMCP manifest live.
-- Canonical market intelligence snapshot is Supabase-backed and public-safe/aggregated.
+- Canonical market intelligence reads are EmpireDB-backed through the governed data boundary; public surfaces remain aggregated/public-safe.
 - `market.search`, aggregate `opportunity.search`, and revenue-backed SEO keyword intelligence execute live.
 - AEO/GEO/citation evidence adapter ✅ local/tested: only observed citation/mention evidence is counted, missing evidence remains unknown, and no fabricated visibility score or ranking is emitted. Production observation ingestion remains gated.
 - Astra bootstrap is deterministic/plan-only.

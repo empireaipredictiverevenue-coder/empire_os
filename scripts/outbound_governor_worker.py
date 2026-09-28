@@ -19,6 +19,7 @@ from empire_os.outbound_governor_executor import (
 from empire_os.outbound_provider import OutboundProviderError
 from empire_os.outbound_role_transport import (
     PostgresOutboundRpc,
+    PostgresStandingAuthorityApproverRpc,
     SupabaseOutboundRpc,
     SupabaseStandingAuthorityApproverRpc,
 )
@@ -48,34 +49,59 @@ def _provider_ready() -> bool:
     ])
 
 
+def _empiredb_mode() -> bool:
+    return (
+        os.getenv("EMPIRE_DATA_BACKEND", "")
+        .strip()
+        .lower()
+        == "empiredb"
+    )
+
+
 def _sender_rpc():
     dsn = os.getenv("EMPIRE_OUTBOUND_SENDER_DSN", "").strip()
+
     if dsn:
-        try:
-            return PostgresOutboundRpc(
-                dsn,
-                "empire_outbound_sender",
-            )
-        except OutboundProviderError as exc:
-            # Dedicated role transport is preferred, but a missing local
-            # psycopg driver must not take the governed sender offline. The
-            # Supabase bridge exposes the same narrow RPC allowlist and keeps
-            # database policy as the authority boundary.
-            if "psycopg is required" not in str(exc):
-                raise
+        return PostgresOutboundRpc(
+            dsn,
+            "empire_outbound_sender",
+        )
+
+    if _empiredb_mode():
+        raise OutboundProviderError(
+            "EmpireDB outbound sender DSN required"
+        )
+
     return SupabaseOutboundRpc("empire_outbound_sender")
 
 
 def _approver_rpc():
-    dsn = os.getenv("EMPIRE_OUTBOUND_APPROVER_DSN", "").strip()
+    cap = int(
+        os.getenv(
+            "EMPIRE_GTM_DAILY_EXTERNAL_CAP",
+            "25",
+        )
+    )
+
+    dsn = os.getenv(
+        "EMPIRE_OUTBOUND_APPROVER_DSN",
+        "",
+    ).strip()
+
     if dsn:
-        try:
-            return PostgresOutboundRpc(dsn, "empire_outbound_approver")
-        except OutboundProviderError as exc:
-            if "psycopg is required" not in str(exc):
-                raise
-    cap = int(os.getenv("EMPIRE_GTM_DAILY_EXTERNAL_CAP", "25"))
-    return SupabaseStandingAuthorityApproverRpc(daily_cap=cap)
+        return PostgresStandingAuthorityApproverRpc(
+            dsn,
+            daily_cap=cap,
+        )
+
+    if _empiredb_mode():
+        raise OutboundProviderError(
+            "EmpireDB outbound approver DSN required"
+        )
+
+    return SupabaseStandingAuthorityApproverRpc(
+        daily_cap=cap
+    )
 
 
 def _evaluate(
@@ -149,11 +175,14 @@ def main(argv=None) -> int:
                     message = str(exc)
                     if (
                         decision.get("decision") == "AUTO_APPROVE_ELIGIBLE"
-                        and "existing outbound history requires explicit review"
-                        in message
+                        and (
+                            "existing outbound history requires explicit review"
+                            in message
+                            or "standing authority blocked:" in message
+                        )
                     ):
                         record["execution_blocked"] = {
-                            "reason": "existing_outbound_history_requires_explicit_review",
+                            "reason": message[:500],
                             "nonfatal": True,
                         }
                         results.append(record)
