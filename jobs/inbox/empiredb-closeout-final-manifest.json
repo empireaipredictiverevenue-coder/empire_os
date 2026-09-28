@@ -1,0 +1,22 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/data_cloud_cutover_manifest.py",
+    "tests/test_data_cloud_cutover_manifest.py",
+    "docs/EMPIRE_DATA_CLOUD_CUTOVER_RUNBOOK.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-09-28T08:44:30.679085+00:00",
+  "job_id": "empiredb-closeout-final-manifest",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:data_cloud_cutover_manifest"
+  ],
+  "max_runtime_seconds": 1200,
+  "prompt": "Build a machine-readable final EmpireDB cutover manifest generator that consumes existing verified artifacts only. It must report every gate GREEN/OPEN/UNKNOWN with evidence refs, prohibit promotion while off-node backup, PITR, tenant isolation, rollback or runtime proof is open, and always return production_cutover_authority=false. Founder approval must remain an external explicit gate; never infer it.",
+  "pytest_targets": [
+    "tests/test_data_cloud_cutover_manifest.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
