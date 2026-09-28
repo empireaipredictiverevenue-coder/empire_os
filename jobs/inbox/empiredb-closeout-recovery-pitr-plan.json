@@ -1,0 +1,21 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "docs/EMPIRE_DATA_CLOUD_RECOVERY_PITR.md",
+    "tests/test_data_cloud_recovery_contract.py"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-09-28T08:44:25.019874+00:00",
+  "job_id": "empiredb-closeout-recovery-pitr-plan",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:data_cloud_recovery_architecture"
+  ],
+  "max_runtime_seconds": 1200,
+  "prompt": "Produce the production architecture delta and executable proof plan for off-node encrypted pgBackRest backup, WAL archiving/PITR and single-node recovery. Reuse current PostgreSQL 18 + pgBackRest. Do not pretend a second target exists. Specify the exact external storage/failure-domain requirement, encryption, retention, restore drill, RPO/RTO evidence and fail-closed readiness criteria. No infrastructure mutation or paid resource commitment.",
+  "pytest_targets": [
+    "tests/test_data_cloud_recovery_contract.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
