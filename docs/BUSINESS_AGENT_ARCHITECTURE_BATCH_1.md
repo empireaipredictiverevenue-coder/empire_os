@@ -14,6 +14,20 @@ shadow revenue ledgers, shadow buyer stores, or parallel crawler truth systems.
 
 ---
 
+## Commercial conversation doctrine
+
+Buyer Reply / Conversation Operations must follow
+[`PARTNERSHIP_FIRST_COMMERCIAL_DOCTRINE.md`](PARTNERSHIP_FIRST_COMMERCIAL_DOCTRINE.md).
+
+The canonical commercial motion is relationship-led and partnership-first:
+
+`DISCOVER -> UNDERSTAND -> CONNECT -> BUILD TRUST -> SHARE INTELLIGENCE -> PROVE VALUE -> PILOT -> PARTNERSHIP -> COMMERCIALISE -> EXPAND -> LEARN`
+
+The agent should optimize for useful relationship progression and commercial truth,
+not premature pitching or closing. Product and pricing support the conversation;
+they do not replace discovery. Suppression, outbound authority, terms, payment and
+revenue-recognition gates remain unchanged.
+
 ## 1. Buyer Reply / Conversation Operations Agent
 
 ### Business purpose
