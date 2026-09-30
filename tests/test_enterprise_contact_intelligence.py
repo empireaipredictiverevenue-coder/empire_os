@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from empire_os.enterprise_contact_intelligence import (
+    _probe_people,
     _refresh_pending_review,
     current_target_people,
     reconcile_verified_enterprise_contact,
@@ -41,6 +42,24 @@ def _probe(name, title, email):
             "source": "person_structured_data",
         }],
     }
+
+
+def test_probe_people_prefers_canonical_people_contract():
+    canonical = [{"name": "Jane Smith", "title": "CEO"}]
+    legacy = [{"name": "Legacy Person", "title": "Owner"}]
+
+    assert _probe_people({
+        "people": canonical,
+        "site_people": legacy,
+    }) == canonical
+
+
+def test_probe_people_accepts_legacy_site_people_snapshots():
+    legacy = [{"name": "Legacy Person", "title": "Owner"}]
+
+    assert _probe_people({
+        "site_people": legacy,
+    }) == legacy
 
 
 def test_sila_verified_contact_reconciles_to_current_observed_title():
@@ -540,6 +559,35 @@ def test_conflicting_scraped_title_cannot_supersede_curated_target_role():
     assert reconciled["title"] == "Vice President, Corporate Development"
     assert reconciled["site_title_conflict"] is True
     assert reconciled["site_title_conflicts"][0]["title"] == (
+        "Chief Strategy Officer"
+    )
+
+
+def test_canonical_probe_people_participate_in_title_conflict_detection():
+    row = {
+        "account_name": "Sila Services",
+        "person_contact_verified": True,
+        "probe": {
+            **_probe(
+                "Kyle Martin",
+                "Chief Strategy Officer",
+                "kmartin@sila.com",
+            ),
+            "people": [{
+                "name": "Kyle Martin",
+                "title": "Chief Strategy Officer",
+                "url": "https://silaservices.com/leadership/",
+                "source_kind": "visible_text",
+            }],
+        },
+    }
+
+    result = reconcile_verified_enterprise_contact(row)
+
+    assert result is not None
+    assert result["title"] == "Vice President, Corporate Development"
+    assert result["site_title_conflict"] is True
+    assert result["site_title_conflicts"][0]["title"] == (
         "Chief Strategy Officer"
     )
 
