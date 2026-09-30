@@ -299,6 +299,83 @@ def test_schema_people_keep_matching_name_only_profile_url():
     }]
 
 
+def test_probe_rejects_name_only_schema_person_on_different_profile_page(monkeypatch):
+    import empire_os.search_fabric.site_probe as sp
+
+    doc = type("Doc", (), {
+        "url": "https://acme.test/people/lisa-gordon/",
+        "canonical_url": "https://acme.test/people/lisa-gordon/",
+        "format": "html",
+        "text": "<html><body>Lisa Gordon Chair</body></html>",
+        "title": "Lisa Gordon",
+        "description": "",
+        "structured_data": [{
+            "@type": "Person",
+            "name": "Romilly Hicks",
+        }],
+        "emails": [],
+        "phones": [],
+        "socials": [],
+    })()
+
+    monkeypatch.setattr(
+        sp,
+        "_fetch",
+        lambda session, url, *, timeout=15.0, public_only=False: doc,
+    )
+
+    result = sp.probe_site(
+        "https://acme.test/people/lisa-gordon/",
+        max_pages=1,
+        request_timeout=1,
+        time_budget_seconds=1,
+    )
+
+    assert not any(
+        person.get("name") == "Romilly Hicks"
+        for person in result["people"]
+    )
+
+
+def test_probe_keeps_name_only_schema_person_on_matching_profile_page(monkeypatch):
+    import empire_os.search_fabric.site_probe as sp
+
+    doc = type("Doc", (), {
+        "url": "https://acme.test/people/jane-smith/",
+        "canonical_url": "https://acme.test/people/jane-smith/",
+        "format": "html",
+        "text": "<html><body>Jane Smith</body></html>",
+        "title": "Jane Smith",
+        "description": "",
+        "structured_data": [{
+            "@type": "Person",
+            "name": "Jane Smith",
+        }],
+        "emails": [],
+        "phones": [],
+        "socials": [],
+    })()
+
+    monkeypatch.setattr(
+        sp,
+        "_fetch",
+        lambda session, url, *, timeout=15.0, public_only=False: doc,
+    )
+
+    result = sp.probe_site(
+        "https://acme.test/people/jane-smith/",
+        max_pages=1,
+        request_timeout=1,
+        time_budget_seconds=1,
+    )
+
+    assert any(
+        person.get("name") == "Jane Smith"
+        and person.get("source_kind") == "structured_data"
+        for person in result["people"]
+    )
+
+
 def test_visible_people_rejects_generic_team_heading():
     import empire_os.search_fabric.site_probe as sp
 
