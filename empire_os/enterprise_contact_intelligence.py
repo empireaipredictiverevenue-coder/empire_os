@@ -30,6 +30,27 @@ def _key(value: Any) -> str:
     return _text(value).casefold()
 
 
+def _probe_people(probe: Any) -> list[Any]:
+    """Normalize the canonical site-probe people contract.
+
+    New/raw site_probe evidence uses 'people'. 'site_people' is accepted only
+    as a legacy compatibility key so older persisted review snapshots do not
+    lose evidence during rollout.
+    """
+    if not isinstance(probe, Mapping):
+        return []
+
+    if "people" in probe:
+        people = probe.get("people")
+    else:
+        people = probe.get("site_people")
+
+    if not isinstance(people, (list, tuple)):
+        return []
+
+    return list(people)
+
+
 TARGET_BY_NAME = {
     target.account_name: target
     for target in TARGETS
@@ -98,12 +119,7 @@ def current_target_people(
     evidence: list[dict[str, Any]] = []
 
     probe = row.get("probe")
-    site_people = (
-        probe.get("site_people")
-        if isinstance(probe, Mapping)
-        else None
-    )
-    for person in site_people or []:
+    for person in _probe_people(probe):
         if not isinstance(person, Mapping):
             continue
         name = _text(person.get("name"))
@@ -203,7 +219,7 @@ def reconcile_verified_enterprise_contact(
     )
     if curated_match is not None:
         curated_title = _text(curated_match.get("title"))
-        for person in (probe.get("site_people") or []):
+        for person in _probe_people(probe):
             if not isinstance(person, Mapping):
                 continue
             if _key(person.get("name")) != _key(name):
