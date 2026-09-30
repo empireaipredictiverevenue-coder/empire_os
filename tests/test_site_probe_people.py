@@ -252,6 +252,53 @@ def test_visible_people_recovers_named_ceo_without_schema():
     assert people[0]["email"] == "jane@acme.test"
 
 
+def test_visible_people_rejects_role_labels_as_person_names():
+    import empire_os.search_fabric.site_probe as sp
+
+    people = sp._visible_people_from_html(
+        "<section><h3>Managing Partner</h3>"
+        "<p>Managing Director</p></section>"
+        "<section><h3>Operating Partner</h3>"
+        "<p>Principal</p></section>",
+        page_url="https://acme.test/team/",
+        page_title="Team",
+        emails=[],
+    )
+
+    names = {person["name"] for person in people}
+    assert "Managing Partner" not in names
+    assert "Operating Partner" not in names
+
+
+def test_schema_people_reject_mismatched_name_only_profile_url():
+    records = [{
+        "@type": "Person",
+        "name": "Romilly Hicks",
+        "url": "https://acme.test/people/lisa-gordon/",
+    }]
+
+    evidence = _schema_evidence(records)
+
+    assert evidence["people"] == []
+
+
+def test_schema_people_keep_matching_name_only_profile_url():
+    records = [{
+        "@type": "Person",
+        "name": "Jane Smith",
+        "url": "https://acme.test/people/jane-smith/",
+    }]
+
+    evidence = _schema_evidence(records)
+
+    assert evidence["people"] == [{
+        "name": "Jane Smith",
+        "title": "",
+        "email": "",
+        "url": "https://acme.test/people/jane-smith/",
+    }]
+
+
 def test_visible_people_rejects_generic_team_heading():
     import empire_os.search_fabric.site_probe as sp
 
