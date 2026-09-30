@@ -114,3 +114,50 @@ Tomorrow:
 health, and canonical commercial state?**
 
 Then continue the agenda from evidence, not assumptions.
+
+
+## PRIOR SYSTEM UPGRADE AUDIT — MUST VERIFY TOMORROW
+
+The founder is referring to the earlier broad EmpireOS / Predictive Revenue
+upgrade-and-enhance pass, separate from the 2026-10-01 partnership doctrine.
+
+The recalled upgrade set is:
+
+1. Buyer Demand Graph
+2. Demand-First Crawling
+3. Predictive Strike Zones
+4. Multi-Buyer Routing
+5. Inventory Exchange
+6. Buyer Capacity Learning
+7. Supply Quality Twin
+8. Economic Memory
+9. Opportunity Decay
+10. Revenue Router
+11. Zero-Cash Mode
+12. Commercial Health / Self-Healing
+13. Revenue Truth Feedback
+14. Founder Command Centre
+15. Empire Opportunity Auction / auction-style allocation concept
+
+Important:
+- Do NOT assume all of these are complete because adjacent modules exist.
+- Tomorrow audit each upgrade against:
+  DESIGN -> CODE -> TESTS -> LIVE RUNTIME -> CANONICAL DATA -> FOUNDER SURFACE.
+- Classify each as DONE, PARTIAL, DESIGNED_ONLY, BLOCKED, or NOT_STARTED.
+- Record exact owning files/services, commits, tests, live evidence and blockers.
+- Preserve existing authority boundaries.
+- Save worked examples for every completed capability and a negative/failure
+  example where relevant.
+
+Known evidence to verify against:
+- Economic Memory exists in the Phase 3F/Predictive Intelligence stack.
+- buyer capacity, buyer allocation, Commercial Exchange and Revenue Exchange
+  modules exist in the wider Phase 4 stack.
+- self-healing/recovery work exists but prior failed systemd units mean live
+  health must be re-verified rather than assumed.
+- Founder Console / Founder Dashboard surfaces exist, but each upgrade's
+  visibility must be confirmed.
+- no claim is made here that all 15 items are production-complete.
+
+Tomorrow's first engineering deliverable:
+**SYSTEM UPGRADE COMPLETION MATRIX** with one row per upgrade and explicit proof.
