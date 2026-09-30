@@ -163,7 +163,7 @@ _NON_PERSON_WORDS = {
     "about", "contact", "company", "leadership", "management", "meet",
     "our", "staff", "team", "the", "people", "services", "service",
     "founder", "owner", "president", "principal", "director", "manager",
-    "chief", "executive", "officer", "ceo", "cro", "cco",
+    "chief", "executive", "officer", "ceo", "cro", "cco", "partner",
 }
 
 _NON_PERSON_NAMES = {
@@ -221,6 +221,37 @@ def _looks_like_visible_person_name(value: str) -> bool:
         if not letters.isalpha():
             return False
     return True
+
+
+def _person_url_conflicts_with_name(name: str, url: str) -> bool:
+    """Detect a clearly different person slug on first-party profile URLs."""
+    try:
+        slug = urlparse(str(url or "")).path.rstrip("/").rsplit("/", 1)[-1]
+    except ValueError:
+        return False
+
+    slug_parts = [
+        re.sub(r"[^a-z]", "", part.casefold())
+        for part in re.split(r"[-_]+", slug)
+    ]
+    slug_parts = [part for part in slug_parts if part]
+
+    name_parts = [
+        re.sub(r"[^a-z]", "", part.casefold())
+        for part in str(name or "").replace("-", " ").split()
+    ]
+    name_parts = [
+        part for part in name_parts
+        if part and part not in {"jr", "sr", "ii", "iii", "iv"}
+    ]
+
+    if len(slug_parts) < 2 or len(name_parts) < 2:
+        return False
+
+    return not (
+        slug_parts[0] == name_parts[0]
+        and slug_parts[-1] == name_parts[-1]
+    )
 
 
 def _matching_person_email(name: str, emails: Iterable[str]) -> str:
@@ -503,12 +534,34 @@ def _schema_evidence(records: List[Dict[str, Any]]) -> Dict[str, Any]:
             name = item.get("name")
             if isinstance(name, str) and name.strip():
                 if is_person:
-                    people.append({
-                        "name": name.strip(),
-                        "title": str(item.get("jobTitle") or "").strip(),
-                        "email": str(item.get("email") or "").removeprefix("mailto:").strip(),
-                        "url": str(item.get("url") or "").strip(),
-                    })
+                    person_name = name.strip()
+                    person_title = str(
+                        item.get("jobTitle") or ""
+                    ).strip()
+                    person_email = str(
+                        item.get("email") or ""
+                    ).removeprefix("mailto:").strip()
+                    person_url = str(
+                        item.get("url") or ""
+                    ).strip()
+
+                    # A name-only Person record with a profile URL that
+                    # clearly names somebody else is malformed first-party
+                    # evidence. Fail closed rather than binding it.
+                    if not (
+                        person_url
+                        and not person_email
+                        and _person_url_conflicts_with_name(
+                            person_name,
+                            person_url,
+                        )
+                    ):
+                        people.append({
+                            "name": person_name,
+                            "title": person_title,
+                            "email": person_email,
+                            "url": person_url,
+                        })
                 else:
                     names.append(name.strip())
 
