@@ -1037,14 +1037,32 @@ def probe_site(
         addresses.extend(schema["addresses"])
         socials.extend(document.socials)
         schema_types.extend(schema["schema_types"])
-        people.extend(
-            {
+        for person in schema["people"]:
+            person_name = str(person.get("name") or "").strip()
+            person_email = str(person.get("email") or "").strip()
+            person_url = str(person.get("url") or "").strip()
+            evidence_url = person_url or document.url
+
+            # Structured Person metadata occasionally leaks a stale author
+            # or unrelated person onto another profile page. If there is no
+            # direct email binding, require any person-like profile URL to
+            # agree with the person's name. Generic team/about URLs remain
+            # valid because they do not look like person slugs.
+            if (
+                not person_email
+                and evidence_url
+                and _person_url_conflicts_with_name(
+                    person_name,
+                    evidence_url,
+                )
+            ):
+                continue
+
+            people.append({
                 **person,
                 "source_kind": "structured_data",
                 "page_url": document.url,
-            }
-            for person in schema["people"]
-        )
+            })
         people.extend(
             {
                 **person,
