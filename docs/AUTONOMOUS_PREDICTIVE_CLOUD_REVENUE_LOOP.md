@@ -15,6 +15,18 @@ plan, prioritize, execute permitted internal work, measure outcomes and learn.
 
 Predictive Revenue is the commercial engine inside that loop.
 
+## Partnership-first commercial motion
+
+All demand, GTM, buyer and conversation stages follow
+[`PARTNERSHIP_FIRST_COMMERCIAL_DOCTRINE.md`](PARTNERSHIP_FIRST_COMMERCIAL_DOCTRINE.md).
+
+The commercial relationship motion is:
+
+`DISCOVER -> UNDERSTAND -> CONNECT -> BUILD TRUST -> SHARE INTELLIGENCE -> PROVE VALUE -> PILOT -> PARTNERSHIP -> COMMERCIALISE -> EXPAND -> LEARN`
+
+This sits inside the wider Predictive Revenue loop. It does not weaken evidence,
+suppression, founder approval, terms, payment, fulfilment or revenue-truth gates.
+
 ## Canonical Autonomous Loop
 
 SENSOR MESH
