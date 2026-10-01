@@ -125,14 +125,24 @@ Verification:
 - focused proposal / optimizer / allocation suite: 34 passed;
 - independent adjacent suite: 56 passed;
 - compilation and diff check passed;
-- OBSERVE preview returned AVAILABLE with buyer capacity=1 and explicit EV;
+- deterministic OBSERVE preview returned AVAILABLE with buyer capacity=1 and explicit EV;
+- that preview used bounded verification input and is not claimed as a live canonical route;
 - allocation_execution=false;
 - pricing_mutation=false;
 - payment_action=false;
 - revenue_recognition=false;
 - execution_authority=none.
 
+Production-truth check:
+- the current runtime/commercial_exchange/latest.json snapshot contains no
+  allocation-ready live inventory;
+- current inventory remains blocked by missing evidence, so a live canonical
+  Revenue Router recommendation is not presently available;
+- this is a live-data blocker, not a reason to fabricate an expected value,
+  capacity, buyer route or revenue outcome.
+
 Status:
-ENGINEERING COMPLETE / OBSERVE PREVIEW VERIFIED.
+ENGINEERING COMPLETE / DETERMINISTIC OBSERVE PREVIEW VERIFIED /
+LIVE CANONICAL ROUTING BLOCKED BY CURRENT EVIDENCE.
 Live canonical allocation remains separately governed by the existing atomic
 allocation boundary.
