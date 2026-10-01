@@ -18,3 +18,10 @@ def test_enterprise_activation_uses_canonical_existing_workers():
     assert '"payment_action": False' in text
     assert '"actual_revenue": False' in text
     assert "allow_company_routed=False" in text
+
+
+def test_enterprise_activation_reads_canonical_empiredb():
+    text = (ROOT / "scripts/activate_predictive_revenue_enterprise_targets.py").read_text()
+    assert "fetch_prospect(prospect_id)" in text
+    assert "request_json" not in text
+    assert "urllib.parse" not in text

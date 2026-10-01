@@ -4,8 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-import urllib.parse
-
 from empire_os.buyer_probe_worker import rejection_reason, run as probe_buyer
 from empire_os.crawler_runner import ingest_candidate
 from empire_os.predictive_revenue_enterprise_acquisition import (
@@ -13,8 +11,7 @@ from empire_os.predictive_revenue_enterprise_acquisition import (
     build_enterprise_lead_candidates,
 )
 from empire_os.predictive_revenue_enterprise_targets import TARGETS
-from empire_os.qualification_worker_v2 import qualify_prospect
-from empire_os.sb import request_json
+from empire_os.qualification_worker_v2 import fetch_prospect, qualify_prospect
 
 
 OUT = Path(
@@ -32,24 +29,13 @@ def _prospect_id(result: dict) -> str:
 
 
 def _fetch_prospect(prospect_id: str) -> dict:
-    params = urllib.parse.urlencode({
-        "select": (
-            "id,created_at,business_name,niche,metro,phone,website,"
-            "address,buy_signal_score,status,notes,contact_name,"
-            "contact_title,contact_source,contacted_status"
-        ),
-        "id": f"eq.{prospect_id}",
-        "limit": 1,
-    })
-    rows = request_json(
-        "GET",
-        f"/rest/v1/prospects?{params}",
-    ) or []
-    if not rows or not isinstance(rows[0], dict):
+    """Read the canonical prospect through the configured EmpireDB gateway."""
+    prospect = fetch_prospect(prospect_id)
+    if not isinstance(prospect, dict) or not prospect.get("id"):
         raise RuntimeError(
             f"canonical prospect not found after ingest:{prospect_id}"
         )
-    return rows[0]
+    return prospect
 
 
 def _target_by_name() -> dict[str, object]:
