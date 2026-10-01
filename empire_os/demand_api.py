@@ -6,6 +6,12 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from empire_os.buyer_demand_graph import (
+    BuyerDemandGraphEdge,
+    BuyerDemandGraphNode,
+    build_buyer_demand_graph,
+)
+
 from empire_os.demand_commercial_impact import (
     DemandCommercialImpactEvidence,
     review_demand_commercial_impact,
@@ -24,6 +30,29 @@ from empire_os.demand_readiness import (
 )
 
 
+
+
+class BuyerDemandGraphNodeRequest(BaseModel):
+    node_id: str
+    node_type: str
+    label: str
+    evidence_refs: list[str] = Field(min_length=1)
+
+
+class BuyerDemandGraphEdgeRequest(BaseModel):
+    edge_id: str
+    source_node_id: str
+    target_node_id: str
+    relation: str
+    observed_at: str
+    evidence_refs: list[str] = Field(min_length=1)
+    capacity_remaining: int | None = Field(default=None, ge=0)
+    demand_units: int | None = Field(default=None, ge=0)
+
+
+class BuyerDemandGraphPreviewRequest(BaseModel):
+    nodes: list[BuyerDemandGraphNodeRequest] = Field(min_length=1)
+    edges: list[BuyerDemandGraphEdgeRequest] = Field(default_factory=list)
 
 
 class DemandPlanRegistryRequest(BaseModel):
@@ -100,6 +129,48 @@ def create_demand_router(registry=None) -> APIRouter:
             "ad_spend_enabled": False,
             "provider_activation_enabled": False,
             "registry_available": registry is not None,
+        }
+
+    @router.post("/graph/preview")
+    def graph_preview(req: BuyerDemandGraphPreviewRequest):
+        try:
+            graph = build_buyer_demand_graph(
+                nodes=[
+                    BuyerDemandGraphNode(
+                        node_id=row.node_id,
+                        node_type=row.node_type,
+                        label=row.label,
+                        evidence_refs=tuple(row.evidence_refs),
+                    )
+                    for row in req.nodes
+                ],
+                edges=[
+                    BuyerDemandGraphEdge(
+                        edge_id=row.edge_id,
+                        source_node_id=row.source_node_id,
+                        target_node_id=row.target_node_id,
+                        relation=row.relation,
+                        observed_at=row.observed_at,
+                        evidence_refs=tuple(row.evidence_refs),
+                        capacity_remaining=row.capacity_remaining,
+                        demand_units=row.demand_units,
+                    )
+                    for row in req.edges
+                ],
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "recommendation_only": True,
+            "crawler_scheduling_enabled": False,
+            "publishing_enabled": False,
+            "outbound_enabled": False,
+            "ad_spend_enabled": False,
+            "provider_activation_enabled": False,
+            "execution_authority": "none",
+            "graph": graph.as_dict(),
         }
 
     @router.post("/outcome/preview")

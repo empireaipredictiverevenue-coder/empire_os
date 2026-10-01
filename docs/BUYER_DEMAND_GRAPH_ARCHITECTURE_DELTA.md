@@ -1,62 +1,63 @@
 # Buyer Demand Graph Architecture Delta
 
 Date: 2026-10-01
-Status: CONTRACT LOCKED / IMPLEMENTATION PENDING
+Status: IMPLEMENTATION IN PROGRESS
 
 ## Diagram
 
-Demand plan / readiness / outcome evidence
-+ buyer identity / product / market evidence
-+ verified buyer-capacity evidence
--> Buyer Demand Graph read model
--> Founder / Predictive Cloud context
+Buyer evidence + Product evidence + Market evidence + Capacity evidence + Demand signals
+-> Demand Lane Graph
+-> read-only demand topology
+-> Demand-First Crawling input (separate next architecture)
 
-No graph edge creates buyer intent, capacity, price, terms or execution authority.
+## Why a Demand Lane node
 
-## Owner
+Commercial demand is buyer + product + market + evidence + capacity context.
+The graph uses a LANE node as the explicit product/market corridor.
 
-New read-model owner:
-- empire_os/buyer_demand_graph.py
+## Node types
+- BUYER
+- PRODUCT
+- MARKET
+- LANE
+- SIGNAL
 
-Existing truth owners remain:
-- demand_genesis.py / demand_registry.py / demand_outcome.py;
-- buyer capacity/readiness;
-- product catalog;
-- market identity.
+Every node requires evidence refs.
 
-## Graph contract
+## Edge relations
+- PRODUCT_DEFINES_LANE
+- MARKET_DEFINES_LANE
+- BUYER_DEMANDS_LANE
+- BUYER_HAS_CAPACITY_FOR_LANE
+- SIGNAL_SUPPORTS_LANE
 
-Node types:
-- demand_plan;
-- buyer;
-- product;
-- market.
+Every edge requires source/target nodes, relation, observed timestamp and evidence refs.
+BUYER_HAS_CAPACITY_FOR_LANE additionally requires explicit nonnegative capacity_remaining.
+BUYER_DEMANDS_LANE may carry demand_units; absent quantity stays unknown and is not zero.
 
-Permitted edges:
-- demand_plan -> product: TARGETS_PRODUCT;
-- demand_plan -> market: TARGETS_MARKET;
-- buyer -> product: BUYS_PRODUCT only with explicit buyer-demand evidence;
-- buyer -> market: OPERATES_IN_MARKET only with explicit market evidence;
-- buyer -> product+market capacity projection represented by a verified
-  BUYER_CAPACITY edge carrying remaining capacity and its evidence ref.
+## No inferred topology
+The builder never creates edges from co-occurrence, scores, generic signals or defaults.
+It never schedules crawling.
 
-Unknown identities or missing edge evidence create no edge.
+## Positive example
+A buyer has explicit evidence that it buys Permit Intelligence in Austin and has capacity 10.
+Product and market define lane permit_intelligence:austin; observed demand and capacity edges connect the buyer to that lane.
 
-Capacity=0 is a known value when explicitly evidenced.
-Missing capacity is UNKNOWN, never zero.
-
-## Output
-
-Deterministic deduplicated nodes/edges, blockers, evidence refs, mode=OBSERVE,
-execution_authority=none.
-
-No generic graph score is introduced.
+## Negative examples
+- A roofing permit signal in Austin does not automatically create a buyer edge.
+- A buyer with no capacity evidence does not get a capacity edge.
+- A missing demand quantity remains unknown.
+- Conflicting duplicate IDs fail closed.
+- Graph presence grants no outreach or crawler authority.
 
 ## Verification
+- deterministic replay;
+- relation source/target type validation;
+- explicit capacity required;
+- missing demand quantity preserved;
+- duplicate/conflicting IDs fail closed;
+- API preview OBSERVE-only;
+- existing Demand Genesis/registry/outcome tests remain green.
 
-- duplicate evidence dedupes;
-- mismatched identities fail closed;
-- missing capacity remains unknown;
-- explicit zero capacity is preserved;
-- plan evidence never becomes buyer intent;
-- no write/send/payment/allocation authority.
+## Authority
+Read-only projection. No crawler scheduling, outbound, ad spend, provider activation, allocation, payment, revenue recognition, migration or authority expansion.
