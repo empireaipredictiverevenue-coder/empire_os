@@ -25,6 +25,16 @@ _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # Explicit compatibility RPC surface. This mirrors only legacy service-role
 # proposal/read authority. Sensitive approval, verifier, sender and revenue
 # recognition functions remain available only through dedicated role transports.
+_RPC_SQL_CASTS: dict[str, dict[str, str]] = {
+    "ingest_prospect_atomic": {
+        "p_prospect": "jsonb",
+        "p_evidence": "jsonb",
+        "p_ingest_key": "text",
+        "p_identity_keys": "text[]",
+    },
+}
+
+
 _RPC_PARAMS: dict[str, tuple[str, ...]] = {
     "propose_outbound_intent": (
         "p_entity_id", "p_prospect_id", "p_buyer_id", "p_opportunity_id",
@@ -555,9 +565,14 @@ class EmpireDbProvider:
                 f"EmpireDB RPC parameters do not match contract: {rpc_name}"
             )
 
+        casts = _RPC_SQL_CASTS.get(rpc_name, {})
+        placeholders = [
+            f"%s::{casts[key]}" if key in casts else "%s"
+            for key in keys
+        ]
         sql = (
             f"SELECT public.{_ident(rpc_name)}("
-            + ", ".join("%s" for _ in keys)
+            + ", ".join(placeholders)
             + ")"
         )
         # RPC parameters cross a PostgreSQL function-call boundary.
@@ -582,8 +597,16 @@ class EmpireDbProvider:
                 if not isinstance(value, Decimal):
                     value = Decimal(str(value))
 
-            if isinstance(value, (dict, list)):
+            if isinstance(value, dict):
                 value = JsonValue(value)
+            elif isinstance(value, list):
+                # Most structured lists are JSONB, but RPC parameters
+                # explicitly declared as SQL arrays must remain native lists
+                # so psycopg binds them as PostgreSQL arrays.
+                if casts.get(key, "").endswith("[]"):
+                    value = [str(item) for item in value]
+                else:
+                    value = JsonValue(value)
 
             return self._adapt(value)
 

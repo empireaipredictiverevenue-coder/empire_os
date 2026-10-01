@@ -446,3 +446,31 @@ def test_numeric_rpc_scores_bind_as_decimal():
     assert params[7] == Decimal("0.91")
     assert isinstance(params[6], Decimal)
     assert isinstance(params[7], Decimal)
+
+
+def test_ingest_prospect_atomic_binds_text_and_text_array_contract():
+    connection = FakeConnection()
+    connection.next_cursor = Cursor([({"decision": "created"},)], ("result",))
+    provider = EmpireDbProvider(FakeConnector(connection))
+
+    result = provider.rpc(
+        "ingest_prospect_atomic",
+        {
+            "p_prospect": {"business_name": "Example"},
+            "p_evidence": {"source": "test"},
+            "p_ingest_key": "ingest:test",
+            "p_identity_keys": ["domain:example.com", "name_metro:example|denver"],
+        },
+    )
+
+    assert result == {"decision": "created"}
+    sql, params = connection.calls[0]
+    assert sql == (
+        'SELECT public."ingest_prospect_atomic"('
+        '%s::jsonb, %s::jsonb, %s::text, %s::text[])'
+    )
+    assert params[2] == "ingest:test"
+    assert params[3] == [
+        "domain:example.com",
+        "name_metro:example|denver",
+    ]
