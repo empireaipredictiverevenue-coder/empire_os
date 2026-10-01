@@ -450,11 +450,11 @@ def _pending_review_for_prospect(
     params = urllib.parse.urlencode({
         "select": (
             "id,status,prospect_id,contact_name,contact_title,contact_email,"
-            "decision_score,evidence,created_at"
+            "decision_score,evidence,proposed_at"
         ),
         "prospect_id": f"eq.{prospect_id}",
         "status": "eq.pending",
-        "order": "created_at.desc",
+        "order": "proposed_at.desc",
         "limit": 2,
     })
     rows = _request_with_retry(
