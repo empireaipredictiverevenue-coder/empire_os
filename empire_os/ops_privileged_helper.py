@@ -112,9 +112,9 @@ def _systemctl_argv(request: HelperRequest) -> list[str]:
             "--property=ActiveState,SubState,UnitFileState",
         ]
     if request.action == "service_restart":
-        return ["systemctl", "restart", request.unit]
+        return ["systemctl", "--no-block", "restart", request.unit]
     if request.action == "service_start":
-        return ["systemctl", "start", request.unit]
+        return ["systemctl", "--no-block", "start", request.unit]
     raise PrivilegedHelperPolicyError("unsupported action")
 
 

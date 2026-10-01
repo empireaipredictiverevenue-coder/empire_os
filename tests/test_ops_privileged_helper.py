@@ -41,7 +41,10 @@ def test_restart_is_allowlisted_but_no_arbitrary_command():
         request("service_restart", "empire-revenue-pulse.service"),
         runner=runner,
     )
-    assert calls == [["systemctl", "restart", "empire-revenue-pulse.service"]]
+    assert calls == [[
+        "systemctl", "--no-block", "restart",
+        "empire-revenue-pulse.service",
+    ]]
 
 
 def test_arbitrary_action_is_rejected():
@@ -118,3 +121,19 @@ def test_data_cloud_health_rejects_arbitrary_resource():
         match="invalid data cloud resource",
     ):
         validate_request(request("data_cloud_health", "ssh.service"))
+
+
+def test_start_uses_non_blocking_systemctl_so_helper_stays_responsive():
+    calls = []
+    def runner(argv, **kwargs):
+        calls.append(argv)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    result = execute_request(
+        request("service_start", "empire-buyer-deferred-enrichment.service"),
+        runner=runner,
+    )
+    assert result["ok"] is True
+    assert calls == [[
+        "systemctl", "--no-block", "start",
+        "empire-buyer-deferred-enrichment.service",
+    ]]
