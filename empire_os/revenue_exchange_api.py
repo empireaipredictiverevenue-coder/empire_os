@@ -7,6 +7,11 @@ from typing import Any, Mapping, Protocol, Sequence
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from empire_os.opportunity_auction import (
+    OpportunityAuctionBid,
+    preview_opportunity_auction,
+)
+
 from empire_os.revenue_exchange import normalise_exchange_snapshot
 from empire_os.revenue_exchange_allocation_readiness import (
     assess_exchange_allocation_readiness,
@@ -76,6 +81,33 @@ class ExchangeAllocationProposalRequest(ExchangeAllocationReadinessRequest):
     territory_evidence_ref: str | None = None
     exclusivity_clear: bool | None = None
     exclusivity_evidence_ref: str | None = None
+
+
+class OpportunityAuctionBidRequest(BaseModel):
+    bid_id: str
+    opportunity_id: str
+    buyer_id: str
+    bid_amount_cents: int = Field(gt=0)
+    currency: str
+    bid_verified: bool = False
+    bid_evidence_ref: str | None = None
+    buyer_capacity_remaining: int | None = Field(default=None, ge=0)
+    capacity_evidence_ref: str | None = None
+    territory_eligible: bool | None = None
+    territory_evidence_ref: str | None = None
+    exclusivity_clear: bool | None = None
+    exclusivity_evidence_ref: str | None = None
+    observed_at: str
+    expires_at: str | None = None
+
+
+class OpportunityAuctionPreviewRequest(BaseModel):
+    opportunity_id: str
+    currency: str
+    reserve_floor_cents: int = Field(ge=0)
+    reserve_evidence_ref: str
+    as_of: str
+    bids: list[OpportunityAuctionBidRequest] = Field(min_length=1)
 
 
 class ExchangeObservationIngestRequest(BaseModel):
@@ -307,6 +339,43 @@ def create_revenue_exchange_router(
             "exclusivity_authority": "none",
             "funds_movement": False,
             "proposal": proposal.as_dict(),
+        }
+
+    @router.post("/auction/preview")
+    def auction_preview(req: OpportunityAuctionPreviewRequest):
+        try:
+            normalized = (
+                req.as_of[:-1] + "+00:00"
+                if req.as_of.endswith("Z")
+                else req.as_of
+            )
+            now = datetime.fromisoformat(normalized)
+            if now.tzinfo is None:
+                raise ValueError("as_of must include timezone")
+            preview = preview_opportunity_auction(
+                [
+                    OpportunityAuctionBid(**bid.model_dump())
+                    for bid in req.bids
+                ],
+                opportunity_id=req.opportunity_id,
+                currency=req.currency,
+                reserve_floor_cents=req.reserve_floor_cents,
+                reserve_evidence_ref=req.reserve_evidence_ref,
+                as_of=now,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "mode": "OBSERVE",
+            "auction": preview.as_dict(),
+            "allocation_authority": "none",
+            "pricing_authority": "none",
+            "terms_authority": "none",
+            "payment_authority": "none",
+            "settlement_authority": "none",
+            "revenue_recognition_authority": "none",
+            "execution_authority": "none",
         }
 
     @router.post("/observations/ingest")
