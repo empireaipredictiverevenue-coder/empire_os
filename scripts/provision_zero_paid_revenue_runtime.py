@@ -6,6 +6,7 @@ import base64
 import json
 import os
 import secrets
+import subprocess
 from pathlib import Path
 
 import psycopg
@@ -39,30 +40,50 @@ def _runtime_dsn(base: dict, login: str, password: str) -> str:
     )
 
 
+def _role_provision_sql(passwords: dict[str, str]) -> str:
+    statements = ["BEGIN;"]
+    for login, capability in ROLES:
+        password = passwords[login]
+        if not password.replace("-", "").replace("_", "").isalnum():
+            raise RuntimeError("generated runtime password contains unsafe characters")
+        statements.extend([
+            "DO $$ BEGIN",
+            f" IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{login}') THEN",
+            f"  CREATE ROLE {login} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE;",
+            " END IF;",
+            "END $$;",
+            f"ALTER ROLE {login} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '{password}';",
+            f"ALTER ROLE {login} SET statement_timeout = '3s';",
+            f"REVOKE ALL ON SCHEMA public FROM {login};",
+            f"GRANT {capability} TO {login};",
+        ])
+    statements.append("COMMIT;")
+    return "\n".join(statements) + "\n"
+
+
 def _ensure_roles(base_dsn: str) -> dict[str, str]:
+    # LOGIN role creation/password rotation is intentionally outside the
+    # restricted migrator authority. This script is root-only, so use the
+    # local postgres OS account for role administration and keep application
+    # credentials out of stdout/stderr.
     passwords = {login: secrets.token_urlsafe(36) for login, _ in ROLES}
-    with psycopg.connect(base_dsn, autocommit=True) as conn:
-        for login, capability in ROLES:
-            exists = conn.execute(
-                "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=%s)",
-                (login,),
-            ).fetchone()[0]
-            if not exists:
-                conn.execute(sql.SQL(
-                    "CREATE ROLE {} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE"
-                ).format(sql.Identifier(login)))
-            conn.execute(sql.SQL("ALTER ROLE {} PASSWORD {}").format(
-                sql.Identifier(login), sql.Literal(passwords[login])
-            ))
-            conn.execute(sql.SQL(
-                "ALTER ROLE {} SET statement_timeout = '3s'"
-            ).format(sql.Identifier(login)))
-            conn.execute(sql.SQL("REVOKE ALL ON SCHEMA public FROM {}").format(
-                sql.Identifier(login)
-            ))
-            conn.execute(sql.SQL("GRANT {} TO {}").format(
-                sql.Identifier(capability), sql.Identifier(login)
-            ))
+    sql_text = _role_provision_sql(passwords)
+    result = subprocess.run(
+        [
+            "runuser", "-u", "postgres", "--",
+            "psql", "-X", "-v", "ON_ERROR_STOP=1", "-d", "empiredb",
+        ],
+        input=sql_text,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "postgres runtime role provisioning failed: "
+            + result.stderr.strip()[-1000:]
+        )
     return passwords
 
 
