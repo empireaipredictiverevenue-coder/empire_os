@@ -270,3 +270,38 @@ def test_execution_request_rejects_unapproved_base_branch():
             allowed_paths=("empire_os/example.py",),
             lease_resources=("domain:data_cloud_example",),
         ).validate()
+
+
+def test_observe_hermes_dispatch_preserves_zero_mutation_scope(
+    tmp_path,
+    monkeypatch,
+):
+    import empire_os.execution_plane_dispatcher as module
+    from empire_os.hermes_control import HermesJob
+
+    captured = {}
+
+    def publish(_root, payload):
+        job = HermesJob.from_mapping(payload)
+        captured["job"] = job
+        return {"published": True}
+
+    monkeypatch.setattr(module, "publish_control_job", publish)
+
+    result = dispatch_execution_request(
+        tmp_path,
+        ExecutionRequest(
+            request_id="observe-hermes-audit",
+            capability="backend_code",
+            department="engineering",
+            objective="Inspect architecture only.",
+            authority="observe",
+        ),
+    )
+
+    assert result["worker"] == "hermes"
+    assert result["status"] == "QUEUED"
+    assert captured["job"].authority == "observe"
+    assert captured["job"].allowed_paths == ()
+    assert captured["job"].lease_resources == ()
+    assert result["execution_authority"] == "none"

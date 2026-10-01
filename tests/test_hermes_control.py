@@ -454,3 +454,31 @@ def test_job_schema_preserves_ai_behavior_change():
         base_job(ai_behavior_change=True)
     )
     assert job.ai_behavior_change is True
+
+
+def test_observe_job_accepts_explicit_zero_mutation_scope():
+    job = HermesJob.from_mapping(
+        base_job(
+            authority="observe",
+            allowed_paths=[],
+            lease_resources=[],
+        )
+    )
+
+    assert job.authority == "observe"
+    assert job.allowed_paths == ()
+    assert job.lease_resources == ()
+
+
+def test_internal_write_job_rejects_explicit_zero_mutation_scope():
+    with pytest.raises(
+        HermesControlError,
+        match="allowed_paths cannot be empty",
+    ):
+        HermesJob.from_mapping(
+            base_job(
+                authority="internal_write",
+                allowed_paths=[],
+                lease_resources=[],
+            )
+        )

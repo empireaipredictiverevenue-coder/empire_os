@@ -147,14 +147,18 @@ class HermesJob:
 
         requested_paths = raw.get("allowed_paths")
         if requested_paths is None:
-            allowed_paths = SAFE_EDIT_PREFIXES
+            allowed_paths = (
+                ()
+                if authority == "observe"
+                else SAFE_EDIT_PREFIXES
+            )
         elif isinstance(requested_paths, list):
             cleaned = tuple(
                 _normalise_allowed_prefix(str(value))
                 for value in requested_paths
                 if str(value).strip()
             )
-            if not cleaned:
+            if not cleaned and authority != "observe":
                 raise HermesControlError(
                     "allowed_paths cannot be empty when supplied"
                 )
@@ -179,7 +183,7 @@ class HermesJob:
                 for value in raw_lease_resources
                 if str(value).strip()
             )
-            if not lease_resources:
+            if not lease_resources and authority != "observe":
                 raise HermesControlError(
                     "lease_resources cannot be empty when supplied"
                 )
