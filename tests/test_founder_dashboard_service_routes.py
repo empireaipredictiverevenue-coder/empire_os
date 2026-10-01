@@ -9,19 +9,26 @@ CODING_TEAM_PATH = (
 )
 
 
-def _paths(service):
-    return {
-        getattr(route, "path", None)
-        for route in service.routes
-    }
+def _documented_paths(service):
+    """Use FastAPI's public OpenAPI contract, not router internals.
+
+    FastAPI 0.137+ preserves included APIRouters as nested _IncludedRouter
+    objects. Top-level app.routes entries therefore do not necessarily expose
+    .path even when the included endpoints are correctly registered.
+    """
+    schema = service.openapi()
+    paths = schema.get("paths") or {}
+    return set(paths)
 
 
 def test_live_founder_service_mounts_coding_team_status_route():
-    assert CODING_TEAM_PATH in _paths(app)
+    assert CODING_TEAM_PATH in _documented_paths(app)
 
 
 def test_fresh_founder_service_factory_mounts_coding_team_status_route():
     fresh = build_founder_dashboard_service()
-    assert CODING_TEAM_PATH in _paths(fresh)
-    assert "/v1/founder-execution-plane/status" in _paths(fresh)
-    assert "/health" in _paths(fresh)
+    paths = _documented_paths(fresh)
+
+    assert CODING_TEAM_PATH in paths
+    assert "/v1/founder-execution-plane/status" in paths
+    assert "/health" in paths
