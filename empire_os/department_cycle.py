@@ -8,6 +8,7 @@ from typing import Any
 
 from empire_os.astra_department_evaluator import evaluate_executive_plan
 from empire_os.department_worker import run_department_worker
+from empire_os.marketing_agency import observe_marketing_agency
 from empire_os.economic_memory import refresh_economic_memory_snapshot
 
 
@@ -32,6 +33,8 @@ def run_department_cycle(
         "schema_version": "empire.department_cycle.v1",
         "mode": "OBSERVE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "service_health": "completed",
+        "work_ok": worker.get("ok") is not False,
         "worker": {
             "ok": worker.get("ok"),
             "processed_count": worker.get("processed_count"),
@@ -67,6 +70,7 @@ def run_department_cycle(
                 "verified_outcomes_only_for_outcome_conditioned_memory"
             ),
         },
+        "marketing_growth": observe_marketing_agency(root),
         "external_execution_performed": False,
         "commercial_authority": "none",
         "payment_authority": "none",

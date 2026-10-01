@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -95,7 +96,8 @@ def fetch_catalog(
     if not isinstance(rows, list):
         raise ValueError("commercial product catalog RPC must return a list")
     clean = [row for row in rows if isinstance(row, Mapping)]
-    return summarize_catalog(clean)
+    return {**summarize_catalog(clean),
+            "generated_at": datetime.now(timezone.utc).isoformat()}
 
 
 def write_catalog_snapshot(
@@ -209,4 +211,5 @@ def fetch_catalog_postgres(
             "commercial product catalog RPC must return a list"
         )
     clean = [item for item in payload if isinstance(item, Mapping)]
-    return summarize_catalog(clean)
+    return {**summarize_catalog(clean),
+            "generated_at": datetime.now(timezone.utc).isoformat()}

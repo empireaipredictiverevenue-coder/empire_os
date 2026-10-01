@@ -61,3 +61,52 @@ def test_department_cycle_runs_worker_then_evaluation(
     assert result["economic_memory"]["verified_outcomes_only"] is True
     assert result["external_execution_performed"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_department_cycle_persists_process_and_work_truth(
+    tmp_path,
+    monkeypatch,
+):
+    import empire_os.department_cycle as module
+
+    monkeypatch.setattr(
+        module,
+        "run_department_worker",
+        lambda *args, **kwargs: {
+            "ok": False,
+            "processed_count": 2,
+            "done_count": 1,
+            "blocked_count": 0,
+            "failed_count": 1,
+        },
+    )
+
+    monkeypatch.setattr(
+        module,
+        "evaluate_executive_plan",
+        lambda root: {
+            "plan_id": "test",
+            "evaluation_state": "IN_PROGRESS",
+            "eligible_step_count": 1,
+            "status_counts": {"READY": 1},
+            "undispatched_step_ids": [],
+            "result_evidence_refs": [],
+        },
+    )
+
+    monkeypatch.setattr(
+        module,
+        "refresh_economic_memory_snapshot",
+        lambda root: {
+            "department_episode_count": 1,
+            "outcome_conditioned_memory_count": 0,
+            "rejected_outcome_memory_count": 0,
+            "verified_outcomes_only_for_outcome_conditioned_memory": True,
+        },
+    )
+
+    result = module.run_department_cycle(tmp_path)
+
+    assert result["service_health"] == "completed"
+    assert result["work_ok"] is False
+    assert result["worker"]["failed_count"] == 1

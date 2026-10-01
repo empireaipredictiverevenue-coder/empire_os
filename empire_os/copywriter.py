@@ -15,6 +15,7 @@ from empire_os.outreach_message_optimizer import optimise_first_touch
 
 
 SUPPORTED_CHANNELS = {
+    "campaign_research",
     "cold_email",
     "followup_email",
     "landing_hero",
@@ -150,7 +151,7 @@ def _validate_brief(brief: CopyBrief) -> None:
         raise ValueError(f"unsupported copy channel: {brief.channel}")
     if not _usable(brief.objective):
         raise ValueError("copy objective required")
-    if not _usable(brief.product_code):
+    if not _usable(brief.product_code) and not (brief.channel == "campaign_research" and brief.product_code == "UNKNOWN"):
         raise ValueError("product code required")
     if not _usable(brief.product_name):
         raise ValueError("product name required")
@@ -172,6 +173,19 @@ def _evidence_context(brief: CopyBrief) -> tuple[str | None, tuple[str, ...]]:
 
 def build_copy(brief: CopyBrief) -> CopyDraft:
     _validate_brief(brief)
+
+    if brief.channel == "campaign_research":
+        topic = " / ".join(filter(None, (_usable(brief.niche), _usable(brief.metro))))
+        return CopyDraft(
+            channel=brief.channel, headline=f"{topic}: an evidence review", subject=None,
+            body=(f"Exploring {topic}? Start with the source evidence, its date and its limits. "
+                  "Separate observed activity from customer demand. Check audience fit and "
+                  "product suitability before making a commercial decision. "
+                  "This draft offers no traffic, conversion or revenue forecast."),
+            cta="Discuss product fit" if brief.product_code != "UNKNOWN" else "Enquire about the research",
+            evidence_used=(), claims=(), quality_tier="research_invitation",
+            requires_human_review=True,
+        )
 
     business = _usable(brief.business_name)
     niche = _usable(brief.niche)

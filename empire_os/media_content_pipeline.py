@@ -309,6 +309,22 @@ def build_content_pipeline(
     }
 
 
+def campaign_draft_content(*, content_id, topic, audience, body, cta,
+                           evidence_refs, opportunity_key, product_refs, generated_at):
+    """Materialize a claim-free editorial draft; never a verified research pack."""
+    if not evidence_refs:
+        raise ValueError("campaign draft requires opportunity provenance")
+    content = CanonicalContentObject(
+        content_id=content_id, topic=topic, thesis=body, audience=audience,
+        evidence_refs=tuple(evidence_refs), opportunity_refs=(opportunity_key,),
+        product_refs=tuple(product_refs), cta=cta, created_at=generated_at,
+        uncertainty=("Market demand and performance remain unknown.",),
+    ).as_dict()
+    content.update(draft_status="INTERNAL_DRAFT", claim_verification_complete=False,
+                   asset_status="DRAFT", publication_status="NOT_PUBLISHED")
+    return content
+
+
 def refresh_media_content_pipeline(
     repo_root: Path,
 ) -> dict[str, Any]:

@@ -120,6 +120,7 @@ TARGET_BUYER_TYPES = (
     "managed_growth_buyer",
     "commercial_diagnostics_buyer",
     "vertical_intelligence_buyer",
+    "publisher_affiliate_partner",
 )
 
 BUYER_POOLS = (
@@ -402,8 +403,12 @@ def direct_buyer_profile(record: Mapping[str, Any]) -> dict[str, Any]:
         phrase in reseller_hits for phrase in ("agency", "marketing agency")
     ):
         buyer_type = "white_label_agency"
+    elif any(phrase in corpus for phrase in (
+        "affiliate program", "publisher program", "affiliate network",
+    )):
+        buyer_type = "publisher_affiliate_partner"
     else:
-        buyer_type = "qualified_end_buyer"
+        buyer_type = "unknown"
 
     return {
         "buyer_type": buyer_type,
@@ -414,6 +419,49 @@ def direct_buyer_profile(record: Mapping[str, Any]) -> dict[str, Any]:
         "reseller_signal_hits": sorted(reseller_hits),
         "explicit_direct_buyer_evidence": explicit_buyer,
         "binding_commercial_evidence": False,
+    }
+
+
+# These are research routes, not declarations that an organisation buys a unit.
+COMMERCIAL_RESEARCH_INTENTS = {
+    "local_and_smb_buyers": "smb_customer_prospect",
+    "end_service_buyers": "service_business_customer_prospect",
+    "direct_demand_buyers": "network_or_direct_demand_prospect",
+    "agency_and_reseller_buyers": "white_label_partner_prospect",
+    "enterprise_and_data_buyers": "enterprise_data_api_prospect",
+    "software_and_advisory_buyers": "software_mrr_advisory_prospect",
+}
+
+
+def commercial_research_profile(
+    query_evidence: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Preserve multi-offer research provenance without manufacturing intent."""
+    routes = []
+    for row in query_evidence:
+        if not isinstance(row, Mapping):
+            continue
+        pool = _text(row.get("buyer_pool") or row.get("pool"))
+        query = _text(row.get("query"))
+        if pool not in COMMERCIAL_RESEARCH_INTENTS or not query:
+            continue
+        route = {
+            "intent": COMMERCIAL_RESEARCH_INTENTS[pool],
+            "buyer_pool": pool,
+            "product_code": _text(row.get("product_code")) or None,
+            "opportunity_key": _text(row.get("opportunity_key")) or None,
+            "query": query,
+            "classification": "INFERRED_RESEARCH_FIT",
+        }
+        if route not in routes:
+            routes.append(route)
+    return {
+        "research_routes": routes,
+        "commercial_intents": sorted({row["intent"] for row in routes}),
+        "demand_state": "UNKNOWN",
+        "customer_state": "UNKNOWN",
+        "commercial_terms_verified": False,
+        "execution_authority": "none",
     }
 
 
@@ -577,6 +625,7 @@ def buyer_research_queries(
             f'"{niche}" "growth agency"{suffix}',
             f'"{niche}" "white label"{suffix}',
             f'"{niche}" reseller{suffix}',
+            f'"{niche}" "publisher affiliate program"{suffix}',
         ],
         "enterprise_and_data_buyers": [
             f'"{niche}" "market intelligence"{suffix}',
@@ -734,6 +783,11 @@ def build_product_demand_queue(
         pools = _product_buyer_pools(product_family, product_code)
         queue.append({
             "product_code": product_code,
+            "product_id": row.get("product_id"),
+            "version": row.get("version"),
+            "price_basis": row.get("price_basis"),
+            "catalog_provenance": row.get("provenance"),
+            "readiness_blockers": list(row.get("readiness_blockers") or []),
             "product_name": product_name or product_code,
             "product_family": product_family or None,
             "billing_model": row.get("billing_model"),
@@ -791,6 +845,7 @@ def product_research_queries(
             f'"{subject}" "marketing agency"',
             f'"{subject}" "white label"',
             f'"{subject}" reseller',
+            f'"{subject}" "publisher affiliate program"',
         ],
         "enterprise_and_data_buyers": [
             f'"{subject}" enterprise',
@@ -829,7 +884,7 @@ def build_buyer_acquisition_plan(
             **row,
             "research_queries": product_research_queries(row),
         }
-        for row in product_queue[:25]
+        for row in product_queue
     ]
     icp_targets = build_icp_priority_targets(
         corridor_targets=targets,

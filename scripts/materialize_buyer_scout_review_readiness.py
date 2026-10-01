@@ -9,13 +9,12 @@ from empire_os.buyer_scout_review_readiness import (
     materialize_review_readiness,
     write_review_readiness,
 )
-from empire_os.qualification_worker_v2 import request_json
-
-
+from empire_os.sb import request_json
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")
     parser.add_argument("--limit", type=int, default=200)
+    parser.add_argument("--observe-only", action="store_true", help="Evaluate evidence without database updates")
     args = parser.parse_args()
 
     query = urllib.parse.urlencode({
@@ -38,7 +37,7 @@ def main() -> int:
 
     payload = materialize_review_readiness(
         [row for row in (rows or []) if isinstance(row, dict)],
-        patch_call=lambda method, path, body: request_json(
+        patch_call=None if args.observe_only else lambda method, path, body: request_json(
             method,
             path,
             payload=body,
@@ -52,6 +51,7 @@ def main() -> int:
         "candidate_count": payload["candidate_count"],
         "review_ready_count": payload["review_ready_count"],
         "blocked_count": payload["blocked_count"],
+        "database_write_performed": payload["database_write_performed"],
         "canonical_promotion_performed": False,
         "outbound_sent": False,
         "execution_authority": "none",

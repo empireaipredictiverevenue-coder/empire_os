@@ -10,9 +10,7 @@ from empire_os.buyer_scout_raw_prospect_promotion import (
     run_raw_prospect_promotion,
     write_raw_prospect_promotion,
 )
-from empire_os.qualification_worker_v2 import request_json
-
-
+from empire_os.sb import request_json
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")

@@ -158,6 +158,23 @@ def extract_resend_provider_event(event: dict[str, Any]) -> dict[str, Any] | Non
     data = event.get("data")
     if not isinstance(data, dict):
         raise OutboundProviderError("verified provider event missing data")
+
+    tags = data.get("tags")
+    if _resend_tag(tags, "empire_event_scope").lower() == "internal_reply_visibility":
+        return None
+
+    subject = str(data.get("subject") or "").strip()
+    raw_sender = str(data.get("from") or "").strip().lower()
+    internal_sender = (
+        raw_sender == "reply@mail.empire-ai.co.uk"
+        or raw_sender.endswith("<reply@mail.empire-ai.co.uk>")
+    )
+
+    if (
+        internal_sender
+        and subject.startswith(("[Empire buyer reply] ", "[Empire inbox] "))
+    ):
+        return None
     message_id = str(data.get("email_id") or "").strip()
     if not message_id:
         raise OutboundProviderError("verified provider event missing email_id")

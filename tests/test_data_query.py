@@ -43,3 +43,8 @@ def test_order_can_preserve_nulls_last_semantics():
     order = OrderSpec("buy_signal_score", descending=True, nulls_last=True)
     assert order.descending is True
     assert order.nulls_last is True
+
+def test_is_not_null_has_no_value():
+    item = DataFilter.is_not_null("website")
+    assert item.operator is FilterOperator.IS_NOT_NULL
+    assert item.value is None

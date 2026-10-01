@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -100,6 +101,8 @@ def audit_aeo_asset(path: Path, *, root: Path) -> AeoAssetAudit:
 
 
 def build_aeo_recovery_census(root: Path) -> dict[str, Any]:
+    if not root.is_dir():
+        raise ValueError("aeo_asset_root_unavailable")
     assets = [
         audit_aeo_asset(path, root=root)
         for path in sorted(root.glob("*/*/index.html"))
@@ -113,6 +116,7 @@ def build_aeo_recovery_census(root: Path) -> dict[str, Any]:
 
     return {
         "schema_version": "empire.aeo_recovery.v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": "OBSERVE",
         "execution_authority": "none",
         "publishing_authority": False,

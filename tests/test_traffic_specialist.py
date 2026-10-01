@@ -96,3 +96,19 @@ class TestTrafficSpecialist:
 
         state = get_state(backend, "p1")
         assert state.current_state == "matched"
+
+
+def test_organic_review_never_invokes_funnel_mutations(monkeypatch):
+    from empire_os import traffic_specialist as traffic
+    def forbidden(*args, **kwargs):
+        raise AssertionError('proposal review must not write the funnel')
+    monkeypatch.setattr(traffic, 'transition', forbidden)
+    monkeypatch.setattr(traffic, 'tick', forbidden)
+    result = traffic.review_organic_traffic([], {
+        'search': {'status': 'stale', 'evidence_refs': ['old']},
+        'aeo': {'status': 'available', 'evidence_refs': ['observed:aeo']},
+    })
+    assert result['action_count'] == 1
+    assert result['actions'][0]['action_type'] == 'review_aeo_evidence'
+    assert result['actions'][0]['opportunity_key'] is None
+    assert result['actions'][0]['total_action_cost_cents'] is None

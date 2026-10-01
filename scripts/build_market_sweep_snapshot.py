@@ -9,17 +9,14 @@ from empire_os.market_sweep_revenue_gps import (
     fetch_market_sweep_postgres,
     write_market_sweep_snapshot,
 )
-from empire_os.runtime_env import load_runtime_env
+from empire_os.intelligence_materializer_env import load_materializer_env
 
 
 ROOT = Path("/srv/empire_os")
 
 
 def main() -> int:
-    env = load_runtime_env(
-        ROOT / "runtime/secrets/intelligence_materializer.env",
-        required=("EMPIRE_INTELLIGENCE_MATERIALIZER_DSN",),
-    )
+    env = load_materializer_env()
     payload = fetch_market_sweep_postgres(
         env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"],
         window_days=7,

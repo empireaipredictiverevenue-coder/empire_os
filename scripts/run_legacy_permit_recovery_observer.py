@@ -8,9 +8,72 @@ from empire_os.legacy_permit_recovery import (
     refresh_legacy_permit_recovery_observer,
 )
 from empire_os.legacy_permit_inventory import update_cumulative_inventory
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 
 
 def main() -> int:
+    backend = os.getenv(
+        "EMPIRE_DATA_BACKEND",
+        "",
+    ).strip().lower()
+
+    if backend == "empiredb":
+        payload = {
+            "schema_version": (
+                "empire.legacy-permit-recovery-runtime.v1"
+            ),
+            "observed_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+            "mode": "OBSERVE",
+            "state": "LEGACY_SOURCE_UNAVAILABLE",
+            "canonical_backend": "empiredb",
+            "source_store": (
+                "legacy_supabase.public.lane_leads"
+            ),
+            "reason": (
+                "lane_leads is retired legacy recovery state "
+                "and is intentionally not materialized in EmpireDB"
+            ),
+            "database_write_performed": False,
+            "canonical_promotion_performed": False,
+            "outbound_sent": False,
+            "commercial_terms_created": False,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        }
+
+        status_path = Path(
+            "/srv/empire_os/runtime/recovery/"
+            "legacy_permit_recovery_runtime_status.json"
+        )
+        status_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        tmp = status_path.with_suffix(".json.tmp")
+        tmp.write_text(
+            json.dumps(
+                payload,
+                indent=2,
+                sort_keys=True,
+            ) + "\n",
+            encoding="utf-8",
+        )
+        tmp.replace(status_path)
+
+        print(
+            json.dumps(
+                payload,
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")
     parser.add_argument("--batch-size", type=int, default=100)

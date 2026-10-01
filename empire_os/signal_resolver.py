@@ -140,10 +140,8 @@ def run_signal_resolution(
         raise ValueError("signal resolution limit must be 1-25")
     current = (now or _now()).astimezone(timezone.utc)
 
-    if reader is None or writer is None:
-        from empire_os.crawler_runner import _canonical_reader, _canonical_writer
-        reader = reader or _canonical_reader
-        writer = writer or _canonical_writer
+    if (reader is None) != (writer is None):
+        raise ValueError("reader and writer must be provided together")
 
     from empire_os.crawler_runner import ingest_candidate
 

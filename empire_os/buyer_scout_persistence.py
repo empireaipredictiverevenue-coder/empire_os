@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.parse import urlparse
 
+from empire_os.buyer_acquisition_team import commercial_research_profile
+
 
 OUTPUT = Path("runtime/buyer_acquisition/persistence_latest.json")
 RpcCall = Callable[[str, str, dict[str, Any]], Any]
@@ -164,6 +166,12 @@ def persist_new_external_candidates(
             "budget_verified": False,
         }
         provenance = {
+            "commercial_research_profile": commercial_research_profile(
+                candidate.get("query_evidence") or []
+            ),
+            "target_opportunity_keys": list(
+                candidate.get("target_opportunity_keys") or []
+            ),
             "source": "empire_buyer_acquisition_scout",
             "candidate_state": candidate.get("candidate_state"),
             "query_evidence_count": candidate.get(

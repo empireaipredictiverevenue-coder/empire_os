@@ -10,8 +10,7 @@ from empire_os.conversation_recovery import (
     build_conversation_recovery,
     parse_delivered_events,
 )
-from empire_os.qualification_worker_v2 import request_json
-
+from empire_os.sb import request_json
 ROOT = Path("/srv/empire_os")
 OUT = ROOT / "runtime" / "conversation_recovery" / "latest.json"
 

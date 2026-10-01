@@ -2,44 +2,32 @@
 from __future__ import annotations
 
 import json
-import urllib.parse
 from pathlib import Path
 
 from empire_os.buyer_capacity_readiness import summarize_buyer_capacity
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.buyer_allocation_repository import BuyerAllocationDataRepository
+from empire_os.canonical_data_gateway import empiredb_gateway_from_environment as gateway_from_environment
+from empire_os.runtime_env import load_runtime_env
 
 ROOT = Path("/srv/empire_os")
 OUT = ROOT / "runtime" / "buyer_capacity_readiness" / "latest.json"
 
-SELECT = ",".join((
-    "id","buyer_name","status","is_active","commercial_activation_state",
-    "reviewed_at","commercial_activated_at",
-    "commercial_terms_source","commercial_terms_reference",
-    "commercial_terms_verified_at","capacity_verified_at",
-    "delivery_verified_at","niche","metro","destination_phone",
-    "webhook_url","daily_cap","calls_today","per_lead_rate",
-    "base_payout","priority",
-))
-
-
 def fetch_all_buyers(
-    request=request_json,
+    repository: BuyerAllocationDataRepository | None = None,
     *,
     page_size: int = 1000,
     max_rows: int = 10000,
 ) -> list[dict]:
+    if repository is None:
+        repository = BuyerAllocationDataRepository(
+            gateway_from_environment(load_runtime_env("/etc/empire_os.env"))
+        )
     size = max(1, min(int(page_size), 1000))
     cap = max(size, min(int(max_rows), 50000))
     rows: list[dict] = []
     offset = 0
     while offset < cap:
-        params = urllib.parse.urlencode({
-            "select": SELECT,
-            "order": "created_at.desc,id.desc",
-            "limit": size,
-            "offset": offset,
-        })
-        page = request("GET", f"/rest/v1/buyers?{params}") or []
+        page = repository.buyer_page(page_size=size, offset=offset)
         if not isinstance(page, list):
             raise RuntimeError("buyer projection must be a list")
         rows.extend(row for row in page if isinstance(row, dict))

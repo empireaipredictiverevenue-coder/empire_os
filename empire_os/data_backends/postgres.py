@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 import os
 from typing import Any, Callable, Mapping, Protocol
 
-from empire_os.data_values import JsonValue
+from empire_os.data_values import JsonValue, unwrap_data_value
 
 
 class ConnectionLike(Protocol):
@@ -135,7 +135,11 @@ class PostgresConnector:
             raise RuntimeError(
                 "psycopg is required for EmpireDB JSONB adaptation"
             ) from exc
-        return Jsonb(value)
+        # JSONB is a serialization boundary. PostgreSQL-native/Python
+        # values may legitimately exist inside nested application payloads,
+        # but psycopg's JSON encoder requires JSON-safe scalar values.
+        # Keep native SQL column values native; normalize only JSONB content.
+        return Jsonb(unwrap_data_value(value))
 
     def health(self) -> dict[str, Any]:
         connection: ConnectionLike | None = None

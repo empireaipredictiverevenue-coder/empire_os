@@ -311,3 +311,40 @@ def test_targeted_verification_does_not_pollute_generic_share():
     assert result["share_of_voice_available"] is True
     assert by_name["Roofer A"]["observed_search_presence_share"] == 1.0
     assert by_name["Roofer B"]["observed_search_presence_share"] == 0.0
+
+
+def test_cache_and_errors_cannot_be_restamped_as_observations():
+    for change in ({"error": "unavailable"}, {"searchParameters": {"cache": True}}):
+        def search(query, num):
+            return {**_search(query, num), **change}
+        result = build_search_presence_snapshot(
+            companies=_companies(), queries=("Denver roofing",), search_fn=search,
+        )
+        assert result["observation_count"] == 0
+
+
+def test_public_only_never_uses_auto_or_keyed_engines(monkeypatch):
+    from empire_os import competitor_search_presence as module
+    calls = []
+    def search(query, num, engine):
+        calls.append(engine)
+        return {"organic": [], "error": "unavailable"}
+    monkeypatch.setattr(module, "search_web", search)
+    assert module._public_search_query("Denver roofing")["organic"] == []
+    assert calls == ["bing_html", "duckduckgo_html", "bing_rss", "duckduckgo_lite", "mojeek"]
+
+
+def test_failed_refresh_preserves_previous_snapshot(tmp_path, monkeypatch):
+    import json
+    import pytest
+    from empire_os import competitor_search_presence as module
+    root = tmp_path / "runtime/competitive_intelligence"
+    root.mkdir(parents=True)
+    (root / "competitor_market_scale_latest.json").write_text(json.dumps({"niche": "roofing", "metro": "Denver"}))
+    output = tmp_path / module.SNAPSHOT_RELATIVE_PATH
+    output.write_text('{"generated_at":"old"}')
+    monkeypatch.setattr(module, "load_resolved_market_entities", lambda *a, **k: _companies())
+    monkeypatch.setattr(module, "_public_search_query", lambda *a: {"organic": [], "error": "unavailable"})
+    with pytest.raises(ValueError, match="fresh_search_observations_unavailable"):
+        module.refresh_search_presence_snapshot(tmp_path, object(), public_only=True)
+    assert output.read_text() == '{"generated_at":"old"}'

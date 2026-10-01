@@ -27,6 +27,52 @@ from empire_os.funnel import (
 logger = logging.getLogger("traffic_specialist")
 
 
+def review_organic_traffic(opportunities, search_intelligence):
+    """Review validated Distribution evidence without invoking funnel writes.
+
+    ZERO-CASH describes the proposed media channel, not the total action cost.
+    No acquisition budget is needed to propose an evidence investigation.
+    """
+    actions = []
+
+    def propose(kind, refs, opportunity=None):
+        if not refs:
+            return
+        opportunity = opportunity or {}
+        actions.append({
+            "action_type": kind,
+            "channel": "organic_search",
+            "opportunity_key": opportunity.get("opportunity_key"),
+            "evidence_refs": list(refs),
+            "classification": "PROPOSAL",
+            "proposal_only": True,
+            "zero_cash_mode": True,
+            "paid_media_spend_cents": 0,
+            "total_action_cost_cents": None,
+            "execution_authority": "none",
+            "missing_evidence": sorted(set([
+                "total_action_cost", "verified_search_gap",
+                *opportunity.get("missing_evidence", []),
+            ])),
+            "canonical_prediction": opportunity.get("canonical_prediction"),
+            "expected_canonical_revenue_contribution_cents": opportunity.get(
+                "expected_canonical_revenue_contribution_cents"
+            ),
+        })
+
+    for opportunity in opportunities:
+        propose("review_opportunity_organic_evidence", opportunity["evidence_refs"], opportunity)
+    for name, kind in (
+        ("search", "review_organic_search_evidence"),
+        ("aeo", "review_aeo_evidence"),
+        ("competitor", "review_competitor_visibility"),
+    ):
+        source = search_intelligence.get(name, {})
+        if source.get("status") == "available":
+            propose(kind, source.get("evidence_refs", []))
+    return {"actions": actions, "action_count": len(actions), "execution_authority": "none"}
+
+
 @dataclass
 class DiscoveredProspect:
     """A prospect that was discovered by the Neural Scout or another source."""

@@ -14,6 +14,8 @@ recognizes revenue.
 """
 from __future__ import annotations
 
+from empire_os.sb import request_json
+
 from datetime import datetime, timezone
 from typing import Any, Callable
 import urllib.parse
@@ -22,7 +24,6 @@ from empire_os.qualification_worker_v2 import (
     SCORING_ENGINE,
     SCORING_VERSION,
     qualify_prospect,
-    request_json,
 )
 
 

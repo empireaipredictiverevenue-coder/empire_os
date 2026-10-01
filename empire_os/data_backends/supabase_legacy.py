@@ -17,6 +17,7 @@ from empire_os.data_cloud_contract import DataBackend
 from empire_os.legacy_data_egress import LegacyDataEgressGovernor
 from empire_os.data_query import ConflictAction, DataFilter, FilterOperator, OrderSpec
 from empire_os.data_values import unwrap_data_value
+from empire_os.data_query import validate_filter_column
 
 
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -48,17 +49,22 @@ def _postgrest_scalar(value: object) -> str:
 
 
 def _filter_param(item: DataFilter) -> tuple[str, str]:
-    column = _ident(item.column)
+    column = validate_filter_column(item.column)
     if item.operator is FilterOperator.EQ:
         return column, f"eq.{_postgrest_scalar(item.value)}"
     if item.operator is FilterOperator.NE:
         return column, f"not.eq.{_postgrest_scalar(item.value)}"
+    if item.operator is FilterOperator.LIKE:
+        return column, f"like.{_postgrest_scalar(item.value)}"
     if item.operator is FilterOperator.ILIKE:
         return column, f"ilike.{_postgrest_scalar(item.value)}"
     if item.operator is FilterOperator.GTE:
         return column, f"gte.{_postgrest_scalar(item.value)}"
     if item.operator is FilterOperator.IS_NULL:
         return column, "is.null"
+    if item.operator is FilterOperator.IS_NOT_NULL:
+        return column, "not.is.null"
+
     if item.operator in {FilterOperator.IN, FilterOperator.NOT_IN}:
         values = tuple(item.value or ())
         if not values:

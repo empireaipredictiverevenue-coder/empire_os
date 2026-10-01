@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import re
 import urllib.parse
+
+from empire_os.data_values import unwrap_data_value
 from typing import Any, Mapping
 
 from empire_os.canonical_data_gateway import gateway_from_environment
@@ -20,6 +22,7 @@ from empire_os.data_query import (
     OrderSpec,
 )
 from empire_os.runtime_env import load_runtime_env
+from empire_os.data_query import validate_filter_column
 
 
 ENV_PATH = "/etc/empire_os.env"
@@ -127,7 +130,19 @@ def _ident(value: str) -> str:
 
 
 def _scalar(value: str) -> Any:
-    text = urllib.parse.unquote_plus(str(value))
+    # Query values reaching this function have already been decoded by
+    # urllib.parse.parse_qsl() in _table_request_parts().
+    #
+    # Decoding again with unquote_plus() corrupts legitimate "+" values,
+    # notably ISO-8601 timezone offsets such as +00:00.
+    text = str(value)
+
+    # PostgREST in.(...) values may be double-quoted, particularly when
+    # values contain spaces.  Quotes delimit the value and are not part
+    # of the stored scalar.
+    if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
+        text = text[1:-1].replace(r'\\"', '"').replace(r'\\\\', '\\')
+
     lowered = text.casefold()
     if lowered == "null":
         return None
@@ -149,9 +164,11 @@ def _scalar(value: str) -> Any:
 
 
 def _data_filter(column: str, expression: str) -> DataFilter:
-    column = _ident(column)
+    column = validate_filter_column(column)
     if expression == "is.null":
         return DataFilter.is_null(column)
+    if expression == "not.is.null":
+        return DataFilter.is_not_null(column)
     if expression.startswith("not.eq."):
         return DataFilter.ne(column, _scalar(expression[7:]))
     if expression.startswith("not.in.(") and expression.endswith(")"):
@@ -161,8 +178,12 @@ def _data_filter(column: str, expression: str) -> DataFilter:
         return DataFilter.eq(column, _scalar(expression[3:]))
     if expression.startswith("gte."):
         return DataFilter.gte(column, _scalar(expression[4:]))
+    if expression.startswith("like."):
+        pattern = str(_scalar(expression[5:])).replace("*", "%")
+        return DataFilter.like(column, pattern)
     if expression.startswith("ilike."):
-        return DataFilter.ilike(column, str(_scalar(expression[6:])))
+        pattern = str(_scalar(expression[6:])).replace("*", "%")
+        return DataFilter.ilike(column, pattern)
     if expression.startswith("in.(") and expression.endswith(")"):
         values = expression[4:-1].split(",")
         return DataFilter.in_(column, tuple(_scalar(v) for v in values))
@@ -265,6 +286,13 @@ def _equality_match(filters: tuple[DataFilter, ...]) -> dict[str, Any]:
     return match
 
 
+
+
+def _compat_result(value: Any) -> Any:
+    """Normalize native backend values at the legacy transport boundary."""
+    return unwrap_data_value(value)
+
+
 def request_json(
     method: str,
     path: str,
@@ -288,6 +316,10 @@ def request_json(
     if not gateway.configured:
         return None
 
+    # Legacy/PostgREST compatibility boundary:
+    # normalize native PostgreSQL/Python values before writes.
+    payload = unwrap_data_value(payload)
+
     verb = str(method or "").strip().upper()
     parsed = urllib.parse.urlsplit(path)
     rpc_prefix = "/rest/v1/rpc/"
@@ -296,7 +328,9 @@ def request_json(
             raise ValueError("canonical RPC compatibility requires POST")
         name = _ident(parsed.path[len(rpc_prefix):])
         params = payload if isinstance(payload, Mapping) else {}
-        return gateway.rpc(name, dict(params))
+        return unwrap_data_value(
+            gateway.rpc(name, dict(params))
+        )
 
     (
         table,
@@ -309,14 +343,15 @@ def request_json(
     ) = _table_request_parts(path)
 
     if verb == "GET":
-        return gateway.query(
+        return unwrap_data_value(gateway.query(
             table,
             columns,
             filters=filters,
             order=ordering,
             limit=limit,
             offset=offset,
-        )
+        ))
+
 
     if verb == "POST":
         if not isinstance(payload, Mapping):
@@ -357,11 +392,11 @@ def request_json(
             raise TypeError(
                 "canonical table-update compatibility requires object payload"
             )
-        return gateway.update(
+        return _compat_result(gateway.update(
             table,
             _equality_match(filters),
             dict(payload),
-        )
+        ))
 
     if verb == "DELETE":
         gateway.delete(table, _equality_match(filters))

@@ -8,7 +8,7 @@ NOW = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
 def discovered_buyer():
     return {
         "id": "b1",
-        "buyer_name": "Example Roofing",
+        "buyer_name": "Observed Roofing",
         "status": "ACTIVE",
         "is_active": True,
         "commercial_activation_state": "discovered",
@@ -22,7 +22,7 @@ def discovered_buyer():
         "niche": "Roofing",
         "metro": "DFW",
         "destination_phone": "+12145550100",
-        "webhook_url": "https://example.invalid/webhook",
+        "webhook_url": None,
         "daily_cap": 50,
         "calls_today": 0,
     }
@@ -70,3 +70,44 @@ def test_no_buyers_stays_not_ready():
     assert result["fully_activated"] == 0
     assert result["allocation_ready"] is False
     assert result["highest_priority_blocker"] == "verified_commercial_terms"
+
+
+def test_quality_holds_exclude_populated_commercial_fields():
+    from empire_os.buyer_allocation import buyer_activation_decision
+    for change in (
+        {"buyer_name": "Test Buyer"},
+        {"buyer_name": "test_buyer"},
+        {"buyer_name": "Demo Buyer"},
+        {"id": "fixture:buyer"},
+        {"status": "non_buyer"},
+        {"webhook_url": "https://routing.example.invalid/hook"},
+        {"webhook_url": "https://example.com/hook"},
+    ):
+        row = {**activated_buyer(), **change}
+        assert buyer_activation_decision(row)[0] is False
+        result = summarize_buyer_capacity([row], observed_at=NOW)
+        assert result["identity_quality_held"] == 1
+        assert result["fully_activated"] == 0
+        assert result["terms_verified"] == 0
+        assert result["capacity_verified"] == 0
+        assert result["delivery_verified"] == 0
+        assert result["allocation_ready"] is False
+
+
+def test_classification_does_not_promote_discovery_or_reply_to_terms():
+    from empire_os.buyer_allocation import buyer_evidence_classification
+    row = discovered_buyer()
+    assert buyer_evidence_classification(row) == "unreviewed_identity"
+    row.update(reviewed_at="2026-09-21T10:00:00Z", reply="Interested, send details")
+    assert buyer_evidence_classification(row) == "reviewed_commercial_facts_unknown"
+    result = summarize_buyer_capacity([row], observed_at=NOW)
+    assert result["terms_verified"] == 0
+    assert result["allocation_ready"] is False
+    assert result["classification_establishes_commercial_verification"] is False
+
+
+def test_identity_marker_detection_is_not_arbitrary_substring_matching():
+    from empire_os.buyer_allocation import buyer_identity_quality_hold
+    row = activated_buyer()
+    row.update(buyer_name="Latest Roofing", commercial_terms_reference="contract:test-reference")
+    assert buyer_identity_quality_hold(row) is None

@@ -10,9 +10,7 @@ from empire_os.permit_buyer_commercial_packet import (
     build_permit_buyer_packet,
     write_permit_buyer_packet,
 )
-from empire_os.qualification_worker_v2 import request_json
-
-
+from empire_os.sb import request_json
 def _candidate(domain: str) -> dict:
     query = urllib.parse.urlencode({
         "select": (

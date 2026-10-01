@@ -13,7 +13,8 @@ from empire_os.predictive_revenue_enterprise_acquisition import (
     build_enterprise_lead_candidates,
 )
 from empire_os.predictive_revenue_enterprise_targets import TARGETS
-from empire_os.qualification_worker_v2 import qualify_prospect, request_json
+from empire_os.qualification_worker_v2 import qualify_prospect
+from empire_os.sb import request_json
 
 
 OUT = Path(

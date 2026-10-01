@@ -262,3 +262,145 @@ def test_standing_authority_routes_closer_reply_to_closer_gate():
     assert result["sequence_kind"] == "closer_reply"
     assert calls[1][1] == "/rest/v1/rpc/auto_approve_closer_reply_intent"
     assert calls[1][2]["p_daily_cap"] == 5
+
+
+def test_empiredb_standing_authority_routes_by_sequence_kind():
+    from empire_os.outbound_role_transport import (
+        PostgresStandingAuthorityApproverRpc,
+    )
+
+    class Cursor:
+        def __init__(self):
+            self.calls = []
+            self.fetches = [
+                ({"sequence_kind": "followup"},),
+                ({"decision": "approved"},),
+            ]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+
+        def fetchone(self):
+            return self.fetches.pop(0)
+
+    class Connection:
+        def __init__(self, cursor):
+            self._cursor = cursor
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def cursor(self):
+            return self._cursor
+
+    cursor = Cursor()
+
+    rpc = PostgresStandingAuthorityApproverRpc(
+        "postgresql://secret",
+        daily_cap=7,
+        connect_factory=lambda _dsn: Connection(cursor),
+    )
+
+    result = rpc(
+        "approve_outbound_intent",
+        {
+            "p_intent_id":
+                "00000000-0000-0000-0000-000000000001",
+            "p_approved_by": "outbound_governor",
+            "p_note": "bounded",
+        },
+    )
+
+    assert result["decision"] == "approved"
+    assert cursor.calls[0][0] == (
+        "SET LOCAL ROLE empire_outbound_approver"
+    )
+
+    assert "SELECT metadata" in cursor.calls[1][0]
+
+    assert (
+        "auto_approve_outbound_followup"
+        in cursor.calls[2][0]
+    )
+
+    assert cursor.calls[2][1][1] == 7
+
+
+def test_empiredb_standing_authority_routes_by_sequence_kind():
+    from empire_os.outbound_role_transport import (
+        PostgresStandingAuthorityApproverRpc,
+    )
+
+    class Cursor:
+        def __init__(self):
+            self.calls = []
+            self.fetches = [
+                ({"sequence_kind": "followup"},),
+                ({"decision": "approved"},),
+            ]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+
+        def fetchone(self):
+            return self.fetches.pop(0)
+
+    class Connection:
+        def __init__(self, cursor):
+            self._cursor = cursor
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def cursor(self):
+            return self._cursor
+
+    cursor = Cursor()
+
+    rpc = PostgresStandingAuthorityApproverRpc(
+        "postgresql://secret",
+        daily_cap=7,
+        connect_factory=lambda _dsn: Connection(cursor),
+    )
+
+    result = rpc(
+        "approve_outbound_intent",
+        {
+            "p_intent_id":
+                "00000000-0000-0000-0000-000000000001",
+            "p_approved_by": "outbound_governor",
+            "p_note": "bounded",
+        },
+    )
+
+    assert result["decision"] == "approved"
+    assert cursor.calls[0][0] == (
+        "SET LOCAL ROLE empire_outbound_approver"
+    )
+
+    assert "SELECT metadata" in cursor.calls[1][0]
+
+    assert (
+        "auto_approve_outbound_followup"
+        in cursor.calls[2][0]
+    )
+
+    assert cursor.calls[2][1][1] == 7

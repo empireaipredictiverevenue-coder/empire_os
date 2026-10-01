@@ -134,7 +134,21 @@ def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
     }
     direct_pool = "direct_demand_buyers" in pools
     if direct_pool and row.get("explicit_direct_buyer_evidence") is not True:
-        return False, "direct_buyer_evidence_missing"
+        # Independently sourced product research can qualify the organisation
+        # for holding review. It cannot qualify it as a direct inventory buyer.
+        non_direct_product_evidence = any(
+            isinstance(item, Mapping)
+            and item.get("buyer_pool") in pools.intersection({
+                "local_and_smb_buyers", "end_service_buyers",
+                "agency_and_reseller_buyers", "enterprise_and_data_buyers",
+                "software_and_advisory_buyers",
+            })
+            and str(item.get("query") or "").strip()
+            and item.get("product_code") in products
+            for item in query_evidence
+        )
+        if not non_direct_product_evidence:
+            return False, "direct_buyer_evidence_missing"
 
     return True, "review_ready"
 
@@ -142,7 +156,7 @@ def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
 def materialize_review_readiness(
     rows: list[Mapping[str, Any]],
     *,
-    patch_call: PatchCall,
+    patch_call: PatchCall | None = None,
 ) -> dict[str, Any]:
     ready = 0
     blocked: dict[str, int] = {}
@@ -175,7 +189,7 @@ def materialize_review_readiness(
                 "reviewed_by": "empire_buyer_scout_review_gate",
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             },
-        )
+        ) if patch_call is not None else None
         ready += 1
         updates.append({
             "candidate_id": candidate_id,
@@ -192,6 +206,7 @@ def materialize_review_readiness(
         "blocked_count": len(rows) - ready,
         "blocked_reason_counts": dict(sorted(blocked.items())),
         "updates": updates,
+        "database_write_performed": patch_call is not None and bool(updates),
         "canonical_promotion_performed": False,
         "outbound_sent": False,
         "terms_accepted": False,

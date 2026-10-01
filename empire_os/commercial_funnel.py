@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from empire_os.runtime_env import load_runtime_env
+from empire_os.intelligence_materializer_env import load_materializer_env
 
 
 SNAPSHOT_PATH = Path(
@@ -176,10 +176,7 @@ def main() -> int:
         ))
         return 0
 
-    env = load_runtime_env(
-        root / "runtime/secrets/intelligence_materializer.env",
-        required=("EMPIRE_INTELLIGENCE_MATERIALIZER_DSN",),
-    )
+    env = load_materializer_env()
     payload = fetch_founder_commercial_funnel_postgres(
         env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"]
     )

@@ -82,6 +82,25 @@ def _search_query(query: str, num: int = 20) -> dict[str, Any]:
     }
 
 
+def _public_search_query(query: str, num: int = 20) -> dict[str, Any]:
+    """Explicit unkeyed providers only; never invoke automatic paid fallback."""
+    for engine in ("bing_html", "duckduckgo_html", "bing_rss", "duckduckgo_lite", "mojeek"):
+        result = search_web(query, num=num, engine=engine)
+        if (isinstance(result, Mapping) and result.get("organic")
+                and not result.get("error")
+                and not (result.get("searchParameters") or {}).get("cache")):
+            return dict(result)
+    return {"organic": [], "error": "fresh_public_search_unavailable"}
+
+
+def _fresh_search_result(result):
+    if not isinstance(result, Mapping):
+        return {}
+    if result.get("error") or (result.get("searchParameters") or {}).get("cache"):
+        return {}
+    return result
+
+
 def _canonical_company_queries(
     company_name: str,
     company_domain: str,
@@ -119,7 +138,7 @@ def _canonical_presence_probe(
 
     observations = []
     for query in _canonical_company_queries(company_name, company_domain):
-        result = search_fn(query, 10)
+        result = _fresh_search_result(search_fn(query, 10))
         organic = result.get("organic") if isinstance(result, Mapping) else []
         organic = organic if isinstance(organic, list) else []
         engine = _clean(
@@ -213,7 +232,7 @@ def build_search_presence_snapshot(
     query_results: list[dict[str, Any]] = []
 
     def _run(query: str) -> dict[str, Any]:
-        result = search_fn(query, 20)
+        result = _fresh_search_result(search_fn(query, 20))
         engine = _clean(
             (result.get("searchParameters") or {}).get("engine")
         )
@@ -576,6 +595,7 @@ def refresh_search_presence_snapshot(
     writer: PostgresIntelligenceMaterializer,
     *,
     persist: bool = False,
+    public_only: bool = False,
 ) -> dict[str, Any]:
     market = _load_json(
         repo_root
@@ -587,7 +607,14 @@ def refresh_search_presence_snapshot(
         niche=_clean(market.get("niche")),
         metro=_clean(market.get("metro")),
     )
-    payload = build_search_presence_snapshot(companies=companies)
+    if not companies:
+        raise ValueError("canonical_companies_unavailable")
+    payload = build_search_presence_snapshot(
+        companies=companies,
+        search_fn=_public_search_query if public_only else _search_query,
+    )
+    if not payload["observation_count"]:
+        raise ValueError("fresh_search_observations_unavailable")
 
     persistence = []
     if persist:
@@ -659,6 +686,7 @@ def main() -> int:
     )
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--persist", action="store_true")
+    parser.add_argument("--public-only", action="store_true")
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -676,6 +704,7 @@ def main() -> int:
         repo_root,
         writer,
         persist=args.persist,
+        public_only=args.public_only,
     )
     print(json.dumps(payload, indent=2, sort_keys=True, default=str))
     return 0

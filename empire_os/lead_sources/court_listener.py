@@ -21,12 +21,11 @@ full search endpoint needs token. Auth token optional — falls back to
 public search.
 """
 
-import os
 import time
 import requests
 from datetime import date, timedelta
 from typing import Iterator
-from pathlib import Path
+from empire_os.runtime_env import load_runtime_env
 
 from empire_os.lead_sources import LeadCandidate, SourceInfo
 
@@ -35,15 +34,7 @@ COURTLISTENER_URL = "https://www.courtlistener.com/api/rest/v4/search/"
 
 
 def _read_token() -> str:
-    env_path = Path("/root/empire_os/.env")
-    try:
-        with open(env_path) as f:
-            for line in f:
-                if line.startswith("COURTLISTENER_TOKEN="):
-                    return line.split("=", 1)[1].strip()
-    except Exception:
-        pass
-    return ""
+    return load_runtime_env("/etc/empire_os.env").get("COURTLISTENER_TOKEN", "")
 
 
 # Public RECAP search (no auth required for some endpoints)
@@ -81,6 +72,7 @@ def run(metro: str = None) -> Iterator[LeadCandidate]:
     token = _read_token()
     end = date.today()
     start = end - timedelta(days=7)
+    successful_queries = 0
 
     for case_term, niche in CASES:
         try:
@@ -103,7 +95,10 @@ def run(metro: str = None) -> Iterator[LeadCandidate]:
                 continue
 
             data = r.json()
-            results = data.get("results", [])
+            results = data.get("results")
+            if not isinstance(results, list):
+                continue
+            successful_queries += 1
             for row in results[:10]:
                 case_name = row.get("caseName", "") or row.get("case_name", "")
                 court = row.get("court", "") or row.get("court_id", "")
@@ -128,6 +123,8 @@ def run(metro: str = None) -> Iterator[LeadCandidate]:
         except Exception:
             continue
         time.sleep(1)
+    if successful_queries == 0:
+        raise RuntimeError("courtlistener_producer_unavailable:no_successful_query")
 
 
 def register_source(reg):

@@ -18,7 +18,9 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
-from empire_os.buyer_acquisition_team import direct_buyer_profile
+from empire_os.buyer_acquisition_team import (
+    commercial_research_profile, direct_buyer_profile,
+)
 from empire_os.buyer_scout_review_readiness import reliable_business_name
 from empire_os.icp_buyer_trigger_intelligence import (
     assess_icp_candidate,
@@ -198,6 +200,7 @@ def collect_research_queries(
                         "corridor_key": target.get("corridor_key"),
                         "opportunity_key": target.get("opportunity_key"),
                         "product_code": target.get("product_code"),
+                        "billing_model": target.get("billing_model"),
                         "icp_profile_key": target.get("icp_profile_key"),
                         "buying_triggers": list(
                             target.get("buying_triggers") or []
@@ -218,10 +221,65 @@ def collect_research_queries(
         )
     )
 
-    dedup: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
+    # Round-robin streams, then pools/targets within each stream. A high-volume
+    # corridor must not consume the entire bounded product/MRR research budget.
+    streams: dict[tuple, dict[tuple, list[dict[str, Any]]]] = {}
     for row in rows:
-        key = (row["query"], row["buyer_pool"])
+        key = (row["buyer_pool"], row.get("corridor_key"),
+               row.get("product_code"), row.get("icp_profile_key"),
+               row.get("opportunity_key"))
+        stream = (row["target_kind"], row.get("billing_model")
+                  if row["target_kind"] == "product" else None)
+        streams.setdefault(stream, {}).setdefault(key, []).append(row)
+    balanced: dict[tuple, list[dict[str, Any]]] = {}
+    for kind, groups in streams.items():
+        balanced[kind] = []
+        pools: dict[str, list[list[dict[str, Any]]]] = {}
+        for key, group in groups.items():
+            pools.setdefault(key[0], []).append(group)
+        while any(group for bucket in pools.values() for group in bucket):
+            for bucket in pools.values():
+                active = [group for group in bucket if group]
+                if active:
+                    group = active[0]
+                    balanced[kind].append(group.pop(0))
+                    bucket.remove(group)
+                    bucket.append(group)
+    rows = []
+    while any(balanced.values()):
+        for stream in balanced.values():
+            if stream:
+                rows.append(stream.pop(0))
+
+    # Reserve existing streams and pools before filling remaining priority slots.
+    # Partner queries share the existing reseller pool, not direct-buyer status.
+    reserved = []
+    coverage = set()
+    for dimension in ("stream", "pool", "partner"):
+        for row in rows:
+            if dimension == "stream":
+                key = (dimension, row["target_kind"], row.get("billing_model"))
+            elif dimension == "pool":
+                key = (dimension, row["buyer_pool"])
+            else:
+                query = row["query"].lower()
+                lane = "publisher" if "affiliate" in query or "publisher" in query else (
+                    "white_label" if "white label" in query else None)
+                if lane is None:
+                    continue
+                key = (dimension, lane)
+            if key not in coverage:
+                coverage.add(key)
+                if row not in reserved:
+                    reserved.append(row)
+    rows = reserved + rows
+
+    dedup: list[dict[str, Any]] = []
+    seen: set[tuple] = set()
+    for row in rows:
+        key = (row["query"], row["buyer_pool"], row.get("product_code"),
+               row.get("opportunity_key"), row.get("corridor_key"),
+               row.get("icp_profile_key"))
         if key in seen:
             continue
         seen.add(key)
@@ -245,7 +303,7 @@ def run_buyer_scout(
         plan,
         max_queries=max_queries,
     )
-    query_text = [row["query"] for row in queries]
+    query_text = list(dict.fromkeys(row["query"] for row in queries))
 
     domain_map = (
         search_domains_parallel(
@@ -524,7 +582,9 @@ def run_buyer_scout(
                 else "search_fabric"
             ),
             "canonical_seed_prospect_id": (
-                canonical_seed_by_domain.get(domain, {}).get("id")
+                str(canonical_seed_by_domain.get(domain, {}).get("id"))
+                if canonical_seed_by_domain.get(domain, {}).get("id") is not None
+                else None
             ),
             "canonical_seed_niche": (
                 canonical_seed_by_domain.get(domain, {}).get("niche")
@@ -596,6 +656,9 @@ def run_buyer_scout(
             "budget_verified": False,
             "query_evidence_count": len(provenance[domain]),
             "query_evidence": provenance[domain],
+            "commercial_research_profile": commercial_research_profile(
+                provenance[domain]
+            ),
             "site_evidence_score": evidence.get("evidence_score"),
             "first_party_email_count": len(evidence.get("emails") or []),
             "first_party_phone_count": len(evidence.get("phones") or []),

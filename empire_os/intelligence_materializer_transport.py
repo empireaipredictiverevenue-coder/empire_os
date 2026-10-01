@@ -53,12 +53,12 @@ class PostgresIntelligenceMaterializer:
 
     @classmethod
     def from_env(cls) -> "PostgresIntelligenceMaterializer":
-        return cls(
-            os.getenv(
-                "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN",
-                "",
-            )
-        )
+        from empire_os.intelligence_materializer_env import load_materializer_env
+        try:
+            env = load_materializer_env()
+        except ValueError as exc:
+            raise IntelligenceMaterializerTransportError(str(exc)) from None
+        return cls(env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"])
 
     @staticmethod
     def _row(cursor) -> dict[str, Any] | None:

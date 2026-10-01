@@ -21,9 +21,7 @@ from empire_os.buyer_discovery import (
 )
 from empire_os.buyer_probe_worker import rejection_reason
 from empire_os.buyer_review_materializer import run_buyer_probe_isolated
-from empire_os.qualification_worker_v2 import request_json
-
-
+from empire_os.sb import request_json
 DEFERRED_LOCK = Path("/srv/empire_os/runtime/buyer_deferred_enrichment/run.lock")
 
 

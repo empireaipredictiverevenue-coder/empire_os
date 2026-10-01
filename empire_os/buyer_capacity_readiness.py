@@ -5,7 +5,10 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
-from empire_os.buyer_allocation import buyer_activation_decision
+from empire_os.buyer_allocation import (
+    buyer_activation_decision, buyer_evidence_classification,
+    buyer_identity_quality_hold,
+)
 
 
 def _text(value: Any) -> str:
@@ -39,18 +42,20 @@ def summarize_buyer_capacity(
         else:
             blockers[reason] += 1
 
-    reviewed = sum(bool(row.get("reviewed_at")) for row in rows)
+    eligible_rows = [row for row in rows if not buyer_identity_quality_hold(row)]
+    classifications = Counter(buyer_evidence_classification(row) for row in rows)
+    reviewed = sum(bool(row.get("reviewed_at")) for row in eligible_rows)
     terms_verified = sum(
         bool(_text(row.get("commercial_terms_source")))
         and bool(_text(row.get("commercial_terms_reference")))
         and bool(row.get("commercial_terms_verified_at"))
-        for row in rows
+        for row in eligible_rows
     )
     capacity_verified = sum(
-        bool(row.get("capacity_verified_at")) for row in rows
+        bool(row.get("capacity_verified_at")) for row in eligible_rows
     )
     delivery_verified = sum(
-        bool(row.get("delivery_verified_at")) for row in rows
+        bool(row.get("delivery_verified_at")) for row in eligible_rows
     )
     commercially_activated = sum(
         _text(row.get("commercial_activation_state")).lower() == "activated"
@@ -94,6 +99,9 @@ def summarize_buyer_capacity(
         "observed_at": now.astimezone(timezone.utc).isoformat(),
         "mode": "OBSERVE",
         "buyers_seen": len(rows),
+        "evidence_classification_counts": dict(sorted(classifications.items())),
+        "identity_quality_held": len(rows) - len(eligible_rows),
+        "classification_establishes_commercial_verification": False,
         "status_active": active_status,
         "is_active_true": active_flag,
         "commercially_activated": commercially_activated,

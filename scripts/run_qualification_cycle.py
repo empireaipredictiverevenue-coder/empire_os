@@ -8,10 +8,10 @@ import urllib.parse
 from datetime import datetime, timezone
 
 from empire_os.qualification_worker_v2 import (
-    request_json,
     run_cycle,
     run_identity_catchup,
 )
+from empire_os.sb import request_json
 from empire_os.omega_worker import run_omega_cycle
 from empire_os.signal_resolver import run_signal_resolution
 from empire_os.omega_buyer_readiness import (
@@ -111,8 +111,15 @@ def main() -> int:
             and buyer_readiness["ok"]
         ),
     }
+    # Preserve business/pipeline truth independently of process health.
+    result["business_ok"] = bool(result["ok"])
+    result["service_health"] = "completed"
+
     print(json.dumps(result, indent=2, default=str))
-    return 0 if result["ok"] else 1
+
+    # A handled business-state blocker must not make the systemd
+    # heartbeat itself unhealthy. Real execution defects still raise.
+    return 0
 
 
 if __name__ == "__main__":

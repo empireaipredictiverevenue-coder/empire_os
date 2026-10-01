@@ -53,7 +53,7 @@ ROLE_FUNCTIONS = {
             ("p_intent_id", "p_provider_message_id", "p_from_contact", "p_subject", "p_body_text", "p_received_at", "p_metadata"),
         ),
         "classify_outbound_reply": (
-            "select public.classify_outbound_reply(%s,%s,%s,%s)",
+            "select public.classify_outbound_reply(%s,%s,%s::numeric,%s)",
             ("p_reply_id", "p_classification", "p_confidence", "p_actor"),
         ),
         "record_outbound_provider_event": (

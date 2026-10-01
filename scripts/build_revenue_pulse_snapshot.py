@@ -11,7 +11,7 @@ from empire_os.revenue_pulse import StormPulse, build_revenue_pulse
 from empire_os.revenue_pulse_reader import (
     fetch_current_and_previous_windows_postgres,
 )
-from empire_os.runtime_env import load_runtime_env
+from empire_os.intelligence_materializer_env import load_materializer_env
 
 
 ROOT = Path("/srv/empire_os")
@@ -106,10 +106,7 @@ def load_storm_pulse(*, now: datetime | None = None) -> StormPulse | None:
 
 def main() -> int:
     now = datetime.now(timezone.utc)
-    env = load_runtime_env(
-        ROOT / "runtime/secrets/intelligence_materializer.env",
-        required=("EMPIRE_INTELLIGENCE_MATERIALIZER_DSN",),
-    )
+    env = load_materializer_env()
     current, previous = fetch_current_and_previous_windows_postgres(
         env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"],
         now=now,

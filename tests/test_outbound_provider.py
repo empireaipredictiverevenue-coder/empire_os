@@ -287,3 +287,68 @@ def test_extract_reply_records_signed_metadata_when_body_fetch_is_unavailable():
     assert reply["body_unavailable"] is True
     assert reply["body_text"]
     assert reply["executable"] is False
+
+
+
+def test_provider_event_ignores_internal_visibility_scope():
+    event = {
+        "type": "email.delivered",
+        "data": {
+            "email_id": "internal-visibility-1",
+            "to": ["founder@example.com"],
+            "tags": [
+                {
+                    "name": "intent_id",
+                    "value": "00000000-0000-0000-0000-000000000001",
+                },
+                {
+                    "name": "empire_event_scope",
+                    "value": "internal_reply_visibility",
+                },
+            ],
+        },
+    }
+
+    assert extract_resend_provider_event(event) is None
+
+
+def test_provider_event_ignores_historical_internal_visibility_copy():
+    event = {
+        "type": "email.delivered",
+        "data": {
+            "email_id": "internal-visibility-old",
+            "from": "reply@mail.empire-ai.co.uk",
+            "to": ["founder@example.com"],
+            "subject": "[Empire buyer reply] Re: opportunity",
+            "tags": [
+                {
+                    "name": "intent_id",
+                    "value": "00000000-0000-0000-0000-000000000001",
+                }
+            ],
+        },
+    }
+
+    assert extract_resend_provider_event(event) is None
+
+
+def test_provider_event_keeps_real_buyer_delivery():
+    event = {
+        "type": "email.delivered",
+        "data": {
+            "email_id": "real-buyer-delivery",
+            "to": ["buyer@example.com"],
+            "tags": [
+                {
+                    "name": "intent_id",
+                    "value": "00000000-0000-0000-0000-000000000001",
+                }
+            ],
+        },
+    }
+
+    result = extract_resend_provider_event(event)
+
+    assert result is not None
+    assert result["event_type"] == "delivered"
+    assert result["recipient"] == "buyer@example.com"

@@ -6,9 +6,7 @@ from pathlib import Path
 import urllib.parse
 
 from empire_os.predictive_revenue_enterprise_targets import TARGETS
-from empire_os.qualification_worker_v2 import request_json
-
-
+from empire_os.sb import request_json
 ROOT = Path("/srv/empire_os")
 INTEL = ROOT / "runtime/predictive_revenue/enterprise_contact_intelligence_latest.json"
 ACTIVATION = ROOT / "runtime/predictive_revenue/enterprise_activation_latest.json"

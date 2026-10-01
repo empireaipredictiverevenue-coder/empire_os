@@ -8,6 +8,8 @@ Type=oneshot
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 EnvironmentFile=/srv/empire_os/runtime/secrets/outbound.env
+EnvironmentFile=/etc/empire_os.env
+EnvironmentFile=/etc/empiredb.env
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_closer_reply_worker.py --limit 50
 NoNewPrivileges=true
 PrivateTmp=true

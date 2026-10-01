@@ -13,8 +13,7 @@ from empire_os.commercial_loop_observer import (
     fetch_canonical_commercial_observations,
     write_commercial_loop_snapshot,
 )
-from empire_os.qualification_worker_v2 import request_json
-
+from empire_os.sb import request_json
 SNAPSHOT = Path("/srv/empire_os/runtime/commercial_loop/latest.json")
 
 

@@ -6,13 +6,17 @@ execution are intentionally unsupported.
 """
 from __future__ import annotations
 
+from decimal import Decimal
+
 import re
 from typing import Any, Mapping, Sequence
 
+from empire_os.data_values import JsonValue
 from empire_os.canonical_data_gateway import DataGatewayOperationUnsupported
 from empire_os.data_backends.postgres import PostgresConnector
 from empire_os.data_cloud_contract import DataBackend
 from empire_os.data_query import ConflictAction, DataFilter, FilterOperator, OrderSpec
+from empire_os.data_query import postgres_filter_column
 
 
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -174,6 +178,11 @@ def _rows(cursor: Any) -> list[dict[str, Any]]:
     ]
 
 
+_RPC_NUMERIC_PARAMS: dict[str, frozenset[str]] = {
+    'propose_buyer_candidate_review': frozenset(('p_company_score', 'p_decision_score',)),
+    'refresh_pending_buyer_candidate_review': frozenset(('p_decision_score',)),
+}
+
 class EmpireDbProvider:
     backend = DataBackend.EMPIREDB
 
@@ -236,12 +245,15 @@ class EmpireDbProvider:
         where_parts: list[str] = []
 
         for item in filters:
-            column = _ident(item.column)
+            column = postgres_filter_column(item.column)
             if item.operator is FilterOperator.EQ:
                 where_parts.append(f"{column} = %s")
                 params.append(item.value)
             elif item.operator is FilterOperator.NE:
                 where_parts.append(f"{column} <> %s")
+                params.append(item.value)
+            elif item.operator is FilterOperator.LIKE:
+                where_parts.append(f"{column} LIKE %s")
                 params.append(item.value)
             elif item.operator is FilterOperator.ILIKE:
                 where_parts.append(f"{column} ILIKE %s")
@@ -251,6 +263,8 @@ class EmpireDbProvider:
                 params.append(item.value)
             elif item.operator is FilterOperator.IS_NULL:
                 where_parts.append(f"{column} IS NULL")
+            elif item.operator is FilterOperator.IS_NOT_NULL:
+                where_parts.append(f"{column} IS NOT NULL")
             elif item.operator in {FilterOperator.IN, FilterOperator.NOT_IN}:
                 values = tuple(item.value or ())
                 if not values:
@@ -546,7 +560,37 @@ class EmpireDbProvider:
             + ", ".join("%s" for _ in keys)
             + ")"
         )
-        values = tuple(self._adapt(supplied[key]) for key in keys)
+        # RPC parameters cross a PostgreSQL function-call boundary.
+        # Structured Python values represent json/jsonb RPC arguments and
+        # must never reach psycopg as raw dict/list objects.
+        #
+        # Keep scalar SQL values native; mark only structured RPC values
+        # for the connector's canonical JSONB adapter.
+        numeric_keys = _RPC_NUMERIC_PARAMS.get(
+            rpc_name,
+            frozenset(),
+        )
+
+        def adapt_rpc_parameter(key: str) -> Any:
+            value = supplied[key]
+
+            # Psycopg binds Python float as PostgreSQL double precision.
+            # A PostgreSQL function declared with NUMERIC will therefore
+            # fail overload resolution. Decimal binds as NUMERIC and
+            # preserves exact score semantics.
+            if key in numeric_keys and value is not None:
+                if not isinstance(value, Decimal):
+                    value = Decimal(str(value))
+
+            if isinstance(value, (dict, list)):
+                value = JsonValue(value)
+
+            return self._adapt(value)
+
+        values = tuple(
+            adapt_rpc_parameter(key)
+            for key in keys
+        )
 
         connection = self._connection()
         try:

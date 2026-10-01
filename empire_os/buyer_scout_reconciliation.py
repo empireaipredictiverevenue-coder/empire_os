@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
+from empire_os.buyer_acquisition_team import commercial_research_profile
+
 
 OUTPUT = Path("runtime/buyer_acquisition/reconciliation_latest.json")
 
@@ -134,6 +136,12 @@ def reconcile_scout_candidates(
             "domain": domain or None,
             "business_name": candidate.get("business_name"),
             "buyer_type": candidate.get("buyer_type"),
+            "commercial_research_profile": commercial_research_profile(
+                candidate.get("query_evidence") or []
+            ),
+            "target_opportunity_keys": list(
+                candidate.get("target_opportunity_keys") or []
+            ),
             "direct_buyer_score": candidate.get(
                 "direct_buyer_score"
             ),

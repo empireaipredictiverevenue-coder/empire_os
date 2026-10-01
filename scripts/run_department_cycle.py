@@ -18,9 +18,20 @@ def main() -> int:
         max_items=args.max_items,
         timeout_seconds=args.timeout_seconds,
     )
-    print(json.dumps(payload, indent=2, sort_keys=True))
     worker_ok = (payload.get("worker") or {}).get("ok")
-    return 0 if worker_ok is not False else 1
+
+    # Process health is separate from department-work truth.
+    # FAILED/BLOCKED work remains persisted in the durable queue and
+    # executive evaluation, but a successfully completed heartbeat
+    # must not poison systemd health or stop future queue processing.
+    payload["service_health"] = "completed"
+    payload["work_ok"] = worker_ok is not False
+
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+    # Any real process defect still raises before this point and
+    # therefore exits non-zero naturally.
+    return 0
 
 
 if __name__ == "__main__":

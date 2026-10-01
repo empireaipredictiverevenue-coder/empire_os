@@ -163,3 +163,13 @@ def test_permit_buyer_can_be_review_ready_with_site_identity_and_nyc():
         },
     )
     assert review_readiness(row) == (True, "review_ready")
+
+
+def test_observe_preview_uses_same_gate_without_mutation():
+    rows = [candidate(), candidate(target_buyer_pools=['direct_demand_buyers'])]
+    result = materialize_review_readiness(rows)
+    assert result['review_ready_count'] == 1
+    assert result['blocked_count'] == 1
+    assert result['database_write_performed'] is False
+    assert result['canonical_promotion_performed'] is False
+    assert rows[0]['review_state'] == 'discovered'

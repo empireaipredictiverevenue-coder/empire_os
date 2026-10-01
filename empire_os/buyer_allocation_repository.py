@@ -76,6 +76,10 @@ class BuyerAllocationDataRepository:
         return self._gateway.query(
             "buyers",
             BUYER_COLUMNS,
+            order=(
+                OrderSpec("created_at", descending=True),
+                OrderSpec("id", descending=True),
+            ),
             limit=page_size,
             offset=offset,
         )

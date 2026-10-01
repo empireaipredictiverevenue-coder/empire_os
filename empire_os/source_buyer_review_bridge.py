@@ -30,8 +30,8 @@ from empire_os.market_pricing import (
 from empire_os.qualification_worker_v2 import (
     SCORING_ENGINE,
     SCORING_VERSION,
-    request_json,
 )
+from empire_os.sb import request_json
 
 
 Request = Callable[..., Any]

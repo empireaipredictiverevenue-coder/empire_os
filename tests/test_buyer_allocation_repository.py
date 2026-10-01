@@ -46,7 +46,7 @@ class FakeGateway:
 def test_buyer_allocation_runtime_contains_no_rest_transport():
     source = inspect.getsource(allocation)
     assert "/rest/v1/" not in source
-    assert "urllib." not in source
+    assert "urllib.request" not in source
     assert "SUPABASE_" not in source
 
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import re
 from typing import Any, Callable, Protocol
+from urllib.parse import urlsplit
 
 from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
 from empire_os.niche_taxonomy import (
@@ -70,11 +72,60 @@ def _buyer_rate(row: dict[str, Any]) -> float | None:
     return _float_or_none(value)
 
 
+def buyer_identity_quality_hold(row: dict[str, Any]) -> str | None:
+    """Conservative review hold, not an assertion of genuine buyer identity.
+
+    Use only identity/configuration fields, never a substring in reply text or
+    commercial references. Absence of a marker is not commercial verification.
+    """
+    state = normalise(row.get("commercial_activation_state"))
+    status = normalise(row.get("status"))
+    if state in {"non buyer", "noise", "rejected"} or status in {
+        "non buyer", "noise", "rejected",
+    }:
+        return "buyer_non_commercial_identity_hold"
+    name = str(row.get("buyer_name") or "").strip().casefold().replace("_", " ")
+    identity = str(row.get("id") or "").strip().casefold()
+    if (re.search(r"\b(test|testing|fixture|synthetic|dummy|placeholder|demo|e2e|smoke)\b", name)
+            or re.match(r"^(test|fixture|synthetic|dummy|demo|e2e|smoke)[_:-]", identity)):
+        return "buyer_test_identity_hold"
+    endpoint = str(row.get("webhook_url") or "").strip()
+    if endpoint:
+        try:
+            host = (urlsplit(endpoint).hostname or "").lower().rstrip(".")
+        except ValueError:
+            return "buyer_invalid_delivery_identity_hold"
+        if any(host == suffix or host.endswith("." + suffix) for suffix in (
+            "invalid", "test", "localhost", "example.com", "example.net", "example.org",
+        )):
+            return "buyer_test_identity_hold"
+    return None
+
+
+def buyer_evidence_classification(row: dict[str, Any]) -> str:
+    """Project existing review evidence; never infer terms from discovery."""
+    hold = buyer_identity_quality_hold(row)
+    if hold:
+        return hold
+    if not row.get("reviewed_at"):
+        return "unreviewed_identity"
+    if all(row.get(key) for key in (
+        "commercial_terms_source", "commercial_terms_reference",
+        "commercial_terms_verified_at",
+    )):
+        return "reviewed_terms_evidence_recorded"
+    return "reviewed_commercial_facts_unknown"
+
+
 def buyer_activation_decision(
     row: dict[str, Any] | None,
 ) -> tuple[bool, str]:
     if not isinstance(row, dict):
         return False, "missing_buyer"
+
+    hold = buyer_identity_quality_hold(row)
+    if hold:
+        return False, hold
 
     if not bool(row.get("is_active")):
         return False, "buyer_inactive"

@@ -3,6 +3,10 @@
 Exported environment variables win. Protected env files are fallback only.
 This lets systemd inject secrets into non-root workers without those workers
 needing permission to read the root-owned file themselves.
+
+The canonical production runtime spans empire_os.env and empiredb.env. Loading
+the former fills missing values from the latter; explicit custom files remain
+isolated. Connection parsing and validation belong to the database connector.
 """
 from __future__ import annotations
 
@@ -22,21 +26,24 @@ def load_runtime_env(
         if value not in (None, "")
     }
 
-    p = Path(path)
-    try:
-        content = p.read_text(encoding="utf-8")
-    except (OSError, PermissionError):
-        content = ""
-
-    for raw in content.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    paths = [Path(path)]
+    if paths[0] == Path("/etc/empire_os.env"):
+        paths.append(Path("/etc/empiredb.env"))
+    for p in paths:
+        try:
+            content = p.read_text(encoding="utf-8")
+        except OSError:
             continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if key and value and key not in env:
-            env[key] = value
+
+        for raw in content.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+            if key and value and key not in env:
+                env[key] = value
 
     missing = [key for key in required if not env.get(key)]
     if missing:

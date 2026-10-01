@@ -66,8 +66,8 @@ def log(level, msg, **fields):
         **fields,
     }
     with LOG_PATH.open("a") as fh:
-        fh.write(json.dumps(event) + "\n")
-    print(json.dumps(event))
+        fh.write(json.dumps(event, default=str) + "\n")
+    print(json.dumps(event, default=str))
 
 
 def ingest_candidate(
@@ -150,6 +150,13 @@ def run_source_safe(src, metro, dry_run, max_candidates=None, niche=None):
             quality = assess_candidate(cand)
             if not quality.accepted:
                 if quality.source_role == "signal":
+                    if dry_run:
+                        log(
+                            "DRYRUN", "signal_candidate", source=cand.source,
+                            source_role=quality.source_role,
+                            entity_kind=quality.entity_kind,
+                        )
+                        continue
                     signal = enqueue_signal(cand, quality=quality)
                     accepted += 1
                     log(
@@ -282,7 +289,7 @@ def main():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Discover candidates without writing canonical prospects",
+        help="Observe candidates without writing prospects or queuing signals",
     )
     parser.add_argument("--source", default=None, help="Run one source by name")
     parser.add_argument(

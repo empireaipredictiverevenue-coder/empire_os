@@ -8,6 +8,7 @@ Type=oneshot
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 Environment=CRAWLER_TIMEOUT=600
+Environment=EMPIRE_DATA_BACKEND=empiredb
 EnvironmentFile=/srv/empire_os/runtime/secrets/outbound.env
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_acquisition_guarded.py --max-candidates 10
 NoNewPrivileges=true

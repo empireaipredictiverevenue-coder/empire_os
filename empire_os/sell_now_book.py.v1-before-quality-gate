@@ -1,0 +1,341 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from hashlib import sha256
+import json
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+
+SCHEMA_VERSION = "empire.predictive-revenue.sell-now.v1"
+
+GENERAL_PRODUCTS = frozenset({
+    "managed_service",
+    "search_opportunity_map",
+})
+
+RULES: dict[str, tuple[str, ...]] = {
+    "competitor_search_gap": (
+        "competitor", "competition", "search gap", "serp",
+        "ranking", "rankings", "seo",
+    ),
+    "local_search_grid": (
+        "local", "maps", "map pack", "google maps",
+        "metro", "city", "near me",
+    ),
+    "technical_search_audit": (
+        "technical", "site", "website", "seo",
+        "crawl", "index", "search",
+    ),
+    "authority_intelligence": (
+        "backlink", "authority", "links", "link gap",
+    ),
+    "content_protection": (
+        "content", "cannibal", "decay", "keyword",
+        "page", "organic",
+    ),
+    "geo_ai_visibility": (
+        "ai visibility", "aeo", "geo", "citation",
+        "answer engine",
+    ),
+    "search_growth_command": (
+        "search", "seo", "organic", "ranking", "growth",
+    ),
+    "serp_intelligence_api": (
+        "serp", "keyword", "ranking", "search",
+    ),
+    "permit_intelligence": (
+        "permit", "construction", "contractor",
+        "roofing", "roofer", "hvac",
+    ),
+    "private_capital_rollup": (
+        "private equity", "private capital", "roll-up",
+        "rollup", "acquisition", "investor",
+    ),
+    "property_intelligence": (
+        "property", "real estate", "developer",
+        "development", "construction", "permit",
+    ),
+}
+
+
+def _walk_text(value: Any) -> Iterable[str]:
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if str(key).lower() in {
+                "password", "secret", "token", "dsn",
+                "authorization", "api_key", "apikey",
+            }:
+                continue
+            yield from _walk_text(item)
+    elif isinstance(value, (list, tuple, set)):
+        for item in value:
+            yield from _walk_text(item)
+    elif isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned:
+            yield cleaned
+
+
+def candidate_text(candidate: Mapping[str, Any]) -> str:
+    return " ".join(_walk_text(candidate)).lower()
+
+
+def candidate_id(candidate: Mapping[str, Any]) -> str:
+    for key in (
+        "opportunity_id",
+        "candidate_id",
+        "id",
+        "key",
+    ):
+        value = str(candidate.get(key) or "").strip()
+        if value:
+            return value
+
+    encoded = json.dumps(
+        dict(candidate),
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode()
+
+    return "radar_" + sha256(encoded).hexdigest()[:20]
+
+
+def _country_match(
+    product_code: str,
+    text: str,
+) -> bool:
+    if not product_code.startswith("solar_opportunity_map_"):
+        return False
+
+    if "solar" not in text:
+        return False
+
+    suffix = product_code.rsplit("_", 1)[-1]
+
+    aliases = {
+        "us": (" usa ", " us ", "united states", "america"),
+        "gb": (" uk ", " gb ", "united kingdom", "britain", "england"),
+        "ca": (" canada ", " canadian "),
+        "au": (" australia ", " australian "),
+        "nz": (" new zealand ",),
+        "ie": (" ireland ", " irish "),
+        "de": (" germany ", " german "),
+        "fr": (" france ", " french "),
+        "es": (" spain ", " spanish "),
+        "it": (" italy ", " italian "),
+        "nl": (" netherlands ", " dutch "),
+        "be": (" belgium ", " belgian "),
+        "pt": (" portugal ", " portuguese "),
+    }
+
+    padded = f" {text} "
+
+    return any(
+        alias in padded
+        for alias in aliases.get(suffix, ())
+    )
+
+
+def product_fit(
+    product: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+) -> tuple[bool, str, str]:
+    code = str(product.get("product_code") or "").strip()
+    text = candidate_text(candidate)
+
+    if not code:
+        return False, "none", "missing_product_code"
+
+    if code in GENERAL_PRODUCTS:
+        return True, "general", "general_opportunity_product"
+
+    if code.startswith("solar_opportunity_map_"):
+        if _country_match(code, text):
+            return True, "specific", "solar_country_match"
+        return False, "none", "solar_country_mismatch"
+
+    keywords = RULES.get(code)
+
+    if not keywords:
+        return False, "none", "no_explicit_fit_rule"
+
+    hits = tuple(
+        keyword
+        for keyword in keywords
+        if keyword in text
+    )
+
+    if not hits:
+        return False, "none", "no_keyword_fit"
+
+    return (
+        True,
+        "specific",
+        "matched:" + ",".join(hits[:5]),
+    )
+
+
+def product_ready(product: Mapping[str, Any]) -> bool:
+    return (
+        product.get("active") is True
+        and product.get("binding_terms_ready") is True
+        and str(product.get("catalog_state") or "").upper()
+            == "VERIFIED"
+        and str(product.get("version_state") or "").upper()
+            == "VERIFIED"
+    )
+
+
+def build_sell_now_book(
+    *,
+    catalog: Mapping[str, Any],
+    radar: Mapping[str, Any],
+    generated_at: str | None = None,
+) -> dict[str, Any]:
+    generated_at = generated_at or datetime.now(
+        timezone.utc
+    ).isoformat()
+
+    products = tuple(catalog.get("products") or ())
+    candidates = tuple(radar.get("candidates") or ())
+
+    ready_products = tuple(
+        product
+        for product in products
+        if isinstance(product, Mapping)
+        and product_ready(product)
+    )
+
+    rows: list[dict[str, Any]] = []
+
+    for candidate in candidates:
+        if not isinstance(candidate, Mapping):
+            continue
+
+        opp_id = candidate_id(candidate)
+
+        for product in ready_products:
+            matched, scope, reason = product_fit(
+                product,
+                candidate,
+            )
+
+            if not matched:
+                continue
+
+            rows.append({
+                "status": "SELL_NOW",
+                "commercial_meaning":
+                    "ready_for_proposal_or_closer",
+                "live_outbound_authorized": False,
+                "execution_authority": "none",
+
+                "opportunity_id": opp_id,
+                "opportunity": dict(candidate),
+
+                "product_id": product.get("product_id"),
+                "product_code": product.get("product_code"),
+                "product_name": product.get("product_name"),
+                "product_family":
+                    product.get("product_family"),
+                "billing_model":
+                    product.get("billing_model"),
+                "currency": product.get("currency"),
+
+                # Preserve canonical verified pricing evidence exactly.
+                # Do not reinterpret or invent a number here.
+                "price_basis": product.get("price_basis"),
+
+                "catalog_state":
+                    product.get("catalog_state"),
+                "version_state":
+                    product.get("version_state"),
+                "verified_at":
+                    product.get("verified_at"),
+                "product_evidence_refs":
+                    product.get("evidence_refs") or [],
+
+                "fit_scope": scope,
+                "fit_reason": reason,
+            })
+
+    # Specific product fit before general product fit.
+    # This is NOT an economic ranking.
+    rows.sort(
+        key=lambda row: (
+            row["opportunity_id"],
+            0 if row["fit_scope"] == "specific" else 1,
+            str(row["product_code"]),
+        )
+    )
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": generated_at,
+
+        "catalog_generated_at":
+            catalog.get("generated_at"),
+        "radar_generated_at":
+            radar.get("generated_at"),
+
+        "execution_authority": "none",
+        "outreach_authority": "none",
+        "payment_authority": "none",
+        "actual_revenue":
+            bool(catalog.get("actual_revenue")),
+
+        "radar_candidate_count": len(candidates),
+        "ready_product_count": len(ready_products),
+        "sell_now_count": len(rows),
+
+        "definition": {
+            "SELL_NOW":
+                "verified active binding-ready product "
+                "with deterministic opportunity fit; "
+                "proposal/Closer readiness only",
+            "live_execution":
+                "still requires normal Empire authority gates",
+        },
+
+        "ready_products": [
+            {
+                "product_id": row.get("product_id"),
+                "product_code": row.get("product_code"),
+                "product_name": row.get("product_name"),
+                "product_family": row.get("product_family"),
+                "billing_model": row.get("billing_model"),
+                "currency": row.get("currency"),
+                "price_basis": row.get("price_basis"),
+                "verified_at": row.get("verified_at"),
+            }
+            for row in ready_products
+        ],
+
+        "sell_now": rows,
+    }
+
+
+def write_sell_now_book(
+    payload: Mapping[str, Any],
+    path: Path,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    temporary = path.with_suffix(
+        path.suffix + ".tmp"
+    )
+
+    temporary.write_text(
+        json.dumps(
+            dict(payload),
+            indent=2,
+            sort_keys=True,
+            default=str,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    temporary.replace(path)

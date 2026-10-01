@@ -9,9 +9,7 @@ from empire_os.buyer_scout_persistence import (
     persist_new_external_candidates,
     write_persistence,
 )
-from empire_os.qualification_worker_v2 import request_json
-
-
+from empire_os.sb import request_json
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")

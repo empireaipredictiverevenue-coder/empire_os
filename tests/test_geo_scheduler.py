@@ -4,7 +4,7 @@ from empire_os.geo_registry import acquisition_markets
 from empire_os.geo_scheduler import choose_market, recent_market_stats
 
 
-def _write_runs(path):
+def _runs(path):
     rows = [
         {
             "msg": "crawler_run_start",
@@ -27,67 +27,127 @@ def _write_runs(path):
             "errors": 0,
         },
     ]
-    path.write_text(
-        "\n".join(json.dumps(row) for row in rows) + "\n"
-    )
+    path.write_text("\n".join(json.dumps(x) for x in rows))
 
 
-def test_recent_market_stats_pairs_start_with_done(tmp_path):
-    log = tmp_path / "crawler.jsonl"
-    _write_runs(log)
-    stats = recent_market_stats(log, source="overpass")
-    assert stats["Dallas, TX"]["runs"] == 1
-    assert stats["Dallas, TX"]["accepted"] == 25
-    assert stats["Birmingham, AL"]["accepted"] == 1
+def test_stats(tmp_path):
+    p = tmp_path / "l"
+    _runs(p)
+    s = recent_market_stats(p, source="overpass")
+    assert s["Dallas, TX"]["accepted"] == 25
 
 
-def test_scheduler_balances_exploration_across_countries(tmp_path):
-    log = tmp_path / "crawler.jsonl"
-    _write_runs(log)
-    markets = acquisition_markets()
+def test_global_source_80_20(tmp_path):
+    p = tmp_path / "l"
+    p.write_text("")
+    state = {"country_market_cursors": {}}
+    countries = []
 
-    state = {
-        "geo_cycle_count": 4,
-        "next_country_index": 0,
-        "country_market_cursors": {},
-    }
-    first = choose_market(
-        markets,
-        state=state,
-        source="overpass",
-        log_path=log,
-    )
-    assert first["policy"] == "explore_country_balanced"
-    first_country = first["market"].country_code
+    for cycle in range(10):
+        state["geo_cycle_count"] = cycle
+        r = choose_market(
+            acquisition_markets(),
+            state=state,
+            source="overpass",
+            log_path=p,
+        )
+        countries.append(r["market"].country_code)
+        state["country_market_cursors"] = r[
+            "country_market_cursors"
+        ]
 
-    state = {
-        "geo_cycle_count": 8,
-        "next_country_index": first["next_country_index"],
-        "country_market_cursors": first["country_market_cursors"],
-    }
-    second = choose_market(
-        markets,
-        state=state,
-        source="overpass",
-        log_path=log,
-    )
-    assert second["policy"] == "explore_country_balanced"
-    assert second["market"].country_code != first_country
+    assert sum(x == "US" for x in countries) == 8
+    assert sum(x != "US" for x in countries) == 2
 
 
-def test_scheduler_exploits_only_markets_with_observed_yield(tmp_path):
-    log = tmp_path / "crawler.jsonl"
-    _write_runs(log)
-    result = choose_market(
+def test_us_markets_rotate(tmp_path):
+    p = tmp_path / "l"
+    p.write_text("")
+
+    a = choose_market(
         acquisition_markets(),
         state={
-            "geo_cycle_count": 1,
-            "next_country_index": 0,
+            "geo_cycle_count": 0,
             "country_market_cursors": {},
         },
         source="overpass",
-        log_path=log,
+        log_path=p,
     )
-    assert result["policy"] == "exploit_observed_yield"
-    assert result["market"].metro == "Dallas, TX"
-    assert result["recent_stats"]["accepted"] == 25
+
+    b = choose_market(
+        acquisition_markets(),
+        state={
+            "geo_cycle_count": 5,
+            "country_market_cursors":
+                a["country_market_cursors"],
+        },
+        source="overpass",
+        log_path=p,
+    )
+
+    assert a["market"].country_code == "US"
+    assert b["market"].country_code == "US"
+    assert a["market"].market_id != b["market"].market_id
+
+
+def test_nws_is_us_only(tmp_path):
+    p = tmp_path / "l"
+    p.write_text("")
+    r = choose_market(
+        acquisition_markets(),
+        state={"geo_cycle_count": 4},
+        source="nws_alerts",
+        log_path=p,
+    )
+    assert r["market"].country_code == "US"
+
+
+def test_global_source_can_go_international(tmp_path):
+    p = tmp_path / "l"
+    p.write_text("")
+    r = choose_market(
+        acquisition_markets(),
+        state={"geo_cycle_count": 4},
+        source="overpass",
+        log_path=p,
+    )
+    assert r["target_bucket"] == "INTL"
+    assert r["market"].country_code != "US"
+
+
+def test_fixed_specialist_geography(tmp_path):
+    p = tmp_path / "l"
+    p.write_text("")
+
+    ny = choose_market(
+        acquisition_markets(),
+        state={"geo_cycle_count": 4},
+        source="permits",
+        log_path=p,
+    )
+    chi = choose_market(
+        acquisition_markets(),
+        state={"geo_cycle_count": 4},
+        source="chicago_311",
+        log_path=p,
+    )
+
+    assert ny["market"].market_id == "US-NY"
+    assert chi["market"].market_id == "US-IL"
+
+
+def test_healthy_observed_market_wins(tmp_path):
+    p = tmp_path / "l"
+    _runs(p)
+
+    r = choose_market(
+        acquisition_markets(),
+        state={
+            "geo_cycle_count": 1,
+            "country_market_cursors": {},
+        },
+        source="overpass",
+        log_path=p,
+    )
+
+    assert r["market"].metro == "Dallas, TX"

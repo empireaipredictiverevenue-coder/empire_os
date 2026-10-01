@@ -8,7 +8,7 @@ from empire_os.commercial_product_catalog import (
     fetch_catalog_postgres,
     write_catalog_snapshot,
 )
-from empire_os.runtime_env import load_runtime_env
+from empire_os.intelligence_materializer_env import load_materializer_env
 
 
 def main() -> int:
@@ -18,10 +18,7 @@ def main() -> int:
     if args.limit < 1 or args.limit > 500:
         parser.error("--limit must be between 1 and 500")
 
-    env = load_runtime_env(
-        "runtime/secrets/intelligence_materializer.env",
-        required=("EMPIRE_INTELLIGENCE_MATERIALIZER_DSN",),
-    )
+    env = load_materializer_env()
     snapshot = fetch_catalog_postgres(
         env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"],
         limit=args.limit,

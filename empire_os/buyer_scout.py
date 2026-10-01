@@ -49,72 +49,16 @@ def _flatten_queries(
     *,
     max_queries: int,
 ) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+    # Share bounded scheduling and provenance with the first-party scout.
+    from empire_os.buyer_acquisition_scout import collect_research_queries
 
-    for target in plan.get("priority_targets") or []:
-        if not isinstance(target, Mapping):
-            continue
-        query_groups = target.get("research_queries")
-        if not isinstance(query_groups, Mapping):
-            continue
-        for pool, queries in query_groups.items():
-            if not isinstance(queries, list):
-                continue
-            for query in queries:
-                if str(query or "").strip():
-                    rows.append({
-                        "source": "corridor_demand",
-                        "pool": str(pool),
-                        "query": str(query).strip(),
-                        "corridor_key": target.get("corridor_key"),
-                        "product_code": None,
-                        "priority_score": int(
-                            target.get("priority_score") or 0
-                        ),
-                    })
-
-    for target in plan.get("product_priority_targets") or []:
-        if not isinstance(target, Mapping):
-            continue
-        query_groups = target.get("research_queries")
-        if not isinstance(query_groups, Mapping):
-            continue
-        for pool, queries in query_groups.items():
-            if not isinstance(queries, list):
-                continue
-            for query in queries:
-                if str(query or "").strip():
-                    rows.append({
-                        "source": "product_demand",
-                        "pool": str(pool),
-                        "query": str(query).strip(),
-                        "corridor_key": None,
-                        "product_code": target.get("product_code"),
-                        "priority_score": int(
-                            target.get("priority_score") or 0
-                        ),
-                    })
-
-    rows.sort(
-        key=lambda row: (
-            -int(row["priority_score"]),
-            str(row["source"]),
-            str(row["pool"]),
-            str(row["query"]),
-        )
-    )
-
-    selected: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for row in rows:
-        query = str(row["query"])
-        if query in seen:
-            continue
-        seen.add(query)
-        selected.append(row)
-        if len(selected) >= max(1, int(max_queries)):
-            break
-    return selected
+    sources = {"corridor": "corridor_demand", "product": "product_demand",
+               "icp": "icp_demand"}
+    return [
+        {**row, "source": sources[row["target_kind"]],
+         "pool": row["buyer_pool"]}
+        for row in collect_research_queries(plan, max_queries=max_queries)
+    ]
 
 
 def run_buyer_scout(
@@ -176,6 +120,8 @@ def run_buyer_scout(
                 "target_pool": query_row["pool"],
                 "corridor_key": query_row.get("corridor_key"),
                 "product_code": query_row.get("product_code"),
+                "opportunity_key": query_row.get("opportunity_key"),
+                "icp_profile_key": query_row.get("icp_profile_key"),
                 "search_engine": engine,
                 "buyer_profile": profile,
                 "candidate_state": "RESEARCH_OBSERVATION",

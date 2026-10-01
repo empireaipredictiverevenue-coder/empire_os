@@ -19,9 +19,7 @@ from empire_os.commercial_pricing_policy import (
     LAUNCH_PRICING,
     build_launch_pricing_proposal,
 )
-from empire_os.qualification_worker_v2 import request_json
-
-
+from empire_os.sb import request_json
 def _rpc_payload(
     row: dict[str, Any],
     *,

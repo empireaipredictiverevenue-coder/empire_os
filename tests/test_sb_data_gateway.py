@@ -214,3 +214,107 @@ def test_request_json_fails_closed_for_egress_probe(monkeypatch):
             "/rest/v1/prospects?select=id&limit=1",
             allow_egress_probe=True,
         )
+
+def test_compatibility_parser_supports_not_is_null():
+    from empire_os.sb import _data_filter
+    from empire_os.data_query import FilterOperator
+
+    item = _data_filter("website", "not.is.null")
+    assert item.column == "website"
+    assert item.operator is FilterOperator.IS_NOT_NULL
+    assert item.value is None
+
+def test_compatibility_in_filter_strips_postgrest_quotes():
+    from empire_os.sb import _data_filter
+    from empire_os.data_query import FilterOperator
+
+    item = _data_filter(
+        "niche",
+        'in.("roofing","solar","mass tort lawyer")',
+    )
+
+    assert item.operator is FilterOperator.IN
+    assert item.value == (
+        "roofing",
+        "solar",
+        "mass tort lawyer",
+    )
+
+
+def test_compatibility_in_filter_preserves_unquoted_values():
+    from empire_os.sb import _data_filter
+    from empire_os.data_query import FilterOperator
+
+    item = _data_filter("status", "in.(new,qualified)")
+
+    assert item.operator is FilterOperator.IN
+    assert item.value == ("new", "qualified")
+
+
+def test_compat_scalar_preserves_iso_timezone_plus():
+    from empire_os.sb import _table_request_parts
+
+    (
+        _table,
+        _columns,
+        filters,
+        _ordering,
+        _limit,
+        _offset,
+        _conflicts,
+    ) = _table_request_parts(
+        "/rest/v1/qualifications?"
+        "scored_at=eq.2026-09-28T08%3A56%3A28%2B00%3A00"
+    )
+
+    assert len(filters) == 1
+    assert filters[0].value == "2026-09-28T08:56:28+00:00"
+
+
+def test_unwrap_data_value_normalizes_native_empiredb_types():
+    from datetime import date, datetime, timezone
+    from decimal import Decimal
+    from uuid import UUID
+
+    from empire_os.data_values import unwrap_data_value
+
+    uid = UUID("12345678-1234-5678-1234-567812345678")
+
+    value = {
+        "id": uid,
+        "created_at": datetime(
+            2026, 9, 28, 8, 56, 28, tzinfo=timezone.utc
+        ),
+        "day": date(2026, 9, 28),
+        "amount": Decimal("12.50"),
+        "nested": [{"prospect_id": uid}],
+    }
+
+    result = unwrap_data_value(value)
+
+    assert result == {
+        "id": "12345678-1234-5678-1234-567812345678",
+        "created_at": "2026-09-28T08:56:28+00:00",
+        "day": "2026-09-28",
+        "amount": "12.50",
+        "nested": [
+            {
+                "prospect_id":
+                "12345678-1234-5678-1234-567812345678"
+            }
+        ],
+    }
+
+
+def test_compatibility_parser_supports_json_text_filter():
+    from empire_os.data_query import FilterOperator
+    from empire_os.sb import _data_filter
+
+    item = _data_filter(
+        "evidence->>niche",
+        "eq.solar",
+    )
+
+    assert item.column == "evidence->>niche"
+    assert item.operator is FilterOperator.EQ
+    assert item.value == "solar"

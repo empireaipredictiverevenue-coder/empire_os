@@ -47,10 +47,11 @@ def main() -> int:
 
     result = run_repair_cycle()
     print(json.dumps(result, indent=2, sort_keys=True))
-    return 0 if result["status"] not in {
-        "RUNTIME_RETRY_EXHAUSTED",
-        "OBSERVE_ONLY_UNKNOWN",
-    } else 1
+    return (
+        1
+        if result["status"] == "RUNTIME_RETRY_EXHAUSTED"
+        else 0
+    )
 
 
 if __name__ == "__main__":

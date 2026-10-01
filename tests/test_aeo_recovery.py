@@ -46,3 +46,26 @@ def test_census_counts_assets_and_risks(tmp_path):
     assert result["niche_count"] == 2
     assert result["publishing_authority"] is False
     assert result["status_counts"]["blocked_for_rewrite"] == 1
+
+
+def test_producer_writes_timezone_aware_census(tmp_path, monkeypatch):
+    import json
+    from datetime import datetime, timezone
+    from scripts import build_aeo_recovery_snapshot as producer
+
+    write_page(tmp_path / "pages/roofing/DFW/index.html", BASE.format(text="Evidence. " * 100))
+    monkeypatch.setattr(producer, "ROOT", tmp_path / "pages")
+    monkeypatch.setattr(producer, "OUTPUT", tmp_path / "snapshot.json")
+    before = datetime.now(timezone.utc)
+    assert producer.main() == 0
+    payload = json.loads(producer.OUTPUT.read_text())
+    stamp = datetime.fromisoformat(payload["generated_at"])
+    assert stamp.tzinfo is not None
+    assert before <= stamp <= datetime.now(timezone.utc)
+    assert payload["asset_count"] == 1
+
+
+def test_missing_asset_root_fails_closed(tmp_path):
+    import pytest
+    with pytest.raises(ValueError, match="aeo_asset_root_unavailable"):
+        build_aeo_recovery_census(tmp_path / "missing")

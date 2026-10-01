@@ -28,6 +28,14 @@ class CrawlerProspectRepository:
     @classmethod
     def from_environment(cls) -> "CrawlerProspectRepository":
         env = load_runtime_env(ENV_PATH)
+        backend = env.get("EMPIRE_DATA_BACKEND", "empiredb").strip()
+        if backend != "empiredb":
+            raise ProspectIngestError("crawler requires canonical EmpireDB backend")
+        env["EMPIRE_DATA_BACKEND"] = "empiredb"
+        if not env.get("EMPIREDB_DSN"):
+            database_env = load_runtime_env("/etc/empiredb.env")
+            if database_env.get("EMPIREDB_DSN"):
+                env["EMPIREDB_DSN"] = database_env["EMPIREDB_DSN"]
         return cls(gateway_from_environment(env))
 
     @property

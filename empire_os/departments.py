@@ -78,7 +78,15 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "conversion_intelligence",
                 "media_os",
             ),
-            agent_roles=("marketing", "growth"),
+            agent_roles=(
+                "marketing", "growth", "marketing_director",
+                "market_intelligence_strategist", "traffic_specialist",
+                "content_copy_agent", "creative_media_agent", "distribution_agent",
+                "conversion_specialist", "lifecycle_crm_agent", "attribution_agent",
+                "brand_quality_agent", "paid_acquisition_planner",
+                "market_intelligence", "content_copy", "creative_media", "distribution",
+                "lifecycle_crm", "attribution_analytics", "brand_quality",
+            ),
             kpis=(
                 "marketing_sourced_recognized_revenue",
                 "realized_gross_profit",

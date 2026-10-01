@@ -343,3 +343,37 @@ def test_run_source_safe_logs_matched_inventory_separately(monkeypatch):
     assert (found, accepted, errors) == (1, 1, 0)
     assert any(msg == "prospect_matched" for _, msg, _ in events)
     assert not any(msg == "prospect_acquired" for _, msg, _ in events)
+
+
+def test_dry_run_signal_never_queues_or_ingests(monkeypatch):
+    import empire_os.crawler_runner as crawler
+    signal_candidate = LeadCandidate(
+        name="Severe Thunderstorm Warning", niche="roofing", metro="Austin",
+        source="nws_alerts", url="https://api.weather.gov/alerts/observed",
+    )
+    src = SimpleNamespace(name="nws_alerts", tier="real", requires=[],
+                          run_fn=lambda metro=None: iter([signal_candidate]))
+    def forbidden(*args, **kwargs):
+        raise AssertionError("OBSERVE must not write")
+    monkeypatch.setattr(crawler, "enqueue_signal", forbidden)
+    monkeypatch.setattr(crawler, "ingest_candidate", forbidden)
+    events = []
+    monkeypatch.setattr(crawler, "log", lambda *args, **kwargs: events.append(args))
+    assert crawler.run_source_safe(src, None, True) == (1, 0, 0)
+    assert ("DRYRUN", "signal_candidate") in events
+    assert not any("signal_queued" in event for event in events)
+
+def test_log_serializes_native_uuid(capsys, tmp_path, monkeypatch):
+    """Production DB UUID values must remain safe at the crawler JSON boundary."""
+    from uuid import UUID
+    import empire_os.crawler_runner as runner
+
+    log_path = tmp_path / "crawler.jsonl"
+    monkeypatch.setattr(runner, "LOG_PATH", log_path)
+
+    value = UUID("12345678-1234-5678-1234-567812345678")
+    runner.log("INFO", "uuid_boundary_test", prospect_id=value)
+
+    output = capsys.readouterr().out
+    assert str(value) in output
+    assert str(value) in log_path.read_text()

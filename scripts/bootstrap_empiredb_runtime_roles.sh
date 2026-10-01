@@ -3,6 +3,10 @@ set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || { echo "run as root"; exit 1; }
 
+if [[ "${1:-}" == "--intelligence-materializer" ]]; then
+  exec /srv/empire_os/.venv/bin/python /srv/empire_os/scripts/provision_intelligence_materializer.py --apply
+fi
+
 runuser -u postgres -- psql -X -v ON_ERROR_STOP=1 -d empiredb <<'SQL'
 DO $$
 DECLARE r text;

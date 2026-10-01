@@ -11,6 +11,9 @@ from empire_os.buyer_allocation import (
     fetch_latest_qualification,
     plan_allocation,
 )
+from empire_os.buyer_allocation_repository import BuyerAllocationDataRepository
+from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.runtime_env import load_runtime_env
 from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
 from empire_os.omega_worker import SCORE_TYPE
 from empire_os.sb import request_json
@@ -188,7 +191,10 @@ def fetch_prospect(prospect_id: str) -> dict[str, Any] | None:
 
 def run_omega_buyer_readiness_cycle(limit: int = 10) -> dict[str, Any]:
     scores = fetch_recent_omega_scores(limit)
-    buyers = fetch_buyer_rows(_reader)
+    repository = BuyerAllocationDataRepository(
+        gateway_from_environment(load_runtime_env("/etc/empire_os.env"))
+    )
+    buyers = fetch_buyer_rows(repository)
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
 
@@ -212,11 +218,11 @@ def run_omega_buyer_readiness_cycle(limit: int = 10) -> dict[str, Any]:
             if not prospect:
                 raise OmegaBuyerReadinessError("prospect missing")
             qualification = fetch_latest_qualification(
-                _reader,
+                repository,
                 prospect_id,
             )
             identity_link = fetch_active_identity_link(
-                _reader,
+                repository,
                 prospect_id,
             )
             results.append(

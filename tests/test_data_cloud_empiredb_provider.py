@@ -352,3 +352,97 @@ def test_cutover_safe_rpc_is_mapped_but_voice_auto_approval_is_not():
     assert "ingest_prospect_atomic" in _RPC_PARAMS
     assert "register_commercial_product_identity" in _RPC_PARAMS
     assert "auto_approve_voice_intent" not in _RPC_PARAMS
+
+
+def test_migration_017_numeric_rpc_contract_is_explicit():
+    import re
+    from pathlib import Path
+
+    from empire_os.data_backends.empiredb import (
+        _RPC_NUMERIC_PARAMS,
+        _RPC_PARAMS,
+    )
+
+    sql = Path(
+        "migrations/empiredb/"
+        "017_cutover_compatibility_rpc_parity.sql"
+    ).read_text()
+
+    pattern = re.compile(
+        r"CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\."
+        r"([A-Za-z0-9_]+)\s*\((.*?)\)\s*"
+        r"RETURNS",
+        re.I | re.S,
+    )
+
+    expected = {}
+
+    for match in pattern.finditer(sql):
+        name = match.group(1)
+
+        if name not in _RPC_PARAMS:
+            continue
+
+        numeric = []
+
+        for raw in match.group(2).split(","):
+            raw = raw.strip()
+
+            m = re.match(
+                r"(p_[A-Za-z0-9_]+)\s+(.+)",
+                raw,
+                re.I,
+            )
+
+            if (
+                m
+                and re.search(
+                    r"\bnumeric\b",
+                    m.group(2),
+                    re.I,
+                )
+            ):
+                numeric.append(m.group(1))
+
+        if numeric:
+            expected[name] = frozenset(numeric)
+
+    assert _RPC_NUMERIC_PARAMS == expected
+
+
+def test_numeric_rpc_scores_bind_as_decimal():
+    from decimal import Decimal
+
+    connection = FakeConnection()
+    connection.next_cursor = Cursor(
+        [({"decision": "proposed"},)],
+        ("result",),
+    )
+
+    provider = EmpireDbProvider(
+        FakeConnector(connection)
+    )
+
+    provider.rpc(
+        "propose_buyer_candidate_review",
+        {
+            "p_prospect_id":
+                "00000000-0000-0000-0000-000000000001",
+            "p_entity_id": None,
+            "p_contact_name": "Test Buyer",
+            "p_contact_title": "Director",
+            "p_contact_email": "buyer@example.com",
+            "p_offer_key": "test-offer",
+            "p_company_score": 85.5,
+            "p_decision_score": 0.91,
+            "p_evidence": {"source": "test"},
+            "p_idempotency_key": "numeric-contract-test",
+        },
+    )
+
+    _, params = connection.calls[0]
+
+    assert params[6] == Decimal("85.5")
+    assert params[7] == Decimal("0.91")
+    assert isinstance(params[6], Decimal)
+    assert isinstance(params[7], Decimal)

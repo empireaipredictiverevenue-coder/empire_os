@@ -23,8 +23,8 @@ from empire_os.outbound_provider import (
 )
 from empire_os.outbound_role_transport import (
     PostgresOutboundRpc,
-    SupabaseOutboundRpc,
 )
+from empire_os.gmail_reply_adapter import visible_reply_text
 from empire_os.reply_classifier import classify_reply_text
 
 MAX_WEBHOOK_BYTES = 1_000_000
@@ -221,9 +221,16 @@ def _forward_reply_notification(
             "to": [target_email],
             "subject": subject,
             "text": text,
-            "tags": [
-                {"name": "intent_id", "value": intent_id}
-            ] if intent_id else [],
+            "tags": (
+                [
+                    {"name": "intent_id", "value": intent_id},
+                    {"name": "empire_event_scope",
+                     "value": "internal_reply_visibility"},
+                ]
+                if intent_id else
+                [{"name": "empire_event_scope",
+                  "value": "internal_reply_visibility"}]
+            ),
         },
         options,
     )
@@ -290,13 +297,20 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
         if reply_rpc is not None:
             return reply_rpc
         dsn = os.getenv("EMPIRE_REPLY_INGEST_DSN", "").strip()
-        if dsn:
-            return PostgresOutboundRpc(dsn, "empire_reply_ingest")
-        return SupabaseOutboundRpc("empire_reply_ingest")
+        # Never route sensitive reply writes through the generic app role or
+        # a legacy fallback when the dedicated runtime identity is absent.
+        return PostgresOutboundRpc(dsn, "empire_reply_ingest")
 
     @app.get("/health")
     async def health():
-        return {"ok": True, "mode": "OBSERVE", "provider": "resend"}
+        configured = reply_rpc is not None or bool(
+            os.getenv("EMPIRE_REPLY_INGEST_DSN", "").strip()
+        )
+        return JSONResponse(
+            {"ok": configured, "mode": "OBSERVE", "provider": "resend",
+             "reply_transport_configured": configured},
+            status_code=200 if configured else 503,
+        )
 
     @app.post("/webhooks/resend-inbound")
     async def inbound(request: Request):
@@ -422,12 +436,15 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                     "body_unavailable": bool(reply.get("body_unavailable")),
                     "in_reply_to": reply["in_reply_to"],
                     "references": reply["references"],
+                    "classifier_body_mode": "visible_reply_only_v1",
                 },
             })
         except Exception:
             return JSONResponse({"ok": False}, status_code=503)
 
-        classification = classify_reply_text(reply["body_text"], reply["subject"])
+        classification = classify_reply_text(
+            visible_reply_text(reply["body_text"]), reply["subject"]
+        )
         classified = None
         if classification["auto_apply"]:
             try:

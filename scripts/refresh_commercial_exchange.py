@@ -14,8 +14,11 @@ from empire_os.commercial_exchange_inventory import (
     build_exchange_snapshot,
     write_exchange_snapshot,
 )
-from empire_os.qualification_worker_v2 import request_json
+from empire_os.sb import request_json
 from empire_os.niche_taxonomy import normalise
+from empire_os.buyer_allocation_repository import BuyerAllocationDataRepository
+from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.runtime_env import load_runtime_env
 
 
 def reader(path: str, params: dict[str, str]) -> Any:
@@ -162,7 +165,12 @@ def main() -> int:
 
     qualifications = fetch_qualification_map(prospect_ids)
     identity_links = fetch_identity_map(prospect_ids)
-    buyers = fetch_buyer_rows(reader)
+    buyer_repository = BuyerAllocationDataRepository(
+        gateway_from_environment(
+            load_runtime_env("/etc/empire_os.env")
+        )
+    )
+    buyers = fetch_buyer_rows(buyer_repository)
     allocated = fetch_allocated_prospect_ids(prospect_ids)
 
     snapshot = build_exchange_snapshot(

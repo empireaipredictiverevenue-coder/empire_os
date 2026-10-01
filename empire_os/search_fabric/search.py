@@ -28,12 +28,16 @@ import random
 import hashlib
 import urllib.parse
 import threading
+from collections import Counter
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Iterator, Optional, List, Dict, Any, Mapping
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
+
+from empire_os.geo_registry import acquisition_markets
 from .decoder import decode_document
 
 # ──────────────────────────────────────────────────────────────────────
@@ -168,6 +172,22 @@ BAD_DOMAINS = (
 _last_req: Dict[str, float] = {}
 _engine_health_lock = threading.Lock()
 _engine_health: Dict[str, dict] = {}
+_provider_locks = {e["name"]: threading.Lock() for e in ENGINES}
+_run_local = threading.local()
+
+
+def _diagnostic(message, *, file=None):
+    stats = getattr(_run_local, "stats", None)
+    if stats is None:
+        print(message, file=file or sys.stderr)
+    else:
+        stats[message] += 1
+
+
+def _eligible_available():
+    return any(_engine_available(e["name"]) for e in ENGINES
+               if not e["requires_key"] or (e["name"] == "brave" and BRAVE_API_KEY))
+
 
 
 def _engine_available(engine: str) -> bool:
@@ -186,13 +206,33 @@ def _record_engine_success(engine: str) -> None:
         }
 
 
-def _record_engine_failure(engine: str, reason: str) -> None:
+def _record_engine_failure(
+    engine: str, reason: str, *, temporary: bool = False,
+    retry_after: str | None = None,
+) -> None:
     now = time.time()
     with _engine_health_lock:
         state = dict(_engine_health.get(engine) or {})
         failures = int(state.get("failures") or 0) + 1
         disabled_until = float(state.get("disabled_until") or 0.0)
-        if failures >= SEARCH_ENGINE_FAILURE_THRESHOLD:
+        if temporary:
+            # Public blocks are not proof of a broken provider. Permit a later
+            # query to probe after a short cooldown, escalating sustained blocks
+            # to the normal cooldown. Never retry a block inside this fetch.
+            delay = min(
+                SEARCH_ENGINE_COOLDOWN_SECONDS,
+                RATE_LIMIT.get(engine, 2.0) * 2 ** min(failures - 1, 10),
+            )
+            if retry_after:
+                try:
+                    delay = max(delay, float(retry_after))
+                except (ValueError, TypeError):
+                    try:
+                        delay = max(delay, parsedate_to_datetime(retry_after).timestamp() - now)
+                    except (ValueError, TypeError, OverflowError):
+                        pass
+            disabled_until = max(disabled_until, now + delay)
+        elif failures >= SEARCH_ENGINE_FAILURE_THRESHOLD:
             disabled_until = max(
                 disabled_until,
                 now + SEARCH_ENGINE_COOLDOWN_SECONDS,
@@ -302,10 +342,73 @@ def _decode_http_response(response) -> str:
     return document.text
 
 
+def _search_market_locale(query: str) -> tuple[str | None, str | None]:
+    """Resolve search locale from one unambiguous canonical registered market."""
+    query_text = " ".join(
+        re.findall(r"[a-z0-9]+", str(query or "").casefold())
+    )
+
+    matches = []
+
+    for market in acquisition_markets():
+        # Registry metros may contain region suffixes such as "Denver, CO".
+        # Match the full metro first, then its canonical city component.
+        metro = str(market.metro or "").casefold()
+        metro_text = " ".join(re.findall(r"[a-z0-9]+", metro))
+
+        city = metro.split(",", 1)[0].strip()
+        city_text = " ".join(re.findall(r"[a-z0-9]+", city))
+
+        candidates = tuple(
+            value for value in (metro_text, city_text)
+            if value
+        )
+
+        if any(
+            re.search(
+                rf"(?<![a-z0-9]){re.escape(value)}(?![a-z0-9])",
+                query_text,
+            )
+            for value in candidates
+        ):
+            matches.append(market)
+
+    # Multiple registry entries for the same real locale are acceptable only
+    # when they agree on country and language.
+    if not matches:
+        return None, None
+
+    # Prefer the most specific matching city/metro.
+    # Example: "New York" must outrank the nested market name "York".
+    specificity = {}
+    for market in matches:
+        city = str(market.metro or "").split(",", 1)[0].strip()
+        city_tokens = re.findall(r"[a-z0-9]+", city.casefold())
+        specificity.setdefault(len(city_tokens), []).append(market)
+
+    best = specificity[max(specificity)]
+    locales = {
+        (market.country_code, market.language_code)
+        for market in best
+    }
+
+    # Equal-specificity disagreement remains ambiguous and fails closed.
+    if len(locales) != 1:
+        return None, None
+
+    return next(iter(locales))
+
+
 def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
+    # Queued threads must recheck the circuit after the preceding request.
+    with _provider_locks[engine["name"]]:
+        return _fetch_locked(engine, query, num)
+
+
+def _fetch_locked(engine: dict, query: str, num: int) -> Optional[str]:
     """Fetch raw HTML/JSON from engine. Returns text or None on failure."""
     if not _engine_available(engine["name"]):
-        print(
+        _diagnostic(
             f"[search_api] {engine['name']} circuit-open; skipping",
             file=sys.stderr,
         )
@@ -331,12 +434,15 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                     timeout=timeout,
                 )
             elif engine["name"] == "bing_html":
+                country_code, language_code = _search_market_locale(query)
                 params = {
                     "q": query,
                     "count": str(min(num, 20)),
-                    "cc": "US",
-                    "setlang": "en-US",
                 }
+                if country_code:
+                    params["cc"] = country_code
+                if language_code:
+                    params["setlang"] = language_code
                 r = requests.get(
                     engine["base"],
                     params=params,
@@ -381,12 +487,16 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
             if r.status_code == 200:
                 _record_engine_success(engine["name"])
                 return _decode_http_response(r)
-            elif r.status_code in (403, 429, 503):
+            elif r.status_code in (202, 403, 429, 503):
                 _record_engine_failure(
                     engine["name"],
                     f"http_{r.status_code}",
+                    temporary=True,
+                    retry_after=getattr(r, "headers", {}).get("Retry-After"),
                 )
-                print(f"[search_api] {engine['name']} HTTP {r.status_code} (attempt {attempt+1}/{attempts})", file=sys.stderr)
+                _diagnostic(f"[search_api] {engine['name']} HTTP {r.status_code} (attempt {attempt+1}/{attempts})", file=sys.stderr)
+                if not keyed or not _engine_available(engine["name"]):
+                    return None
                 if attempt + 1 < attempts:
                     time.sleep(2 ** attempt + random.uniform(0, 1))
                     if proxy and _proxy_cycle:
@@ -397,19 +507,21 @@ def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
                     engine["name"],
                     f"http_{r.status_code}",
                 )
-                print(f"[search_api] {engine['name']} HTTP {r.status_code}", file=sys.stderr)
+                _diagnostic(f"[search_api] {engine['name']} HTTP {r.status_code}", file=sys.stderr)
                 return None
 
         except requests.exceptions.Timeout:
-            _record_engine_failure(engine["name"], "timeout")
-            print(f"[search_api] {engine['name']} timeout (attempt {attempt+1}/{attempts})", file=sys.stderr)
+            _record_engine_failure(engine["name"], "timeout", temporary=not keyed)
+            _diagnostic(f"[search_api] {engine['name']} timeout (attempt {attempt+1}/{attempts})", file=sys.stderr)
+            if not keyed or not _engine_available(engine["name"]):
+                return None
         except Exception as e:
             _record_engine_failure(
                 engine["name"],
                 type(e).__name__,
             )
-            print(f"[search_api] {engine['name']} error: {e}", file=sys.stderr)
-            if attempt + 1 >= attempts:
+            _diagnostic(f"[search_api] {engine['name']} error: {type(e).__name__}", file=sys.stderr)
+            if attempt + 1 >= attempts or not _engine_available(engine["name"]):
                 return None
             time.sleep(1)
 
@@ -691,13 +803,24 @@ def _result_relevance(result: dict, query: str) -> float:
     link_tokens = set(re.findall(r"[a-z0-9]+", link))
 
     matched = 0.0
+    matched_terms = set()
+
     for term in terms:
         if term in title_tokens:
             matched += 1.0
+            matched_terms.add(term)
         elif term in link_tokens:
             matched += 0.8
+            matched_terms.add(term)
         elif term in snippet_tokens:
             matched += 0.6
+            matched_terms.add(term)
+
+    # Multi-term intent must be supported by multiple distinct query terms.
+    # This prevents a result matching only "solar" from satisfying
+    # "solar London", while preserving single-term search behaviour.
+    if len(terms) >= 2 and len(matched_terms) < 2:
+        return 0.0
 
     return matched / len(terms)
 
@@ -735,7 +858,7 @@ def _quality_filter(
     return ranked
 
 
-def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
+def search(query: str, num: int = 10, engine: Optional[str] = None, *, use_cache: bool = True) -> dict:
     """
     Main search function. Returns Serper-compatible dict.
 
@@ -743,6 +866,7 @@ def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
         query: Search query string
         num: Number of results (1-20)
         engine: Specific engine to use, or None for auto-rotation
+        use_cache: False forces new provider retrieval for observation producers
 
     Returns:
         {
@@ -793,7 +917,7 @@ def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
 
     for eng in engines_to_try:
         # Check cache first
-        cached = _get_cache(eng["name"], query, num)
+        cached = _get_cache(eng["name"], query, num) if use_cache else None
         if cached:
             cached_results = _quality_filter(
                 cached.get("organic", []),
@@ -805,7 +929,7 @@ def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
                 cached["organic"] = cached_results
                 cached["searchParameters"] = {
                     **cached.get("searchParameters", {}),
-                    "quality_gate": "lexical_v1",
+                    "quality_gate": "lexical_v2",
                     "cache": True,
                 }
                 return cached
@@ -836,7 +960,7 @@ def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
         )
 
         if not results:
-            print(
+            _diagnostic(
                 f"[search_fabric] {eng['name']} rejected: "
                 "no relevant results",
                 file=sys.stderr,
@@ -849,7 +973,7 @@ def search(query: str, num: int = 10, engine: Optional[str] = None) -> dict:
                 "q": query,
                 "num": num,
                 "engine": eng["name"],
-                "quality_gate": "lexical_v1",
+                "quality_gate": "lexical_v2",
                 "cache": False,
             },
             "credits_left": 999999,
@@ -888,33 +1012,51 @@ def _broaden_query(query: str) -> str:
     return broadened
 
 
-def search_domains(query: str, num: int = 20) -> List[str]:
+def search_domains(query: str, num: int = 20, *, use_cache: bool = True) -> List[str]:
     """Extract clean domains with a bounded quote-relaxation fallback."""
-    res = search(query, num=num)
+    kwargs = {} if use_cache else {"use_cache": False}
+    res = search(query, num=num, **kwargs)
     domains = _domains_from_response(res)
     if domains:
         return domains
 
     broadened = _broaden_query(query)
-    if broadened and broadened != query.strip():
-        print(
+    if broadened and broadened != query.strip() and _eligible_available():
+        _diagnostic(
             "[search_fabric] no domains; retrying without exact-match quotes",
             file=sys.stderr,
         )
         domains = _domains_from_response(
-            search(broadened, num=num)
+            search(broadened, num=num, **kwargs)
         )
     return domains
 
 def search_domains_parallel(queries: List[str], num: int = 15) -> Dict[str, List[str]]:
     """Search multiple queries in parallel (threaded)."""
+    if not queries:
+        return {}
     out = {}
+    totals = Counter()
+
     def _one(q):
-        return q, search_domains(q, num=num)
+        stats = Counter()
+        _run_local.stats = stats
+        try:
+            return q, search_domains(q, num=num, use_cache=False), stats
+        except Exception as exc:
+            stats["query_failure:" + type(exc).__name__] += 1
+            return q, [], stats
+        finally:
+            del _run_local.stats
 
     with ThreadPoolExecutor(max_workers=min(5, len(queries))) as ex:
-        for q, domains in ex.map(_one, queries):
+        for q, domains, stats in ex.map(_one, queries):
             out[q] = domains
+            totals.update(stats)
+    print(json.dumps({"search_fabric_run": {
+        "queries": len(queries), "queries_with_domains": sum(bool(v) for v in out.values()),
+        "diagnostics": dict(sorted(totals.items())), "fresh_only": True,
+    }}, sort_keys=True), file=sys.stderr)
     return out
 
 # ──────────────────────────────────────────────────────────────────────

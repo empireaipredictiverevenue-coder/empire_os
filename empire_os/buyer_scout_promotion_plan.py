@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from empire_os.buyer_scout_review_readiness import reliable_business_name
+from empire_os.buyer_acquisition_team import commercial_research_profile
 
 
 OUTPUT = Path("runtime/buyer_acquisition/promotion_plan_latest.json")
@@ -149,6 +150,9 @@ def build_promotion_plan(
             "candidate_id": candidate_id,
             "domain": row.get("domain"),
             "buyer_type": row.get("buyer_type"),
+            "commercial_research_profile": commercial_research_profile(
+                row.get("query_evidence") or []
+            ),
             "target_buyer_pools": list(
                 row.get("target_buyer_pools") or []
             ),

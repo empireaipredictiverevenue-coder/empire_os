@@ -7,8 +7,7 @@ from pathlib import Path
 import urllib.parse
 
 from empire_os.buyer_probe_worker import rejection_reason, run
-from empire_os.qualification_worker_v2 import request_json
-
+from empire_os.sb import request_json
 TARGET_IDS = (
     "ab6369f5-143d-4311-9781-405d74a1996a",
     "e9f3aa93-b51b-496e-9041-3c861c8db593",

@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Mapping
+from uuid import UUID
 
 
 @dataclass(frozen=True)
@@ -30,4 +33,10 @@ def unwrap_data_value(value: Any) -> Any:
         return [unwrap_data_value(item) for item in value]
     if isinstance(value, list):
         return [unwrap_data_value(item) for item in value]
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
     return value

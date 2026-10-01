@@ -22,6 +22,7 @@ from empire_os.data_backends.supabase_legacy import (
     SupabaseLegacyProvider,
 )
 from empire_os.runtime_env import load_runtime_env
+import os
 
 
 STATUS_PATH = Path(
@@ -190,6 +191,29 @@ def run_guard(
     stagger_seconds: float = 5.0,
 ) -> dict[str, Any]:
     """Run one guard cycle and return a non-consequential status payload."""
+    backend = os.getenv(
+        "EMPIRE_DATA_BACKEND",
+        "",
+    ).strip().lower()
+
+    if backend == "empiredb":
+        payload = {
+            "schema_version": "empire.supabase-egress-guard.v2",
+            "observed_at": _now(),
+            "state": "inactive_empiredb",
+            "contained": False,
+            "canonical_backend": "empiredb",
+            "reason": (
+                "Supabase egress containment is not authoritative "
+                "while EmpireDB is the canonical backend"
+            ),
+            "managed_timers": [],
+            "inbound_mail_touched": False,
+            "revenue_mutation": False,
+        }
+        _write_status(payload)
+        return payload
+
     try:
         request(
             "GET",

@@ -30,8 +30,9 @@ def test_copy_preserves_compliance_and_is_step_specific():
     _, final = build_followup_copy(row(2))
     assert subject.startswith("Re:")
     assert "Kihle Roofing" in first
-    assert "one-page Wichita roofing brief" in first
-    assert "send it" in first.lower()
+    assert "The three checks are:" in first
+    assert "Competitor Search Gap" in first
+    assert "reply “gap”" in first
     assert "Closing the loop" in final
     assert POSTAL_ADDRESS in first
     assert "opt out" in first.lower()

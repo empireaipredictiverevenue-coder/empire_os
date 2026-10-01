@@ -5,7 +5,7 @@ from typing import Any
 
 from empire_os.canonical_data_gateway import (
     CanonicalDataGateway,
-    gateway_from_environment,
+    empiredb_gateway_from_environment as gateway_from_environment,
 )
 from empire_os.data_query import DataFilter, OrderSpec
 from empire_os.runtime_env import load_runtime_env

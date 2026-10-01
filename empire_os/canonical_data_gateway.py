@@ -296,6 +296,16 @@ class CanonicalDataGateway:
 
 
 
+def empiredb_gateway_from_environment(environ=None):
+    """Production reader boundary: missing configuration never selects legacy."""
+    source = dict(os.environ if environ is None else environ)
+    backend = str(source.get("EMPIRE_DATA_BACKEND") or "empiredb").strip()
+    if backend != "empiredb":
+        raise DataGatewayUnavailable("production reader requires canonical EmpireDB")
+    source["EMPIRE_DATA_BACKEND"] = "empiredb"
+    return gateway_from_environment(source)
+
+
 def gateway_from_environment(
     environ: Mapping[str, str] | None = None,
     *,

@@ -10,9 +10,7 @@ from empire_os.buyer_scout_reconciliation import (
     reconcile_scout_candidates,
     write_reconciliation,
 )
-from empire_os.qualification_worker_v2 import request_json
-
-
+from empire_os.sb import request_json
 def _get(path: str, params: dict[str, str]):
     return request_json(
         "GET",
