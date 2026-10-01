@@ -119,3 +119,33 @@ or UNKNOWN.
 This architecture grants no live outbound, contract, allocation, payment,
 settlement, fulfilment, revenue-recognition, migration or production-deploy
 authority.
+
+## 2026-10-01 implementation and live verification
+
+Implemented:
+- `empire_os/partnership_progression.py`;
+- `tests/test_partnership_progression.py`;
+- Account Digital Twin projection integration;
+- explicit positive and negative-state precedence;
+- silence / score non-inference;
+- zero outbound/payment/execution authority.
+
+Verification:
+- standalone progression suite: 18 passed;
+- adjacent progression + Twin + buyer-state + NBA suite: 47 passed;
+- production OBSERVE Account Twin refresh succeeded;
+- live Twin snapshot now exposes `partnership_progression`;
+- current live accounts correctly remain `UNKNOWN` because explicit partnership
+  evidence is not yet supplied;
+- migration 018 checksum remained unchanged.
+
+Current blocker:
+The existing dedicated `empire_intelligence_materializer_login` runtime
+credential is deliberately unprovisioned. The Account Twin therefore cannot
+currently load canonical commercial history/revenue truth through the dedicated
+materializer transport. Provisioning that credential changes protected runtime
+database authority and remains founder-gated.
+
+Status:
+ENGINEERING COMPLETE / LIVE PROJECTION VERIFIED /
+CANONICAL COMMERCIAL-HISTORY ACTIVATION GATED.
