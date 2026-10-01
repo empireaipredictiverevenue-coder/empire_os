@@ -24,6 +24,8 @@ class ExchangeAllocationProposalEvidence:
     territory_evidence_ref: str | None
     exclusivity_clear: bool | None
     exclusivity_evidence_ref: str | None
+    expected_value_cents: int | None = None
+    expected_value_evidence_ref: str | None = None
 
     def validate(self) -> None:
         for label, value in (
@@ -38,6 +40,8 @@ class ExchangeAllocationProposalEvidence:
             raise ValueError("proposed_price_cents must be positive")
         if self.buyer_capacity_remaining is not None and self.buyer_capacity_remaining < 0:
             raise ValueError("buyer_capacity_remaining must be nonnegative")
+        if self.expected_value_cents is not None and self.expected_value_cents < 0:
+            raise ValueError("expected_value_cents must be nonnegative")
 
 
 @dataclass(frozen=True)
@@ -47,6 +51,10 @@ class ExchangeAllocationProposalReview:
     niche: str
     metro: str
     proposed_price_cents: int
+    buyer_capacity_remaining: int | None
+    buyer_capacity_evidence_ref: str | None
+    expected_value_cents: int | None
+    expected_value_evidence_ref: str | None
     ready_for_operator_match_review: bool
     blockers: tuple[str, ...]
     evidence_refs: tuple[str, ...]
@@ -122,12 +130,22 @@ def review_exchange_allocation_proposal(
         refs.append(exclusivity_ref)
 
     ordered = tuple(sorted(set(blockers)))
+    expected_ref = str(
+        evidence.expected_value_evidence_ref or ""
+    ).strip()
+    if evidence.expected_value_cents is not None and expected_ref:
+        refs.append(expected_ref)
+
     return ExchangeAllocationProposalReview(
         inventory_id=evidence.inventory_id,
         buyer_id=evidence.buyer_id,
         niche=evidence.niche,
         metro=evidence.metro,
         proposed_price_cents=evidence.proposed_price_cents,
+        buyer_capacity_remaining=evidence.buyer_capacity_remaining,
+        buyer_capacity_evidence_ref=(capacity_ref or None),
+        expected_value_cents=evidence.expected_value_cents,
+        expected_value_evidence_ref=(expected_ref or None),
         ready_for_operator_match_review=not ordered,
         blockers=ordered,
         evidence_refs=tuple(dict.fromkeys(refs)),

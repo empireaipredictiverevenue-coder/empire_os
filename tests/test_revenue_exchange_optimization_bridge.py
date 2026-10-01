@@ -9,6 +9,7 @@ def _proposal(**overrides):
         "buyer_id": "b1",
         "ready_for_operator_match_review": True,
         "proposed_price_cents": 12000,
+        "expected_value_cents": 9000,
         "buyer_capacity_remaining": 1,
         "evidence_refs": ["proposal:p1:b1"],
     }
@@ -100,3 +101,44 @@ def test_multiple_buyers_respect_capacity_and_no_execution():
     assert exact["status"] == "AVAILABLE"
     assert exact["allocation_execution"] is False
     assert body["execution_authority"] == "none"
+
+
+def test_proposed_price_never_substitutes_for_expected_value():
+    preview = build_revenue_exchange_optimization_preview(
+        allocation_proposals=[_proposal(expected_value_cents=None)]
+    )
+    body = preview.as_dict()
+
+    assert body["status"] == "UNAVAILABLE"
+    assert body["proposals_considered"] == 0
+    assert body["optimization_problem"]["blocked_options"][0]["reason"] == (
+        "unknown_allocation_economics_preserved"
+    )
+
+
+def test_conflicting_capacity_for_same_buyer_fails_closed():
+    preview = build_revenue_exchange_optimization_preview(
+        allocation_proposals=[
+            _proposal(
+                inventory_id="p1",
+                buyer_id="b1",
+                buyer_capacity_remaining=1,
+                expected_value_cents=9000,
+            ),
+            _proposal(
+                inventory_id="p2",
+                buyer_id="b1",
+                buyer_capacity_remaining=3,
+                expected_value_cents=10000,
+                evidence_refs=["proposal:p2:b1"],
+            ),
+        ]
+    )
+    body = preview.as_dict()
+
+    assert body["status"] == "UNAVAILABLE"
+    assert body["proposals_considered"] == 0
+    assert any(
+        row["reason"] == "conflicting_buyer_capacity_evidence"
+        for row in body["optimization_problem"]["blocked_options"]
+    )

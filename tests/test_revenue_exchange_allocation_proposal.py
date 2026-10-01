@@ -132,6 +132,8 @@ def test_api_proposal_preview_never_allocates_or_settles():
             "buyer_capacity_evidence_ref": "buyer-capacity:1",
             "proposed_price_cents": 12000,
             "verified_price_evidence_ref": "commercial-terms:1",
+            "expected_value_cents": 9000,
+            "expected_value_evidence_ref": "erv:api:1",
             "territory_eligible": True,
             "territory_evidence_ref": "territory:1",
             "exclusivity_clear": True,
@@ -147,3 +149,24 @@ def test_api_proposal_preview_never_allocates_or_settles():
     assert body["exclusivity_authority"] == "none"
     assert body["funds_movement"] is False
     assert body["proposal"]["ready_for_operator_match_review"] is True
+    assert body["proposal"]["buyer_capacity_remaining"] == 3
+    assert body["proposal"]["expected_value_cents"] == 9000
+    assert body["proposal"]["expected_value_evidence_ref"] == "erv:api:1"
+
+
+def test_review_preserves_verified_capacity_and_optional_expected_value():
+    review = review_exchange_allocation_proposal(
+        snapshot=snapshot(),
+        readiness=readiness(),
+        evidence=evidence(
+            expected_value_cents=9000,
+            expected_value_evidence_ref="erv:1",
+        ),
+    )
+
+    assert review.buyer_capacity_remaining == 3
+    assert review.buyer_capacity_evidence_ref == "buyer-capacity:1"
+    assert review.expected_value_cents == 9000
+    assert review.expected_value_evidence_ref == "erv:1"
+    assert "erv:1" in review.evidence_refs
+    assert review.allocation_authority == "none"

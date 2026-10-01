@@ -70,6 +70,8 @@ class ExchangeAllocationProposalRequest(ExchangeAllocationReadinessRequest):
     buyer_capacity_evidence_ref: str | None = None
     proposed_price_cents: int = Field(gt=0)
     verified_price_evidence_ref: str | None = None
+    expected_value_cents: int | None = Field(default=None, ge=0)
+    expected_value_evidence_ref: str | None = None
     territory_eligible: bool | None = None
     territory_evidence_ref: str | None = None
     exclusivity_clear: bool | None = None
@@ -287,6 +289,8 @@ def create_revenue_exchange_router(
                     buyer_capacity_evidence_ref=req.buyer_capacity_evidence_ref,
                     proposed_price_cents=req.proposed_price_cents,
                     verified_price_evidence_ref=req.verified_price_evidence_ref,
+                    expected_value_cents=req.expected_value_cents,
+                    expected_value_evidence_ref=req.expected_value_evidence_ref,
                     territory_eligible=req.territory_eligible,
                     territory_evidence_ref=req.territory_evidence_ref,
                     exclusivity_clear=req.exclusivity_clear,

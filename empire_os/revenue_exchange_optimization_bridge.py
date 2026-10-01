@@ -76,9 +76,6 @@ def _extract(
             continue
 
         expected = raw.get("expected_value_cents")
-        if expected is None:
-            # Existing Exchange proposal reviews expose verified proposed price.
-            expected = raw.get("proposed_price_cents")
 
         refs = tuple(dict.fromkeys(
             str(ref).strip()
@@ -157,7 +154,29 @@ def _extract(
             })
             continue
 
-        capacities[buyer_id] = max(capacities.get(buyer_id, 0), capacity_number)
+        previous_capacity = capacities.get(buyer_id)
+        if (
+            previous_capacity is not None
+            and previous_capacity != capacity_number
+        ):
+            blocked.append({
+                "inventory_id": inventory_id,
+                "buyer_id": buyer_id,
+                "reason": "conflicting_buyer_capacity_evidence",
+                "observed_capacities": sorted({
+                    previous_capacity,
+                    capacity_number,
+                }),
+            })
+            options = [
+                option
+                for option in options
+                if option.get("buyer_id") != buyer_id
+            ]
+            capacities.pop(buyer_id, None)
+            continue
+
+        capacities[buyer_id] = capacity_number
         options.append({
             "prospect_id": inventory_id,
             "buyer_id": buyer_id,
