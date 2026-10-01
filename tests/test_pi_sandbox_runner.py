@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import socket
 
 import pytest
 
@@ -6,6 +8,8 @@ from empire_os.pi_sandbox_runner import (
     DATA_CLOUD_CLOSEOUT_BRANCH,
     PiSandboxJob,
     build_pi_systemd_command,
+    _safe_env,
+    _systemd_user_env,
 )
 
 
@@ -182,3 +186,80 @@ def test_pi_rejects_arbitrary_base_branch():
             allowed_paths=("empire_os/example.py",),
             base_branch="main",
         ).validate()
+
+
+def test_systemd_user_env_derives_canonical_bus_when_missing(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+    monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
+    uid = os.geteuid()
+    runtime_root = tmp_path / "run" / "user"
+    runtime_dir = runtime_root / str(uid)
+    runtime_dir.mkdir(parents=True)
+    bus = runtime_dir / "bus"
+
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.bind(str(bus))
+        env = _systemd_user_env(uid=uid, runtime_root=runtime_root)
+    finally:
+        sock.close()
+
+    assert env["XDG_RUNTIME_DIR"] == str(runtime_dir)
+    assert env["DBUS_SESSION_BUS_ADDRESS"] == f"unix:path={bus}"
+
+
+def test_systemd_user_env_missing_bus_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+    monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
+    uid = os.geteuid()
+    runtime_root = tmp_path / "run" / "user"
+    runtime_dir = runtime_root / str(uid)
+    runtime_dir.mkdir(parents=True)
+
+    env = _systemd_user_env(uid=uid, runtime_root=runtime_root)
+
+    assert env["XDG_RUNTIME_DIR"] == str(runtime_dir)
+    assert "DBUS_SESSION_BUS_ADDRESS" not in env
+
+
+def test_systemd_user_env_rejects_non_socket_bus(tmp_path, monkeypatch):
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+    monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
+    uid = os.geteuid()
+    runtime_root = tmp_path / "run" / "user"
+    runtime_dir = runtime_root / str(uid)
+    runtime_dir.mkdir(parents=True)
+    (runtime_dir / "bus").write_text("not a socket", encoding="utf-8")
+
+    env = _systemd_user_env(uid=uid, runtime_root=runtime_root)
+
+    assert env["XDG_RUNTIME_DIR"] == str(runtime_dir)
+    assert "DBUS_SESSION_BUS_ADDRESS" not in env
+
+
+def test_systemd_user_env_preserves_ambient_bus_values(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_RUNTIME_DIR", "/custom/runtime")
+    monkeypatch.setenv(
+        "DBUS_SESSION_BUS_ADDRESS",
+        "unix:path=/custom/runtime/bus",
+    )
+
+    env = _systemd_user_env(
+        uid=os.geteuid(),
+        runtime_root=tmp_path / "run" / "user",
+    )
+
+    assert env["XDG_RUNTIME_DIR"] == "/custom/runtime"
+    assert env["DBUS_SESSION_BUS_ADDRESS"] == "unix:path=/custom/runtime/bus"
+
+
+def test_safe_env_still_filters_sensitive_values(monkeypatch):
+    monkeypatch.setenv("EMPIRE_EXAMPLE_API_KEY", "should-not-leak")
+    monkeypatch.setenv("EMPIRE_SAFE_MARKER", "kept")
+
+    env = _safe_env()
+
+    assert "EMPIRE_EXAMPLE_API_KEY" not in env
+    assert env["EMPIRE_SAFE_MARKER"] == "kept"

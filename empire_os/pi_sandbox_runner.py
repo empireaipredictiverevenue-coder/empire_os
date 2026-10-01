@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 from typing import Any, Mapping
 
@@ -128,6 +129,44 @@ def _safe_env(extra: Mapping[str, str] | None = None) -> dict[str, str]:
         base[key] = value
     base.update(dict(extra or {}))
     return base
+
+
+def _systemd_user_env(
+    extra: Mapping[str, str] | None = None,
+    *,
+    uid: int | None = None,
+    runtime_root: Path = Path("/run/user"),
+) -> dict[str, str]:
+    """Return a sanitized environment for systemd-run --user.
+
+    Non-login control-plane processes may omit user-session bus variables even
+    while the canonical per-UID systemd user bus is healthy. Reconstruct only
+    the standard runtime path and DBus address when they are missing. If the
+    canonical bus is absent or not a Unix socket, leave the address unset so
+    systemd-run fails closed.
+    """
+    env = _safe_env(extra)
+    effective_uid = os.geteuid() if uid is None else int(uid)
+    runtime_dir = runtime_root / str(effective_uid)
+    bus_path = runtime_dir / "bus"
+
+    if not str(env.get("XDG_RUNTIME_DIR") or "").strip():
+        if runtime_dir.is_dir():
+            env["XDG_RUNTIME_DIR"] = str(runtime_dir)
+
+    if not str(env.get("DBUS_SESSION_BUS_ADDRESS") or "").strip():
+        try:
+            bus_stat = bus_path.stat()
+        except OSError:
+            bus_stat = None
+        if (
+            bus_stat is not None
+            and bus_stat.st_uid == effective_uid
+            and stat.S_ISSOCK(bus_stat.st_mode)
+        ):
+            env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={bus_path}"
+
+    return env
 
 
 def _allowed_changed_path(path: str, allowed: tuple[str, ...]) -> bool:
@@ -335,7 +374,7 @@ def run_pi_sandbox_job(
         try:
             completed = _run(
                 command,
-                env=_safe_env(),
+                env=_systemd_user_env(),
                 timeout=max(60, min(job.max_runtime_seconds + 30, 1830)),
             )
         except subprocess.TimeoutExpired as exc:
