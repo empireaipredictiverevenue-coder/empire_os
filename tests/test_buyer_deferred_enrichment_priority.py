@@ -25,7 +25,7 @@ def test_due_age_boost_prevents_starvation(tmp_path):
     now = datetime.now(timezone.utc)
     import json
     data = json.loads((tmp_path / "deferred.json").read_text())
-    data["old-low"]["created_at"] = (now - timedelta(hours=100)).isoformat()
+    data["old-low"]["created_at"] = (now - timedelta(hours=400)).isoformat()
     data["old-low"]["next_retry_at"] = (now - timedelta(minutes=1)).isoformat()
     data["new-high"]["created_at"] = now.isoformat()
     data["new-high"]["next_retry_at"] = (now - timedelta(minutes=1)).isoformat()

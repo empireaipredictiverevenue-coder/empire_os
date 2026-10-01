@@ -111,10 +111,11 @@ def _effective_priority(item: Mapping[str, Any], *, now: datetime) -> int:
     base = _priority(item.get("priority_score"))
     created = _parse(item.get("created_at")) or now
     age_hours = max(0, int((now - created).total_seconds() // 3600))
-    # Old work must eventually outrank newly-arriving premium work.  The
-    # bounded age boost prevents indefinite starvation without discarding the
-    # explicit commercial priority signal.
-    age_boost = min(age_hours, 120)
+    # Commercial priority should dominate normal backlog on arrival. Old work
+    # still ages upward, but only one point per four hours, so a two-day-old
+    # default-priority row does not outrank a fresh enterprise priority row.
+    # The bounded boost still prevents indefinite starvation.
+    age_boost = min(age_hours // 4, 100)
     return base + age_boost
 
 def canonical_phone(value: Any) -> str:
