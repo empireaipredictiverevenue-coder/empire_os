@@ -91,3 +91,24 @@ and explicitly capacity-rejects additional units. Candidate review ceiling is
 
 No buyer mutation, allocation execution, outbound, terms, payment, settlement,
 revenue recognition, migration, deployment or authority expansion.
+
+## 2026-10-01 verification
+
+Implemented:
+- evidence-first buyer/product/market outcome windows;
+- duplicate-window dedupe;
+- quality rejection separated from capacity rejection;
+- minimum sample and resolved-unit evidence thresholds;
+- maintain/review-downward recommendations only;
+- verified buyer capacity remains authoritative.
+
+Verification:
+- learning + buyer readiness + buyer capacity snapshot + allocation + Revenue
+  Exchange readiness suites: 50 passed;
+- diff check passed;
+- no live buyer-capacity-learning outcome stream or projection is currently
+  present in runtime, so adaptive production learning is not claimed.
+
+Status:
+ENGINEERING COMPLETE / DETERMINISTIC VERIFICATION PASSED /
+LIVE OUTCOME LEARNING PENDING REAL EVIDENCE.
