@@ -749,6 +749,8 @@ def test_rolling_enterprise_account_queues_without_curated_target_membership():
     item = queue.enqueued[0]
     assert item["account_key"] == "rolling:forthepeople.com"
     assert item["wave"] == "rolling_enterprise"
+    assert item["priority_score"] == 95
+    assert item["priority_reason"] == "enterprise_contact_convergence"
     assert item["offer_key"] == "predictive_revenue_diagnostic"
     assert item["target_people"][0]["name"] == "Matt Morgan"
 
