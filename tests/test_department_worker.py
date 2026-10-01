@@ -287,6 +287,7 @@ def test_execution_plane_department_adapter_dispatches_explicit_contract(
                     "allowed_paths": ["empire_os/example.py"],
                     "lease_resources": ["domain:example"],
                     "required_tests": ["tests/test_example.py"],
+                    "base_branch": "agent/data-cloud-wave4",
                     "execute_pi": False,
                 }
             },
@@ -318,7 +319,47 @@ def test_execution_plane_department_adapter_dispatches_explicit_contract(
     assert captured["request"].capability == "backend_code"
     assert captured["request"].allowed_paths == ("empire_os/example.py",)
     assert captured["request"].lease_resources == ("domain:example",)
+    assert captured["request"].base_branch == "agent/data-cloud-wave4"
     assert captured["execute_pi"] is False
+
+
+def test_execution_plane_department_adapter_blocks_failed_dispatch(
+    tmp_path, monkeypatch
+):
+    _write_plan(tmp_path, [
+        _step(
+            step_id="exec_step_execution_plane_no_impl",
+            department_keys=["engineering"],
+            target_component="agent_tool_execution_plane",
+            action="build_bounded_feature",
+            authority="internal_write",
+            intelligence_request={
+                "execution_plane": {
+                    "capability": "parallel_backend_code",
+                    "objective": "Implement bounded feature.",
+                    "allowed_paths": ["empire_os/example.py"],
+                    "lease_resources": ["domain:example"],
+                    "required_tests": ["tests/test_example.py"],
+                }
+            },
+        )
+    ])
+    dispatch_executive_plan(tmp_path)
+
+    monkeypatch.setattr(
+        worker_module,
+        "dispatch_execution_request",
+        lambda *args, **kwargs: {
+            "status": "NO_IMPLEMENTATION",
+            "worker": "empire_coder",
+            "execution_authority": "none",
+        },
+    )
+    result = worker_module.run_one_department_work(tmp_path)
+
+    assert result["state"] == "BLOCKED"
+    assert result["blocker"] == "execution_plane_no_implementation"
+    assert result["result"]["dispatch"]["status"] == "NO_IMPLEMENTATION"
 
 
 def test_execution_plane_department_adapter_fails_without_contract(tmp_path):

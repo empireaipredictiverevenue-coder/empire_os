@@ -18,6 +18,7 @@ from empire_os.execution_plane_dispatcher import (
     ExecutionRequest,
     dispatch_execution_request,
 )
+from empire_os.hermes_control import DEFAULT_BASE_BRANCH
 from empire_os.department_identity_adapter import (
     resolve_entity_decision_maker,
 )
@@ -170,6 +171,11 @@ def _execution_plane_bridge(
             "execution_plane capability and objective are required"
         )
 
+    base_branch = (
+        str(raw.get("base_branch") or "").strip()
+        or DEFAULT_BASE_BRANCH
+    )
+
     request = ExecutionRequest(
         request_id=item.id,
         capability=capability,
@@ -182,6 +188,7 @@ def _execution_plane_bridge(
         authority=item.authority,
         risk_class=str(raw.get("risk_class") or "low").strip(),
         source_ref=f"department_work:{item.id}",
+        base_branch=base_branch,
         allowed_paths=tuple(
             str(value).strip()
             for value in (raw.get("allowed_paths") or [])
@@ -467,6 +474,34 @@ def run_one_department_work(
         try:
             result = _execution_plane_bridge(root, item)
             dispatch = result.get("dispatch") or {}
+            dispatch_status = str(
+                dispatch.get("status") or ""
+            ).strip().upper()
+            accepted_dispatch_states = {
+                "QUEUED",
+                "EXISTS",
+                "SENSOR_REQUEST_READY",
+                "WORKSPACE_REQUEST_READY",
+                "CANDIDATE_GATE_PASSED",
+                "AWAITING_PROMPTFOO",
+            }
+            if dispatch_status not in accepted_dispatch_states:
+                reason = (
+                    "execution_plane_"
+                    + (dispatch_status.lower() or "unknown")
+                )
+                blocked = queue.block(item, reason, result)
+                return {
+                    "ok": True,
+                    "state": "BLOCKED",
+                    "work_id": blocked.id,
+                    "target_component": blocked.target_component,
+                    "blocker": reason,
+                    "result": blocked.result,
+                    "queue_counts": queue.counts(),
+                    "execution_authority": "none",
+                }
+
             done = queue.complete(
                 item,
                 result,
