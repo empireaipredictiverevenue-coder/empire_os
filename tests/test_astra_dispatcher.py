@@ -231,3 +231,13 @@ def test_astra_department_dispatch_is_safe_internal_job():
         str(part).endswith("dispatch_astra_departments.py")
         for part in command
     )
+
+
+def test_astra_systemd_service_defaults_to_observe():
+    from pathlib import Path
+
+    unit = Path("deploy/systemd/empire-astra-dispatcher.service").read_text(
+        encoding="utf-8"
+    )
+    assert "EMPIRE_ASTRA_DISPATCH_MODE=OBSERVE" in unit
+    assert "EMPIRE_ASTRA_DISPATCH_MODE=GUARDED_EXECUTE" not in unit

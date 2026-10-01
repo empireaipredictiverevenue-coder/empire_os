@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
-Environment=EMPIRE_ASTRA_DISPATCH_MODE=GUARDED_EXECUTE
+Environment=EMPIRE_ASTRA_DISPATCH_MODE=OBSERVE
 EnvironmentFile=/srv/empire_os/runtime/secrets/outbound.env
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_astra_dispatcher.py
 NoNewPrivileges=true
