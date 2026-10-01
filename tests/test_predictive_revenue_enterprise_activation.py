@@ -32,3 +32,9 @@ def test_enterprise_activation_includes_verified_rolling_pool():
     assert "_rolling_candidates()" in text
     assert "rolling enterprise candidate from buyer scout promotion pool" in text
     assert '"outreach_authorized": False' in text
+
+
+def test_rolling_activation_revalidates_first_party_location():
+    text = (ROOT / "scripts/activate_predictive_revenue_enterprise_targets.py").read_text()
+    assert "location_from_addresses(" in text
+    assert "location_evidence_addresses" in text

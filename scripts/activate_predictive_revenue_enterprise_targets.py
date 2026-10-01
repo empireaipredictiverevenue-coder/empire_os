@@ -11,6 +11,7 @@ from empire_os.predictive_revenue_enterprise_acquisition import (
     build_enterprise_lead_candidates,
 )
 from empire_os.predictive_revenue_enterprise_targets import TARGETS
+from empire_os.predictive_revenue_enterprise_location import location_from_addresses
 from empire_os.lead_sources import LeadCandidate
 from empire_os.qualification_worker_v2 import fetch_prospect, qualify_prospect
 
@@ -67,6 +68,11 @@ def _rolling_candidates() -> list[tuple[LeadCandidate, dict]]:
     for item in location.get("candidates") or []:
         if not isinstance(item, dict) or item.get("location_verified") is not True:
             continue
+        location = location_from_addresses(
+            list(item.get("location_evidence_addresses") or [])
+        )
+        if not location:
+            continue
         domain = str(item.get("domain") or "").strip().lower()
         proposal = by_domain.get(domain) or {}
         emails = [
@@ -82,9 +88,9 @@ def _rolling_candidates() -> list[tuple[LeadCandidate, dict]]:
             name=str(item.get("account_name") or "").strip(),
             email=emails[0] if emails else "",
             niche="predictive_revenue_enterprise",
-            metro=str(item.get("metro") or "").strip(),
-            state=str(item.get("state") or "").strip(),
-            country_code=str(item.get("country_code") or "US").strip(),
+            metro=str(location.get("metro") or "").strip(),
+            state=str(location.get("state") or "").strip(),
+            country_code=str(location.get("country_code") or "US").strip(),
             source="public_enterprise_target",
             lead_score=55,
             url=str(item.get("website") or "").strip(),
