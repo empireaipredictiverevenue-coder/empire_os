@@ -23,7 +23,8 @@ from empire_os.search_fabric.verification import is_directory_url
 ECONOMIC_BUYER_TERMS = (
     "founder", "co-founder", "owner", "chief executive", "ceo",
     "managing director", "president", "principal", "chief revenue", "cro",
-    "chief commercial", "cco",
+    "chief commercial", "cco", "managing partner", "founding partner",
+    "equity partner", "senior partner",
 )
 FUNCTIONAL_BUYER_TERMS = (
     "vp sales", "vice president sales", "sales director", "head of sales",
@@ -147,6 +148,13 @@ def classify_decision_role(title: Any) -> tuple[str, float]:
         return "influencer", 0.6
 
     if any(_title_has(value, term) for term in ECONOMIC_BUYER_TERMS):
+        return "economic_buyer", 1.0
+
+    if (
+        value == "partner"
+        or re.match(r"^partner\s*[,/&-]\s*(attorney|lawyer|counsel)\b", value)
+        or re.search(r"\b(attorney|lawyer|counsel)\s*[,/&-]\s*partner$", value)
+    ):
         return "economic_buyer", 1.0
 
     functional_c_suite_phrases = (

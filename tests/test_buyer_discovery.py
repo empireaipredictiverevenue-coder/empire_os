@@ -1174,3 +1174,13 @@ def test_candidate_review_accepts_explicit_evidence_backed_offer_override():
         plan["params"]["p_offer_key"]
         == "predictive_revenue_intelligence_os"
     )
+
+
+def test_law_firm_partner_titles_are_economic_buyers_without_partnership_false_positive():
+    assert classify_decision_role("Managing Partner") == ("economic_buyer", 1.0)
+    assert classify_decision_role("Founding Partner") == ("economic_buyer", 1.0)
+    assert classify_decision_role("Equity Partner") == ("economic_buyer", 1.0)
+    assert classify_decision_role("Partner, Attorney") == ("economic_buyer", 1.0)
+    assert classify_decision_role("Attorney / Partner") == ("economic_buyer", 1.0)
+    assert classify_decision_role("Partnerships Director")[0] != "economic_buyer"
+    assert classify_decision_role("Strategic Partnerships")[0] != "economic_buyer"

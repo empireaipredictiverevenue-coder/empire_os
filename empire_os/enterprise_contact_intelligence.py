@@ -57,6 +57,66 @@ TARGET_BY_NAME = {
 }
 
 
+def _target_metadata(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Resolve enterprise metadata from the activation row first.
+
+    Curated targets may enrich the original seed accounts, but rolling accounts
+    remain first-class and must not depend on TARGETS membership.
+    """
+    account_name = _text(row.get("account_name"))
+    target = TARGET_BY_NAME.get(account_name)
+
+    account_key = _text(row.get("account_key"))
+    if not account_key and target is not None:
+        account_key = _text(target.account_key)
+
+    wave = _text(row.get("wave"))
+    if not wave and target is not None:
+        wave = _text(target.wave)
+
+    raw_codes = row.get("target_product_codes")
+    product_codes = [
+        _text(value)
+        for value in (raw_codes if isinstance(raw_codes, (list, tuple)) else [])
+        if _text(value)
+    ]
+    if not product_codes and target is not None:
+        product_codes = [
+            _text(value)
+            for value in target.target_product_codes
+            if _text(value)
+        ]
+
+    urls: list[str] = []
+    for key in ("target_evidence_urls", "evidence_urls"):
+        raw_urls = row.get(key)
+        if isinstance(raw_urls, (list, tuple)):
+            urls.extend(_text(value) for value in raw_urls if _text(value))
+    if target is not None:
+        urls.extend(_text(value) for value in target.evidence_urls if _text(value))
+    canonical_website = _text(row.get("canonical_website"))
+    if canonical_website:
+        urls.append(canonical_website)
+    for route in row.get("company_contact_routes") or []:
+        if isinstance(route, Mapping):
+            evidence_url = _text(route.get("evidence_url"))
+            if evidence_url:
+                urls.append(evidence_url)
+    for person in _probe_people(row.get("probe")):
+        if isinstance(person, Mapping):
+            evidence_url = _text(person.get("url")) or _text(person.get("page_url"))
+            if evidence_url:
+                urls.append(evidence_url)
+
+    return {
+        "target": target,
+        "account_key": account_key,
+        "wave": wave,
+        "target_product_codes": list(dict.fromkeys(product_codes)),
+        "target_evidence_urls": list(dict.fromkeys(urls)),
+    }
+
+
 def _request_with_retry(
     request,
     method: str,
@@ -113,8 +173,6 @@ def current_target_people(
 ) -> list[dict[str, Any]]:
     account_name = _text(row.get("account_name"))
     target = TARGET_BY_NAME.get(account_name)
-    if target is None:
-        return []
 
     evidence: list[dict[str, Any]] = []
 
@@ -137,19 +195,35 @@ def current_target_people(
             "source_kind": _text(person.get("source_kind")),
         })
 
-    curated_url = _leadership_evidence_url(target)
-    for person in target.observed_people:
+    for person in row.get("observed_people") or []:
+        if not isinstance(person, Mapping):
+            continue
         name = _text(person.get("name"))
         title = _text(person.get("title"))
-        if not name or not title:
+        if not looks_like_person_name(name) or not title:
             continue
         evidence.append({
             "name": name,
             "title": title,
-            "email": "",
-            "url": curated_url or "",
-            "source_kind": "curated_first_party",
+            "email": _text(person.get("email")),
+            "url": _text(person.get("url")) or _text(person.get("page_url")),
+            "source_kind": _text(person.get("source_kind")) or "activation_observed",
         })
+
+    if target is not None:
+        curated_url = _leadership_evidence_url(target)
+        for person in target.observed_people:
+            name = _text(person.get("name"))
+            title = _text(person.get("title"))
+            if not name or not title:
+                continue
+            evidence.append({
+                "name": name,
+                "title": title,
+                "email": "",
+                "url": curated_url or "",
+                "source_kind": "curated_first_party",
+            })
 
     ranked = rank_site_people(evidence)
     return [
@@ -195,9 +269,8 @@ def reconcile_verified_enterprise_contact(
     if not looks_like_person_name(name):
         return None
 
-    target = TARGET_BY_NAME.get(_text(row.get("account_name")))
-    if target is None:
-        return None
+    metadata = _target_metadata(row)
+    target = metadata["target"]
 
     observed = next(
         (
@@ -216,7 +289,7 @@ def reconcile_verified_enterprise_contact(
             if _key(person.get("name")) == _key(name)
         ),
         None,
-    )
+    ) if target is not None else None
     if curated_match is not None:
         curated_title = _text(curated_match.get("title"))
         for person in _probe_people(probe):
@@ -255,7 +328,7 @@ def reconcile_verified_enterprise_contact(
             "role_reconciled": True,
             "site_title_conflict": bool(site_title_conflicts),
             "site_title_conflicts": site_title_conflicts,
-            "target_evidence_urls": list(target.evidence_urls),
+            "target_evidence_urls": list(metadata["target_evidence_urls"]),
         }
 
     if observed is not None:
@@ -274,7 +347,7 @@ def reconcile_verified_enterprise_contact(
             "role_reconciled": True,
             "site_title_conflict": bool(site_title_conflicts),
             "site_title_conflicts": site_title_conflicts,
-            "target_evidence_urls": list(target.evidence_urls),
+            "target_evidence_urls": list(metadata["target_evidence_urls"]),
         }
 
     # A new person may enter only when the probe itself has strong first-party
@@ -314,7 +387,7 @@ def reconcile_verified_enterprise_contact(
         "source": "enterprise_first_party_new_person",
         "probe_source": source,
         "role_reconciled": False,
-        "target_evidence_urls": list(target.evidence_urls),
+        "target_evidence_urls": list(metadata["target_evidence_urls"]),
     }
 
 
@@ -448,15 +521,23 @@ def sync_enterprise_activation(
         if not isinstance(row, Mapping):
             continue
         account_name = _text(row.get("account_name"))
-        target = TARGET_BY_NAME.get(account_name)
+        metadata = _target_metadata(row)
         prospect_id = _text(row.get("prospect_id"))
-        if target is None or not prospect_id:
+        account_key = _text(metadata.get("account_key"))
+        wave = _text(metadata.get("wave"))
+        target_product_codes = list(
+            metadata.get("target_product_codes") or []
+        )
+        target_evidence_urls = list(
+            metadata.get("target_evidence_urls") or []
+        )
+        if not prospect_id or not account_key:
             skipped += 1
             continue
 
         offer_key = (
-            target.target_product_codes[0]
-            if target.target_product_codes
+            target_product_codes[0]
+            if target_product_codes
             else "predictive_revenue_diagnostic"
         )
         reconciled = reconcile_verified_enterprise_contact(row)
@@ -490,18 +571,16 @@ def sync_enterprise_activation(
                         "offer_key": offer_key,
                     },
                     idempotency_key=(
-                        f"enterprise-review:{target.account_key}:"
+                        f"enterprise-review:{account_key}:"
                         f"{reconciled['email']}:v1"
                     ),
                 )
                 plan["params"]["p_evidence"].update({
                     "source": "enterprise_contact_intelligence.v1",
-                    "account_key": target.account_key,
-                    "wave": target.wave,
-                    "target_product_codes": list(
-                        target.target_product_codes
-                    ),
-                    "target_evidence_urls": list(target.evidence_urls),
+                    "account_key": account_key,
+                    "wave": wave,
+                    "target_product_codes": target_product_codes,
+                    "target_evidence_urls": list(metadata["target_evidence_urls"]),
                     "company_contact_routes": [
                         dict(route)
                         for route in (
@@ -600,13 +679,11 @@ def sync_enterprise_activation(
                     else ""
                 ),
                 "reason": reason,
-                "account_key": target.account_key,
-                "wave": target.wave,
+                "account_key": account_key,
+                "wave": wave,
                 "offer_key": offer_key,
                 "target_people": current_target_people(row),
-                "target_product_codes": list(
-                    target.target_product_codes
-                ),
+                "target_product_codes": target_product_codes,
                 "company_contact_routes": company_routes,
             })
             if enqueued:

@@ -709,3 +709,100 @@ def test_sila_existing_review_is_refreshed_from_curated_title_end_to_end():
     )
     assert review["decision_score"] == 0.8
     assert result["outcomes"][0]["pending_review_refreshed"] is True
+
+
+def test_rolling_enterprise_account_queues_without_curated_target_membership():
+    activation = {
+        "targets": [{
+            "account_name": "Morgan & Morgan",
+            "account_key": "rolling:forthepeople.com",
+            "wave": "rolling_enterprise",
+            "prospect_id": "11111111-1111-4111-8111-111111111111",
+            "person_contact_verified": False,
+            "probe": {
+                "rejection_reason": "site_unavailable",
+                "site_people": [{
+                    "name": "Matt Morgan",
+                    "title": "Managing Partner",
+                    "url": "https://www.forthepeople.com/",
+                    "source_kind": "structured_data",
+                }],
+            },
+            "company_contact_routes": [{
+                "channel": "email",
+                "value": "contact@forthepeople.com",
+                "verified": True,
+                "person_bound": False,
+                "source": "first_party_site",
+                "evidence_url": "https://forthepeople.com/",
+            }],
+        }]
+    }
+    queue = FakeQueue()
+    result = sync_enterprise_activation(
+        activation,
+        request=lambda *args, **kwargs: None,
+        queue=queue,
+    )
+    assert result["targeted_retry_queued_count"] == 1
+    assert result["skipped_count"] == 0
+    item = queue.enqueued[0]
+    assert item["account_key"] == "rolling:forthepeople.com"
+    assert item["wave"] == "rolling_enterprise"
+    assert item["offer_key"] == "predictive_revenue_diagnostic"
+    assert item["target_people"][0]["name"] == "Matt Morgan"
+
+
+def test_rolling_verified_person_can_propose_review_without_curated_target():
+    prospect_id = "22222222-2222-4222-8222-222222222222"
+    activation = {
+        "targets": [{
+            "account_name": "Example Rolling Law",
+            "account_key": "rolling:examplelaw.test",
+            "wave": "rolling_enterprise",
+            "prospect_id": prospect_id,
+            "person_contact_verified": True,
+            "probe": {
+                **_probe(
+                    "Jane Smith",
+                    "Managing Partner",
+                    "jane@examplelaw.test",
+                ),
+                "site_people": [{
+                    "name": "Jane Smith",
+                    "title": "Managing Partner",
+                    "email": "jane@examplelaw.test",
+                    "url": "https://examplelaw.test/team",
+                    "source_kind": "visible_text",
+                }],
+            },
+        }]
+    }
+    calls = []
+    def request(method, path, payload=None, **kwargs):
+        calls.append((method, path, payload))
+        if method == "GET":
+            return [{
+                "id": prospect_id,
+                "business_name": "Example Rolling Law",
+                "niche": "personal injury lawyer",
+                "metro": "Philadelphia, PA",
+                "website": "https://examplelaw.test",
+                "buy_signal_score": 80,
+                "contact_source": "first_party_site",
+            }]
+        return {
+            "decision": "proposed",
+            "review_id": "33333333-3333-4333-8333-333333333333",
+            "status": "pending",
+            "actual_revenue": False,
+        }
+    result = sync_enterprise_activation(
+        activation,
+        request=request,
+        queue=FakeQueue(),
+    )
+    assert result["proposed_review_count"] == 1
+    post = next(call for call in calls if call[0] == "POST")
+    assert post[2]["p_offer_key"] == "predictive_revenue_diagnostic"
+    assert post[2]["p_evidence"]["account_key"] == "rolling:examplelaw.test"
