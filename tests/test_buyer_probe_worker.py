@@ -342,3 +342,58 @@ def test_probe_options_can_enable_company_routed_contact():
     }
     options = worker._probe_options_from_row(row)
     assert options["allow_company_routed"] is True
+
+
+def test_confirmed_first_party_buyer_replaces_off_domain_bound_contact():
+    import empire_os.buyer_probe_worker as worker
+
+    enriched = {
+        "decision_maker": {
+            "name": "Adam Hanover",
+            "title": "Co-Founder",
+            "decision_score": 1.0,
+        },
+        "contact_candidates": [{
+            "email": "adam@unionmain.us",
+            "bound_to_decision_maker": True,
+        }],
+    }
+    result = worker._promote_confirmed_first_party_buyer(
+        enriched,
+        [{
+            "name": "Richard Lewis",
+            "title": "Chief Executive Officer & Founder",
+            "email": "richard@redwoodservices.com",
+            "source_url": "https://redwoodservices.com/leadership/",
+            "source_kind": "official_site",
+        }],
+    )
+    assert result["decision_maker"]["name"] == "Richard Lewis"
+    assert result["decision_maker"]["email"] == "richard@redwoodservices.com"
+
+
+def test_same_domain_bound_contact_is_not_replaced():
+    import empire_os.buyer_probe_worker as worker
+
+    enriched = {
+        "decision_maker": {
+            "name": "Jane Smith",
+            "title": "CEO",
+            "decision_score": 1.0,
+        },
+        "contact_candidates": [{
+            "email": "jane@acme.test",
+            "bound_to_decision_maker": True,
+        }],
+    }
+    result = worker._promote_confirmed_first_party_buyer(
+        enriched,
+        [{
+            "name": "John Smith",
+            "title": "Founder",
+            "email": "john@acme.test",
+            "source_url": "https://acme.test/team",
+            "source_kind": "official_site",
+        }],
+    )
+    assert result["decision_maker"]["name"] == "Jane Smith"

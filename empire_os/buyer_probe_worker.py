@@ -5,6 +5,7 @@ import hashlib
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 
 from empire_os.buyer_discovery import (
     build_candidate,
@@ -110,8 +111,6 @@ def _promote_confirmed_first_party_buyer(
         for item in (enriched.get("contact_candidates") or [])
         if isinstance(item, dict)
     ]
-    if any(item.get("bound_to_decision_maker") is True for item in current_contacts):
-        return enriched
 
     eligible = []
     for item in contacts:
@@ -133,6 +132,27 @@ def _promote_confirmed_first_party_buyer(
         })
 
     if not eligible:
+        return enriched
+
+    first_party_domains = {
+        (urlparse(str(item.get("source_url") or "")).hostname or "")
+        .lower().removeprefix("www.")
+        for item in eligible
+        if item.get("source_url")
+    }
+    first_party_domains.discard("")
+
+    current_bound = [
+        item for item in current_contacts
+        if item.get("bound_to_decision_maker") is True
+    ]
+    current_has_first_party_domain = any(
+        str(item.get("email") or "").strip().lower().rsplit("@", 1)[-1]
+        in first_party_domains
+        for item in current_bound
+        if "@" in str(item.get("email") or "")
+    )
+    if current_bound and current_has_first_party_domain:
         return enriched
 
     eligible.sort(
