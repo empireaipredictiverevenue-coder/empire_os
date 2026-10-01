@@ -79,3 +79,11 @@ The legacy marketing recovery lane must treat the canonical Empire prospect/iden
 IMPLEMENT -> COMMIT -> CONVERGE -> FULL DEPENDENCY TEST -> PROMOTE -> DEPLOY -> LIVE VERIFY -> RECORD RUNTIME STATE -> DONE
 
 A passing isolated test or an uncommitted runtime artifact is not DONE.
+
+## Agent execution reconciliation
+
+- revenue-zero-spend-high-ticket-discovery-v1: superseded by verified A2A discovery + Predictive Revenue catalogue commits in this candidate.
+- revenue-zero-spend-organic-a2a-readiness-v1: superseded by the verified revenue activation pack and organic recovery pack in this candidate.
+- revenue-zero-spend-buyer-review-v1: stale pending runtime job; no send authority. Canonical commercial priority remains genuine person-bound conversations such as Seth / Lead Smart and Kieran / Connexis.
+- revenue-zero-spend-allocation-candidates-v1: no persisted agent result. Commercial Exchange remains an evidence/data-quality lane: inventory identity, active buyer-seat state, demand/capacity and fulfilment evidence must be sufficient before candidates are generated.
+- Runtime request files are not treated as active work or proof of completion.
