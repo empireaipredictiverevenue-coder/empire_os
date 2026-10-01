@@ -1,9 +1,9 @@
 [Unit]
-Description=Run deferred buyer enrichment every ten minutes
+Description=Run deferred buyer enrichment every two minutes
 
 [Timer]
 OnActiveSec=1min
-OnUnitInactiveSec=10min
+OnUnitInactiveSec=2min
 AccuracySec=30s
 Persistent=true
 Unit=empire-buyer-deferred-enrichment.service

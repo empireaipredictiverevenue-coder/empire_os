@@ -97,6 +97,26 @@ def _locked_update(path: Path, fn):
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
+
+
+def _priority(value: Any, *, default: int = 50) -> int:
+    try:
+        score = int(value)
+    except (TypeError, ValueError):
+        score = int(default)
+    return max(0, min(score, 100))
+
+
+def _effective_priority(item: Mapping[str, Any], *, now: datetime) -> int:
+    base = _priority(item.get("priority_score"))
+    created = _parse(item.get("created_at")) or now
+    age_hours = max(0, int((now - created).total_seconds() // 3600))
+    # Old work must eventually outrank newly-arriving premium work.  The
+    # bounded age boost prevents indefinite starvation without discarding the
+    # explicit commercial priority signal.
+    age_boost = min(age_hours, 120)
+    return base + age_boost
+
 def canonical_phone(value: Any) -> str:
     raw = str(value or "").strip()
     if not is_commercially_usable_phone(raw):
@@ -166,6 +186,11 @@ class BuyerDeferredEnrichmentQueue:
                 and str(route.get("value") or "").strip()
             ][:8]
 
+            requested_priority = _priority(
+                item.get("priority_score"),
+                default=_priority(existing.get("priority_score")),
+            )
+            existing_priority = _priority(existing.get("priority_score"))
             existing.update({
                 "business_name": str(item.get("business_name") or "").strip(),
                 "website": str(item.get("website") or "").strip(),
@@ -209,6 +234,12 @@ class BuyerDeferredEnrichmentQueue:
                     company_contact_routes
                     or list(existing.get("company_contact_routes") or [])
                 ),
+                "priority_score": max(existing_priority, requested_priority),
+                "priority_reason": (
+                    str(item.get("priority_reason") or "").strip()
+                    or existing.get("priority_reason")
+                    or "default"
+                ),
             })
             data[prospect_id] = existing
             return True
@@ -234,8 +265,11 @@ class BuyerDeferredEnrichmentQueue:
             rows.append(dict(item))
         rows.sort(
             key=lambda row: (
+                -_effective_priority(row, now=current),
+                -_priority(row.get("priority_score")),
                 int(row.get("attempts") or 0),
                 str(row.get("created_at") or ""),
+                str(row.get("prospect_id") or ""),
             )
         )
         return rows[: max(1, min(int(limit), 25))]

@@ -679,6 +679,10 @@ def sync_enterprise_activation(
                     else ""
                 ),
                 "reason": reason,
+                "priority_score": (
+                    95 if wave == "rolling_enterprise" else 90
+                ),
+                "priority_reason": "enterprise_contact_convergence",
                 "account_key": account_key,
                 "wave": wave,
                 "offer_key": offer_key,

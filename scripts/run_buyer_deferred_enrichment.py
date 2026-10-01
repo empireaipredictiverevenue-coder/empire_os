@@ -435,7 +435,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
         str(item.get("prospect_id") or "")
         for item in due
     ])
-    network_probe_budget = min(max(1, int(limit)), 8)
+    network_probe_budget = min(max(1, int(limit)), 16)
     network_probes = 0
 
     for item in due:
@@ -528,6 +528,14 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
 
             if result is None:
                 if network_probes >= network_probe_budget:
+                    queue.defer_again(
+                        prospect_id,
+                        reason="network_probe_budget_exhausted",
+                        attempts=attempts,
+                        retry_minutes=10,
+                    )
+                    deferred_again += 1
+                    processed += 1
                     results.append({
                         "prospect_id": prospect_id,
                         "outcome": "deferred_by_network_budget",
@@ -688,7 +696,7 @@ def main() -> int:
             }, indent=2, sort_keys=True))
             return 0
 
-        result = run_cycle(limit=max(1, min(args.limit, 10)))
+        result = run_cycle(limit=max(1, min(args.limit, 25)))
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
 

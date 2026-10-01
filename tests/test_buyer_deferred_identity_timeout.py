@@ -67,3 +67,51 @@ def test_batch_prospect_loader_uses_three_bounded_queries(monkeypatch):
     assert calls[0][1]["id"] == "in.(p1)"
     assert calls[1][1]["prospect_id"] == "in.(p1)"
     assert calls[2][1]["prospect_id"] == "in.(p1)"
+
+
+def test_targeted_probe_budget_exhaustion_is_durably_redeferred(monkeypatch):
+    class FakeQueue:
+        instance = None
+        def __init__(self):
+            self.deferred = []
+            FakeQueue.instance = self
+        def due(self, *, limit):
+            return [{
+                "prospect_id": "p1",
+                "attempts": 0,
+                "target_people": [{"name":"Jane Smith","title":"CEO"}],
+                "reason": "target_contact_not_verified",
+            }]
+        def defer_again(self, prospect_id, *, reason, attempts, retry_minutes):
+            self.deferred.append((prospect_id, reason, attempts, retry_minutes))
+        def resolve(self, *args, **kwargs):
+            raise AssertionError("must not resolve")
+        def mark_call_ready(self, *args, **kwargs):
+            return False
+        def snapshot(self):
+            return {}
+
+    monkeypatch.setattr(worker, "BuyerDeferredEnrichmentQueue", FakeQueue)
+    monkeypatch.setattr(worker, "_prospect_rows", lambda ids: {
+        "p1": {
+            "id":"p1", "business_name":"Acme Law", "niche":"law",
+            "metro":"Dallas, TX", "website":"https://acme.test",
+            "phone":"", "buy_signal_score":90, "status":"new",
+            "notes":"", "contact_name":"", "contact_title":"",
+            "contact_source":"", "contacted_status":"", "created_at":"",
+        }
+    })
+    monkeypatch.setattr(
+        worker, "_targeted_enterprise_probe",
+        lambda *args, **kwargs: (None, 1),
+    )
+    monkeypatch.setattr(worker, "materialize_call_plans", lambda: {"count":0})
+
+    result = worker.run_cycle(limit=1)
+
+    assert result["processed"] == 1
+    assert result["deferred_again"] == 1
+    assert result["results"][0]["outcome"] == "deferred_by_network_budget"
+    assert FakeQueue.instance.deferred == [
+        ("p1", "network_probe_budget_exhausted", 1, 10)
+    ]

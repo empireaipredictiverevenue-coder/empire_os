@@ -153,7 +153,7 @@ def test_deferred_enrichment_unit_has_bounded_batch():
     ).read_text()
 
     assert (
-        "run_buyer_deferred_enrichment.py --limit 2"
+        "run_buyer_deferred_enrichment.py --limit 8"
         in unit
     )
     assert "TimeoutStartSec=300" in unit
