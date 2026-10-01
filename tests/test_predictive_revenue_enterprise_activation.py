@@ -38,3 +38,9 @@ def test_rolling_activation_revalidates_first_party_location():
     text = (ROOT / "scripts/activate_predictive_revenue_enterprise_targets.py").read_text()
     assert "location_from_addresses(" in text
     assert "location_evidence_addresses" in text
+
+
+def test_rolling_enterprise_wave_is_semantic_and_sort_safe():
+    text = (ROOT / "scripts/activate_predictive_revenue_enterprise_targets.py").read_text()
+    assert '"wave": "rolling_enterprise"' in text
+    assert 'str(row["wave"])' in text

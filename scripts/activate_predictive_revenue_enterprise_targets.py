@@ -122,7 +122,7 @@ def _rolling_candidates() -> list[tuple[LeadCandidate, dict]]:
         ]
         rows.append((candidate, {
             "account_key": f"rolling:{domain}",
-            "wave": 99,
+            "wave": "rolling_enterprise",
             "observed_people": [],
             "company_contact_routes": routes,
         }))
@@ -222,7 +222,7 @@ def activate(*, probe: bool = True) -> dict:
                 "error": f"{type(exc).__name__}:{str(exc)[:500]}",
             })
 
-    rows.sort(key=lambda row: (row["wave"], row["account_name"]))
+    rows.sort(key=lambda row: (str(row["wave"]), str(row["account_name"])))
     payload = {
         "schema_version": (
             "empire.predictive-revenue-enterprise-activation.v1"
