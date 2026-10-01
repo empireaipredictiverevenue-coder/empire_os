@@ -61,3 +61,25 @@ Product and market define lane permit_intelligence:austin; observed demand and c
 
 ## Authority
 Read-only projection. No crawler scheduling, outbound, ad spend, provider activation, allocation, payment, revenue recognition, migration or authority expansion.
+
+## 2026-10-01 implementation and verification
+
+Implemented:
+- deterministic BUYER / PRODUCT / MARKET / LANE / SIGNAL read model;
+- evidence-required node and edge contracts;
+- explicit buyer demand and capacity lane edges;
+- Demand API OBSERVE preview;
+- no inferred topology or crawler authority.
+
+Verification:
+- graph + Demand Genesis/Registry/Outcome + capacity readiness + Demand API: 33 passed;
+- deterministic API preview returned HTTP 200;
+- explicit capacity_remaining=0 remained known zero;
+- missing demand_units remained unknown;
+- inferred_edge_count=0;
+- crawler_scheduling_enabled=false;
+- execution_authority=none.
+
+Status:
+ENGINEERING COMPLETE / DETERMINISTIC API PREVIEW VERIFIED /
+LIVE CANONICAL GRAPH DEPTH DEPENDS ON REAL DEMAND/CAPACITY EVIDENCE.
