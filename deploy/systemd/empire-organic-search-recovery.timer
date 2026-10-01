@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily read-only EmpireOS organic search recovery observer
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+Unit=empire-organic-search-recovery.service
+
+[Install]
+WantedBy=timers.target
