@@ -394,6 +394,7 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
     assert result["error_count"] == 0
     assert result["proposed_review_count"] == 0
     assert result["reconciled_existing_review_count"] == 1
+    assert result["outcomes"][0]["outcome"] == "buyer_review_reconciled"
     assert calls["post"] == 0
     assert calls["refresh_rpc"] == 1
     assert review["contact_title"] == "Chief Executive Officer & Founder"
@@ -710,6 +711,7 @@ def test_sila_existing_review_is_refreshed_from_curated_title_end_to_end():
     assert result["error_count"] == 0
     assert result["proposed_review_count"] == 0
     assert result["reconciled_existing_review_count"] == 1
+    assert result["outcomes"][0]["outcome"] == "buyer_review_reconciled"
     assert review["contact_title"] == (
         "Vice President, Corporate Development"
     )
@@ -874,3 +876,55 @@ def test_reconciliation_fails_closed_without_verified_decision_email():
         },
     }
     assert reconcile_verified_enterprise_contact(row) is None
+
+
+def test_multiple_pending_reviews_for_prospect_fail_closed():
+    prospect_id = "44444444-4444-4444-8444-444444444444"
+    activation = {
+        "targets": [{
+            "account_name": "Redwood Services",
+            "prospect_id": prospect_id,
+            "person_contact_verified": True,
+            "probe": _probe(
+                "Richard Lewis",
+                "Chief Executive Officer & Founder",
+                "richard@redwoodservices.com",
+            ),
+        }]
+    }
+
+    def request(method, path, payload=None, **kwargs):
+        if method == "GET" and "/prospects?" in path:
+            return [{
+                "id": prospect_id,
+                "business_name": "Redwood Services",
+                "niche": "predictive_revenue_enterprise",
+                "metro": "Memphis, TN",
+                "website": "https://redwoodservices.com",
+                "buy_signal_score": 50,
+                "contact_source": "public_enterprise_target",
+            }]
+        if method == "GET" and "/buyer_candidate_reviews?" in path:
+            return [
+                {
+                    "id": "55555555-5555-4555-8555-555555555555",
+                    "prospect_id": prospect_id,
+                    "status": "pending",
+                },
+                {
+                    "id": "66666666-6666-4666-8666-666666666666",
+                    "prospect_id": prospect_id,
+                    "status": "pending",
+                },
+            ]
+        raise AssertionError((method, path))
+
+    result = sync_enterprise_activation(
+        activation,
+        request=request,
+        queue=FakeQueue(),
+    )
+    assert result["proposed_review_count"] == 0
+    assert result["reconciled_existing_review_count"] == 0
+    assert result["error_count"] == 1
+    assert "multiple_pending_buyer_reviews" in result["errors"][0]["error"]

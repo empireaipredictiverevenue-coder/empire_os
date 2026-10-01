@@ -685,6 +685,8 @@ def sync_enterprise_activation(
                     request=request,
                 )
                 review_refreshed = False
+                review_outcome = "buyer_review_proposed"
+                queue_outcome = "enterprise_buyer_review_proposed"
                 if pending_review is not None:
                     review_id = str(pending_review["id"])
                     review_refreshed = _refresh_pending_review(
@@ -699,6 +701,8 @@ def sync_enterprise_activation(
                         request=request,
                     )
                     reconciled_existing += 1
+                    review_outcome = "buyer_review_reconciled"
+                    queue_outcome = "enterprise_buyer_review_reconciled"
                 else:
                     response = _request_with_retry(
                         request,
@@ -735,12 +739,12 @@ def sync_enterprise_activation(
                         proposed += 1
                 queue.resolve(
                     prospect_id,
-                    outcome="enterprise_buyer_review_proposed",
+                    outcome=queue_outcome,
                 )
                 outcomes.append({
                     "account_name": account_name,
                     "prospect_id": prospect_id,
-                    "outcome": "buyer_review_proposed",
+                    "outcome": review_outcome,
                     "review_id": str(review_id),
                     "contact_name": reconciled["name"],
                     "contact_title": reconciled["title"],
