@@ -1,0 +1,14 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [],
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-01T15:08:17.153058+00:00",
+  "job_id": "closure-owned-traffic-v1",
+  "kind": "code_task",
+  "lease_resources": [],
+  "max_runtime_seconds": 1200,
+  "prompt": "Close every reversible blocker for the five prepared zero-paid-spend owned campaigns. Production webpack build is already independently PASS. Work in isolated scope. Keep migration 025 HELD and do not apply it. Prepare exact release-readiness evidence so canonical_intake_schema is the only remaining founder DB gate. No publication/deployment/restart without approval.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
