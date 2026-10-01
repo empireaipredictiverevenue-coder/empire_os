@@ -153,11 +153,16 @@ def a2a_agent_card(base_url: str) -> dict[str, Any]:
         "capabilities": {"streaming": False, "pushNotifications": False, "extendedAgentCard": False},
         "defaultInputModes": ["text/plain", "application/json"],
         "defaultOutputModes": ["application/json", "text/plain"],
-        "skills": [{
-            "id": "empire.agent-web.discovery",
-            "name": "Empire Intelligence Discovery",
-            "description": "Discover public read-only Empire intelligence capabilities and their schemas.",
-            "tags": tags,
-            "examples": ["What market intelligence can Empire provide?", "List your SEO, AEO and GEO tools."],
-        }],
+        "skills": [
+            {
+                "id": f"empire.{cap.key}",
+                "name": cap.title,
+                "description": cap.description,
+                "tags": sorted(set(cap.intelligence)),
+                "examples": [
+                    f"Use {cap.title} with its published input schema.",
+                ],
+            }
+            for cap in public_capabilities("a2a")
+        ],
     }
