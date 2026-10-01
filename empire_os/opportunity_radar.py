@@ -7,10 +7,18 @@ separate evidence-backed assessment step.
 """
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any, Mapping
+
+
+from empire_os.opportunity_revenue_evidence import bridge_factor_evidence
+
+from empire_os.commercial_opportunity_decay import (
+    assess_opportunity_decay,
+)
 
 
 MARKET_GPS = Path("runtime/market_sweeps/revenue_gps_latest.json")
@@ -236,7 +244,15 @@ def build_opportunity_radar(
     community_intent: Mapping[str, Any] | None,
     competitor_market: Mapping[str, Any] | None,
     generated_at: str | None = None,
+    decay_evidence_by_opportunity: Mapping[
+        str, Mapping[str, Any]
+    ] | None = None,
 ) -> dict[str, Any]:
+    generated_at = generated_at or datetime.now(timezone.utc).isoformat()
+    now = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    decay_evidence_by_opportunity = dict(
+        decay_evidence_by_opportunity or {}
+    )
     candidates: list[dict[str, Any]] = []
     source_status: dict[str, Any] = {}
 
@@ -247,6 +263,18 @@ def build_opportunity_radar(
     ):
         if isinstance(payload, Mapping):
             rows = builder(payload)
+            source_rows = (payload.get("research_queue", []) if key == "market_gps"
+                           else payload.get("pain_solution_briefs", []) if key == "community_intent"
+                           else [payload])
+            source_rows = source_rows if isinstance(source_rows, list) else []
+            if payload.get("available") is False or payload.get("ok") is False:
+                source_rows = []
+            for row in rows:
+                row.update(bridge_factor_evidence(
+                    row, source_rows,
+                    source_timestamp=payload.get("generated_at") or payload.get("observed_at"),
+                    now=now,
+                ))
             candidates.extend(rows)
             source_status[key] = {
                 "available": True,
@@ -258,6 +286,30 @@ def build_opportunity_radar(
             }
         else:
             source_status[key] = {"available": False}
+
+    identities = Counter(row["opportunity_key"] for row in candidates)
+    decay_evidence_count = 0
+    for row in candidates:
+        decay_evidence = decay_evidence_by_opportunity.get(
+            str(row.get("opportunity_key") or "")
+        )
+        if isinstance(decay_evidence, Mapping):
+            merged = dict(decay_evidence)
+            merged.setdefault(
+                "opportunity_key",
+                row.get("opportunity_key"),
+            )
+            row["opportunity_decay"] = (
+                assess_opportunity_decay(
+                    merged,
+                    as_of=now,
+                ).as_dict()
+            )
+            decay_evidence_count += 1
+
+        if identities[row["opportunity_key"]] != 1:
+            row["predictive_revenue_inputs"] = {}
+            row["predictive_revenue_evidence_refs"] = {}
 
     candidates.sort(
         key=lambda row: (
@@ -274,6 +326,8 @@ def build_opportunity_radar(
             generated_at or datetime.now(timezone.utc).isoformat()
         ),
         "candidate_count": len(candidates),
+        "decay_evidence_count": decay_evidence_count,
+        "decay_changes_ranking": False,
         "factory_ready_count": sum(
             row.get("opportunity_factory_ready") is True
             for row in candidates

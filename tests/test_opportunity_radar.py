@@ -67,3 +67,53 @@ def test_missing_sources_stay_unavailable():
     assert payload["source_status"]["market_gps"]["available"] is False
     assert payload["source_status"]["community_intent"]["available"] is False
     assert payload["source_status"]["competitor_market"]["available"] is False
+
+
+def test_radar_attaches_decay_evidence_without_reordering():
+    payload = build_opportunity_radar(
+        generated_at="2026-10-01T12:00:00+00:00",
+        market_gps={
+            "generated_at": "2026-10-01T11:00:00+00:00",
+            "research_queue": [{
+                "niche": "roofing",
+                "metro": "denver, co",
+                "research_priority_score": 72,
+                "evidence_refs": ["market:roofing:denver"],
+                "recommended_next_action": "deepen_market_research",
+            }],
+            "markets": [{
+                "niche": "roofing",
+                "metro": "denver, co",
+                "commercial_demand_state": "observed",
+                "product_candidate": "permit_intelligence",
+            }],
+        },
+        community_intent=None,
+        competitor_market=None,
+        decay_evidence_by_opportunity={
+            "market:roofing:denver, co": {
+                "revalidated_at": "2026-10-01T11:30:00+00:00",
+                "freshness_window_seconds": 86400,
+                "evidence_refs": ["revalidation:market:roofing:denver"],
+            }
+        },
+    )
+
+    assert payload["decay_evidence_count"] == 1
+    assert payload["decay_changes_ranking"] is False
+    candidate = payload["candidates"][0]
+    assert candidate["opportunity_decay"]["state"] == "ACTIVE"
+    assert candidate["opportunity_decay"]["execution_authority"] == "none"
+
+
+def test_radar_without_decay_evidence_preserves_candidate_behavior():
+    payload = build_opportunity_radar(
+        generated_at="2026-10-01T12:00:00+00:00",
+        market_gps=None,
+        community_intent=None,
+        competitor_market=None,
+    )
+
+    assert payload["decay_evidence_count"] == 0
+    assert payload["decay_changes_ranking"] is False
+    assert payload["candidates"] == []
