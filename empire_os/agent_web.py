@@ -109,6 +109,13 @@ CAPABILITIES: tuple[Capability, ...] = (
         ("product_fit", "commercial_intent", "buyer_fit"),
         _schema({"category": {"type": "string"}}),
     ),
+    Capability(
+        "product.predictive_revenue",
+        "Predictive Revenue Deployments",
+        "Discover founder-approved Predictive Revenue deployment tiers and entry pricing without creating binding terms, payment, or deployment.",
+        ("predictive_revenue", "enterprise", "product_fit", "commercial_intent"),
+        _schema({}),
+    ),
 )
 
 def public_capabilities(surface: str | None = None) -> list[Capability]:

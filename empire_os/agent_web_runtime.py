@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.commercial_product_catalog import public_catalog_projection
+from empire_os.predictive_revenue_products import predictive_revenue_product_catalog
 
 SNAPSHOT_PATH = Path(os.getenv(
     "EMPIRE_AGENT_WEB_SNAPSHOT",
@@ -143,6 +144,18 @@ def execute_public_capability(name: str, args: dict[str, Any]) -> dict[str, Any]
             "capability": name,
             **public,
             "provenance": provenance,
+        }
+
+    if name == "product.predictive_revenue":
+        return {
+            "capability": name,
+            **predictive_revenue_product_catalog(),
+            "commercial_action": "non_binding_discovery_only",
+            "interest_url": "/predictive-revenue",
+            "provenance": {
+                **provenance,
+                "pricing_authority": "founder_approved_2026_09_24",
+            },
         }
 
     return {"error": "unknown_public_capability", "capability": name}

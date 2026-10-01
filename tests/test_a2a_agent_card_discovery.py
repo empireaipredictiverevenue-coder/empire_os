@@ -8,7 +8,7 @@ from empire_os.agent_web import (
 def test_agent_card_advertises_each_public_a2a_capability_as_skill():
     card = a2a_agent_card("https://empire-ai.co.uk/")
     capabilities = public_capabilities("a2a")
-    assert len(capabilities) == 8
+    assert len(capabilities) == 9
     assert len(card["skills"]) == len(capabilities)
 
     ids = {skill["id"] for skill in card["skills"]}
@@ -34,3 +34,19 @@ def test_agent_card_does_not_advertise_commerce_as_active_skill():
     ids = {skill["id"] for skill in card["skills"]}
     assert not any(skill_id.startswith("empire.commerce.") for skill_id in ids)
     assert card["capabilities"]["extendedAgentCard"] is False
+
+
+
+def test_predictive_revenue_catalog_skill_is_non_binding():
+    from empire_os.agent_web_runtime import execute_public_capability
+
+    result = execute_public_capability("product.predictive_revenue", {})
+    assert result["product_count"] == 5
+    assert result["binding_terms_ready"] is False
+    assert result["payment_action"] is False
+    assert result["actual_revenue"] is False
+    assert result["execution_authority"] == "none"
+    assert result["commercial_action"] == "non_binding_discovery_only"
+    assert result["interest_url"] == "/predictive-revenue"
+    prices = [p["deployment_price_cents"] for p in result["products"]]
+    assert prices == [2500000, 5000000, 10000000, 20000000, 25000000]
