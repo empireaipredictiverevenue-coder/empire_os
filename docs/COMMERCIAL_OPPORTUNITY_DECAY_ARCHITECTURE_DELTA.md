@@ -196,3 +196,27 @@ expires the owned opportunity.
 - zero execution / accounting authority.
 
 Status: V2 CONTRACT LOCKED / IMPLEMENTATION PENDING.
+
+## V2 implementation and live verification — 2026-10-01
+
+Implemented:
+- temporal validity separated from retained commercial value;
+- buyer need/capacity timing made buyer/offer-specific;
+- competitive saturation exposed only as an observed sample fraction;
+- no automatic ACTIVE=1 or generic EXPIRED=0 commercial recency factor;
+- no default decay curve, saturation penalty or automatic ERV transport;
+- malformed candidate evidence fails closed without aborting Radar.
+
+Verification:
+- Decay v2 + Radar + Predictive Revenue + factor-evidence bridge: 166 passed;
+- production OBSERVE Radar refresh succeeded;
+- live Radar candidate_count=22;
+- live decay_evidence_count=0;
+- decay_changes_ranking=false;
+- execution_authority=none;
+- automatic_external_execution_allowed=false;
+- migration 018 checksum unchanged.
+
+Status:
+ENGINEERING COMPLETE / LIVE RADAR V2 VERIFIED /
+UPSTREAM COMMERCIAL DECAY EVIDENCE DEPTH CURRENTLY ZERO.
