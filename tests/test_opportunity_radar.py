@@ -117,3 +117,65 @@ def test_radar_without_decay_evidence_preserves_candidate_behavior():
     assert payload["decay_evidence_count"] == 0
     assert payload["decay_changes_ranking"] is False
     assert payload["candidates"] == []
+
+
+def radar_with(evidence, duplicate=False):
+    rows = [{"pain_point": pain, "opportunity_event": "observed"}
+            for pain in (["one", "one", "two"] if duplicate else ["one", "two"])]
+    return build_opportunity_radar(
+        generated_at="2026-10-01T12:00:00Z", market_gps=None, competitor_market=None,
+        community_intent={"pain_solution_briefs": rows},
+        decay_evidence_by_opportunity=evidence,
+    )
+
+
+def valid_decay():
+    return {"source_expires_at": "2026-10-02T12:00:00Z", "evidence_refs": ["source:1"],
+            "commercial_value": {
+                "source_expires_at": "2026-10-02T12:00:00Z", "evidence_refs": ["terms:1"],
+                "retained_value_ratio": 0.8, "basis": "explicit_commercial_terms", "basis_ref": "terms:1",
+                "effective_from": "2026-10-01T12:00:00Z", "effective_until": "2026-10-02T12:00:00Z"}}
+
+
+def test_duplicate_identities_receive_no_usable_decay():
+    result = radar_with({"community_pain:one": valid_decay(), "community_pain:two": valid_decay()}, True)
+    for row in result["candidates"]:
+        if row["opportunity_key"] == "community_pain:one":
+            assert row["opportunity_decay"]["state"] == "UNKNOWN"
+            assert row["opportunity_decay"]["recency_factor_candidate"] is None
+            assert row["predictive_revenue_inputs"] == {}
+        else:
+            assert row["opportunity_decay"]["recency_factor_candidate"] == 0.8
+
+
+def test_mismatched_identity_fails_closed():
+    evidence = valid_decay()
+    evidence["opportunity_key"] = "community_pain:two"
+    row = radar_with({"community_pain:one": evidence})["candidates"][0]
+    assert row["opportunity_decay"]["state"] == "UNKNOWN"
+    assert row["opportunity_decay"]["recency_factor_candidate"] is None
+
+
+def test_malformed_candidate_does_not_abort_radar_or_transport_factors():
+    for malformed in (42, [], "bad", {"observed_at": "naive"}, {"freshness_window_seconds": float("inf")}):
+        result = radar_with({"community_pain:one": malformed, "community_pain:two": valid_decay()})
+        first, second = result["candidates"]
+        assert first["opportunity_decay"]["state"] == "UNKNOWN"
+        assert second["opportunity_decay"]["recency_factor_candidate"] == 0.8
+        assert second["predictive_revenue_inputs"] == {}
+        assert result["decay_changes_ranking"] is False
+        assert result["revenue_recognition_authority"] == "none"
+
+
+def test_radar_offer_scope_is_bound_to_candidate():
+    evidence = valid_decay()
+    evidence["commercial_value"]["offer_key"] = "wrong-offer"
+    result = build_opportunity_radar(
+        generated_at="2026-10-01T12:00:00Z", market_gps=None, competitor_market=None,
+        community_intent={"pain_solution_briefs": [{"pain_point": "one", "opportunity_event": "observed",
+                                                    "offer_key": "actual-offer"}]},
+        decay_evidence_by_opportunity={"community_pain:one": evidence},
+    )
+    decay = result["candidates"][0]["opportunity_decay"]
+    assert decay["commercial_value"]["state"] == "UNKNOWN"
+    assert decay["recency_factor_candidate"] is None

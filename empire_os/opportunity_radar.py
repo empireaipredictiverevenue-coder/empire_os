@@ -250,6 +250,8 @@ def build_opportunity_radar(
 ) -> dict[str, Any]:
     generated_at = generated_at or datetime.now(timezone.utc).isoformat()
     now = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("generated_at must be timezone-aware")
     decay_evidence_by_opportunity = dict(
         decay_evidence_by_opportunity or {}
     )
@@ -293,18 +295,26 @@ def build_opportunity_radar(
         decay_evidence = decay_evidence_by_opportunity.get(
             str(row.get("opportunity_key") or "")
         )
-        if isinstance(decay_evidence, Mapping):
-            merged = dict(decay_evidence)
-            merged.setdefault(
-                "opportunity_key",
-                row.get("opportunity_key"),
-            )
-            row["opportunity_decay"] = (
-                assess_opportunity_decay(
-                    merged,
-                    as_of=now,
-                ).as_dict()
-            )
+        if row["opportunity_key"] in decay_evidence_by_opportunity:
+            # The map key binds evidence without an embedded identity.
+            # An explicit identity may never override that binding.
+            merged = dict(decay_evidence) if isinstance(decay_evidence, Mapping) else {}
+            merged.setdefault("opportunity_key", row["opportunity_key"])
+            if row.get("offer_key"):
+                if "offer_key" in merged and merged["offer_key"] != row["offer_key"]:
+                    merged = {}
+                else:
+                    merged.setdefault("offer_key", row["offer_key"])
+            if not isinstance(decay_evidence, Mapping) or identities[row["opportunity_key"]] != 1:
+                merged = {}  # No usable component survives ambiguous identity.
+            row["opportunity_decay"] = assess_opportunity_decay(
+                merged, as_of=now,
+                expected_opportunity_key=row["opportunity_key"],
+            ).as_dict()
+            if identities[row["opportunity_key"]] != 1:
+                row["opportunity_decay"]["blockers"] = ("duplicate_opportunity_key",)
+            elif not isinstance(decay_evidence, Mapping):
+                row["opportunity_decay"]["blockers"] = ("decay_evidence_must_be_mapping",)
             decay_evidence_count += 1
 
         if identities[row["opportunity_key"]] != 1:
