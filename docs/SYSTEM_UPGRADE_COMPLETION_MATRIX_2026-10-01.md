@@ -120,3 +120,97 @@ Silence is not classified as rejection, engagement or partnership progress.
 
 This audit grants no new send, payment, settlement, allocation, migration,
 contract or revenue-recognition authority.
+
+# 2026-10-01 EXECUTION UPDATE — POST-CONVERGENCE
+
+This section supersedes the morning status labels above where they conflict.
+It records only evidence verified during the live engineering session.
+
+## Global verification
+
+- convergence regression: **368 passed**;
+- converged owner compilation: PASS;
+- `git diff --check`: PASS;
+- failed systemd units: **0**;
+- migration 018 protected checksum: PASS;
+- Economic Memory snapshot: fresh / OBSERVE / execution_authority=none;
+- Commercial Exchange snapshot: fresh / OBSERVE / execution_authority=none;
+- Opportunity Radar snapshot: fresh / OBSERVE / execution_authority=none;
+- Account Twin snapshot: fresh / OBSERVE / execution_authority=none;
+- self-heal: DEGRADED only because one enabled timer is inactive and
+  founder-gated; repair_count=0.
+
+## Updated completion state
+
+| # | Upgrade | Updated state | Verified evidence | Remaining boundary |
+|---|---|---|---|---|
+| 1 | Buyer Demand Graph | PARTIAL | Existing demand registry/genesis/comparison/outcome modules remain regression-green | Explicit graph model and live Founder graph surface still not closed |
+| 2 | Demand-First Crawling | PARTIAL | Existing buyer-demand/source-review bridges remain regression-green | Direct demand-plan -> crawler scheduling/control still not proven |
+| 3 | Predictive Strike Zones | PARTIAL | Market Sweep / Revenue GPS remains regression-green | Unified calibrated strike-zone economics still not closed |
+| 4 | Multi-Buyer Routing | PARTIAL / STRONG | Buyer allocation + Revenue Router contracts pass convergence regression | Live canonical allocation execution remains separately governed and was not exercised |
+| 5 | Inventory Exchange | ENGINEERING COMPLETE / LIVE SNAPSHOT VERIFIED | Commercial Exchange snapshot fresh in OBSERVE; exchange contract/inventory tests green | Real transaction/liquidity depth remains commercial evidence, not engineering completion |
+| 6 | Buyer Capacity Learning | ENGINEERING COMPLETE / OBSERVE VERIFIED | `buyer_capacity_learning.py`; windowed outcomes; quality rejection separated from capacity rejection; recommendation never raises verified cap; independent preview verified | Canonical outcome-window producer/persistence still needs live evidence feed |
+| 7 | Supply Quality Twin | ENGINEERING COMPLETE / OBSERVE VERIFIED | `supply_quality_twin.py`; idempotent replay; multi-source attribution protection; missing cost preserves unknown GP | Persistent canonical cohort/history feed remains to be activated |
+| 8 | Economic Memory | ENGINEERING COMPLETE / LIVE SNAPSHOT VERIFIED | Fresh `empire.economic_memory.v1` snapshot, OBSERVE, authority none | Outcome-conditioned depth grows only with genuine verified outcomes |
+| 9 | Commercial Opportunity Decay | ENGINEERING COMPLETE / RADAR PROJECTION LIVE | `commercial_opportunity_decay.py`; ACTIVE/STALE/EXPIRED/UNKNOWN; no invented curve; Radar live with `decay_changes_ranking=false` | Current live Radar has `decay_evidence_count=0`; upstream explicit decay evidence producer remains |
+| 10 | Revenue Router | ENGINEERING COMPLETE / OBSERVE PREVIEW VERIFIED | Capacity preserved; explicit EV required; price never substitutes for EV; conflicting capacity fails closed; 56-test router gate green | Canonical expected-value/evidence feed and live governed routing remain separate |
+| 11 | Zero-Cash Mode | ENGINEERING COMPLETE / OBSERVE PREVIEW VERIFIED | `zero_cash_operating_policy.py`; forecast revenue never becomes cash; reservations protected; paid spend requires cash + budget authority | Canonical cash/reservation feed and actual budget approval remain governed inputs |
+| 12 | Commercial Health / Self-Healing | ENGINEERING COMPLETE / RUNTIME FOUNDER-GATED DEGRADED | 0 failed systemd units; direct policy classifies revenue supervisor as FOUNDER_GATE; fresh self-heal snapshot shows exactly one unresolved founder-gated timer | Founder decision required before reactivating `empire-revenue-runtime-supervisor.timer` |
+| 13 | Revenue Truth Feedback | ENGINEERING COMPLETE / LIVE OUTCOME DEPTH PENDING | Revenue OS feedback/registry tests green; Economic Memory fresh | Genuine canonical recognized-revenue/cost outcomes determine learning depth |
+| 14 | Founder Command Centre | ENGINEERING COMPLETE / LIVE ENDPOINT VERIFIED | Founder read API active; health, execution-plane status and coding-team status returned HTTP 200; route regressions green | New upgrade-specific Founder visualizations can be added without changing truth owners |
+| 15 | Empire Opportunity Auction | ENGINEERING COMPLETE / API OBSERVE PREVIEW VERIFIED | `opportunity_auction.py`; verified bid/reserve/capacity/territory/exclusivity gates; deterministic highest-verified-bid preview; Revenue Exchange API surface; bid != EV | Real buyer-bid ingestion/liquidity and any binding commercial clearing remain separately governed |
+
+## Partnership Progression — additional commercial architecture
+
+Status:
+**ENGINEERING COMPLETE / LIVE TWIN PROJECTION VERIFIED /
+CANONICAL COMMERCIAL-HISTORY ACTIVATION FOUNDER-GATED**
+
+Evidence:
+- deterministic evidence-first progression module;
+- positive stages plus STOP / NO_FIT / HOLD / STALLED / UNKNOWN;
+- silence does not become STALLED;
+- score does not become intent;
+- Account Digital Twin integration;
+- 47-test adjacent progression/Twin/NBA regression passed;
+- live Account Twin refresh exposes progression with authority none;
+- current live records remain UNKNOWN where explicit partnership evidence is absent.
+
+Blocker:
+`EMPIRE_INTELLIGENCE_MATERIALIZER_DSN` is deliberately unprovisioned. Existing
+architecture states that issuing the dedicated materializer runtime credential
+is gated. No credential or database authority was created during this work.
+
+## Team verification
+
+- **Codex:** completed read-only architecture review and materially confirmed the
+  owner boundaries used for Partnership Progression, Opportunity Decay, Revenue
+  Router, Capacity Learning, Supply Quality Twin and Zero-Cash Mode.
+- **Pi:** completed isolated OBSERVE design work with production inaccessible;
+  no mutation or authority expansion. Output was treated as advisory only.
+- **Hermes:** zero-scope OBSERVE contract was repaired and verified. The final
+  owner audit remained mutation-free but ended HERMES_FAILED due OpenRouter free
+  model cooldown after extensive read-only inspection. No repository/database/
+  commercial mutation occurred.
+- **Swarm / Empire Coder queue:** stale root-owned pending PLAN files were
+  repaired to canonical ubuntu ownership without executing the 251-job backlog.
+
+## Current founder gates
+
+1. Dedicated EmpireDB intelligence materializer runtime credential activation.
+2. Revenue runtime supervisor timer reactivation.
+3. Any live outbound beyond existing bounded authority.
+4. Any payment, settlement, binding terms, allocation authority expansion,
+   destructive infrastructure, database migration or revenue recognition.
+
+## Next convergence priorities
+
+The highest-value unfinished engineering gaps are now the first three matrix
+items rather than the six previously missing commercial primitives:
+
+1. Buyer Demand Graph;
+2. Demand-First Crawling;
+3. Predictive Strike Zones.
+
+After those, connect the newly completed OBSERVE modules to genuine canonical
+evidence producers one at a time, preserving founder gates and Unknown != 0.
