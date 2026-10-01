@@ -2,7 +2,7 @@
   "authority": "internal_write",
   "base_branch": "agent/data-cloud-wave4",
   "changed_paths": [],
-  "completed_at": "2026-10-01T08:56:00.305862+00:00",
+  "completed_at": "2026-10-01T08:56:03.611789+00:00",
   "database_mutation_performed": false,
   "error": "ExecutionLeaseError: lease_conflict:hermes:000-morning-pi-user-bus-recovery-v1",
   "execution_authority": "none",
@@ -18,7 +18,7 @@
   "proposal_branch": null,
   "proposal_commit": null,
   "schema_version": "empire.hermes.control_result.v1",
-  "started_at": "2026-10-01T08:56:00.305104+00:00",
+  "started_at": "2026-10-01T08:56:03.611325+00:00",
   "status": "LEASE_BLOCKED",
   "verification": null
 }
