@@ -110,3 +110,23 @@ alternates.
 Recommendation-only OBSERVE preview. No allocation execution, binding terms,
 pricing mutation, payment request, settlement, fulfilment, revenue recognition,
 migration, deployment or authority expansion.
+
+## 2026-10-01 verification
+
+Implemented:
+- buyer-stated bid evidence contract;
+- reserve, capacity, territory, exclusivity and expiry gates;
+- deterministic highest-verified-bid preview with bounded tie handling;
+- duplicate buyer bids fail closed;
+- Revenue Exchange API preview surface;
+- zero allocation, terms, payment, settlement or revenue authority.
+
+Verification:
+- auction + allocation adjacency suite: 35 passed;
+- auction + Revenue Exchange API suite: 12 passed;
+- no live auction/bid runtime artifacts are currently present;
+- no live allocation, settlement or payment action was executed.
+
+Status:
+ENGINEERING COMPLETE / DETERMINISTIC PREVIEW VERIFIED /
+LIVE AUCTION LIQUIDITY NOT YET OBSERVED.
