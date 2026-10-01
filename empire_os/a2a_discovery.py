@@ -39,6 +39,7 @@ def commerce_discovery_manifest(
     *,
     public_base_url: str,
     public_capability_names: list[str],
+    authentication_status: str = "not_activated",
 ) -> dict[str, Any]:
     base = public_base_url.rstrip("/")
     return {
@@ -54,7 +55,7 @@ def commerce_discovery_manifest(
         },
         "commercial_discovery": {
             "authentication_required": True,
-            "authentication_status": "not_activated",
+            "authentication_status": authentication_status,
             "governance": "explicit approval required before consequential action",
             "capabilities": [
                 capability.as_dict()

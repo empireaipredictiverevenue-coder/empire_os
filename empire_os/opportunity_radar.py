@@ -15,6 +15,7 @@ from typing import Any, Mapping
 
 
 from empire_os.opportunity_revenue_evidence import bridge_factor_evidence
+from empire_os.opportunity_factory_readiness import evaluate_factory_readiness
 
 from empire_os.commercial_opportunity_decay import (
     assess_opportunity_decay,
@@ -277,6 +278,7 @@ def build_opportunity_radar(
                     source_timestamp=payload.get("generated_at") or payload.get("observed_at"),
                     now=now,
                 ))
+                row.update(evaluate_factory_readiness(row))
             candidates.extend(rows)
             source_status[key] = {
                 "available": True,

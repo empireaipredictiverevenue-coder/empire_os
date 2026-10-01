@@ -31,3 +31,7 @@ runtime/
 # Node / local tool caches
 node_modules/
 supabase/.temp/
+.aider-venv/
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/

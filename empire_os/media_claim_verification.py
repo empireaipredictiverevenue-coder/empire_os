@@ -979,3 +979,33 @@ def refresh_media_claim_verification(
         },
     )
     return payload
+
+
+def verify_owned_projection_claims(claims, *, campaign, opportunity, catalog_product=None):
+    """Pure local provenance check; verifies projection statements, not market facts.
+
+    This intentionally cannot promote arbitrary prose or use a local projection
+    as direct-source verification of demand, performance or customer outcomes.
+    """
+    allowed = {
+        "segment": f"Empire's current research projection identifies {opportunity.get('niche')} in {opportunity.get('metro')} as a research segment.",
+        "source": f"The recorded evidence class is {opportunity.get('evidence_strength')}; the source owner is {opportunity.get('source')}.",
+    }
+    if catalog_product and catalog_product.get("catalog_state") == "VERIFIED":
+        allowed["catalog"] = (
+            f"Empire's verified catalog names {catalog_product.get('product_name')} "
+            f"in the {catalog_product.get('product_family')} family."
+        )
+    refs = set(campaign.get("opportunity_evidence_refs", []) + campaign.get("product_evidence_refs", []))
+    valid = bool(claims) and opportunity.get("opportunity_key") == campaign.get("opportunity_key")
+    results = []
+    for claim in claims:
+        supported = (claim.get("text") == allowed.get(claim.get("kind"))
+                     and claim.get("kind") in allowed
+                     and bool(claim.get("evidence_refs"))
+                     and set(claim["evidence_refs"]).issubset(refs))
+        valid = valid and supported
+        results.append({"kind": claim.get("kind"), "verdict": "SUPPORTED_PROJECTION_STATEMENT" if supported else "UNKNOWN"})
+    return {"status": "PASS" if valid else "BLOCKED", "results": results,
+            "scope": "local projection statements only", "market_claims_verified": False,
+            "external_reads_performed": False}

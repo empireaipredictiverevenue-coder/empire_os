@@ -1,0 +1,32 @@
+{
+  "owned_destination": {
+    "status": "PASS",
+    "evidence_refs": ["docs/BLUEPRINT_V6.md#canonical-architecture-decisions", "apps/empire-public-site/src/app/layout.tsx", "empire_os/public_gateway.py"],
+    "detail": "Repository architecture identifies https://empire-ai.co.uk as Empire-owned. Live reachability is separately unverified."
+  },
+  "internal_account_resolution": {
+    "status": "UNRESOLVED",
+    "evidence_refs": ["empire_os/marketing_agency.py", "empire_os/tenant_isolation.py", "docs/marketing_agency_v1_delta.md"],
+    "detail": "Existing campaign representation is Empire AI / INTERNAL_UNRESOLVED with null account_id and tenant_id. No ID is invented. An activated intake account boundary has not been resolved. Null IDs alone are not proof that public static content needs a tenant UUID."
+  },
+  "privacy_review": {
+    "status": "BLOCKED",
+    "evidence_refs": ["empire_os/self_serve_checkout_api.py", "apps/empire-public-site/src/app/buy/page.tsx", "apps/empire-public-site/src/app/predictive-revenue/page.tsx"],
+    "detail": "No campaign research-question form with nearby privacy notice exists. Existing product intake is not the campaign's minimal reply_email/research_question contract. No synthetic enquiry was submitted."
+  },
+  "governed_enquiry_endpoint": {
+    "status": "BLOCKED",
+    "evidence_refs": ["empire_os/public_gateway.py", "empire_os/self_serve_checkout_api.py", "empire_os/exchange_self_serve.py", "empire_os/predictive_revenue_self_serve.py"],
+    "detail": "Public routes support checkout orders, Lead Exchange tier/capacity interest and Predictive Revenue deployment interest. No governed generic research-enquiry endpoint is present. Do not map research interest to purchase/demand or fabricate business identity."
+  },
+  "first_party_event_collector": {
+    "status": "BLOCKED",
+    "evidence_refs": ["empire_os/public_gateway.py", "empire_os/search_intelligence/attribution.py", "runtime/astra/department_cycle_latest.json#marketing_growth"],
+    "detail": "Campaign attribution is a proposal event contract. The referenced owner is a recognized-revenue attribution preview, not a persistent browser collector for the four required campaign events."
+  },
+  "production_verification": {
+    "status": "UNAVAILABLE",
+    "evidence_refs": ["/etc/systemd/system/empire-public-gateway.service"],
+    "detail": "Service definition points at the existing static out directory on loopback port 80. systemctl access is denied. curl cannot resolve the public hostname or open a loopback socket. Web tool requests for health, sitemap and a campaign route were inaccessible. These failures do not prove the production site is down."
+  }
+}

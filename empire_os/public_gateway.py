@@ -23,10 +23,14 @@ from fastapi.staticfiles import StaticFiles
 
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
 from empire_os.a2a_discovery import commerce_discovery_manifest
+from empire_os.a2a_runtime import load_a2a_runtime
+from empire_os.a2a_identity_api import create_a2a_identity_router
+from empire_os.a2a_commerce_api import create_a2a_commerce_router
 from empire_os.agent_web_runtime import execute_public_capability
 
 GATEWAY_VERSION = "agent-web-v1.1"
 PUBLIC_BASE_URL = os.getenv("EMPIRE_PUBLIC_BASE_URL", "https://empire-ai.co.uk").rstrip("/")
+A2A_RUNTIME = load_a2a_runtime(os.environ)
 AEO_ROOT = Path(os.getenv("EMPIRE_PUBLIC_AEO_ROOT", "/srv/empire_os/runtime/aeo"))
 AEO_ROOT.mkdir(parents=True, exist_ok=True)
 SITE_OUT = Path(os.getenv("EMPIRE_PUBLIC_SITE_OUT", "/srv/empire_os/apps/empire-public-site/out"))
@@ -131,6 +135,9 @@ def _public_site_urls(root: Path | None = None) -> list[str]:
         urls.append(f"{PUBLIC_BASE_URL}/buy")
     if (base / "predictive-revenue.html").is_file():
         urls.append(f"{PUBLIC_BASE_URL}/predictive-revenue")
+    from empire_os.owned_campaign_release import released_paths
+    if root is None:
+        urls.extend(f"{PUBLIC_BASE_URL}{path}" for path in released_paths())
     industries = base / "industries"
     if industries.is_dir():
         for path in sorted(industries.glob("*.html")):
@@ -432,6 +439,23 @@ async def checkout_predictive_revenue_interest_proxy(request: Request):
     )
 
 
+app.include_router(
+    create_a2a_identity_router(
+        verifier=A2A_RUNTIME.verifier,
+        trusted_key_ids=A2A_RUNTIME.trusted_key_ids,
+        nonce_registry=A2A_RUNTIME.nonce_registry,
+    )
+)
+app.include_router(
+    create_a2a_commerce_router(
+        verifier=A2A_RUNTIME.verifier,
+        trusted_key_ids=A2A_RUNTIME.trusted_key_ids,
+        repository=A2A_RUNTIME.repository,
+        nonce_registry=A2A_RUNTIME.nonce_registry,
+    )
+)
+
+
 @app.get("/agent-web/capabilities")
 def capabilities(surface: str | None = Query(default=None, pattern="^(webmcp|mcp|a2a)$")):
     return {
@@ -454,6 +478,7 @@ def a2a_discovery():
         public_capability_names=[
             item["name"] for item in capability_manifest("a2a")
         ],
+        authentication_status=A2A_RUNTIME.authentication_status,
     )
 
 
@@ -650,3 +675,35 @@ def home():
 <p>Human-readable, crawler-readable and agent-readable intelligence through the governed EmpireOS control plane.</p>
 <nav><a href="/agent-web/capabilities">Agent Web capabilities</a> · <a href="/.well-known/agent-card.json">A2A Agent Card</a></nav>
 </main></body></html>"""
+
+
+# Existing gateway owns these routes; no second service or autonomous publisher.
+@app.get('/research/{campaign_id}')
+def research_page(campaign_id: str):
+    from empire_os.owned_campaign_release import released_html
+    html = released_html(campaign_id)
+    if html is None:
+        return JSONResponse({'error': 'research_page_unpublished'}, status_code=404,
+                            headers={'Cache-Control': 'no-store'})
+    return HTMLResponse(html, headers={'Cache-Control': 'no-store'})
+
+
+@app.get('/research-runtime.js')
+def research_runtime_script():
+    from empire_os.owned_campaign_release import load_release, ROOT, SCRIPT
+    if load_release() is None:
+        return JSONResponse({'error': 'research_runtime_unpublished'}, status_code=404)
+    return Response((ROOT / SCRIPT).read_bytes(), media_type='application/javascript',
+                    headers={'Cache-Control': 'no-store'})
+
+
+@app.post('/api/research/enquiry')
+async def research_enquiry(request: Request):
+    from empire_os.owned_campaign_http import handle_intake
+    return await handle_intake(request, 'enquiry', origin=PUBLIC_BASE_URL)
+
+
+@app.post('/api/research/event')
+async def research_event(request: Request):
+    from empire_os.owned_campaign_http import handle_intake
+    return await handle_intake(request, 'event', origin=PUBLIC_BASE_URL)
