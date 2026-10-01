@@ -11,6 +11,7 @@ from empire_os.predictive_revenue_enterprise_acquisition import (
     build_enterprise_lead_candidates,
 )
 from empire_os.predictive_revenue_enterprise_targets import TARGETS
+from empire_os.lead_sources import LeadCandidate
 from empire_os.qualification_worker_v2 import fetch_prospect, qualify_prospect
 
 
@@ -42,15 +43,109 @@ def _target_by_name() -> dict[str, object]:
     return {target.account_name: target for target in TARGETS}
 
 
+def _rolling_candidates() -> list[tuple[LeadCandidate, dict]]:
+    root = Path("/srv/empire_os")
+    location_path = (
+        root / "runtime/predictive_revenue/"
+        "enterprise_location_enrichment_latest.json"
+    )
+    promotion_path = (
+        root / "runtime/buyer_acquisition/promotion_plan_latest.json"
+    )
+    if not location_path.exists() or not promotion_path.exists():
+        return []
+
+    location = json.loads(location_path.read_text(encoding="utf-8"))
+    promotion = json.loads(promotion_path.read_text(encoding="utf-8"))
+    by_domain = {
+        str(row.get("domain") or "").strip().lower(): row
+        for row in (promotion.get("proposals") or [])
+        if isinstance(row, dict)
+    }
+
+    rows: list[tuple[LeadCandidate, dict]] = []
+    for item in location.get("candidates") or []:
+        if not isinstance(item, dict) or item.get("location_verified") is not True:
+            continue
+        domain = str(item.get("domain") or "").strip().lower()
+        proposal = by_domain.get(domain) or {}
+        emails = [
+            str(v).strip()
+            for v in (
+                proposal.get(
+                    "first_party_emails_preserved_for_identity_resolution"
+                ) or []
+            )
+            if str(v).strip()
+        ]
+        candidate = LeadCandidate(
+            name=str(item.get("account_name") or "").strip(),
+            email=emails[0] if emails else "",
+            niche="predictive_revenue_enterprise",
+            metro=str(item.get("metro") or "").strip(),
+            state=str(item.get("state") or "").strip(),
+            country_code=str(item.get("country_code") or "US").strip(),
+            source="public_enterprise_target",
+            lead_score=55,
+            url=str(item.get("website") or "").strip(),
+            details="rolling enterprise candidate from buyer scout promotion pool",
+            raw={
+                "candidate_id": item.get("candidate_id"),
+                "domain": domain,
+                "buyer_type": item.get("buyer_type"),
+                "selection_score": item.get("selection_score"),
+                "target_buyer_pools": item.get("target_buyer_pools") or [],
+                "target_product_codes": item.get("target_product_codes") or [],
+                "first_party_emails": emails,
+                "location_evidence": item.get("evidence_address"),
+                "rolling_enterprise_candidate": True,
+                "outreach_authorized": False,
+                "actual_revenue": False,
+            },
+        )
+        routes = [
+            {
+                "channel": "email",
+                "value": email,
+                "verified": True,
+                "person_bound": False,
+                "source": "first_party_site",
+                "evidence_url": str(item.get("website") or "").strip(),
+            }
+            for email in emails
+        ]
+        rows.append((candidate, {
+            "account_key": f"rolling:{domain}",
+            "wave": 99,
+            "observed_people": [],
+            "company_contact_routes": routes,
+        }))
+    return rows
+
+
 def activate(*, probe: bool = True) -> dict:
-    candidates = build_enterprise_lead_candidates()
+    seed_candidates = list(build_enterprise_lead_candidates())
     targets = _target_by_name()
+    work: list[tuple[LeadCandidate, dict]] = []
+    for candidate in seed_candidates:
+        target = targets[candidate.name]
+        acquisition = TARGET_ACQUISITION[target.account_key]
+        work.append((candidate, {
+            "account_key": target.account_key,
+            "wave": target.wave,
+            "observed_people": [
+                dict(person) for person in target.observed_people
+            ],
+            "company_contact_routes": [
+                dict(item)
+                for item in acquisition["company_contact_routes"]
+            ],
+        }))
+    work.extend(_rolling_candidates())
     rows: list[dict] = []
     errors: list[dict] = []
 
-    for candidate in candidates:
-        target = targets[candidate.name]
-        acquisition = TARGET_ACQUISITION[target.account_key]
+    for candidate, meta in work:
         try:
             ingest = ingest_candidate(candidate)
             prospect_id = _prospect_id(ingest)
@@ -78,12 +173,12 @@ def activate(*, probe: bool = True) -> dict:
 
             company_routes = [
                 dict(item)
-                for item in acquisition["company_contact_routes"]
+                for item in (meta.get("company_contact_routes") or [])
             ]
             rows.append({
-                "account_key": target.account_key,
-                "account_name": target.account_name,
-                "wave": target.wave,
+                "account_key": meta["account_key"],
+                "account_name": candidate.name,
+                "wave": meta["wave"],
                 "prospect_id": prospect_id,
                 "ingest_decision": ingest.get("decision"),
                 "ingest_reason": ingest.get("reason"),
@@ -92,7 +187,7 @@ def activate(*, probe: bool = True) -> dict:
                 "probe": probe_result,
                 "observed_people": [
                     dict(person)
-                    for person in target.observed_people
+                    for person in (meta.get("observed_people") or [])
                 ],
                 "company_contact_routes": company_routes,
                 "company_route_count": len(company_routes),
@@ -133,7 +228,7 @@ def activate(*, probe: bool = True) -> dict:
             if rows
             else "FAILED"
         ),
-        "target_count": len(candidates),
+        "target_count": len(work),
         "canonical_prospect_count": len(rows),
         "failed_count": len(errors),
         "qualified_count": sum(

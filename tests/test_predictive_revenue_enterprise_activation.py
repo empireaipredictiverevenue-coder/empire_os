@@ -25,3 +25,10 @@ def test_enterprise_activation_reads_canonical_empiredb():
     assert "fetch_prospect(prospect_id)" in text
     assert "request_json" not in text
     assert "urllib.parse" not in text
+
+
+def test_enterprise_activation_includes_verified_rolling_pool():
+    text = (ROOT / "scripts/activate_predictive_revenue_enterprise_targets.py").read_text()
+    assert "_rolling_candidates()" in text
+    assert "rolling enterprise candidate from buyer scout promotion pool" in text
+    assert '"outreach_authorized": False' in text

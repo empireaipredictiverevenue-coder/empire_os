@@ -10,3 +10,7 @@ def test_location_from_first_party_us_address():
 
 def test_location_missing_stays_unknown():
     assert location_from_addresses(["Call us today"]) is None
+
+
+def test_location_rejects_street_fragment_as_city():
+    assert location_from_addresses(["100 Piedmont Avenue Northeast Atlanta, GA 30303"]) is None

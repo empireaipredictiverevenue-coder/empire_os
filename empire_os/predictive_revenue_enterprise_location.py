@@ -24,6 +24,15 @@ def location_from_addresses(addresses: list[str] | tuple[str, ...]) -> dict[str,
             city = city.rsplit(",", 1)[-1].strip()
         if not city or any(ch.isdigit() for ch in city):
             continue
+        city_tokens = city.casefold().split()
+        street_terms = {
+            "street", "st", "avenue", "ave", "road", "rd", "boulevard", "blvd",
+            "drive", "dr", "lane", "ln", "highway", "hwy", "suite", "ste",
+        }
+        if any(token.strip(".,") in street_terms for token in city_tokens):
+            continue
+        if len(city_tokens) > 4:
+            continue
         state = match.group("state").upper()
         return {
             "metro": f"{city}, {state}",
