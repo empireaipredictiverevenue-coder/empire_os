@@ -59,3 +59,27 @@ Crawler canonical-ingest behavior remains unchanged and fail-closed.
 - missing target/evidence blocks;
 - max-candidate bound preserved;
 - planner never invokes crawler_runner.
+
+## 2026-10-01 implementation and verification
+
+Implemented:
+- pure DemandRegistryRecord -> crawler request planner;
+- explicit real-source allowlist matching the registered real crawler adapters;
+- explicit niche/metro/country target;
+- explicit source-capability and demand evidence;
+- approval evidence required before dispatch_ready;
+- guarded acquisition max_candidates bound 1..25;
+- deterministic crawler CLI argument tokens only;
+- no crawler import or invocation.
+
+Verification:
+- planner + Demand Genesis/Registry + crawler runner suite: 61 passed;
+- source allowlist checked against live registered source names;
+- biz_search remains excluded because it is registered as a stub;
+- no deployed /v1/demand/* runtime surface was found on current internal ports;
+- no readable dedicated demand-registry DSN is exposed to the ubuntu MCP worker;
+- therefore no live canonical demand plan or crawl dispatch is claimed.
+
+Status:
+ENGINEERING COMPLETE / DETERMINISTIC PLANNER VERIFIED /
+LIVE CANONICAL DEMAND-PLAN FEED NOT CURRENTLY AVAILABLE TO THIS RUNTIME SURFACE.

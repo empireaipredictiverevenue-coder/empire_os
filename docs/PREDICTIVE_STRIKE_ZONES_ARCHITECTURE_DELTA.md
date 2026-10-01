@@ -60,3 +60,28 @@ Recommendation only:
 - deterministic EV ranking;
 - duplicate identity fails closed;
 - no execution authority.
+
+## 2026-10-01 implementation and verification
+
+Implemented:
+- pure OBSERVE strike-zone projection;
+- explicit positive expected_revenue_value_cents + evidence required;
+- ACTIVE decay required;
+- explicit positive buyer_capacity_remaining + evidence required;
+- ranking by explicit EV only;
+- price/scores/probabilities cannot substitute for EV;
+- zero execution, crawler, outbound, spend, allocation or revenue authority.
+
+Verification:
+- Strike Zones + Market Sweep + Predictive Revenue + Opportunity Decay: 76 passed;
+- production Radar projection used 22 current real candidates;
+- strike_candidates=0;
+- all 22 remained UNKNOWN because explicit ERV, decay and remaining-capacity
+  evidence is currently absent;
+- no fake ranking or inferred economics were produced;
+- execution_authority=none; outbound=false; allocation=false;
+  revenue_recognition=false.
+
+Status:
+ENGINEERING COMPLETE / LIVE READ-ONLY PROJECTION VERIFIED /
+CURRENT CANONICAL STRIKE EVIDENCE DEPTH INSUFFICIENT FOR A RANKED CANDIDATE.
