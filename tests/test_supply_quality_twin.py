@@ -29,7 +29,13 @@ def obs(
         delivered=delivered,
         buyer_accepted=buyer,
         recognized_revenue_cents=revenue,
+        revenue_recognition_evidence_ref=(
+            f"revenue-recognition:{key}" if revenue is not None else None
+        ),
         observed_cost_cents=cost,
+        observed_cost_evidence_ref=(
+            f"observed-cost:{key}" if cost is not None else None
+        ),
         evidence_refs=(f"evidence:{key}",),
     )
 
@@ -137,3 +143,37 @@ def test_twin_never_grants_operational_authority():
     assert twin.allocation_execution is False
     assert twin.revenue_recognition is False
     assert twin.execution_authority == "none"
+
+
+def test_recognized_revenue_requires_dedicated_evidence_ref():
+    row = obs("o1", "s1")
+    row = SupplyQualityObservation(
+        **{
+            **row.__dict__,
+            "revenue_recognition_evidence_ref": None,
+        }
+    )
+
+    try:
+        build([row])
+    except ValueError as exc:
+        assert "revenue_recognition_evidence_ref required" in str(exc)
+    else:
+        raise AssertionError("missing revenue recognition evidence must fail")
+
+
+def test_observed_cost_requires_dedicated_evidence_ref():
+    row = obs("o1", "s1")
+    row = SupplyQualityObservation(
+        **{
+            **row.__dict__,
+            "observed_cost_evidence_ref": None,
+        }
+    )
+
+    try:
+        build([row])
+    except ValueError as exc:
+        assert "observed_cost_evidence_ref required" in str(exc)
+    else:
+        raise AssertionError("missing cost evidence must fail")

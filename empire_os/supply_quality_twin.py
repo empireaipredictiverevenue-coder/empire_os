@@ -23,7 +23,9 @@ class SupplyQualityObservation:
     delivered: bool | None = None
     buyer_accepted: bool | None = None
     recognized_revenue_cents: int | None = None
+    revenue_recognition_evidence_ref: str | None = None
     observed_cost_cents: int | None = None
+    observed_cost_evidence_ref: str | None = None
 
     def validate(self) -> None:
         for label, value in (
@@ -51,6 +53,22 @@ class SupplyQualityObservation:
         ):
             if value is not None and value < 0:
                 raise ValueError(f"{label} must be nonnegative")
+        if (
+            self.recognized_revenue_cents is not None
+            and not str(self.revenue_recognition_evidence_ref or "").strip()
+        ):
+            raise ValueError(
+                "revenue_recognition_evidence_ref required when "
+                "recognized_revenue_cents is supplied"
+            )
+        if (
+            self.observed_cost_cents is not None
+            and not str(self.observed_cost_evidence_ref or "").strip()
+        ):
+            raise ValueError(
+                "observed_cost_evidence_ref required when "
+                "observed_cost_cents is supplied"
+            )
 
 
 @dataclass(frozen=True)
@@ -191,8 +209,12 @@ def build_supply_quality_twin(
     refs = tuple(dict.fromkeys(
         ref
         for row in rows
-        for ref in row.evidence_refs
-        if str(ref).strip()
+        for ref in (
+            *row.evidence_refs,
+            row.revenue_recognition_evidence_ref,
+            row.observed_cost_evidence_ref,
+        )
+        if str(ref or "").strip()
     ))
 
     return SupplyQualityTwin(

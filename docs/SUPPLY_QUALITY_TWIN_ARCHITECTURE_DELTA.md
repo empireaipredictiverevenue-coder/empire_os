@@ -67,6 +67,10 @@ Missing cost keeps realized GP unknown.
 No source-health observation does not mean unhealthy.
 Identity acceptance does not imply buyer acceptance.
 
+Recognized revenue and observed cost are accepted only when each carries its own
+dedicated evidence reference. Generic observation evidence cannot silently
+establish accounting truth or realized cost.
+
 ## Positive example
 
 A source supplies 20 unique businesses, 17 pass identity quality, 12 are
@@ -96,3 +100,23 @@ complete cost evidence. The Twin exposes those denominators separately.
 OBSERVE only. No canonical writes, acquisition policy mutation, allocation,
 outbound, spend, terms, payment, settlement, revenue recognition, migration or
 deployment authority.
+
+## 2026-10-01 verification
+
+Implemented:
+- replayable source/product/market Twin;
+- separate availability, identity, delivery, buyer outcome and economics dimensions;
+- explicit multi-source attribution;
+- dedicated evidence refs for recognized revenue and observed cost;
+- unknown GP when cost evidence is incomplete;
+- zero execution/revenue-recognition authority.
+
+Verification:
+- Supply Twin + candidate quality + source health + revenue feedback: 29 passed;
+- diff check passed;
+- no live Supply Quality Twin projection or attributed outcome stream is
+  currently claimed from production runtime.
+
+Status:
+ENGINEERING COMPLETE / DETERMINISTIC VERIFICATION PASSED /
+LIVE ATTRIBUTED OUTCOME PROJECTION PENDING REAL EVIDENCE.
