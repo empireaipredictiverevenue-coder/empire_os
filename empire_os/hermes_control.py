@@ -107,6 +107,11 @@ class HermesJob:
     ai_behavior_change: bool = False
     created_at: str | None = None
 
+    @property
+    def requires_mutation_lease(self) -> bool:
+        """Only repository-mutating Hermes jobs require a mutation lease."""
+        return self.authority == "internal_write"
+
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any]) -> "HermesJob":
         schema = str(raw.get("schema_version") or "").strip()
@@ -1429,14 +1434,15 @@ def process_job(
     }
 
     try:
-        lease_manager = ExecutionLeaseManager()
-        lease = lease_manager.acquire(
-            owner="hermes",
-            job_id=job.job_id,
-            resources=job.lease_resources,
-            ttl_seconds=job.max_runtime_seconds + 300,
-        )
-        result["lease_id"] = lease.lease_id
+        if job.requires_mutation_lease:
+            lease_manager = ExecutionLeaseManager()
+            lease = lease_manager.acquire(
+                owner="hermes",
+                job_id=job.job_id,
+                resources=job.lease_resources,
+                ttl_seconds=job.max_runtime_seconds + 300,
+            )
+            result["lease_id"] = lease.lease_id
 
         fetch_control_refs(
             repo_root,

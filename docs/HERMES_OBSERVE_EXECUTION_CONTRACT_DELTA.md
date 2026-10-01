@@ -32,6 +32,7 @@ Simply omitting the fields is unsafe because the legacy default is
 For `authority=observe`:
 - explicit empty `allowed_paths` is valid and means zero editable paths;
 - explicit empty `lease_resources` is valid and means zero mutation leases;
+- the Hermes worker skips mutation-lease acquisition entirely for OBSERVE;
 - any changed path fails changed-path validation;
 - no production or consequential authority is added.
 

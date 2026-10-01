@@ -482,3 +482,18 @@ def test_internal_write_job_rejects_explicit_zero_mutation_scope():
                 lease_resources=[],
             )
         )
+
+def test_mutation_lease_requirement_tracks_hermes_authority():
+    observe = HermesJob.from_mapping(
+        base_job(
+            authority="observe",
+            allowed_paths=[],
+            lease_resources=[],
+        )
+    )
+    internal_write = HermesJob.from_mapping(
+        base_job(authority="internal_write")
+    )
+
+    assert observe.requires_mutation_lease is False
+    assert internal_write.requires_mutation_lease is True
