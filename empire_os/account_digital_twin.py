@@ -19,6 +19,10 @@ from empire_os.intelligence_materializer_transport import (
     PostgresIntelligenceMaterializer,
 )
 
+from empire_os.partnership_progression import (
+    derive_partnership_progression,
+)
+
 
 SNAPSHOT_RELATIVE_PATH = Path(
     "runtime/account_twin/account_twin_latest.json"
@@ -80,6 +84,7 @@ def build_account_twin(
     qualification_history: list[Mapping[str, Any]] | None = None,
     commercial_history: Mapping[str, Any] | None = None,
     revenue_truth: Mapping[str, Any] | None = None,
+    partnership_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     audience = dict(audience or {})
     research = dict(research or {})
@@ -90,6 +95,9 @@ def build_account_twin(
     commercial_history = dict(commercial_history or {})
     revenue_truth_loaded = revenue_truth is not None
     revenue_truth = dict(revenue_truth or {})
+    partnership = derive_partnership_progression(
+        partnership_evidence
+    )
 
     states = _state_map(entity)
     unknown_states = list(entity.get("unknown_states", []) or [])
@@ -206,6 +214,7 @@ def build_account_twin(
             ),
         },
         "next_best_action": next_action or None,
+        "partnership_progression": partnership.as_dict(),
         "outreach": {
             "contacted_state": states.get("CONTACTED"),
             "contacted_status": contacted.get("contacted_status"),
@@ -325,6 +334,9 @@ def build_account_twin_snapshot(
     revenue_truth_by_entity: Mapping[
         str, Mapping[str, Any]
     ] | None = None,
+    partnership_evidence_by_entity: Mapping[
+        str, Mapping[str, Any]
+    ] | None = None,
 ) -> dict[str, Any]:
     audience_by_id = _index(list(audience.get("companies", []) or []))
     research_by_id = _index(list(research.get("actions", []) or []))
@@ -338,6 +350,9 @@ def build_account_twin_snapshot(
     )
     revenue_truth_by_entity = dict(
         revenue_truth_by_entity or {}
+    )
+    partnership_evidence_by_entity = dict(
+        partnership_evidence_by_entity or {}
     )
 
     twins = []
@@ -361,6 +376,9 @@ def build_account_twin_snapshot(
                 entity_id
             ),
             revenue_truth=revenue_truth_by_entity.get(entity_id),
+            partnership_evidence=partnership_evidence_by_entity.get(
+                entity_id
+            ),
         ))
 
     twins.sort(

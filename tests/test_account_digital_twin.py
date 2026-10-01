@@ -428,3 +428,67 @@ def test_snapshot_can_attach_revenue_truth_by_entity():
     assert twin["revenue_truth"]["available"] is True
     assert twin["revenue_truth"]["recognized_revenue_cents"] == 0
     assert twin["revenue_truth"]["realized_gp_cents"] == 0
+
+
+def test_twin_partnership_progression_defaults_unknown():
+    twin = build_account_twin(
+        _buyer_entity(),
+        audience=_audience(),
+        research=_research(),
+        brief=_brief(),
+        next_action=_next_action(),
+    )
+
+    progression = twin["partnership_progression"]
+    assert progression["state"] == "UNKNOWN"
+    assert progression["buyer_intent_inferred"] is False
+    assert progression["commercial_intent_inferred"] is False
+    assert progression["outreach_authorized"] is False
+    assert progression["execution_authority"] == "none"
+
+
+def test_twin_surfaces_explicit_partnership_evidence_without_inference():
+    twin = build_account_twin(
+        _buyer_entity(),
+        audience=_audience(),
+        research=_research(),
+        brief=_brief(),
+        next_action=_next_action(),
+        partnership_evidence={
+            "person_bound": True,
+            "needs_discovered": True,
+            "evidence_refs": [
+                "contact:adam",
+                "reply:criteria",
+            ],
+        },
+    )
+
+    progression = twin["partnership_progression"]
+    assert progression["state"] == "NEEDS_DISCOVERED"
+    assert progression["observed_positive_states"] == (
+        "PERSON_BOUND",
+        "NEEDS_DISCOVERED",
+    )
+    assert "ENGAGED" not in progression["observed_positive_states"]
+
+
+def test_snapshot_attaches_partnership_evidence_by_entity():
+    result = build_account_twin_snapshot(
+        buyer_state={"entities": [_buyer_entity()]},
+        audience={"companies": [_audience()]},
+        research={"actions": [_research()]},
+        briefs={"briefs": [_brief()]},
+        next_actions={"actions": [_next_action()]},
+        partnership_evidence_by_entity={
+            "entity-golden": {
+                "capacity_hold": True,
+                "evidence_refs": ["reply:capacity-full"],
+            }
+        },
+    )
+
+    progression = result["twins"][0]["partnership_progression"]
+    assert progression["state"] == "HOLD"
+    assert progression["state_class"] == "negative"
+    assert progression["execution_authority"] == "none"
