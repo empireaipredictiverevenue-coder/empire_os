@@ -22,6 +22,8 @@ def test_consequential_units_are_never_auto_repairable():
         "empire-closer-reply-worker.service",
         "empire-payment-verifier.service",
         "empire-settlement.service",
+        "empire-revenue-runtime-supervisor.service",
+        "empire-revenue-runtime-supervisor.timer",
     ):
         assert runtime_self_heal.unit_is_auto_repairable(unit) is False
 
@@ -173,6 +175,12 @@ def test_unit_policy_defaults_to_observe_only_and_gates_consequential():
             "empire-public-gateway.service"
         )
         == "AUTO_REPAIR"
+    )
+    assert (
+        runtime_self_heal.classify_unit_policy(
+            "empire-revenue-runtime-supervisor.timer"
+        )
+        == "FOUNDER_GATE"
     )
 
 

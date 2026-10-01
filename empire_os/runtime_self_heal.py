@@ -174,6 +174,7 @@ FOUNDER_GATE_UNIT_PREFIXES: tuple[str, ...] = (
     "empire-settlement",
     "empire-settle-",
     "empire-revenue-recognition",
+    "empire-revenue-runtime-supervisor",
     "empire-ppc-billing",
     "empire-marketing-deploy",
 )
