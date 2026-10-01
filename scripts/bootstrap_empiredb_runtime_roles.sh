@@ -28,6 +28,9 @@ BEGIN
     'empire_conversation_reader',
     'empire_revenue_exchange_ingest',
     'empire_revenue_exchange_reader',
+    'empire_owned_campaign_ingest',
+    'empire_a2a_identity_nonce_writer',
+    'empire_a2a_intent_writer',
     'empiredb_tenant_reader'
   ] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r) THEN

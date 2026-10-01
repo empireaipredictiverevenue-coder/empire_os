@@ -21,6 +21,9 @@ db_bits() {
   psql "$EMPIREDB_MIGRATOR_DSN" -X -Atqc "$1"
 }
 
+echo "=== BOOTSTRAP RUNTIME CAPABILITY ROLES ==="
+bash "$ROOT/scripts/bootstrap_empiredb_runtime_roles.sh"
+
 apply_if_absent() {
   local label="$1" migration="$2" probe_sql="$3"
   local state
