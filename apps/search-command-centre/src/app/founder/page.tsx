@@ -6,6 +6,7 @@ import {
   getFounderDailyResults,
   getFounderIntelligenceNodes,
   getFounderOps,
+  getFounderOperationalTruth,
   type FounderStage,
 } from "@/lib/founder-api";
 
@@ -33,6 +34,15 @@ function stageClass(stage: FounderStage) {
   return "border-white/8 bg-white/[0.025]";
 }
 
+function operationalLaneTone(value: string) {
+  if (value === "LIVE") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
+  if (value === "READY") return "border-cyan-400/30 bg-cyan-400/10 text-cyan-200";
+  if (value === "GATED") return "border-violet-400/30 bg-violet-400/10 text-violet-200";
+  if (value === "BLOCKED") return "border-rose-400/30 bg-rose-400/10 text-rose-200";
+  if (value === "OBSERVE") return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+  return "border-white/10 bg-white/[0.035] text-slate-400";
+}
+
 function operatingTone(value: string | undefined) {
   if (value === "WAITING_EXTERNAL") {
     return "border-cyan-400/30 bg-cyan-400/10 text-cyan-200";
@@ -48,14 +58,21 @@ function operatingTone(value: string | undefined) {
 
 export default async function FounderPage() {
   await connection();
-  const [result, nodesResult, productsResult, opsResult, dailyResult] =
-    await Promise.all([
-      getFounderDashboard(),
-      getFounderIntelligenceNodes(),
-      getFounderDataProducts(),
-      getFounderOps(),
-      getFounderDailyResults(),
-    ]);
+  const [
+    result,
+    nodesResult,
+    productsResult,
+    opsResult,
+    dailyResult,
+    operationalTruthResult,
+  ] = await Promise.all([
+    getFounderDashboard(),
+    getFounderIntelligenceNodes(),
+    getFounderDataProducts(),
+    getFounderOps(),
+    getFounderDailyResults(),
+    getFounderOperationalTruth(),
+  ]);
   const data = result.data;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
@@ -74,6 +91,8 @@ export default async function FounderPage() {
   const incidents = ops?.incident_manager?.diagnoses ?? [];
   const repairPlan = ops?.sentinel?.repair_plan ?? [];
   const daily = dailyResult.data;
+  const operationalTruth = operationalTruthResult.data;
+  const operationalLanes = operationalTruth?.lanes ?? [];
   const dailyFunnel = daily?.commercial_funnel;
   const opportunityRadar = data?.opportunity_radar;
   const opportunityBlockers = Object.entries(
@@ -134,6 +153,55 @@ export default async function FounderPage() {
           </section>
         ) : (
           <>
+            <section className="panel mt-7">
+              <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
+                <div>
+                  <p className="eyebrow">Revenue lane truth</p>
+                  <h2 className="mt-1 text-2xl font-semibold text-white">
+                    What is actually live, ready, gated or blocked
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Founder gates: {operationalTruth?.summary?.founder_gate_count ?? 0}
+                </p>
+              </div>
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {operationalLanes.map((lane) => (
+                  <div
+                    key={lane.key}
+                    className={["rounded-2xl border p-4", operationalLaneTone(lane.state)].join(" ")}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-semibold capitalize text-white">
+                        {lane.key.replaceAll("_", " ")}
+                      </p>
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">
+                        {lane.state}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-slate-300">
+                      {lane.detail}
+                    </p>
+                    {lane.blocker ? (
+                      <p className="mt-3 text-[11px] text-slate-400">
+                        Blocker: {lane.blocker.replaceAll("_", " ")}
+                      </p>
+                    ) : null}
+                    {lane.next_action ? (
+                      <p className="mt-2 text-[11px] leading-5 text-white/80">
+                        Next: {lane.next_action}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+                {!operationalLanes.length ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4 text-xs text-slate-400">
+                    Operational truth API unavailable. No state is inferred.
+                  </div>
+                ) : null}
+              </div>
+            </section>
+
             <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
               <MetricCard
                 label="Owned inventory"

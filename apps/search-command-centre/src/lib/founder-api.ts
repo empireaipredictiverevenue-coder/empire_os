@@ -715,3 +715,61 @@ export function getFounderMailboxDraftPreview(
   );
 }
 
+
+
+export type FounderOperationalLane = {
+  key: string;
+  state: "LIVE" | "READY" | "GATED" | "BLOCKED" | "OBSERVE" | "UNKNOWN";
+  detail: string;
+  blocker?: string | null;
+  founder_gate?: boolean;
+  next_action?: string | null;
+  evidence?: Record<string, unknown>;
+  execution_authority?: string;
+};
+
+export type FounderOperationalTruth = {
+  schema_version?: string;
+  mode?: string;
+  lanes?: FounderOperationalLane[];
+  summary?: {
+    lane_count?: number;
+    by_state?: Record<string, number>;
+    founder_gate_count?: number;
+  };
+  execution_authority?: string;
+};
+
+export async function getFounderOperationalTruth(): Promise<{
+  ok: boolean;
+  status: number | null;
+  data: FounderOperationalTruth | null;
+  reason: string | null;
+}> {
+  const base = apiBase();
+  if (!base) {
+    return { ok: false, status: null, data: null, reason: "api_base_not_configured" };
+  }
+  try {
+    const response = await fetch(
+      base + "/v1/founder-operational-truth/status",
+      { cache: "no-store", headers: { Accept: "application/json" } },
+    );
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        data: null,
+        reason: "http_" + response.status,
+      };
+    }
+    return {
+      ok: true,
+      status: response.status,
+      data: (await response.json()) as FounderOperationalTruth,
+      reason: null,
+    };
+  } catch {
+    return { ok: false, status: null, data: null, reason: "api_unreachable" };
+  }
+}
