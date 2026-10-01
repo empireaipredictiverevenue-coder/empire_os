@@ -54,6 +54,7 @@ def _role_provision_sql(passwords: dict[str, str]) -> str:
             "END $$;",
             f"ALTER ROLE {login} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '{password}';",
             f"ALTER ROLE {login} SET statement_timeout = '3s';",
+            f"GRANT CONNECT ON DATABASE empiredb TO {login};",
             f"REVOKE ALL ON SCHEMA public FROM {login};",
             f"GRANT {capability} TO {login};",
         ])
