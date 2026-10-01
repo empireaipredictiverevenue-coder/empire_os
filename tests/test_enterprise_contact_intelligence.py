@@ -32,6 +32,7 @@ def _probe(name, title, email):
         "decision_maker": {
             "name": name,
             "title": title,
+            "email": email,
             "decision_score": 1.0,
             "decision_role": "economic_buyer",
             "source": "website_structured_data",
@@ -39,6 +40,7 @@ def _probe(name, title, email):
         "verified_contacts": [{
             "email": email,
             "is_valid": True,
+            "bound_to_decision_maker": True,
             "source": "person_structured_data",
         }],
     }
@@ -302,7 +304,7 @@ def test_enterprise_sync_retries_transient_prospect_fetch_failure(monkeypatch):
     )
     assert result["error_count"] == 0
     assert result["proposed_review_count"] == 1
-    assert calls["get"] == 2
+    assert calls["get"] == 3
     assert calls["post"] == 1
 
 
@@ -326,6 +328,7 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
     review = {
         "id": review_id,
         "status": "pending",
+        "prospect_id": prospect_id,
         "contact_name": "Richard Lewis",
         "contact_title": "Chief Executive Officer",
         "contact_email": "richard@redwoodservices.com",
@@ -389,8 +392,9 @@ def test_enterprise_sync_retries_idempotent_review_rpc_timeout(monkeypatch):
         queue=FakeQueue(),
     )
     assert result["error_count"] == 0
-    assert result["proposed_review_count"] == 1
-    assert calls["post"] == 2
+    assert result["proposed_review_count"] == 0
+    assert result["reconciled_existing_review_count"] == 1
+    assert calls["post"] == 0
     assert calls["refresh_rpc"] == 1
     assert review["contact_title"] == "Chief Executive Officer & Founder"
 
@@ -633,6 +637,7 @@ def test_sila_existing_review_is_refreshed_from_curated_title_end_to_end():
     review = {
         "id": review_id,
         "status": "pending",
+        "prospect_id": prospect_id,
         "contact_name": "Kyle Martin",
         "contact_title": "President",
         "contact_email": "kmartin@sila.com",
@@ -703,7 +708,8 @@ def test_sila_existing_review_is_refreshed_from_curated_title_end_to_end():
     )
 
     assert result["error_count"] == 0
-    assert result["proposed_review_count"] == 1
+    assert result["proposed_review_count"] == 0
+    assert result["reconciled_existing_review_count"] == 1
     assert review["contact_title"] == (
         "Vice President, Corporate Development"
     )
@@ -808,3 +814,63 @@ def test_rolling_verified_person_can_propose_review_without_curated_target():
     post = next(call for call in calls if call[0] == "POST")
     assert post[2]["p_offer_key"] == "predictive_revenue_diagnostic"
     assert post[2]["p_evidence"]["account_key"] == "rolling:examplelaw.test"
+
+
+def test_reconciliation_uses_email_bound_to_same_decision_maker():
+    row = {
+        "account_name": "Redwood Services",
+        "person_contact_verified": True,
+        "probe": {
+            **_probe(
+                "Richard Lewis",
+                "Chief Executive Officer & Founder",
+                "adam@unionmain.us",
+            ),
+            "preferred_email": "adam@unionmain.us",
+            "decision_maker": {
+                "name": "Richard Lewis",
+                "title": "Chief Executive Officer & Founder",
+                "email": "richard@redwoodservices.com",
+                "source": "hunter_confirmed_first_party",
+            },
+            "verified_contacts": [
+                {
+                    "email": "adam@unionmain.us",
+                    "is_valid": True,
+                    "bound_to_decision_maker": True,
+                    "source": "person_structured_data",
+                },
+                {
+                    "email": "richard@redwoodservices.com",
+                    "is_valid": True,
+                    "bound_to_decision_maker": True,
+                    "source": "official_site",
+                },
+            ],
+        },
+    }
+    result = reconcile_verified_enterprise_contact(row)
+    assert result is not None
+    assert result["name"] == "Richard Lewis"
+    assert result["email"] == "richard@redwoodservices.com"
+
+
+def test_reconciliation_fails_closed_without_verified_decision_email():
+    row = {
+        "account_name": "Redwood Services",
+        "person_contact_verified": True,
+        "probe": {
+            **_probe(
+                "Richard Lewis",
+                "Chief Executive Officer & Founder",
+                "adam@unionmain.us",
+            ),
+            "decision_maker": {
+                "name": "Richard Lewis",
+                "title": "Chief Executive Officer & Founder",
+                "email": "richard@redwoodservices.com",
+                "source": "hunter_confirmed_first_party",
+            },
+        },
+    }
+    assert reconcile_verified_enterprise_contact(row) is None

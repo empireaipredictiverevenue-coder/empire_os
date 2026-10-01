@@ -243,6 +243,52 @@ def current_target_people(
         for person in ranked[:8]
     ]
 
+def _verified_decision_email(
+    probe: Mapping[str, Any],
+    decision: Mapping[str, Any],
+) -> str:
+    """Return only an email verified for the same named decision maker."""
+    email = _text(decision.get("email")).lower()
+    name = _text(decision.get("name"))
+    if not email or not looks_like_person_name(name):
+        return ""
+
+    verified = next(
+        (
+            item
+            for item in (probe.get("verified_contacts") or [])
+            if isinstance(item, Mapping)
+            and _text(item.get("email")).lower() == email
+            and item.get("is_valid") is True
+            and item.get("bound_to_decision_maker") is True
+        ),
+        None,
+    )
+    if verified is None:
+        return ""
+
+    first_party_sources = {
+        "official_site",
+        "person_structured_data",
+        "first_party_schema_person",
+        "hunter_confirmed_first_party",
+    }
+    if _text(verified.get("source")) in first_party_sources:
+        return email
+
+    hunter_match = any(
+        isinstance(item, Mapping)
+        and _text(item.get("email")).lower() == email
+        and _key(item.get("person_name")) == _key(name)
+        and item.get("person_bound") is True
+        and item.get("first_party") is True
+        and _text(item.get("state")).lower() == "confirmed"
+        and item.get("bounced_evidence") is not True
+        for item in (probe.get("hunter_confirmed_contacts") or [])
+    )
+    return email if hunter_match else ""
+
+
 def reconcile_verified_enterprise_contact(
     row: Mapping[str, Any],
 ) -> dict[str, Any] | None:
@@ -260,9 +306,11 @@ def reconcile_verified_enterprise_contact(
     ):
         return None
 
-    email = _text(probe.get("preferred_email")).lower()
     decision = probe.get("decision_maker")
-    if not email or not isinstance(decision, Mapping):
+    if not isinstance(decision, Mapping):
+        return None
+    email = _verified_decision_email(probe, decision)
+    if not email:
         return None
 
     name = _text(decision.get("name"))
@@ -391,6 +439,44 @@ def reconcile_verified_enterprise_contact(
     }
 
 
+def _pending_review_for_prospect(
+    prospect_id: str,
+    *,
+    request=request_json,
+) -> dict[str, Any] | None:
+    prospect_id = _text(prospect_id)
+    if not prospect_id:
+        return None
+    params = urllib.parse.urlencode({
+        "select": (
+            "id,status,prospect_id,contact_name,contact_title,contact_email,"
+            "decision_score,evidence,created_at"
+        ),
+        "prospect_id": f"eq.{prospect_id}",
+        "status": "eq.pending",
+        "order": "created_at.desc",
+        "limit": 2,
+    })
+    rows = _request_with_retry(
+        request,
+        "GET",
+        f"/rest/v1/buyer_candidate_reviews?{params}",
+    ) or []
+    pending = [
+        dict(row)
+        for row in rows
+        if isinstance(row, Mapping)
+        and _text(row.get("status")).lower() == "pending"
+        and _text(row.get("prospect_id")) == prospect_id
+        and _text(row.get("id"))
+    ]
+    if len(pending) > 1:
+        raise RuntimeError(
+            f"multiple_pending_buyer_reviews:{prospect_id}"
+        )
+    return pending[0] if pending else None
+
+
 def _refresh_pending_review(
     review_id: str,
     *,
@@ -513,7 +599,7 @@ def sync_enterprise_activation(
     queue: BuyerDeferredEnrichmentQueue | None = None,
 ) -> dict[str, Any]:
     queue = queue or BuyerDeferredEnrichmentQueue()
-    proposed = queued = skipped = 0
+    proposed = reconciled_existing = queued = skipped = 0
     errors: list[dict[str, str]] = []
     outcomes: list[dict[str, Any]] = []
 
@@ -594,28 +680,15 @@ def sync_enterprise_activation(
                     "live_outbound_send": False,
                     "actual_revenue": False,
                 })
-                response = _request_with_retry(
-                    request,
-                    "POST",
-                    "/rest/v1/rpc/propose_buyer_candidate_review",
-                    payload=plan["params"],
+                pending_review = _pending_review_for_prospect(
+                    prospect_id,
+                    request=request,
                 )
-                review_id = (
-                    response.get("review_id")
-                    if isinstance(response, Mapping)
-                    else None
-                )
-                if not review_id:
-                    raise RuntimeError("review proposal returned no review_id")
-
                 review_refreshed = False
-                if (
-                    isinstance(response, Mapping)
-                    and _text(response.get("decision")).lower()
-                    == "existing"
-                ):
+                if pending_review is not None:
+                    review_id = str(pending_review["id"])
                     review_refreshed = _refresh_pending_review(
-                        str(review_id),
+                        review_id,
                         contact_name=reconciled["name"],
                         contact_title=reconciled["title"],
                         contact_email=reconciled["email"],
@@ -625,8 +698,41 @@ def sync_enterprise_activation(
                         evidence=plan["params"]["p_evidence"],
                         request=request,
                     )
-
-                proposed += 1
+                    reconciled_existing += 1
+                else:
+                    response = _request_with_retry(
+                        request,
+                        "POST",
+                        "/rest/v1/rpc/propose_buyer_candidate_review",
+                        payload=plan["params"],
+                    )
+                    review_id = (
+                        response.get("review_id")
+                        if isinstance(response, Mapping)
+                        else None
+                    )
+                    if not review_id:
+                        raise RuntimeError(
+                            "review proposal returned no review_id"
+                        )
+                    if (
+                        isinstance(response, Mapping)
+                        and _text(response.get("decision")).lower()
+                        == "existing"
+                    ):
+                        review_refreshed = _refresh_pending_review(
+                            str(review_id),
+                            contact_name=reconciled["name"],
+                            contact_title=reconciled["title"],
+                            contact_email=reconciled["email"],
+                            decision_score=float(
+                                plan["params"]["p_decision_score"]
+                            ),
+                            evidence=plan["params"]["p_evidence"],
+                            request=request,
+                        )
+                    else:
+                        proposed += 1
                 queue.resolve(
                     prospect_id,
                     outcome="enterprise_buyer_review_proposed",
@@ -712,6 +818,7 @@ def sync_enterprise_activation(
     return {
         "schema_version": "empire.enterprise-contact-intelligence.v1",
         "proposed_review_count": proposed,
+        "reconciled_existing_review_count": reconciled_existing,
         "targeted_retry_queued_count": queued,
         "skipped_count": skipped,
         "error_count": len(errors),
