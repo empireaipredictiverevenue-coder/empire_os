@@ -14,6 +14,7 @@ def test_enterprise_contact_sync_service_owns_secret_environment_boundary():
     assert "User=ubuntu" in text
     assert "Group=ubuntu" in text
     assert "EnvironmentFile=/etc/empire_os.env" in text
+    assert "EnvironmentFile=/etc/empiredb.env" in text
     assert "EMPIRE_AUTONOMOUS_MODE=OBSERVE" in text
     assert "run_enterprise_contact_sync_cycle.py" in text
     assert "OnFailure=empire-enterprise-contact-repair.service" in text
