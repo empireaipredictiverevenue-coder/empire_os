@@ -1180,6 +1180,11 @@ def build_candidate_review_plan(candidate: BuyerCandidate, contact_plan: Mapping
         "contact_source": contact_source or None,
         "contact_route": _text(contact_plan.get("contact_route")) or None,
         "person_bound": bool(contact_plan.get("person_bound")),
+        "has_named_contact": looks_like_person_name(name),
+        "contact_personhood_valid": bool(
+            looks_like_person_name(name)
+            and contact_plan.get("person_bound")
+        ),
         "routing_name": _text(contact_plan.get("routing_name")) or None,
         "routing_title": _text(contact_plan.get("routing_title")) or None,
         "verified_contacts": verified_contacts,

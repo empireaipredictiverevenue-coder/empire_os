@@ -381,6 +381,8 @@ def test_candidate_review_and_reviewed_outbound_plans_are_separate():
     assert review["params"]["p_evidence"]["metro"] == "London"
     assert review["params"]["p_evidence"]["website"] == "https://acme.test"
     assert review["params"]["p_evidence"]["contact_source"] is None
+    assert review["params"]["p_evidence"]["has_named_contact"] is True
+    assert review["params"]["p_evidence"]["contact_personhood_valid"] is False
 
     sourced_contact = {
         **contact,
@@ -394,11 +396,14 @@ def test_candidate_review_and_reviewed_outbound_plans_are_separate():
             "source": "person_structured_data",
         }],
     }
+    sourced_contact["person_bound"] = True
     sourced = build_candidate_review_plan(
         candidate, sourced_contact, idempotency_key="buyer:0001:sourced"
     )
     assert sourced["params"]["p_evidence"]["contact_source"] == "official_site"
     assert sourced["params"]["p_evidence"]["decision_source"] == "website_structured_data"
+    assert sourced["params"]["p_evidence"]["has_named_contact"] is True
+    assert sourced["params"]["p_evidence"]["contact_personhood_valid"] is True
     preferred = sourced["params"]["p_evidence"]["verified_contacts"][0]
     assert preferred["source"] == "official_site"
     assert preferred["source_detail"] == "person_structured_data"
@@ -1157,6 +1162,7 @@ def test_candidate_review_accepts_explicit_evidence_backed_offer_override():
             "source": "official_site",
         }],
         "offer_key": "predictive_revenue_intelligence_os",
+        "person_bound": True,
     }
     from empire_os.buyer_discovery import build_candidate_review_plan
     plan = build_candidate_review_plan(
