@@ -233,11 +233,17 @@ def test_astra_department_dispatch_is_safe_internal_job():
     )
 
 
-def test_astra_systemd_service_defaults_to_observe():
+def test_astra_systemd_service_runs_bounded_guarded_execute():
     from pathlib import Path
 
     unit = Path("deploy/systemd/empire-astra-dispatcher.service").read_text(
         encoding="utf-8"
     )
-    assert "EMPIRE_ASTRA_DISPATCH_MODE=OBSERVE" in unit
-    assert "EMPIRE_ASTRA_DISPATCH_MODE=GUARDED_EXECUTE" not in unit
+    assert "EMPIRE_ASTRA_DISPATCH_MODE=GUARDED_EXECUTE" in unit
+    assert "EnvironmentFile=/etc/empire_os.env" in unit
+    assert "EnvironmentFile=/etc/empiredb.env" in unit
+
+    timer = Path("deploy/systemd/empire-astra-dispatcher.timer").read_text(
+        encoding="utf-8"
+    )
+    assert "OnUnitInactiveSec=2min" in timer
