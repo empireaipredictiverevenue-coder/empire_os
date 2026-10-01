@@ -111,3 +111,28 @@ may recommend at most one item for that buyer.
 
 No live allocation, outbound, pricing mutation, terms acceptance, payment,
 settlement, fulfilment, revenue recognition, migration or authority expansion.
+
+## 2026-10-01 verification
+
+Implemented:
+- proposal review now preserves verified buyer capacity and optional expected value;
+- optimization requires explicit expected value and never substitutes price;
+- conflicting capacity observations for one buyer fail closed;
+- API preview exposes expected value evidence;
+- execution remains outside the router.
+
+Verification:
+- focused proposal / optimizer / allocation suite: 34 passed;
+- independent adjacent suite: 56 passed;
+- compilation and diff check passed;
+- OBSERVE preview returned AVAILABLE with buyer capacity=1 and explicit EV;
+- allocation_execution=false;
+- pricing_mutation=false;
+- payment_action=false;
+- revenue_recognition=false;
+- execution_authority=none.
+
+Status:
+ENGINEERING COMPLETE / OBSERVE PREVIEW VERIFIED.
+Live canonical allocation remains separately governed by the existing atomic
+allocation boundary.
