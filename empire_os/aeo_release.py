@@ -19,6 +19,12 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _content_sha(path: Path) -> str:
+    html = path.read_text(encoding="utf-8")
+    normalized = re.sub(r"\s+", " ", html).strip().encode("utf-8")
+    return hashlib.sha256(normalized).hexdigest()
+
+
 def _read_json(path: Path) -> dict:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
@@ -66,7 +72,7 @@ def build_release_manifest(
         path = aeo_root / niche / metro / "index.html"
         if not path.is_file():
             raise ValueError("AEO page file missing")
-        digest = _sha(path)
+        digest = _content_sha(path)
         if asset.get("content_hash") != digest:
             raise ValueError("AEO recovery hash mismatch")
         released.append({
