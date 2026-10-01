@@ -201,7 +201,10 @@ def test_release_requires_exact_assets_and_current_campaigns(tmp_path, marketing
          'canonical_campaigns_sha256': digest(marketing['campaigns']),
          'infrastructure_review': infrastructure(),
          'script_sha256': hashlib.sha256((tmp_path / SCRIPT).read_bytes()).hexdigest(),
-         'asset_digests': {c['campaign_id']: c['owned_publication_review']['asset_sha256'] for c in prepared['campaigns']}}
+         'asset_digests': {c['campaign_id']: c['owned_publication_review']['asset_sha256'] for c in prepared['campaigns']},
+         'campaign_ids': [c['campaign_id'] for c in prepared['campaigns']],
+         'campaigns': prepared['campaigns'],
+         'zero_paid_media': True}
     path = tmp_path / RELEASE
     path.write_text(json.dumps(r))
     assert len(load_release(tmp_path)['campaigns']) == 5
@@ -210,6 +213,33 @@ def test_release_requires_exact_assets_and_current_campaigns(tmp_path, marketing
     r['deployment_verified'] = False
     path.write_text(json.dumps(r)); assert load_release(tmp_path) is None
 
+
+
+def test_release_survives_planning_projection_refresh(tmp_path, marketing, prepared):
+    for rel in ('runtime/astra/department_cycle_latest.json', 'runtime/opportunity_radar/latest.json',
+                'runtime/commercial_catalog/latest.json'):
+        target = tmp_path / rel; target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((FIXTURE_ROOT / rel).read_bytes())
+    target = tmp_path / SCRIPT; target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes((REPO_ROOT / SCRIPT).read_bytes())
+    infra = infrastructure()
+    from empire_os.owned_campaign_release import build_release_manifest
+    manifest = build_release_manifest(
+        marketing, infra, root=tmp_path, evidence_refs=['test:live'],
+        script_path=tmp_path / SCRIPT,
+    )
+    path = tmp_path / RELEASE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(manifest))
+
+    refreshed = deepcopy(marketing)
+    refreshed['campaigns'][0]['campaign_objective'] = 'new planning objective after release'
+    (tmp_path / 'runtime/astra/department_cycle_latest.json').write_text(
+        json.dumps({'marketing_growth': refreshed})
+    )
+    loaded = load_release(tmp_path)
+    assert loaded is not None
+    assert len(loaded['campaigns']) == 5
 
 def test_rate_limiter_bounded_without_raw_ip():
     limiter = IntakeLimiter()

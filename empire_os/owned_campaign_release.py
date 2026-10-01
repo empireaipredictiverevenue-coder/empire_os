@@ -12,25 +12,44 @@ SCRIPT = Path('apps/empire-public-site/public/research-runtime.js')
 
 
 def load_release(root=ROOT):
-    """Missing, stale, modified or not live-verified evidence exposes no routes."""
+    """Missing, modified or not live-verified evidence exposes no routes.
+
+    Released campaigns are immutable deployment snapshots. They are not
+    re-bound to the continuously changing Astra planning projection.
+    """
     try:
         release = json.loads((root / RELEASE).read_text())
         if release.get('deployment_verified') is not True or not release.get('deployment_evidence_refs'):
             return None
-        current = json.loads((root / 'runtime/astra/department_cycle_latest.json').read_text())['marketing_growth']
-        if release.get('canonical_campaigns_sha256') != digest(current['campaigns']):
+        if release.get('zero_paid_media') is not True:
             return None
-        prepared = prepare_marketing(current, root)
+        campaigns = release.get('campaigns')
+        if not isinstance(campaigns, list) or len(campaigns) != 5:
+            return None
+        campaign_ids = [c.get('campaign_id') for c in campaigns if isinstance(c, dict)]
+        if campaign_ids != release.get('campaign_ids') or len(set(campaign_ids)) != 5:
+            return None
+        if any(c.get('paid_media_spend_cents') != 0 for c in campaigns):
+            return None
+
+        prepared = {'campaigns': campaigns}
         report = inspect_campaigns(prepared, release['infrastructure_review'])
-        if report['campaigns_blocked'] or not report['campaigns_requested']:
+        if report['campaigns_blocked'] or report['campaigns_requested'] != 5:
             return None
+
         if release.get('script_sha256') != hashlib.sha256((root / SCRIPT).read_bytes()).hexdigest():
             return None
-        expected = {c['campaign_id']: c['owned_publication_review']['asset_sha256'] for c in prepared['campaigns']}
+
+        expected = {
+            c['campaign_id']: hashlib.sha256(
+                render_asset(_landing(c)).encode('utf-8')
+            ).hexdigest()
+            for c in campaigns
+        }
         if release.get('asset_digests') != expected:
             return None
         return prepared
-    except (OSError, ValueError, KeyError, TypeError, StopIteration):
+    except (OSError, ValueError, KeyError, TypeError, StopIteration, json.JSONDecodeError):
         return None
 
 
@@ -73,6 +92,7 @@ def build_release_manifest(marketing, infrastructure, *, root=ROOT, evidence_ref
             for c in prepared["campaigns"]
         },
         "campaign_ids": [c["campaign_id"] for c in prepared["campaigns"]],
+        "campaigns": prepared["campaigns"],
         "zero_paid_media": True,
         "execution_authority": "none",
     }

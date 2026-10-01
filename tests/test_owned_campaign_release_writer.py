@@ -19,4 +19,6 @@ def test_release_writer_requires_all_gates_and_zero_paid():
     assert manifest["deployment_verified"] is True
     assert manifest["zero_paid_media"] is True
     assert len(manifest["campaign_ids"]) == 5
+    assert len(manifest["campaigns"]) == 5
+    assert [c["campaign_id"] for c in manifest["campaigns"]] == manifest["campaign_ids"]
     assert manifest["execution_authority"] == "none"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -28,8 +29,21 @@ def _json(path: str) -> dict:
         raise RuntimeError(f"{path} returned {code}")
     return json.loads(body)
 
+
+def _wait_json(path: str, *, timeout_s: float = 20.0) -> dict:
+    deadline = time.monotonic() + timeout_s
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            return _json(path)
+        except (urllib.error.URLError, ConnectionError, OSError, RuntimeError) as exc:
+            last_error = exc
+            time.sleep(0.5)
+    raise RuntimeError(f"{path} did not become ready: {last_error}")
+
+
 def main() -> int:
-    health = _json("/health")
+    health = _wait_json("/health")
     if health.get("status") != "online":
         raise RuntimeError("public gateway offline")
     if _json("/v1/a2a-commerce/health").get("configured") is not True:
