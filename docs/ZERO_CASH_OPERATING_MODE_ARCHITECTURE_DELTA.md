@@ -106,3 +106,23 @@ unknown.
 Recommendation only. No spend, budget mutation, payment, settlement, outbound,
 terms acceptance, fulfilment, revenue recognition, migration or deployment
 authority.
+
+## 2026-10-01 verification
+
+Implemented:
+- verified spendable-cash arithmetic;
+- reservations separated from available cash;
+- zero incremental cash distinguished from zero total cost;
+- paid actions require both verified cash and explicit budget authority;
+- forecasts, pipeline value and expected revenue never become cash;
+- recommendation-only authority.
+
+Verification:
+- Zero-Cash + Capital Allocator + commercial catalog suites: 22 passed;
+- no live spend, budget mutation or payment action executed;
+- no live Zero-Cash decision is claimed until verified cash/reservation evidence
+  is explicitly bound to the policy.
+
+Status:
+ENGINEERING COMPLETE / DETERMINISTIC VERIFICATION PASSED /
+LIVE CASH-EVIDENCE DECISION PENDING CANONICAL INPUT.
