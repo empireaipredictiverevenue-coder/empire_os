@@ -1,0 +1,38 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/a2a_commerce_api.py",
+    "empire_os/a2a_commerce_intent.py",
+    "empire_os/a2a_handoff.py",
+    "empire_os/a2a_handoff_readiness.py",
+    "empire_os/a2a_discovery.py",
+    "tests/test_a2a_commerce_intent.py",
+    "tests/test_a2a_handoff.py",
+    "tests/test_a2a_handoff_readiness.py",
+    "docs/A2A_COMMERCE_ACTIVATION_ARCHITECTURE_DELTA.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-01T15:10:29.626728+00:00",
+  "job_id": "closure-a2a-commerce-code-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "path:empire_os/a2a_commerce_api.py",
+    "path:empire_os/a2a_commerce_intent.py",
+    "path:empire_os/a2a_handoff.py",
+    "path:empire_os/a2a_handoff_readiness.py",
+    "path:empire_os/a2a_discovery.py",
+    "path:tests/test_a2a_commerce_intent.py",
+    "path:tests/test_a2a_handoff.py",
+    "path:tests/test_a2a_handoff_readiness.py",
+    "path:docs/A2A_COMMERCE_ACTIVATION_ARCHITECTURE_DELTA.md"
+  ],
+  "max_runtime_seconds": 1200,
+  "prompt": "Prepare governed A2A commercial activation foundation in isolated worktree: authenticated non-binding commercial intent into canonical review/closer handoff using existing A2A identity, commerce APIs and product catalog. No autonomous commitment, allocation, payment, revenue recognition or production activation. Include architecture delta and focused tests.",
+  "pytest_targets": [
+    "tests/test_a2a_commerce_intent.py",
+    "tests/test_a2a_handoff.py",
+    "tests/test_a2a_handoff_readiness.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
