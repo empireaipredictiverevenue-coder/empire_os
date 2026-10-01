@@ -1,0 +1,204 @@
+{
+  "candidates": [
+    {
+      "buyer_intent_inferred": false,
+      "commercial_demand_observed": false,
+      "evidence_refs": [
+        "canonical:prospect_acquisitions",
+        "canonical:prospect_qualifications",
+        "canonical:outbound_events:delivered"
+      ],
+      "evidence_strength": "research_evidence",
+      "execution_authority": "none",
+      "factory_blockers": [
+        "offer_required",
+        "commercial_demand_observation_required",
+        "qualification_evidence_required",
+        "normalized_economics_required",
+        "distribution_strength_evidence_required",
+        "fulfilment_readiness_evidence_required"
+      ],
+      "market_share_inferred": false,
+      "metro": "nyc",
+      "niche": "general_contractor",
+      "observed_priority_score": 61.0,
+      "offer_key": null,
+      "opportunity_class": "market_research",
+      "opportunity_factory_ready": false,
+      "opportunity_key": "market:general_contractor:nyc",
+      "predictive_revenue_evidence_refs": {},
+      "predictive_revenue_inputs": {},
+      "products": [],
+      "readiness_source": "explicit_predictive_revenue_factor_evidence",
+      "recommended_next_actions": [
+        "deepen_market_research"
+      ],
+      "revenue_inferred": false,
+      "source": "market_sweeps_revenue_gps",
+      "title": "general_contractor / nyc",
+      "trigger": "observed_market_evidence"
+    },
+    {
+      "buyer_intent_inferred": false,
+      "commercial_demand_observed": false,
+      "evidence_refs": [
+        "canonical:prospect_acquisitions"
+      ],
+      "evidence_strength": "research_evidence",
+      "execution_authority": "none",
+      "factory_blockers": [
+        "offer_required",
+        "commercial_demand_observation_required",
+        "qualification_evidence_required",
+        "normalized_economics_required",
+        "distribution_strength_evidence_required",
+        "fulfilment_readiness_evidence_required"
+      ],
+      "market_share_inferred": false,
+      "metro": "denver, co",
+      "niche": "hvac",
+      "observed_priority_score": 6.0,
+      "offer_key": null,
+      "opportunity_class": "market_research",
+      "opportunity_factory_ready": false,
+      "opportunity_key": "market:hvac:denver, co",
+      "predictive_revenue_evidence_refs": {},
+      "predictive_revenue_inputs": {},
+      "products": [],
+      "readiness_source": "explicit_predictive_revenue_factor_evidence",
+      "recommended_next_actions": [
+        "deepen_market_research"
+      ],
+      "revenue_inferred": false,
+      "source": "market_sweeps_revenue_gps",
+      "title": "hvac / denver, co",
+      "trigger": "observed_market_evidence"
+    },
+    {
+      "buyer_intent_inferred": false,
+      "commercial_demand_observed": false,
+      "evidence_refs": [
+        "canonical:buyer_candidate_reviews",
+        "canonical:outbound_events:delivered"
+      ],
+      "evidence_strength": "research_evidence",
+      "execution_authority": "none",
+      "factory_blockers": [
+        "commercial_demand_observation_required",
+        "qualification_evidence_required",
+        "normalized_economics_required",
+        "distribution_strength_evidence_required",
+        "fulfilment_readiness_evidence_required"
+      ],
+      "market_share_inferred": false,
+      "metro": "Atlanta",
+      "niche": "class action lawyer",
+      "observed_priority_score": 4.0,
+      "offer_key": "managed_service",
+      "opportunity_class": "market_research",
+      "opportunity_factory_ready": false,
+      "opportunity_key": "market:class action lawyer:atlanta",
+      "predictive_revenue_evidence_refs": {},
+      "predictive_revenue_inputs": {},
+      "products": [
+        "managed_service"
+      ],
+      "readiness_source": "explicit_predictive_revenue_factor_evidence",
+      "recommended_next_actions": [
+        "advance_existing_approved_buyer"
+      ],
+      "revenue_inferred": false,
+      "source": "market_sweeps_revenue_gps",
+      "title": "class action lawyer / Atlanta",
+      "trigger": "observed_market_evidence"
+    },
+    {
+      "buyer_intent_inferred": false,
+      "commercial_demand_observed": false,
+      "evidence_refs": [
+        "canonical:buyer_candidate_reviews",
+        "canonical:outbound_events:delivered"
+      ],
+      "evidence_strength": "research_evidence",
+      "execution_authority": "none",
+      "factory_blockers": [
+        "commercial_demand_observation_required",
+        "qualification_evidence_required",
+        "normalized_economics_required",
+        "distribution_strength_evidence_required",
+        "fulfilment_readiness_evidence_required"
+      ],
+      "market_share_inferred": false,
+      "metro": "Dallas-Fort Worth",
+      "niche": "hvac",
+      "observed_priority_score": 4.0,
+      "offer_key": "managed_service",
+      "opportunity_class": "market_research",
+      "opportunity_factory_ready": false,
+      "opportunity_key": "market:hvac:dallas-fort worth",
+      "predictive_revenue_evidence_refs": {},
+      "predictive_revenue_inputs": {},
+      "products": [
+        "managed_service"
+      ],
+      "readiness_source": "explicit_predictive_revenue_factor_evidence",
+      "recommended_next_actions": [
+        "advance_existing_approved_buyer"
+      ],
+      "revenue_inferred": false,
+      "source": "market_sweeps_revenue_gps",
+      "title": "hvac / Dallas-Fort Worth",
+      "trigger": "observed_market_evidence"
+    },
+    {
+      "buyer_intent_inferred": false,
+      "demand_inferred": false,
+      "evidence_refs": [
+        "competitive_coverage:2264a972-d608-4920-8746-fbaa20d80d2e",
+        "competitive_coverage:6f5dde87-801d-597f-b7cc-4134c0a76b22",
+        "competitive_coverage:6228863c-dc02-4a70-983f-404956c8d2d0",
+        "competitive_coverage:ac4376af-c83d-4f42-803b-fb0779a79260",
+        "competitive_coverage:b12d33fa-ef87-4242-bbdb-cb6268383a05",
+        "competitive_coverage:d59f4346-2d8c-4c7d-b15f-7ad4e8dc563b",
+        "competitive_coverage:1b9f4bc4-b843-4a67-a588-28f891cb3106",
+        "competitive_coverage:0bb672c0-a59e-5343-af1f-c6dee5e9f77a",
+        "competitive_coverage:08cfb7b7-1a87-5ddd-8679-7e0196adb11f",
+        "competitive_coverage:343a4e4f-223b-41af-b533-4c3bc910129d",
+        "competitive_coverage:fd7e3b88-49d4-58d6-875b-1752bbe30749",
+        "competitive_coverage:1f3b7e2f-2858-4784-894c-ca35d27af682",
+        "competitive_coverage:b00de81b-bcbd-4f91-83de-9e9c385823a1"
+      ],
+      "evidence_strength": "coverage_gap_only",
+      "execution_authority": "none",
+      "factory_blockers": [
+        "offer_required",
+        "commercial_demand_observation_required",
+        "qualification_evidence_required",
+        "normalized_economics_required",
+        "distribution_strength_evidence_required",
+        "fulfilment_readiness_evidence_required"
+      ],
+      "market_share_inferred": false,
+      "metro": "denver, co",
+      "niche": "roofing",
+      "observed_priority_score": null,
+      "offer_key": null,
+      "opportunity_class": "competitive_research_gap",
+      "opportunity_factory_ready": false,
+      "opportunity_key": "competitor_coverage:denver-co-roofing:denver, co",
+      "predictive_revenue_evidence_refs": {},
+      "predictive_revenue_inputs": {},
+      "products": [],
+      "readiness_source": "explicit_predictive_revenue_factor_evidence",
+      "recommended_next_actions": [
+        "collect_additional_public_evidence",
+        "resolve_competitor_coverage_gap"
+      ],
+      "research_gap_company_count": 13,
+      "revenue_inferred": false,
+      "source": "competitor_market_opportunity",
+      "title": "Competitor evidence coverage gap \u2014 roofing denver, co",
+      "trigger": "observed_competitor_evidence_gap"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "products": [
+    {
+      "acquisition_cost_basis": {
+        "amount_cents": 30000,
+        "approval_reference": "founder_approval:first_cash_economics:2026-09-21",
+        "basis_type": "policy_ceiling",
+        "currency": "USD",
+        "observed_actual": false,
+        "source_type": "founder_approved",
+        "state": "VERIFIED",
+        "unit": "flat"
+      },
+      "active": true,
+      "actual_revenue": false,
+      "billing_model": "flat_pilot",
+      "binding_terms_ready": true,
+      "catalog_state": "VERIFIED",
+      "currency": "USD",
+      "effective_from": "2026-09-21T22:06:22.255071+00:00",
+      "effective_until": null,
+      "evidence_refs": [
+        "founder_approval:first_cash_economics:2026-09-21",
+        "git:a87e3837eec94d8de676b1cb215c8c48ab1ef497"
+      ],
+      "fulfilment_cost_basis": {
+        "amount_cents": 30000,
+        "approval_reference": "founder_approval:first_cash_economics:2026-09-21",
+        "basis_type": "policy_ceiling",
+        "currency": "USD",
+        "observed_actual": false,
+        "source_type": "founder_approved",
+        "state": "VERIFIED",
+        "unit": "flat"
+      },
+      "margin_policy": {
+        "approval_reference": "founder_approval:first_cash_economics:2026-09-21",
+        "basis_type": "founder_policy",
+        "minimum_margin_bps": 5500,
+        "state": "VERIFIED"
+      },
+      "price_basis": {
+        "amount_cents": 150000,
+        "approval_reference": "founder_approval:first_cash_economics:2026-09-21",
+        "basis_type": "founder_policy",
+        "currency": "USD",
+        "source_type": "founder_approved",
+        "state": "VERIFIED",
+        "unit": "flat"
+      },
+      "product_code": "managed_service",
+      "product_family": "opportunity_intelligence",
+      "product_id": "a4b11ace-4199-4419-a43d-2bcbeda33364",
+      "product_name": "Empire Opportunity Intelligence Pilot",
+      "product_provenance": {
+        "actual_revenue": false,
+        "costs_are_policy_ceilings": true,
+        "price_is_founder_policy": true,
+        "proposal_commit": "a87e3837eec94d8de676b1cb215c8c48ab1ef497",
+        "proposal_doc": "docs/FIRST_CASH_OFFER_ECONOMICS_PROPOSAL.md",
+        "settlement_rail_binding": {
+          "approved_at": "2026-09-26",
+          "asset": "USDT",
+          "chain_id": 56,
+          "historical_evidence_preserved": true,
+          "legacy_usdc_solana_forward_use": false,
+          "network": "BSC"
+        },
+        "source": "founder_approved_first_cash_offer"
+      },
+      "provenance": {
+        "actual_revenue": false,
+        "costs_are_policy_ceilings": true,
+        "price_is_founder_policy": true,
+        "proposal_commit": "a87e3837eec94d8de676b1cb215c8c48ab1ef497",
+        "proposal_doc": "docs/FIRST_CASH_OFFER_ECONOMICS_PROPOSAL.md",
+        "source": "founder_approved_first_cash_offer"
+      },
+      "readiness_blockers": [],
+      "verified_at": "2026-09-22T14:32:19.435255+00:00",
+      "verified_by": "commercial_catalog_auto_verifier",
+      "version": 2,
+      "version_id": "7f6da5c5-83f7-4a8e-a80f-5c42bd6c64f4",
+      "version_state": "VERIFIED"
+    }
+  ]
+}

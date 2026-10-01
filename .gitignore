@@ -35,3 +35,9 @@ supabase/.temp/
 .aider.chat.history.md
 .aider.input.history
 .aider.tags.cache.v4/
+
+# Committed deterministic fixtures may mirror runtime/ paths for clean-clone tests.
+!tests/fixtures/
+!tests/fixtures/owned_campaign_runtime/
+!tests/fixtures/owned_campaign_runtime/runtime/
+!tests/fixtures/owned_campaign_runtime/runtime/**

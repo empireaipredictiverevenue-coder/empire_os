@@ -19,17 +19,18 @@ from empire_os.owned_campaign_release import load_release, released_html, releas
 from empire_os.owned_campaign_http import IntakeLimiter, handle_intake
 from empire_os.data_backends.owned_campaign_repository import OwnedCampaignRepository
 
-ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[1]
+FIXTURE_ROOT = Path(__file__).resolve().parent / 'fixtures/owned_campaign_runtime'
 
 
 @pytest.fixture
 def marketing():
-    return json.loads((ROOT / 'runtime/astra/department_cycle_latest.json').read_text())['marketing_growth']
+    return json.loads((FIXTURE_ROOT / 'runtime/astra/department_cycle_latest.json').read_text())['marketing_growth']
 
 
 @pytest.fixture
 def prepared(marketing):
-    return prepare_marketing(marketing, ROOT)
+    return prepare_marketing(marketing, FIXTURE_ROOT)
 
 
 def enquiry(m):
@@ -146,7 +147,7 @@ def test_managed_service_form_does_not_require_company_or_grant_terms(prepared):
 
 
 def test_unique_substantive_assets_exact_review_and_no_state_mutation(marketing, prepared):
-    assert prepared == prepare_marketing(marketing, ROOT)
+    assert prepared == prepare_marketing(marketing, FIXTURE_ROOT)
     assert prepared['campaigns'][0]['stage_history'] == marketing['campaigns'][0]['stage_history']
     assets = [_landing(c) for c in prepared['campaigns']]
     assert len({a['seo_title'] for a in assets}) == len(assets) == 5
@@ -164,7 +165,7 @@ def test_unique_substantive_assets_exact_review_and_no_state_mutation(marketing,
         if c['product_code'] is None:
             assert a['cta'] == 'Enquire about the research' and not a['product_refs']
         changed = deepcopy(a); changed['sections'][0]['body'] = 'Guaranteed demand'
-        assert review_asset(c, changed, ROOT)['status'] == 'BLOCKED'
+        assert review_asset(c, changed, FIXTURE_ROOT)['status'] == 'BLOCKED'
         c['assets'][c['assets'].index(a)] = changed
     report = inspect_campaigns(prepared, infrastructure())
     assert report['campaigns_blocked'] == 5
@@ -191,9 +192,11 @@ def test_release_absent_and_sitemap_excludes_blocked(tmp_path, marketing):
 
 def test_release_requires_exact_assets_and_current_campaigns(tmp_path, marketing, prepared):
     for rel in ('runtime/astra/department_cycle_latest.json', 'runtime/opportunity_radar/latest.json',
-                'runtime/commercial_catalog/latest.json', str(SCRIPT)):
+                'runtime/commercial_catalog/latest.json'):
         target = tmp_path / rel; target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes((ROOT / rel).read_bytes())
+        target.write_bytes((FIXTURE_ROOT / rel).read_bytes())
+    target = tmp_path / SCRIPT; target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes((REPO_ROOT / SCRIPT).read_bytes())
     r = {'deployment_verified': True, 'deployment_evidence_refs': ['test:live'],
          'canonical_campaigns_sha256': digest(marketing['campaigns']),
          'infrastructure_review': infrastructure(),
@@ -283,7 +286,7 @@ def test_no_generic_database_fallback(monkeypatch):
 
 
 def test_held_sql_restricts_authority_and_atomic_dedupe():
-    sql = (ROOT / 'migrations/empiredb/025_owned_campaign_intake.sql').read_text()
+    sql = (REPO_ROOT / 'migrations/empiredb/025_owned_campaign_intake.sql').read_text()
     assert 'HELD_FOR_FOUNDER_DB_APPROVAL' in sql
     assert 'ON CONFLICT (event_id) DO NOTHING' in sql
     assert 'conflicting event replay' in sql
@@ -300,7 +303,7 @@ def test_locked_formulas_and_migration():
         'empire_os/predictive_revenue_formula.py': 'ed258882dd71a4292fea670807f5e5a451cdc4482f2da2204d5f6a2293e5bc2e',
         'empire_os/predictive_cloud_formula.py': 'ccbb9b49c31bd4aca57e9d5312de034d20624f3db0344ab0cffed8ed1b99c406',
         'migrations/empiredb/018_tenant_context_foundation.sql': 'e7edcfe1d0f94c3898437e68db0714557370b7b86f9b21ee76cc04be60bc3c21',
-    }.items(): assert hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == expected
+    }.items(): assert hashlib.sha256((REPO_ROOT / path).read_bytes()).hexdigest() == expected
 
 
 
@@ -311,10 +314,10 @@ def test_source_binding_refresh_is_identity_safe(marketing):
     from empire_os.owned_campaign_content import refresh_source_bindings
 
     stale = deepcopy(marketing)
-    refreshed = refresh_source_bindings(stale, ROOT)
+    refreshed = refresh_source_bindings(stale, FIXTURE_ROOT)
     assert stale == marketing
 
-    catalog = json.loads((ROOT / 'runtime/commercial_catalog/latest.json').read_text())
+    catalog = json.loads((FIXTURE_ROOT / 'runtime/commercial_catalog/latest.json').read_text())
     current_hash = hashlib.sha256(json.dumps(catalog, sort_keys=True).encode()).hexdigest()
     expected = 'runtime/commercial_catalog/latest.json#sha256=' + current_hash
     managed = [c for c in refreshed['campaigns'] if c.get('product_code') == 'managed_service']
@@ -328,8 +331,8 @@ def test_source_binding_refresh_rejects_product_identity_change(marketing, tmp_p
     import pytest
     from empire_os.owned_campaign_content import refresh_source_bindings
 
-    radar = json.loads((ROOT / 'runtime/opportunity_radar/latest.json').read_text())
-    catalog = json.loads((ROOT / 'runtime/commercial_catalog/latest.json').read_text())
+    radar = json.loads((FIXTURE_ROOT / 'runtime/opportunity_radar/latest.json').read_text())
+    catalog = json.loads((FIXTURE_ROOT / 'runtime/commercial_catalog/latest.json').read_text())
     catalog['products'] = [
         p for p in catalog['products']
         if p.get('product_code') != 'managed_service'
