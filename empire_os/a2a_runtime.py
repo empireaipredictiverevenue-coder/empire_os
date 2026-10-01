@@ -23,6 +23,7 @@ from empire_os.a2a_identity_transport import (
 KEYS_ENV = "EMPIRE_A2A_TRUSTED_ED25519_KEYS_JSON"
 IDENTITY_DSN_ENV = "EMPIRE_A2A_IDENTITY_DSN"
 INTENT_DSN_ENV = "EMPIRE_A2A_INTENT_DSN"
+LIVE_VERIFIED_ENV = "EMPIRE_A2A_LIVE_VERIFIED"
 
 
 @dataclass(frozen=True)
@@ -125,9 +126,12 @@ def load_a2a_runtime(env: Mapping[str, str] | None = None) -> A2ARuntimeBinding:
     nonce_registry = RpcNonceRegistry(PostgresA2AIdentityNonceRpc(identity_dsn))
     repository = RpcCommercialIntentRepository(PostgresA2AIntentRpc(intent_dsn))
 
+    live_verified = str(values.get(LIVE_VERIFIED_ENV) or "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
     return A2ARuntimeBinding(
         configured=True,
-        authentication_status="configured_unverified",
+        authentication_status=("activated" if live_verified else "configured_unverified"),
         blockers=(),
         trusted_key_ids=frozenset(keys),
         verifier=verifier,

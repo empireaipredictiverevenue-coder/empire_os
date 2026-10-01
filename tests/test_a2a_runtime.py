@@ -76,3 +76,12 @@ def test_discovery_reports_runtime_status_without_execution_authority():
     assert manifest["privileged_actions_exposed"] is False
     assert manifest["payments_exposed"] is False
     assert manifest["allocations_exposed"] is False
+
+
+def test_live_verified_config_reports_activated():
+    _, env = configured_env()
+    env["EMPIRE_A2A_LIVE_VERIFIED"] = "true"
+    runtime = load_a2a_runtime(env)
+    assert runtime.configured is True
+    assert runtime.authentication_status == "activated"
+    assert runtime.public_status()["execution_authority"] == "none"
