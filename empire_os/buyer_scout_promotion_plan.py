@@ -13,6 +13,8 @@ from typing import Any, Iterable, Mapping
 
 from empire_os.buyer_scout_review_readiness import reliable_business_name
 from empire_os.buyer_acquisition_team import commercial_research_profile
+from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
+from empire_os.buyer_discovery import looks_like_person_name
 
 
 OUTPUT = Path("runtime/buyer_acquisition/promotion_plan_latest.json")
@@ -56,6 +58,146 @@ def _person_source(person: Mapping[str, Any] | None) -> str | None:
         if value:
             return value
     return "first_party_site"
+
+
+
+
+def _source_prospect_ids(row: Mapping[str, Any]) -> list[str]:
+    ids: list[str] = []
+    for evidence in row.get("query_evidence") or []:
+        if not isinstance(evidence, Mapping):
+            continue
+        prospect_id = str(evidence.get("prospect_id") or "").strip()
+        if prospect_id and prospect_id not in ids:
+            ids.append(prospect_id)
+    return ids
+
+
+def _target_people(site_evidence: Mapping[str, Any]) -> list[dict[str, Any]]:
+    people: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for raw in site_evidence.get("first_party_people") or []:
+        if not isinstance(raw, Mapping):
+            continue
+        name = str(raw.get("name") or "").strip()
+        title = str(raw.get("title") or "").strip()
+        if not name or not title or not looks_like_person_name(name):
+            continue
+        key = (name.casefold(), title.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        people.append({
+            "name": name,
+            "title": title,
+            "source": str(
+                raw.get("source")
+                or raw.get("identity_source")
+                or raw.get("source_kind")
+                or "first_party_site"
+            ).strip(),
+            "evidence_url": str(
+                raw.get("url") or raw.get("page_url") or ""
+            ).strip() or None,
+        })
+    return people[:8]
+
+
+def enqueue_priority_enrichment(
+    payload: Mapping[str, Any],
+    *,
+    queue: BuyerDeferredEnrichmentQueue | None = None,
+) -> dict[str, Any]:
+    queue = queue or BuyerDeferredEnrichmentQueue()
+    queued = 0
+    skipped = 0
+    prospect_ids: list[str] = []
+    for proposal in payload.get("proposals") or []:
+        if not isinstance(proposal, Mapping):
+            continue
+        pools = {
+            str(value).strip()
+            for value in (proposal.get("target_buyer_pools") or [])
+            if str(value).strip()
+        }
+        source_ids = [
+            str(value).strip()
+            for value in (proposal.get("source_prospect_ids") or [])
+            if str(value).strip()
+        ]
+        if (
+            str(proposal.get("buyer_type") or "") != "qualified_end_buyer"
+            or "enterprise_and_data_buyers" not in pools
+            or not source_ids
+        ):
+            skipped += 1
+            continue
+
+        prospect = proposal.get("proposed_prospect_payload") or {}
+        if not isinstance(prospect, Mapping):
+            skipped += 1
+            continue
+        people = [
+            dict(row)
+            for row in (proposal.get("target_people_for_enrichment") or [])
+            if isinstance(row, Mapping)
+        ]
+        product_codes = [
+            str(value).strip()
+            for value in (proposal.get("target_product_codes") or [])
+            if str(value).strip()
+        ]
+        emails = [
+            str(value).strip()
+            for value in (
+                proposal.get(
+                    "first_party_emails_preserved_for_identity_resolution"
+                )
+                or []
+            )
+            if str(value).strip()
+        ]
+        domain = str(proposal.get("domain") or "").strip().lower()
+        enqueued = queue.enqueue({
+            "prospect_id": source_ids[0],
+            "business_name": str(
+                prospect.get("business_name") or ""
+            ).strip(),
+            "website": str(prospect.get("website") or "").strip(),
+            "phone": str(prospect.get("phone") or "").strip(),
+            "reason": (
+                "no_bound_contact"
+                if people or emails
+                else "no_decision_maker"
+            ),
+            "account_key": (
+                f"buyer_scout:{domain}" if domain else "buyer_scout:unknown"
+            ),
+            "wave": "buyer_scout_review_ready",
+            "offer_key": (
+                product_codes[0]
+                if product_codes
+                else "predictive_revenue_diagnostic"
+            ),
+            "target_people": people,
+            "target_product_codes": product_codes,
+            "priority_score": 92,
+            "priority_reason": "buyer_scout_review_ready_enterprise",
+        })
+        if enqueued:
+            queued += 1
+            prospect_ids.append(source_ids[0])
+        else:
+            skipped += 1
+
+    return {
+        "queued_count": queued,
+        "skipped_count": skipped,
+        "prospect_ids": prospect_ids,
+        "canonical_promotion_performed": False,
+        "outbound_sent": False,
+        "execution_authority": "internal_write",
+    }
 
 
 def build_promotion_plan(
@@ -148,6 +290,8 @@ def build_promotion_plan(
 
         proposals.append({
             "candidate_id": candidate_id,
+            "source_prospect_ids": _source_prospect_ids(row),
+            "target_people_for_enrichment": _target_people(site),
             "domain": row.get("domain"),
             "buyer_type": row.get("buyer_type"),
             "commercial_research_profile": commercial_research_profile(

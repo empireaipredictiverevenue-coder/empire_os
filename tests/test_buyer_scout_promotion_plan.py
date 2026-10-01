@@ -1,5 +1,6 @@
 from empire_os.buyer_scout_promotion_plan import (
     build_promotion_plan,
+    enqueue_priority_enrichment,
 )
 
 
@@ -17,6 +18,10 @@ def candidate(**overrides):
         "target_corridor_keys": [
             "corridor:v1:roofing:austin_tx:qualified_lead:lead"
         ],
+        "query_evidence": [{
+            "source": "canonical_prospect_seed",
+            "prospect_id": "11111111-1111-4111-8111-111111111111",
+        }],
         "site_evidence": {
             "first_party_phones": ["+15125550123"],
             "first_party_emails": ["sales@roof.example"],
@@ -148,3 +153,53 @@ def test_stale_review_ready_generic_name_is_rejected_at_promotion():
     assert result["blocked_reason_counts"] == {
         "business_name_not_verified": 1
     }
+
+
+class FakeDeferredQueue:
+    def __init__(self):
+        self.items = []
+    def enqueue(self, item):
+        self.items.append(dict(item))
+        return True
+
+
+def test_enterprise_review_ready_candidate_enters_priority_enrichment_lane():
+    row = candidate(
+        domain="topdoglaw.com",
+        business_name="TopDog Law Personal Injury Lawyers",
+        website="https://topdoglaw.com/",
+        target_buyer_pools=["enterprise_and_data_buyers"],
+        target_product_codes=[],
+        site_evidence={
+            "first_party_phones": ["844-925-8111"],
+            "first_party_emails": ["reception@topdoglaw.com"],
+            "first_party_people": [{
+                "name": "James Helm",
+                "title": "Founder, Attorney",
+                "source_kind": "visible_text",
+                "url": "https://topdoglaw.com/",
+            }],
+        },
+    )
+    payload = build_promotion_plan([row])
+    queue = FakeDeferredQueue()
+    result = enqueue_priority_enrichment(payload, queue=queue)
+    assert result["queued_count"] == 1
+    item = queue.items[0]
+    assert item["prospect_id"] == "11111111-1111-4111-8111-111111111111"
+    assert item["priority_score"] == 92
+    assert item["priority_reason"] == "buyer_scout_review_ready_enterprise"
+    assert item["account_key"] == "buyer_scout:topdoglaw.com"
+    assert item["offer_key"] == "predictive_revenue_diagnostic"
+    assert item["target_people"][0]["name"] == "James Helm"
+    assert item["reason"] == "no_bound_contact"
+    assert result["canonical_promotion_performed"] is False
+    assert result["outbound_sent"] is False
+
+
+def test_non_enterprise_review_ready_candidate_does_not_enter_priority_lane():
+    payload = build_promotion_plan([candidate()])
+    queue = FakeDeferredQueue()
+    result = enqueue_priority_enrichment(payload, queue=queue)
+    assert result["queued_count"] == 0
+    assert queue.items == []

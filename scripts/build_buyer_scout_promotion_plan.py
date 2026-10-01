@@ -7,6 +7,7 @@ import urllib.parse
 
 from empire_os.buyer_scout_promotion_plan import (
     build_promotion_plan,
+    enqueue_priority_enrichment,
     write_promotion_plan,
 )
 from empire_os.sb import request_json
@@ -20,7 +21,7 @@ def main() -> int:
         "select": (
             "id,domain,business_name,website,buyer_type,"
             "target_buyer_pools,target_product_codes,"
-            "target_corridor_keys,site_evidence,"
+            "target_corridor_keys,query_evidence,site_evidence,"
             "reconciliation_state,review_state"
         ),
         "reconciliation_state": "eq.REVIEW_READY",
@@ -36,6 +37,7 @@ def main() -> int:
         [row for row in (rows or []) if isinstance(row, dict)]
     )
     write_promotion_plan(args.repo_root, payload)
+    priority_enrichment = enqueue_priority_enrichment(payload)
 
     print(json.dumps({
         "ok": True,
@@ -43,6 +45,8 @@ def main() -> int:
         "blocked_count": payload["blocked_count"],
         "database_write_performed": False,
         "canonical_promotion_performed": False,
+        "priority_enrichment_queued_count": priority_enrichment["queued_count"],
+        "priority_enrichment_skipped_count": priority_enrichment["skipped_count"],
         "outbound_sent": False,
         "execution_authority": "none",
     }, indent=2, sort_keys=True))

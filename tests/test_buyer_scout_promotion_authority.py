@@ -28,3 +28,13 @@ def test_governed_promotion_command_requires_explicit_execute_flag():
     assert 'parser.add_argument("--actor")' in script
     assert "execute=args.execute" in script
     assert "actor=args.actor" in script
+
+
+def test_promotion_plan_only_adds_internal_enrichment_not_outreach_authority():
+    script = (
+        ROOT / "scripts/build_buyer_scout_promotion_plan.py"
+    ).read_text(encoding="utf-8")
+    assert "enqueue_priority_enrichment" in script
+    assert '"canonical_promotion_performed": False' in script
+    assert '"outbound_sent": False' in script
+    assert "promote_buyer_scout_candidate_to_prospect" not in script
