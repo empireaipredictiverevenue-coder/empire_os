@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
 from empire_os.a2a_discovery import commerce_discovery_manifest
 from empire_os.a2a_runtime import load_a2a_runtime
+from empire_os.aeo_release import released_file as released_aeo_file, released_paths as released_aeo_paths
 from empire_os.a2a_identity_api import create_a2a_identity_router
 from empire_os.a2a_commerce_api import create_a2a_commerce_router
 from empire_os.agent_web_runtime import execute_public_capability
@@ -45,7 +46,6 @@ CHECKOUT_INTERNAL_URL = os.getenv(
 ).rstrip("/")
 
 app = FastAPI(title="Empire AI Public Gateway", docs_url=None, redoc_url=None, openapi_url=None)
-app.mount("/aeo", StaticFiles(directory=str(AEO_ROOT), html=True), name="aeo")
 app.mount("/_next", StaticFiles(directory=str(SITE_OUT / "_next"), check_dir=False), name="next-static")
 
 
@@ -172,17 +172,15 @@ def _public_trust_manifest(path: Path | None = None) -> dict:
 
 
 def _aeo_page_urls(root: Path | None = None) -> list[str]:
-    base = root or AEO_ROOT
-    urls: list[str] = []
-    for path in sorted(base.glob("*/*/index.html")):
-        rel = path.relative_to(base)
-        if len(rel.parts) != 3:
-            continue
-        niche, metro, filename = rel.parts
-        if filename != "index.html":
-            continue
-        urls.append(f"{PUBLIC_BASE_URL}/aeo/{niche}/{metro}/")
-    return urls
+    if root is not None:
+        urls: list[str] = []
+        for path in sorted(root.glob("*/*/index.html")):
+            rel = path.relative_to(root)
+            if len(rel.parts) != 3 or rel.parts[2] != "index.html":
+                continue
+            urls.append(f"{PUBLIC_BASE_URL}/aeo/{rel.parts[0]}/{rel.parts[1]}/")
+        return urls
+    return [f"{PUBLIC_BASE_URL}{path}" for path in released_aeo_paths()]
 
 
 def _sitemap_xml(
@@ -549,6 +547,23 @@ def webmcp_bootstrap():
 })();'''
     return Response(content=script, media_type="application/javascript")
 
+
+
+@app.get("/aeo/{niche}/{metro}/")
+@app.get("/aeo/{niche}/{metro}")
+def released_aeo_page(niche: str, metro: str):
+    path = released_aeo_file(niche, metro)
+    if path is None:
+        return JSONResponse(
+            {"error": "aeo_page_unpublished"},
+            status_code=404,
+            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
+        )
+    return FileResponse(
+        path,
+        media_type="text/html",
+        headers={"Cache-Control": "public, max-age=900", "X-Robots-Tag": "index, follow"},
+    )
 
 @app.get("/sitemap.xml")
 def sitemap():
