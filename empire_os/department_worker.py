@@ -18,7 +18,10 @@ from empire_os.execution_plane_dispatcher import (
     ExecutionRequest,
     dispatch_execution_request,
 )
-from empire_os.hermes_control import DEFAULT_BASE_BRANCH
+from empire_os.hermes_control import (
+    ALLOWED_BASE_BRANCHES,
+    DEFAULT_BASE_BRANCH,
+)
 from empire_os.department_identity_adapter import (
     resolve_entity_decision_maker,
 )
@@ -150,6 +153,22 @@ def _coder_bridge(repo_root: Path, item: Any) -> dict[str, Any]:
 
 
 
+def _current_allowed_base_branch(repo_root: Path) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=str(repo_root),
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return DEFAULT_BASE_BRANCH
+    branch = (completed.stdout or "").strip()
+    return branch if branch in ALLOWED_BASE_BRANCHES else DEFAULT_BASE_BRANCH
+
+
 def _execution_plane_bridge(
     repo_root: Path,
     item: Any,
@@ -173,7 +192,7 @@ def _execution_plane_bridge(
 
     base_branch = (
         str(raw.get("base_branch") or "").strip()
-        or DEFAULT_BASE_BRANCH
+        or _current_allowed_base_branch(repo_root)
     )
 
     request = ExecutionRequest(

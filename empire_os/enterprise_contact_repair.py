@@ -19,6 +19,7 @@ from typing import Any, Mapping
 
 from empire_os.coder.orchestrator import EmpireCoder
 from empire_os.coder.worktree import WorktreeController
+from empire_os.hermes_control import ALLOWED_BASE_BRANCHES
 
 
 ROOT = Path("/srv/empire_os")
@@ -64,6 +65,7 @@ RUNTIME_ENV_TOKENS = (
     "missing required runtime env",
     "supabase_service_key",
     "supabase_url",
+    "empiredb selected but its runtime provider is not configured",
 )
 
 DATABASE_CONTRACT_TOKENS = (
@@ -300,7 +302,7 @@ def _verify(worktree: Path, tests: list[str]) -> tuple[bool, str]:
 
 def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
     branch, base_head, dirty = _main_state()
-    if branch != "feature/revenue-intelligence-v2":
+    if branch not in ALLOWED_BASE_BRANCHES:
         raise RuntimeError(f"unexpected_main_branch:{branch}")
     if dirty:
         paths = _tracked_dirty_paths()
@@ -440,7 +442,7 @@ def _repair_code_incident(incident: Mapping[str, Any]) -> dict[str, Any]:
     push = _git(
         "push",
         "origin",
-        "feature/revenue-intelligence-v2",
+        branch,
         cwd=ROOT,
         timeout=120,
     )
@@ -464,7 +466,7 @@ def _reconcile_moved_head(
     incident: Mapping[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     branch, head, dirty = _main_state()
-    if branch != "feature/revenue-intelligence-v2" or dirty:
+    if branch not in ALLOWED_BASE_BRANCHES or dirty:
         return dict(incident), None
     recorded = str(incident.get("base_head") or "").strip()
     if not recorded or recorded == head:
@@ -500,7 +502,7 @@ def _retry_branch_push() -> dict[str, Any]:
     push = _git(
         "push",
         "origin",
-        "feature/revenue-intelligence-v2",
+        branch,
         cwd=ROOT,
         timeout=120,
     )

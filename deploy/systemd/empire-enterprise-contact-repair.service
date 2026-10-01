@@ -9,6 +9,7 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/srv/empire_os
 EnvironmentFile=/etc/empire_os.env
+EnvironmentFile=/etc/empiredb.env
 Environment=PYTHONPATH=/srv/empire_os
 Environment=PATH=/srv/empire_os/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=EMPIRE_AUTONOMOUS_MODE=OBSERVE

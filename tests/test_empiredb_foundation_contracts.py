@@ -157,6 +157,7 @@ def test_deferred_enrichment_unit_has_bounded_batch():
         in unit
     )
     assert "TimeoutStartSec=300" in unit
+    assert "EnvironmentFile=/etc/empiredb.env" in unit
 
 
 def test_enterprise_activation_unit_loads_empiredb():

@@ -24,6 +24,10 @@ def test_failure_classifier_distinguishes_safe_repair_classes():
         "SUPABASE_SERVICE_KEY,SUPABASE_URL"
     ) == "RUNTIME_ENV_CONTEXT"
     assert repair.classify_failure(
+        "DataGatewayUnavailable:EmpireDB selected but its runtime provider "
+        "is not configured"
+    ) == "RUNTIME_ENV_CONTEXT"
+    assert repair.classify_failure(
         "POST /rest/v1/buyer_candidate_reviews -> HTTP 403: "
         "permission denied for table buyer_candidate_reviews"
     ) == "DATABASE_CONTRACT"
@@ -103,6 +107,7 @@ def test_repair_controller_uses_isolated_worktree_and_compare_swap_guards():
     assert "git_add_failed" in source
     assert '"merge", "--ff-only"' in source
     assert '"push",' in source
+    assert "ALLOWED_BASE_BRANCHES" in source
     assert "coder repair attempted authority expansion" in source
     assert "coder repair attempted to remove a test assertion" in source
 
@@ -119,6 +124,7 @@ def test_repair_systemd_is_internal_observe_only():
 
     assert "User=ubuntu" in service
     assert "EMPIRE_AUTONOMOUS_MODE=OBSERVE" in service
+    assert "EnvironmentFile=/etc/empiredb.env" in service
     assert "run_enterprise_contact_repair.py" in service
     assert "OnUnitActiveSec=10min" in timer
     assert "Persistent=true" in timer

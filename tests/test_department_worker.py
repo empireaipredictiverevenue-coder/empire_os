@@ -378,3 +378,45 @@ def test_execution_plane_department_adapter_fails_without_contract(tmp_path):
     result = worker_module.run_one_department_work(tmp_path)
     assert result["state"] == "FAILED"
     assert "execution_plane contract required" in result["error"]
+
+
+def test_execution_plane_department_adapter_defaults_to_current_allowed_branch(
+    tmp_path, monkeypatch
+):
+    _write_plan(tmp_path, [
+        _step(
+            step_id="exec_step_current_branch",
+            department_keys=["engineering"],
+            target_component="agent_tool_execution_plane",
+            action="build_on_current_branch",
+            authority="internal_write",
+            intelligence_request={
+                "execution_plane": {
+                    "capability": "backend_code",
+                    "objective": "Implement bounded feature.",
+                    "allowed_paths": ["empire_os/example.py"],
+                    "lease_resources": ["domain:example-current"],
+                    "required_tests": ["tests/test_example.py"],
+                    "execute_pi": False,
+                }
+            },
+        )
+    ])
+    dispatch_executive_plan(tmp_path)
+    monkeypatch.setattr(
+        worker_module,
+        "_current_allowed_base_branch",
+        lambda _root: "agent/data-cloud-wave4",
+    )
+    captured = {}
+    def fake_dispatch(root, request, execute_pi=True):
+        captured["request"] = request
+        return {
+            "status": "QUEUED",
+            "worker": "hermes",
+            "execution_authority": "none",
+        }
+    monkeypatch.setattr(worker_module, "dispatch_execution_request", fake_dispatch)
+    result = worker_module.run_one_department_work(tmp_path)
+    assert result["state"] == "DONE"
+    assert captured["request"].base_branch == "agent/data-cloud-wave4"
