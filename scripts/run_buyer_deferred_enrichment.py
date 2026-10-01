@@ -192,6 +192,16 @@ def _prospect_row(prospect_id: str) -> dict[str, Any] | None:
     return row
 
 
+def _retry_minutes(item: dict[str, Any], attempts: int) -> int:
+    try:
+        priority = int(item.get("priority_score") or 0)
+    except (TypeError, ValueError):
+        priority = 0
+    if priority >= 90:
+        return min(60, 10 * (2 ** min(max(0, attempts - 1), 3)))
+    return min(360, 30 * (2 ** min(max(0, attempts - 1), 3)))
+
+
 def _same_host(left: str, right: str) -> bool:
     def host(value: str) -> str:
         raw = urlparse(str(value or "").strip()).netloc.lower()
@@ -474,7 +484,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                 )
                 if marked_call:
                     call_ready += 1
-                retry_minutes = min(360, 30 * (2 ** min(attempts - 1, 3)))
+                retry_minutes = _retry_minutes(item, attempts)
                 queue.defer_again(
                     prospect_id,
                     reason=reason,
@@ -623,7 +633,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
             )
             if marked_call:
                 call_ready += 1
-            retry_minutes = min(360, 30 * (2 ** min(attempts - 1, 3)))
+            retry_minutes = _retry_minutes(item, attempts)
             queue.defer_again(
                 prospect_id,
                 reason=reason,
@@ -640,7 +650,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                 "identity_recovered": identity_recovered,
             })
         except Exception as exc:
-            retry_minutes = min(360, 30 * (2 ** min(attempts - 1, 3)))
+            retry_minutes = _retry_minutes(item, attempts)
             queue.defer_again(
                 prospect_id,
                 reason=str(item.get("reason") or "contact_not_ready"),

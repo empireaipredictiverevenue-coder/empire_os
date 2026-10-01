@@ -115,3 +115,21 @@ def test_targeted_probe_budget_exhaustion_is_durably_redeferred(monkeypatch):
     assert FakeQueue.instance.deferred == [
         ("p1", "network_probe_budget_exhausted", 1, 10)
     ]
+
+
+def test_high_priority_retry_backoff_is_fast_but_bounded():
+    item = {"priority_score": 100}
+    assert worker._retry_minutes(item, 1) == 10
+    assert worker._retry_minutes(item, 2) == 20
+    assert worker._retry_minutes(item, 3) == 40
+    assert worker._retry_minutes(item, 4) == 60
+    assert worker._retry_minutes(item, 8) == 60
+
+
+def test_normal_retry_backoff_preserves_existing_cadence():
+    item = {"priority_score": 50}
+    assert worker._retry_minutes(item, 1) == 30
+    assert worker._retry_minutes(item, 2) == 60
+    assert worker._retry_minutes(item, 3) == 120
+    assert worker._retry_minutes(item, 4) == 240
+    assert worker._retry_minutes(item, 8) == 240
