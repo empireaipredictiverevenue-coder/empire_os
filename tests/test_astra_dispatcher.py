@@ -239,6 +239,8 @@ def test_astra_systemd_service_runs_bounded_guarded_execute():
     unit = Path("deploy/systemd/empire-astra-dispatcher.service").read_text(
         encoding="utf-8"
     )
+    assert "User=ubuntu" in unit
+    assert "Group=ubuntu" in unit
     assert "EMPIRE_ASTRA_DISPATCH_MODE=GUARDED_EXECUTE" in unit
     assert "EnvironmentFile=/etc/empire_os.env" in unit
     assert "EnvironmentFile=/etc/empiredb.env" in unit
