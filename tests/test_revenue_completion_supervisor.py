@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from empire_os.revenue_completion_supervisor import buyer_status, tam_status
+from empire_os.revenue_completion_supervisor import build_snapshot, buyer_status, tam_status
 
 
 def _write(path: Path, value) -> None:
@@ -97,3 +97,47 @@ def test_tam_coder_timer_is_plan_only_and_bounded():
     assert "--max-attempts 3" in service
     assert "ReadWritePaths=/srv/empire_os/runtime" in service
     assert "OnUnitActiveSec=5min" in timer
+
+
+def test_build_snapshot_classifies_missing_tam_runtime_as_evidence_unavailable(monkeypatch, tmp_path):
+    import empire_os.revenue_completion_supervisor as supervisor
+
+    monkeypatch.setattr(supervisor, "DEFAULT_TAM_RUNTIME", tmp_path / "coder")
+    monkeypatch.setattr(supervisor, "DEFAULT_TAM_SNAPSHOT", tmp_path / "missing.json")
+    monkeypatch.setattr(supervisor, "buyer_status", lambda: {
+        "genuine_review_ready_count": 0,
+        "evidence_rich_high_priority": 0,
+    })
+    _write(tmp_path / "coder/jobs/failed/job.json", {
+        "id": "job-1", "task_id": "task-1", "attempts": 3,
+        "status": "FAILED", "error": "timeout",
+    })
+    result = build_snapshot()
+    assert "tam_runtime_evidence_unavailable" in result["blockers"]
+    assert "tam_planner_failed" not in result["blockers"]
+    assert result["tam_runtime"]["available"] is False
+
+
+def test_build_snapshot_keeps_failed_planner_as_history_when_runtime_exists(monkeypatch, tmp_path):
+    import empire_os.revenue_completion_supervisor as supervisor
+
+    monkeypatch.setattr(supervisor, "DEFAULT_TAM_RUNTIME", tmp_path / "coder")
+    snapshot = tmp_path / "tam.json"
+    _write(snapshot, {
+        "schema_version": "empire.tam-market-intelligence.v1",
+        "opportunity_classes": [{"opportunity_key": "tam:test"}],
+    })
+    monkeypatch.setattr(supervisor, "DEFAULT_TAM_SNAPSHOT", snapshot)
+    monkeypatch.setattr(supervisor, "buyer_status", lambda: {
+        "genuine_review_ready_count": 0,
+        "evidence_rich_high_priority": 0,
+    })
+    _write(tmp_path / "coder/jobs/failed/job.json", {
+        "id": "job-1", "task_id": "task-1", "attempts": 3,
+        "status": "FAILED", "error": "timeout",
+    })
+    result = build_snapshot()
+    assert "tam_planner_failed_historical" in result["blockers"]
+    assert "tam_runtime_evidence_unavailable" not in result["blockers"]
+    assert result["tam_runtime"]["available"] is True
+    assert result["tam_runtime"]["opportunity_class_count"] == 1

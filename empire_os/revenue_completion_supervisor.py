@@ -14,6 +14,7 @@ DEFAULT_TAM_RUNTIME = ROOT / "runtime/coder_tam_lane"
 DEFAULT_DEFERRED = ROOT / "runtime/hunter/buyer_deferred_enrichment.json"
 DEFAULT_MATERIALIZER = ROOT / "runtime/buyer_review_materializer/latest.json"
 DEFAULT_OUTPUT = ROOT / "runtime/revenue_completion_supervisor/latest.json"
+DEFAULT_TAM_SNAPSHOT = ROOT / "runtime/tam_market_intelligence/latest.json"
 
 
 def _now() -> str:
@@ -145,6 +146,8 @@ def buyer_status(
 
 def build_snapshot() -> dict[str, Any]:
     tam = tam_status()
+    tam_runtime = _read_json(DEFAULT_TAM_SNAPSHOT)
+    tam_runtime_available = isinstance(tam_runtime, dict)
     buyers = buyer_status()
     if buyers["genuine_review_ready_count"] > 0:
         next_action = "founder_review_genuine_buyers"
@@ -154,8 +157,10 @@ def build_snapshot() -> dict[str, Any]:
         next_action = "refresh_buyer_scout_research"
 
     blockers: list[str] = []
-    if tam["state"] == "FAILED":
-        blockers.append("tam_planner_failed")
+    if not tam_runtime_available:
+        blockers.append("tam_runtime_evidence_unavailable")
+    elif tam["state"] == "FAILED":
+        blockers.append("tam_planner_failed_historical")
     if tam["state"] == "RUNNING" and tam["worker_alive"] is False:
         blockers.append("tam_planner_worker_missing")
     if buyers["genuine_review_ready_count"] == 0:
@@ -166,6 +171,19 @@ def build_snapshot() -> dict[str, Any]:
         "observed_at": _now(),
         "mode": "OBSERVE",
         "tam": tam,
+        "tam_runtime": {
+            "available": tam_runtime_available,
+            "schema_version": (
+                tam_runtime.get("schema_version")
+                if isinstance(tam_runtime, dict)
+                else None
+            ),
+            "opportunity_class_count": (
+                len(tam_runtime.get("opportunity_classes") or [])
+                if isinstance(tam_runtime, dict)
+                else 0
+            ),
+        },
         "buyers": buyers,
         "next_action": next_action,
         "blockers": blockers,
