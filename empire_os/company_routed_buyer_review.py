@@ -112,24 +112,68 @@ def _eligible_routes(row: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 def build_company_routed_review_queue(
     rows: Iterable[Mapping[str, Any]],
+    *,
+    prior_contact_prospect_ids: Iterable[str] = (),
+    prior_contact_domains: Iterable[str] = (),
+    suppressed_emails: Iterable[str] = (),
 ) -> dict[str, Any]:
     items: list[dict[str, Any]] = []
+    prior_prospects = {
+        _text(value)
+        for value in prior_contact_prospect_ids
+        if _text(value)
+    }
+    prior_domains = {
+        _text(value).lower().removeprefix("www.")
+        for value in prior_contact_domains
+        if _text(value)
+    }
+    suppressed = {
+        _text(value).lower()
+        for value in suppressed_emails
+        if _text(value)
+    }
     counts = {
         "review_ready": 0,
         "ambiguous_person": 0,
         "no_same_domain_person": 0,
+        "prior_contact_history": 0,
+        "suppressed_route": 0,
     }
 
     for raw in rows:
         if not isinstance(raw, Mapping):
             continue
+        prospect_id = _text(raw.get("prospect_id"))
+        if prospect_id and prospect_id in prior_prospects:
+            counts["prior_contact_history"] += 1
+            continue
+
         routes = _eligible_routes(raw)
         if not routes:
             continue
 
+        unsuppressed_routes = [
+            route
+            for route in routes
+            if route["email"].lower() not in suppressed
+        ]
+        if len(unsuppressed_routes) != len(routes):
+            counts["suppressed_route"] += 1
+        routes = unsuppressed_routes
+        if not routes:
+            continue
+
+        route_domains = {
+            route["email_domain"]
+            for route in routes
+        }
+        if route_domains & prior_domains:
+            counts["prior_contact_history"] += 1
+            continue
+
         # Keep each company on one route domain. Different route domains are
         # not automatically reconciled.
-        route_domains = {route["email_domain"] for route in routes}
         if len(route_domains) != 1:
             continue
         company_domain = next(iter(route_domains))
@@ -188,6 +232,8 @@ def build_company_routed_review_queue(
         "review_ready_count": counts["review_ready"],
         "ambiguous_person_count": counts["ambiguous_person"],
         "no_same_domain_person_count": counts["no_same_domain_person"],
+        "prior_contact_history_count": counts["prior_contact_history"],
+        "suppressed_route_count": counts["suppressed_route"],
         "items": items,
         "execution_authority": "none",
         "outbound_authorized": False,

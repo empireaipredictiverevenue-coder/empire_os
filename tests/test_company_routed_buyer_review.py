@@ -83,3 +83,76 @@ def test_tied_top_authority_people_are_ambiguous():
     assert payload["ambiguous_person_count"] == 1
     assert payload["items"][0]["state"] == "AMBIGUOUS_PERSON"
     assert payload["outbound_authorized"] is False
+
+
+def test_prior_company_domain_is_excluded_from_review_queue():
+    payload = build_company_routed_review_queue(
+        [{
+            "prospect_id": "p4",
+            "business_name": "Example Roofing",
+            "target_people": [{
+                "name": "Jane Smith",
+                "title": "Founder",
+                "evidence_url": "https://example.com/about",
+            }],
+            "company_contact_routes": [{
+                "channel": "email",
+                "value": "info@example.com",
+                "verified": True,
+                "source": "first_party_site",
+                "evidence_url": "https://example.com/contact",
+            }],
+        }],
+        prior_contact_domains={"example.com"},
+    )
+    assert payload["candidate_count"] == 0
+    assert payload["review_ready_count"] == 0
+    assert payload["prior_contact_history_count"] == 1
+
+
+def test_prior_prospect_is_excluded_even_with_new_route():
+    payload = build_company_routed_review_queue(
+        [{
+            "prospect_id": "p5",
+            "business_name": "Example HVAC",
+            "target_people": [{
+                "name": "John Smith",
+                "title": "Owner",
+                "evidence_url": "https://examplehvac.com/about",
+            }],
+            "company_contact_routes": [{
+                "channel": "email",
+                "value": "office@examplehvac.com",
+                "verified": True,
+                "source": "first_party_site",
+                "evidence_url": "https://examplehvac.com/contact",
+            }],
+        }],
+        prior_contact_prospect_ids={"p5"},
+    )
+    assert payload["candidate_count"] == 0
+    assert payload["prior_contact_history_count"] == 1
+
+
+def test_suppressed_company_route_is_excluded():
+    payload = build_company_routed_review_queue(
+        [{
+            "prospect_id": "p6",
+            "business_name": "Example Solar",
+            "target_people": [{
+                "name": "Alex Smith",
+                "title": "Founder",
+                "evidence_url": "https://examplesolar.com/about",
+            }],
+            "company_contact_routes": [{
+                "channel": "email",
+                "value": "info@examplesolar.com",
+                "verified": True,
+                "source": "first_party_site",
+                "evidence_url": "https://examplesolar.com/contact",
+            }],
+        }],
+        suppressed_emails={"info@examplesolar.com"},
+    )
+    assert payload["candidate_count"] == 0
+    assert payload["suppressed_route_count"] == 1
