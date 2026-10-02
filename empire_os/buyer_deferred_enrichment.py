@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.buyer_discovery import looks_like_person_name
+
 from empire_os.phone_quality import (
     is_commercially_usable_phone,
     normalized_e164,
@@ -117,7 +119,7 @@ def _effective_priority(item: Mapping[str, Any], *, now: datetime) -> int:
     target_people = [
         row for row in (item.get("target_people") or [])
         if isinstance(row, Mapping)
-        and str(row.get("name") or "").strip()
+        and looks_like_person_name(row.get("name"))
         and str(row.get("title") or "").strip()
     ]
     verified_routes = [
@@ -139,7 +141,23 @@ def _effective_priority(item: Mapping[str, Any], *, now: datetime) -> int:
     }:
         evidence_bonus += 6
 
-    attempt_penalty = min(80, attempts * 4)
+    near_sendable = bool(target_people) and reason in {
+        "no_contact_evidence",
+        "no_bound_contact",
+        "contact_not_verified",
+        "outreach_not_ready",
+        "target_contact_not_verified",
+    }
+    conversion_proximity_bonus = (
+        32 + min(8, len(verified_routes) * 4)
+        if near_sendable
+        else 0
+    )
+    attempt_penalty = (
+        min(40, attempts * 2)
+        if near_sendable
+        else min(80, attempts * 4)
+    )
     weak_reason_penalty = (
         30
         if reason in {
@@ -157,6 +175,7 @@ def _effective_priority(item: Mapping[str, Any], *, now: datetime) -> int:
         starvation_boost
         + base
         + evidence_bonus
+        + conversion_proximity_bonus
         - attempt_penalty
         - weak_reason_penalty
     )
@@ -214,7 +233,7 @@ class BuyerDeferredEnrichmentQueue:
                 }
                 for person in (item.get("target_people") or [])
                 if isinstance(person, Mapping)
-                and str(person.get("name") or "").strip()
+                and looks_like_person_name(person.get("name"))
                 and str(person.get("title") or "").strip()
             ][:6]
             target_product_codes = [

@@ -138,3 +138,54 @@ def test_defer_again_clears_worker_lease(tmp_path):
     assert row["status"] == "deferred"
     assert row["lease_owner"] is None
     assert row["lease_expires_at"] is None
+
+
+def test_due_prioritises_near_sendable_named_buyer(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "identity-gap",
+        "reason": "no_decision_maker",
+        "priority_score": 100,
+    })
+    q.enqueue({
+        "prospect_id": "contact-gap",
+        "reason": "no_bound_contact",
+        "priority_score": 95,
+        "target_people": [{
+            "name": "Jane Smith",
+            "title": "Founder",
+            "source": "first_party_site_current",
+            "evidence_url": "https://acme.test/about",
+        }],
+        "company_contact_routes": [{
+            "channel": "email",
+            "value": "info@acme.test",
+            "verified": True,
+        }],
+        "offer_key": "predictive_revenue_diagnostic",
+    })
+    import json
+    data = json.loads((tmp_path / "deferred.json").read_text())
+    data["contact-gap"]["attempts"] = 10
+    (tmp_path / "deferred.json").write_text(json.dumps(data))
+
+    due = q.due(limit=2)
+    assert [row["prospect_id"] for row in due] == [
+        "contact-gap", "identity-gap",
+    ]
+
+
+def test_enqueue_drops_false_target_people(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "p-false",
+        "reason": "no_bound_contact",
+        "priority_score": 90,
+        "target_people": [
+            {"name": "Case Studies", "title": "Managing Director"},
+            {"name": "New Orleans", "title": "Owner"},
+            {"name": "Jane Smith", "title": "Founder"},
+        ],
+    })
+    row = q.due(limit=1)[0]
+    assert [p["name"] for p in row["target_people"]] == ["Jane Smith"]
