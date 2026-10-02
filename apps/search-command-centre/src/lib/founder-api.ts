@@ -54,6 +54,32 @@ export type FounderDashboard = {
     revenue_recognized?: boolean;
     execution_authority?: string;
   };
+  competitor_audience_intelligence?: {
+    available?: boolean;
+    canonical_signal_row_count?: number;
+    company_count?: number;
+    generated_at?: string | null;
+    latest_observed_at?: string | null;
+    execution_authority?: string;
+    buyer_intent_inferred?: boolean;
+    commercial_intent_inferred?: boolean;
+    companies?: Array<{
+      entity_id?: string;
+      company_name?: string;
+      company_website?: string;
+      competitor_count?: number;
+      competitors?: string[];
+      confidence?: number;
+      evidence?: Array<{
+        competitor_key?: string;
+        confidence?: number;
+        evidence_type?: string;
+        observed_at?: string;
+        source_ref?: string;
+        summary?: string;
+      }>;
+    }>;
+  };
   astra?: {
     available?: boolean;
     mode?: string;
@@ -321,6 +347,43 @@ export function getFounderDataProducts() {
 
 export function getFounderOps() {
   return getFounderRead<FounderOps>("/v1/founder-ops/status");
+}
+
+
+export type SpatialPhysicalStatus = {
+  schema_version?: string;
+  mode?: string;
+  execution_authority?: string;
+  available?: boolean;
+  volumetric_observations?: number | null;
+  physical_observations?: number | null;
+  modeled_opportunities?: number | null;
+  max_combined_priority_boost?: number | null;
+  storm_multiplier_max?: number | null;
+  physical_rows?: Array<{
+    phenomenon?: string;
+    market?: string;
+    observed_at?: string;
+    source?: string;
+    evidence_ref?: string;
+  }>;
+  evidence_refs?: string[];
+  source_state?: {
+    storm_exposure_observed?: boolean;
+    satellite_real_imagery?: boolean;
+    satellite_state?: string;
+    satellite_observed_at?: string | null;
+  };
+  unknown_stays_unknown?: boolean;
+  preview_only?: boolean;
+  revenue_mutation?: boolean;
+  execution_allowed?: boolean;
+};
+
+export function getSpatialPhysicalStatus() {
+  return getFounderRead<SpatialPhysicalStatus>(
+    "/v1/spatial-physical/status",
+  );
 }
 
 

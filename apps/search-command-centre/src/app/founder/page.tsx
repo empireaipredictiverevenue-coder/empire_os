@@ -7,6 +7,7 @@ import {
   getFounderIntelligenceNodes,
   getFounderOps,
   getFounderOperationalTruth,
+  getSpatialPhysicalStatus,
   type FounderStage,
 } from "@/lib/founder-api";
 
@@ -65,6 +66,7 @@ export default async function FounderPage() {
     opsResult,
     dailyResult,
     operationalTruthResult,
+    spatialResult,
   ] = await Promise.all([
     getFounderDashboard(),
     getFounderIntelligenceNodes(),
@@ -72,6 +74,7 @@ export default async function FounderPage() {
     getFounderOps(),
     getFounderDailyResults(),
     getFounderOperationalTruth(),
+    getSpatialPhysicalStatus(),
   ]);
   const data = result.data;
   const loop = data?.commercial_loop;
@@ -94,6 +97,17 @@ export default async function FounderPage() {
   const operationalTruth = operationalTruthResult.data;
   const operationalLanes = operationalTruth?.lanes ?? [];
   const dailyFunnel = daily?.commercial_funnel;
+  const competitorIntelligence = data?.competitor_audience_intelligence;
+  const competitorCompanies = competitorIntelligence?.companies ?? [];
+  const graphCompany = [...competitorCompanies].sort(
+    (a, b) => (b.competitor_count ?? 0) - (a.competitor_count ?? 0),
+  )[0];
+  const spatialStatus = spatialResult.data;
+  const stormObservation = spatialStatus?.physical_rows?.[0];
+  const stormMultiplier =
+    typeof spatialStatus?.storm_multiplier_max === "number"
+      ? spatialStatus.storm_multiplier_max.toFixed(3) + "×"
+      : "Unknown";
   const opportunityRadar = data?.opportunity_radar;
   const opportunityBlockers = Object.entries(
     opportunityRadar?.blocker_counts ?? {},
@@ -497,6 +511,140 @@ export default async function FounderPage() {
                 </div>
               </section>
             </div>
+
+            <section className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
+              <div className="panel overflow-hidden">
+                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
+                  <div>
+                    <p className="eyebrow">Competitive intelligence graph</p>
+                    <h2 className="mt-1 text-xl font-semibold text-white">
+                      Observed market overlap
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                      Company-to-competitor edges come only from canonical
+                      observed comparison/listing evidence. Buyer or commercial
+                      intent is not inferred from graph proximity.
+                    </p>
+                  </div>
+                  <div className="text-left md:text-right">
+                    <p className="text-xs text-slate-600">
+                      {int(competitorIntelligence?.canonical_signal_row_count)} canonical signals
+                    </p>
+                    <p className="mt-1 text-xs text-emerald-200">
+                      {int(competitorIntelligence?.company_count)} observed companies
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-[1.15fr_.85fr]">
+                  <CompetitorGraph company={graphCompany} />
+                  <div className="space-y-3">
+                    {competitorCompanies.slice(0, 4).map((company) => (
+                      <div
+                        key={company.entity_id ?? company.company_name}
+                        className="rounded-2xl border border-white/8 bg-white/[0.025] p-4 transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-cyan-300/[0.035]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-white">
+                              {show(company.company_name)}
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-500">
+                              {int(company.competitor_count)} observed competitors
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] px-2.5 py-1 text-[10px] font-semibold text-cyan-100">
+                            {typeof company.confidence === "number"
+                              ? Math.round(company.confidence * 100) + "%"
+                              : "Unknown"}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-[11px] leading-5 text-slate-500">
+                          {(company.competitors ?? [])
+                            .slice(0, 4)
+                            .map(formatGraphLabel)
+                            .join(" · ") || "No observed competitor edges"}
+                        </p>
+                      </div>
+                    ))}
+                    {!competitorCompanies.length ? (
+                      <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-4 text-xs text-slate-500">
+                        No canonical competitor graph observations available.
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <p className="mt-4 border-t border-white/8 pt-4 text-[11px] leading-5 text-slate-600">
+                  Latest canonical observation: {show(competitorIntelligence?.latest_observed_at)} ·
+                  execution authority {show(competitorIntelligence?.execution_authority, "none")}.
+                </p>
+              </div>
+
+              <div className="panel relative overflow-hidden [perspective:1100px]">
+                <div className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-cyan-400/[0.08] blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-24 -left-16 size-64 rounded-full bg-emerald-400/[0.06] blur-3xl" />
+                <div className="relative transition duration-500 [transform-style:preserve-3d] hover:[transform:rotateX(1.5deg)_rotateY(-2deg)_translateZ(6px)]">
+                  <p className="eyebrow">Storm Leads Multiplier</p>
+                  <h2 className="mt-1 text-xl font-semibold text-white">
+                    Physical demand acceleration
+                  </h2>
+                  <div className="mt-6 rounded-3xl border border-cyan-300/20 bg-gradient-to-br from-cyan-300/[0.08] via-white/[0.025] to-emerald-300/[0.05] p-5 shadow-[0_25px_70px_rgba(0,0,0,.22)]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200/70">
+                      Modeled max multiplier
+                    </p>
+                    <p className="mt-2 text-5xl font-semibold tracking-[-0.05em] text-white">
+                      {stormMultiplier}
+                    </p>
+                    <p className="mt-3 text-xs leading-5 text-slate-400">
+                      Modeled priority effect only. It does not equal revenue,
+                      delivered leads or buyer demand.
+                    </p>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                    <Evidence
+                      label="Physical observations"
+                      value={int(spatialStatus?.physical_observations)}
+                    />
+                    <Evidence
+                      label="Storm observed"
+                      value={truth(spatialStatus?.source_state?.storm_exposure_observed)}
+                    />
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
+                    <p className="text-sm font-semibold text-white">
+                      {show(stormObservation?.market)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {show(stormObservation?.phenomenon).replaceAll("_", " ")}
+                    </p>
+                    <p className="mt-3 text-[11px] leading-5 text-slate-400">
+                      {show(stormObservation?.source)}
+                    </p>
+                    <p className="mt-2 break-all text-[10px] leading-5 text-cyan-200/70">
+                      {show(stormObservation?.evidence_ref)}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <TruthPill
+                      label="Preview only"
+                      value={spatialStatus?.preview_only === true}
+                    />
+                    <TruthPill
+                      label="Execution allowed"
+                      value={spatialStatus?.execution_allowed === true}
+                    />
+                    <TruthPill
+                      label="Revenue mutation"
+                      value={spatialStatus?.revenue_mutation === true}
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
 
             <section className="panel mt-5">
               <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
@@ -978,6 +1126,171 @@ export default async function FounderPage() {
         )}
       </div>
     </main>
+  );
+}
+
+
+function formatGraphLabel(value: string | undefined) {
+  const text = (value ?? "").replaceAll("-", " ").trim();
+  if (!text) return "Unknown";
+  return text.length > 24 ? text.slice(0, 23) + "…" : text;
+}
+
+function CompetitorGraph({
+  company,
+}: {
+  company:
+    | {
+        company_name?: string;
+        competitors?: string[];
+        confidence?: number;
+        evidence?: Array<{ source_ref?: string }>;
+      }
+    | undefined;
+}) {
+  const competitors = (company?.competitors ?? []).slice(0, 9);
+  const width = 680;
+  const height = 390;
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = 145;
+  const nodes = competitors.map((competitor, index) => {
+    const angle = (Math.PI * 2 * index) / Math.max(competitors.length, 1) - Math.PI / 2;
+    return {
+      competitor,
+      x: cx + Math.cos(angle) * radius,
+      y: cy + Math.sin(angle) * radius,
+    };
+  });
+
+  if (!company) {
+    return (
+      <div className="grid min-h-[360px] place-items-center rounded-3xl border border-white/8 bg-white/[0.02] text-sm text-slate-500">
+        No canonical competitor graph available.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-3xl border border-white/8 bg-[radial-gradient(circle_at_50%_45%,rgba(34,211,238,.09),transparent_38%),linear-gradient(145deg,rgba(255,255,255,.025),rgba(255,255,255,.01))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_30px_80px_rgba(0,0,0,.18)] [perspective:1200px]">
+      <div className="transition duration-500 [transform-style:preserve-3d] hover:[transform:rotateX(1.5deg)_rotateY(1.5deg)_translateZ(8px)]">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label={`Observed competitor graph for ${show(company.company_name)}`}
+          className="h-auto w-full"
+        >
+          <defs>
+            <radialGradient id="graph-core" cx="35%" cy="30%" r="70%">
+              <stop offset="0%" stopColor="#d9fbff" stopOpacity="0.95" />
+              <stop offset="45%" stopColor="#22d3ee" stopOpacity="0.75" />
+              <stop offset="100%" stopColor="#0f766e" stopOpacity="0.45" />
+            </radialGradient>
+            <radialGradient id="graph-node" cx="35%" cy="30%" r="70%">
+              <stop offset="0%" stopColor="#ecfdf5" stopOpacity="0.9" />
+              <stop offset="55%" stopColor="#34d399" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="#064e3b" stopOpacity="0.35" />
+            </radialGradient>
+            <filter id="graph-glow">
+              <feGaussianBlur stdDeviation="5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {nodes.map((node) => (
+            <line
+              key={"edge-" + node.competitor}
+              x1={cx}
+              y1={cy}
+              x2={node.x}
+              y2={node.y}
+              stroke="#67e8f9"
+              strokeOpacity="0.26"
+              strokeWidth="1.4"
+            />
+          ))}
+
+          {nodes.map((node) => (
+            <g key={node.competitor}>
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r="26"
+                fill="url(#graph-node)"
+                stroke="#6ee7b7"
+                strokeOpacity="0.35"
+                filter="url(#graph-glow)"
+              />
+              <text
+                x={node.x}
+                y={node.y + 42}
+                textAnchor="middle"
+                fill="#94a3b8"
+                fontSize="10"
+              >
+                {formatGraphLabel(node.competitor)}
+              </text>
+            </g>
+          ))}
+
+          <circle
+            cx={cx}
+            cy={cy}
+            r="58"
+            fill="url(#graph-core)"
+            stroke="#a5f3fc"
+            strokeOpacity="0.55"
+            filter="url(#graph-glow)"
+          />
+          <text
+            x={cx}
+            y={cy - 4}
+            textAnchor="middle"
+            fill="#ffffff"
+            fontSize="13"
+            fontWeight="700"
+          >
+            {formatGraphLabel(company.company_name)}
+          </text>
+          <text
+            x={cx}
+            y={cy + 16}
+            textAnchor="middle"
+            fill="#cffafe"
+            fontSize="10"
+          >
+            {competitors.length} observed edges
+          </text>
+        </svg>
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t border-white/8 px-2 pt-3 text-[10px] text-slate-600">
+        <span>{(company.evidence ?? []).length} evidence records</span>
+        <span>
+          confidence{" "}
+          {typeof company.confidence === "number"
+            ? Math.round(company.confidence * 100) + "%"
+            : "unknown"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function TruthPill({ label, value }: { label: string; value: boolean }) {
+  return (
+    <span
+      className={[
+        "rounded-full border px-2.5 py-1 text-[10px] font-semibold",
+        value
+          ? "border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-100"
+          : "border-slate-400/15 bg-white/[0.025] text-slate-500",
+      ].join(" ")}
+    >
+      {label}: {value ? "yes" : "no"}
+    </span>
   );
 }
 
