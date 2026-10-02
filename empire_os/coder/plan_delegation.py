@@ -51,7 +51,7 @@ def _load_local_planner_environment(root: Path) -> None:
 
 
 def _local_planner_capability(coder: EmpireCoder) -> int:
-    return max(
+    available = max(
         (
             int(profile.capability)
             for profile in coder.router.profiles
@@ -59,6 +59,14 @@ def _local_planner_capability(coder: EmpireCoder) -> int:
         ),
         default=0,
     )
+    configured = max(
+        0,
+        min(
+            int(os.getenv("EMPIRE_CODER_LOCAL_PLAN_MAX_CAPABILITY", "1")),
+            3,
+        ),
+    )
+    return min(available, configured)
 
 
 def delegate_oversized_plans(

@@ -198,3 +198,30 @@ def test_unreadable_legacy_task_does_not_block_next_delegatable_job(monkeypatch,
     assert result["blocked"][0]["job_id"] == bad_job.id
     assert queue.get(bad_job.id).status is JobStatus.PENDING
     assert queue.get(good_job.id).status is JobStatus.DELEGATED
+
+
+def test_delegation_caps_hot_local_plan_lane_for_throughput(monkeypatch, tmp_path):
+    root, runtime = _workspace(tmp_path)
+    store = LocalTaskStore(root, runtime_root=runtime)
+    task = store.create(
+        "Review database architecture and production migration safety",
+        blueprint_path="docs/BLUEPRINT_V6.md",
+    )
+    queue = LocalJobQueue(root, runtime_root=runtime)
+    job = queue.enqueue(task_id=task.id, kind=JobKind.PLAN, priority=100)
+    fake_coder = SimpleNamespace(
+        store=store,
+        router=SimpleNamespace(profiles=(
+            ModelProfile("ollama", "qwen3-coder:30b", capability=3, cost_tier=2, local=True, roles=("planner",)),
+        )),
+    )
+    monkeypatch.setattr("empire_os.coder.plan_delegation.EmpireCoder", lambda *a, **k: fake_coder)
+    monkeypatch.delenv("EMPIRE_CODER_LOCAL_PLAN_MAX_CAPABILITY", raising=False)
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.dispatch_execution_request",
+        lambda *a, **k: {"status":"QUEUED","worker":"hermes"},
+    )
+    result = delegate_oversized_plans(root, runtime_root=runtime, max_jobs=1)
+    assert result["local_planner_capability"] == 1
+    assert result["delegated_count"] == 1
+    assert queue.get(job.id).status is JobStatus.DELEGATED
