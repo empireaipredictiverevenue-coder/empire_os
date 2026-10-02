@@ -387,8 +387,8 @@ reserved for genuine consequential gates.
 - [ ] Continue real outbound
 - [x] Improve target quality using account intelligence
 - [ ] Legitimate decision-maker enrichment
-- [ ] Buyer review creation
-- [ ] Governed outbound intent
+- [x] Buyer review creation
+- [x] Governed outbound intent
 - [ ] Genuine positive/commercial reply
 - [x] Evidence-backed one-page opportunity brief
 - [ ] Capacity/territory/delivery-route capture
