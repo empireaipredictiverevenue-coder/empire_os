@@ -390,7 +390,7 @@ reserved for genuine consequential gates.
 - [ ] Buyer review creation
 - [ ] Governed outbound intent
 - [ ] Genuine positive/commercial reply
-- [ ] Evidence-backed one-page opportunity brief
+- [x] Evidence-backed one-page opportunity brief
 - [ ] Capacity/territory/delivery-route capture
 - [ ] Closer case
 - [ ] Actual product-bound order
