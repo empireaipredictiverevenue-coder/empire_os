@@ -433,11 +433,11 @@ reserved for genuine consequential gates.
 - [x] Market opportunities
 - [ ] Competitor graph visualization
 - [x] Real funnel
-- [ ] Terms/payment/fulfilment
-- [ ] Recognized revenue/GP
-- [ ] Revenue Pulse
+- [x] Terms/payment/fulfilment — LIVE FOUNDER SURFACE VERIFIED 2026-10-02; underlying commercial stages remain evidence-gated
+- [x] Recognized revenue/GP — LIVE FOUNDER SURFACE VERIFIED 2026-10-02; current recognized revenue/GP truth remains zero
+- [x] Revenue Pulse — LIVE VERIFIED 2026-10-02
 - [ ] Storm Leads Multiplier
-- [ ] Market Sweeps
+- [x] Market Sweeps — LIVE VERIFIED 2026-10-02 via Revenue GPS
 - [x] Live system/service health — LIVE VERIFIED 2026-10-02 via `/v1/founder-ops/status`
 - [ ] Premium frontend/3D interaction work
 
