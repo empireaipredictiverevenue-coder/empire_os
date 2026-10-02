@@ -1,0 +1,30 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/commercial_loop_observer.py",
+    "scripts/refresh_commercial_loop.py",
+    "tests/test_commercial_loop_observer.py",
+    "tests/test_commercial_loop_acquisition_truth.py",
+    "docs/architecture/revenue_blocker_truth_v1.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T20:28:10.692556+00:00",
+  "job_id": "revenue-blocker-truth-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:revenue_blocker_truth",
+    "path:empire_os/commercial_loop_observer.py",
+    "path:scripts/refresh_commercial_loop.py",
+    "path:tests/test_commercial_loop_observer.py",
+    "path:tests/test_commercial_loop_acquisition_truth.py",
+    "path:docs/architecture/revenue_blocker_truth_v1.md"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "REVENUE FIRST. Follow Architecture-First doctrine. Inspect the live commercial loop observer and refresh path. Fix the blocker selection so the highest_priority_blocker reflects the first genuinely unobserved revenue stage from canonical evidence. Today acquisition, qualification, approved buyer reviews and sent/delivered outbound are observed, while commercial buyer replies are zero, so buyer_conversation must outrank already-proven upstream stages. Preserve UNKNOWN when evidence is not loaded. Add focused tests. Do not send outreach, alter approvals, accept terms, touch payments, or recognize revenue.",
+  "pytest_targets": [
+    "tests/test_commercial_loop_observer.py",
+    "tests/test_commercial_loop_acquisition_truth.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
