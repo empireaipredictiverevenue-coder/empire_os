@@ -54,7 +54,6 @@ ALLOWED_UNITS = frozenset({
     "empire-enterprise-contact-repair.service",
     "empire-enterprise-contact-repair.timer",
     "empire-revenue-exchange-snapshot.service",
-    "empire-revenue-exchange-snapshot.timer",
 })
 START_ONLY_UNITS = frozenset({
     "empire-revenue-pulse.service",

@@ -103,3 +103,22 @@ def test_diagnosis_uses_identity_recovery_when_only_identity_missing():
     a=diagnose_next_revenue_action(s)
     assert a["action"]=="resolve_identity_links"
     assert a["candidate_count"]==1
+
+
+def test_recovery_breakdown_separates_raw_lanes():
+    from empire_os.autonomous_revenue_os import _inventory_recovery_breakdown
+    snapshot={"items":[
+        {"stage":RAW_LEAD,"blockers":["missing_qualification","missing_active_identity_link"]},
+        {"stage":RAW_LEAD,"blockers":["qualification_evidence_confidence_below_floor"]},
+        {"stage":RAW_LEAD,"blockers":["missing_active_identity_link"]},
+        {"stage":RAW_LEAD,"blockers":["qualification_tier_not_allocatable"]},
+        {"stage":RAW_LEAD,"blockers":["something_else"]},
+        {"stage":PREQUALIFIED_LEAD,"blockers":[]},
+    ]}
+    assert _inventory_recovery_breakdown(snapshot)=={
+        "missing_qualification":1,
+        "low_confidence":1,
+        "missing_identity":1,
+        "non_allocatable_tier":1,
+        "other_raw":1,
+    }

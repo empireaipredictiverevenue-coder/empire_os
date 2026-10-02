@@ -12,6 +12,7 @@ import signal
 import subprocess
 import sys
 import time
+import urllib.parse
 from typing import Any, Mapping
 
 from empire_os.buyer_allocation import (
@@ -29,6 +30,18 @@ from empire_os.qualification_worker_v2 import (
     run_evidence_recovery,
     run_identity_catchup,
 )
+from empire_os.signal_resolver import run_signal_resolution
+from empire_os.omega_worker import run_omega_cycle
+from empire_os.omega_buyer_readiness import run_omega_buyer_readiness_cycle
+from empire_os.commercial_loop_observer import (
+    assess_commercial_loop,
+    fetch_canonical_commercial_observations,
+    observations_from_cycle,
+    read_latest_acquisition_accepted,
+    write_commercial_loop_snapshot,
+)
+from empire_os.sb import request_json
+from scripts.run_acquisition_cycle import run_cycle_with_fallback as run_acquisition_cycle
 from empire_os.revenue_architecture_critic import review_revenue_architecture
 from empire_os.revenue_exchange_snapshot import (
     build_revenue_exchange_live_snapshot,
@@ -413,24 +426,64 @@ def _inventory_recovery_breakdown(snapshot: Mapping[str, Any]) -> dict[str, int]
 
 
 def _run_qualification_bundle(limit: int) -> dict[str, Any]:
-    bounded = max(1, int(limit))
+    bounded = max(1, min(25, int(limit)))
+    signal_resolution = run_signal_resolution(bounded)
     pending = run_qualification_cycle(limit=bounded)
-    identity = run_identity_catchup(limit=bounded)
     recovery = run_evidence_recovery(limit=bounded)
+    identity = run_identity_catchup(limit=bounded)
+    omega = run_omega_cycle(bounded)
+    buyer_readiness = run_omega_buyer_readiness_cycle(bounded)
+
+    def canonical_reader(path: str, params: dict[str, str]):
+        query = urllib.parse.urlencode(params)
+        return request_json("GET", f"{path}?{query}")
+
+    canonical_observations = fetch_canonical_commercial_observations(
+        canonical_reader,
+        now=datetime.now(timezone.utc),
+    )
+    commercial_loop = assess_commercial_loop(
+        observations_from_cycle(
+            acquisition_accepted=read_latest_acquisition_accepted(),
+            qualification=pending,
+            omega=omega,
+            buyer_readiness=buyer_readiness,
+            canonical_observations=canonical_observations,
+        )
+    )
+    write_commercial_loop_snapshot(commercial_loop)
+
     return {
-        "schema_version": "autonomous_revenue_qualification_bundle.v1",
-        "pending": pending,
+        "schema_version": "autonomous_revenue_qualification_bundle.v2",
+        "signal_resolution": signal_resolution,
+        "qualification": pending,
         "identity_catchup": identity,
         "evidence_recovery": recovery,
-        "attempted": int(pending.get("attempted") or 0)
+        "omega_projection": omega,
+        "buyer_readiness": buyer_readiness,
+        "commercial_loop": commercial_loop.as_dict(),
+        "attempted": int(signal_resolution.get("attempted") or 0)
+        + int(pending.get("attempted") or 0)
         + int(identity.get("attempted") or 0)
         + int(recovery.get("attempted") or 0),
-        "material_actions": int(pending.get("qualified") or 0)
+        "material_actions": int(signal_resolution.get("resolved") or 0)
+        + int(pending.get("qualified") or 0)
         + int(identity.get("identity_resolved") or 0)
-        + int(recovery.get("requalified") or 0),
-        "failed": int(pending.get("failed") or 0)
+        + int(recovery.get("requalified") or 0)
+        + int(omega.get("scored") or omega.get("attempted") or 0)
+        + int(buyer_readiness.get("promoted") or 0),
+        "failed": int(signal_resolution.get("failed") or 0)
+        + int(pending.get("failed") or 0)
         + int(identity.get("failed") or 0)
         + int(recovery.get("failed") or 0),
+        "ok": bool(
+            signal_resolution.get("ok")
+            and pending.get("ok")
+            and recovery.get("ok")
+            and identity.get("ok")
+            and omega.get("ok")
+            and buyer_readiness.get("ok")
+        ),
         "actual_revenue": False,
         "communications_execution": False,
         "payment_enabled": False,

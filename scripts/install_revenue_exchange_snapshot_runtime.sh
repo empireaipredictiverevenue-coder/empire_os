@@ -19,8 +19,10 @@ fi
 
 echo "=== REVENUE EXCHANGE SNAPSHOT RUNTIME INSTALL ==="
 
-# Anti-loop: stop any previously enabled failing timer before changing runtime.
-systemctl stop empire-revenue-exchange-snapshot.timer 2>/dev/null || true
+# Agentic-loop migration: the old timer must stay retired. Autonomous
+# Revenue OS owns refresh cadence/state transitions.
+systemctl disable --now empire-revenue-exchange-snapshot.timer 2>/dev/null || true
+rm -f /etc/systemd/system/empire-revenue-exchange-snapshot.timer
 
 # Founder-gated authority activation. The installer never provisions a new
 # database identity unless the explicit flag is present.
@@ -40,29 +42,23 @@ install -m 0644 \
   deploy/systemd/empire-revenue-exchange-snapshot.service \
   /etc/systemd/system/empire-revenue-exchange-snapshot.service
 
-install -m 0644 \
-  deploy/systemd/empire-revenue-exchange-snapshot.timer \
-  /etc/systemd/system/empire-revenue-exchange-snapshot.timer
-
 systemctl daemon-reload
 
 # Reload the narrow helper so its new read-only unit allowlist is active.
 systemctl restart empire-ops-privileged-helper.service
 
-# Enable bounded autonomous refresh and run one governed cycle immediately.
-systemctl enable --now empire-revenue-exchange-snapshot.timer
+# Run one governed read-only compatibility refresh. Future refresh cadence
+# is owned by the Autonomous Revenue OS agentic loop, not systemd timers.
 systemctl start empire-revenue-exchange-snapshot.service
 
 echo "=== INSTALLED CONTRACT ==="
 systemctl cat \
   empire-revenue-exchange-snapshot.service \
-  empire-revenue-exchange-snapshot.timer \
-  | grep -E 'User=|Group=|EnvironmentFile=|ExecStart=|OnUnitInactiveSec=|ReadWritePaths=|NoNewPrivileges='
+  | grep -E 'User=|Group=|EnvironmentFile=|ExecStart=|ReadWritePaths=|NoNewPrivileges='
 
 echo "=== RUNTIME STATUS ==="
 systemctl status \
   empire-revenue-exchange-snapshot.service \
-  empire-revenue-exchange-snapshot.timer \
   empire-ops-privileged-helper.service \
   --no-pager -l
 

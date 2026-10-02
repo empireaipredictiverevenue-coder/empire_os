@@ -18,3 +18,7 @@ def test_snapshot_refresh_requires_dedicated_dsn_key():
     assert 'READER_DSN_KEY = "EMPIRE_REVENUE_EXCHANGE_READER_DSN"' in text
     assert 'env[READER_DSN_KEY]' in text
     assert 'env["EMPIREDB_DSN"]' not in text
+
+
+def test_snapshot_timer_is_retired_from_agentic_architecture():
+    assert not (ROOT / "deploy/systemd/empire-revenue-exchange-snapshot.timer").exists()
