@@ -92,13 +92,30 @@ Each market row includes:
 - created_at
 - reconciliation_evidence (or null)
 
-## Runtime activation
+## Runtime identity and activation
+
+The snapshot runtime MUST NOT use the broad canonical `EMPIREDB_DSN` login to
+borrow the reader capability. It uses one dedicated NOINHERIT LOGIN identity:
+
+- login: `empire_revenue_exchange_reader_login`
+- capability role: `empire_revenue_exchange_reader`
+- env key: `EMPIRE_REVENUE_EXCHANGE_READER_DSN`
+- protected env file: `/etc/empire_revenue_exchange.env`
+
+The login is granted exactly the Revenue Exchange reader capability role. The
+transport continues to execute `SET LOCAL ROLE empire_revenue_exchange_reader`
+inside each transaction. The login receives no writer, allocation, pricing,
+payment, settlement or revenue-recognition capability.
+
+Provisioning this LOGIN/password/role membership is an authority activation and
+remains founder-gated even though it is read-only. The code/provisioner may be
+staged and tested before that approval, but must not apply the role or credential.
+
 A oneshot service/timer may refresh this read model on a bounded cadence using:
 - User=ubuntu
-- `/etc/empire_os.env`
-- `/etc/empiredb.env`
+- `/etc/empire_revenue_exchange.env`
 - no outbound secret file required
-- no network destination other than EmpireDB
+- no network destination other than local EmpireDB
 
 ## Authority
 Always read-only. No ingest, allocation, pricing mutation, terms, payment, settlement,
@@ -108,6 +125,7 @@ fulfilment or revenue recognition.
 - `empire_os/revenue_exchange_transport.py` (reader fields only)
 - `empire_os/revenue_exchange_snapshot.py`
 - `scripts/refresh_revenue_exchange_snapshot.py`
+- `scripts/provision_revenue_exchange_reader.py`
 - `tests/test_revenue_exchange_reader.py`
 - `tests/test_revenue_exchange_snapshot.py`
 - `deploy/systemd/empire-revenue-exchange-snapshot.service`
