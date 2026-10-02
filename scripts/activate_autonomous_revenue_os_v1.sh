@@ -98,6 +98,17 @@ timers_disabled=1
 sleep 5
 systemctl is-active --quiet "$SERVICE"
 
+for unit in "${TIMERS[@]}"; do
+  if systemctl is-active --quiet "$unit" 2>/dev/null; then
+    echo "CUTOVER_ABORTED=timer_still_active:$unit" >&2
+    exit 1
+  fi
+  if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+    echo "CUTOVER_ABORTED=timer_still_enabled:$unit" >&2
+    exit 1
+  fi
+done
+
 python3 - <<'PY'
 import json
 p=json.load(open("/srv/empire_os/runtime/autonomous_revenue_os/latest.json"))
