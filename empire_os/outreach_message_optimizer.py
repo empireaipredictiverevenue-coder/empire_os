@@ -44,9 +44,31 @@ _VENDORISH_PHRASES = (
     "leverage",
     "revolutionary",
     "game-changing",
+    "cutting-edge",
+    "state-of-the-art",
+    "world-class",
+    "ai-powered",
+    "unlock",
+    "supercharge",
+    "elevate your",
+    "transform your",
+    "seamless",
+    "tailored solution",
+    "innovative solution",
+    "in today's fast-paced",
+    "ever-evolving landscape",
+    "delve into",
     "i hope this email finds you well",
     "i wanted to reach out",
     "my name is ",
+)
+
+_AI_SLOP_PATTERNS = (
+    r"\b(?:unlock|supercharge|revolutioni[sz]e|elevate|transform)\b",
+    r"\b(?:cutting[- ]edge|state[- ]of[- ]the[- ]art|world[- ]class)\b",
+    r"\b(?:seamless(?:ly)?|robust|holistic|bespoke)\b",
+    r"\b(?:powerful|innovative|game[- ]changing) (?:solution|platform|tool)\b",
+    r"\b(?:navigate|thrive in) (?:today'?s )?(?:fast[- ]paced|ever[- ]changing) landscape\b",
 )
 
 
@@ -193,16 +215,16 @@ def build_subject_variants(
     territory_text = _text(territory)
 
     raw = [
-        f"{company} {topic}",
-        f"quick {company} question",
-        f"{company} commercial signals",
+        ("company_only", company),
+        ("company_question", f"{company} question"),
+        ("one_thing", f"one thing on {company}"),
     ]
     if territory_text:
-        raw.append(f"{territory_text} {topic}")
+        raw.append(("territory_company", f"{territory_text} / {company}"))
 
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for priority, value in enumerate(raw):
+    for priority, (variant_id, value) in enumerate(raw):
         subject = _text(value)
         key = subject.casefold()
         if not subject or key in seen:
@@ -210,6 +232,7 @@ def build_subject_variants(
         seen.add(key)
         score, issues = _subject_score(subject)
         rows.append({
+            "variant_id": variant_id,
             "subject": subject,
             "score": score,
             "issues": issues,
@@ -227,6 +250,36 @@ def build_subject_variants(
         )
     )
     return rows
+
+
+def human_copy_gate(
+    *,
+    subject: str,
+    body: str,
+) -> dict[str, Any]:
+    """Hard reject generic/AI-ish copy before it can enter an experiment."""
+    combined = f"{_text(subject)} {_text(body)}".lower()
+    blockers: list[str] = []
+
+    if any(re.search(pattern, combined, flags=re.IGNORECASE) for pattern in _AI_SLOP_PATTERNS):
+        blockers.append("ai_slop_pattern")
+    if any(phrase in combined for phrase in _VENDORISH_PHRASES):
+        blockers.append("vendor_or_ai_sounding_language")
+    if len(re.findall(r"\b(?:we|our|us)\b", combined)) >= 6:
+        blockers.append("brand_monologue")
+    if combined.count("!") > 0:
+        blockers.append("salesy_exclamation")
+    if re.search(r"\b(?:guarantee|guaranteed|guaranteeing)\b", combined):
+        blockers.append("unsupported_guarantee")
+    if re.search(r"\b(?:10x|100x|massive roi|skyrocket)\b", combined):
+        blockers.append("hype_claim")
+
+    return {
+        "eligible": not blockers,
+        "blockers": list(dict.fromkeys(blockers)),
+        "policy": "human_plain_specific_v1",
+        "execution_authority": "none",
+    }
 
 
 def review_message(
@@ -280,11 +333,18 @@ def review_message(
         score -= 10
         issues.append("sender_centric_copy")
 
+    human_gate = human_copy_gate(subject=subject, body=body)
+    if not human_gate["eligible"]:
+        score = 0
+        issues.extend(human_gate["blockers"])
+
     return {
         "score": max(score, 0),
         "issues": list(dict.fromkeys(issues)),
         "word_count": words,
         "c_suite": c_suite,
+        "human_copy_gate": human_gate,
+        "experiment_eligible": bool(human_gate["eligible"] and score >= 80),
         "policy": {
             "c_suite_word_limit": 75,
             "other_word_limit": 110,
@@ -297,6 +357,79 @@ def review_message(
         "send_enabled": False,
         "execution_authority": "none",
     }
+
+
+
+
+def build_body_variants(
+    *,
+    business_name: str,
+    reason_now: str,
+    proof: str,
+    contact_title: str | None = None,
+) -> list[dict[str, Any]]:
+    """Build a small vetted set of plain, specific first-touch copy arms."""
+    business = _text(business_name)
+    reason = _text(reason_now).rstrip(".")
+    observed_proof = _text(proof).rstrip(".")
+    if not business or not reason or not observed_proof:
+        raise ValueError("business_name, reason_now and proof are required")
+
+    proof_line = f"Saw {observed_proof}."
+    rows = [
+        {
+            "variant_id": "plain_one_page",
+            "body": (
+                f"{proof_line}\n\n"
+                f"I can put together a one-page view for {business} showing the "
+                "commercial opportunities I would check first, using public evidence "
+                "rather than guesses.\n\n"
+                "Want me to send it?"
+            ),
+            "cta": "Want me to send it?",
+        },
+        {
+            "variant_id": "direct_observation",
+            "body": (
+                f"{proof_line}\n\n"
+                f"There are a few things I would check next for {business} before "
+                "spending more time or money on growth. I can send the short version "
+                "with the evidence behind each one.\n\n"
+                "Useful if I send that?"
+            ),
+            "cta": "Useful if I send that?",
+        },
+        {
+            "variant_id": "simple_question",
+            "body": (
+                f"{proof_line}\n\n"
+                "Are you already tracking which outside signals are worth acting on "
+                "before they show up in the numbers?\n\n"
+                f"I can send the one-page view I would use for {business}. "
+                "No deck, just the evidence and the first things I would test."
+            ),
+            "cta": (
+                "Are you already tracking which outside signals are worth acting on "
+                "before they show up in the numbers?"
+            ),
+        },
+    ]
+
+    eligible = []
+    for row in rows:
+        review = review_message(
+            subject=f"{_company_token(business)} question",
+            body=str(row["body"]),
+            cta=str(row["cta"]),
+            contact_title=contact_title,
+        )
+        if review["experiment_eligible"]:
+            eligible.append({**row, "quality": review})
+
+    if len(eligible) < 2:
+        raise ValueError("insufficient human-quality body variants")
+    return eligible
+
 
 
 def optimise_first_touch(
@@ -324,35 +457,14 @@ def optimise_first_touch(
     )
     subject = subjects[0]["subject"]
 
-    title = _text(contact_title).lower()
-    c_suite = any(token in title for token in C_SUITE_TOKENS)
-
-    if reason.casefold() == observed_proof.casefold():
-        opener = f"Noticed {reason}."
-    else:
-        opener = f"Noticed {reason}. The useful signal is {observed_proof}."
-
-    if c_suite:
-        body = (
-            f"{opener}\n\n"
-            "Curious how early that becomes visible in your commercial planning.\n\n"
-            f"For {business}, we turn observed market, demand and operating signals "
-            "into a ranked commercial brief, without treating forecasts as revenue.\n\n"
-            "Worth sending the one-page example?"
-        )
-    else:
-        body = (
-            f"{opener}\n\n"
-            f"For {business}, we turn those observed signals into a ranked commercial "
-            "brief so the team can review what deserves attention first.\n\n"
-            "Worth sending the concise example?"
-        )
-
-    cta = (
-        "Worth sending the one-page example?"
-        if c_suite
-        else "Worth sending the concise example?"
+    bodies = build_body_variants(
+        business_name=business,
+        reason_now=reason,
+        proof=observed_proof,
+        contact_title=contact_title,
     )
+    body = str(bodies[0]["body"])
+    cta = str(bodies[0]["cta"])
     quality = review_message(
         subject=subject,
         body=body,
@@ -368,6 +480,7 @@ def optimise_first_touch(
     return {
         "subject": subject,
         "subject_variants": subjects[:4],
+        "body_variants": bodies,
         "body": body,
         "cta": cta,
         "quality": quality,

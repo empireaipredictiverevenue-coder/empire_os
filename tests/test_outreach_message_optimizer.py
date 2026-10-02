@@ -80,3 +80,37 @@ def test_quality_review_flags_vendorish_long_copy():
     assert result["score"] < 70
     assert "vendor_or_ai_sounding_language" in result["issues"]
     assert "body_too_long_for_audience" in result["issues"]
+
+
+def test_human_copy_gate_rejects_ai_slop():
+    from empire_os.outreach_message_optimizer import human_copy_gate
+
+    result = human_copy_gate(
+        subject="Unlock massive growth",
+        body=(
+            "Our cutting-edge AI-powered platform will revolutionize your "
+            "growth with a seamless innovative solution."
+        ),
+    )
+    assert result["eligible"] is False
+    assert "ai_slop_pattern" in result["blockers"]
+
+
+def test_body_variants_are_human_vetted_and_specific():
+    from empire_os.outreach_message_optimizer import build_body_variants
+
+    rows = build_body_variants(
+        business_name="BH Roofing",
+        reason_now="your public profile shows 5★ across 472 reviews",
+        proof="your public profile shows 5★ across 472 reviews",
+        contact_title="Owner",
+    )
+    assert len(rows) >= 2
+    assert len({row["variant_id"] for row in rows}) == len(rows)
+    for row in rows:
+        assert row["quality"]["experiment_eligible"] is True
+        text = row["body"].lower()
+        assert "unlock" not in text
+        assert "leverage" not in text
+        assert "game-changing" not in text
+        assert "ai-powered" not in text

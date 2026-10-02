@@ -33,10 +33,11 @@ def test_first_touch_uses_specific_proof_not_generic_opportunity_pitch():
     assert "generic lead pitch" not in copy.body
     assert "small pilot" not in copy.body.lower()
     assert "opportunities in" not in copy.subject.lower()
-    assert "worth sending the concise example?" in copy.body.lower()
-    assert "ranked commercial brief" in copy.body.lower()
+    assert "want me to send it?" in copy.body.lower()
+    assert "public evidence rather than guesses" in copy.body.lower()
     assert "bounded pilot" not in copy.body.lower()
-    assert copy.subject == "Kihle customer signals"
+    assert copy.subject in copy.subject_variants
+    assert not any(term in copy.body.lower() for term in ("unlock", "leverage", "game-changing", "ai-powered"))
     assert POSTAL_ADDRESS in copy.body
     assert copy.subject_variants
     assert copy.quality_review["score"] >= 70
