@@ -94,7 +94,7 @@ def test_unsupported_source_is_not_probed():
         search_fn=_search_factory("https://random-social.example/jane"),
         probe_fn=probe,
     )
-    assert calls == []
+    assert calls == ["https://acme.example"]
     assert result["evidence"] == []
 
 

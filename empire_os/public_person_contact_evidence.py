@@ -142,6 +142,58 @@ def collect_public_person_contact_evidence(
     ):
         return base
 
+    # Prefer the already-known canonical company website before public search.
+    # This preserves the same exact-person evidence gate while avoiding repeated
+    # search-provider latency for evidence the first-party site can supply.
+    try:
+        official_probe = probe_fn(
+            website,
+            max_pages=2,
+            request_timeout=3.0,
+            time_budget_seconds=8.0,
+            page_priority="people",
+            public_only=True,
+        )
+    except Exception:
+        official_probe = {}
+    base["attempted"] = True
+    base["pages_inspected"] = 1
+    if isinstance(official_probe, Mapping) and official_probe.get("ok") is True:
+        for raw in official_probe.get("people") or []:
+            if not isinstance(raw, Mapping):
+                continue
+            if not _same_person(raw.get("name"), name):
+                continue
+            email = _text(raw.get("email")).lower()
+            if not email or _email_domain(email) != company_domain:
+                continue
+            observed_title = _text(raw.get("title"))
+            observed_role, observed_score = classify_decision_role(
+                observed_title or title
+            )
+            if observed_score < 0.5:
+                continue
+            source_url = (
+                _text(raw.get("url") or raw.get("evidence_url"))
+                or website
+            )
+            source_kind = _source_kind(source_url, company_domain)
+            if source_kind is None:
+                continue
+            base["evidence"] = [{
+                "name": name,
+                "title": observed_title or title,
+                "email": email,
+                "source_url": source_url,
+                "source_kind": source_kind,
+                "role_corroborated": True,
+                "direct_publication": True,
+                "business_identity_correlated": True,
+                "decision_role": observed_role,
+                "decision_score": observed_score,
+            }]
+            return base
+
     queries = [
         f'site:{company_domain} "{name}" email',
         f'site:{company_domain} "{name}" contact',
