@@ -802,8 +802,8 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Typed worker registry + capability router — focused server regression passed
 - [x] Exclusive domain/path mutation lease manager — focused server regression passed
 - [ ] Hermes central mutation-lease integration — CODED; regression/runtime verification pending
-- [ ] Governed Hermes control-job publisher — CODED; runtime verification pending
-- [ ] Execution-plane dispatcher — CODED; focused/runtime verification pending
+- [x] Governed Hermes control-job publisher — LIVE VERIFIED 2026-10-02
+- [x] Execution-plane dispatcher — LIVE VERIFIED 2026-10-02
 - [x] Pi pinned bootstrap + isolated full-clone/systemd sandbox runner — LIVE; local qwen2.5-coder:1.5b retained as planning-only until native structured tool calls are proven
 - [x] Agent Reach isolated bootstrap — LIVE; doctor returns bounded source health
 - [x] Agent Reach public sensor adapter — LIVE public observation proven with provenance/no truth authority
