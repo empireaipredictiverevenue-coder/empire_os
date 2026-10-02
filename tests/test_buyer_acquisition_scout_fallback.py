@@ -321,3 +321,43 @@ def test_permit_home_service_seed_preserves_buyer_pool_and_product_fit(
         in row["target_corridor_keys"]
     )
     assert row["outreach_authorized"] is False
+
+
+def test_scout_filters_false_people_before_icp_and_persistence():
+    import empire_os.buyer_acquisition_scout as scout
+
+    evidence = {
+        "people": [
+            {
+                "name": "Press Release",
+                "title": "Founder",
+                "url": "https://acme.test/press",
+            },
+            {
+                "name": "Strategy AI Systems Architecture",
+                "title": "Founder",
+                "url": "https://acme.test/team",
+            },
+            {
+                "name": "Adrian De La Garza",
+                "title": "Founder & President",
+                "url": "https://acme.test/about",
+            },
+            {
+                "name": "Jamie Benfield",
+                "title": "owner",
+                "url": "https://acme.test/team",
+            },
+            {
+                "name": "Random Person",
+                "title": "Engineer",
+                "url": "https://acme.test/team",
+            },
+        ]
+    }
+
+    rows = scout._credible_first_party_people(evidence)
+    assert [row["name"] for row in rows] == [
+        "Adrian De La Garza",
+        "Jamie Benfield",
+    ]

@@ -1184,3 +1184,25 @@ def test_law_firm_partner_titles_are_economic_buyers_without_partnership_false_p
     assert classify_decision_role("Attorney / Partner") == ("economic_buyer", 1.0)
     assert classify_decision_role("Partnerships Director")[0] != "economic_buyer"
     assert classify_decision_role("Strategic Partnerships")[0] != "economic_buyer"
+
+
+def test_personhood_guard_rejects_live_buyer_scout_false_people():
+    from empire_os.buyer_discovery import looks_like_person_name
+
+    for value in (
+        "Press Release",
+        "Strategy AI Systems Architecture",
+        "Joins National Association",
+        "Solo Agency",
+        "First Name",
+        "Lin Health",
+    ):
+        assert looks_like_person_name(value) is False, value
+
+    for value in (
+        "Adrian De La Garza",
+        "Husnain Arbi",
+        "Jamie Benfield",
+        "William Stapleton",
+    ):
+        assert looks_like_person_name(value) is True, value

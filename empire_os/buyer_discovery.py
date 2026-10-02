@@ -47,6 +47,9 @@ NON_PERSON_NAME_TERMS = {
     "ship", "club", "engineer", "your", "referral", "program", "email",
     "learn", "more", "strategic", "operations", "leadership", "about",
     "read", "meet", "turnpoint", "thats", "that's",
+    "press", "release", "strategy", "systems", "architecture", "agency",
+    "association", "national", "joins", "health", "first", "last", "full",
+    "name", "department", "division", "platform", "network",
 }
 
 

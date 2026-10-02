@@ -525,3 +525,41 @@ def test_visible_people_keeps_real_adjacent_owner_card():
         and person["title"].lower() == "owner"
         for person in people
     )
+
+
+def test_people_extractor_rejects_marketing_and_form_fragments():
+    import empire_os.search_fabric.site_probe as sp
+
+    bad = [
+        "Press Release",
+        "Strategy AI Systems Architecture",
+        "Joins National Association",
+        "Solo Agency",
+        "First Name",
+        "Lin Health",
+    ]
+    for value in bad:
+        assert sp._looks_like_visible_person_name(value) is False, value
+
+    records = [
+        {
+            "@type": "Person",
+            "name": value,
+            "jobTitle": "Founder",
+            "url": "https://acme.test/team/",
+        }
+        for value in bad
+    ]
+    assert sp._schema_evidence(records)["people"] == []
+
+
+def test_people_extractor_keeps_real_decision_people():
+    import empire_os.search_fabric.site_probe as sp
+
+    for value in (
+        "Adrian De La Garza",
+        "Husnain Arbi",
+        "Jamie Benfield",
+        "William Stapleton",
+    ):
+        assert sp._looks_like_visible_person_name(value) is True, value

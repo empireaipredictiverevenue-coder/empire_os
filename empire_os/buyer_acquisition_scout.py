@@ -21,6 +21,10 @@ from urllib.parse import urlparse
 from empire_os.buyer_acquisition_team import (
     commercial_research_profile, direct_buyer_profile,
 )
+from empire_os.buyer_discovery import (
+    classify_decision_role,
+    looks_like_person_name,
+)
 from empire_os.buyer_scout_review_readiness import reliable_business_name
 from empire_os.icp_buyer_trigger_intelligence import (
     assess_icp_candidate,
@@ -90,6 +94,36 @@ def _clean_site_title(value: Any) -> str:
             if reliable_business_name(candidate):
                 return candidate
     return text
+
+
+def _credible_first_party_people(
+    evidence: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for raw in evidence.get("people") or []:
+        if not isinstance(raw, Mapping):
+            continue
+        name = str(raw.get("name") or "").strip()
+        title = str(raw.get("title") or "").strip()
+        if not looks_like_person_name(name):
+            continue
+        _role, score = classify_decision_role(title)
+        if score < 0.5:
+            continue
+        evidence_url = str(
+            raw.get("url")
+            or raw.get("evidence_url")
+            or ""
+        ).strip()
+        key = (name.casefold(), title.casefold(), evidence_url.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(dict(raw))
+        if len(rows) >= 10:
+            break
+    return rows
 
 
 def _site_corpus(evidence: Mapping[str, Any]) -> str:
@@ -592,6 +626,7 @@ def run_buyer_scout(
             for item in provenance[domain]
             if str(item.get("icp_profile_key") or "")
         })
+        credible_people = _credible_first_party_people(evidence)
         icp = assess_icp_candidate(
             {
                 **record,
@@ -600,9 +635,7 @@ def run_buyer_scout(
                 "reseller_signal_hits": profile["reseller_signal_hits"],
                 "target_buyer_pools": pools,
                 "target_product_codes": products,
-                "first_party_people": list(
-                    evidence.get("people") or []
-                )[:10],
+                "first_party_people": credible_people,
             },
             target_profile_keys=icp_profiles,
         )
@@ -670,11 +703,7 @@ def run_buyer_scout(
             "first_party_phones": list(
                 evidence.get("phones") or []
             )[:10],
-            "first_party_people": [
-                dict(person)
-                for person in (evidence.get("people") or [])[:10]
-                if isinstance(person, Mapping)
-            ],
+            "first_party_people": credible_people,
             "buyer_type": profile["buyer_type"],
             "direct_buyer_score": profile["direct_buyer_score"],
             "explicit_direct_buyer_evidence": profile[
@@ -725,7 +754,7 @@ def run_buyer_scout(
             "site_evidence_score": evidence.get("evidence_score"),
             "first_party_email_count": len(evidence.get("emails") or []),
             "first_party_phone_count": len(evidence.get("phones") or []),
-            "people_count": len(evidence.get("people") or []),
+            "people_count": len(credible_people),
             "candidate_state": "RESEARCH_EVIDENCE_ONLY",
             "canonical_identity_verified": False,
             "commercial_terms_verified": False,

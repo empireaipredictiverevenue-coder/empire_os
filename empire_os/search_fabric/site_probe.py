@@ -164,6 +164,9 @@ _NON_PERSON_WORDS = {
     "our", "staff", "team", "the", "people", "services", "service",
     "founder", "owner", "president", "principal", "director", "manager",
     "chief", "executive", "officer", "ceo", "cro", "cco", "partner",
+    "press", "release", "strategy", "systems", "architecture", "agency",
+    "association", "national", "joins", "health", "first", "last", "full",
+    "name", "department", "division", "platform", "network", "ai",
 }
 
 _NON_PERSON_NAMES = {
@@ -548,12 +551,15 @@ def _schema_evidence(records: List[Dict[str, Any]]) -> Dict[str, Any]:
                     # A name-only Person record with a profile URL that
                     # clearly names somebody else is malformed first-party
                     # evidence. Fail closed rather than binding it.
-                    if not (
-                        person_url
-                        and not person_email
-                        and _person_url_conflicts_with_name(
-                            person_name,
-                            person_url,
+                    if (
+                        _looks_like_visible_person_name(person_name)
+                        and not (
+                            person_url
+                            and not person_email
+                            and _person_url_conflicts_with_name(
+                                person_name,
+                                person_url,
+                            )
                         )
                     ):
                         people.append({
