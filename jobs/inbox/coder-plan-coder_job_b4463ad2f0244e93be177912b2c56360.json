@@ -1,0 +1,14 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [],
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T23:10:04.877002+00:00",
+  "job_id": "coder-plan-coder_job_b4463ad2f0244e93be177912b2c56360",
+  "kind": "code_task",
+  "lease_resources": [],
+  "max_runtime_seconds": 600,
+  "prompt": "Produce a concise advisory implementation PLAN ONLY for the following EmpireOS task. Do not edit files, emit deployment commands, perform production actions, contact external parties, mutate databases, move funds, or expand authority. Identify affected modules, focused tests, main risks, dependencies, and approval gates.\n\nTASK:\nConverge EmpireOS specialist acquisition/revenue producers into one business-wide event-driven Revenue Fast Lane. Inventory and integrate: lead_sniper_agent, idle_asset_sniper_agent, scanner modules including adgen_scanner and source scanners, satellite_damage_agent / satellite_damage_bda_agent / satellite product flows, mass_tort_agent and legal_mass_tort_intelligence, product_research_agent, buyer_hunter_agent, lead_handler_agent, contractor/b2b scrapers, permit/solar/storm/public-signal sources, marketplace and related specialist acquisition agents. Preserve specialist discovery logic but remove/retire any legacy direct si_outbox or standalone queue behavior that bypasses canonical EmpireDB/GTM governance. Target architecture: specialist producer -> canonical prospect/opportunity event -> durable GTM job -> qualification -> identity/contact verification -> buyer/offer match -> outreach-review packet -> founder gate. Use existing autonomous_execution_bus durable claim/lease/idempotency machinery; do not replace business logic with cron. Add explicit internal-safe adapter allowlist so only reversible internal stages can execute automatically. External outbound, terms, payment, fulfilment, destructive infra, and authority expansion must remain founder-gated. Add latency/stage metrics, dead-letter/blocker state, bounded retries, idempotency, and tests. Do not deploy or enable broader production authority.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
