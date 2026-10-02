@@ -815,7 +815,7 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Founder execution-ledger read API — LIVE VERIFIED 2026-10-02
 - [x] Control Fabric execution-plane registration — LIVE VERIFIED 2026-10-02
 - [x] Swarm V6 verification hook for candidate worker output — LIVE VERIFIED 2026-10-02
-- [ ] Promptfoo AI-policy/eval hook for agent-produced behavioral changes
+- [x] Promptfoo AI-policy/eval hook for agent-produced behavioral changes — LIVE VERIFIED 2026-10-02
 - [ ] OTEL/Langfuse trace events for queue → route → lease → worker → verify → proposal → live result
 - [x] Astra/department queue automatic dispatch into the execution plane — LIVE VERIFIED 2026-10-02
 - [ ] Live parallel non-overlapping Hermes/Pi proof
