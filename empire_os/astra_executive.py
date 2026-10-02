@@ -41,6 +41,15 @@ QUANT_REVIEW = Path(
 CONTROL_FABRIC = Path("runtime/control_fabric/latest.json")
 OUTPUT = Path("runtime/astra/executive_latest.json")
 
+REVENUE_NORTH_STAR = {
+    "objective": "maximize_verified_revenue",
+    "first_milestone_gbp": 10_000,
+    "scale_milestone_gbp": 100_000,
+    "enterprise_upside": "uncapped",
+    "terminal_target": None,
+    "truth_rule": "recognized_revenue_only",
+}
+
 
 CAPABILITY_COMPONENT = {
     "conversation_os": "conversation_os",
@@ -211,6 +220,7 @@ def build_world_state(
         "recognized_revenue_cents": recognized,
         "realized_gp_cents": realized_gp,
         "revenue_state_known": recognized is not None,
+        "revenue_north_star": dict(REVENUE_NORTH_STAR),
         "revenue_blocker": _clean(
             pulse.get("highest_priority_blocker")
         ) or None,
@@ -252,6 +262,35 @@ def build_world_state(
 def derive_goals(world: Mapping[str, Any]) -> tuple[ExecutiveGoal, ...]:
     goals: list[ExecutiveGoal] = []
 
+    revenue = world.get("recognized_revenue_cents")
+    blocker = _clean(world.get("revenue_blocker"))
+    goals.append(ExecutiveGoal(
+        key="maximize_verified_revenue",
+        objective=(
+            "Continuously maximize verified revenue using the full Empire "
+            "intelligence and commercial stack. Treat GBP 10k monthly as the "
+            "first milestone, GBP 100k monthly as the scale milestone, and "
+            "enterprise upside as uncapped."
+        ),
+        priority=100,
+        reason=(
+            f"recognized_revenue_cents={revenue}; "
+            f"current_blocker={blocker or 'none'}; "
+            "revenue_north_star_is_non_terminal"
+        ),
+        evidence_refs=(
+            "runtime:revenue_pulse",
+            "runtime:predictive_cloud",
+            "runtime:opportunity_factory",
+            "runtime:buyer_acquisition",
+            "runtime:commercial_exchange",
+        ),
+        success_condition=(
+            "verified commercial state advances and recognized revenue grows "
+            "without treating forecast, modelled economics or intent as revenue"
+        ),
+    ))
+
     unavailable = tuple(world.get("unavailable_components") or ())
     stale = tuple(world.get("stale_components") or ())
     if unavailable or stale:
@@ -265,7 +304,7 @@ def derive_goals(world: Mapping[str, Any]) -> tuple[ExecutiveGoal, ...]:
                 "Restore fresh canonical business state before relying on "
                 "degraded or missing intelligence."
             ),
-            priority=100,
+            priority=99,
             reason=(
                 f"unavailable={len(unavailable)} stale={len(stale)}"
             ),
@@ -275,8 +314,6 @@ def derive_goals(world: Mapping[str, Any]) -> tuple[ExecutiveGoal, ...]:
             ),
         ))
 
-    revenue = world.get("recognized_revenue_cents")
-    blocker = _clean(world.get("revenue_blocker"))
     if revenue == 0 and blocker:
         goals.append(ExecutiveGoal(
             key="advance_first_verified_revenue",
@@ -558,15 +595,19 @@ def build_plan(
     primary = goals[0]
     steps: list[ExecutivePlanStep] = []
 
-    if primary.key == "restore_operating_truth":
+    truth_goal = next(
+        (goal for goal in goals if goal.key == "restore_operating_truth"),
+        None,
+    )
+    if truth_goal is not None:
         steps.append(_step(
-            goal=primary,
+            goal=truth_goal,
             ordinal=1,
             action="refresh_predictive_cloud_truth",
             component="ops_sentinel",
-            rationale=primary.reason,
-            success_condition=primary.success_condition,
-            evidence_refs=primary.evidence_refs,
+            rationale=truth_goal.reason,
+            success_condition=truth_goal.success_condition,
+            evidence_refs=truth_goal.evidence_refs,
             topic_keys=("freshness", "source_health"),
             task_type="execution_review",
         ))

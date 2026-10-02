@@ -89,7 +89,7 @@ def test_world_state_preserves_revenue_truth_and_routes():
     assert world["execution_authority"] == "none"
 
 
-def test_goals_prioritize_first_real_revenue_then_buyer_progression():
+def test_goals_keep_verified_revenue_as_permanent_north_star():
     world = build_world_state(
         predictive_status=status(),
         evidence_routes=routes(),
@@ -97,23 +97,51 @@ def test_goals_prioritize_first_real_revenue_then_buyer_progression():
         revenue_pulse=pulse(),
     )
     goals = derive_goals(world)
-    assert goals[0].key == "advance_first_verified_revenue"
+    assert goals[0].key == "maximize_verified_revenue"
+    assert goals[0].priority == 100
+    assert any(
+        goal.key == "advance_first_verified_revenue"
+        for goal in goals
+    )
     assert any(
         goal.key == "complete_opportunity_evidence"
         for goal in goals
     )
+    assert world["revenue_north_star"] == {
+        "objective": "maximize_verified_revenue",
+        "first_milestone_gbp": 10_000,
+        "scale_milestone_gbp": 100_000,
+        "enterprise_upside": "uncapped",
+        "terminal_target": None,
+        "truth_rule": "recognized_revenue_only",
+    }
 
 
-def test_missing_truth_outranks_revenue_work():
+def test_missing_truth_is_prerequisite_without_replacing_revenue_north_star():
+    predictive = status(unavailable=("source_health",))
     world = build_world_state(
-        predictive_status=status(unavailable=("source_health",)),
+        predictive_status=predictive,
         evidence_routes=routes(),
         next_best_action=nba(),
         revenue_pulse=pulse(),
     )
     goals = derive_goals(world)
-    assert goals[0].key == "restore_operating_truth"
-    assert goals[0].priority == 100
+    assert goals[0].key == "maximize_verified_revenue"
+    truth_goal = next(
+        goal for goal in goals
+        if goal.key == "restore_operating_truth"
+    )
+    assert truth_goal.priority == 99
+
+    result = build_executive_snapshot(
+        predictive_status=predictive,
+        evidence_routes=routes(),
+        next_best_action=nba(),
+        revenue_pulse=pulse(),
+    )
+    assert result["primary_goal"]["key"] == "maximize_verified_revenue"
+    assert result["plan"][0]["action"] == "refresh_predictive_cloud_truth"
+    assert result["plan"][0]["goal_key"] == "restore_operating_truth"
 
 
 def test_executive_delegates_to_existing_components_with_memory_scope():
