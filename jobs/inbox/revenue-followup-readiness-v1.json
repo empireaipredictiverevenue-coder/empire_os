@@ -1,0 +1,27 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/revenue_followup_readiness.py",
+    "scripts/build_revenue_followup_readiness.py",
+    "tests/test_revenue_followup_readiness.py",
+    "docs/architecture/revenue_followup_readiness_v1.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T20:28:14.855019+00:00",
+  "job_id": "revenue-followup-readiness-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:revenue_followup_readiness",
+    "path:empire_os/revenue_followup_readiness.py",
+    "path:scripts/build_revenue_followup_readiness.py",
+    "path:tests/test_revenue_followup_readiness.py",
+    "path:docs/architecture/revenue_followup_readiness_v1.md"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "REVENUE FIRST. Build a read-only canonical follow-up readiness materializer for already approved and sent/delivered buyer outreach with no commercial reply. Rank only person-bound, approved-review-backed records using canonical outbound intent/reply/review evidence, age/freshness and offer value. Emit who is due, why, evidence refs, and blockers. Explicitly exclude unsubscribes, suppressed contacts, bounces and any contact without valid personhood. No email send, call, approval, terms or external execution authority. Provide tests and an OBSERVE runtime script.",
+  "pytest_targets": [
+    "tests/test_revenue_followup_readiness.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
