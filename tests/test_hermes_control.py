@@ -280,7 +280,7 @@ def test_resident_worker_uses_isolated_omniroute_config(monkeypatch, tmp_path):
     assert '"max_tokens": 16384' in config
 
 
-def test_omniroute_model_selector_uses_live_catalog_and_skips_failed_candidates(monkeypatch):
+def test_omniroute_model_selector_uses_live_catalog_and_skips_failed_candidates(monkeypatch, tmp_path):
     from empire_os import hermes_control
 
     catalog = (
@@ -309,6 +309,7 @@ def test_omniroute_model_selector_uses_live_catalog_and_skips_failed_candidates(
         fake_probe,
     )
     monkeypatch.delenv("EMPIRE_HERMES_MODEL_CANDIDATES", raising=False)
+    monkeypatch.setenv("LLM_HEALTH_PATH", str(tmp_path / "health.json"))
 
     model, attempts = hermes_control._select_omniroute_model(
         {
@@ -376,7 +377,7 @@ def test_omniroute_catalog_ranking_requires_opt_in_for_paid_models():
     assert "openrouter/openrouter/free" in paid_allowed
 
 
-def test_omniroute_model_selector_retries_free_router_cooldown_once(monkeypatch):
+def test_omniroute_model_selector_retries_free_router_cooldown_once(monkeypatch, tmp_path):
     from empire_os import hermes_control
 
     catalog = (
@@ -412,6 +413,7 @@ def test_omniroute_model_selector_retries_free_router_cooldown_once(monkeypatch)
         lambda seconds: sleeps.append(seconds),
     )
     monkeypatch.delenv("EMPIRE_HERMES_MODEL_CANDIDATES", raising=False)
+    monkeypatch.setenv("LLM_HEALTH_PATH", str(tmp_path / "health.json"))
 
     model, attempts = hermes_control._select_omniroute_model(
         {
