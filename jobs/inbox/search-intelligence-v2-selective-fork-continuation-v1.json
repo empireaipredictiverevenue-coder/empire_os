@@ -1,0 +1,28 @@
+{
+  "ai_behavior_change": true,
+  "allowed_paths": [
+    "empire_os/search_intelligence/",
+    "tests/search_intelligence/",
+    "docs/architecture/search_intelligence_v2_agent_continuation.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T20:50:22.453821+00:00",
+  "job_id": "search-intelligence-v2-selective-fork-continuation-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "path:empire_os/search_intelligence/",
+    "path:tests/search_intelligence/",
+    "path:docs/architecture/search_intelligence_v2_agent_continuation.md"
+  ],
+  "max_runtime_seconds": 1800,
+  "prompt": "Continue the Empire Search Intelligence V2 selective-fork programme. Read docs/architecture/search_intelligence_v2_selective_fork.md, docs/SEARCH_PRODUCT_OPEN_SOURCE_INTAKE_2026-09-20.md, docs/architecture/search_evidence_fabric_v1.md, empire_os/search_intelligence/evidence_fabric.py and technical_audit.py first. Preserve Empire Search Fabric/Web Intelligence Crawler as canonical. Reuse or reimplement bounded patterns from OpenSEO, SEOnaut, SerpBear, Unlighthouse/Lighthouse, SiteOne, GPT Researcher, Advance-Labs/aeo-toolkit, Auriti-Labs/geo-optimizer-skill and discoveredlabs/awesome-aeo-seo; Firecrawl remains reference-only. Upgrade missing/weak Search/SEO/AEO/GEO capability contracts, prioritising evidence-backed technical audit depth, rank-history/SERP ingestion design, AI crawler accessibility, structured-data/citation readiness, AEO/GEO visibility, competitor citation gaps and product reporting. Do not create parallel platforms. UNKNOWN stays UNKNOWN. No synthetic rank/traffic/authority/citation/revenue. No publishing, indexing, outreach, payment, commercial or production deployment authority. Do not touch Digital Avatar/Recall or Founder Dashboard-owned files. Run focused and relevant Search regressions and leave changes as a verified candidate only.",
+  "pytest_targets": [
+    "tests/search_intelligence/test_evidence_fabric.py",
+    "tests/search_intelligence/test_technical_audit.py",
+    "tests/search_intelligence/test_ai_visibility.py",
+    "tests/search_intelligence/test_citation_gap.py",
+    "tests/search_intelligence/test_competitor_gap.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
