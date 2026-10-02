@@ -546,3 +546,44 @@ def test_pipeline_only_uses_fresh_approved_contacts_as_duplicate_blockers():
     assert "reviewed_at=gte." in approved_path
     assert "order=reviewed_at.desc" in approved_path
     assert "2026-09-14T16%3A00%3A00%2B00%3A00" in approved_path
+
+
+def test_offer_outside_standing_authority_is_routed_to_founder_review():
+    review = {
+        "id": "review-1",
+        "prospect_id": "prospect-1",
+        "contact_name": "Jane Smith",
+        "contact_title": "Founder",
+        "contact_email": "jane@example.com",
+        "offer_key": "predictive_revenue_diagnostic",
+        "company_score": 90,
+        "decision_score": 1.0,
+        "proposed_at": NOW.isoformat(),
+    }
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            if "status=eq.pending" in path:
+                return [review]
+            return []
+        if path.endswith("auto_review_buyer_candidate"):
+            raise RuntimeError("offer outside standing authority")
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+
+    assert result.candidate_skipped == 1
+    assert len(result.founder_review_required) == 1
+    row = result.founder_review_required[0]
+    assert row["review_id"] == "review-1"
+    assert row["offer_key"] == "predictive_revenue_diagnostic"
+    assert row["founder_gate_required"] is True
+    assert row["outbound_authorized"] is False
+    assert not any(
+        "offer outside standing authority" in reason
+        for reason in result.deferred_reasons
+    )

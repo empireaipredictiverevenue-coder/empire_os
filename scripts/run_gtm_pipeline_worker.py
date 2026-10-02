@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from pathlib import Path
 
 from empire_os.adaptive_outreach_optimizer import load_snapshot
 from empire_os.gtm_pipeline_worker import run_gtm_pipeline
@@ -21,6 +22,26 @@ def main() -> int:
     )
     payload = result.as_dict()
     payload["ok"] = not payload["proposal_errors"]
+    review_path = Path(
+        "/srv/empire_os/runtime/gtm_pipeline/"
+        "founder_review_required_latest.json"
+    )
+    review_path.parent.mkdir(parents=True, exist_ok=True)
+    review_payload = {
+        "schema_version": "empire.gtm-founder-review-required.v1",
+        "count": len(payload["founder_review_required"]),
+        "items": payload["founder_review_required"],
+        "founder_gate_required": bool(
+            payload["founder_review_required"]
+        ),
+        "outbound_authorized": False,
+        "execution_authority": "none",
+    }
+    tmp = review_path.with_suffix(".json.tmp")
+    tmp.write_text(
+        json.dumps(review_payload, indent=2, sort_keys=True) + "\n"
+    )
+    tmp.replace(review_path)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if payload["ok"] else 2
 

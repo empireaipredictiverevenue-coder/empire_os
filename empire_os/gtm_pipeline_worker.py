@@ -28,6 +28,7 @@ class GTMPipelineResult:
     intents_proposed: int
     outreach_deferred: int
     deferred_reasons: tuple[str, ...]
+    founder_review_required: tuple[dict[str, Any], ...]
     proposal_errors: tuple[str, ...]
 
     def as_dict(self) -> dict[str, Any]:
@@ -39,6 +40,9 @@ class GTMPipelineResult:
             "intents_proposed": self.intents_proposed,
             "outreach_deferred": self.outreach_deferred,
             "deferred_reasons": list(self.deferred_reasons),
+            "founder_review_required": [
+                dict(item) for item in self.founder_review_required
+            ],
             "proposal_errors": list(self.proposal_errors),
             "actual_revenue": False,
             "payment_mutation": False,
@@ -332,7 +336,10 @@ def run_gtm_pipeline(
 
     pending_cutoff = current - timedelta(days=7)
     pending_query = urlencode({
-        "select": "id,contact_email,proposed_at",
+        "select": (
+            "id,prospect_id,contact_name,contact_title,contact_email,"
+            "offer_key,company_score,decision_score,proposed_at"
+        ),
         "status": "eq.pending",
         "proposed_at": f"gte.{pending_cutoff.isoformat()}",
         "order": "proposed_at.desc",
@@ -369,6 +376,7 @@ def run_gtm_pipeline(
     approved_count = 0
     skipped = 0
     pending_skip_reasons: list[str] = []
+    founder_review_required: list[dict[str, Any]] = []
     for row in pending:
         review_id = str((row or {}).get("id") or "").strip()
         if not review_id:
@@ -402,9 +410,34 @@ def run_gtm_pipeline(
                 )
         except Exception as exc:
             skipped += 1
-            pending_skip_reasons.append(
-                f"{review_id}:{type(exc).__name__}:{str(exc)[:180]}"
-            )
+            message = str(exc)
+            if "offer outside standing authority" in message:
+                founder_review_required.append({
+                    "review_id": review_id,
+                    "prospect_id": str(
+                        (row or {}).get("prospect_id") or ""
+                    ).strip() or None,
+                    "contact_name": str(
+                        (row or {}).get("contact_name") or ""
+                    ).strip() or None,
+                    "contact_title": str(
+                        (row or {}).get("contact_title") or ""
+                    ).strip() or None,
+                    "contact_email": contact or None,
+                    "offer_key": str(
+                        (row or {}).get("offer_key") or ""
+                    ).strip() or None,
+                    "company_score": (row or {}).get("company_score"),
+                    "decision_score": (row or {}).get("decision_score"),
+                    "proposed_at": (row or {}).get("proposed_at"),
+                    "reason": "offer_outside_standing_authority",
+                    "founder_gate_required": True,
+                    "outbound_authorized": False,
+                })
+            else:
+                pending_skip_reasons.append(
+                    f"{review_id}:{type(exc).__name__}:{message[:180]}"
+                )
 
     ready = request(
         "POST",
@@ -470,5 +503,6 @@ def run_gtm_pipeline(
         intents_proposed=proposed,
         outreach_deferred=deferred,
         deferred_reasons=tuple(deferred_reasons + pending_skip_reasons),
+        founder_review_required=tuple(founder_review_required),
         proposal_errors=tuple(errors),
     )
