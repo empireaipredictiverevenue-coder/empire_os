@@ -6,9 +6,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 
+from empire_os.adaptive_outreach_optimizer import (
+    build_body_arm_candidates,
+    build_subject_arm_candidates,
+    select_message_arms,
+)
 from empire_os.conversation_value import build_first_touch_copy
 from empire_os.buyer_discovery import looks_like_person_name
 from empire_os.locale_intelligence import contact_window_status, resolve_locale
+from empire_os.outreach_message_optimizer import review_message
 
 POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
 
@@ -119,6 +125,7 @@ def build_outbound_payload(
     review: Mapping[str, Any],
     *,
     now: datetime,
+    optimizer_snapshot: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if now.tzinfo is None:
         raise ValueError("now must include timezone")
@@ -144,9 +151,123 @@ def build_outbound_payload(
     copy = build_first_touch_copy(review, now=now)
     subject = copy.subject
     body = copy.body
+    adaptive_selection = None
+    selected_quality = (
+        dict(copy.quality_review)
+        if isinstance(copy.quality_review, Mapping)
+        else None
+    )
+
     review_id = str(review.get("id") or "").strip()
     if not review_id:
         raise ValueError("review id required")
+
+    if optimizer_snapshot is not None:
+        body_rows = build_body_arm_candidates(
+            business_name=business,
+            observed_evidence=(
+                copy.why_now_summary
+                or copy.specific_proof
+                or ""
+            ),
+        )
+        subject_rows = build_subject_arm_candidates(
+            copy.subject_variants,
+            business_name=business,
+            territory=metro,
+        )
+
+        # Every candidate must pass the canonical message quality gate before
+        # it can enter the adaptive experiment.
+        safe_subjects = []
+        for row in subject_rows:
+            quality = review_message(
+                subject=str(row["subject"]),
+                body=str(body_rows[0]["core_body"]),
+                cta=str(body_rows[0]["cta"]),
+                contact_title=str(review.get("contact_title") or ""),
+            )
+            eligible = quality.get(
+                "experiment_eligible",
+                int(quality.get("score") or 0) >= 80,
+            )
+            if bool(eligible) and int(quality.get("score") or 0) >= 80:
+                safe_subjects.append(row)
+
+        safe_bodies = []
+        safe_subject = (
+            str(safe_subjects[0]["subject"])
+            if safe_subjects
+            else copy.subject
+        )
+        for row in body_rows:
+            quality = review_message(
+                subject=safe_subject,
+                body=str(row["core_body"]),
+                cta=str(row["cta"]),
+                contact_title=str(review.get("contact_title") or ""),
+            )
+            eligible = quality.get(
+                "experiment_eligible",
+                int(quality.get("score") or 0) >= 80,
+            )
+            if bool(eligible) and int(quality.get("score") or 0) >= 80:
+                safe_bodies.append(row)
+
+        if len(safe_subjects) < 2 or len(safe_bodies) < 2:
+            raise ValueError(
+                "insufficient quality-gated adaptive outreach variants"
+            )
+
+        adaptive_selection = select_message_arms(
+            assignment_key=review_id,
+            subject_arm_ids=[
+                str(row["variant_id"])
+                for row in safe_subjects
+            ],
+            body_arm_ids=[
+                str(row["variant_id"])
+                for row in safe_bodies
+            ],
+            offer_key=str(review.get("offer_key") or "managed_service"),
+            niche=niche,
+            decision_role=evidence.get("decision_role"),
+            snapshot=optimizer_snapshot,
+        )
+        subject_row = next(
+            row for row in safe_subjects
+            if row["variant_id"] == adaptive_selection["subject_arm"]
+        )
+        body_row = next(
+            row for row in safe_bodies
+            if row["variant_id"] == adaptive_selection["body_arm"]
+        )
+        subject = str(subject_row["subject"])
+        core_body = str(body_row["core_body"])
+        body = (
+            f"Hi {first},\n\n"
+            f"{core_body}\n\n"
+            "Best,\nPhil\nFounder, Empire AI\nempire-ai.co.uk\n\n"
+            f"{POSTAL_ADDRESS}\n"
+            "If you’d rather not hear from me, reply “opt out”."
+        )
+        selected_quality = review_message(
+            subject=subject,
+            body=core_body,
+            cta=str(body_row["cta"]),
+            contact_title=str(review.get("contact_title") or ""),
+        )
+        eligible = selected_quality.get(
+            "experiment_eligible",
+            int(selected_quality.get("score") or 0) >= 80,
+        )
+        if not bool(eligible) or int(
+            selected_quality.get("score") or 0
+        ) < 80:
+            raise ValueError(
+                "adaptive outreach variant failed message quality gate"
+            )
+
     return {
         "p_review_id": review_id,
         "p_subject": subject,
@@ -163,11 +284,26 @@ def build_outbound_payload(
             "business_name": business,
             "conversation_quality": "v2",
             "conversation_quality_tier": copy.quality_tier,
-            "message_optimizer_version": "v1",
+            "message_optimizer_version": (
+                "adaptive_v1"
+                if adaptive_selection is not None
+                else "v1"
+            ),
             "subject_variants": list(copy.subject_variants),
-            "message_quality_review": (
-                dict(copy.quality_review)
-                if isinstance(copy.quality_review, Mapping)
+            "message_quality_review": selected_quality,
+            "adaptive_outreach": (
+                {
+                    **adaptive_selection,
+                    "subject_text": subject,
+                    "body_variant_id": (
+                        str(body_row["variant_id"])
+                        if adaptive_selection is not None
+                        else None
+                    ),
+                    "copy_policy": "human_plain_specific_v1",
+                    "ai_slop_allowed": False,
+                }
+                if adaptive_selection is not None
                 else None
             ),
             "why_now_summary": copy.why_now_summary,
@@ -186,6 +322,7 @@ def run_gtm_pipeline(
     limit: int = 25,
     daily_cap: int = 25,
     now: datetime | None = None,
+    optimizer_snapshot: Mapping[str, Any] | None = None,
 ) -> GTMPipelineResult:
     bounded = max(1, min(int(limit), 50))
     cap = max(1, min(int(daily_cap), 50))
@@ -279,7 +416,11 @@ def run_gtm_pipeline(
     for review in ready[:bounded]:
         try:
             hydrated = _hydrate_review_evidence(request, review)
-            payload = build_outbound_payload(hydrated, now=current)
+            payload = build_outbound_payload(
+                hydrated,
+                now=current,
+                optimizer_snapshot=optimizer_snapshot,
+            )
             result = request(
                 "POST",
                 "/rest/v1/rpc/propose_reviewed_outbound_intent",

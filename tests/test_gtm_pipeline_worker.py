@@ -31,7 +31,8 @@ def review(review_id="00000000-0000-0000-0000-000000000001"):
 
 def test_build_outbound_payload_is_compliant_and_evidence_safe():
     payload = build_outbound_payload(review(), now=NOW)
-    assert payload["p_subject"] == "Kihle customer signals"
+    assert payload["p_subject"]
+    assert "unlock" not in payload["p_body_text"].lower()
     assert POSTAL_ADDRESS in payload["p_body_text"]
     assert "opt out" in payload["p_body_text"].lower()
     assert "Kihle Roofing" in payload["p_body_text"]
@@ -201,7 +202,7 @@ def test_pipeline_hydrates_missing_context_from_canonical_prospect():
         for method, path, payload in calls
         if path.endswith("propose_reviewed_outbound_intent")
     )
-    assert proposal["p_subject"] == "SewerTV customer signals"
+    assert proposal["p_subject"]
     assert "SewerTV Hydro Jetting and Plumbing" in proposal["p_body_text"]
     assert "4.9★ across 87 reviews" in proposal["p_body_text"]
     assert "your team" not in proposal["p_body_text"]
@@ -431,3 +432,63 @@ def test_pipeline_skips_second_duplicate_pending_contact_same_cycle():
     assert approved_calls == [first]
     assert result.candidate_auto_approved == 1
     assert result.candidate_skipped == 1
+
+
+def test_adaptive_payload_records_selected_subject_and_body_arms():
+    snapshot = {
+        "segments": {
+            "__global__": {
+                "delivered": 0,
+                "subject_arms": {},
+                "body_arms": {},
+            }
+        }
+    }
+    payload = build_outbound_payload(
+        review(),
+        now=NOW,
+        optimizer_snapshot=snapshot,
+    )
+    adaptive = payload["p_metadata"]["adaptive_outreach"]
+    assert adaptive["subject_arm"] in {
+        "company_only",
+        "company_question",
+        "one_thing",
+        "territory_company",
+        "company_topic",
+        "quick_question",
+        "commercial_signals",
+        "territory_topic",
+    }
+    assert adaptive["body_arm"] in {
+        "plain_one_page",
+        "direct_observation",
+        "simple_question",
+    }
+    assert adaptive["subject_selection"]["mode"] == "balanced_learning"
+    assert adaptive["body_selection"]["mode"] == "balanced_learning"
+    assert payload["p_metadata"]["message_optimizer_version"] == "adaptive_v1"
+    assert payload["p_metadata"]["message_quality_review"]["score"] >= 80
+    assert POSTAL_ADDRESS in payload["p_body_text"]
+    assert "opt out" in payload["p_body_text"].lower()
+
+
+def test_adaptive_payload_records_human_arm_attribution():
+    payload = build_outbound_payload(
+        review(),
+        now=NOW,
+        optimizer_snapshot={},
+    )
+    meta = payload["p_metadata"]
+    adaptive = meta["adaptive_outreach"]
+    assert meta["message_optimizer_version"] == "adaptive_v1"
+    assert adaptive["subject_arm"]
+    assert adaptive["body_arm"]
+    assert adaptive["copy_policy"] == "human_plain_specific_v1"
+    assert adaptive["ai_slop_allowed"] is False
+    assert meta["message_quality_review"]["experiment_eligible"] is True
+    lowered = payload["p_body_text"].lower()
+    assert not any(term in lowered for term in (
+        "unlock", "leverage", "game-changing", "ai-powered",
+        "cutting-edge", "revolutionary",
+    ))

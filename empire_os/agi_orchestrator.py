@@ -105,14 +105,67 @@ def _specialist_review(
             "causal_claim": packet.get("causal_claim"),
         })
     elif name == "quantum_optimization":
+        schema_version = _text(packet.get("schema_version"))
+        fabric_v2 = (
+            schema_version
+            == "empire.intelligence_optimization_fabric.v2"
+        )
+        solver_route = packet.get("solver_route")
+        solver_route = (
+            solver_route
+            if isinstance(solver_route, Mapping)
+            else {}
+        )
         review.update({
-            "qaoa_ready": packet.get("qaoa_ready"),
+            "qaoa_ready": (
+                packet.get("qaoa_ready")
+                if not fabric_v2
+                else packet.get("qaoa_model_eligible")
+            ),
             "model_type": packet.get("model_type"),
             "external_solver_called": packet.get(
                 "external_solver_called"
             ),
             "quantum_advantage_claimed": packet.get(
                 "quantum_advantage_claimed"
+            ),
+            "optimization_fabric_v2": fabric_v2,
+            "solver_execution_ready": (
+                packet.get("solver_execution_ready")
+                if fabric_v2
+                else None
+            ),
+            "primary_solver": (
+                packet.get("primary_solver")
+                if fabric_v2
+                else None
+            ),
+            "primary_reference_quality": (
+                packet.get("primary_reference_quality")
+                if fabric_v2
+                else None
+            ),
+            "cqm_model_eligible": (
+                packet.get("cqm_model_eligible")
+                if fabric_v2
+                else None
+            ),
+            "benchmark_lane_count": (
+                packet.get("benchmark_lane_count")
+                if fabric_v2
+                else None
+            ),
+            "global_constraint_reconciliation_required": (
+                packet.get(
+                    "global_constraint_reconciliation_required"
+                )
+                if fabric_v2
+                else None
+            ),
+            "solver_routing_reason": (
+                solver_route.get("routing_reason")
+                if fabric_v2
+                else None
             ),
         })
     elif name == "economic_memory":
@@ -166,6 +219,16 @@ def _candidate_workstreams(
 
     quantum = reviews["quantum_optimization"]
     if (
+        quantum.get("optimization_fabric_v2") is True
+        and quantum.get("solver_execution_ready") is False
+    ):
+        candidates.append({
+            "workstream": "establish_compatible_solver_lane",
+            "priority": 72,
+            "reason": "optimization_problem_has_no_implemented_compatible_solver",
+            "side_effect_class": "none",
+        })
+    elif (
         quantum.get("qaoa_ready") is True
         and quantum.get("external_solver_called") is not True
     ):

@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 
+from empire_os.adaptive_outreach_optimizer import load_snapshot
 from empire_os.gtm_pipeline_worker import run_gtm_pipeline
 from empire_os.sb import request_json
 def main() -> int:
@@ -16,6 +17,7 @@ def main() -> int:
         request_json,
         limit=args.limit,
         daily_cap=cap,
+        optimizer_snapshot=load_snapshot(),
     )
     payload = result.as_dict()
     payload["ok"] = not payload["proposal_errors"]
