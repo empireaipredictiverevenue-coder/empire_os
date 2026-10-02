@@ -21,8 +21,14 @@ from empire_os.buyer_discovery import (
     build_candidate_review_plan,
     classify_decision_role,
     looks_like_person_name,
+    merge_public_web_contact_evidence,
+    verify_contact_plan,
 )
 from empire_os.buyer_probe_worker import rejection_reason
+from empire_os.mx_validator import MxValidator
+from empire_os.public_person_contact_evidence import (
+    collect_public_person_contact_evidence,
+)
 from empire_os.buyer_review_materializer import run_buyer_probe_isolated
 from empire_os.sb import request_json
 DEFERRED_LOCK = Path("/srv/empire_os/runtime/buyer_deferred_enrichment/run.lock")
@@ -80,6 +86,120 @@ def recover_identity_isolated(
         "decision": "deferred",
         "identity": None,
         "reason": "identity_recovery_invalid_shape",
+    }
+
+
+_TRUSTED_CONTACT_RECOVERY_SOURCES = {
+    "website_structured_data",
+    "official_site_current",
+    "hunter_confirmed_first_party",
+    "empire_first_party_people_probe",
+}
+
+
+def _direct_public_contact_recovery(
+    candidate: Any,
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    """Recover a bound email without re-running the full site probe."""
+    if result.get("review_ready") is True:
+        return result
+
+    decision = result.get("decision_maker")
+    reconciliation = result.get("decision_reconciliation")
+    if isinstance(decision, dict):
+        if (
+            isinstance(reconciliation, dict)
+            and reconciliation.get("review_required") is True
+        ):
+            return result
+        name = str(decision.get("name") or "").strip()
+        title = str(decision.get("title") or "").strip()
+        source = str(decision.get("source") or "").strip()
+        role, score = classify_decision_role(title)
+        trusted = bool(
+            looks_like_person_name(name)
+            and score >= 0.70
+            and (
+                source in _TRUSTED_CONTACT_RECOVERY_SOURCES
+                or source.startswith("empire_registry:")
+                or source in {"public_web_corroborated", "official_site"}
+            )
+        )
+    else:
+        name = str(getattr(candidate, "contact_name", "") or "").strip()
+        title = str(getattr(candidate, "contact_title", "") or "").strip()
+        source = str(getattr(candidate, "contact_source", "") or "").strip()
+        role, score = classify_decision_role(title)
+        trusted = bool(
+            looks_like_person_name(name)
+            and score >= 0.70
+            and (
+                source in _TRUSTED_CONTACT_RECOVERY_SOURCES
+                or source.startswith("empire_registry:")
+            )
+        )
+        decision = {
+            "name": name,
+            "title": title,
+            "source": source,
+            "decision_role": role,
+            "decision_score": score,
+        } if trusted else None
+
+    if not trusted or not isinstance(decision, dict):
+        return result
+
+    observed = collect_public_person_contact_evidence(
+        business_name=str(candidate.business_name or ""),
+        website=str(candidate.website or ""),
+        person_name=name,
+        person_title=title,
+        max_queries=2,
+        max_results_per_query=4,
+        max_pages_total=3,
+    )
+    evidence = observed.get("evidence") or []
+    if not evidence:
+        return {
+            **result,
+            "public_person_contact_evidence": observed,
+        }
+
+    enriched = {
+        "decision_maker": dict(decision),
+        "decision_reconciliation": (
+            dict(reconciliation)
+            if isinstance(reconciliation, dict)
+            else {
+                "status": "trusted_identity_contact_recovery",
+                "review_required": False,
+                "decision_maker": dict(decision),
+            }
+        ),
+        "contact_candidates": [
+            dict(item)
+            for item in (result.get("contacts") or [])
+            if isinstance(item, dict)
+        ],
+    }
+    merged = merge_public_web_contact_evidence(enriched, evidence)
+    contact = verify_contact_plan(
+        merged,
+        validator=MxValidator(do_smtp_probe=False),
+        allow_company_routed=False,
+    )
+    return {
+        **result,
+        "decision_maker": contact.get("decision_maker") or decision,
+        "contacts": merged.get("contact_candidates") or [],
+        "verified_contacts": contact.get("verified_contacts") or [],
+        "preferred_email": contact.get("preferred_email"),
+        "contact_route": contact.get("contact_route"),
+        "person_bound": bool(contact.get("person_bound")),
+        "review_ready": bool(contact.get("review_ready")),
+        "outreach_ready": bool(contact.get("outreach_ready")),
+        "public_person_contact_evidence": observed,
     }
 
 
@@ -603,7 +723,7 @@ def run_cycle(
                     probe_row,
                     hard_timeout_seconds=BUYER_PROBE_TIMEOUT_SECONDS,
                     probe_options={
-                        "allow_public_person_contact_search": True,
+                        "allow_public_person_contact_search": False,
                     },
                 )
 
@@ -631,7 +751,7 @@ def run_cycle(
                             probe_row,
                             hard_timeout_seconds=BUYER_PROBE_TIMEOUT_SECONDS,
                             probe_options={
-                                "allow_public_person_contact_search": True,
+                                "allow_public_person_contact_search": False,
                             },
                         )
                         if not result.get("decision_maker"):
@@ -653,6 +773,11 @@ def run_cycle(
                                     "confidence"
                                 ),
                             }
+
+            result = _direct_public_contact_recovery(
+                candidate,
+                dict(result or {}),
+            )
 
             identity_recovered = False
             if (
