@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh EmpireOS Revenue Exchange snapshot every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=empire-revenue-exchange-snapshot.service
+
+[Install]
+WantedBy=timers.target

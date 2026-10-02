@@ -18,6 +18,7 @@ class Cursor:
     def __init__(self):
         self.calls = []
         self.description = [
+            Description("observation_key"),
             Description("niche"),
             Description("metro"),
             Description("qualified_inventory_count"),
@@ -25,6 +26,8 @@ class Cursor:
             Description("verified_price_per_lead_cents"),
             Description("observed_at"),
             Description("source"),
+            Description("evidence"),
+            Description("created_at"),
         ]
 
     def __enter__(self):
@@ -38,6 +41,7 @@ class Cursor:
 
     def fetchall(self):
         return [(
+            "roofing-london-1",
             "roofing",
             "London",
             12,
@@ -45,6 +49,8 @@ class Cursor:
             [7500, 10000],
             "2026-09-19T20:00:00+00:00",
             "canonical_exchange_projection",
+            {"evidence_refs": ["exchange:1"]},
+            "2026-09-19T20:00:01+00:00",
         )]
 
 

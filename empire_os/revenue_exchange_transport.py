@@ -91,13 +91,16 @@ class PostgresRevenueExchangeRpc:
 
 READ_SQL = """
 SELECT
+  observation_key,
   niche,
   metro,
   qualified_inventory_count,
   active_buyer_capacity,
   verified_price_per_lead_cents,
   observed_at,
-  source
+  source,
+  evidence,
+  created_at
 FROM public.revenue_exchange_observations
 ORDER BY observed_at DESC,id DESC
 LIMIT %s
