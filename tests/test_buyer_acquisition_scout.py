@@ -398,3 +398,87 @@ def test_scout_classifies_insurance_lane(monkeypatch):
     assert row["continuous_lane_candidate"] is True
     assert result["continuous_lane_candidate_counts"]["insurance"] == 1
     assert row["outreach_authorized"] is False
+
+
+def test_public_research_seed_supplements_weak_search_without_bypassing_gates(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {query: [] for query in queries},
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "canonical_url": "https://buyer.example",
+            "final_url": "https://buyer.example",
+            "business_names": ["Buyer Network"],
+            "title": "Buyer Network",
+            "description": (
+                "We buy leads for roofing campaigns and connect approved "
+                "publishers with advertisers using pay per call campaigns."
+            ),
+            "emails": ["partners@buyer.example"],
+            "phones": [],
+            "people": [],
+            "pages_checked": [],
+            "evidence_score": 0.95,
+        },
+    )
+
+    result = run_buyer_scout(
+        plan(),
+        max_queries=10,
+        max_domains=10,
+        max_probes=10,
+        research_seed_records=[{
+            "domain": "buyer.example",
+            "website": "https://buyer.example",
+            "source_refs": ["public:first_party:buyer.example"],
+            "source_queries": ['"roofing" "publisher" "pay per call"'],
+            "target_buyer_pools": ["direct_demand_buyers"],
+            "target_corridor_keys": [
+                "corridor:v1:roofing:austin_tx:qualified_lead:lead"
+            ],
+            "target_product_codes": ["permit_intelligence"],
+        }],
+    )
+
+    assert result["public_research_seed_domain_count"] == 1
+    assert result["public_research_seed_supplement_used"] is True
+    assert result["candidate_count"] == 1
+    row = result["candidates"][0]
+    assert row["domain"] == "buyer.example"
+    assert row["discovery_source"] == "public_research_seed"
+    assert row["explicit_direct_buyer_evidence"] is True
+    assert row["canonical_identity_verified"] is False
+    assert row["commercial_terms_verified"] is False
+    assert row["budget_verified"] is False
+    assert row["outreach_authorized"] is False
+    assert result["database_write_performed"] is False
+    assert result["outbound_sent"] is False
+    assert result["execution_authority"] == "none"
+
+def test_public_research_seed_does_not_overwrite_query_accounting(monkeypatch):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {query: [] for query in queries},
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {"ok": False, "error": "offline"},
+    )
+    result = run_buyer_scout(
+        plan(),
+        max_queries=10,
+        max_domains=10,
+        max_probes=10,
+        research_seed_records=[{
+            "domain": "buyer.example",
+            "website": "https://buyer.example",
+            "target_buyer_pools": ["direct_demand_buyers"],
+        }],
+    )
+    assert result["query_count"] == 4
+    assert len(result["queries"]) == 4

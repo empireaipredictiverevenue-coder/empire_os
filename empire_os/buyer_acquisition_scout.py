@@ -297,6 +297,7 @@ def run_buyer_scout(
     max_domains: int = 40,
     max_probes: int = 20,
     canonical_seed_records: list[Mapping[str, Any]] | None = None,
+    research_seed_records: list[Mapping[str, Any]] | None = None,
     search_enabled: bool = True,
 ) -> dict[str, Any]:
     queries = collect_research_queries(
@@ -398,12 +399,70 @@ def run_buyer_scout(
                 "canonical_niche": row.get("niche"),
             })
 
+    research_seed_domains: set[str] = set()
+    for raw in research_seed_records or []:
+        if not isinstance(raw, Mapping):
+            continue
+        row = dict(raw)
+        host = _host(str(row.get("website") or row.get("domain") or ""))
+        if not host:
+            continue
+        research_seed_domains.add(host)
+
+        pools = [
+            str(value).strip()
+            for value in (row.get("target_buyer_pools") or [])
+            if str(value).strip()
+        ] or ["direct_demand_buyers"]
+        corridors = [
+            str(value).strip()
+            for value in (row.get("target_corridor_keys") or [])
+            if str(value).strip()
+        ] or [None]
+        products = [
+            str(value).strip()
+            for value in (row.get("target_product_codes") or [])
+            if str(value).strip()
+        ] or [None]
+        seed_queries = [
+            str(value).strip()
+            for value in (row.get("source_queries") or [])
+            if str(value).strip()
+        ] or [None]
+        source_refs = [
+            str(value).strip()
+            for value in (row.get("source_refs") or [])
+            if str(value).strip()
+        ]
+
+        for pool in pools:
+            for corridor in corridors:
+                for product in products:
+                    for query in seed_queries:
+                        provenance.setdefault(host, []).append({
+                            "source": "public_research_seed",
+                            "source_refs": source_refs,
+                            "query": query,
+                            "buyer_pool": pool,
+                            "target_kind": "public_research_seed",
+                            "corridor_key": corridor,
+                            "opportunity_key": None,
+                            "product_code": product,
+                            "icp_profile_key": None,
+                            "buying_triggers": [],
+                            "decision_maker_roles": [],
+                        })
+
     seed_domain_count = len(canonical_seed_by_domain)
     opportunity_seed_domain_count = len(opportunity_seed_domains)
+    research_seed_domain_count = len(research_seed_domains)
 
     ranked_domains = sorted(
         provenance,
         key=lambda domain: (
+            0 if domain in opportunity_seed_domains else (
+                1 if domain in research_seed_domains else 2
+            ),
             -len(provenance[domain]),
             domain,
         ),
@@ -579,7 +638,11 @@ def run_buyer_scout(
             "discovery_source": (
                 "canonical_prospect_seed"
                 if domain in canonical_seed_by_domain
-                else "search_fabric"
+                else (
+                    "public_research_seed"
+                    if domain in research_seed_domains
+                    else "search_fabric"
+                )
             ),
             "canonical_seed_prospect_id": (
                 str(canonical_seed_by_domain.get(domain, {}).get("id"))
@@ -690,6 +753,10 @@ def run_buyer_scout(
         "search_domain_count": search_domain_count,
         "canonical_seed_domain_count": seed_domain_count,
         "opportunity_seed_domain_count": opportunity_seed_domain_count,
+        "public_research_seed_domain_count": research_seed_domain_count,
+        "public_research_seed_supplement_used": bool(
+            research_seed_domain_count
+        ),
         "canonical_seed_fallback_used": bool(
             seed_domain_count and search_domain_count == 0
         ),

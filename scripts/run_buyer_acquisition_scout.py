@@ -7,6 +7,9 @@ import json
 import urllib.parse
 
 from empire_os.buyer_acquisition_scout import refresh_buyer_scout
+from empire_os.buyer_public_research_seed import (
+    refresh_public_research_seeds,
+)
 from empire_os.sb import request_json
 SEED_LANES = (
     (
@@ -136,6 +139,12 @@ def main() -> int:
     parser.add_argument("--max-probes", type=int, default=20)
     args = parser.parse_args()
 
+    public_research = refresh_public_research_seeds(
+        args.repo_root,
+        max_queries=min(args.max_queries, 12),
+        results_per_query=min(args.results_per_query, 5),
+    )
+
     payload = refresh_buyer_scout(
         args.repo_root,
         max_queries=args.max_queries,
@@ -145,6 +154,7 @@ def main() -> int:
         canonical_seed_records=_canonical_seed_records(
             per_lane=8,
         ),
+        research_seed_records=public_research.get("seeds") or [],
     )
     print(json.dumps({
         "ok": True,
