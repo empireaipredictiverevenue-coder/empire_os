@@ -270,6 +270,85 @@ class ExecutionBusDataRepository:
             offset=offset,
         )
 
+    def inventory_prospects(
+        self,
+        *,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        return self._gateway.query(
+            "prospects",
+            PROSPECT_COLUMNS,
+            filters=(DataFilter.ne("status", "archived"),),
+            order=(
+                OrderSpec("buy_signal_score", descending=True, nulls_last=True),
+                OrderSpec("created_at", descending=True),
+            ),
+            limit=max(1, int(limit)),
+        )
+
+    def prospect_conversation_events(
+        self,
+        prospect_id: str,
+        *,
+        conversation_limit: int = 20,
+        event_limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        conversations = self._gateway.query(
+            "empire_conversations",
+            "id,channel,state,updated_at",
+            filters=(DataFilter.eq("prospect_id", prospect_id),),
+            order=(OrderSpec("updated_at", descending=True),),
+            limit=max(1, int(conversation_limit)),
+        )
+        by_id = {
+            str(row.get("id")): str(row.get("channel") or "")
+            for row in conversations
+            if row.get("id")
+        }
+        if not by_id:
+            return []
+        rows = self._gateway.query(
+            "empire_conversation_events",
+            "conversation_id,event_type,direction,provider_event_id,evidence,occurred_at",
+            filters=(DataFilter.in_("conversation_id", tuple(by_id)),),
+            order=(OrderSpec("occurred_at", descending=True),),
+            limit=max(1, int(event_limit)),
+        )
+        return [
+            {**row, "channel": by_id.get(str(row.get("conversation_id")), "")}
+            for row in rows
+        ]
+
+    def prospect_commercial_outcomes(
+        self,
+        prospect_id: str,
+        *,
+        order_limit: int = 20,
+        outcome_limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        orders = self._gateway.query(
+            "fulfilment_orders",
+            "id",
+            filters=(DataFilter.eq("prospect_id", prospect_id),),
+            order=(OrderSpec("updated_at", descending=True),),
+            limit=max(1, int(order_limit)),
+        )
+        order_ids = tuple(
+            str(row.get("id"))
+            for row in orders
+            if row.get("id")
+        )
+        if not order_ids:
+            return []
+        return self._gateway.query(
+            "commercial_outcomes",
+            "fulfilment_order_id,delivery_outcome,conversion_outcome,"
+            "evidence_kind,evidence_reference,evidence,recorded_at",
+            filters=(DataFilter.in_("fulfilment_order_id", order_ids),),
+            order=(OrderSpec("recorded_at", descending=True),),
+            limit=max(1, int(outcome_limit)),
+        )
+
     def snapshot(self) -> dict[str, object]:
         backend = self._gateway.snapshot().as_dict()
         return {

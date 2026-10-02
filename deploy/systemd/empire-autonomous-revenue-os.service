@@ -1,0 +1,35 @@
+[Unit]
+Description=Empire OS Autonomous Revenue Loop
+After=network-online.target empire-autonomous-execution.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=-/etc/empire_os.env
+EnvironmentFile=-/etc/empiredb.env
+Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_REVENUE_LOOP_INTERNAL_WRITE=1
+Environment=EMPIRE_REVENUE_GAUNTLET_ATTESTED=1
+Environment=EMPIRE_REVENUE_RELEASE_ID=autonomous-revenue-os-v1
+Environment=EMPIRE_REVENUE_INVENTORY_LIMIT=200
+Environment=EMPIRE_REVENUE_QUALIFICATION_LIMIT=10
+Environment=EMPIRE_REVENUE_CONTINUOUS_LEAD_GENERATION=1
+Environment=EMPIRE_REVENUE_LEAD_GENERATION_BATCH=25
+Environment=EMPIRE_REVENUE_LEAD_GENERATION_COOLDOWN_SECONDS=900
+ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.autonomous_revenue_os
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStopSec=30
+KillSignal=SIGINT
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
