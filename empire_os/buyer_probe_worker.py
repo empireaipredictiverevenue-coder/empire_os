@@ -369,6 +369,9 @@ def run(
             website=candidate.website,
             person_name=str(decision.get("name") or ""),
             person_title=str(decision.get("title") or ""),
+            max_queries=2,
+            max_results_per_query=4,
+            max_pages_total=3,
         )
         public_evidence = public_person_contact.get("evidence") or []
         if public_evidence:
