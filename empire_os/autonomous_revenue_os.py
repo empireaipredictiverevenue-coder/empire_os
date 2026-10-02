@@ -813,6 +813,8 @@ def run_agentic_cycle(
 
     payload = {
         "schema_version": "empire.autonomous-revenue.loop.v1",
+        "release_id": RELEASE_ID,
+        "status": "ACTIVE",
         "cycle_at": _utc_now(),
         "loop": [
             "OBSERVE",
@@ -887,6 +889,25 @@ class AutonomousRevenueLoop:
         signal.signal(signal.SIGTERM, self.stop)
         signal.signal(signal.SIGINT, self.stop)
         failure_backoff = FAILURE_SLEEP_SECONDS
+        _atomic_json(LATEST_STATE_PATH, {
+            "schema_version": "empire.autonomous-revenue.loop.v1",
+            "release_id": RELEASE_ID,
+            "status": "STARTING",
+            "cycle_at": _utc_now(),
+            "loop": [
+                "OBSERVE",
+                "DIAGNOSE",
+                "ARCHITECT",
+                "PLAN",
+                "GAUNTLET",
+                "ACT",
+                "VERIFY",
+                "RECORD",
+                "REPEAT",
+            ],
+            "actual_revenue": False,
+            "execution_authority": "none",
+        })
 
         while not self._stop:
             try:

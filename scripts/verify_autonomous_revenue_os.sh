@@ -27,4 +27,8 @@ grep -q 'EMPIRE_REVENUE_LOOP_INTERNAL_WRITE=1' deploy/systemd/empire-autonomous-
 ! grep -q '"booking_execution": True' empire_os/autonomous_revenue_os.py
 ! grep -q '"actual_revenue": True' empire_os/autonomous_revenue_os.py
 
+! grep -q 'runtime/secrets/outbound.env' deploy/systemd/empire-autonomous-revenue-os.service
+grep -q 'Environment=EMPIRE_DATA_BACKEND=empiredb' deploy/systemd/empire-autonomous-revenue-os.service
+grep -q 'ProtectHome=true' deploy/systemd/empire-autonomous-revenue-os.service
+
 echo "GAUNTLET_VERIFY=READY_FOR_ACTIVATION"
