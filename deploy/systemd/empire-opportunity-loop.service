@@ -1,0 +1,23 @@
+[Unit]
+Description=EmpireOS canonical Predictive Cloud Opportunity Loop
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=/etc/empire_os.env
+EnvironmentFile=/etc/empiredb.env
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_opportunity_loop.py --repo-root /srv/empire_os --min-interval-seconds 900
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/empire_os/runtime/opportunity_radar /srv/empire_os/runtime/opportunity_factory
+TimeoutStartSec=10min
+
+[Install]
+WantedBy=multi-user.target

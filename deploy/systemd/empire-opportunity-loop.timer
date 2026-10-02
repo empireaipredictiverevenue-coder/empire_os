@@ -1,0 +1,11 @@
+[Unit]
+Description=Run EmpireOS Predictive Cloud Opportunity Loop every fifteen minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=15min
+Persistent=true
+Unit=empire-opportunity-loop.service
+
+[Install]
+WantedBy=timers.target
