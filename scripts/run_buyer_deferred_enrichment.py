@@ -33,6 +33,9 @@ from empire_os.public_person_contact_evidence import (
 from empire_os.buyer_review_materializer import run_buyer_probe_isolated
 from empire_os.sb import request_json
 DEFERRED_LOCK = Path("/srv/empire_os/runtime/buyer_deferred_enrichment/run.lock")
+MAX_CYCLE_LIMIT = 48
+MAX_CYCLE_WORKERS = 8
+MIN_CYCLE_WORKERS = 2
 
 # Keep one enrichment cycle safely below the systemd wall. The worker is
 # evidence-seeking, not exhaustive: unresolved rows remain durable and retry.
@@ -963,13 +966,47 @@ def run_cycle(
     }
 
 
+def adaptive_capacity(
+    *,
+    queue: BuyerDeferredEnrichmentQueue | None = None,
+    requested_limit: int = MAX_CYCLE_LIMIT,
+    requested_workers: int = MAX_CYCLE_WORKERS,
+) -> dict[str, Any]:
+    queue = queue or BuyerDeferredEnrichmentQueue()
+    statuses = queue.snapshot().get("deferred_by_status") or {}
+    backlog = sum(int(statuses.get(s) or 0) for s in ("pending", "deferred", "running"))
+    cpu_count = max(1, int(os.cpu_count() or 1))
+    try:
+        load_1m = float(os.getloadavg()[0])
+    except (AttributeError, OSError):
+        load_1m = 0.0
+    load_ratio = load_1m / cpu_count
+    worker_ceiling = min(MAX_CYCLE_WORKERS, cpu_count)
+    if load_ratio >= 1.25:
+        worker_ceiling = max(MIN_CYCLE_WORKERS, worker_ceiling // 2)
+    elif load_ratio >= 0.85:
+        worker_ceiling = max(MIN_CYCLE_WORKERS, worker_ceiling - 2)
+    workers = max(1, min(int(requested_workers), worker_ceiling, max(1, backlog)))
+    limit_ceiling = min(MAX_CYCLE_LIMIT, max(workers, workers * 6))
+    limit = max(1, min(int(requested_limit), limit_ceiling, max(1, backlog)))
+    return {
+        "backlog": backlog,
+        "cpu_count": cpu_count,
+        "load_1m": round(load_1m, 3),
+        "load_ratio": round(load_ratio, 3),
+        "limit": limit,
+        "workers": workers,
+    }
+
+
 def run_parallel_cycle(
     *,
-    limit: int = 48,
-    workers: int = 8,
+    limit: int = MAX_CYCLE_LIMIT,
+    workers: int = MAX_CYCLE_WORKERS,
 ) -> dict[str, Any]:
-    total_limit = max(1, min(int(limit), 48))
-    worker_count = max(1, min(int(workers), 8, total_limit))
+    capacity = adaptive_capacity(requested_limit=limit, requested_workers=workers)
+    total_limit = capacity["limit"]
+    worker_count = capacity["workers"]
     base = total_limit // worker_count
     remainder = total_limit % worker_count
     lane_limits = [
@@ -1013,6 +1050,7 @@ def run_parallel_cycle(
         "mode": "INTERNAL_ENRICHMENT_PARALLEL",
         "worker_count": len(lane_limits),
         "lane_limits": lane_limits,
+        "capacity": capacity,
         "errors": [
             error
             for row in lanes
@@ -1058,8 +1096,8 @@ def main() -> int:
             return 0
 
         result = run_parallel_cycle(
-            limit=max(1, min(args.limit, 48)),
-            workers=max(1, min(args.workers, 8)),
+            limit=max(1, min(args.limit, MAX_CYCLE_LIMIT)),
+            workers=max(1, min(args.workers, MAX_CYCLE_WORKERS)),
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0

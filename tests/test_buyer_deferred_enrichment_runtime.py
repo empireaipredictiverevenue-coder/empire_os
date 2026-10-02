@@ -32,8 +32,9 @@ def test_parallel_enrichment_is_bounded_to_eight_lanes():
         ROOT / "scripts/run_buyer_deferred_enrichment.py"
     ).read_text()
     assert "ThreadPoolExecutor" in script
-    assert "min(int(workers), 8, total_limit)" in script
-    assert "min(int(limit), 48)" in script
+    assert "MAX_CYCLE_WORKERS = 8" in script
+    assert "MAX_CYCLE_LIMIT = 48" in script
+    assert "worker_ceiling = min(MAX_CYCLE_WORKERS, cpu_count)" in script
     assert "lease_seconds=420" in script
     assert "live_calls_placed" in script
     assert '"execution_allowed": False' in script
