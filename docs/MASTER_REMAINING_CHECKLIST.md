@@ -819,7 +819,7 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [ ] OTEL/Langfuse trace events for queue → route → lease → worker → verify → proposal → live result
 - [ ] Astra/department queue automatic dispatch into the execution plane
 - [ ] Live parallel non-overlapping Hermes/Pi proof
-- [ ] Live collision test proving overlapping mutation leases fail closed
+- [x] Live collision test proving overlapping mutation leases fail closed — LIVE VERIFIED 2026-10-02
 - [ ] First checklist items completed by the software factory and independently verified
 
 
