@@ -516,13 +516,40 @@ class BuyerDeferredEnrichmentQueue:
         deferred = _load(self.deferred_path)
         calls = _load(self.call_ready_path)
         counts: dict[str, int] = {}
+        current = _now()
+        pending_ages: list[float] = []
+        due_now = 0
         for row in deferred.values():
             if isinstance(row, dict):
                 status = str(row.get("status") or "unknown")
                 counts[status] = counts.get(status, 0) + 1
+                if status == "pending":
+                    created = _parse(row.get("created_at"))
+                    if created is not None:
+                        pending_ages.append(
+                            max(0.0, (current - created).total_seconds() / 3600)
+                        )
+                if status in {"pending", "deferred"}:
+                    retry_at = _parse(row.get("next_retry_at"))
+                    if retry_at is None or retry_at <= current:
+                        due_now += 1
+        oldest_pending_hours = max(pending_ages, default=0.0)
+        stale_pending_count = sum(age >= 6.0 for age in pending_ages)
+        pending_count = int(counts.get("pending") or 0)
+        backlog_health = (
+            "CRITICAL"
+            if oldest_pending_hours >= 24.0 or pending_count >= 1500
+            else "DEGRADED"
+            if oldest_pending_hours >= 6.0 or pending_count >= 500
+            else "HEALTHY"
+        )
         return {
             "deferred_total": len(deferred),
             "deferred_by_status": counts,
+            "due_now": due_now,
+            "oldest_pending_hours": round(oldest_pending_hours, 2),
+            "stale_pending_count": stale_pending_count,
+            "backlog_health": backlog_health,
             "call_ready_total": sum(
                 1 for row in calls.values()
                 if isinstance(row, dict)

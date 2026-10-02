@@ -105,6 +105,34 @@ def buyer_status(
     rows = [row for row in deferred.values() if isinstance(row, Mapping)]
     reasons = Counter(str(row.get("reason") or "unknown") for row in rows)
     statuses = Counter(str(row.get("status") or "unknown") for row in rows)
+    now = datetime.now(timezone.utc)
+    pending_ages: list[float] = []
+    due_now = 0
+    for row in rows:
+        status = str(row.get("status") or "")
+        if status == "pending":
+            try:
+                created = datetime.fromisoformat(str(row.get("created_at") or "").replace("Z", "+00:00"))
+            except ValueError:
+                created = None
+            if created is not None:
+                pending_ages.append(max(0.0, (now - created).total_seconds() / 3600))
+        if status in {"pending", "deferred"}:
+            retry_text = str(row.get("next_retry_at") or "").strip()
+            try:
+                retry_at = datetime.fromisoformat(retry_text.replace("Z", "+00:00")) if retry_text else None
+            except ValueError:
+                retry_at = None
+            if retry_at is None or retry_at <= now:
+                due_now += 1
+    oldest_pending_hours = max(pending_ages, default=0.0)
+    stale_pending_count = sum(age >= 6.0 for age in pending_ages)
+    pending_count = int(statuses.get("pending") or 0)
+    backlog_health = (
+        "CRITICAL" if oldest_pending_hours >= 24.0 or pending_count >= 1500
+        else "DEGRADED" if oldest_pending_hours >= 6.0 or pending_count >= 500
+        else "HEALTHY"
+    )
 
     evidence_rich = 0
     saturated = 0
@@ -133,6 +161,10 @@ def buyer_status(
         "deferred_total": len(rows),
         "status_counts": dict(sorted(statuses.items())),
         "reason_counts": dict(reasons.most_common()),
+        "due_now": due_now,
+        "oldest_pending_hours": round(oldest_pending_hours, 2),
+        "stale_pending_count": stale_pending_count,
+        "backlog_health": backlog_health,
         "evidence_rich_high_priority": evidence_rich,
         "retry_saturated": saturated,
         "materializer_eligible": int(materializer.get("eligible") or 0),
@@ -163,6 +195,11 @@ def build_snapshot() -> dict[str, Any]:
         blockers.append("tam_planner_failed_historical")
     if tam["state"] == "RUNNING" and tam["worker_alive"] is False:
         blockers.append("tam_planner_worker_missing")
+    backlog_health = str(buyers.get("backlog_health") or "UNKNOWN")
+    if backlog_health == "CRITICAL":
+        blockers.append("buyer_enrichment_backlog_critical")
+    elif backlog_health == "DEGRADED":
+        blockers.append("buyer_enrichment_backlog_degraded")
     if buyers["genuine_review_ready_count"] == 0:
         blockers.append("no_genuine_review_ready_buyer")
 
