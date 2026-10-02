@@ -90,8 +90,8 @@ def test_find_official_license_principals_combines_cached_tdlr_and_rmp(
 
     monkeypatch.setattr(
         module,
-        "_load_tdlr_cache",
-        lambda: [{
+        "_tdlr_candidate_rows",
+        lambda company_name: [{
             "license_type": "A/C Contractor",
             "business_name": "PATRIOT PLUMBING",
             "owner_name": "DOE, JANE",
@@ -114,3 +114,42 @@ def test_find_official_license_principals_combines_cached_tdlr_and_rmp(
         "texas_tsbpe_rmp",
     }
     assert all(row["state"] == "TX" for row in rows)
+
+
+def test_indexed_tdlr_candidate_lookup_is_bounded(tmp_path):
+    import json
+    import empire_os.official_license_identity as module
+
+    records = [
+        {
+            "license_type": "A/C Contractor",
+            "business_name": "COOL AIR SERVICES INC",
+            "owner_name": "SMITH, JANE",
+            "license_expiration_date_mmddccyy": "12/31/2027",
+        },
+        {
+            "license_type": "A/C Contractor",
+            "business_name": "OTHER HVAC LLC",
+            "owner_name": "DOE, JOHN",
+            "license_expiration_date_mmddccyy": "12/31/2027",
+        },
+    ]
+    path = tmp_path / "cache.json"
+    path.write_text(json.dumps({
+        "records": records,
+        "company_index": {
+            "cool air services": [0],
+            "other hvac": [1],
+        },
+        "token_index": {
+            "cool": [0], "air": [0], "services": [0],
+            "other": [1], "hvac": [1],
+        },
+    }))
+
+    rows = module._tdlr_candidate_rows(
+        "Cool Air Services LLC",
+        cache_path=path,
+    )
+    assert len(rows) == 1
+    assert rows[0]["owner_name"] == "SMITH, JANE"

@@ -227,13 +227,26 @@ def refresh_texas_tdlr_ac_cache(
                 and str(row.get("license_type") or "").strip()
                 == "A/C Contractor"
             ]
+            company_index: dict[str, list[int]] = {}
+            token_index: dict[str, list[int]] = {}
+            for index, row in enumerate(records):
+                company = _normalise_company(row.get("business_name") or "")
+                if not company:
+                    continue
+                company_index.setdefault(company, []).append(index)
+                for token in set(company.split()):
+                    if len(token) >= 3:
+                        token_index.setdefault(token, []).append(index)
+
             snapshot = {
-                "schema_version": "empire.official-license-cache.v1",
+                "schema_version": "empire.official-license-cache.v2",
                 "source": "texas_tdlr_ac_contractor",
                 "source_url": TEXAS_TDLR_SOURCE,
                 "refreshed_at": datetime.now(timezone.utc).isoformat(),
                 "record_count": len(records),
                 "records": records,
+                "company_index": company_index,
+                "token_index": token_index,
                 "database_write_performed": False,
                 "outbound_sent": False,
                 "execution_authority": "none",
@@ -268,21 +281,83 @@ def refresh_texas_tdlr_ac_cache(
             }
 
 
-def _load_tdlr_cache(
+def _load_tdlr_cache_payload(
     cache_path: str | Path = TEXAS_TDLR_AC_CACHE,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     try:
         payload = json.loads(
             Path(cache_path).read_text(encoding="utf-8")
         )
     except (OSError, json.JSONDecodeError):
-        return []
-    records = payload.get("records") if isinstance(payload, dict) else None
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _load_tdlr_cache(
+    cache_path: str | Path = TEXAS_TDLR_AC_CACHE,
+) -> list[dict[str, Any]]:
+    payload = _load_tdlr_cache_payload(cache_path)
     return [
         dict(row)
-        for row in (records or [])
+        for row in (payload.get("records") or [])
         if isinstance(row, dict)
     ]
+
+
+def _tdlr_candidate_rows(
+    company_name: str,
+    *,
+    cache_path: str | Path = TEXAS_TDLR_AC_CACHE,
+) -> list[dict[str, Any]]:
+    payload = _load_tdlr_cache_payload(cache_path)
+    records = payload.get("records") or []
+    if not isinstance(records, list):
+        return []
+    target = _normalise_company(company_name)
+    if not target:
+        return []
+
+    exact = payload.get("company_index")
+    if isinstance(exact, dict):
+        indexes = exact.get(target) or []
+        if indexes:
+            return [
+                dict(records[index])
+                for index in indexes
+                if isinstance(index, int)
+                and 0 <= index < len(records)
+                and isinstance(records[index], dict)
+            ]
+
+    token_index = payload.get("token_index")
+    if not isinstance(token_index, dict):
+        return [
+            dict(row) for row in records if isinstance(row, dict)
+        ]
+
+    tokens = [token for token in target.split() if len(token) >= 3]
+    sets = [
+        set(index for index in (token_index.get(token) or [])
+            if isinstance(index, int))
+        for token in tokens
+        if token_index.get(token)
+    ]
+    if not sets:
+        return []
+    candidate_indexes = (
+        set.intersection(*sets)
+        if len(sets) > 1 and set.intersection(*sets)
+        else set.union(*sets)
+    )
+    # Bound fuzzy matching work. Exact company matches were already handled.
+    ranked = sorted(candidate_indexes)[:500]
+    return [
+        dict(records[index])
+        for index in ranked
+        if 0 <= index < len(records)
+        and isinstance(records[index], dict)
+    ]
+
 
 
 def texas_rmp_seeds_from_csv(
@@ -330,7 +405,7 @@ def find_official_license_principals(
     if state != "TX" or not str(company_name or "").strip():
         return []
     seeds: list[LicensePrincipalSeed] = []
-    tdlr_rows = _load_tdlr_cache()
+    tdlr_rows = _tdlr_candidate_rows(company_name)
     if tdlr_rows:
         seeds.extend(
             texas_tdlr_ac_seeds_from_rows(
