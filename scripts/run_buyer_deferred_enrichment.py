@@ -20,6 +20,7 @@ from empire_os.buyer_discovery import (
     build_candidate,
     build_candidate_review_plan,
     classify_decision_role,
+    looks_like_person_name,
 )
 from empire_os.buyer_probe_worker import rejection_reason
 from empire_os.buyer_review_materializer import run_buyer_probe_isolated
@@ -305,7 +306,7 @@ def _targeted_enterprise_probe(
         dict(person)
         for person in (item.get("target_people") or [])
         if isinstance(person, dict)
-        and str(person.get("name") or "").strip()
+        and looks_like_person_name(person.get("name"))
         and str(person.get("title") or "").strip()
     ]
     if not people or available_budget <= 0:

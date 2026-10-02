@@ -188,3 +188,37 @@ def test_targeted_enterprise_probe_rotates_target_people_by_attempt(monkeypatch)
         attempts=2,
     )
     assert seen == ["Person Three", "Person One"]
+
+
+def test_targeted_enterprise_probe_skips_false_people(monkeypatch):
+    seen = []
+
+    def probe(row, **kwargs):
+        seen.append(row["contact_name"])
+        return {
+            "decision_maker": {
+                "name": row["contact_name"],
+                "title": row["contact_title"],
+            },
+            "review_ready": False,
+            "outreach_ready": False,
+            "person_bound": False,
+            "preferred_email": None,
+        }
+
+    monkeypatch.setattr(worker, "run_buyer_probe_isolated", probe)
+    result, used = worker._targeted_enterprise_probe(
+        _candidate(),
+        {
+            "target_people": [
+                {"name": "Case Studies", "title": "Managing Director"},
+                {"name": "New Orleans", "title": "Owner"},
+                {"name": "Jane Smith", "title": "Chief Executive Officer"},
+            ],
+        },
+        available_budget=3,
+        attempts=1,
+    )
+    assert used == 1
+    assert seen == ["Jane Smith"]
+    assert result["enterprise_target_person"]["name"] == "Jane Smith"

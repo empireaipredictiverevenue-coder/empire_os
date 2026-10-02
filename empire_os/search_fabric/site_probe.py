@@ -172,8 +172,15 @@ _NON_PERSON_WORDS = {
 }
 
 _NON_PERSON_NAMES = {
+    "case studies",
+    "customer service",
     "new york",
     "new york city",
+    "new orleans",
+    "los angeles",
+    "san antonio",
+    "san diego",
+    "san francisco",
     "brooklyn",
     "queens",
     "bronx",

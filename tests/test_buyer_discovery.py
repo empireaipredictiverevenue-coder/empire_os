@@ -1191,6 +1191,8 @@ def test_personhood_guard_rejects_live_buyer_scout_false_people():
 
     for value in (
         "Press Release",
+        "Case Studies",
+        "New Orleans",
         "Strategy AI Systems Architecture",
         "Joins National Association",
         "Solo Agency",

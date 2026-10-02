@@ -532,6 +532,8 @@ def test_people_extractor_rejects_marketing_and_form_fragments():
 
     bad = [
         "Press Release",
+        "Case Studies",
+        "New Orleans",
         "Strategy AI Systems Architecture",
         "Joins National Association",
         "Solo Agency",

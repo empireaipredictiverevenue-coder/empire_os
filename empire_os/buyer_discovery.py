@@ -36,6 +36,18 @@ WHITE_LABEL_TERMS = (
     "managing director", "founder", "owner",
 )
 
+NON_PERSON_NAME_PHRASES = {
+    "case studies",
+    "new orleans",
+    "new york",
+    "new york city",
+    "los angeles",
+    "san antonio",
+    "san diego",
+    "san francisco",
+    "customer service",
+}
+
 NON_PERSON_NAME_TERMS = {
     "membership", "pricing", "price", "guide", "award", "awards", "multiple",
     "services", "service", "contact", "team", "company", "solutions", "quote",
@@ -86,6 +98,8 @@ def _text(value: Any) -> str:
 def looks_like_person_name(value: Any) -> bool:
     name = _text(value)
     if not name or "@" in name or any(ch.isdigit() for ch in name):
+        return False
+    if " ".join(name.casefold().split()) in NON_PERSON_NAME_PHRASES:
         return False
     words = [w.strip(".,()[]{}") for w in name.split() if w.strip(".,()[]{}") ]
     if not 2 <= len(words) <= 5:
