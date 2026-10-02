@@ -1,0 +1,28 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/marketplace_auction_readiness.py",
+    "tests/test_marketplace_auction_readiness.py",
+    "docs/architecture/marketplace_auction_readiness_v1.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T08:17:46.127346+00:00",
+  "job_id": "completion-marketplace-auction-readiness-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:marketplace_auction_readiness",
+    "path:empire_os/marketplace_auction_readiness.py",
+    "path:tests/test_marketplace_auction_readiness.py",
+    "path:docs/architecture/marketplace_auction_readiness_v1.md"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "Follow the Architecture-First Engineering Doctrine. First inspect the existing marketplace, opportunity_auction, Revenue Exchange, buyer allocation and capacity contracts. Record a bounded architecture delta in docs/architecture/marketplace_auction_readiness_v1.md, then implement a canonical read-only marketplace/auction readiness model in empire_os/marketplace_auction_readiness.py with focused tests. Reuse existing canonical components; do not create a second marketplace or settlement path. The readiness model must expose inventory, buyer eligibility/capacity, bid/price evidence, auction/clearing readiness, allocation readiness, blockers and evidence refs. Unknown stays unknown. No bid execution, allocation execution, pricing mutation, terms, payment, settlement, outbound or revenue-recognition authority.",
+  "pytest_targets": [
+    "tests/test_marketplace_auction_readiness.py",
+    "tests/test_opportunity_auction.py",
+    "tests/test_revenue_exchange.py",
+    "tests/test_revenue_exchange_allocation_readiness.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
