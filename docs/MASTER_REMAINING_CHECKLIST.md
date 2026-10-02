@@ -536,10 +536,10 @@ Truth boundary:
 - only recognized canonical revenue can be reported as actual revenue.
 
 Implementation state:
-- [ ] Evidence model for captured AI answers/recommendations — CODED; focused runtime test pending
-- [ ] Recommendation visibility analysis — CODED; focused runtime test pending
-- [ ] OBSERVE API: `/v1/search/recommendation-visibility/preview` — CODED; route/runtime verification pending
-- [ ] Sellable product contract: `organic_ai_recommendation_intelligence` — CODED; catalog/runtime verification pending
+- [x] Evidence model for captured AI answers/recommendations — LIVE VERIFIED 2026-10-02
+- [x] Recommendation visibility analysis — LIVE VERIFIED 2026-10-02
+- [x] OBSERVE API: `/v1/search/recommendation-visibility/preview` — LIVE VERIFIED 2026-10-02
+- [x] Sellable product contract: `organic_ai_recommendation_intelligence` — LIVE VERIFIED 2026-10-02
 - [ ] Organic SERP baseline from Search Fabric
 - [ ] Real AI-answer observation adapters / evidence capture
 - [ ] Brand mention/citation/recommendation history
