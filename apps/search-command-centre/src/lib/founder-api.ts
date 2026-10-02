@@ -773,3 +773,129 @@ export async function getFounderOperationalTruth(): Promise<{
     return { ok: false, status: null, data: null, reason: "api_unreachable" };
   }
 }
+
+
+export type PredictiveRevenueDemo = {
+  generated_at?: string;
+  mode?: string;
+  living_proof?: boolean;
+  revenue_operating_system?: {
+    status?: string;
+    cycle_at?: string;
+    inventory_counts?: Record<string, number>;
+    review_queue_count?: number;
+    next_action?: { action?: string; reason?: string; candidate_count?: number };
+  };
+  predictive_cloud?: {
+    available_component_count?: number;
+    component_count?: number;
+    unavailable_components?: string[];
+    stale_components?: string[];
+    component_matrix?: Array<{
+      component?: string;
+      available?: boolean;
+      freshness?: string | null;
+      mode?: string | null;
+    }>;
+  };
+  predictive_engine?: {
+    canonical_formula?: string;
+    expected_revenue_value_formula?: string;
+    decision_packets_ready?: number;
+    decision_packets_blocked?: number;
+    missing_inputs?: Record<string, number>;
+    prediction_state?: string;
+  };
+  executive_intelligence?: {
+    primary_goal?: string;
+    plan_step_count?: number;
+    auto_dispatch_eligible_count?: number;
+    departments_in_plan?: string[];
+  };
+  opportunity_intelligence?: {
+    radar_candidate_count?: number;
+    research_observation_count?: number;
+    total_normalized_scores?: number;
+    factory_ready_count?: number;
+    factory_blocked_count?: number;
+    prediction_state?: string;
+  };
+  buyer_market?: {
+    buyer_pool_count?: number;
+    priority_target_count?: number;
+    product_demand_count?: number;
+    sellable_product_demand_count?: number;
+    buyer_seat_count?: number;
+    corridor_count?: number;
+    exchange_inventory_ready_count?: number;
+    commercially_activated_buyers?: number;
+    capacity_verified?: number;
+    terms_verified?: number;
+    highest_priority_blocker?: string;
+  };
+  commercial_catalog?: {
+    product_count?: number;
+    active_count?: number;
+    binding_terms_ready_count?: number;
+    active_binding_products?: Array<{
+      product_code?: string;
+      product_name?: string;
+      product_family?: string;
+      currency?: string;
+      amount_cents?: number | null;
+      unit?: string | null;
+    }>;
+  };
+  enterprise_predictive_revenue?: {
+    seed_target_count?: number;
+    enterprise_candidate_count?: number;
+    eligible_rolling_candidate_count?: number;
+    targeted_retry_queued_count?: number;
+    private_deployment?: {
+      price_cents?: number;
+      display_price?: string;
+      truth_label?: string;
+      actual_revenue?: boolean;
+    };
+    targets?: Array<{
+      account_name?: string;
+      account_type?: string;
+      target_product_codes?: string[];
+      observed_triggers?: string[];
+    }>;
+  };
+  revenue_truth?: {
+    acquisitions?: number;
+    qualified?: number;
+    buyer_reviews?: number;
+    commercial_replies?: number;
+    commercial_terms?: number;
+    verified_payments?: number;
+    fulfilments?: number;
+    recognized_revenue_cents?: number;
+    realized_gp_cents?: number;
+    highest_priority_blocker?: string;
+    pulse_state?: string;
+    actual_revenue?: boolean;
+  };
+  proof_chain?: Array<{
+    stage?: string;
+    label?: string;
+    observed?: boolean;
+    value?: number;
+    value_cents?: number;
+  }>;
+  settlement?: {
+    asset?: string;
+    network?: string;
+    chain_id?: number;
+  };
+  side_effects?: string;
+  execution_authority?: string;
+};
+
+export function getPredictiveRevenueDemo() {
+  return getFounderRead<PredictiveRevenueDemo>(
+    "/v1/predictive-revenue/demo",
+  );
+}

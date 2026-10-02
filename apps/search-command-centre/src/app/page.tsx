@@ -271,6 +271,12 @@ export default async function Home() {
                 >
                   Organic revenue →
                 </Link>
+                <Link
+                  href="/predictive-revenue"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300 hover:text-cyan-200"
+                >
+                  Predictive Revenue live demo →
+                </Link>
               </div>
             </div>
 

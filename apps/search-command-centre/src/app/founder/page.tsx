@@ -106,12 +106,20 @@ export default async function FounderPage() {
         <header className="border-b border-white/10 pb-7">
           <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
             <div>
-              <Link
-                href="/"
-                className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300 hover:text-emerald-200"
-              >
-                ← Search Command Centre
-              </Link>
+              <div className="flex flex-wrap gap-5">
+                <Link
+                  href="/"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300 hover:text-emerald-200"
+                >
+                  ← Search Command Centre
+                </Link>
+                <Link
+                  href="/predictive-revenue"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300 hover:text-cyan-200"
+                >
+                  Predictive Revenue live demo →
+                </Link>
+              </div>
               <p className="eyebrow mt-6">Empire AI · Founder operating view</p>
               <h1 className="mt-2 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
                 Empire Founder Console
