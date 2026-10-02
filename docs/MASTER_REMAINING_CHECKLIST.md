@@ -876,6 +876,6 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Source Reliability core implemented with observed health/quality/downstream metrics, unknown economics preserved, bounded scheduler recommendations, and no permanent-retirement/delete authority
 - [x] Batch 1 agents registered in Control Fabric
 - [x] Batch 1 Founder read-only status API coded
-- [ ] Batch 1 focused tests pass on live EmpireOS server
-- [ ] Founder business-agent status endpoint verified live
-- [ ] Builder capability ledger verified live after Pi + Empire Coder probes
+- [x] Batch 1 focused tests pass on live EmpireOS server
+- [x] Founder business-agent status endpoint verified live
+- [x] Builder capability ledger verified live after Pi + Empire Coder probes
