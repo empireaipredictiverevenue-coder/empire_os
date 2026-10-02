@@ -68,6 +68,7 @@ def run_buyer_probe_isolated(
                 "request_timeout",
                 "time_budget_seconds",
                 "allow_company_routed",
+                "allow_public_person_contact_search",
             }
         })
     payload["_probe_options"] = defaults

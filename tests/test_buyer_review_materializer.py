@@ -508,6 +508,7 @@ def test_isolated_probe_accepts_bounded_override_options(monkeypatch):
             "max_pages": 12,
             "request_timeout": 5.0,
             "time_budget_seconds": 35.0,
+            "allow_public_person_contact_search": True,
         },
     )
 
@@ -515,6 +516,7 @@ def test_isolated_probe_accepts_bounded_override_options(monkeypatch):
         "max_pages": 12,
         "request_timeout": 5.0,
         "time_budget_seconds": 35.0,
+        "allow_public_person_contact_search": True,
     }
 
 

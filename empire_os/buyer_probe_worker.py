@@ -186,6 +186,54 @@ def _promote_confirmed_first_party_buyer(
     return result
 
 
+_TRUSTED_PERSISTED_IDENTITY_SOURCES = {
+    "website_structured_data",
+    "official_site_current",
+    "hunter_confirmed_first_party",
+    "empire_first_party_people_probe",
+}
+
+
+def _restore_strong_persisted_identity(
+    enriched: dict,
+    candidate,
+    *,
+    enabled: bool,
+) -> dict:
+    """Reuse previously verified identity only as a bounded recovery seed."""
+    if not enabled or enriched.get("decision_maker"):
+        return enriched
+    name = str(getattr(candidate, "contact_name", "") or "").strip()
+    title = str(getattr(candidate, "contact_title", "") or "").strip()
+    source = str(getattr(candidate, "contact_source", "") or "").strip()
+    if (
+        not looks_like_person_name(name)
+        or not title
+        or (
+            source not in _TRUSTED_PERSISTED_IDENTITY_SOURCES
+            and not source.startswith("empire_registry:")
+        )
+    ):
+        return enriched
+    role, score = classify_decision_role(title)
+    if score < 0.70:
+        return enriched
+    result = dict(enriched)
+    result["decision_maker"] = {
+        "name": name,
+        "title": title,
+        "decision_role": role,
+        "decision_score": score,
+        "source": source,
+    }
+    result["decision_reconciliation"] = {
+        "status": "persisted_strong_identity_recovery_seed",
+        "review_required": False,
+        "decision_maker": result["decision_maker"],
+    }
+    return result
+
+
 def run(
     row: dict,
     *,
@@ -208,6 +256,11 @@ def run(
         page_priority="people",
     )
     enriched = enrich_candidate(candidate, evidence)
+    enriched = _restore_strong_persisted_identity(
+        enriched,
+        candidate,
+        enabled=allow_public_person_contact_search,
+    )
 
     # Prefer current first-party structured person+email evidence when the
     # canonical contact does not yield a bound email. This lets stale contact

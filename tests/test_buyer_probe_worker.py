@@ -573,3 +573,42 @@ def test_public_person_search_is_opt_in(monkeypatch):
         "website": "https://acme.example",
     })
     assert result["public_person_contact_evidence"]["attempted"] is False
+
+
+def test_strong_persisted_identity_can_seed_deferred_public_recovery():
+    from types import SimpleNamespace
+    import empire_os.buyer_probe_worker as worker
+
+    candidate = SimpleNamespace(
+        contact_name="Chris Shaffer",
+        contact_title="Co-Founder",
+        contact_source="website_structured_data",
+    )
+    restored = worker._restore_strong_persisted_identity(
+        {
+            "decision_maker": None,
+            "contact_candidates": [],
+        },
+        candidate,
+        enabled=True,
+    )
+    assert restored["decision_maker"]["name"] == "Chris Shaffer"
+    assert restored["decision_maker"]["decision_role"] == "economic_buyer"
+    assert restored["decision_reconciliation"]["review_required"] is False
+
+
+def test_untrusted_persisted_identity_cannot_seed_public_recovery():
+    from types import SimpleNamespace
+    import empire_os.buyer_probe_worker as worker
+
+    candidate = SimpleNamespace(
+        contact_name="Chris Shaffer",
+        contact_title="Co-Founder",
+        contact_source="canonical_prospect",
+    )
+    restored = worker._restore_strong_persisted_identity(
+        {"decision_maker": None, "contact_candidates": []},
+        candidate,
+        enabled=True,
+    )
+    assert restored["decision_maker"] is None

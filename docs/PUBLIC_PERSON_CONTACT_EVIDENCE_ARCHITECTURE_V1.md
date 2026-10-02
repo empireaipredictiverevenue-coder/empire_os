@@ -75,3 +75,14 @@ buyer remains deferred; no gate is weakened.
 
 OBSERVE / evidence-only. This component cannot approve a buyer, authorize an
 outbound intent, accept commercial terms, move funds, or recognize revenue.
+
+## Persisted identity failover
+
+A previously persisted strong identity may be reused only as a recovery search
+seed when a current site probe is temporarily unavailable. Eligible sources are
+current/structured first-party identity, Hunter-confirmed first-party identity,
+Empire first-party identity recovery, or authoritative registry evidence.
+
+This failover does not make the buyer review-ready or send-ready by itself.
+A new person-bound contact must still pass the resolver and existing contact
+verification gates.
