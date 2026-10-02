@@ -159,3 +159,42 @@ def test_local_planner_environment_loads_only_allowlisted_keys(monkeypatch, tmp_
     assert __import__('os').environ["EMPIRE_CODER_LLAMA_CPP_ENABLED"] == "true"
     assert __import__('os').environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] == "2"
     assert "SECRET_SHOULD_NOT_LOAD" not in __import__('os').environ
+
+
+def test_unreadable_legacy_task_does_not_block_next_delegatable_job(monkeypatch, tmp_path):
+    root, runtime = _workspace(tmp_path)
+    store = LocalTaskStore(root, runtime_root=runtime)
+    bad = store.create("Review database architecture old", blueprint_path="docs/BLUEPRINT_V6.md")
+    good = store.create("Review database architecture current", blueprint_path="docs/BLUEPRINT_V6.md")
+    queue = LocalJobQueue(root, runtime_root=runtime)
+    bad_job = queue.enqueue(task_id=bad.id, kind=JobKind.PLAN, priority=100)
+    good_job = queue.enqueue(task_id=good.id, kind=JobKind.PLAN, priority=99)
+    real_load = store.load
+    def load(task_id):
+        if task_id == bad.id:
+            raise PermissionError("legacy root-owned task")
+        return real_load(task_id)
+    fake_store = SimpleNamespace(load=load)
+    fake_coder = SimpleNamespace(
+        store=fake_store,
+        router=SimpleNamespace(profiles=(
+            ModelProfile(
+                "llama_cpp", "qwen2.5-coder:1.5b",
+                capability=1, cost_tier=0, local=True,
+                roles=("planner",),
+            ),
+        )),
+    )
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.EmpireCoder",
+        lambda *a, **k: fake_coder,
+    )
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.dispatch_execution_request",
+        lambda *a, **k: {"status":"QUEUED","worker":"hermes"},
+    )
+    result = delegate_oversized_plans(root, runtime_root=runtime, max_jobs=1)
+    assert result["blocked_count"] == 1
+    assert result["blocked"][0]["job_id"] == bad_job.id
+    assert queue.get(bad_job.id).status is JobStatus.PENDING
+    assert queue.get(good_job.id).status is JobStatus.DELEGATED

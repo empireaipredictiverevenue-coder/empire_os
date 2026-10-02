@@ -74,12 +74,21 @@ def delegate_oversized_plans(
     queue = LocalJobQueue(root, runtime_root=runtime)
     local_capability = _local_planner_capability(coder)
     delegated: list[dict[str, Any]] = []
+    blocked: list[dict[str, str]] = []
     skipped_local = 0
 
     for job in queue.list_pending(kind=JobKind.PLAN):
         if len(delegated) >= max(0, int(max_jobs)):
             break
-        task = coder.store.load(job.task_id)
+        try:
+            task = coder.store.load(job.task_id)
+        except (FileNotFoundError, PermissionError, ValueError) as exc:
+            blocked.append({
+                "job_id": job.id,
+                "task_id": job.task_id,
+                "reason": f"task_state_unreadable:{type(exc).__name__}",
+            })
+            continue
         complexity = ModelRouter.complexity(task.objective)
         if complexity <= local_capability:
             skipped_local += 1
@@ -153,8 +162,10 @@ def delegate_oversized_plans(
         "schema_version": "empire.coder.plan-delegation.v1",
         "local_planner_capability": local_capability,
         "delegated_count": len(delegated),
+        "blocked_count": len(blocked),
         "skipped_local_count": skipped_local,
         "delegated": delegated,
+        "blocked": blocked,
         "execution_authority": "none",
     }
 
