@@ -774,6 +774,28 @@ class EmpireCoder:
         )
         return route
 
+    def degraded_local_planner_route(
+        self,
+        task_id: str,
+    ) -> ModelRoute:
+        task = self.store.load(task_id)
+        route = self.router.degraded_local_route(
+            task.objective,
+            role="planner",
+            exclude=self.model_health.excluded_routes(),
+        )
+        self._record_and_sync(
+            task_id=task_id,
+            event="degraded_local_planner_routed",
+            data={
+                "provider": route.provider,
+                "model": route.model,
+                "reason": route.reason,
+                "advisory_only": True,
+            },
+        )
+        return route
+
     def verifier_model_route(
         self,
         task_id: str,
@@ -902,6 +924,7 @@ class EmpireCoder:
         context: ContextPack,
         *,
         max_output_chars: int = 1_000,
+        degraded_local: bool = False,
     ) -> ModelProposal:
         """Return one non-actionable planner draft.
 
@@ -910,7 +933,11 @@ class EmpireCoder:
         where a candidate may later become actionable.
         """
         self.refresh_knowledge()
-        route = self.planner_model_route(task_id)
+        route = (
+            self.degraded_local_planner_route(task_id)
+            if degraded_local
+            else self.planner_model_route(task_id)
+        )
         provider = self.providers.get(route.provider)
         context = self._fresh_context_pack(
             task_id,

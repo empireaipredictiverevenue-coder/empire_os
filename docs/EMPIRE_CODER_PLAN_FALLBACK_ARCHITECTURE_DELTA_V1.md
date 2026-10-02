@@ -55,3 +55,13 @@ PLAN jobs. Recovery is intentionally narrow:
 
 Historical founder directives, implementation jobs, verification jobs and
 substantive policy/verification failures are not replayed automatically.
+
+
+## Degraded local route
+
+A Hermes-fallback PLAN does not use normal capability routing again. It enters
+an explicit degraded-local advisory route that prefers the dedicated loopback
+llama.cpp planner before heavier local Ollama planners. Normal PLAN, IMPLEMENT
+and VERIFY routing remains capability-strict. This prevents provider outage
+fallback from queueing behind heavyweight local writer inference while keeping
+the output non-actionable.

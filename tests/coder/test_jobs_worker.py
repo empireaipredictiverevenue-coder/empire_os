@@ -454,3 +454,28 @@ def test_failed_delegation_publication_restores_pending_job(tmp_path):
     assert restored.status is JobStatus.PENDING
     assert restored.error == "publish_failed"
     assert queue.get(job.id).status is JobStatus.PENDING
+
+
+def test_hermes_fallback_plan_requests_degraded_local_planner(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = FakeCoder()
+    worker = CoderTaskWorker(coder, queue)
+    job = queue.enqueue(
+        task_id="coder_task_hermes_fallback",
+        kind=JobKind.PLAN,
+        payload={
+            "terms": ["revenue"],
+            "local_fallback_after_hermes": True,
+            "hermes_fallback_reason": "provider_unavailable",
+        },
+        priority=100,
+    )
+
+    result = worker.run_once()
+
+    assert result.id == job.id
+    assert result.status is JobStatus.COMPLETED
+    assert result.result["production_mutation"] is False
+    plan_call = next(call for call in coder.calls if call[0] == "plan")
+    assert plan_call[3]["degraded_local"] is True

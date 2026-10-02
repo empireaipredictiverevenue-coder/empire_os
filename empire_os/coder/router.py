@@ -62,6 +62,58 @@ class ModelRouter:
             return 2
         return 1
 
+    def degraded_local_route(
+        self,
+        objective: str,
+        *,
+        role: str = "planner",
+        exclude: Iterable[tuple[str, str]] = (),
+    ) -> ModelRoute:
+        """Return a local advisory fallback even when capability is below need.
+
+        This is intentionally separate from route(): normal routing remains
+        capability-strict. Callers must explicitly opt into degraded advisory
+        behavior after an external-provider availability failure.
+        """
+        excluded = set(exclude)
+        role_name = str(role or "planner").strip().lower()
+        candidates = sorted(
+            (
+                profile
+                for profile in self.profiles
+                if profile.local
+                and role_name in profile.roles
+                and (profile.provider, profile.model) not in excluded
+            ),
+            key=lambda p: (
+                p.provider != "llama_cpp",
+                p.cost_tier,
+                -p.capability,
+                p.provider,
+                p.model,
+            ),
+        )
+        if not candidates:
+            return ModelRoute(
+                "unconfigured",
+                "none",
+                "no local degraded advisory route configured",
+                local=False,
+                cost_tier=0,
+            )
+        chosen = candidates[0]
+        return ModelRoute(
+            chosen.provider,
+            chosen.model,
+            (
+                f"degraded_local_fallback; role={role_name}; "
+                f"objective_complexity={self.complexity(objective)}; "
+                f"capability={chosen.capability}"
+            ),
+            local=True,
+            cost_tier=chosen.cost_tier,
+        )
+
     def route(
         self,
         objective: str,

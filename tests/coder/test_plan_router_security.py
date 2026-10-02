@@ -162,3 +162,38 @@ def test_router_fails_closed_when_planner_is_below_required_capability():
     )
     assert route.provider == "unconfigured"
     assert route.model == "none"
+
+
+def test_degraded_local_router_prefers_loopback_planner_under_capability():
+    router = ModelRouter([
+        ModelProfile(
+            "ollama",
+            "qwen3-coder:30b",
+            capability=3,
+            cost_tier=2,
+            local=True,
+            roles=("writer", "planner"),
+        ),
+        ModelProfile(
+            "llama_cpp",
+            "qwen2.5-coder:1.5b",
+            capability=1,
+            cost_tier=0,
+            local=True,
+            roles=("planner",),
+        ),
+    ])
+    objective = "Review database architecture and production migration safety"
+
+    normal = router.route(objective, role="planner")
+    assert normal.provider == "ollama"
+    assert normal.model == "qwen3-coder:30b"
+
+    degraded = router.degraded_local_route(
+        objective,
+        role="planner",
+    )
+    assert degraded.provider == "llama_cpp"
+    assert degraded.model == "qwen2.5-coder:1.5b"
+    assert degraded.local is True
+    assert "degraded_local_fallback" in degraded.reason

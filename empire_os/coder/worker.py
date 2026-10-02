@@ -234,6 +234,9 @@ class CoderTaskWorker:
                 ),
                 context,
                 max_output_chars=1800,
+                degraded_local=bool(
+                    job.payload.get("local_fallback_after_hermes")
+                ),
             )
             return {
                 "kind": job.kind.value,
