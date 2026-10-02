@@ -264,7 +264,7 @@ business loop rather than continue building isolated modules.
 - [ ] Wire remaining Sensor Mesh domains -> Opportunity Radar
 - [x] Wire Opportunity Radar -> bounded research -> Opportunity Factory readiness
 - [ ] Wire Opportunity Factory -> Astra work queue — CANONICAL Opportunity Loop registered with Astra/Control Fabric; normalized Factory evidence completion + live verification pending
-- [ ] Wire Astra -> automatic research / analysis / enrichment / planning — CODED/STAGED with continuous Opportunity Loop + freshness guard; live timer verification pending
+- [x] Wire Astra -> automatic research / analysis / enrichment / planning — LIVE VERIFIED 2026-10-02
 - [ ] Wire safe research/build tasks -> Empire Coder — AI planner now queues deduplicated PLAN jobs from Radar + research + Factory blockers; reversible IMPLEMENT promotion still pending
 - [ ] Wire product/GTM preparation -> governed external execution
 - [ ] Wire Conversation OS -> terms/payment/fulfilment progression
