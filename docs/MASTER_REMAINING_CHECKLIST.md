@@ -817,7 +817,7 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [ ] Swarm V6 verification hook for candidate worker output
 - [ ] Promptfoo AI-policy/eval hook for agent-produced behavioral changes
 - [ ] OTEL/Langfuse trace events for queue → route → lease → worker → verify → proposal → live result
-- [ ] Astra/department queue automatic dispatch into the execution plane
+- [x] Astra/department queue automatic dispatch into the execution plane — LIVE VERIFIED 2026-10-02
 - [ ] Live parallel non-overlapping Hermes/Pi proof
 - [x] Live collision test proving overlapping mutation leases fail closed — LIVE VERIFIED 2026-10-02
 - [ ] First checklist items completed by the software factory and independently verified
