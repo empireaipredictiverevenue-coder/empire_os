@@ -4,7 +4,7 @@ cd /srv/empire_os
 
 echo "=== AUTONOMOUS REVENUE OS GAUNTLET VERIFY ==="
 
-PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q   tests/test_engineering_gauntlet.py   tests/test_revenue_architecture_critic.py   tests/test_revenue_inventory.py   tests/test_autonomous_revenue_loop.py   tests/test_autonomous_revenue_os.py   tests/test_conversation_qualification.py   tests/test_buyer_allocation.py   tests/test_qualification_worker_v2.py   tests/test_revenue_exchange_snapshot.py   tests/test_revenue_exchange_snapshot_installer.py   tests/test_revenue_exchange_snapshot_systemd.py   --tb=short
+PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q   tests/test_engineering_gauntlet.py   tests/test_revenue_architecture_critic.py   tests/test_revenue_inventory.py   tests/test_autonomous_revenue_loop.py   tests/test_autonomous_revenue_os.py   tests/test_conversation_qualification.py   tests/test_buyer_allocation.py   tests/test_qualification_worker_v2.py   tests/test_acquisition_bounded_fallback.py   tests/test_revenue_exchange_snapshot.py   tests/test_revenue_exchange_snapshot_installer.py   tests/test_revenue_exchange_snapshot_systemd.py   --tb=short
 
 ./.venv/bin/python -m py_compile   empire_os/engineering_gauntlet.py   empire_os/revenue_architecture_critic.py   empire_os/revenue_inventory.py   empire_os/autonomous_revenue_os.py   empire_os/execution_bus_data_repository.py
 
