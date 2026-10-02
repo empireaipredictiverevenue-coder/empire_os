@@ -53,6 +53,8 @@ ALLOWED_UNITS = frozenset({
     "empire-enterprise-contact-sync.service",
     "empire-enterprise-contact-repair.service",
     "empire-enterprise-contact-repair.timer",
+    "empire-revenue-exchange-snapshot.service",
+    "empire-revenue-exchange-snapshot.timer",
 })
 START_ONLY_UNITS = frozenset({
     "empire-revenue-pulse.service",
@@ -69,6 +71,7 @@ START_ONLY_UNITS = frozenset({
     "empire-predictive-revenue-enterprise-activation.service",
     "empire-enterprise-contact-sync.service",
     "empire-enterprise-contact-repair.service",
+    "empire-revenue-exchange-snapshot.service",
 })
 MAX_REQUEST_BYTES = 8192
 

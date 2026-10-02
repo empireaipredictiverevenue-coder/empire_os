@@ -91,6 +91,8 @@ def test_runtime_self_heal_units_are_allowlisted_without_outbound_authority():
         "empire-enterprise-contact-sync.service",
         "empire-enterprise-contact-repair.service",
         "empire-enterprise-contact-repair.timer",
+        "empire-revenue-exchange-snapshot.service",
+        "empire-revenue-exchange-snapshot.timer",
     }
     assert expected.issubset(ALLOWED_UNITS)
     assert all("outbound" not in unit for unit in ALLOWED_UNITS)
