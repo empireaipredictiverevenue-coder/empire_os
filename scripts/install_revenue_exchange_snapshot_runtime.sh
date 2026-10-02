@@ -19,6 +19,9 @@ fi
 
 echo "=== REVENUE EXCHANGE SNAPSHOT RUNTIME INSTALL ==="
 
+# Anti-loop: stop any previously enabled failing timer before changing runtime.
+systemctl stop empire-revenue-exchange-snapshot.timer 2>/dev/null || true
+
 # Founder-gated authority activation. The installer never provisions a new
 # database identity unless the explicit flag is present.
 if [[ "$PROVISION_READER" == true ]]; then

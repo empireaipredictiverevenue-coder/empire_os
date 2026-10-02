@@ -10,6 +10,7 @@ def test_installer_requires_explicit_reader_provision_flag():
     assert "provision_revenue_exchange_reader.py\" --apply" in text
     assert "dedicated Revenue Exchange reader is not provisioned" in text
     assert "rerun with --provision-reader" in text
+    assert "systemctl stop empire-revenue-exchange-snapshot.timer" in text
 
 
 def test_installer_does_not_embed_db_credentials_or_broad_dsn():
