@@ -385,7 +385,7 @@ reserved for genuine consequential gates.
 ## Buyer acquisition / commercial loop
 
 - [ ] Continue real outbound
-- [ ] Improve target quality using account intelligence
+- [x] Improve target quality using account intelligence
 - [ ] Legitimate decision-maker enrichment
 - [ ] Buyer review creation
 - [ ] Governed outbound intent
