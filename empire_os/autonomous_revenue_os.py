@@ -9,8 +9,6 @@ import json
 import os
 from pathlib import Path
 import signal
-import subprocess
-import sys
 import time
 import urllib.parse
 from typing import Any, Mapping
@@ -148,6 +146,12 @@ LATEST_STATE_PATH = REVENUE_RUNTIME_DIR / "latest.json"
 RELEASE_ID = "autonomous-revenue-os-v1"
 DEFAULT_INVENTORY_LIMIT = int(os.environ.get("EMPIRE_REVENUE_INVENTORY_LIMIT", "100"))
 DEFAULT_QUALIFICATION_LIMIT = int(os.environ.get("EMPIRE_REVENUE_QUALIFICATION_LIMIT", "10"))
+QUALIFICATION_ACTIVE_COOLDOWN_SECONDS = int(
+    os.environ.get("EMPIRE_REVENUE_QUALIFICATION_ACTIVE_COOLDOWN_SECONDS", "60")
+)
+QUALIFICATION_IDLE_COOLDOWN_SECONDS = int(
+    os.environ.get("EMPIRE_REVENUE_QUALIFICATION_IDLE_COOLDOWN_SECONDS", "300")
+)
 MIN_IDLE_SLEEP_SECONDS = int(os.environ.get("EMPIRE_REVENUE_IDLE_SLEEP_SECONDS", "30"))
 ACTIVE_SLEEP_SECONDS = int(os.environ.get("EMPIRE_REVENUE_ACTIVE_SLEEP_SECONDS", "3"))
 FAILURE_SLEEP_SECONDS = int(os.environ.get("EMPIRE_REVENUE_FAILURE_SLEEP_SECONDS", "60"))
@@ -425,6 +429,32 @@ def _inventory_recovery_breakdown(snapshot: Mapping[str, Any]) -> dict[str, int]
     return counts
 
 
+
+
+def _qualification_due(previous: Mapping[str, Any] | None) -> bool:
+    if not isinstance(previous, Mapping):
+        return True
+    result = previous.get("qualification_result")
+    if not isinstance(result, Mapping):
+        return True
+    raw = str(result.get("attempted_at") or "").strip()
+    if not raw:
+        return True
+    try:
+        observed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if observed.tzinfo is None:
+        observed = observed.replace(tzinfo=timezone.utc)
+    material = int(result.get("material_actions") or 0)
+    cooldown = (
+        QUALIFICATION_ACTIVE_COOLDOWN_SECONDS
+        if material > 0
+        else QUALIFICATION_IDLE_COOLDOWN_SECONDS
+    )
+    age = (datetime.now(timezone.utc) - observed).total_seconds()
+    return age >= max(5, cooldown)
+
 def _run_qualification_bundle(limit: int) -> dict[str, Any]:
     bounded = max(1, min(25, int(limit)))
     signal_resolution = run_signal_resolution(bounded)
@@ -455,6 +485,7 @@ def _run_qualification_bundle(limit: int) -> dict[str, Any]:
 
     return {
         "schema_version": "autonomous_revenue_qualification_bundle.v2",
+        "attempted_at": _utc_now(),
         "signal_resolution": signal_resolution,
         "qualification": pending,
         "identity_catchup": identity,
@@ -470,8 +501,7 @@ def _run_qualification_bundle(limit: int) -> dict[str, Any]:
         + int(pending.get("qualified") or 0)
         + int(identity.get("identity_resolved") or 0)
         + int(recovery.get("requalified") or 0)
-        + int(omega.get("scored") or omega.get("attempted") or 0)
-        + int(buyer_readiness.get("promoted") or 0),
+        + int(omega.get("scores_written") or 0),
         "failed": int(signal_resolution.get("failed") or 0)
         + int(pending.get("failed") or 0)
         + int(identity.get("failed") or 0)
@@ -571,7 +601,7 @@ def _lead_generation_gauntlet(
             "revenue-loop:lead-generation:"
             f"{target.get('niche')}:{target.get('metro')}"
         ),
-        component="crawler_runner",
+        component="canonical_acquisition_cycle",
         authority="internal_write",
         evidence_refs=refs + (
             "docs/architecture/revenue_inventory_ladder_v1.md",
@@ -611,38 +641,32 @@ def _lead_generation_due(previous: Mapping[str, Any] | None) -> bool:
 def _run_lead_generation(
     target: Mapping[str, Any],
 ) -> dict[str, Any]:
-    command = [
-        sys.executable,
-        "-m",
-        "empire_os.crawler_runner",
-        "--metro",
-        str(target["metro"]),
-        "--niche",
-        str(target["niche"]),
-        "--max-candidates",
-        str(max(1, LEAD_GENERATION_BATCH)),
-    ]
-    completed = subprocess.run(
-        command,
-        cwd="/srv/empire_os",
-        capture_output=True,
-        text=True,
-        timeout=1800,
-        check=False,
+    result = run_acquisition_cycle(
+        max_candidates=max(1, min(25, LEAD_GENERATION_BATCH)),
+        max_attempts=2,
     )
     return {
         "attempted_at": _utc_now(),
-        "target": {
+        "opportunity_hint": {
             "niche": target.get("niche"),
             "metro": target.get("metro"),
             "opportunity_key": target.get("opportunity_key"),
         },
-        "returncode": completed.returncode,
-        "ok": completed.returncode == 0,
-        "stdout_tail": (completed.stdout or "")[-4000:],
-        "stderr_tail": (completed.stderr or "")[-4000:],
-        "max_candidates": max(1, LEAD_GENERATION_BATCH),
+        "acquisition": result,
+        "ok": result.get("ok") is True,
+        "canonical_acquisition_observed": bool(
+            result.get("canonical_acquisition_observed")
+        ),
+        "source": result.get("source"),
+        "source_family": result.get("source_family"),
+        "metro": result.get("metro"),
+        "country_code": result.get("country_code"),
+        "attempt_count": result.get("attempt_count"),
+        "fallback_used": result.get("fallback_used"),
+        "max_candidates": max(1, min(25, LEAD_GENERATION_BATCH)),
         "actual_revenue": False,
+        "outreach_enabled": False,
+        "payment_enabled": False,
     }
 
 
@@ -709,16 +733,29 @@ def run_agentic_cycle(
             == RELEASE_ID
         )
 
+    previous_state = _read_json(LATEST_STATE_PATH)
     qualification_result: dict[str, Any] | None = None
     qualification_gate = _qualification_gauntlet(bool(gauntlet_attested))
+    qualification_due = _qualification_due(previous_state)
 
     if (
-        internal_write
+        qualification_due
+        and internal_write
         and qualification_gate["decision"] == "READY_FOR_INTERNAL_EXECUTION"
     ):
         qualification_result = _run_qualification_bundle(
             limit=max(1, int(qualification_limit))
         )
+    qualification_executed = qualification_result is not None
+    qualification_state = (
+        qualification_result
+        if qualification_result is not None
+        else (
+            previous_state.get("qualification_result")
+            if isinstance(previous_state, Mapping)
+            else None
+        )
+    )
 
     revenue_exchange_refresh: dict[str, Any] | None = None
     if _revenue_exchange_snapshot_due():
@@ -732,7 +769,6 @@ def run_agentic_cycle(
                 "execution_authority": "none",
             }
 
-    previous_state = _read_json(LATEST_STATE_PATH)
     snapshot = build_inventory_snapshot(
         repository=repository,
         limit=inventory_limit,
@@ -761,6 +797,16 @@ def run_agentic_cycle(
             == "READY_FOR_INTERNAL_EXECUTION"
         ):
             lead_generation = _run_lead_generation(target or {})
+    lead_generation_executed = lead_generation is not None
+    lead_generation_state = (
+        lead_generation
+        if lead_generation is not None
+        else (
+            previous_state.get("lead_generation")
+            if isinstance(previous_state, Mapping)
+            else None
+        )
+    )
 
     next_action = diagnose_next_revenue_action(snapshot)
     review_queue = build_revenue_review_queue(snapshot)
@@ -771,6 +817,7 @@ def run_agentic_cycle(
         "loop": [
             "OBSERVE",
             "DIAGNOSE",
+            "ARCHITECT",
             "PLAN",
             "GAUNTLET",
             "ACT",
@@ -779,7 +826,13 @@ def run_agentic_cycle(
             "REPEAT",
         ],
         "qualification_gauntlet": qualification_gate,
-        "qualification_result": qualification_result,
+        "qualification_decision": {
+            "due": qualification_due,
+            "executed": qualification_executed,
+            "internal_write": bool(internal_write),
+            "gauntlet_attested": bool(gauntlet_attested),
+        },
+        "qualification_result": qualification_state,
         "revenue_exchange_refresh": revenue_exchange_refresh,
         "lead_generation_decision": {
             "target": target,
@@ -792,7 +845,8 @@ def run_agentic_cycle(
             "gauntlet_attested": bool(gauntlet_attested),
         },
         "lead_generation_gauntlet": lead_generation_gate,
-        "lead_generation": lead_generation,
+        "lead_generation_executed": lead_generation_executed,
+        "lead_generation": lead_generation_state,
         "continuous_lead_generation": CONTINUOUS_LEAD_GENERATION,
         "inventory_floor": INVENTORY_FLOOR,
         "inventory_recovery": recovery_breakdown,
@@ -807,7 +861,7 @@ def run_agentic_cycle(
         "actual_revenue": False,
         "execution_authority": (
             "bounded_internal"
-            if qualification_result is not None or lead_generation is not None
+            if qualification_executed or lead_generation_executed
             else "observe"
         ),
     }
@@ -841,13 +895,19 @@ class AutonomousRevenueLoop:
                     qualification_limit=self.qualification_limit,
                 )
                 qualification = result.get("qualification_result")
-                lead_generation = result.get("lead_generation")
+                qualification_executed = bool(
+                    (result.get("qualification_decision") or {}).get("executed")
+                )
+                lead_generation_executed = bool(
+                    result.get("lead_generation_executed")
+                )
                 did_work = bool(
                     (
-                        isinstance(qualification, dict)
+                        qualification_executed
+                        and isinstance(qualification, dict)
                         and int(qualification.get("material_actions") or 0) > 0
                     )
-                    or isinstance(lead_generation, dict)
+                    or lead_generation_executed
                 )
                 sleep_for = (
                     ACTIVE_SLEEP_SECONDS

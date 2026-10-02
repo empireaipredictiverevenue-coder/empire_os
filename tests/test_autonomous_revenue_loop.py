@@ -122,3 +122,57 @@ def test_recovery_breakdown_separates_raw_lanes():
         "non_allocatable_tier":1,
         "other_raw":1,
     }
+
+
+def test_lead_generation_uses_canonical_bounded_acquisition(monkeypatch):
+    import empire_os.autonomous_revenue_os as revenue
+
+    seen={}
+    def fake_cycle(*, max_candidates, max_attempts):
+        seen["max_candidates"]=max_candidates
+        seen["max_attempts"]=max_attempts
+        return {
+            "ok":True,
+            "canonical_acquisition_observed":True,
+            "source":"overpass",
+            "source_family":"broad_discovery",
+            "metro":"Austin, TX",
+            "country_code":"US",
+            "attempt_count":1,
+            "fallback_used":False,
+        }
+
+    monkeypatch.setattr(revenue,"run_acquisition_cycle",fake_cycle)
+    monkeypatch.setattr(revenue,"LEAD_GENERATION_BATCH",25)
+
+    result=revenue._run_lead_generation({
+        "niche":"roofing",
+        "metro":"Austin, TX",
+        "opportunity_key":"opp:1",
+    })
+
+    assert seen=={"max_candidates":25,"max_attempts":2}
+    assert result["ok"] is True
+    assert result["canonical_acquisition_observed"] is True
+    assert result["outreach_enabled"] is False
+    assert result["payment_enabled"] is False
+    assert result["opportunity_hint"]["niche"]=="roofing"
+
+
+def test_qualification_cooldown_preserves_recent_idle_result():
+    from datetime import datetime, timezone
+    from empire_os.autonomous_revenue_os import _qualification_due
+    previous={"qualification_result":{
+        "attempted_at":datetime.now(timezone.utc).isoformat(),
+        "material_actions":0,
+    }}
+    assert _qualification_due(previous) is False
+
+def test_lead_generation_cooldown_preserves_last_attempt():
+    from datetime import datetime, timezone
+    from empire_os.autonomous_revenue_os import _lead_generation_due
+    previous={"lead_generation":{
+        "attempted_at":datetime.now(timezone.utc).isoformat(),
+        "ok":True,
+    }}
+    assert _lead_generation_due(previous) is False

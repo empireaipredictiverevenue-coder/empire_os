@@ -11,11 +11,15 @@ WorkingDirectory=/srv/empire_os
 EnvironmentFile=-/etc/empire_os.env
 EnvironmentFile=-/etc/empiredb.env
 Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_DATA_BACKEND=empiredb
+Environment=CRAWLER_TIMEOUT=600
 Environment=EMPIRE_REVENUE_LOOP_INTERNAL_WRITE=1
 Environment=EMPIRE_REVENUE_GAUNTLET_ATTESTED=1
 Environment=EMPIRE_REVENUE_RELEASE_ID=autonomous-revenue-os-v1
 Environment=EMPIRE_REVENUE_INVENTORY_LIMIT=200
 Environment=EMPIRE_REVENUE_QUALIFICATION_LIMIT=10
+Environment=EMPIRE_REVENUE_QUALIFICATION_ACTIVE_COOLDOWN_SECONDS=60
+Environment=EMPIRE_REVENUE_QUALIFICATION_IDLE_COOLDOWN_SECONDS=300
 Environment=EMPIRE_REVENUE_CONTINUOUS_LEAD_GENERATION=1
 Environment=EMPIRE_REVENUE_LEAD_GENERATION_BATCH=25
 Environment=EMPIRE_REVENUE_LEAD_GENERATION_COOLDOWN_SECONDS=900
@@ -24,6 +28,7 @@ Restart=always
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectHome=true
 ProtectSystem=strict
 ReadWritePaths=/srv/empire_os/runtime
 TimeoutStopSec=30
