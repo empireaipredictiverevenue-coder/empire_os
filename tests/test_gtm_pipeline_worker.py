@@ -705,3 +705,91 @@ def test_founder_review_history_guard_fails_closed():
         "founder_history_guard_failed" in reason
         for reason in result.deferred_reasons
     )
+
+
+def test_prior_outbound_history_excludes_founder_review_candidate():
+    review = {
+        "id": "review-redwood",
+        "prospect_id": "prospect-redwood",
+        "contact_name": "Richard Lewis",
+        "contact_title": "Chief Executive Officer & Founder",
+        "contact_email": "richard@redwoodservices.com",
+        "offer_key": "predictive_revenue_intelligence_os",
+        "company_score": 90,
+        "decision_score": 1.0,
+        "proposed_at": NOW.isoformat(),
+    }
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            if "status=eq.pending" in path:
+                return [review]
+            return []
+        if method == "GET" and path.startswith(
+            "/rest/v1/outbound_intents?"
+        ):
+            return [{
+                "prospect_id": "prospect-redwood",
+                "normalized_recipient": "richard@redwoodservices.com",
+                "status": "delivered",
+            }]
+        if method == "GET" and path.startswith(
+            "/rest/v1/outbound_suppressions?"
+        ):
+            return []
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+
+    assert result.candidate_skipped == 1
+    assert result.founder_review_required == ()
+    assert any(
+        "prior_outbound_history" in reason
+        for reason in result.deferred_reasons
+    )
+
+
+def test_suppressed_contact_excluded_before_founder_review():
+    review = {
+        "id": "review-suppressed",
+        "prospect_id": "prospect-suppressed",
+        "contact_name": "Jane Smith",
+        "contact_title": "Founder",
+        "contact_email": "jane@example.com",
+        "offer_key": "search_growth_command",
+        "company_score": 90,
+        "decision_score": 1.0,
+        "proposed_at": NOW.isoformat(),
+    }
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            if "status=eq.pending" in path:
+                return [review]
+            return []
+        if method == "GET" and path.startswith(
+            "/rest/v1/outbound_intents?"
+        ):
+            return []
+        if method == "GET" and path.startswith(
+            "/rest/v1/outbound_suppressions?"
+        ):
+            return [{"normalized_contact": "jane@example.com"}]
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+
+    assert result.candidate_skipped == 1
+    assert result.founder_review_required == ()
+    assert any(
+        "suppressed_contact" in reason
+        for reason in result.deferred_reasons
+    )

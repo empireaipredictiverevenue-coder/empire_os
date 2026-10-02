@@ -427,6 +427,59 @@ def run_gtm_pipeline(
         if str((row or {}).get("contact_email") or "").strip()
     }
 
+    history_query = urlencode({
+        "select": "prospect_id,normalized_recipient,status",
+        "status": (
+            "in.(sending,sent,delivered,replied,bounced,failed,suppressed)"
+        ),
+        "order": "created_at.desc",
+        "limit": "1000",
+    })
+    try:
+        history_rows = request(
+            "GET",
+            f"/rest/v1/outbound_intents?{history_query}",
+        ) or []
+    except Exception:
+        history_rows = []
+    if not isinstance(history_rows, list):
+        history_rows = []
+
+    prior_prospect_ids = {
+        str((row or {}).get("prospect_id") or "").strip()
+        for row in history_rows
+        if str((row or {}).get("prospect_id") or "").strip()
+    }
+    prior_contacts = {
+        str((row or {}).get("normalized_recipient") or "").strip().lower()
+        for row in history_rows
+        if str((row or {}).get("normalized_recipient") or "").strip()
+    }
+    prior_domains = {
+        value.rsplit("@", 1)[-1]
+        for value in prior_contacts
+        if "@" in value
+    }
+
+    suppression_query = urlencode({
+        "select": "normalized_contact",
+        "limit": "5000",
+    })
+    try:
+        suppression_rows = request(
+            "GET",
+            f"/rest/v1/outbound_suppressions?{suppression_query}",
+        ) or []
+    except Exception:
+        suppression_rows = []
+    if not isinstance(suppression_rows, list):
+        suppression_rows = []
+    suppressed_contacts = {
+        str((row or {}).get("normalized_contact") or "").strip().lower()
+        for row in suppression_rows
+        if str((row or {}).get("normalized_contact") or "").strip()
+    }
+
     approved_count = 0
     skipped = 0
     pending_skip_reasons: list[str] = []
@@ -438,10 +491,34 @@ def run_gtm_pipeline(
         contact = str(
             (row or {}).get("contact_email") or ""
         ).strip().lower()
+        prospect_id = str(
+            (row or {}).get("prospect_id") or ""
+        ).strip()
+        contact_domain = (
+            contact.rsplit("@", 1)[-1]
+            if "@" in contact
+            else ""
+        )
         if contact and contact in seen_contacts:
             skipped += 1
             pending_skip_reasons.append(
                 f"{review_id}:duplicate_normalized_contact"
+            )
+            continue
+        if (
+            (prospect_id and prospect_id in prior_prospect_ids)
+            or (contact and contact in prior_contacts)
+            or (contact_domain and contact_domain in prior_domains)
+        ):
+            skipped += 1
+            pending_skip_reasons.append(
+                f"{review_id}:prior_outbound_history"
+            )
+            continue
+        if contact and contact in suppressed_contacts:
+            skipped += 1
+            pending_skip_reasons.append(
+                f"{review_id}:suppressed_contact"
             )
             continue
         try:
