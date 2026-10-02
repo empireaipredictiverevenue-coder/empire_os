@@ -47,3 +47,14 @@ revenue recognition occurs in the cache refresh.
 Convert Texas HVAC no_decision_maker cases into attributable owner/license
 search seeds at zero paid-data cost while keeping personhood requirements
 unchanged.
+
+## Net-new market discovery
+
+The same active-license cache also feeds a rotating research-only market lane.
+Each Buyer Scout cycle selects a bounded slice of active, named A/C contractor
+businesses, searches exact business + location, removes directory/social hosts,
+and passes discovered domains into the existing first-party Buyer Scout probe.
+
+Registry identity is retained only as a search seed. The scout still derives
+business identity and people from the discovered first-party site before any
+review or promotion path can proceed.

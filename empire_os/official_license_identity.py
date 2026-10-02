@@ -189,7 +189,9 @@ def _tdlr_query_url() -> str:
     params = urllib.parse.urlencode({
         "$select": (
             "license_type,license_number,business_county,business_name,"
-            "license_expiration_date_mmddccyy,owner_name,license_subtype"
+            "business_address_line1,business_city_state_zip,business_telephone,"
+            "license_expiration_date_mmddccyy,owner_name,owner_telephone,"
+            "license_subtype"
         ),
         "$where": "license_type='A/C Contractor'",
         "$limit": "30000",

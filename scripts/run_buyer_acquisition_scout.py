@@ -10,6 +10,9 @@ from empire_os.buyer_acquisition_scout import refresh_buyer_scout
 from empire_os.buyer_public_research_seed import (
     refresh_public_research_seeds,
 )
+from empire_os.official_license_market_seed import (
+    refresh_official_license_market_seeds,
+)
 from empire_os.sb import request_json
 SEED_LANES = (
     (
@@ -145,6 +148,16 @@ def main() -> int:
         results_per_query=min(args.results_per_query, 10),
     )
 
+    official_license_research = refresh_official_license_market_seeds(
+        args.repo_root,
+        max_queries=max(12, min(args.max_queries // 2, 60)),
+        results_per_query=min(args.results_per_query, 4),
+    )
+    research_seeds = [
+        *(public_research.get("seeds") or []),
+        *(official_license_research.get("seeds") or []),
+    ]
+
     payload = refresh_buyer_scout(
         args.repo_root,
         max_queries=args.max_queries,
@@ -154,7 +167,7 @@ def main() -> int:
         canonical_seed_records=_canonical_seed_records(
             per_lane=8,
         ),
-        research_seed_records=public_research.get("seeds") or [],
+        research_seed_records=research_seeds,
     )
     print(json.dumps({
         "ok": True,
@@ -168,6 +181,12 @@ def main() -> int:
             "canonical_seed_fallback_used"
         ],
         "candidate_count": payload["candidate_count"],
+        "official_license_query_count": official_license_research[
+            "query_count"
+        ],
+        "official_license_seed_count": official_license_research[
+            "seed_count"
+        ],
         "predictive_revenue_enterprise_candidate_count": payload[
             "predictive_revenue_enterprise_candidate_count"
         ],
