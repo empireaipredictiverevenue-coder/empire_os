@@ -567,16 +567,16 @@ Implementation state:
 
 ## Commercial/product economics across Empire
 
-- [ ] Permit pricing
-- [ ] Property pricing
-- [ ] Search Intelligence pricing
+- [x] Permit pricing
+- [x] Property pricing
+- [x] Search Intelligence pricing
 - [ ] Storm pricing
-- [ ] Data/API pricing
+- [x] Data/API pricing
 - [ ] Seats/territories
 - [ ] Managed-growth pricing
-- [ ] Enterprise/private-capital pricing
+- [x] Enterprise/private-capital pricing
 - [ ] White-label/channel pricing
-- [ ] Usage/value-based pricing
+- [x] Usage/value-based pricing
 - [ ] Actual cost tracking
 - [ ] Realized margin tracking
 
