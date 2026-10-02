@@ -2,6 +2,7 @@
 Description=EmpireOS first-party buyer review materializer
 After=network-online.target
 Wants=network-online.target
+OnSuccess=empire-gtm-pipeline.service
 
 [Service]
 Type=oneshot
