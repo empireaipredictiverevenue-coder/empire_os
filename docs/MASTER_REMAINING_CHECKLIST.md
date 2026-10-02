@@ -224,7 +224,7 @@ Canonical organization:
 - [x] Core intelligence/org regression — 73 passed, 1 dependency deprecation warning — 2026-09-22
 - [x] Live runtime verification of Astra Executive snapshot on EmpireOS — VERIFIED 2026-09-22: primary goal `advance_first_verified_revenue`, 8 plan steps, 8 auto-dispatch eligible, 0 founder gates
 - [ ] Department scorecards from live KPIs
-- [ ] Department work queues / budgets / review cadence — durable deduplicated queue + atomic leases + safe worker + 2-minute bounded heartbeat + evaluator CODED/STAGED; budget ledger still pending
+- [x] Department work queues / budgets / review cadence — LIVE VERIFIED 2026-10-02; budget ledger fail-closes unconfigured resource caps and grants no spend authority
 - [x] Astra automatic dispatch from executive plan into eligible department queues — LIVE VERIFIED 2026-09-22: 8/8 eligible steps queued, 0 authority-blocked, 0 unowned
 - [x] Department execution spine live proof — 8 processed, 3 DONE, 5 BLOCKED, 0 FAILED; queue drained with 0 ready/running
 - [x] Obsolete `specialist_adapter_required` work can reopen deterministically after adapter rollout — CODED
