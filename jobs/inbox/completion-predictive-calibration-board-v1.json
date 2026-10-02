@@ -1,0 +1,29 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/predictive_calibration.py",
+    "empire_os/predictive_calibration_board.py",
+    "tests/test_predictive_calibration_board.py",
+    "docs/architecture/predictive_calibration_board_v1.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T08:18:02.300806+00:00",
+  "job_id": "completion-predictive-calibration-board-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:predictive_calibration_board",
+    "path:empire_os/predictive_calibration.py",
+    "path:empire_os/predictive_calibration_board.py",
+    "path:tests/test_predictive_calibration_board.py",
+    "path:docs/architecture/predictive_calibration_board_v1.md"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "Follow the Architecture-First Engineering Doctrine. Inspect existing predictive_calibration, Predictive Cloud, Quant Brain, Digital Twin and verified-outcome contracts. Record a bounded architecture delta in docs/architecture/predictive_calibration_board_v1.md, then implement or extend the canonical calibration read model without duplicating existing calibration ownership. The board must preserve forecast vs actual, Brier/error/interval-coverage/drift fields only when supported by verified cohorts, preserve UNKNOWN otherwise, and expose evidence/freshness. It must not mutate model weights, capital, pricing, commercial state or revenue truth.",
+  "pytest_targets": [
+    "tests/test_predictive_calibration_board.py",
+    "tests/test_predictive_cloud_formula.py",
+    "tests/test_quant_brain.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
