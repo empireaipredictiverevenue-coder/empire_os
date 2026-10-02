@@ -277,6 +277,42 @@ class LocalJobQueue:
             source.replace(destination)
             return job
 
+    def restore_failed_plan_for_local_fallback(
+        self,
+        job_id: str,
+        *,
+        error: str,
+        reason: str = "provider_unavailable",
+    ) -> CoderJob:
+        safe = self._safe_id(job_id)
+        source = self.failed / f"{safe}.json"
+        with self._locked():
+            if not source.exists():
+                return self.get(safe)
+            job = self._load_path(source)
+            if job.kind is not JobKind.PLAN:
+                raise JobQueueError(
+                    "only failed PLAN jobs may use local fallback recovery"
+                )
+            job.status = JobStatus.PENDING
+            job.payload = {
+                **dict(job.payload or {}),
+                "local_fallback_after_hermes": True,
+                "hermes_fallback_reason": str(reason or "provider_unavailable"),
+            }
+            job.result = {}
+            job.error = str(error)[:4000]
+            job.retry_after = None
+            job.lease_id = None
+            job.worker_id = None
+            job.heartbeat_at = None
+            job.lease_expires_at = None
+            job.updated_at = utc_now()
+            self._write(source, job)
+            destination = self.pending / source.name
+            source.replace(destination)
+            return job
+
     def finish_delegated(
         self,
         job_id: str,

@@ -41,3 +41,17 @@ gate and substantive worker failures remain failed and require review.
 - non-provider Hermes failure remains FAILED;
 - local Coder worker can claim the restored PLAN;
 - no implementation authority changes.
+
+
+## Existing backlog recovery
+
+The delegation cycle also performs a bounded recovery scan of already-failed
+PLAN jobs. Recovery is intentionally narrow:
+- PLAN kind only;
+- completion-board jobs only (department_work_id required);
+- recognized Hermes provider/model availability failure only;
+- at most the cycle max-jobs bound;
+- restored jobs receive the same local-fallback marker and cannot re-delegate.
+
+Historical founder directives, implementation jobs, verification jobs and
+substantive policy/verification failures are not replayed automatically.

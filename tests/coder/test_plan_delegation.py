@@ -365,3 +365,118 @@ def test_non_provider_hermes_failure_remains_failed(
     terminal = queue.get(job.id)
     assert terminal.status is JobStatus.FAILED
     assert "local_fallback_after_hermes" not in terminal.payload
+
+
+def test_failed_completion_plan_provider_outage_recovers_locally(tmp_path):
+    from empire_os.coder.plan_delegation import recover_failed_provider_plans
+
+    root, runtime = _workspace(tmp_path)
+    store = LocalTaskStore(root, runtime_root=runtime)
+    task = store.create(
+        "Revenue completion review",
+        blueprint_path="docs/BLUEPRINT_V6.md",
+    )
+    queue = LocalJobQueue(root, runtime_root=runtime)
+    queued = queue.enqueue(
+        task_id=task.id,
+        kind=JobKind.PLAN,
+        priority=100,
+        payload={"department_work_id": "dept_work_revenue_1"},
+    )
+    running = queue.claim_next(worker_id="test", lease_seconds=60)
+    assert running.id == queued.id
+    running.attempts = 2
+    terminal = queue.fail(
+        running,
+        (
+            "HermesControlError: OmniRoute has no healthy eligible "
+            "zero-cost Hermes model candidates"
+        ),
+    )
+    assert terminal.status is JobStatus.FAILED
+
+    result = recover_failed_provider_plans(
+        root,
+        runtime_root=runtime,
+        max_jobs=1,
+    )
+
+    assert result["recovered_count"] == 1
+    restored = queue.get(queued.id)
+    assert restored.status is JobStatus.PENDING
+    assert restored.attempts == 2
+    assert restored.payload["local_fallback_after_hermes"] is True
+    assert restored.payload["hermes_fallback_reason"] == (
+        "provider_unavailable"
+    )
+
+
+def test_failed_non_completion_provider_plan_is_not_auto_recovered(
+    tmp_path,
+):
+    from empire_os.coder.plan_delegation import recover_failed_provider_plans
+
+    root, runtime = _workspace(tmp_path)
+    store = LocalTaskStore(root, runtime_root=runtime)
+    task = store.create(
+        "Historical founder directive",
+        blueprint_path="docs/BLUEPRINT_V6.md",
+    )
+    queue = LocalJobQueue(root, runtime_root=runtime)
+    queued = queue.enqueue(
+        task_id=task.id,
+        kind=JobKind.PLAN,
+        priority=100,
+        payload={"directive_id": "directive_old"},
+    )
+    running = queue.claim_next(worker_id="test", lease_seconds=60)
+    queue.fail(
+        running,
+        (
+            "HermesControlError: OmniRoute has no healthy eligible "
+            "zero-cost Hermes model candidates"
+        ),
+    )
+
+    result = recover_failed_provider_plans(
+        root,
+        runtime_root=runtime,
+        max_jobs=3,
+    )
+
+    assert result["recovered_count"] == 0
+    assert result["skipped_non_completion_count"] == 1
+    assert queue.get(queued.id).status is JobStatus.FAILED
+
+
+def test_failed_completion_non_provider_error_is_not_auto_recovered(
+    tmp_path,
+):
+    from empire_os.coder.plan_delegation import recover_failed_provider_plans
+
+    root, runtime = _workspace(tmp_path)
+    store = LocalTaskStore(root, runtime_root=runtime)
+    task = store.create(
+        "Revenue completion review",
+        blueprint_path="docs/BLUEPRINT_V6.md",
+    )
+    queue = LocalJobQueue(root, runtime_root=runtime)
+    queued = queue.enqueue(
+        task_id=task.id,
+        kind=JobKind.PLAN,
+        payload={"department_work_id": "dept_work_revenue_2"},
+    )
+    running = queue.claim_next(worker_id="test", lease_seconds=60)
+    queue.fail(
+        running,
+        "HermesControlError: governed proposal validation failed",
+    )
+
+    result = recover_failed_provider_plans(
+        root,
+        runtime_root=runtime,
+        max_jobs=3,
+    )
+
+    assert result["recovered_count"] == 0
+    assert queue.get(queued.id).status is JobStatus.FAILED

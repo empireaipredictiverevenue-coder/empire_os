@@ -97,6 +97,65 @@ def _local_planner_capability(coder: EmpireCoder) -> int:
     return min(available, configured)
 
 
+def recover_failed_provider_plans(
+    repo_root: str | Path,
+    *,
+    runtime_root: str | Path | None = None,
+    max_jobs: int = 3,
+) -> dict[str, Any]:
+    root = Path(repo_root).resolve()
+    runtime = Path(runtime_root or root / "runtime/coder").resolve()
+    queue = LocalJobQueue(root, runtime_root=runtime)
+    recovered: list[dict[str, str]] = []
+    skipped_non_completion = 0
+
+    candidates = []
+    for path in queue.failed.glob("*.json"):
+        try:
+            job = queue._load_path(path)
+        except Exception:
+            continue
+        candidates.append((str(job.updated_at or ""), path, job))
+
+    for _, _, job in sorted(candidates, reverse=True):
+        if len(recovered) >= max(0, min(int(max_jobs), 10)):
+            break
+        if job.kind is not JobKind.PLAN:
+            continue
+        if not str((job.payload or {}).get("department_work_id") or "").strip():
+            skipped_non_completion += 1
+            continue
+        failure = {
+            "error": str(job.error or ""),
+            "hermes": {},
+        }
+        if not _hermes_provider_outage(failure):
+            continue
+
+        pending = queue.restore_failed_plan_for_local_fallback(
+            job.id,
+            error=(
+                "recovered_hermes_provider_outage_local_fallback:"
+                + str(job.error or "")
+            ),
+            reason="provider_unavailable",
+        )
+        recovered.append({
+            "job_id": pending.id,
+            "task_id": pending.task_id,
+            "status": pending.status.value,
+        })
+
+    return {
+        "schema_version": "empire.coder.plan-fallback-recovery.v1",
+        "recovered_count": len(recovered),
+        "skipped_non_completion_count": skipped_non_completion,
+        "recovered": recovered,
+        "execution_authority": "none",
+        "production_mutation": False,
+    }
+
+
 def delegate_oversized_plans(
     repo_root: str | Path,
     *,

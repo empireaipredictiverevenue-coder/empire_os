@@ -7,6 +7,7 @@ from pathlib import Path
 
 from empire_os.coder.plan_delegation import (
     delegate_oversized_plans,
+    recover_failed_provider_plans,
     reconcile_delegated_plans,
 )
 
@@ -27,6 +28,10 @@ def main() -> int:
         "execution_authority": "none",
     }
     if args.phase in {"reconcile", "both"}:
+        payload["fallback_recovery"] = recover_failed_provider_plans(
+            root,
+            max_jobs=max(0, min(int(args.max_jobs), 10)),
+        )
         payload["reconciliation"] = reconcile_delegated_plans(root)
     if args.phase in {"delegate", "both"}:
         payload["delegation"] = delegate_oversized_plans(
