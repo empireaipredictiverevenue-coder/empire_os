@@ -492,3 +492,33 @@ def test_adaptive_payload_records_human_arm_attribution():
         "unlock", "leverage", "game-changing", "ai-powered",
         "cutting-edge", "revolutionary",
     ))
+
+
+def test_pipeline_prioritizes_fresh_reviews_and_excludes_stale_backlog():
+    seen_paths = []
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            seen_paths.append(path)
+            if "status=eq.approved" in path:
+                return []
+            return []
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(
+        request,
+        now=NOW,
+    )
+
+    assert result.pending_seen == 0
+    pending_path = next(
+        path for path in seen_paths
+        if "status=eq.pending" in path
+    )
+    assert "order=proposed_at.desc" in pending_path
+    assert "proposed_at=gte." in pending_path
+    assert "2026-09-14T16%3A00%3A00%2B00%3A00" in pending_path

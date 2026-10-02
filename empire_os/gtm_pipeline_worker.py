@@ -330,10 +330,12 @@ def run_gtm_pipeline(
     if current.tzinfo is None:
         raise ValueError("now must include timezone")
 
+    pending_cutoff = current - timedelta(days=7)
     pending_query = urlencode({
         "select": "id,contact_email,proposed_at",
         "status": "eq.pending",
-        "order": "proposed_at.asc",
+        "proposed_at": f"gte.{pending_cutoff.isoformat()}",
+        "order": "proposed_at.desc",
         "limit": str(bounded),
     })
     pending = request(
