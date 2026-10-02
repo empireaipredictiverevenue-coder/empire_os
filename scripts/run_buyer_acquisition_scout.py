@@ -141,8 +141,8 @@ def main() -> int:
 
     public_research = refresh_public_research_seeds(
         args.repo_root,
-        max_queries=min(args.max_queries, 12),
-        results_per_query=min(args.results_per_query, 5),
+        max_queries=min(args.max_queries, 48),
+        results_per_query=min(args.results_per_query, 10),
     )
 
     payload = refresh_buyer_scout(

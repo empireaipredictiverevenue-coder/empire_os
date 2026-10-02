@@ -25,6 +25,7 @@ def test_public_research_seeds_are_observe_only_and_bounded():
         max_queries=12,
         results_per_query=5,
         observed_at=datetime(2026, 10, 2, tzinfo=timezone.utc),
+        include_volume=False,
     )
 
     assert result["mode"] == "OBSERVE"
@@ -83,3 +84,44 @@ def test_search_failure_degrades_to_baseline_seeds():
     assert result["errors"][0].startswith("search_fabric:RuntimeError:")
     assert result["outbound_sent"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_rotating_volume_wave_is_bounded_and_observe_only():
+    seen = {}
+
+    def fake_search(queries, num):
+        seen["queries"] = list(queries)
+        seen["num"] = num
+        return {
+            query: [f"buyer{index}.example"]
+            for index, query in enumerate(queries)
+        }
+
+    result = build_public_research_seeds(
+        {},
+        search_fn=fake_search,
+        max_queries=24,
+        results_per_query=7,
+        observed_at=datetime(2026, 10, 2, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert result["query_count"] == 24
+    assert len(seen["queries"]) == 24
+    assert seen["num"] == 7
+    assert any("roofing" in q or "hvac" in q for q in seen["queries"])
+    assert result["outbound_sent"] is False
+    assert result["commercial_authority"] == "none"
+    assert result["execution_authority"] == "none"
+    volume_rows = [
+        row for row in result["seeds"]
+        if row["domain"].endswith(".example")
+    ]
+    assert len(volume_rows) == 24
+    assert all(
+        "local_and_smb_buyers" in row["target_buyer_pools"]
+        for row in volume_rows
+    )
+    assert all(
+        "managed_service" in row["target_product_codes"]
+        for row in volume_rows
+    )

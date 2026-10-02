@@ -21,8 +21,28 @@ SearchFn = Callable[[list[str], int], Mapping[str, list[str]]]
 _BAD_HOSTS = {
     "google.com", "bing.com", "duckduckgo.com", "facebook.com",
     "linkedin.com", "youtube.com", "reddit.com", "wikipedia.org",
-    "mthink.com",
+    "mthink.com", "search.google",
 }
+
+_VOLUME_VERTICALS = (
+    ("roofing contractor", "roofing"),
+    ("hvac contractor", "hvac"),
+    ("water damage restoration", "restoration"),
+    ("plumber", "plumbing"),
+    ("solar installer", "solar"),
+    ("general contractor", "general_contractor"),
+    ("personal injury lawyer", "personal_injury"),
+    ("workers compensation lawyer", "workers_comp"),
+    ("mass tort law firm", "mass_tort"),
+)
+
+_VOLUME_METROS = (
+    "Dallas TX", "Houston TX", "San Antonio TX", "Austin TX",
+    "Phoenix AZ", "Tampa FL", "Orlando FL", "Miami FL",
+    "Atlanta GA", "Charlotte NC", "Nashville TN", "Denver CO",
+    "Kansas City MO", "Oklahoma City OK", "Chicago IL",
+    "Philadelphia PA", "New York NY", "Los Angeles CA",
+)
 
 # First-party domains observed publicly on 2026-10-02. They are only starting
 # points for repeat first-party verification; no price, capacity, terms or
@@ -93,6 +113,40 @@ def _dynamic_queries(
     return dedup
 
 
+def _volume_queries(
+    *,
+    observed_at: datetime,
+    max_queries: int,
+) -> list[dict[str, Any]]:
+    combinations = [
+        (vertical, niche, metro)
+        for metro in _VOLUME_METROS
+        for vertical, niche in _VOLUME_VERTICALS
+    ]
+    if not combinations:
+        return []
+    count = max(0, min(int(max_queries), len(combinations)))
+    if count == 0:
+        return []
+
+    slot = int(observed_at.timestamp() // 1800)
+    start = (slot * 37) % len(combinations)
+    rows: list[dict[str, Any]] = []
+    for offset in range(count):
+        vertical, niche, metro = combinations[(start + offset) % len(combinations)]
+        rows.append({
+            "query": f'"{vertical}" "{metro}"',
+            "buyer_pool": "local_and_smb_buyers",
+            "corridor_key": None,
+            "product_code": "managed_service",
+            "priority_score": 80,
+            "niche_family": niche,
+            "metro": metro,
+            "source": "rotating_volume_wave",
+        })
+    return rows
+
+
 def build_public_research_seeds(
     plan: Mapping[str, Any],
     *,
@@ -100,6 +154,7 @@ def build_public_research_seeds(
     max_queries: int = 12,
     results_per_query: int = 5,
     observed_at: datetime | None = None,
+    include_volume: bool = True,
 ) -> dict[str, Any]:
     now = observed_at or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -114,6 +169,7 @@ def build_public_research_seeds(
         source_query: str | None = None,
         corridor_key: str | None = None,
         product_code: str | None = None,
+        buyer_pool: str = "direct_demand_buyers",
     ) -> None:
         host = _host(website)
         if not host or host in _BAD_HOSTS:
@@ -123,7 +179,7 @@ def build_public_research_seeds(
             "website": website,
             "source_refs": [],
             "source_queries": [],
-            "target_buyer_pools": ["direct_demand_buyers"],
+            "target_buyer_pools": [],
             "target_corridor_keys": [],
             "target_product_codes": [],
             "truth_class": "OBSERVED_PUBLIC_RESEARCH",
@@ -134,6 +190,11 @@ def build_public_research_seeds(
             "outreach_authorized": False,
             "execution_authority": "none",
         })
+        buyer_pool = str(
+            buyer_pool or "direct_demand_buyers"
+        ).strip() or "direct_demand_buyers"
+        if buyer_pool not in row["target_buyer_pools"]:
+            row["target_buyer_pools"].append(buyer_pool)
         if source_ref and source_ref not in row["source_refs"]:
             row["source_refs"].append(source_ref)
         if source_query and source_query not in row["source_queries"]:
@@ -146,7 +207,28 @@ def build_public_research_seeds(
     for website, source_ref in _BASELINE_SEEDS:
         add_seed(website, source_ref=source_ref)
 
-    queries = _dynamic_queries(plan, max_queries=max_queries)
+    safe_max = max(1, min(int(max_queries), 60))
+    dynamic_budget = max(1, min(20, safe_max // 3))
+    dynamic = _dynamic_queries(plan, max_queries=dynamic_budget)
+    remaining = max(0, safe_max - len(dynamic))
+    volume = (
+        _volume_queries(
+            observed_at=now,
+            max_queries=remaining,
+        )
+        if include_volume
+        else []
+    )
+    queries: list[dict[str, Any]] = []
+    seen_queries: set[str] = set()
+    for row in [*dynamic, *volume]:
+        query = str(row.get("query") or "").strip()
+        if not query or query in seen_queries:
+            continue
+        seen_queries.add(query)
+        queries.append(row)
+        if len(queries) >= safe_max:
+            break
     query_texts = [row["query"] for row in queries]
     errors: list[str] = []
     try:
@@ -176,6 +258,10 @@ def build_public_research_seeds(
                 source_query=query,
                 corridor_key=query_row.get("corridor_key"),
                 product_code=query_row.get("product_code"),
+                buyer_pool=str(
+                    query_row.get("buyer_pool")
+                    or "direct_demand_buyers"
+                ),
             )
 
     seeds = sorted(by_domain.values(), key=lambda row: row["domain"])
