@@ -176,3 +176,41 @@ def test_lead_generation_cooldown_preserves_last_attempt():
         "ok":True,
     }}
     assert _lead_generation_due(previous) is False
+
+
+def test_fresh_acquisition_wakes_qualification_before_idle_cooldown():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.autonomous_revenue_os import _qualification_due
+
+    qualification_at=datetime.now(timezone.utc)
+    acquisition_at=qualification_at + timedelta(seconds=5)
+    previous={
+        "qualification_result":{
+            "attempted_at":qualification_at.isoformat(),
+            "material_actions":0,
+        },
+        "lead_generation":{
+            "attempted_at":acquisition_at.isoformat(),
+            "canonical_acquisition_observed":True,
+        },
+    }
+    assert _qualification_due(previous) is True
+
+
+def test_noncanonical_acquisition_does_not_bypass_qualification_cooldown():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.autonomous_revenue_os import _qualification_due
+
+    qualification_at=datetime.now(timezone.utc)
+    acquisition_at=qualification_at + timedelta(seconds=5)
+    previous={
+        "qualification_result":{
+            "attempted_at":qualification_at.isoformat(),
+            "material_actions":0,
+        },
+        "lead_generation":{
+            "attempted_at":acquisition_at.isoformat(),
+            "canonical_acquisition_observed":False,
+        },
+    }
+    assert _qualification_due(previous) is False

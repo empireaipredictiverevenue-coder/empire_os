@@ -446,6 +446,33 @@ def _qualification_due(previous: Mapping[str, Any] | None) -> bool:
         return True
     if observed.tzinfo is None:
         observed = observed.replace(tzinfo=timezone.utc)
+
+    # Fresh canonical acquisition must wake qualification immediately instead
+    # of waiting for an idle cooldown. This keeps the agentic loop reactive:
+    # acquisition -> signal resolution -> qualification -> Omega.
+    lead_generation = previous.get("lead_generation")
+    if isinstance(lead_generation, Mapping):
+        acquired = bool(
+            lead_generation.get("canonical_acquisition_observed")
+        )
+        acquisition_raw = str(
+            lead_generation.get("attempted_at") or ""
+        ).strip()
+        if acquired and acquisition_raw:
+            try:
+                acquisition_at = datetime.fromisoformat(
+                    acquisition_raw.replace("Z", "+00:00")
+                )
+            except ValueError:
+                acquisition_at = None
+            if acquisition_at is not None:
+                if acquisition_at.tzinfo is None:
+                    acquisition_at = acquisition_at.replace(
+                        tzinfo=timezone.utc
+                    )
+                if acquisition_at > observed:
+                    return True
+
     material = int(result.get("material_actions") or 0)
     cooldown = (
         QUALIFICATION_ACTIVE_COOLDOWN_SECONDS
