@@ -150,7 +150,101 @@ def test_systemd_refresh_is_runtime_only():
         root / "deploy/systemd/empire-opportunity-brief.timer"
     ).read_text()
 
-    assert "scripts/run_opportunity_briefs.py" in service
+    assert "scripts/refresh_opportunity_brief_chain.py" in service
     assert "ReadWritePaths=/srv/empire_os/runtime" in service
     assert "OnUnitActiveSec=15min" in timer
     assert "outbound" not in service.lower()
+
+
+def test_refresh_chain_keeps_send_and_money_authority_false(
+    tmp_path,
+    monkeypatch,
+):
+    import scripts.refresh_opportunity_brief_chain as chain
+
+    audience = {
+        "canonical_signal_row_count": 2,
+        "latest_observed_at": "2026-10-02T18:00:00+00:00",
+        "companies": [],
+        "omega_cortex_context": [],
+    }
+    research = {
+        "generated_at": "2026-10-02T19:00:00+00:00",
+        "observation_count": 3,
+        "actions": [],
+    }
+    account_briefs = {
+        "brief_count": 1,
+        "supported_claim_count": 2,
+        "blocked_claim_count": 0,
+        "briefs": [],
+    }
+    opportunity = {
+        "brief_count": 1,
+        "review_ready_count": 1,
+        "briefs": [],
+    }
+
+    monkeypatch.setattr(
+        chain,
+        "refresh_competitor_audience_snapshot",
+        lambda _root, _writer: audience,
+    )
+    monkeypatch.setattr(
+        chain,
+        "execute_snapshot_research",
+        lambda _audience, **_kwargs: research,
+    )
+    monkeypatch.setattr(
+        chain,
+        "write_account_research_snapshot",
+        lambda _root, _payload: tmp_path / "research.json",
+    )
+    monkeypatch.setattr(
+        chain,
+        "build_account_brief_batch",
+        lambda _audience, _research: account_briefs,
+    )
+    monkeypatch.setattr(
+        chain,
+        "write_account_brief_snapshot",
+        lambda _root, _payload: tmp_path / "account.json",
+    )
+    monkeypatch.setattr(
+        chain,
+        "materialize_opportunity_briefs",
+        lambda _payload: opportunity,
+    )
+    monkeypatch.setattr(
+        chain,
+        "write_opportunity_briefs",
+        lambda _root, _payload: [tmp_path / "latest.json"],
+    )
+
+    result = chain.refresh_opportunity_brief_chain(
+        tmp_path,
+        writer=object(),
+        search_fn=lambda *_args, **_kwargs: {},
+        fetch_fn=lambda *_args, **_kwargs: None,
+    )
+    assert result["canonical_signal_row_count"] == 2
+    assert result["account_research_observation_count"] == 3
+    assert result["supported_claim_count"] == 2
+    assert result["review_ready_count"] == 1
+    assert result["external_send_allowed"] is False
+    assert result["payment_mutation"] is False
+    assert result["revenue_recognition"] is False
+    assert result["execution_authority"] == "none"
+
+
+def test_systemd_refreshes_full_evidence_chain():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    service = (
+        root / "deploy/systemd/empire-opportunity-brief.service"
+    ).read_text()
+    assert "EnvironmentFile=/etc/empiredb.env" in service
+    assert "refresh_opportunity_brief_chain.py" in service
+    assert "run_opportunity_briefs.py" not in service
+    assert "ReadWritePaths=/srv/empire_os/runtime" in service
