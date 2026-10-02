@@ -12,6 +12,7 @@ echo "=== TEST ==="
 PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q \
   tests/test_icp_buyer_trigger_intelligence.py \
   tests/test_buyer_acquisition_scout.py \
+  tests/test_buyer_public_research_seed.py \
   tests/test_buyer_scout_persistence.py \
   tests/test_buyer_acquisition_scout_systemd.py \
   tests/test_buyer_scout_reconciliation.py \
@@ -24,6 +25,7 @@ echo "=== COMPILE ==="
 PYTHONPATH=/srv/empire_os ./.venv/bin/python -m py_compile \
   empire_os/icp_buyer_trigger_intelligence.py \
   empire_os/buyer_acquisition_scout.py \
+  empire_os/buyer_public_research_seed.py \
   empire_os/buyer_scout_persistence.py \
   scripts/run_buyer_acquisition_scout.py
 
