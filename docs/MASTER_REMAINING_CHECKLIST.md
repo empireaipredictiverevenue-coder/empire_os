@@ -235,7 +235,7 @@ Canonical organization:
 - [x] Empire Coder department work bridges to governed PLAN jobs only — CODED
 - [x] Astra plan evaluator reports DONE/BLOCKED/FAILED/IN_PROGRESS without claiming success — CODED
 - [x] Department heartbeat systemd service/timer — STAGED, live activation pending
-- [ ] Executive plan-vs-outcome evaluation / feedback loop — execution episodes + verified outcome memory CODED; causal plan-step → commercial-outcome attribution still pending
+- [x] Executive plan-vs-outcome evaluation / feedback loop — LIVE VERIFIED 2026-10-02; causal attribution requires explicit canonical outcome refs and remains zero without verified outcomes
 - [ ] Founder Console department command surface
 
 Canonical docs:
