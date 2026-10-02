@@ -5,10 +5,11 @@ Run after any push+restart. Asserts the core revenue path is live:
   - hub /health -> 200
   - /v1/buyers/apply -> ok:True (no 502)
   - TELEGRAM_MONEY_ONLY gate drops non-revenue send
-  - Solana RPC getHealth -> ok
+  - canonical BSC/USDT verifier config + BSC chain read -> ok
 Exits non-zero on any failure so a broken deploy is caught, not shipped.
 """
 import os, sys, json, sqlite3, urllib.request
+from empire_os.bsc_usdt_verifier import BscUsdtConfig, get_block_anchor
 sys.path.insert(0, "/root/empire_os")
 _env_lines = []
 for _ln in open("/root/empire_os/.env"):
@@ -59,18 +60,16 @@ else:
     else:
         print("money-only gate: drops non-revenue OK")
 
-# 4) Solana RPC healthy
+# 4) Canonical BSC/USDT verifier is configured and reading BSC mainnet.
 try:
-    req = urllib.request.Request("https://api.mainnet-beta.solana.com",
-        data=json.dumps({"jsonrpc":"2.0","id":1,"method":"getHealth"}).encode(),
-        headers={"Content-Type":"application/json"})
-    d = json.loads(urllib.request.urlopen(req, timeout=10).read())
-    if d.get("result") != "ok":
-        fails.append(f"RPC unhealthy: {d}")
+    cfg = BscUsdtConfig.from_env()
+    anchor = get_block_anchor(cfg)
+    if int(anchor.get("chain_id", 0)) != 56:
+        fails.append(f"BSC chain mismatch: {anchor}")
     else:
-        print("Solana RPC: ok")
+        print("BSC/USDT verifier: chain 56 OK")
 except Exception as e:
-    fails.append(f"RPC down: {e}")
+    fails.append(f"BSC/USDT verifier unavailable: {e}")
 
 print("=== deploy-check ===")
 if fails:

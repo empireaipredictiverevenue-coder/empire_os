@@ -67,7 +67,7 @@ def copy_via_hub(brief: dict) -> str:
         f"Hey {{name}},\n\n"
         f"this is the Empire OS team. We noticed a recent {{niche}} in {{metro}}. "
         f"Empire OS delivers exclusive leads (one agency per (niche × metro), "
-        f"no recycled leads, real-time webhook, USDC on Solana) for agencies "
+        f"no recycled leads, real-time webhook, USDT on BSC) for agencies "
         f"with 50+ active projects in your metro. Want a 1-day free trial of "
         f"the pipeline?\n\nFirst 14 days are free — cancel anytime.\n\nEmpire OS\n"
     )
@@ -128,9 +128,9 @@ def write_emails(rows: list, path: Path):
                  "name":  (r.get("name") or "there").strip() or "there"}
         body.append(f"## #{i} - {r['niche']} in {r['metro']} - {r['phone']}")
         body.append("\n**Subject options:**\n")
-        body.append(f"- Empire OS for {r['metro']} {r['niche']}: real leads, USDC billing\n")
+        body.append(f"- Empire OS for {r['metro']} {r['niche']}: real leads, USDT billing\n")
         body.append(f"- Exclusive {r['niche']} leads in {r['metro']} - one agency per lane\n")
-        body.append(f"- Pay-in-USDC lead-gen for {r['metro']} agencies\n")
+        body.append(f"- Pay-in-USDT lead-gen for {r['metro']} agencies\n")
         body.append("\n**Body:**\n")
         body.append(copy_via_hub(brief))
         body.append("\n---\n")
@@ -139,7 +139,7 @@ def write_emails(rows: list, path: Path):
 
 def main():
     raise SystemExit(
-        "RETIRED: scripts/outreach_now.py uses legacy lane/USDC outreach. "
+        "RETIRED: scripts/outreach_now.py uses legacy lane/USDT outreach. "
         "Use scripts/run_gtm_pipeline_worker.py and canonical governed outbound."
     )
     ap = argparse.ArgumentParser()

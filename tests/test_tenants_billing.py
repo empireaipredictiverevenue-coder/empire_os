@@ -127,164 +127,31 @@ class TestCheckQuota:
         allowed, current, limit, reason = check_quota(s, t.tenant_id)
         assert reason == "unlimited"
 
+# ── Legacy billing retirement / canonical USDT-BSC rail ──────────
 
-# ── Billing (PayPal + Crypto) ────────────────────────────────────
-
-from empire_os.billing import (
-    PayPalConfig, CryptoConfig,
-    paypal_create_subscription, paypal_get_subscription,
-    paypal_cancel_subscription, crypto_payment_request,
-    verify_crypto_payment, BillingEngine,
-)
+import pytest
+from empire_os import billing, billing_webhooks, payout_batch
+from empire_os.payment_rail_policy import RetiredPaymentRailError
 
 
-class TestPayPalConfig:
-    def test_unconfigured(self, monkeypatch):
-        monkeypatch.delenv("PAYPAL_CLIENT_ID", raising=False)
-        monkeypatch.delenv("PAYPAL_SECRET", raising=False)
-        cfg = PayPalConfig.from_env()
-        assert cfg.configured() is False
-
-    def test_configured(self, monkeypatch):
-        monkeypatch.setenv("PAYPAL_CLIENT_ID", "client_abc")
-        monkeypatch.setenv("PAYPAL_SECRET", "secret_xyz")
-        cfg = PayPalConfig.from_env()
-        assert cfg.configured() is True
-        assert cfg.mode == "sandbox"  # default
-
-    def test_base_url_sandbox_vs_live(self, monkeypatch):
-        monkeypatch.setenv("PAYPAL_CLIENT_ID", "x")
-        monkeypatch.setenv("PAYPAL_SECRET", "y")
-        monkeypatch.setenv("PAYPAL_MODE", "live")
-        cfg = PayPalConfig.from_env()
-        assert "api-m.paypal.com" in cfg.base_url()
+def test_legacy_billing_surface_is_retired():
+    state = billing.status()
+    assert state["status"] == "RETIRED"
+    assert state["asset"] == "USDT"
+    assert state["network"] == "BSC"
+    assert state["chain_id"] == 56
 
 
-class TestCryptoConfig:
-    def test_unconfigured(self, monkeypatch):
-        monkeypatch.delenv("VAULT_WALLET_ADDRESS", raising=False)
-        cfg = CryptoConfig.from_env()
-        assert cfg.configured() is False
-
-    def test_configured(self, monkeypatch):
-        monkeypatch.setenv("VAULT_WALLET_ADDRESS", "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
-        cfg = CryptoConfig.from_env()
-        assert cfg.configured() is True
+def test_legacy_payment_execution_fails_closed():
+    with pytest.raises(RetiredPaymentRailError):
+        billing.crypto_payment_request()
+    with pytest.raises(RetiredPaymentRailError):
+        billing_webhooks.handle_crypto_payment({})
+    with pytest.raises(RetiredPaymentRailError):
+        payout_batch.build_payout_batch([])
 
 
-class TestCryptoPaymentRequest:
-    def test_builds_request(self):
-        cfg = CryptoConfig(vault_wallet="vault_addr")
-        req = crypto_payment_request(cfg, 10000, "t1", "starter", "monthly")
-        assert req["amount_cents"] == 10000
-        assert req["amount_usdc"] == 100.0
-        assert req["vault_wallet"] == "vault_addr"
-        assert "vault_addr" in req["qr_data"]
-        assert "empire-os:t1:starter:" in req["memo"] or "t1" in req["memo"]
-
-    def test_qr_includes_memo(self):
-        cfg = CryptoConfig(vault_wallet="vault")
-        req = crypto_payment_request(cfg, 50000, "tenant42", "team")
-        assert "tenant42" in req["qr_data"]
-        assert "team" in req["memo"]
-
-
-class TestBillingEngine:
-    def test_available_methods_empty(self, monkeypatch):
-        monkeypatch.delenv("PAYPAL_CLIENT_ID", raising=False)
-        monkeypatch.delenv("PAYPAL_SECRET", raising=False)
-        monkeypatch.delenv("VAULT_WALLET_ADDRESS", raising=False)
-        b = BillingEngine()
-        assert b.available_methods() == []
-
-    def test_available_methods_crypto(self, monkeypatch):
-        monkeypatch.delenv("PAYPAL_CLIENT_ID", raising=False)
-        monkeypatch.setenv("VAULT_WALLET_ADDRESS", "vault_abc")
-        b = BillingEngine()
-        methods = b.available_methods()
-        assert any(m["method"] == "crypto_usdc" for m in methods)
-
-    def test_start_subscription_crypto_unconfigured(self, monkeypatch):
-        monkeypatch.delenv("VAULT_WALLET_ADDRESS", raising=False)
-        b = BillingEngine()
-        result = b.start_subscription("t1", "starter", "monthly", 1, "crypto_usdc")
-        assert "error" in result
-
-
-# ── Payout Batch ──────────────────────────────────────────────────
-
-from empire_os.payout_batch import (
-    PayoutBatch, PayoutBatchStore, build_payout_batch,
-)
-
-
-class TestPayoutBatch:
-    def test_add_request(self):
-        b = PayoutBatch(batch_id="abc")
-        b.add_request({"amount_cents": 10000, "payout_id": "p1"})
-        b.add_request({"amount_cents": 5000, "payout_id": "p2"})
-        assert b.total_amount_cents == 15000
-        assert len(b.payment_requests) == 2
-
-
-class TestPayoutBatchStore:
-    def test_persists(self, tmp_path):
-        path = tmp_path / "batches.json"
-        s = PayoutBatchStore(path=path)
-        b = PayoutBatch(batch_id="abc", total_amount_cents=1000)
-        s.add(b)
-        s2 = PayoutBatchStore(path=path)
-        assert len(s2.batches) == 1
-        assert s2.batches[0]["batch_id"] == "abc"
-
-    def test_update(self, tmp_path):
-        s = PayoutBatchStore(path=tmp_path / "batches.json")
-        b = PayoutBatch(batch_id="abc")
-        s.add(b)
-        s.update("abc", status="complete")
-        assert s.get("abc")["status"] == "complete"
-
-
-class TestBuildPayoutBatch:
-    def test_builds_deeplinks(self):
-        from empire_os.billing import CryptoConfig
-        cfg = CryptoConfig(vault_wallet="vault_addr")
-        store_sentinel = PayoutBatchStore(path=Path("/tmp/_test_batches.json"))
-        payouts = [
-            {"payout_id": "p1", "amount_cents": 10000, "status": "pending"},
-            {"payout_id": "p2", "amount_cents": 5000, "status": "pending"},
-            {"payout_id": "p3", "amount_cents": 9999, "status": "paid"},  # skip
-        ]
-        batch = build_payout_batch(payouts, cfg, store_sentinel)
-        assert len(batch.payment_requests) == 2  # skipped paid
-        assert batch.total_amount_cents == 15000
-        assert batch.payment_requests[0]["payout_id"] == "p1"
-        # Deeplink should reference TokenPocket
-        assert "tokenpocket" in batch.payment_requests[0]["deeplink"]
-
-
-# ── Billing Webhooks ──────────────────────────────────────────────
-
-from empire_os.billing_webhooks import (
-    handle_paypal_event, handle_crypto_payment,
-    PAYPAL_WEBHOOK_EVENTS,
-)
-
-
-class TestHandlePayPalEvent:
-    def test_subscription_created(self, tmp_path):
-        s = TenantStore(str(tmp_path / "test.db"))
-        t = s.create_tenant("X", "x@x.com")
-        event = {
-            "event_type": "BILLING.SUBSCRIPTION.CREATED",
-            "resource": {"id": "I-ABC123", "custom_id": t.tenant_id},
-        }
-        result = handle_paypal_event(event, s)
-        assert result.handled is True
-        assert result.action == "subscription_created"
-
-    def test_unhandled_event(self, tmp_path):
-        s = TenantStore(str(tmp_path / "test.db"))
-        event = {"event_type": "UNKNOWN.EVENT", "resource": {}}
-        result = handle_paypal_event(event, s)
-        assert result.handled is False
+def test_billing_engine_only_advertises_canonical_rail():
+    assert billing.BillingEngine().available_methods() == [
+        {"method": "usdt_bsc", "chain_id": 56}
+    ]

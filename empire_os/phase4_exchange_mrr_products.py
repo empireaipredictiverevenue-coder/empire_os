@@ -1,7 +1,7 @@
 """Phase 4 recurring-revenue product plan for Commercial Exchange.
 
 Modernizes historical lane-seat subscriptions without reviving legacy pricing,
-SQLite commercial truth, or Solana/USDC settlement.
+SQLite commercial truth, or legacy settlement.
 
 Launch membership pricing is founder-approved. Seat activation, fulfilment,
 usage billing and revenue remain governed by verified commercial terms.
@@ -195,7 +195,7 @@ def build_exchange_mrr_product_plan() -> dict[str, Any]:
             "exclusivity_requires_explicit_terms": True,
             "delivery_requires_verified_destination": True,
             "legacy_sqlite_not_used": True,
-            "legacy_usdc_solana_not_used": True,
+            "legacy_payment_rail_not_used": True,
         },
         "canonical_settlement_rail": "USDT_BSC",
         "pricing_authority": "founder_approved_2026_09_24",

@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS si_subscription (
     seats            INTEGER NOT NULL DEFAULT 1,
     price_cents      INTEGER NOT NULL,
     status           TEXT NOT NULL DEFAULT 'pending',  -- pending | active | past_due | cancelled
-    payment_method   TEXT NOT NULL DEFAULT 'paypal',    -- paypal | crypto_usdc
+    payment_method   TEXT NOT NULL DEFAULT 'paypal',    -- paypal | usdt_bsc
     payment_ref      TEXT,                              -- paypal_sub_id or tx_hash
     started_at       TEXT NOT NULL,
     current_period_end TEXT NOT NULL,

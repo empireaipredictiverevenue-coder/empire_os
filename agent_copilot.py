@@ -5,7 +5,7 @@ Co-Pilot for Agents (B2B2agent) — routing + settlement layer.
 A foreign (customer) agent posts a natural-language task, e.g.
     "find roofing leads in TX"
     "generate an AEO page for acme logistics"
-    "quote a USDC settle for 50 logistics leads in USA"
+    "quote a USDT settle for 50 logistics leads in USA"
 
 `route(task)` maps it to the right Empire MCP tool (search_leads /
 generate_aeo / settle_quote), executes it via a local MCP client call to
@@ -19,7 +19,7 @@ generate_aeo / settle_quote), executes it via a local MCP client call to
       "result": <normalized mcp result>,                # real result from live MCP
       "status": "ok" | "error",
       "sku": "agent_copilot",
-      "settlement": "MRR T1 $99/T2 $299/T3 $999/T4 $2999 USDC (setup $3k)"
+      "settlement": "MRR T1 $99/T2 $299/T3 $999/T4 $2999 USDT (setup $3k)"
     }
 
 Stdlib only. No creds. The loopback MCP call exercises the LIVE server the
@@ -28,7 +28,7 @@ copilot_route, then settle_quote on the result).
 
 SKU agent_copilot pricing (g-brain/revenue/pricing.md):
   MRR  T1 $99 / T2 $299 / T3 $999 / T4 $2999
-  setup $3,000  (USDC, TS-5 out-of-band)
+  setup $3,000  (USDT, governed BSC commercial flow)
 """
 
 import json
@@ -38,7 +38,7 @@ from http.server import BaseHTTPRequestHandler  # noqa: F401  (kept stdlib, no d
 MCP_HOST = "127.0.0.1"
 MCP_PORT = 9000
 SKU = "agent_copilot"
-SETTLEMENT = "MRR T1 $99/T2 $299/T3 $999/T4 $2999 USDC (setup $3k)"
+SETTLEMENT = "MRR T1 $99/T2 $299/T3 $999/T4 $2999 USDT (setup $3k)"
 TIERS = {"T1": 99, "T2": 299, "T3": 999, "T4": 2999}
 
 # Vertical vocabulary (mirror of mcp_lead_server.VERTICALS) for intent mapping.
@@ -120,7 +120,7 @@ def _plan(task):
             "arguments": {"tenant": slug, "niche": slug,
                           "city": metro, "tone": "sharp"}
         }]
-    if "settle" in t or "quote" in t or "usdc" in t:
+    if "settle" in t or "quote" in t or "usdt" in t:
         return [{
             "tool": "settle_quote",
             "arguments": {"product": "lead_lane", "niche": vertical,
@@ -172,7 +172,7 @@ def route(task):
 
 def quote_settle(product="lead_lane", niche="", metro="", buyer_agent=""):
     """Standalone settlement-quote surface (mirrors MCP settle_quote tool).
-    Returns a USDC settle_instruction quote. No on-chain tx — TS-5 out-of-band."""
+    Returns a non-binding USDT/BSC quote. It cannot create or verify a payment."""
     price = TIERS.get("T1", 99)
     return {
         "sku": SKU,
@@ -180,19 +180,19 @@ def quote_settle(product="lead_lane", niche="", metro="", buyer_agent=""):
         "niche": niche,
         "metro": metro,
         "buyer_agent": buyer_agent,
-        "quote_usdc": {
+        "quote_usdt": {
             "t1": TIERS["T1"], "t2": TIERS["T2"],
             "t3": TIERS["T3"], "t4": TIERS["T4"],
         },
-        "setup_fee_usdc": 3000,
-        "token": "USDC",
+        "setup_fee_usdt": 3000,
+        "token": "USDT",
         "settle_instruction": {
-            "token": "USDC",
-            "amount_usdc": price,
-            "to": "Empire Vault (TS-5 listener)",
+            "token": "USDT",
+            "amount_usdt": price,
+            "to": "Empire governed BSC treasury",
             "memo": f"SKU_{SKU.upper()}_{product.upper()}",
         },
-        "settlement": "out-of-band USDC (TS-5) — no on-chain txn here",
+        "settlement": "non-binding USDT/BSC quote — payment request created only after governed terms",
         "note": "chain after search_leads / copilot_route to close a deal",
     }
 

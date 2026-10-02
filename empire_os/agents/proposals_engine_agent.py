@@ -44,7 +44,7 @@ SEED_PROPOSALS = [
             "args": {"path": "/v1/voice/call",
                      "method": "POST"}
         },
-        "expected_revenue_usdc_monthly": 8000,
+        "expected_revenue_usdt_monthly": 8000,
     },
     {
         "name": "Empire Video Brief",
@@ -55,7 +55,7 @@ SEED_PROPOSALS = [
             "args": {"path": "/v1/video/brief",
                      "method": "POST"}
         },
-        "expected_revenue_usdc_monthly": 6000,
+        "expected_revenue_usdt_monthly": 6000,
     },
     {
         "name": "Empire Media Suite",
@@ -66,7 +66,7 @@ SEED_PROPOSALS = [
             "args": {"path": "/v1/media/schedule",
                      "method": "POST"}
         },
-        "expected_revenue_usdc_monthly": 4500,
+        "expected_revenue_usdt_monthly": 4500,
     },
     {
         "name": "Empire Cinematic LP",
@@ -77,7 +77,7 @@ SEED_PROPOSALS = [
             "args": {"path": "/v1/cinematic/render",
                      "method": "POST"}
         },
-        "expected_revenue_usdc_monthly": 5500,
+        "expected_revenue_usdt_monthly": 5500,
     },
     {
         "name": "Empire Tenant Studio",
@@ -88,7 +88,7 @@ SEED_PROPOSALS = [
             "args": {"path": "/v1/tenants/portal",
                      "method": "GET"}
         },
-        "expected_revenue_usdc_monthly": 12000,
+        "expected_revenue_usdt_monthly": 12000,
     },
 ]
 
@@ -97,7 +97,7 @@ def cycle():
     for p in SEED_PROPOSALS:
         log("EVENT", "proposal_emitted",
             name=p["name"], category=p["category"],
-            tier=p["tier"], expected_revenue=p["expected_revenue_usdc_monthly"])
+            tier=p["tier"], expected_revenue=p["expected_revenue_usdt_monthly"])
 
 
 if __name__ == "__main__":

@@ -17,13 +17,13 @@ State files:
   /root/products/research.json     — latest research findings
   /root/products/store/<slug>/     — static landing page files
   /root/products/video/<slug>/     — OpenMontage-rendered promo
-  /root/products/outreach/<slug>/  — queued USDC outreach
+  /root/products/outreach/<slug>/  — queued USDT outreach
   /root/feedback/products.jsonl    — append-only audit log
 
 Backing libraries (already on host):
   - /root/empire_os/skills_library/   (web-artifacts-builder skill)
   - /root/OpenMontage/                 (12 pipeline_defs for video)
-  - hub POST /v1/outbox/enqueue        (USDC outreach queue)
+  - hub POST /v1/outbox/enqueue        (USDT outreach queue)
   - hermes-gateway /v1/notify/alert    (operator paging)
   - synthetic_intelligence             (memory + anti-rep from v2 base)
 
@@ -67,10 +67,9 @@ HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 HERMES_GATEWAY_URL = os.environ.get(
     "HERMES_GATEWAY_URL", "http://10.118.155.156:9100")
 
-# Empire OS USDC vault address — real revenue lands here
-USDC_VAULT = os.environ.get("USDC_VAULT",
-                            "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
-SOLANA_PAY_BASE = "solana:" + USDC_VAULT
+# Canonical settlement is USDT on BSC; this research agent cannot create payment requests.
+BSC_TREASURY_ADDRESS = os.environ.get("BSC_TREASURY_ADDRESS", "")
+PAYMENT_INFO_URL = "https://empire-ai.co.uk/payment"
 
 # ──────────────────────────────────────────────────────────────────────
 # Marketplace research sources (all free + public)
@@ -180,7 +179,7 @@ def save_json(path: Path, data):
 # Productize + build funnel/store
 # ──────────────────────────────────────────────────────────────────────
 def _render_landing_html(product: dict, niche: str,
-                          price_usd: float, solana_url: str,
+                          price_usd: float, payment_url: str,
                           hero_url: str, testimonials: list,
                           variant: str) -> str:
     """Inner renderer — produces the HTML string without recursing
@@ -189,26 +188,26 @@ def _render_landing_html(product: dict, niche: str,
     title = product.get("title", "Untitled Product")
     if variant == "minimal":
         body = f"""
-  <span class="pill">USDC · SOLANA · INSTANT</span>
+  <span class="pill">USDT · SOLANA · INSTANT</span>
   <h1>{title}</h1>
   <p class="lead">{product.get('source', 'Curated')} pick.</p>
-  <div class="price">${price_usd:.2f} <small>USDC</small></div>
-  <a href="{solana_url}" class="btn">Pay with USDC →</a>"""
+  <div class="price">${price_usd:.2f} <small>USDT</small></div>
+  <a href="{payment_url}" class="btn">Request USDT/BSC payment details →</a>"""
     elif variant == "social":
         testimonial_html = "\n".join(
             f'<blockquote><p>"{t["what"]}"</p><cite>— {t["who"]}</cite></blockquote>'
             for t in testimonials)
         body = f"""
-  <span class="pill">USDC · SOLANA · INSTANT</span>
+  <span class="pill">USDT · SOLANA · INSTANT</span>
   <img src="{hero_url}" alt="{title}" class="hero">
   <h1>{title}</h1>
   <p class="lead">{product.get('source', 'Curated')} pick — back by demand.</p>
-  <div class="price">${price_usd:.2f} <small>USDC</small></div>
+  <div class="price">${price_usd:.2f} <small>USDT</small></div>
   <div class="testimonials">{testimonial_html}</div>
-  <a href="{solana_url}" class="btn">Pay with USDC →</a>"""
+  <a href="{payment_url}" class="btn">Request USDT/BSC payment details →</a>"""
     else:  # video
         body = f"""
-  <span class="pill">USDC · SOLANA · INSTANT</span>
+  <span class="pill">USDT · SOLANA · INSTANT</span>
   <div class="video-hero">
     <div class="video-placeholder">
       <p>▶ Product demo renders here<br><small>(OpenMontage pipeline in /root/products/video/)</small></p>
@@ -216,8 +215,8 @@ def _render_landing_html(product: dict, niche: str,
   </div>
   <h1>{title}</h1>
   <p class="lead">{product.get('source', 'Curated')} pick — see it, buy it, ship it.</p>
-  <div class="price">${price_usd:.2f} <small>USDC</small></div>
-  <a href="{solana_url}" class="btn">Pay with USDC →</a>"""
+  <div class="price">${price_usd:.2f} <small>USDT</small></div>
+  <a href="{payment_url}" class="btn">Request USDT/BSC payment details →</a>"""
 
     if variant == "minimal":
         css = """
@@ -270,7 +269,7 @@ def _render_landing_html(product: dict, niche: str,
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title} — Empire OS</title>
-<meta name="description" content="Instant digital delivery. Pay with USDC on Solana.">
+<meta name="description" content="Instant digital delivery. Pay with USDT on BSC.">
 <style>{css}</style>
 </head>
 <body>
@@ -293,10 +292,7 @@ def build_landing_page(product: dict, niche: str,
     price_usd = float(re.match(r"\$?(\d+\.?\d*)",
                                 product.get("price", "0")).group(1) or 99)
     import urllib.parse
-    title_enc = urllib.parse.quote(title)
-    solana_url = (f"{SOLANA_PAY_BASE}?amount={int(price_usd * 1_000_000)}"
-                  f"&label={title_enc}"
-                  f"&message=EmpireOS+instant+delivery")
+    payment_url = PAYMENT_INFO_URL
 
     # Pick variant: 'auto' = random, otherwise forced
     import random as _r
@@ -314,7 +310,7 @@ def build_landing_page(product: dict, niche: str,
         {"who": "Marcus T., product lead",
          "what": "Quality is real. Used it in my last launch."},
         {"who": "Lin H., growth hacker",
-         "what": "The instant USDC pay is what sold me."},
+         "what": "The instant USDT pay is what sold me."},
     ]
 
     # A/B: alt variant is whichever of the other two we pick
@@ -323,9 +319,9 @@ def build_landing_page(product: dict, niche: str,
     alt_variant = _r.choice(candidates)
 
     # Render primary + alt in one shot, write both files
-    html = _render_landing_html(product, niche, price_usd, solana_url,
+    html = _render_landing_html(product, niche, price_usd, payment_url,
                                  hero_url, testimonials, variant)
-    alt_html = _render_landing_html(product, niche, price_usd, solana_url,
+    alt_html = _render_landing_html(product, niche, price_usd, payment_url,
                                     hero_url, testimonials, alt_variant)
 
     store_dir = STORES_DIR / slug
@@ -346,29 +342,29 @@ def build_landing_page(product: dict, niche: str,
         f"  - index.html     = {variant} (default)\n"
         f"  - variant-b.html = {alt_variant}\n"
         f"  A/B test with EqualWeb or Plausible.\n\n"
-        f"Solana pay URL: {solana_url}\n"
+        f"Payment information URL: {payment_url}\n"
     )
     return {"slug": slug, "html_path": str(html_path),
             "html_chars": len(html),
             "alt_chars": len(alt_html),
             "template": variant, "alt_variant": alt_variant,
-            "solana_url": solana_url,
+            "payment_url": payment_url,
             "store_dir": str(store_dir)}
 
 
 def queue_outreach(product: dict, slug: str, niche: str) -> dict:
-    """Queue a USDC outreach email to si_outbox via hub."""
+    """Queue a USDT outreach email to si_outbox via hub."""
     try:
         import requests
         subject = (f"New on Empire OS: {product.get('title','Product')[:60]}"
-                   f" — USDC, instant delivery")
+                   f" — USDT, instant delivery")
         body = (f"Hi founder@,\n\n"
                 f"We just shipped a new product in your {niche} lane:\n"
                 f"  {product.get('title','?')}\n"
                 f"  Source: {product.get('source','?')}\n"
                 f"  Score: {product.get('score',0):.2f}\n"
                 f"  Landing: https://empire-ai.co.uk/store/{slug}/\n\n"
-                f"Pay with USDC on Solana. No accounts, no chargebacks.\n\n"
+                f"Settlement uses USDT on BSC after governed commercial terms.\n\n"
                 f"---\nEmpire OS")
         r = requests.post(f"{HUB_URL}/v1/outbox/enqueue",
                           json={"to_email": "founder@empire-ai.co.uk",
@@ -545,7 +541,7 @@ class ProductResearchAgent(SyntheticAgent):
         launched.append({
             "slug": slug, "title": product.get("title"),
             "niche": niche, "score": product.get("score", 0),
-            "solana_url": page["solana_url"],
+            "payment_url": page["payment_url"],
             "store_dir": page["store_dir"],
             "launched_at": datetime.now(timezone.utc).isoformat(),
             "video_status": video_status,
@@ -559,13 +555,13 @@ class ProductResearchAgent(SyntheticAgent):
         save_json(CANDIDATES_PATH, candidates)
         self._audit({"event": "launch", "slug": slug,
                      "title": product.get("title"),
-                     "solana_url": page["solana_url"],
+                     "payment_url": page["payment_url"],
                      "outreach_ok": outreach.get("ok", False)})
         return {"summary": f"LAUNCHED {slug}: "
                             f"page={page['html_chars']}ch "
                             f"video={video_status} "
                             f"outreach_ok={outreach.get('ok')}",
-                "slug": slug, "solana_url": page["solana_url"]}
+                "slug": slug, "payment_url": page["payment_url"]}
 
     def _audit(self, event: dict):
         try:

@@ -3,9 +3,9 @@
 
 Receives carrier telephony webhooks (Twilio/Telnyx/Ringba compatible) and
 forwards them to the hub's canonical ledger at /v1/ppc/log_charge. It does
-NOT sign Solana transactions — money movement stays inside the hub's
-verified billing path (solana_listener + billing_collector). This keeps the
-hot-wallet out of the webhook path (watchdog rule: no unverified payout).
+NOT sign or broadcast payment transactions. Money movement stays inside the
+governed USDT/BSC payment path and independent BSC verifier. This keeps
+treasury signing out of the webhook path (watchdog rule: no unverified payout).
 
 Optional: mirror the event to the canonical call_logs store + a CRM webhook.
 These are ledger/CRM writes only — no chain signing.

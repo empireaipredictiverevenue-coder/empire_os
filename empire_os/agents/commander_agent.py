@@ -15,7 +15,7 @@ no auto-commit).
 Polled surfaces:
   /root/feedback/crawler_runs.jsonl   — source adapter health
   /root/feedback/lead_deliveries.jsonl — buyer delivery outcomes
-  /root/feedback/solana_payments.jsonl — payment flow
+  canonical BSC/USDT payment evidence — payment flow
   /root/feedback/alerts.jsonl         — alerts that fired
   /root/feedback/outreach_log.jsonl    — outreach agent outcomes
   /root/feedback/lane_monitor.jsonl   — lane-monitor observations
@@ -43,6 +43,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
+
+from empire_os.bsc_usdt_verifier import BscUsdtConfig, PaymentVerificationError
 
 
 HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
@@ -361,32 +363,27 @@ def council_status() -> dict:
 
 
 def vault_status() -> dict:
-    """Read vault USDC balance via Helius RPC. Skipped silently if RPC down."""
+    """Report canonical BSC/USDT rail readiness without inventing a balance."""
     try:
-        env_path = Path("/root/empire_os/.env")
-        env = {}
-        if env_path.exists():
-            for ln in env_path.read_text().splitlines():
-                if "=" in ln and not ln.startswith("#"):
-                    k, v = ln.split("=", 1)
-                    env[k.strip()] = v.strip()
-        rpc = env.get("SOLANA_RPC_URL", "")
-        vault = env.get("SOLANA_VAULT_WALLET", "")
-        if not (rpc and vault):
-            return {"usdc": "unknown", "sol_usd": "unknown"}
-        r_bal = requests.post(rpc, json={
-            "jsonrpc":"2.0","id":1,"method":"getTokenAccountsByOwner",
-            "params":[vault, {"programId":"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
-                      {"encoding":"jsonParsed"}]
-        }, timeout=8).json()
-        usdc = 0.0
-        for a in r_bal.get("result", {}).get("value", []):
-            usdc += a.get("account", {}).get("data", {}).get("parsed", {}) \
-                      .get("info", {}).get("tokenAmount", {}).get("uiAmount", 0)
-        return {"usdc": float(usdc)}
-    except Exception as e:
-        log("ERROR", "vault_status", err=str(e)[:120])
-        return {"usdc": "rpc_down"}
+        cfg = BscUsdtConfig.from_env()
+    except PaymentVerificationError as exc:
+        return {
+            "asset": "USDT",
+            "network": "BSC",
+            "chain_id": 56,
+            "configured": False,
+            "balance_usdt": None,
+            "reason": str(exc),
+        }
+    return {
+        "asset": "USDT",
+        "network": "BSC",
+        "chain_id": cfg.chain_id,
+        "configured": True,
+        "balance_usdt": None,
+        "treasury_address_present": bool(cfg.treasury_address),
+        "reason": "balance_not_claimed_without_verified_read",
+    }
 
 
 def money_projection() -> dict:
@@ -396,7 +393,7 @@ def money_projection() -> dict:
         # count pending leads per lane, sorted
         subs = json.loads(json.dumps({"none":0}))
         # for now: simplistic - 0 paying so MRR = 0
-        return {"mrr_usd": 0, "next_action": "send SEAT_/INV_ USDC to settle"}
+        return {"mrr_usd": 0, "next_action": "use governed USDT/BSC payment request after verified terms"}
     except Exception:
         return {"mrr_usd": 0}
 
@@ -423,8 +420,8 @@ def write_daily_brief():
         f"_Generated {now.strftime('%H:%M UTC')}_",
         "",
         "## Money",
-        f"- MRR (USDC): ${money.get('mrr_usd', 0):,}",
-        f"- Vault USDC: {vault.get('usdc', 'unknown')}",
+        f"- MRR (USDT-denominated): ${money.get('mrr_usd', 0):,}",
+        f"- Treasury USDT: {vault.get('balance_usdt', 'unknown')}",
         f"- Next: {money.get('next_action', '')}",
         "",
         "## Fleet",
@@ -486,8 +483,8 @@ def write_daily_brief():
     with open(DAILY_BRIEF, "w") as f:
         f.write("\n".join(body))
     log("INFO", "daily_brief_v4_written",
-        path=str(DAILY_BRIEF), mrr=money.get("mrr_usdc", 0),
-        vault_usdc=str(vault.get("usdc")),
+        path=str(DAILY_BRIEF), mrr_usdt=money.get("mrr_usd", 0),
+        treasury_usdt=str(vault.get("balance_usdt")),
         proposals=innov.get("proposals_last_24h", 0))
 
 

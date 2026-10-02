@@ -3,7 +3,7 @@
 This module does not make legacy prices current. It classifies historical
 subscription/SKU products for migration into the governed commercial catalog.
 
-Legacy SQLite, USDC/Solana settlement and historical prices are evidence only.
+Legacy SQLite settlement and historical prices are evidence only.
 """
 from __future__ import annotations
 

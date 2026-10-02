@@ -3,12 +3,12 @@ Marketplace Agent — Fiverr-style marketplace for agents.
 
 Why: agents have capabilities that other agents need. Without a
 marketplace they steal/copy each other. With one, they pay each
-other in USDC, building a real revenue stream for the Empire OS
+other in USDT, building a real revenue stream for the Empire OS
 vault.
 
 Flow:
   1. Each agent auto-lists services on init (e.g. "scout: discover
-     10 leads in <niche> = 0.50 USDC, ETA 5 min")
+     10 leads in <niche> = 0.50 USDT, ETA 5 min")
   2. Other agents submit orders via hub POST /v1/marketplace/order
   3. Marketplace agent polls pending orders and waits for independently
      evidenced provider completion.
@@ -18,7 +18,7 @@ Flow:
 State:
   /root/marketplace/services.json  — list of services (id, provider, name, price, eta, active)
   /root/marketplace/orders.json    — pending + completed orders
-  /root/marketplace/wallets.json   — per-agent USDC credit balances
+  /root/marketplace/wallets.json   — per-agent USDT credit balances
   /root/marketplace/ledger.jsonl   — append-only audit (every tx)
 
 Cycle: 5 min — fast enough to feel "live" to ordering agents.
@@ -53,7 +53,7 @@ TICK_INTERVAL = 300  # 5 min
 HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 HERMES_GATEWAY_URL = os.environ.get(
     "HERMES_GATEWAY_URL", "http://10.118.155.156:9100")
-USDC_VAULT = os.environ.get("USDC_VAULT",
+BSC_TREASURY_ADDRESS = os.environ.get("BSC_TREASURY_ADDRESS",
                             "egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM")
 
 # Default service catalog — what every agent offers. Each agent
@@ -61,75 +61,75 @@ USDC_VAULT = os.environ.get("USDC_VAULT",
 DEFAULT_CATALOG = {
     "scout": [
         {"name": "discover-10-leads", "label": "Discover 10 leads in <niche>",
-         "price_usdc": 0.50, "eta_min": 5},
+         "price_usdt": 0.50, "eta_min": 5},
         {"name": "discover-100-leads", "label": "Discover 100 leads in <niche>",
-         "price_usdc": 4.00, "eta_min": 30},
+         "price_usdt": 4.00, "eta_min": 30},
     ],
     "lead_sniper": [
         {"name": "snipe-roofing-urgent", "label": "Snipe urgent roofing leads (24h)",
-         "price_usdc": 1.00, "eta_min": 5},
+         "price_usdt": 1.00, "eta_min": 5},
         {"name": "snipe-multi-niche", "label": "Snipe urgent leads across 5 niches",
-         "price_usdc": 3.50, "eta_min": 10},
+         "price_usdt": 3.50, "eta_min": 10},
     ],
     "lead_handler": [
         {"name": "route-50-leads", "label": "Cross-niche route 50 leads to outreach",
-         "price_usdc": 0.75, "eta_min": 5},
+         "price_usdt": 0.75, "eta_min": 5},
     ],
     "markets_analysis": [
         {"name": "per-niche-mrr-report",
          "label": "Per-niche MRR projection for all 19 niches",
-         "price_usdc": 1.50, "eta_min": 2},
+         "price_usdt": 1.50, "eta_min": 2},
     ],
     "data_analysis": [
         {"name": "snapshot-with-alerts",
          "label": "Full pipeline snapshot + MRR + anomaly alerts",
-         "price_usdc": 0.50, "eta_min": 1},
+         "price_usdt": 0.50, "eta_min": 1},
     ],
     "video_editing": [
         {"name": "render-15s-ad",
          "label": "Render a 15-second product video ad via OpenMontage",
-         "price_usdc": 2.00, "eta_min": 15},
+         "price_usdt": 2.00, "eta_min": 15},
         {"name": "render-30s-ad",
          "label": "Render a 30-second product video ad",
-         "price_usdc": 3.50, "eta_min": 30},
+         "price_usdt": 3.50, "eta_min": 30},
     ],
     "product_research": [
         {"name": "research-sweep",
          "label": "Marketplace research sweep + top-3 candidates",
-         "price_usdc": 1.00, "eta_min": 5},
+         "price_usdt": 1.00, "eta_min": 5},
         {"name": "launch-product",
          "label": "Build store + landing page + queue outreach for one product",
-         "price_usdc": 5.00, "eta_min": 30},
+         "price_usdt": 5.00, "eta_min": 30},
     ],
     "code_review": [
         {"name": "review-diff",
          "label": "Code review of a single file diff with findings",
-         "price_usdc": 0.30, "eta_min": 3},
+         "price_usdt": 0.30, "eta_min": 3},
     ],
     "security": [
         {"name": "secrets-scan",
          "label": "Scan a directory for secrets/domain-guard violations",
-         "price_usdc": 0.30, "eta_min": 3},
+         "price_usdt": 0.30, "eta_min": 3},
     ],
     "engineering": [
         {"name": "fix-bug",
          "label": "Investigate and propose fix for one bug",
-         "price_usdc": 0.50, "eta_min": 10},
+         "price_usdt": 0.50, "eta_min": 10},
     ],
     "marketing": [
         {"name": "draft-email",
          "label": "Draft a 200-word outreach email for a niche",
-         "price_usdc": 0.20, "eta_min": 3},
+         "price_usdt": 0.20, "eta_min": 3},
     ],
     "design": [
         {"name": "color-palette",
          "label": "Suggest color palette + typography for a product",
-         "price_usdc": 0.30, "eta_min": 5},
+         "price_usdt": 0.30, "eta_min": 5},
     ],
     "copywriting": [
         {"name": "landing-copy",
          "label": "500-word landing page copy for a product",
-         "price_usdc": 0.50, "eta_min": 5},
+         "price_usdt": 0.50, "eta_min": 5},
     ],
 }
 
@@ -182,7 +182,7 @@ class MarketplaceAgent(SyntheticAgent):
                         "provider": provider,
                         "name": svc["name"],
                         "label": svc["label"],
-                        "price_usdc": svc["price_usdc"],
+                        "price_usdt": svc["price_usdt"],
                         "eta_min": svc["eta_min"],
                         "active": True,
                         "registered_at": datetime.now(timezone.utc).isoformat(),
@@ -199,17 +199,17 @@ class MarketplaceAgent(SyntheticAgent):
         wallets = load_json(WALLETS_PATH, {})
         n_pending = sum(1 for o in orders if o.get("status") == "pending")
         n_complete = sum(1 for o in orders if o.get("status") == "complete")
-        legacy_unverified_value_usdc = sum(
-            o.get("price_usdc", 0) for o in orders
+        legacy_unverified_value_usdt = sum(
+            o.get("price_usdt", 0) for o in orders
             if o.get("status") == "complete")
         return {
             "ts": datetime.now(timezone.utc).isoformat(),
             "n_services": len([s for s in services if s.get("active")]),
             "n_orders_pending": n_pending,
             "n_orders_complete": n_complete,
-            "total_revenue_usdc": 0.0,
-            "legacy_unverified_complete_value_usdc": round(
-                legacy_unverified_value_usdc, 3
+            "total_revenue_usdt": 0.0,
+            "legacy_unverified_complete_value_usdt": round(
+                legacy_unverified_value_usdt, 3
             ),
             "actual_revenue_source": "canonical_phase3f_only",
             "wallets": wallets,
@@ -272,14 +272,14 @@ class MarketplaceAgent(SyntheticAgent):
         snap = self.observe()
         snap_path = DIR / "snapshot.json"
         snap_path.write_text(json.dumps(snap, indent=2, default=str))
-        legacy_value = snap["legacy_unverified_complete_value_usdc"]
+        legacy_value = snap["legacy_unverified_complete_value_usdt"]
         return {
             "summary": (
                 "legacy marketplace snapshot only; actual revenue is sourced "
                 "from canonical Phase 3F recognition"
             ),
             "actual_revenue_usdt": 0.0,
-            "legacy_unverified_complete_value_usdc": legacy_value,
+            "legacy_unverified_complete_value_usdt": legacy_value,
             "mode": "real_evidence_only",
         }
 

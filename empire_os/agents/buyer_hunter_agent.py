@@ -2,7 +2,7 @@
 buyer_hunter_agent — SEPARATE buyer-acquisition engine.
 
 Distinct from lead_sniper (which finds HOMEOWNERS / leads to sell).
-This agent FINDS BUSINESSES that BUY leads, scores them for USDC-settlement
+This agent FINDS BUSINESSES that BUY leads, scores them for USDT-settlement
 fit, and registers them as cold prospects in the outreach pipeline
 (si_buyer_outreach via hub /v1/outreach/prospect/register).
 
@@ -13,7 +13,7 @@ Sources (no paid API required, proxy-bypassed):
     endpoint (DuckDuckGo HTML, proxy-bypassed).
   - Repurpose existing permit/license data to find CONTRACTOR businesses.
 
-It does NOT send email — outreach_runner does that (repitched to USDC).
+It does NOT send email — outreach_runner does that (repitched to USDT).
 It only DISCOVERS + REGISTERS. Idempotent: skips known prospect_ids.
 """
 from __future__ import annotations
@@ -33,7 +33,7 @@ LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 VERTICALS = ["roofing", "solar", "mortgage", "insurance", "debt_relief",
              "tax_prep", "investing", "hvac", "fencing", "bathroom_remodel"]
 METROS = ["NYC", "LAX", "CHI", "DFW", "SEA", "BOS", "WDC", "PHX", "ATL", "MIA"]
-# Crypto-native fit bonus (verticals whose buyers often hold USDC)
+# Crypto-native fit bonus (verticals whose buyers often hold USDT)
 CRYPTO_FRIENDLY = {"solar", "investing", "debt_relief", "tax_prep", "crypto"}
 
 # B2B product hunting: businesses that buy our SOFTWARE/SaaS SKUs (not leads)
@@ -98,7 +98,7 @@ def hunt_b2b_internal(limit: int = 20) -> int:
                     "url": "skus:" + ",".join(skus),
                     "source": "buyer_hunter_b2b",
                     "score": 80,
-                    "usdc_fit": True,
+                    "usdt_fit": True,
                 }
                 if register_prospect(p):
                     found += 1
@@ -139,7 +139,7 @@ def hunt_b2b_external(limit: int = None) -> int:
                         "url": "skus:" + ",".join(tgt["skus"]),
                         "source": "buyer_hunter_b2b",
                         "score": 86,
-                        "usdc_fit": True,
+                        "usdt_fit": True,
                     }
                     if register_prospect(p):
                         found += 1
@@ -254,7 +254,7 @@ def hunt_cycle():
                     "url": h["url"],
                     "source": "buyer_hunter",
                     "score": 82 if crypto_fit else 70,
-                    "usdc_fit": crypto_fit,
+                    "usdt_fit": crypto_fit,
                 }
                 if register_prospect(p):
                     found += 1

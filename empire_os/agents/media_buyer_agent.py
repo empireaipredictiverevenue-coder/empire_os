@@ -63,10 +63,10 @@ def plan() -> dict:
     search_pct  = 1.0 - native_pct - social_pct
 
     # Daily budget heuristic: $1 per cold prospect + $0.05 per pending lead
-    daily_budget_usdc = round(cold * 1.0 + pending * 0.05, 2)
+    daily_budget_usdt = round(cold * 1.0 + pending * 0.05, 2)
 
     return {
-        "daily_budget_usdc": daily_budget_usdc,
+        "daily_budget_usdt": daily_budget_usdt,
         "splits": {
             "native":  native_pct,
             "social":  social_pct,

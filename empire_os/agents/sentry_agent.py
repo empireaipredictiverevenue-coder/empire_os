@@ -14,7 +14,7 @@ import empire_os.hermes_gateway as g
 POLL = 60
 UNITS = ["empire-hub-service", "empire-ppc-router", "empire-agent-lead_deliverer",
          "empire-agent-idle_asset", "empire-agent-satellite_strike",
-         "empire-agent-solana_listener", "empire-agent-warehouse-report",
+         "empire-agent-warehouse-report",
          "empire-agent-outreach_runner", "empire-agent-supervisor",
          "empire-ppc-sentry", "empire-ppc-billing-collector"]
 REQUIRED_ENV = [

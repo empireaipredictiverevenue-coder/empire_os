@@ -462,7 +462,7 @@ def buy_seat_subscription(tenant_id: str, tier: str,
     args = [
         sub_id, tenant_id, "seat_" + tier, "monthly",
         seats_allowed, monthly_cents, "pending",
-        "usdc_self_serve", now_iso, now_iso, now_iso,
+        "usdt_bsc_self_serve", now_iso, now_iso, now_iso,
     ]
     sub_full = sub_script
     for ii, v in enumerate(args, 1):
@@ -480,7 +480,7 @@ def buy_seat_subscription(tenant_id: str, tier: str,
         "lane_count": len(lanes),
         "lanes": lanes,
         "monthly_cents": monthly_cents,
-        "amount_usdc": monthly_cents / 100,
+        "amount_usdt": monthly_cents / 100,
         "status": "pending",
     }
 

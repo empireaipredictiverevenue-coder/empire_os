@@ -23,14 +23,14 @@ ENV_PATH = Path("/root/empire_os/.env")
 
 # (key, default, prompt_label)
 FIELDS = [
-    ("SOLANA_VAULT_WALLET", "",
-     "Solana vault wallet address (receives USDC)"),
-    ("SOLANA_RPC_URL", "",
-     "Helius RPC URL with api-key"),
-    ("USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-     "USDC mint address (Enter for mainnet USDC)"),
-    ("SOLANA_NETWORK", "mainnet-beta",
-     "Network (mainnet-beta or devnet)"),
+    ("BSC_TREASURY_ADDRESS", "",
+     "BNB Smart Chain treasury address (receives USDT)"),
+    ("BSC_RPC_URL", "",
+     "BNB Smart Chain RPC URL"),
+    ("BSC_USDT_TOKEN_CONTRACT", "0x55d398326f99059ff775485246999027b3197955",
+     "Canonical BSC USDT token contract"),
+    ("BSC_MIN_CONFIRMATIONS", "12",
+     "Minimum BSC confirmations before payment verification"),
     ("RESEND_API_KEY", "",
      "Resend API key (Enter to skip — emails will log only)"),
     ("RESEND_WEBHOOK_SECRET", "",

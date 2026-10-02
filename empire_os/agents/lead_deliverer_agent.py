@@ -308,71 +308,27 @@ def deliver_lead(buyer: dict, lead: dict) -> dict:
     return result
 
 
-def bill_on_delivery(buyer: dict, lead: dict) -> str | None:
-    """Bill a confirmed delivery (pay-per-lead) to the ppc ledger.
+def bill_on_delivery(buyer: dict, lead: dict) -> None:
+    """Record that a delivered lead now needs canonical commercial settlement.
 
-    Called by tick_once / deliver_storm_leads ONLY after delivery is
-    confirmed (webhook_ok or email_ok). Prevents double-billing on retry.
-    Returns invoice_id or None.
+    Delivery never creates a legacy invoice and never implies revenue. USDT/BSC
+    payment starts only from the governed fulfilment-order/payment path.
     """
-    try:
-        inv = _log_ppc_invoice(buyer, lead)
-        return inv
-    except Exception as e:
-        _log_event("INVOICE_FAIL", "ppc invoice log failed",
-                   buyer=buyer.get("tenant_id"),
-                   lead_id=lead.get("lead_id"), err=str(e)[:160])
-        return None
+    _log_event(
+        "PAYMENT_HANDOFF_REQUIRED",
+        "lead delivered; canonical USDT/BSC commercial handoff required",
+        buyer=buyer.get("tenant_id"),
+        lead_id=lead.get("lead_id", lead.get("id")),
+        actual_revenue=False,
+    )
+    return None
 
 
-def _log_ppc_invoice(buyer: dict, lead: dict) -> str:
-    """Bill the delivered lead to the buyer (pay-per-lead) and log it to the
-    ppc ledger so solana_listener can collect USDC against it.
-    Amount = base_payout * fee_rate (buyer's agreed rate). USDC has 6 decimals."""
-    import urllib.request, json, uuid
-    base = float(buyer.get("base_payout", 0) or 0)
-    rate = float(buyer.get("fee_rate", 0) or 0)
-    usd = base * rate if (base and rate) else 0.0
-    amount_usdc = int(usd * 1_000_000)  # 6 decimals
-    if amount_usdc <= 0:
-        return ""  # no billable amount agreed -> skip (NO-SIM: never fake $0)
-    iid = f"ppc-{uuid.uuid4().hex[:12]}"
-    body = {
-        "invoice_id": iid,
-        "buyer_id": buyer.get("tenant_id", ""),
-        "lead_id": str(lead.get("lead_id", lead.get("id", ""))),
-        "amount_cents": int(usd * 100),
-        "amount_usdc": amount_usdc,
-        "status": "open",
-        "metadata": f"pay-per-lead {buyer.get('niche','')} {lead.get('metro','')}",
-        "ts": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-    }
-    req = urllib.request.Request(
-        f"{HUB}/v1/ppc/log_invoice",
-        data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=10) as r:
-        json.loads(r.read())
-    _log_event("INVOICE_LOGGED", "ppc invoice created",
-               invoice_id=iid, amount_usdc=amount_usdc,
-               buyer=buyer.get("tenant_id"))
-    # money-only alert: lead billed = revenue event
-    try:
-        import empire_os.revenue_notify as _rn
-        _rn.billed(iid, usd, buyer.get("niche", ""))
-    except Exception:
-        pass
-    # affiliate credit: if lead was referred, pay commission on this invoice
-    try:
-        slug = lead.get("ref") or lead.get("affiliate_slug")
-        if slug:
-            import empire_os.affiliate as _aff
-            _aff.credit_commission(
-                str(lead.get("lead_id", lead.get("id", ""))), iid,
-                int(usd * 100))
-    except Exception:
-        pass  # never break billing on affiliate credit failure
-    return iid
+def _log_ppc_invoice(_buyer: dict, _lead: dict) -> str:
+    raise RuntimeError(
+        "legacy PPC invoice creation retired; use Commercial Exchange and "
+        "governed USDT/BSC payment flow"
+    )
 
 
 def render_lead_delivered_email(lead: dict, buyer: dict) -> tuple[str, str, str]:
@@ -590,44 +546,48 @@ def deliver_storm_leads(dry_run: bool = False) -> int:
         is_disaster = disaster_on and _storm_is_disaster(lead, disaster_niches)
 
         for buyer in buyers:
-            # 2c. premium-adjusted buyer copy (only affects billing amount)
+            # 2c. Preserve delivery context only. Pricing/payment belongs to the
+            # canonical Commercial Exchange + USDT/BSC settlement path.
             bill_buyer = dict(buyer)
             if is_disaster:
-                bill_buyer["base_payout"] = float(buyer["base_payout"]) * multiplier
-                bill_buyer["_disaster_premium"] = True
-                bill_buyer["_premium_multiplier"] = multiplier
+                bill_buyer["_disaster_signal"] = True
 
             if dry_run:
-                base = float(buyer["base_payout"])
-                rate = float(buyer["fee_rate"])
-                adj = base * (multiplier if is_disaster else 1.0)
-                amt = int(adj * rate * 1_000_000)
-                _log_event("STORM_DRYRUN", "would deliver storm lead",
-                          lead_id=lead_id, buyer=buyer["tenant_id"],
-                          disaster=is_disaster, amount_usdc=amt)
+                _log_event(
+                    "STORM_DRYRUN",
+                    "would deliver storm lead; no payment action",
+                    lead_id=lead_id,
+                    buyer=buyer["tenant_id"],
+                    disaster=is_disaster,
+                    actual_revenue=False,
+                )
                 continue
 
-            # 2d. deliver + bill via existing functions
+            # 2d. Deliver only. Settlement remains a separate governed handoff.
             result = deliver_lead(bill_buyer, storm_lead)
-            ok = result.get("webhook_ok") or result.get("email_ok") \
-                 or result.get("invoice_id")
+            ok = result.get("webhook_ok") or result.get("email_ok")
             if ok:
-                # 2e. bill (confirmed delivery only) + mark delivered/billed
-                inv = bill_on_delivery(bill_buyer, storm_lead)
+                bill_on_delivery(bill_buyer, storm_lead)
                 _hub_exec(
                     "import sqlite3,sys;"
                     "c=sqlite3.connect('/root/empire_os/empire_os.db');"
                     "c.execute(\"UPDATE crm_leads SET delivery_status='delivered', "
-                    "status='billed', updated_at=? WHERE id=?\", "
+                    "status='delivered', updated_at=? WHERE id=?\", "
                     "(__import__('datetime').datetime.utcnow().isoformat(), sys.argv[2]));c.commit();c.close()"
                     .replace("sys.argv[1]", "__import__('datetime').datetime.utcnow().isoformat()")
                     .replace("sys.argv[2]", str(lead_id))
                 )
-                _log_event("STORM_DELIVERED", "storm lead delivered + billed",
-                          lead_id=lead_id, buyer=buyer["tenant_id"],
-                          disaster=is_disaster, webhook=result.get("webhook_ok"),
-                          email=result.get("email_ok"),
-                          invoice_id=result.get("invoice_id"))
+                _log_event(
+                    "STORM_DELIVERED",
+                    "storm lead delivered; payment handoff required",
+                    lead_id=lead_id,
+                    buyer=buyer["tenant_id"],
+                    disaster=is_disaster,
+                    webhook=result.get("webhook_ok"),
+                    email=result.get("email_ok"),
+                    payment_handoff_required=True,
+                    actual_revenue=False,
+                )
                 delivered += 1
                 break  # one buyer per lead is enough
 

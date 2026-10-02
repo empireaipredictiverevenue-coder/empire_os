@@ -116,14 +116,9 @@ from empire_os.agents.satellite_damage_agent import run_scan as _damage_scan
 from empire_os.fee_agent import FeeAgent
 from empire_os.watcher_agent import WatcherAgent
 from empire_os.tenants import TenantStore, PLANS, compute_invoice_amount, check_quota
-from empire_os.billing import (
-    BillingEngine, PayPalConfig, CryptoConfig,
-    paypal_create_subscription, paypal_get_subscription,
-    paypal_cancel_subscription, crypto_payment_request,
-    verify_crypto_payment,
-)
-from empire_os.billing_webhooks import handle_paypal_event, handle_crypto_payment
-from empire_os.payout_batch import PayoutBatchStore, build_payout_batch
+# Legacy billing and payout modules are intentionally not
+# imported by the active hub. Canonical settlement is governed BSC/USDT via
+# payment_governance + bsc_usdt_verifier.
 from empire_os.revenue_notify import paid as _rev_paid
 from empire_os.waterfall import build_default_waterfall
 from empire_os.lanes import ensure_schema as ensure_lane_schema, seed_lanes
@@ -205,8 +200,6 @@ payout_engine: Optional[PayoutEngine] = None
 fee_agent: Optional[FeeAgent] = None
 watcher: Optional[WatcherAgent] = None
 tenant_store: Optional[TenantStore] = None
-billing_engine: Optional[BillingEngine] = None
-payout_batch_store: Optional[PayoutBatchStore] = None
 waterfall = None
 AEO_SURFACE_ROOT = os.environ.get("AEO_SURFACE_ROOT", "/srv/aeo")
 
@@ -315,7 +308,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Could not mount AEO surface: %s", e)
 
-    # Same-origin static assets (avoids Phantom dApp browser blocking 3rd-party scripts)
+    # Same-origin static assets for Empire UI surfaces.
     _STATIC_DIR = Path(__file__).parent / "static"
     _STATIC_DIR.mkdir(parents=True, exist_ok=True)
     try:
@@ -397,13 +390,13 @@ async def lifespan(app: FastAPI):
             hub_url=f"http://localhost:{int(os.environ.get('EMPIRE_PORT', '8080'))}",
         )
 
-        # SaaS corridor: tenants, billing, payout batches
-        global tenant_store, billing_engine, payout_batch_store
+        # Legacy tenant read compatibility only. Payment/billing execution
+        # is not initialized here; canonical settlement is BSC/USDT through
+        # the governed fulfilment-order/payment-governance path.
+        global tenant_store
         tenant_store = TenantStore(db_path=os.environ.get(
             "EMPIRE_DB_PATH", "empire_os.db"))
-        billing_engine = BillingEngine()
-        payout_batch_store = PayoutBatchStore()
-        logger.info("SaaS corridor: tenants + billing + payout batches ready")
+        logger.info("Legacy tenant compatibility loaded; BSC/USDT payment rail remains external to hub")
 
         # Watcher loop — runs every 5 min, alerts on anomalies
         async def _watcher_loop():
@@ -464,21 +457,9 @@ app.add_middleware(
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Permissive CSP for the wallet page so Phantom's dApp browser doesn't block
-    fetch/XHR to remote Solana RPCs (Alchemy, Ankr, public-rpc, mainnet-beta)."""
+    """Compatibility middleware; legacy wallet-signing exceptions are retired."""
     async def dispatch(self, request, call_next):
-        resp: Response = await call_next(request)
-        path = request.url.path
-        if path.startswith("/wallet/") or path == "/wallet":
-            resp.headers["Content-Security-Policy"] = (
-                "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; "
-                "script-src * 'unsafe-inline' 'unsafe-eval'; "
-                "connect-src * https: wss:; "
-                "img-src * data: blob:; "
-                "frame-ancestors *;"
-            )
-            resp.headers["X-Frame-Options"] = "ALLOWALL"
-        return resp
+        return await call_next(request)
 
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -986,7 +967,7 @@ _BUY_LEADS_TEMPLATE = "/root/empire_os/templates/buy-leads.html"
 
 @app.post("/v1/buyers/apply", response_model=BuyerApplyResponse)
 async def buyer_apply(req: BuyerApplyRequest):
-    """Retired legacy Solana/USDC buyer auto-onboarding path."""
+    """Retired legacy buyer auto-onboarding path."""
     raise HTTPException(
         status_code=410,
         detail="legacy_buyer_apply_retired_use_governed_bsc_buyer_onboarding_flow",
@@ -1120,7 +1101,7 @@ def outreach_pending(metro: str = None, niche: str = None, limit: int = 20):
 
 
 
-# Legacy Solana/USDC product-catalog runtime removed.
+# Legacy product-catalog runtime removed.
 # Governed A2A discovery and canonical product/commercial flows are active.
 
 
@@ -1534,7 +1515,7 @@ def mass_torts_direct(req: dict):
 def finance_replay(req: dict):
     """Retired legacy simulation endpoint.
 
-    The former implementation fabricated Solana/USDC deposit evidence and
+    The former implementation fabricated legacy deposit evidence and
     mutated invoices, subscriptions, settlements and a pseudo vault balance.
     Canonical production settlement is BSC USDT with independently verified
     chain evidence, so replay-based finance mutation is permanently fail-closed.
@@ -1914,7 +1895,7 @@ def buyer_enterprise_intake(req: dict):
       contact_name str   required
       email        str   required
       phone        str   required
-      wallet       str   required  (Solana address for billing)
+      treasury_address str optional  (BSC address for governed USDT settlement)
       target_tier  str   required  diamond | empire | titanium
       lanes        list  optional  [{niche, metro}, ...]
       notes        str   optional
@@ -1927,7 +1908,7 @@ def buyer_enterprise_intake(req: dict):
     cn    = req.get("contact_name", "").strip()
     email = req.get("email", "").strip()
     phone = req.get("phone", "").strip()
-    wlt   = req.get("wallet", "").strip()
+    wlt   = (req.get("treasury_address") or req.get("wallet") or "").strip()
     tier  = (req.get("target_tier") or "").strip().lower()
     lanes = req.get("lanes") or []
     notes = req.get("notes", "")
@@ -1935,8 +1916,8 @@ def buyer_enterprise_intake(req: dict):
 
     if tier not in ("diamond", "empire", "titanium"):
         raise HTTPException(400, "target_tier must be diamond|empire|titanium")
-    if not all([name, cn, email, wlt]):
-        raise HTTPException(400, "agency_name, contact_name, email, wallet required")
+    if not all([name, cn, email]):
+        raise HTTPException(400, "agency_name, contact_name, email required")
 
     # Persist the lead
     try:
@@ -1949,7 +1930,7 @@ def buyer_enterprise_intake(req: dict):
                 cnx,
                 name=name, email=email, phone=phone,
                 state="", niche=f"enterprise_{tier}",
-                details=f"{cn} | wallet={wlt} | lanes={len(lanes)} | plan_5_heads={plan5} | {notes}",
+                details=f"{cn} | bsc_treasury={wlt or 'not_provided'} | lanes={len(lanes)} | plan_5_heads={plan5} | {notes}",
                 source="enterprise_intake",
             )
         except TypeError:
@@ -1957,7 +1938,7 @@ def buyer_enterprise_intake(req: dict):
             lead_id = intake_lead(
                 name=name, email=email, phone=phone,
                 state="", niche=f"enterprise_{tier}",
-                details=f"{cn} | wallet={wlt} | lanes={len(lanes)} | plan_5_heads={plan5} | {notes}",
+                details=f"{cn} | bsc_treasury={wlt or 'not_provided'} | lanes={len(lanes)} | plan_5_heads={plan5} | {notes}",
                 source="enterprise_intake",
             )
         cnx.close()
@@ -1978,7 +1959,7 @@ def buyer_enterprise_intake(req: dict):
   Agency:     {name}
   Contact:    {cn} ({email} / {phone})
   Target:     {tier.upper()}
-  Wallet:     {wlt}
+  BSC treasury: {wlt or 'not provided'}
   Lanes:      {len(lanes)} ({lanes[:5]}{'...' if len(lanes)>5 else ''})
   Plan-5:     {plan5}
   Notes:      {notes}
@@ -1999,21 +1980,21 @@ Contract template: https://empire-ai.co.uk/contract-{tier}.pdf
         "next_steps": [
             "1. AE reviews your intake within 4 hours.",
             f"2. Contract template: https://empire-ai.co.uk/contract-{tier}.pdf",
-            "3. Sign + return via DocuSign or Solana-signed message.",
+            "3. Sign + return through the governed contract flow.",
             "4. KYC: provide beneficial owner info + business doc.",
             "5. Once signed, you'll receive an API key + portal link.",
         ],
         "contract_pdf_url": f"/srv/aeo/contract-{tier}.pdf",
         "intake_email_id": em_id,
         "tier": tier,
-        "monthly_usdc": {"diamond": 5000, "empire": 15000, "titanium": 50000}[tier],
+        "monthly_usdt": {"diamond": 5000, "empire": 15000, "titanium": 50000}[tier],
     }
 
 
 
 @app.post("/v1/buyers/signup-seat")
 def buyer_signup_seat(req: dict):
-    """Retired legacy Solana seat signup path."""
+    """Retired legacy seat signup path."""
     raise HTTPException(
         status_code=410,
         detail="legacy_buyer_signup_seat_retired_use_governed_bsc_buyer_activation_flow",
@@ -2032,7 +2013,7 @@ def seat_tiers_endpoint():
 
 @app.post("/v1/buyers/signup")
 def buyer_signup(req: dict):
-    """Retired legacy Solana buyer signup path."""
+    """Retired legacy buyer signup path."""
     raise HTTPException(
         status_code=410,
         detail="legacy_buyer_signup_retired_use_governed_bsc_buyer_activation_flow",
@@ -2770,7 +2751,7 @@ class SubscribeRequest(BaseModel):
     plan: str
     billing_cycle: str = "monthly"
     seats: int = 1
-    payment_method: str = "paypal"  # "paypal" or "crypto_usdc"
+    payment_method: str = "usdt_bsc"  # legacy route is retired; canonical rail label only
 
 
 @app.post("/v1/billing/subscribe")
@@ -2797,11 +2778,11 @@ def crypto_verify(req: CryptoVerifyRequest):
     )
 
 
-# --- Payouts (Crypto USDC for TokenPocket etc.) ---
+# --- Retired legacy payout surfaces ---
 
 @app.post("/v1/payouts/process-all")
 def payouts_process_all():
-    """Retired legacy Solana payout batch path."""
+    """Retired legacy payout batch path."""
     raise HTTPException(
         status_code=410,
         detail="legacy_payout_processing_retired_use_governed_bsc_treasury_flow",
@@ -2815,7 +2796,7 @@ class BatchTxRequest(BaseModel):
 
 @app.post("/v1/payouts/batch-tx")
 def payouts_batch_tx(req: BatchTxRequest = None):
-    """Retired legacy Solana payout transaction builder."""
+    """Retired legacy payout transaction builder."""
     raise HTTPException(
         status_code=410,
         detail="legacy_payout_batch_tx_retired_use_governed_bsc_treasury_flow",
@@ -2830,7 +2811,7 @@ class PayoutVerifyRequest(BaseModel):
 
 @app.post("/v1/payouts/verify")
 def payouts_verify(req: PayoutVerifyRequest):
-    """Retired legacy Solana payout verification path."""
+    """Retired legacy payout verification path."""
     raise HTTPException(
         status_code=410,
         detail="legacy_payout_verify_retired_use_governed_bsc_treasury_flow",
@@ -2895,15 +2876,15 @@ def telegram_alert(req: dict = None, message: str = ""):
 
 
 
-# --- Wallet signing UI + Solana Pay Transaction Request ---
-
-WALLET_SIGN_HTML = (Path(__file__).parent / "templates" / "sign_tx.html").read_text()
-
+# --- Retired legacy wallet signing UI ---
 
 @app.get("/wallet/sign", response_class=HTMLResponse)
 async def wallet_sign_page():
-    """Serve the wallet-adapter signing page."""
-    return WALLET_SIGN_HTML
+    """Retired legacy wallet-signing surface."""
+    raise HTTPException(
+        status_code=410,
+        detail="legacy_wallet_signing_retired_use_governed_bsc_usdt_payment_flow",
+    )
 
 
 @app.get("/v1/payouts/sign-tx")
@@ -2938,7 +2919,7 @@ class PayoutSubmitRequest(BaseModel):
 
 @app.post("/v1/payouts/submit")
 def payouts_submit(req: PayoutSubmitRequest):
-    """Retired legacy Solana payout submission path."""
+    """Retired legacy payout submission path."""
     raise HTTPException(
         status_code=410,
         detail="legacy_payout_submit_retired_use_governed_bsc_treasury_flow",
@@ -2947,7 +2928,7 @@ def payouts_submit(req: PayoutSubmitRequest):
 
 @app.post("/v1/payouts/verify-batch")
 def payouts_verify_batch(req: PayoutVerifyBatchRequest):
-    """Retired legacy Solana payout batch verification path."""
+    """Retired legacy payout batch verification path."""
     raise HTTPException(
         status_code=410,
         detail="legacy_payout_verify_batch_retired_use_governed_bsc_treasury_flow",

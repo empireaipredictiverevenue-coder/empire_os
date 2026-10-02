@@ -408,7 +408,7 @@ class RevenueDashboard:
         breakdown = {
             "stripe": 0.0,
             "paypal": 0.0,
-            "crypto_usdc": 0.0,
+            "crypto_usdt": 0.0,
             "manual": 0.0,
         }
 

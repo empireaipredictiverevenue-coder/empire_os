@@ -49,7 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
     rend.add_argument("--lead-url", default="", help="lead_url (internal only)")
     rend.add_argument("--amount", default="", help="amount (payout_settled only)")
     rend.add_argument("--period", default="this week", help="period")
-    rend.add_argument("--method", default="USDC", help="payout method")
+    rend.add_argument("--method", default="USDT on BSC", help="payout method")
     rend.add_argument("--tx-id", default="", help="tx_id")
     rend.add_argument("--reply-to", default="ops@empire-ai.co.uk")
     rend.add_argument("--sender", default="Empire OS team")

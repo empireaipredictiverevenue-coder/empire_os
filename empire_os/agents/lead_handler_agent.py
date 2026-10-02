@@ -64,12 +64,12 @@ class LeadHandlerAgent(SyntheticAgent):
         try:
             import requests
             subject = (f"Empire OS for {lead.get('metro', 'your area')} "
-                       f"{niche}: real leads, USDC billing")
+                       f"{niche}: real leads, USDT billing")
             body = (f"Hey {lead.get('name', 'there')},\n\n"
                     f"this is the Empire OS team reaching out about your "
                     f"{niche} project in {lead.get('metro', '?')}. "
                     f"We deliver exclusive leads to high-revenue agencies "
-                    f"across 462 lanes. All billing is in USDC on Solana.\n\n"
+                    f"across 462 lanes. All billing is in USDT on BSC.\n\n"
                     f"The Silver tier is the best fit. Want a free 1-day "
                     f"trial of the pipeline?\n\nFirst 14 days free. "
                     f"Cancel anytime.\n\n---\nEmpire OS\n"

@@ -176,7 +176,7 @@ def b2b_block() -> str:
     """Cross-pitch the B2B product suite (satellite/warehouse/AI tools)."""
     return (
         "\nAlso — if you run ops beyond lead-gen, we license B2B tools "
-        "settled in USDC (no card, no KYC):\n"
+        "settled in USDT (no card, no KYC):\n"
         "  - Idle-asset & logistics wastage monitor ($49/mo)\n"
         "  - Warehouse asset reporting ($39/mo)\n"
         "  - AI agent skill audit for your team (NVIDIA SkillSpector, $39/mo)\n"
@@ -206,18 +206,19 @@ def draft_email(prospect: dict, sample: dict | None, step: int = 0) -> tuple[str
         )
 
     if step == 0:
-        subject = f"Exclusive {niche} leads — pay in USDC, no cards, no KYC"
+        subject = f"Exclusive {niche} leads — pay in USDT, no cards, no KYC"
         body = (
             f"Hi {name},\n\n"
             f"Quick one - I run a lead exchange for {niche} contractors in "
-            f"{metro}. Exclusive leads delivered real-time, settled in USDC "
+            f"{metro}. Exclusive leads delivered real-time, settled in USDT "
             f"- no credit cards, no KYC, no processor.\n\n"
             f"{sample_text}"
-            f"How it works: grab a seat (pay-per-lead in USDC to our Solana "
+            f"How it works: grab a seat (pay-per-lead in USDT to our BSC "
             f"vault), we deliver verified {niche} leads to your dashboard + "
             f"email + webhook. You only pay when seated.\n\n"
             f"See + claim a lane: https://empire-ai.co.uk/buy-leads\n"
-            f"Vault: egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM\n\n"
+            f"Payment rail: USDT on BSC; payment instructions are issued only "
+            f"after governed commercial terms.\n\n"
             f"Reply 'sample' for a free live lead.\n\n- Empire OS"
             f"{b2b_block()}"
         )
@@ -231,7 +232,7 @@ def draft_email(prospect: dict, sample: dict | None, step: int = 0) -> tuple[str
             f"  {insight}\n\n"
             f"{sample_text}"
             f"When you're ready to put that demand to work, seats are open "
-            f"at https://empire-ai.co.uk/buy-leads (USDC settle, no card).\n\n"
+            f"at https://empire-ai.co.uk/buy-leads (USDT settle, no card).\n\n"
             f"- Empire OS"
             f"{b2b_block()}"
         )
@@ -240,7 +241,7 @@ def draft_email(prospect: dict, sample: dict | None, step: int = 0) -> tuple[str
         body = (
             f"Hi {name},\n\n"
             f"Last one - your {niche} seat for {metro} is still available. "
-            f"Exclusive leads, USDC settlement, cancel anytime.\n\n"
+            f"Exclusive leads, USDT settlement, cancel anytime.\n\n"
             f"Claim it: https://empire-ai.co.uk/buy-leads\n"
             f"Vault: egJ1t9NZkDs8FvMbfnQTqXzC4KNuhAc9XSfpG9y9AZM\n\n"
             f"If the timing's off, just reply 'later' and I'll close your "

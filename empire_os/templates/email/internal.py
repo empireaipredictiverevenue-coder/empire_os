@@ -90,7 +90,7 @@ def payout_settled(vars: dict) -> tuple[str, str]:
     name   = vars.get("recipient_name") or "team"
     amount = vars.get("amount") or "$0.00"
     period = vars.get("period") or "this week"
-    method = vars.get("method") or "USDC"
+    method = vars.get("method") or "USDT on BSC"
     txid   = vars.get("tx_id") or "n/a"
     tenant = vars.get("tenant_id", "default")
 

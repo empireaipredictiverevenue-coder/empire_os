@@ -39,7 +39,7 @@ echo " pushed ${pushed} files"
 
 if [[ "$RESTART" -eq 1 ]]; then
   echo "==> restarting pm2 services in ${CONTAINER}"
-  incus exec "$CONTAINER" -- pm2 restart empire-hub-service empire-solana-listener empire-north-mini 2>&1 \
+  incus exec "$CONTAINER" -- pm2 restart empire-hub-service empire-north-mini 2>&1 \
     | grep -E "restarting|online" || true
   # poll /health up to 15s (hub may take a few sec to rebind)
   ready=0
@@ -54,34 +54,19 @@ if [[ "$RESTART" -eq 1 ]]; then
 fi
 
 if [[ "$SMOKE" -eq 1 ]]; then
-  echo "==> smoke: hub ready (health polled 200 above)"
-  echo "==> smoke: charge -> replay cycle (NO-SIM + settlement + FK)"
+  echo "==> smoke: canonical USDT/BSC rail + hub health (no payment mutation)"
   incus exec "$CONTAINER" -- bash -c 'cd /root/empire_os && /root/venv/bin/python3 - <<PYEOF
-import sqlite3, sys, json, urllib.request
+import sys
 sys.path.insert(0, "/root/empire_os")
-from empire_os.charge import charge
-con = sqlite3.connect("/root/empire_os/empire_os.db"); con.row_factory = sqlite3.Row
-pid = con.execute("SELECT prospect_id FROM si_buyer_outreach WHERE email LIKE \"%@%\" ORDER BY score DESC LIMIT 1").fetchone()[0]
-res = charge(buyer_id=pid, head=2, reason="deploy_smoke", amount_cents=100, currency="USDC", force_processor="usdc")
-ch = con.execute("SELECT status FROM si_charges WHERE charge_id=?", (res["charge_id"],)).fetchone()
-inv = con.execute("SELECT invoice_id, status, charge_id FROM si_ppc_invoices WHERE charge_id=?", (res["charge_id"],)).fetchone()
-assert ch["status"] == "open", "charge not open: %s" % ch["status"]
-assert inv is not None and inv["status"] == "open", "invoice not created under shared charge_id"
-assert inv["charge_id"] == res["charge_id"], "charge_id FK mismatch"
-iid = inv["invoice_id"]
-body = json.dumps({"amount_usdc":1.0,"memo":"INV_%s" % iid,"wallet_from":"deploy_smoke","force_status":"paid"}).encode()
-req = urllib.request.Request("http://127.0.0.1:8000/v1/finance/replay", data=body, headers={"Content-Type":"application/json"})
-rj = json.loads(urllib.request.urlopen(req, timeout=10).read())
-assert rj.get("paid_invoice_id") == iid, "replay matched wrong: %s" % rj
-sett = con.execute("SELECT prospect_id FROM si_settlements WHERE prospect_id=?", (iid,)).fetchone()
-assert sett is not None, "settlement not written"
-print("SMOKE OK: charge=%s invoice=%s settled=yes" % (res["charge_id"], iid))
-con.execute("DELETE FROM si_settlements WHERE prospect_id=?", (iid,))
-con.execute("DELETE FROM si_ppc_invoices WHERE invoice_id=?", (iid,))
-con.execute("DELETE FROM si_charges WHERE charge_id=?", (res["charge_id"],))
-con.commit()
-print("SMOKE CLEANED")
+from empire_os.payment_rail_policy import canonical_payment_rail
+from empire_os.bsc_usdt_verifier import BSC_MAINNET_CHAIN_ID, BSC_USDT_CONTRACT
+rail = canonical_payment_rail()
+assert rail["asset"] == "USDT", rail
+assert rail["network"] == "BSC", rail
+assert rail["chain_id"] == 56 == BSC_MAINNET_CHAIN_ID, rail
+assert BSC_USDT_CONTRACT.startswith("0x") and len(BSC_USDT_CONTRACT) == 42
+assert rail["actual_revenue"] is False
+print("SMOKE OK: canonical settlement=USDT/BSC chain=56; no payment mutation")
 PYEOF'
 fi
-
 echo "==> deploy complete"

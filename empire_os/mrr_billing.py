@@ -30,7 +30,7 @@ def run_billing(period: str = "2026-07"):
         bps = PLANS.get(plan, PLANS["free"]).backend_bps
         desc = f"MRR {plan} x{seats or 1} {cycle or 'monthly'} {period}"
         inv = store.create_invoice(
-            tid, amt, "usdc_pending",
+            tid, amt, "usdt_bsc_pending",
             subscription_id=sid,
             description=desc,
         )

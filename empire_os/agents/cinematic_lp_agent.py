@@ -52,7 +52,7 @@ TEMPLATE = """<!DOCTYPE html>
 <div class="mt-12 text-4xl font-mono">{price}</div>
 <a href="/signup" class="mt-8 inline-block bg-emerald-500 text-slate-950 px-12 py-6 rounded-2xl text-3xl font-bold">{cta}</a>
 <p class="mt-8 text-slate-400 italic">"{social_proof}"</p>
-<p class="mt-4 text-slate-500">Sole agency per lane. Real leads, real USDC, real contracts.</p>
+<p class="mt-4 text-slate-500">Sole agency per lane. Real leads, real USDT, real contracts.</p>
 <p class="mt-2 text-slate-500">8,300+ leads already in the system.</p>
 </div>
 </section>
@@ -66,7 +66,7 @@ def render(brief: dict) -> dict:
     html = TEMPLATE.format(
         headline=brief.get("headline", "Get exclusive leads"),
         subhead=brief.get("subhead",
-                          "Pay in USDC. Get matched with homeowners now."),
+                          "Pay in USDT. Get matched with homeowners now."),
         cta=brief.get("cta", "Get Matched"),
         price=brief.get("price", "$200/mo"),
         social_proof=brief.get("social_proof",

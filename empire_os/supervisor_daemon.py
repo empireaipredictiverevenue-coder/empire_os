@@ -49,9 +49,9 @@ REGISTRY_DATA = {
                             "note": "Plans ppc. Must wire invoice writes."},
     "outreach_runner":    {"file": "outreach_runner.py", "mode": "daemon",
                             "sim_risk": "low", "enabled": True},
-    "solana_listener":    {"file": "solana_listener_agent.py", "mode": "tool",
+    "legacy_payment_listener": {"file": "legacy_payment_listener_agent.py", "mode": "tool",
                             "sim_risk": "high", "enabled": False,
-                            "note": "RETIRED: legacy Solana/USDC rail; canonical settlement is BSC USDT."},
+                            "note": "RETIRED: legacy payment rail; canonical settlement is BSC USDT."},
     # ── SATELLITE / STORM (daemons, but SIM until real source) ──
     "satellite_damage":   {"file": "satellite_damage_agent.py", "mode": "daemon",
                             "sim_risk": "high", "enabled": False,
