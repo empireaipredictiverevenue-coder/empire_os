@@ -50,6 +50,34 @@ def _load_local_planner_environment(root: Path) -> None:
         os.environ[key] = value
 
 
+_HERMES_PROVIDER_OUTAGE_TOKENS = (
+    "no healthy eligible zero-cost hermes model candidates",
+    "no eligible zero-cost hermes model candidates",
+    "no healthy omniroute model candidate",
+    "model_cooldown",
+    "temporarily unavailable",
+    "service unavailable",
+    "connection refused",
+    "connection reset",
+    "timeout",
+)
+
+
+def _hermes_provider_outage(result: dict[str, Any]) -> bool:
+    error = str(result.get("error") or "").strip().lower()
+    hermes = (
+        result.get("hermes")
+        if isinstance(result.get("hermes"), dict)
+        else {}
+    )
+    combined = " ".join([
+        error,
+        str(hermes.get("error") or "").strip().lower(),
+        str(hermes.get("output_tail") or "").strip().lower(),
+    ])
+    return any(token in combined for token in _HERMES_PROVIDER_OUTAGE_TOKENS)
+
+
 def _local_planner_capability(coder: EmpireCoder) -> int:
     available = max(
         (
@@ -88,6 +116,9 @@ def delegate_oversized_plans(
     for job in queue.list_pending(kind=JobKind.PLAN):
         if len(delegated) >= max(0, int(max_jobs)):
             break
+        if job.payload.get("local_fallback_after_hermes") is True:
+            skipped_local += 1
+            continue
         try:
             task = coder.store.load(job.task_id)
         except (FileNotFoundError, PermissionError, ValueError) as exc:
@@ -246,6 +277,29 @@ def reconcile_delegated_plans(
             "FAILED", "HERMES_FAILED", "LEASE_BLOCKED",
             "VERIFICATION_FAILED", "CANDIDATE_GATE_FAILED",
         }:
+            if (
+                status in {"FAILED", "HERMES_FAILED"}
+                and _hermes_provider_outage(result)
+            ):
+                pending = queue.restore_delegated(
+                    job.id,
+                    error=(
+                        "hermes_provider_outage_local_fallback:"
+                        + str(result.get("error") or status)
+                    ),
+                    payload_updates={
+                        "local_fallback_after_hermes": True,
+                        "hermes_fallback_reason": "provider_unavailable",
+                    },
+                )
+                reconciled.append({
+                    "job_id": job.id,
+                    "request_id": request_id,
+                    "status": "LOCAL_FALLBACK_PENDING",
+                    "job_status": pending.status.value,
+                })
+                continue
+
             terminal = queue.finish_delegated(
                 job.id,
                 success=False,

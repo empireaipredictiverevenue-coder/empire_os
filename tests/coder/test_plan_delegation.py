@@ -225,3 +225,143 @@ def test_delegation_caps_hot_local_plan_lane_for_throughput(monkeypatch, tmp_pat
     assert result["local_planner_capability"] == 1
     assert result["delegated_count"] == 1
     assert queue.get(job.id).status is JobStatus.DELEGATED
+
+
+def test_hermes_provider_outage_restores_plan_for_local_fallback(
+    monkeypatch,
+    tmp_path,
+):
+    root, runtime = _workspace(tmp_path)
+    store = LocalTaskStore(root, runtime_root=runtime)
+    task = store.create(
+        "Review revenue architecture and production safety",
+        blueprint_path="docs/BLUEPRINT_V6.md",
+    )
+    queue = LocalJobQueue(root, runtime_root=runtime)
+    job = queue.enqueue(
+        task_id=task.id,
+        kind=JobKind.PLAN,
+        priority=100,
+    )
+    request_id = f"coder-plan-{job.id}"
+    queue.delegate_pending(
+        job.id,
+        delegation={"worker": "hermes", "request_id": request_id},
+    )
+
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.fetch_control_refs",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.control_path_exists",
+        lambda *a, **k: True,
+    )
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.read_control_json",
+        lambda *a, **k: {
+            "status": "HERMES_FAILED",
+            "error": (
+                "HermesControlError: OmniRoute has no healthy eligible "
+                "zero-cost Hermes model candidates"
+            ),
+            "hermes": {},
+        },
+    )
+
+    result = reconcile_delegated_plans(
+        root,
+        runtime_root=runtime,
+    )
+
+    assert result["reconciled_count"] == 1
+    assert result["reconciled"][0]["status"] == (
+        "LOCAL_FALLBACK_PENDING"
+    )
+    restored = queue.get(job.id)
+    assert restored.status is JobStatus.PENDING
+    assert restored.payload["local_fallback_after_hermes"] is True
+    assert restored.payload["hermes_fallback_reason"] == (
+        "provider_unavailable"
+    )
+    assert "hermes_provider_outage_local_fallback" in restored.error
+
+    fake_coder = SimpleNamespace(
+        store=store,
+        router=SimpleNamespace(profiles=(
+            ModelProfile(
+                "llama_cpp",
+                "qwen2.5-coder:1.5b",
+                capability=1,
+                cost_tier=0,
+                local=True,
+                roles=("planner",),
+            ),
+        )),
+    )
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.EmpireCoder",
+        lambda *a, **k: fake_coder,
+    )
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.dispatch_execution_request",
+        lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError("fallback plan must not re-delegate")
+        ),
+    )
+
+    delegation = delegate_oversized_plans(
+        root,
+        runtime_root=runtime,
+        max_jobs=1,
+    )
+    assert delegation["delegated_count"] == 0
+    assert delegation["skipped_local_count"] == 1
+    assert queue.get(job.id).status is JobStatus.PENDING
+
+
+def test_non_provider_hermes_failure_remains_failed(
+    monkeypatch,
+    tmp_path,
+):
+    root, runtime = _workspace(tmp_path)
+    store = LocalTaskStore(root, runtime_root=runtime)
+    task = store.create(
+        "Review revenue architecture",
+        blueprint_path="docs/BLUEPRINT_V6.md",
+    )
+    queue = LocalJobQueue(root, runtime_root=runtime)
+    job = queue.enqueue(task_id=task.id, kind=JobKind.PLAN)
+    request_id = f"coder-plan-{job.id}"
+    queue.delegate_pending(
+        job.id,
+        delegation={"worker": "hermes", "request_id": request_id},
+    )
+
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.fetch_control_refs",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.control_path_exists",
+        lambda *a, **k: True,
+    )
+    monkeypatch.setattr(
+        "empire_os.coder.plan_delegation.read_control_json",
+        lambda *a, **k: {
+            "status": "HERMES_FAILED",
+            "error": "proposal failed governed validation",
+            "hermes": {},
+        },
+    )
+
+    result = reconcile_delegated_plans(
+        root,
+        runtime_root=runtime,
+    )
+
+    assert result["reconciled_count"] == 1
+    assert result["reconciled"][0]["status"] == "FAILED"
+    terminal = queue.get(job.id)
+    assert terminal.status is JobStatus.FAILED
+    assert "local_fallback_after_hermes" not in terminal.payload

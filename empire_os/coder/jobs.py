@@ -255,6 +255,7 @@ class LocalJobQueue:
         job_id: str,
         *,
         error: str,
+        payload_updates: dict[str, Any] | None = None,
     ) -> CoderJob:
         safe = self._safe_id(job_id)
         source = self.delegated / f"{safe}.json"
@@ -264,6 +265,11 @@ class LocalJobQueue:
             job = self._load_path(source)
             job.status = JobStatus.PENDING
             job.error = str(error)[:4000]
+            if payload_updates:
+                job.payload = {
+                    **dict(job.payload or {}),
+                    **dict(payload_updates),
+                }
             job.result = {}
             job.updated_at = utc_now()
             self._write(source, job)
