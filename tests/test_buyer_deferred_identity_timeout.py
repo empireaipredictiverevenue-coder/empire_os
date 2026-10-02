@@ -134,3 +134,92 @@ def test_normal_retry_backoff_preserves_existing_cadence():
     assert worker._retry_minutes(item, 3) == 120
     assert worker._retry_minutes(item, 4) == 240
     assert worker._retry_minutes(item, 8) == 180
+
+
+def test_slow_recovery_stages_are_bounded_per_lane(monkeypatch):
+    class FakeQueue:
+        def __init__(self):
+            self.deferred = []
+        def claim_due(self, *, limit, worker_id, lease_seconds):
+            return [
+                {
+                    "prospect_id": f"p{i}",
+                    "attempts": 0,
+                    "reason": "no_contact_evidence",
+                }
+                for i in range(1, 4)
+            ]
+        def defer_again(self, prospect_id, *, reason, attempts, retry_minutes):
+            self.deferred.append(prospect_id)
+        def resolve(self, *args, **kwargs):
+            return None
+        def mark_call_ready(self, *args, **kwargs):
+            return False
+        def snapshot(self):
+            return {}
+
+    rows = {
+        f"p{i}": {
+            "id": f"p{i}",
+            "business_name": f"Buyer {i}",
+            "niche": "roofing",
+            "metro": "Dallas, TX",
+            "address": "",
+            "website": f"https://buyer{i}.example",
+            "phone": "",
+            "buy_signal_score": 90,
+            "status": "new",
+            "notes": "",
+            "contact_name": "",
+            "contact_title": "",
+            "contact_source": "",
+            "contacted_status": "",
+            "created_at": "",
+        }
+        for i in range(1, 4)
+    }
+    identity_calls = []
+    public_calls = []
+
+    monkeypatch.setattr(worker, "BuyerDeferredEnrichmentQueue", FakeQueue)
+    monkeypatch.setattr(worker, "_prospect_rows", lambda ids: rows)
+    monkeypatch.setattr(
+        worker,
+        "run_buyer_probe_isolated",
+        lambda *args, **kwargs: {
+            "review_ready": False,
+            "outreach_ready": False,
+            "decision_maker": None,
+            "contacts": [],
+        },
+    )
+    monkeypatch.setattr(
+        worker,
+        "recover_identity_isolated",
+        lambda **kwargs: (
+            identity_calls.append(kwargs) or
+            {"decision": "deferred", "identity": None}
+        ),
+    )
+    monkeypatch.setattr(
+        worker,
+        "_direct_public_contact_recovery",
+        lambda candidate, result: (
+            public_calls.append(candidate.prospect_id) or
+            {**result, "public_person_contact_evidence": {"evidence": []}}
+        ),
+    )
+    monkeypatch.setattr(worker, "_persist_recovered_identity", lambda *a, **k: False)
+    monkeypatch.setattr(worker, "_propose_review", lambda *a, **k: None)
+    monkeypatch.setattr(worker, "rejection_reason", lambda result: "no_contact_evidence")
+    monkeypatch.setattr(worker, "materialize_call_plans", lambda: {"count": 0})
+
+    result = worker.run_cycle(limit=3)
+
+    assert result["processed"] == 3
+    assert result["identity_recovery_attempts"] == 1
+    assert result["identity_recovery_budget"] == 1
+    assert result["public_contact_recovery_attempts"] == 1
+    assert result["public_contact_recovery_budget"] == 1
+    assert len(identity_calls) == 1
+    assert len(public_calls) == 1

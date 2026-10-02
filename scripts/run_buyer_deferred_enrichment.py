@@ -690,6 +690,10 @@ def run_cycle(
     ])
     network_probe_budget = min(max(1, int(limit)), 16)
     network_probes = 0
+    identity_recovery_budget = 1
+    identity_recovery_attempts = 0
+    public_contact_recovery_budget = 1
+    public_contact_recovery_attempts = 0
 
     for item in due:
         prospect_id = str(item.get("prospect_id") or "").strip()
@@ -807,7 +811,11 @@ def run_cycle(
                     },
                 )
 
-                if not result.get("decision_maker"):
+                if (
+                    not result.get("decision_maker")
+                    and identity_recovery_attempts < identity_recovery_budget
+                ):
+                    identity_recovery_attempts += 1
                     recovery_location = ", ".join(
                         value
                         for value in (
@@ -854,10 +862,14 @@ def run_cycle(
                                 ),
                             }
 
-            result = _direct_public_contact_recovery(
-                candidate,
-                dict(result or {}),
-            )
+            if public_contact_recovery_attempts < public_contact_recovery_budget:
+                recovered_result = _direct_public_contact_recovery(
+                    candidate,
+                    dict(result or {}),
+                )
+                if recovered_result.get("public_person_contact_evidence") is not None:
+                    public_contact_recovery_attempts += 1
+                result = recovered_result
 
             identity_recovered = False
             if (
@@ -948,6 +960,10 @@ def run_cycle(
         "processed": processed,
         "network_probes_used": network_probes,
         "network_probe_budget": network_probe_budget,
+        "identity_recovery_budget": identity_recovery_budget,
+        "identity_recovery_attempts": identity_recovery_attempts,
+        "public_contact_recovery_budget": public_contact_recovery_budget,
+        "public_contact_recovery_attempts": public_contact_recovery_attempts,
         "buyer_reviews_proposed": proposed,
         "fresh_reviews_reused": fresh_reused,
         "identities_recovered": identities_recovered,
@@ -1035,6 +1051,10 @@ def run_parallel_cycle(
         "processed",
         "network_probes_used",
         "network_probe_budget",
+        "identity_recovery_budget",
+        "identity_recovery_attempts",
+        "public_contact_recovery_budget",
+        "public_contact_recovery_attempts",
         "buyer_reviews_proposed",
         "fresh_reviews_reused",
         "identities_recovered",
