@@ -58,6 +58,60 @@ def _first_name(value: Any) -> str:
     return clean.split()[0] if clean else ""
 
 
+def _founder_review_has_prior_contact(
+    request: Request,
+    *,
+    prospect_id: str | None,
+    contact_email: str | None,
+) -> bool:
+    prospect = str(prospect_id or "").strip()
+    email = str(contact_email or "").strip().lower()
+    domain = email.split("@", 1)[1] if "@" in email else ""
+
+    if prospect:
+        query = urlencode({
+            "select": "id,status",
+            "prospect_id": f"eq.{prospect}",
+            "status": "in.(sending,sent,delivered,replied,suppressed,bounced,failed)",
+            "limit": "1",
+        })
+        rows = request(
+            "GET",
+            f"/rest/v1/outbound_intents?{query}",
+        ) or []
+        if isinstance(rows, list) and rows:
+            return True
+
+    if domain:
+        query = urlencode({
+            "select": "id,status",
+            "normalized_recipient": f"ilike.%25@{domain}",
+            "status": "in.(sending,sent,delivered,replied,suppressed,bounced,failed)",
+            "limit": "1",
+        })
+        rows = request(
+            "GET",
+            f"/rest/v1/outbound_intents?{query}",
+        ) or []
+        if isinstance(rows, list) and rows:
+            return True
+
+    if email:
+        query = urlencode({
+            "select": "normalized_contact",
+            "normalized_contact": f"eq.{email}",
+            "limit": "1",
+        })
+        rows = request(
+            "GET",
+            f"/rest/v1/outbound_suppressions?{query}",
+        ) or []
+        if isinstance(rows, list) and rows:
+            return True
+
+    return False
+
+
 def _locale_for_evidence(evidence: Mapping[str, Any]):
     raw = evidence.get("locale")
     locale_input = dict(raw) if isinstance(raw, Mapping) else {}
@@ -412,6 +466,27 @@ def run_gtm_pipeline(
             skipped += 1
             message = str(exc)
             if "offer outside standing authority" in message:
+                prospect_id = str(
+                    (row or {}).get("prospect_id") or ""
+                ).strip() or None
+                try:
+                    prior_contact = _founder_review_has_prior_contact(
+                        request,
+                        prospect_id=prospect_id,
+                        contact_email=contact or None,
+                    )
+                except Exception as history_exc:
+                    pending_skip_reasons.append(
+                        f"{review_id}:founder_history_guard_failed:"
+                        f"{type(history_exc).__name__}"
+                    )
+                    continue
+                if prior_contact:
+                    pending_skip_reasons.append(
+                        f"{review_id}:prior_outbound_history"
+                    )
+                    continue
+
                 source_offer_key = str(
                     (row or {}).get("offer_key") or ""
                 ).strip() or None
@@ -422,9 +497,7 @@ def run_gtm_pipeline(
                 )
                 founder_review_required.append({
                     "review_id": review_id,
-                    "prospect_id": str(
-                        (row or {}).get("prospect_id") or ""
-                    ).strip() or None,
+                    "prospect_id": prospect_id,
                     "contact_name": str(
                         (row or {}).get("contact_name") or ""
                     ).strip() or None,
