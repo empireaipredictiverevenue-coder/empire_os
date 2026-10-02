@@ -1,0 +1,14 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [],
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T21:02:23.401236+00:00",
+  "job_id": "coder-plan-coder_job_444c254dea1c470ea7a59abaa366dfc1",
+  "kind": "code_task",
+  "lease_resources": [],
+  "max_runtime_seconds": 600,
+  "prompt": "Produce a concise advisory implementation PLAN ONLY for the following EmpireOS task. Do not edit files, emit deployment commands, perform production actions, contact external parties, mutate databases, move funds, or expand authority. Identify affected modules, focused tests, main risks, dependencies, and approval gates.\n\nTASK:\nDepartment work delegated by Astra Executive. Goal=empire_full_completion_revenue_first; department_keys=['operations_fulfilment']; action=completion_review_then_implement_or_verify; target_component=empire_coder; rationale=Canonical completion board item: [Phase exit / real-money proof] Verified USDT/BSC payment. Revenue-first programme. Reuse existing production modules before adding code. Inspect code, tests, live runtime and canonical data. If already live, assemble proof and recommend checklist closure; if incomplete, identify the smallest production delta and exact files/tests needed. Safe internal implementation may only proceed through the governed builder pipeline.; success_condition=Either production completion is independently evidenced by tests + live runtime + canonical data (+ Founder surface where applicable), or a bounded exact implementation/gate packet is produced. Unknown stays UNKNOWN; code presence alone is not completion.; evidence_refs=['checklist:Phase exit / real-money proof:Verified USDT/BSC payment', 'docs/MASTER_REMAINING_CHECKLIST.md']. PLAN ONLY unless the governed Empire Coder pipeline separately promotes implementation. Do not perform external communication, move funds, accept commercial terms, recognize revenue or expand authority.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
