@@ -1,0 +1,12 @@
+[Unit]
+Description=Retry bounded TAM planner until terminal state
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=20s
+Persistent=true
+Unit=empire-tam-coder-plan.service
+
+[Install]
+WantedBy=timers.target

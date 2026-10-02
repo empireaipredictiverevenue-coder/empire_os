@@ -1,0 +1,18 @@
+[Unit]
+Description=Empire TAM opportunity-class planner retry worker
+After=network-online.target empire-autonomous-revenue-os.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/empire_coder_worker.py --runtime-root /srv/empire_os/runtime/coder_tam_lane --stale-seconds 240 --lease-seconds 240 --heartbeat-seconds 30 --max-attempts 3 --once
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=360

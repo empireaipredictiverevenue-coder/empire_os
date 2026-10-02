@@ -40,3 +40,35 @@ def test_reenqueue_never_lowers_existing_priority(tmp_path):
     q.enqueue({"prospect_id":"p1","reason":"outreach_not_ready","priority_score":20})
     row = q.due(limit=1)[0]
     assert row["priority_score"] == 95
+
+
+def test_due_deprioritises_retry_saturated_site_failure(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "saturated",
+        "reason": "site_unavailable",
+        "priority_score": 100,
+    })
+    q.enqueue({
+        "prospect_id": "evidence-rich",
+        "reason": "no_contact_evidence",
+        "priority_score": 90,
+        "target_people": [{
+            "name": "Jane Buyer",
+            "title": "Founder",
+            "source": "first_party_site_current",
+            "evidence_url": "https://example.com/about",
+        }],
+        "offer_key": "predictive_revenue_diagnostic",
+        "wave": "buyer_scout_review_ready",
+    })
+    import json
+    data = json.loads((tmp_path / "deferred.json").read_text())
+    data["saturated"]["attempts"] = 20
+    data["evidence-rich"]["attempts"] = 1
+    (tmp_path / "deferred.json").write_text(json.dumps(data))
+    due = q.due(limit=2)
+    assert [row["prospect_id"] for row in due] == [
+        "evidence-rich",
+        "saturated",
+    ]

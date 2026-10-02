@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh Empire revenue completion evidence every two minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=empire-revenue-completion-supervisor.service
+
+[Install]
+WantedBy=timers.target

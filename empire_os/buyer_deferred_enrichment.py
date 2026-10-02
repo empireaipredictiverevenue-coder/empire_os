@@ -111,11 +111,55 @@ def _effective_priority(item: Mapping[str, Any], *, now: datetime) -> int:
     base = _priority(item.get("priority_score"))
     created = _parse(item.get("created_at")) or now
     age_hours = max(0, int((now - created).total_seconds() // 3600))
-    # Explicit commercial priority dominates normal backlog. Work that has
-    # waited fourteen days receives a hard starvation override so lower-value
-    # rows still cannot be postponed indefinitely by a continuous premium feed.
+    attempts = max(0, int(item.get("attempts") or 0))
+    reason = str(item.get("reason") or "").strip()
+
+    target_people = [
+        row for row in (item.get("target_people") or [])
+        if isinstance(row, Mapping)
+        and str(row.get("name") or "").strip()
+        and str(row.get("title") or "").strip()
+    ]
+    verified_routes = [
+        row for row in (item.get("company_contact_routes") or [])
+        if isinstance(row, Mapping)
+        and row.get("verified") is True
+        and str(row.get("value") or "").strip()
+    ]
+
+    evidence_bonus = min(24, len(target_people) * 6) + min(
+        16, len(verified_routes) * 4
+    )
+    if str(item.get("offer_key") or "").strip():
+        evidence_bonus += 8
+    if str(item.get("wave") or "").strip() in {
+        "buyer_scout_review_ready",
+        "rolling_enterprise",
+        "direct_enterprise",
+    }:
+        evidence_bonus += 6
+
+    attempt_penalty = min(80, attempts * 4)
+    weak_reason_penalty = (
+        30
+        if reason in {
+            "site_unavailable",
+            "site_timeout",
+            "network_probe_budget_exhausted",
+        }
+        else 0
+    )
+
+    # Fourteen-day starvation protection remains stronger than the adaptive
+    # evidence and retry policy.
     starvation_boost = 1000 if age_hours >= 24 * 14 else 0
-    return starvation_boost + base
+    return (
+        starvation_boost
+        + base
+        + evidence_bonus
+        - attempt_penalty
+        - weak_reason_penalty
+    )
 
 def canonical_phone(value: Any) -> str:
     raw = str(value or "").strip()

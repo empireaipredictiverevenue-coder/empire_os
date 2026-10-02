@@ -203,6 +203,26 @@ def _retry_minutes(item: dict[str, Any], attempts: int) -> int:
         priority = int(item.get("priority_score") or 0)
     except (TypeError, ValueError):
         priority = 0
+    attempts = max(1, int(attempts))
+    reason = str(item.get("reason") or "").strip()
+
+    if reason in {
+        "site_unavailable",
+        "site_timeout",
+        "network_probe_budget_exhausted",
+    }:
+        if attempts >= 16:
+            return 24 * 60
+        if attempts >= 8:
+            return 6 * 60
+        if attempts >= 4:
+            return 2 * 60
+
+    if attempts >= 16:
+        return 12 * 60
+    if attempts >= 8:
+        return 3 * 60
+
     if priority >= 90:
         return min(60, 10 * (2 ** min(max(0, attempts - 1), 3)))
     return min(360, 30 * (2 ** min(max(0, attempts - 1), 3)))
