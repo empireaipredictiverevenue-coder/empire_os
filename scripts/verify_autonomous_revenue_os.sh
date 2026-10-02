@@ -9,8 +9,10 @@ PYTHONPATH=/srv/empire_os ./.venv/bin/python -m pytest -q   tests/test_engineeri
 ./.venv/bin/python -m py_compile   empire_os/engineering_gauntlet.py   empire_os/revenue_architecture_critic.py   empire_os/revenue_inventory.py   empire_os/autonomous_revenue_os.py   empire_os/execution_bus_data_repository.py
 
 git diff --check
-systemd-analyze verify deploy/systemd/empire-autonomous-revenue-os.service >/tmp/empire_revenue_systemd_verify.txt 2>&1 || {
-  cat /tmp/empire_revenue_systemd_verify.txt
+verify_tmp="$(mktemp)"
+trap 'rm -f "$verify_tmp"' EXIT
+systemd-analyze verify deploy/systemd/empire-autonomous-revenue-os.service >"$verify_tmp" 2>&1 || {
+  cat "$verify_tmp"
   exit 1
 }
 
