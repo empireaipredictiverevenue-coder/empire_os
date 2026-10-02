@@ -50,6 +50,8 @@ NON_PERSON_NAME_TERMS = {
     "press", "release", "strategy", "systems", "architecture", "agency",
     "association", "national", "joins", "health", "first", "last", "full",
     "name", "department", "division", "platform", "network",
+    "research", "technologies", "technology", "software", "media", "digital",
+    "group", "holdings", "partners", "capital", "labs", "studio", "studios",
 }
 
 

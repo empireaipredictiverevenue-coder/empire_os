@@ -167,6 +167,8 @@ _NON_PERSON_WORDS = {
     "press", "release", "strategy", "systems", "architecture", "agency",
     "association", "national", "joins", "health", "first", "last", "full",
     "name", "department", "division", "platform", "network", "ai",
+    "research", "technologies", "technology", "software", "media", "digital",
+    "group", "holdings", "partners", "capital", "labs", "studio", "studios",
 }
 
 _NON_PERSON_NAMES = {

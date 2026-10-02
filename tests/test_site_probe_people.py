@@ -537,6 +537,8 @@ def test_people_extractor_rejects_marketing_and_form_fragments():
         "Solo Agency",
         "First Name",
         "Lin Health",
+        "ClearMetric Research",
+        "Arcline Technologies",
     ]
     for value in bad:
         assert sp._looks_like_visible_person_name(value) is False, value

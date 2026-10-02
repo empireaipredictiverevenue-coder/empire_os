@@ -1196,6 +1196,8 @@ def test_personhood_guard_rejects_live_buyer_scout_false_people():
         "Solo Agency",
         "First Name",
         "Lin Health",
+        "ClearMetric Research",
+        "Arcline Technologies",
     ):
         assert looks_like_person_name(value) is False, value
 
