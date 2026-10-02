@@ -758,6 +758,39 @@ Production repositories, provider credentials, trusted keys, migrations and cons
 ## Infrastructure Gated Until Economically Justified
 Docker/Kubernetes, Kafka, Redis/queues, ClickHouse/Grafana, multi-region deployment, heavy model-serving infrastructure and continuous retraining remain later-stage tools. They activate only when measured scale, reliability or revenue requirements justify the complexity.
 
+### Empire Mail — Post-Revenue First-Party Sending Fabric
+
+Empire Mail activates only after verified commercial revenue justifies operating dedicated mail infrastructure. Until then, Empire continues using the governed existing sender stack to reach first cash.
+
+The Founder/Pro mailbox remains reserved for highest-value founder-led outreach. Scaled outbound moves to a separate first-party sending fabric so founder reputation is never used as the bulk delivery pool.
+
+Empire Mail scope:
+- first-party sending subdomains and mailbox pools under Empire-controlled domains;
+- owned SMTP/MTA and queue workers with horizontally scalable sending capacity;
+- dedicated reputation pools rather than one overloaded sender identity;
+- SPF, DKIM and DMARC alignment plus bounce/complaint processing;
+- global suppression and prior-contact history shared across every sending lane;
+- adaptive per-mailbox, per-domain and per-recipient-provider throttling;
+- reputation scoring, automatic quarantine and controlled warm-up/ramp behaviour;
+- reply routing back into the canonical Empire conversation/closer system;
+- delivery, bounce, complaint and reply telemetry feeding the adaptive outreach learner;
+- locale/time-zone windows, duplicate prevention, opt-out handling and sender-health gates retained as production controls.
+
+Capacity principle:
+
+Empire's internal processing capacity should not impose an arbitrary volume ceiling. Safe outbound throughput is derived from the number of healthy sending identities multiplied by evidence-backed throughput per identity, constrained by sender reputation, provider acceptance, recipient-domain behaviour and applicable compliance requirements.
+
+Empire Mail is not a spam-bypass mechanism and does not weaken personhood, suppression, duplicate-history, commercial-authority or evidence gates.
+
+Activation order:
+1. first verified revenue;
+2. measured outbound demand and mailbox/reputation requirements;
+3. dedicated Empire Mail architecture and deliverability test environment;
+4. bounded sending-pool pilot;
+5. independent reputation/delivery verification;
+6. controlled production ramp;
+7. horizontal expansion only when observed delivery and reply quality justify it.
+
 ## Immediate Execution Order
 1. Complete canonical Lead Intelligence convergence and security prerequisites: keep the dedicated reader/runtime identities least-privilege, apply only reviewed Supabase lockdown slices, then activate the Intelligence Materializer on bounded real prospects before any bulk historical write.
 2. Activate the staged Phase 3E outbound/reply hardening migrations and inbound runtime under the existing production gates.
