@@ -1,0 +1,14 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [],
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T23:51:43.200112+00:00",
+  "job_id": "coder-plan-coder_job_d984a7509f434063bcef3e6c7f8f093f",
+  "kind": "code_task",
+  "lease_resources": [],
+  "max_runtime_seconds": 600,
+  "prompt": "Produce a concise advisory implementation PLAN ONLY for the following EmpireOS task. Do not edit files, emit deployment commands, perform production actions, contact external parties, mutate databases, move funds, or expand authority. Identify affected modules, focused tests, main risks, dependencies, and approval gates.\n\nTASK:\nDepartment work delegated by Astra Executive. Goal=converge_master_remaining_checklist; department_keys=['market_intelligence']; action=completion_review_then_implement_or_verify; target_component=empire_coder; rationale=Completion owner for market_intelligence. Produce an evidence-backed PLAN ONLY for remaining items. Classify each Add Storm / Permit / Property / Search AI Recommendation / Private Capital [Autonomous Predictive Cloud / Opportunity Loop \u2014 ACTIVE] | Add TAM / new-industry / new-country opportunity classes [Autonomous Predictive Cloud / Opportunity Loop \u2014 ACTIVE] | Add productization / partner / distribution / pricing mismatch opportunity classes [Autonomous Predictive Cloud / Opportunity Loop \u2014 ACTIVE] | Expose full Radar / research / blockers / opportunity lifecycle in Founder Console [Autonomous Predictive Cloud / Opportunity Loop \u2014 ACTIVE]. Execution class=builder_required. No deploy/send/payment/DB mutation steps and do not infer founder approval.; success_condition=Every item is independently classified as VERIFIED_DONE, NEEDS_WIRING, NEEDS_LIVE_PROOF, FOUNDER_GATE, REAL_WORLD_EVIDENCE_REQUIRED or LEGACY_RETIRED with exact evidence/blockers. Code existence alone is not DONE.; evidence_refs=['/srv/empire_os/docs/MASTER_REMAINING_CHECKLIST.md#sha256=d5e4c5dffa11189ea7e4b17664cbba7a1e8c85cc6e3d67dbb5db3d28f9a7b84e', 'checklist_line:181:check_263dad5b2f228c73', 'checklist_line:183:check_aa679159f09de5cf', 'checklist_line:184:check_23c0ac76cb27938c', 'checklist_line:187:check_efad7f3a6dd57dce']. PLAN ONLY unless the governed Empire Coder pipeline separately promotes implementation. Do not perform external communication, move funds, accept commercial terms, recognize revenue or expand authority.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
