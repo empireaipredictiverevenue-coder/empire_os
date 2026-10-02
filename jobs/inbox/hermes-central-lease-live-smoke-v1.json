@@ -1,0 +1,18 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "docs/architecture/HERMES_CENTRAL_LEASE_LIVE_SMOKE.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T11:09:16.516396+00:00",
+  "job_id": "hermes-central-lease-live-smoke-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "path:docs/architecture/HERMES_CENTRAL_LEASE_LIVE_SMOKE.md"
+  ],
+  "max_runtime_seconds": 180,
+  "prompt": "Create or update only docs/architecture/HERMES_CENTRAL_LEASE_LIVE_SMOKE.md with one short line stating this is a governed proposal-branch lease smoke. Do not touch any other path.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
