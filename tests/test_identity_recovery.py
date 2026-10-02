@@ -424,3 +424,9 @@ def test_direct_first_party_probe_precedes_serp(monkeypatch):
     assert result["identity"]["name"] == "Jane Smith"
     assert "first_party_site_probe" in result["sources_tried"]
     assert "empire_serp" not in result["sources_tried"]
+
+
+def test_state_hint_accepts_postcode_and_full_state_name():
+    assert ir._state_hint("Kansas City, MO 64111") == "MO"
+    assert ir._state_hint("Dallas, Texas 75201") == "TX"
+    assert ir._state_hint("123 Main St, Oklahoma City, OK 73102") == "OK"

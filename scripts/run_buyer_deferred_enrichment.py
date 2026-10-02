@@ -102,7 +102,7 @@ def _prospect_rows(prospect_ids: list[str]) -> dict[str, dict[str, Any]]:
         "/rest/v1/prospects",
         {
             "select": (
-                "id,business_name,niche,metro,phone,website,buy_signal_score,"
+                "id,business_name,niche,metro,address,phone,website,buy_signal_score,"
                 "status,notes,contact_name,contact_title,contact_source,"
                 "contacted_status,created_at"
             ),
@@ -603,10 +603,18 @@ def run_cycle(
                 )
 
                 if not result.get("decision_maker"):
+                    recovery_location = ", ".join(
+                        value
+                        for value in (
+                            str(candidate.metro or "").strip(),
+                            str(row.get("address") or "").strip(),
+                        )
+                        if value
+                    )
                     recovery = recover_identity_isolated(
                         business_name=candidate.business_name,
                         website=candidate.website,
-                        metro=candidate.metro,
+                        metro=recovery_location,
                         hard_timeout_seconds=IDENTITY_RECOVERY_TIMEOUT_SECONDS,
                     )
                     recovered = recovery.get("identity")

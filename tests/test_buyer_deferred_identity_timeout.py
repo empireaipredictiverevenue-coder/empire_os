@@ -65,6 +65,7 @@ def test_batch_prospect_loader_uses_three_bounded_queries(monkeypatch):
     assert rows["p1"]["entity_id"] == "e1"
     assert len(calls) == 3
     assert calls[0][1]["id"] == "in.(p1)"
+    assert "address" in calls[0][1]["select"]
     assert calls[1][1]["prospect_id"] == "in.(p1)"
     assert calls[2][1]["prospect_id"] == "in.(p1)"
 

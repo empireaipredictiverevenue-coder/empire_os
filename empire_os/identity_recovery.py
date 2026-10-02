@@ -7,6 +7,7 @@ outreach.
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+import re
 from typing import Any
 from urllib.parse import urlparse
 
@@ -49,6 +50,27 @@ class IdentityEvidence:
         return asdict(self)
 
 
+
+US_STATE_NAMES = {
+    "ALABAMA": "AL", "ALASKA": "AK", "ARIZONA": "AZ", "ARKANSAS": "AR",
+    "CALIFORNIA": "CA", "COLORADO": "CO", "CONNECTICUT": "CT",
+    "DELAWARE": "DE", "FLORIDA": "FL", "GEORGIA": "GA", "HAWAII": "HI",
+    "IDAHO": "ID", "ILLINOIS": "IL", "INDIANA": "IN", "IOWA": "IA",
+    "KANSAS": "KS", "KENTUCKY": "KY", "LOUISIANA": "LA", "MAINE": "ME",
+    "MARYLAND": "MD", "MASSACHUSETTS": "MA", "MICHIGAN": "MI",
+    "MINNESOTA": "MN", "MISSISSIPPI": "MS", "MISSOURI": "MO",
+    "MONTANA": "MT", "NEBRASKA": "NE", "NEVADA": "NV",
+    "NEW HAMPSHIRE": "NH", "NEW JERSEY": "NJ", "NEW MEXICO": "NM",
+    "NEW YORK": "NY", "NORTH CAROLINA": "NC", "NORTH DAKOTA": "ND",
+    "OHIO": "OH", "OKLAHOMA": "OK", "OREGON": "OR",
+    "PENNSYLVANIA": "PA", "RHODE ISLAND": "RI",
+    "SOUTH CAROLINA": "SC", "SOUTH DAKOTA": "SD", "TENNESSEE": "TN",
+    "TEXAS": "TX", "UTAH": "UT", "VERMONT": "VT", "VIRGINIA": "VA",
+    "WASHINGTON": "WA", "WEST VIRGINIA": "WV", "WISCONSIN": "WI",
+    "WYOMING": "WY", "DISTRICT OF COLUMBIA": "DC",
+}
+US_STATE_CODES = frozenset(US_STATE_NAMES.values())
+
 def _host(value: str) -> str:
     raw = urlparse(str(value or "").strip()).netloc.lower()
     return raw[4:] if raw.startswith("www.") else raw
@@ -71,11 +93,23 @@ def _is_uk_context(metro: str, website: str) -> bool:
 
 
 def _state_hint(metro: str) -> str:
-    raw = str(metro or "").strip()
-    if "," not in raw:
+    raw = " ".join(str(metro or "").strip().upper().split())
+    if not raw:
         return ""
-    state = raw.rsplit(",", 1)[-1].strip().upper()
-    return state if 2 <= len(state) <= 3 else ""
+
+    codes = re.findall(r"(?<![A-Z])([A-Z]{2})(?![A-Z])", raw)
+    for code in reversed(codes):
+        if code in US_STATE_CODES:
+            return code
+
+    tail = raw.rsplit(",", 1)[-1].strip() if "," in raw else raw
+    for name, code in sorted(
+        US_STATE_NAMES.items(),
+        key=lambda item: -len(item[0]),
+    ):
+        if re.search(rf"(?<![A-Z]){re.escape(name)}(?![A-Z])", tail):
+            return code
+    return ""
 
 
 def _rank_people(evidence: dict[str, Any], website: str) -> list[IdentityEvidence]:
