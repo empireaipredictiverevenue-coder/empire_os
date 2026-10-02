@@ -180,6 +180,37 @@ def _effective_priority(item: Mapping[str, Any], *, now: datetime) -> int:
         - weak_reason_penalty
     )
 
+def _recovery_lane(item: Mapping[str, Any]) -> str:
+    """Classify queued work without changing evidence or execution authority."""
+    attempts = max(0, int(item.get("attempts") or 0))
+    reason = str(item.get("reason") or "").strip()
+    target_people = [
+        row for row in (item.get("target_people") or [])
+        if isinstance(row, Mapping)
+        and looks_like_person_name(row.get("name"))
+        and str(row.get("title") or "").strip()
+    ]
+    verified_routes = [
+        row for row in (item.get("company_contact_routes") or [])
+        if isinstance(row, Mapping)
+        and row.get("verified") is True
+        and str(row.get("value") or "").strip()
+    ]
+    near_sendable = bool(target_people) and reason in {
+        "no_contact_evidence", "no_bound_contact", "contact_not_verified",
+        "outreach_not_ready", "target_contact_not_verified",
+    }
+    if attempts >= 8 and not near_sendable:
+        return "quarantine"
+    if near_sendable:
+        return "hot_contact_recovery"
+    if target_people or verified_routes:
+        return "warm_evidence_recovery"
+    if reason in {"site_unavailable", "site_timeout", "network_probe_budget_exhausted"}:
+        return "network_recovery"
+    return "identity_recovery"
+
+
 def canonical_phone(value: Any) -> str:
     raw = str(value or "").strip()
     if not is_commercially_usable_phone(raw):
@@ -328,6 +359,7 @@ class BuyerDeferredEnrichmentQueue:
             rows.append(dict(item))
         rows.sort(
             key=lambda row: (
+                _recovery_lane(row) == "quarantine",
                 -_effective_priority(row, now=current),
                 -_priority(row.get("priority_score")),
                 int(row.get("attempts") or 0),
@@ -377,6 +409,7 @@ class BuyerDeferredEnrichmentQueue:
 
             rows.sort(
                 key=lambda row: (
+                    _recovery_lane(row) == "quarantine",
                     -_effective_priority(row, now=current),
                     -_priority(row.get("priority_score")),
                     int(row.get("attempts") or 0),
@@ -536,6 +569,11 @@ class BuyerDeferredEnrichmentQueue:
         oldest_pending_hours = max(pending_ages, default=0.0)
         stale_pending_count = sum(age >= 6.0 for age in pending_ages)
         pending_count = int(counts.get("pending") or 0)
+        lane_counts: dict[str, int] = {}
+        for row in deferred.values():
+            if isinstance(row, Mapping) and str(row.get("status") or "") in {"pending", "deferred"}:
+                lane = _recovery_lane(row)
+                lane_counts[lane] = lane_counts.get(lane, 0) + 1
         backlog_health = (
             "CRITICAL"
             if oldest_pending_hours >= 24.0 or pending_count >= 1500
@@ -550,6 +588,7 @@ class BuyerDeferredEnrichmentQueue:
             "oldest_pending_hours": round(oldest_pending_hours, 2),
             "stale_pending_count": stale_pending_count,
             "backlog_health": backlog_health,
+            "recovery_lane_counts": dict(sorted(lane_counts.items())),
             "call_ready_total": sum(
                 1 for row in calls.values()
                 if isinstance(row, dict)

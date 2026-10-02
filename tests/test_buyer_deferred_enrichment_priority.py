@@ -189,3 +189,29 @@ def test_enqueue_drops_false_target_people(tmp_path):
     })
     row = q.due(limit=1)[0]
     assert [p["name"] for p in row["target_people"]] == ["Jane Smith"]
+
+def test_claim_due_quarantines_retry_saturated_while_productive_work_exists(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({"prospect_id":"saturated","reason":"no_contact_evidence","priority_score":100})
+    q.enqueue({
+        "prospect_id":"hot","reason":"no_bound_contact","priority_score":80,
+        "target_people":[{"name":"Jane Buyer","title":"Founder"}],
+    })
+    import json
+    data=json.loads((tmp_path/"deferred.json").read_text())
+    data["saturated"]["attempts"]=8
+    (tmp_path/"deferred.json").write_text(json.dumps(data))
+    claimed=q.claim_due(limit=1,worker_id="worker-a")
+    assert claimed[0]["prospect_id"]=="hot"
+
+
+def test_snapshot_exposes_recovery_lanes(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id":"hot","reason":"no_bound_contact",
+        "target_people":[{"name":"Jane Buyer","title":"Founder"}],
+    })
+    q.enqueue({"prospect_id":"identity","reason":"no_decision_maker"})
+    snap=q.snapshot()
+    assert snap["recovery_lane_counts"]["hot_contact_recovery"] == 1
+    assert snap["recovery_lane_counts"]["identity_recovery"] == 1
