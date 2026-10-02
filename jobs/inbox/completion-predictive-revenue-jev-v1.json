@@ -1,0 +1,31 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/predictive_revenue_jev.py",
+    "tests/test_predictive_revenue_jev.py",
+    "docs/architecture/predictive_revenue_signal_to_output_jev_v1.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T08:27:09.861314+00:00",
+  "job_id": "completion-predictive-revenue-jev-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:predictive_revenue_jev",
+    "path:empire_os/predictive_revenue_jev.py",
+    "path:tests/test_predictive_revenue_jev.py",
+    "path:docs/architecture/predictive_revenue_signal_to_output_jev_v1.md"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "Follow docs/architecture/predictive_revenue_signal_to_output_jev_v1.md and the Architecture-First Engineering Doctrine. Implement the canonical Predictive Revenue JEV signal-to-output composition layer in empire_os/predictive_revenue_jev.py with tests/test_predictive_revenue_jev.py. Reuse and compose existing Quant Brain, Predictive Revenue Formula, Opportunity Evidence Normalizer, Next-Best Action/portfolio, Revenue Exchange and Economic Memory contracts; do not redefine their formulas. Input signals must retain provenance/freshness/truth class. UNKNOWN must remain UNKNOWN. Output must be a deterministic recommendation-only packet containing evidence refs, probability, conditional revenue, expected value/cost/time/risk where supported, output_type, ranked next actions, blockers and freshness. Bid amount must never substitute for expected value; forecast value must never become actual revenue. No outbound, allocation execution, pricing mutation, terms acceptance, payment, settlement, fulfilment or revenue-recognition authority.",
+  "pytest_targets": [
+    "tests/test_predictive_revenue_jev.py",
+    "tests/test_predictive_revenue_formula.py",
+    "tests/test_quant_brain.py",
+    "tests/test_opportunity_evidence_normalizer.py",
+    "tests/test_action_portfolio_optimization.py",
+    "tests/test_revenue_exchange_optimization_bridge.py",
+    "tests/test_opportunity_auction.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
