@@ -430,3 +430,56 @@ def test_state_hint_accepts_postcode_and_full_state_name():
     assert ir._state_hint("Kansas City, MO 64111") == "MO"
     assert ir._state_hint("Dallas, Texas 75201") == "TX"
     assert ir._state_hint("123 Main St, Oklahoma City, OK 73102") == "OK"
+
+
+def test_identity_recovery_stops_repeated_serp_after_all_engines_fail(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        ir,
+        "probe_site",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "people": [],
+            "pages_checked": [],
+        },
+    )
+    monkeypatch.setattr(ir, "rank_site_people", lambda people: [])
+
+    def failed_search(query, num=8, engine=None):
+        calls.append(query)
+        return {
+            "organic": [],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": "none",
+            },
+            "error": "All engines failed",
+        }
+
+    monkeypatch.setattr(ir, "search", failed_search)
+    monkeypatch.setattr(
+        ir,
+        "find_official_license_principals",
+        lambda **kwargs: [{
+            "person_name": "Jane Smith",
+            "source": "official_registry",
+        }],
+    )
+    monkeypatch.setattr(
+        ir,
+        "RegistryScraper",
+        lambda *args, **kwargs: SimpleNamespace(
+            search=lambda *a, **k: SimpleNamespace(records=[])
+        ),
+    )
+
+    result = ir.recover_identity(
+        business_name="Acme Roofing",
+        website="https://acme.example",
+        metro="Dallas, TX",
+    )
+
+    assert result["recovered"] is False
+    assert result["serp_degraded"] is True
+    assert len(calls) == 1

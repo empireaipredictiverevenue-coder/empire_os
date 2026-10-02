@@ -171,15 +171,19 @@ def _direct_first_party_people(
     return _rank_people(probe, website), probe
 
 
-def _serp_results(query: str, *, num: int) -> list[dict[str, Any]]:
-    """Query Empire SERP and preserve search provenance for identity recovery."""
+def _serp_results_with_health(
+    query: str,
+    *,
+    num: int,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Return SERP evidence plus whether Search Fabric is degraded."""
     try:
         snapshot = SearchFabricSerpAdapter(search).snapshot(
             query,
             num=max(1, min(int(num), 10)),
         )
     except SerpSnapshotError:
-        return []
+        return [], True
 
     rows: list[dict[str, Any]] = []
     for result in snapshot.results:
@@ -193,6 +197,12 @@ def _serp_results(query: str, *, num: int) -> list[dict[str, Any]]:
             "provenance": list(result.provenance),
             "observed_at": snapshot.observed_at,
         })
+    degraded = bool(snapshot.error) or snapshot.engine == "none"
+    return rows, degraded
+
+
+def _serp_results(query: str, *, num: int) -> list[dict[str, Any]]:
+    rows, _ = _serp_results_with_health(query, num=num)
     return rows
 
 
@@ -216,6 +226,19 @@ def recover_identity(
 
     evidence_rows: list[IdentityEvidence] = []
     sources_tried: list[str] = []
+    serp_degraded = False
+
+    def bounded_serp(query: str) -> list[dict[str, Any]]:
+        nonlocal serp_degraded
+        if serp_degraded:
+            return []
+        rows, degraded = _serp_results_with_health(
+            query,
+            num=max_search_results,
+        )
+        if degraded:
+            serp_degraded = True
+        return rows
 
     # 1. Direct first-party crawl is the primary recovery path. We already
     # know the verified business domain, so buyer identity must not depend on
@@ -240,10 +263,7 @@ def recover_identity(
         )
         for query in queries:
             sources_tried.append("empire_serp")
-            for organic in _serp_results(
-                query,
-                num=max_search_results,
-            ):
+            for organic in bounded_serp(query):
                 if not isinstance(organic, dict):
                     continue
                 link = str(organic.get("link") or "").strip()
@@ -283,9 +303,8 @@ def recover_identity(
             if not person_name:
                 continue
             sources_tried.append("empire_serp")
-            for organic in _serp_results(
-                f'site:{domain} "{person_name}"',
-                num=max_search_results,
+            for organic in bounded_serp(
+                f'site:{domain} "{person_name}"'
             ):
                 if not isinstance(organic, dict):
                     continue
@@ -328,9 +347,8 @@ def recover_identity(
             if not person_name:
                 continue
             sources_tried.append("empire_serp")
-            for organic in _serp_results(
-                f'site:{domain} "{person_name}"',
-                num=max_search_results,
+            for organic in bounded_serp(
+                f'site:{domain} "{person_name}"'
             ):
                 if not isinstance(organic, dict):
                     continue
@@ -405,6 +423,7 @@ def recover_identity(
         "evidence": [row.as_dict() for row in ranked[:10]],
         "license_seeds": license_seeds,
         "companies_house_seeds": companies_house_seeds,
+        "serp_degraded": serp_degraded,
         "outbound_actions": False,
         "guessed_identity": False,
         "guessed_email": False,
