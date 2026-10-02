@@ -8,6 +8,7 @@ import fcntl
 import json
 import os
 import subprocess
+import threading
 import sys
 import urllib.parse
 from pathlib import Path
@@ -42,6 +43,9 @@ MIN_CYCLE_WORKERS = 2
 BUYER_PROBE_TIMEOUT_SECONDS = 18.0
 IDENTITY_RECOVERY_TIMEOUT_SECONDS = 20.0
 TARGETED_PROBE_TIME_BUDGET_SECONDS = 10.0
+
+# Shared only within one systemd enrichment process. A new process starts clean.
+IDENTITY_SEARCH_DEGRADED = threading.Event()
 
 
 def recover_identity_isolated(
@@ -840,6 +844,7 @@ def run_cycle(
                 if (
                     not result.get("decision_maker")
                     and identity_recovery_attempts < identity_recovery_budget
+                    and not IDENTITY_SEARCH_DEGRADED.is_set()
                 ):
                     identity_recovery_attempts += 1
                     recovery_location = ", ".join(
@@ -856,6 +861,8 @@ def run_cycle(
                         metro=recovery_location,
                         hard_timeout_seconds=IDENTITY_RECOVERY_TIMEOUT_SECONDS,
                     )
+                    if recovery.get("serp_degraded") is True:
+                        IDENTITY_SEARCH_DEGRADED.set()
                     recovered = recovery.get("identity")
                     if isinstance(recovered, dict):
                         probe_row["contact_name"] = recovered.get("name")
@@ -988,6 +995,7 @@ def run_cycle(
         "network_probe_budget": network_probe_budget,
         "identity_recovery_budget": identity_recovery_budget,
         "identity_recovery_attempts": identity_recovery_attempts,
+        "identity_search_degraded": IDENTITY_SEARCH_DEGRADED.is_set(),
         "canonical_identity_hints_used": canonical_identity_hints_used,
         "public_contact_recovery_budget": public_contact_recovery_budget,
         "public_contact_recovery_attempts": public_contact_recovery_attempts,
@@ -1047,6 +1055,7 @@ def run_parallel_cycle(
     limit: int = MAX_CYCLE_LIMIT,
     workers: int = MAX_CYCLE_WORKERS,
 ) -> dict[str, Any]:
+    IDENTITY_SEARCH_DEGRADED.clear()
     capacity = adaptive_capacity(requested_limit=limit, requested_workers=workers)
     total_limit = capacity["limit"]
     worker_count = capacity["workers"]
@@ -1112,6 +1121,7 @@ def run_parallel_cycle(
         "live_calls_placed": 0,
         "execution_allowed": False,
         "authority_expansion": False,
+        "identity_search_degraded": IDENTITY_SEARCH_DEGRADED.is_set(),
         "results": [
             result
             for row in lanes

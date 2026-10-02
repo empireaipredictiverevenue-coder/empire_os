@@ -282,3 +282,79 @@ def test_run_cycle_reuses_canonical_identity_as_target_hint(monkeypatch):
     assert captured["people"][0]["name"] == "Jane Smith"
     assert captured["people"][0]["identity_hint_only"] is True
     assert result["canonical_identity_hints_used"] == 1
+
+
+def test_degraded_identity_search_opens_cycle_breaker(monkeypatch):
+    worker.IDENTITY_SEARCH_DEGRADED.clear()
+
+    class FakeQueue:
+        def claim_due(self, **_kwargs):
+            return [{"prospect_id":"p1","attempts":0,"reason":"no_decision_maker"}]
+        def defer_again(self, *args, **kwargs):
+            pass
+        def resolve(self, *args, **kwargs):
+            pass
+        def mark_call_ready(self, *args, **kwargs):
+            return False
+        def snapshot(self):
+            return {}
+
+    monkeypatch.setattr(worker, "BuyerDeferredEnrichmentQueue", FakeQueue)
+    monkeypatch.setattr(worker, "_prospect_rows", lambda _ids: {"p1": {
+        "id":"p1","business_name":"Acme","niche":"roofing","metro":"Dallas, TX",
+        "address":"","phone":"","website":"https://acme.test","buy_signal_score":90,
+        "status":"new","notes":"","contact_name":"","contact_title":"",
+        "contact_source":"","contacted_status":"","created_at":"",
+    }})
+    monkeypatch.setattr(worker, "run_buyer_probe_isolated", lambda *a, **k: {})
+    monkeypatch.setattr(worker, "recover_identity_isolated", lambda **k: {
+        "identity": None,
+        "serp_degraded": True,
+    })
+    monkeypatch.setattr(worker, "_direct_public_contact_recovery", lambda _c, r: r)
+    monkeypatch.setattr(worker, "_persist_recovered_identity", lambda *a, **k: False)
+    monkeypatch.setattr(worker, "rejection_reason", lambda _r: "no_decision_maker")
+    monkeypatch.setattr(worker, "materialize_call_plans", lambda: {"count":0})
+
+    result = worker.run_cycle(limit=1)
+    assert result["identity_search_degraded"] is True
+    assert worker.IDENTITY_SEARCH_DEGRADED.is_set()
+
+
+def test_open_cycle_breaker_skips_identity_recovery(monkeypatch):
+    worker.IDENTITY_SEARCH_DEGRADED.set()
+    called = {"recover": 0}
+
+    class FakeQueue:
+        def claim_due(self, **_kwargs):
+            return [{"prospect_id":"p1","attempts":0,"reason":"no_decision_maker"}]
+        def defer_again(self, *args, **kwargs):
+            pass
+        def resolve(self, *args, **kwargs):
+            pass
+        def mark_call_ready(self, *args, **kwargs):
+            return False
+        def snapshot(self):
+            return {}
+
+    monkeypatch.setattr(worker, "BuyerDeferredEnrichmentQueue", FakeQueue)
+    monkeypatch.setattr(worker, "_prospect_rows", lambda _ids: {"p1": {
+        "id":"p1","business_name":"Acme","niche":"roofing","metro":"Dallas, TX",
+        "address":"","phone":"","website":"https://acme.test","buy_signal_score":90,
+        "status":"new","notes":"","contact_name":"","contact_title":"",
+        "contact_source":"","contacted_status":"","created_at":"",
+    }})
+    monkeypatch.setattr(worker, "run_buyer_probe_isolated", lambda *a, **k: {})
+    def should_not_run(**kwargs):
+        called["recover"] += 1
+        return {}
+    monkeypatch.setattr(worker, "recover_identity_isolated", should_not_run)
+    monkeypatch.setattr(worker, "_direct_public_contact_recovery", lambda _c, r: r)
+    monkeypatch.setattr(worker, "_persist_recovered_identity", lambda *a, **k: False)
+    monkeypatch.setattr(worker, "rejection_reason", lambda _r: "no_decision_maker")
+    monkeypatch.setattr(worker, "materialize_call_plans", lambda: {"count":0})
+
+    result = worker.run_cycle(limit=1)
+    assert called["recover"] == 0
+    assert result["identity_recovery_attempts"] == 0
+    worker.IDENTITY_SEARCH_DEGRADED.clear()
