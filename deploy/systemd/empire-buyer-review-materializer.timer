@@ -1,9 +1,9 @@
 [Unit]
-Description=Run first-party buyer materialization every five minutes
+Description=Fallback run for first-party buyer materialization
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=5min
+OnUnitActiveSec=15min
 AccuracySec=30s
 Persistent=true
 Unit=empire-buyer-review-materializer.service

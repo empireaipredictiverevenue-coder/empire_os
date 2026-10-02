@@ -53,3 +53,16 @@ def test_enterprise_contact_sync_cycle_captures_every_stage():
     assert '"live_outbound_send": False' in text
     assert '"payment_action": False' in text
     assert '"actual_revenue": False' in text
+
+
+def test_enterprise_contact_sync_has_recurring_timer_and_enrichment_handoff():
+    service = (
+        ROOT / "deploy/systemd/empire-enterprise-contact-sync.service"
+    ).read_text()
+    timer = (
+        ROOT / "deploy/systemd/empire-enterprise-contact-sync.timer"
+    ).read_text()
+
+    assert "OnSuccess=empire-buyer-deferred-enrichment.service" in service
+    assert "OnUnitActiveSec=5min" in timer
+    assert "Unit=empire-enterprise-contact-sync.service" in timer

@@ -3,6 +3,7 @@ Description=EmpireOS enterprise contact intelligence sync
 After=network-online.target empire-ops-privileged-helper.service
 Wants=network-online.target
 OnFailure=empire-enterprise-contact-repair.service
+OnSuccess=empire-buyer-deferred-enrichment.service
 
 [Service]
 Type=oneshot

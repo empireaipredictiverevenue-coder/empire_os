@@ -2,6 +2,7 @@
 Description=EmpireOS deferred buyer enrichment and call-ready fallback
 After=network-online.target
 Wants=network-online.target
+OnSuccess=empire-buyer-review-materializer.service
 
 [Service]
 Type=oneshot
