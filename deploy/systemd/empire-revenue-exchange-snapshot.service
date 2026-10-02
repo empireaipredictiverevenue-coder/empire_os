@@ -8,8 +8,7 @@ Type=oneshot
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=/srv/empire_os
-EnvironmentFile=/etc/empire_os.env
-EnvironmentFile=/etc/empiredb.env
+EnvironmentFile=/etc/empire_revenue_exchange.env
 Environment=PYTHONPATH=/srv/empire_os
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_revenue_exchange_snapshot.py --repo-root /srv/empire_os --limit 500
 NoNewPrivileges=true

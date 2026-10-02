@@ -9,7 +9,26 @@ fi
 ROOT=/srv/empire_os
 cd "$ROOT"
 
+PROVISION_READER=false
+if [[ "${1:-}" == "--provision-reader" ]]; then
+  PROVISION_READER=true
+elif [[ -n "${1:-}" ]]; then
+  echo "ERROR: unsupported argument: ${1}" >&2
+  exit 2
+fi
+
 echo "=== REVENUE EXCHANGE SNAPSHOT RUNTIME INSTALL ==="
+
+# Founder-gated authority activation. The installer never provisions a new
+# database identity unless the explicit flag is present.
+if [[ "$PROVISION_READER" == true ]]; then
+  PYTHONPATH="$ROOT" "$ROOT/.venv/bin/python" \
+    "$ROOT/scripts/provision_revenue_exchange_reader.py" --apply
+elif [[ ! -s /etc/empire_revenue_exchange.env ]]; then
+  echo "ERROR: dedicated Revenue Exchange reader is not provisioned." >&2
+  echo "After explicit founder approval, rerun with --provision-reader." >&2
+  exit 3
+fi
 
 install -d -o ubuntu -g ubuntu -m 0755 \
   "$ROOT/runtime/revenue_exchange"

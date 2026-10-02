@@ -12,6 +12,8 @@ from empire_os.revenue_exchange_snapshot import (
 from empire_os.revenue_exchange_transport import PostgresRevenueExchangeReader
 from empire_os.runtime_env import load_runtime_env
 
+READER_DSN_KEY = "EMPIRE_REVENUE_EXCHANGE_READER_DSN"
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -19,8 +21,11 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=500)
     args = parser.parse_args()
 
-    env = load_runtime_env("/etc/empire_os.env", required=("EMPIREDB_DSN",))
-    reader = PostgresRevenueExchangeReader(env["EMPIREDB_DSN"])
+    env = load_runtime_env(
+        "/etc/empire_revenue_exchange.env",
+        required=(READER_DSN_KEY,),
+    )
+    reader = PostgresRevenueExchangeReader(env[READER_DSN_KEY])
     rows = reader(limit=args.limit)
     payload = build_revenue_exchange_live_snapshot(rows)
     output = write_revenue_exchange_live_snapshot(args.repo_root, payload)
