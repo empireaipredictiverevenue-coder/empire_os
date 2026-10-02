@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from empire_os.qualification_worker_v2 import (
     run_cycle,
     run_identity_catchup,
+    run_evidence_recovery,
 )
 from empire_os.sb import request_json
 from empire_os.omega_worker import run_omega_cycle
@@ -39,6 +40,11 @@ def main() -> int:
         type=int,
         default=10,
     )
+    parser.add_argument(
+        "--evidence-recovery-limit",
+        type=int,
+        default=10,
+    )
     args = parser.parse_args()
     if args.limit < 1 or args.limit > 25:
         parser.error("--limit must be between 1 and 25")
@@ -46,6 +52,9 @@ def main() -> int:
         parser.error("--identity-catchup-limit must be between 0 and 25")
     if args.signal_resolution_limit < 0 or args.signal_resolution_limit > 25:
         parser.error("--signal-resolution-limit must be between 0 and 25")
+
+    if args.evidence_recovery_limit < 0 or args.evidence_recovery_limit > 25:
+        parser.error("--evidence-recovery-limit must be between 0 and 25")
 
     signal_resolution = (
         run_signal_resolution(args.signal_resolution_limit)
@@ -60,6 +69,21 @@ def main() -> int:
         }
     )
     qualification = run_cycle(args.limit)
+    evidence_recovery = (
+        run_evidence_recovery(args.evidence_recovery_limit)
+        if args.evidence_recovery_limit
+        else {
+            "schema_version": "qualification_evidence_recovery.v1",
+            "ok": True,
+            "attempted": 0,
+            "requalified": 0,
+            "skipped_unchanged": 0,
+            "deferred": 0,
+            "failed": 0,
+            "results": [],
+            "errors": [],
+        }
+    )
     catchup = (
         run_identity_catchup(args.identity_catchup_limit)
         if args.identity_catchup_limit
@@ -99,6 +123,7 @@ def main() -> int:
         "schema_version": "qualification_service_cycle.v4",
         "signal_resolution": signal_resolution,
         "qualification": qualification,
+        "evidence_recovery": evidence_recovery,
         "identity_catchup": catchup,
         "omega_projection": omega,
         "buyer_readiness": buyer_readiness,
@@ -106,6 +131,7 @@ def main() -> int:
         "ok": bool(
             signal_resolution["ok"]
             and qualification["ok"]
+            and evidence_recovery["ok"]
             and catchup["ok"]
             and omega["ok"]
             and buyer_readiness["ok"]

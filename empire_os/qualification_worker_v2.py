@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
+import json
 from typing import Any
 
 from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.evidence_enrichment_planner import plan_evidence_enrichment
+from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
 from empire_os.commercial_event_repository import CommercialEventRepository
 from empire_os.prospect_enrichment import enrich_prospect_for_scoring
 from empire_os.qualification_data_repository import QualificationDataRepository
@@ -59,6 +63,28 @@ def fetch_latest_acquisition(
     prospect_id: str,
 ) -> dict[str, Any] | None:
     return _qualification_repository().fetch_latest_acquisition(prospect_id)
+
+
+def fetch_low_confidence_recovery_candidates(
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    return _qualification_repository().fetch_low_confidence_recovery_candidates(
+        limit=limit,
+        scoring_engine=SCORING_ENGINE,
+        scoring_version=SCORING_VERSION,
+        confidence_floor=MIN_DECISION_CONFIDENCE,
+    )
+
+
+def record_recovery_metadata(
+    qualification_id: str,
+    result_payload: dict[str, Any],
+) -> dict[str, Any]:
+    return _qualification_repository().record_recovery_metadata(
+        qualification_id,
+        result_payload,
+        updated_at=_now(),
+    )
 
 
 def acquisition_website(acquisition: dict[str, Any] | None) -> str:
@@ -319,7 +345,11 @@ def emit_event(
     _commercial_event_repository().append_idempotent(event)
 
 
-def qualify_prospect(prospect: dict[str, Any]) -> dict[str, Any]:
+def qualify_prospect(
+    prospect: dict[str, Any],
+    *,
+    recovery_context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     prospect_id = str(prospect["id"])
     acquisition = fetch_latest_acquisition(prospect_id)
     website = resolve_acquisition_website(
@@ -353,7 +383,7 @@ def qualify_prospect(prospect: dict[str, Any]) -> dict[str, Any]:
         enrichment=enrichment,
         entity_id=entity_id,
     )
-    payload["result_payload"] = {
+    result_payload = {
         **payload["result_payload"],
         "identity_resolution": {
             "attempted": True,
@@ -367,6 +397,40 @@ def qualify_prospect(prospect: dict[str, Any]) -> dict[str, Any]:
             "attempted_at": _now(),
         },
     }
+    if recovery_context is not None:
+        previous_confidence = float(
+            recovery_context.get("previous_confidence") or 0.0
+        )
+        new_confidence = float(payload.get("evidence_confidence") or 0.0)
+        previous_entity = str(
+            recovery_context.get("previous_entity_id") or ""
+        ).strip()
+        evidence_changed = bool(
+            new_confidence != previous_confidence
+            or (entity_id or "") != previous_entity
+            or promoted_website
+            or payload.get("observed_dimensions")
+            != recovery_context.get("previous_observed_dimensions")
+            or payload.get("unknown_dimensions")
+            != recovery_context.get("previous_unknown_dimensions")
+        )
+        result_payload["evidence_recovery"] = {
+            "recovery_attempted": True,
+            "recovery_attempted_at": _now(),
+            "recovery_input_fingerprint": recovery_context["fingerprint"],
+            "recovery_previous_confidence": previous_confidence,
+            "recovery_new_confidence": new_confidence,
+            "recovery_changed": evidence_changed,
+            "selected_actions": recovery_context.get("selected_actions") or [],
+            "recovery_reason": (
+                "confidence_increased"
+                if new_confidence > previous_confidence
+                else "material_evidence_changed"
+                if evidence_changed
+                else "no_material_change"
+            ),
+        }
+    payload["result_payload"] = result_payload
     row = upsert_qualification(payload)
     emit_event(
         prospect_id=prospect_id,
@@ -432,3 +496,131 @@ def run_identity_catchup(limit: int = 10) -> dict[str, Any]:
         fetch_unlinked_allocatable_prospects(limit),
         schema_version="qualification_identity_catchup.v1",
     )
+
+
+def _recovery_fingerprint(
+    prospect: dict[str, Any],
+    acquisition: dict[str, Any] | None,
+    qualification: dict[str, Any],
+) -> str:
+    prospect_fields = (
+        "id", "business_name", "niche", "metro", "phone", "website",
+        "address", "rating", "review_count", "buy_signal_score",
+        "runs_ads", "status", "contact_name", "contact_title", "contact_source",
+    )
+    payload = {
+        "prospect": {key: prospect.get(key) for key in prospect_fields},
+        "acquisition": acquisition or None,
+        "qualification": {
+            "evidence_confidence": qualification.get("evidence_confidence"),
+            "observed_dimensions": qualification.get("observed_dimensions"),
+            "unknown_dimensions": qualification.get("unknown_dimensions"),
+            "entity_id": qualification.get("entity_id"),
+        },
+    }
+    raw = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def recover_low_confidence_qualification(
+    qualification: dict[str, Any],
+) -> dict[str, Any]:
+    prospect_id = str(qualification.get("prospect_id") or "").strip()
+    qualification_id = str(qualification.get("id") or "").strip()
+    if not prospect_id or not qualification_id:
+        raise ValueError("recovery candidate requires prospect and qualification ids")
+
+    prospect = fetch_prospect(prospect_id)
+    acquisition = fetch_latest_acquisition(prospect_id)
+    fingerprint = _recovery_fingerprint(prospect, acquisition, qualification)
+    previous_payload = qualification.get("result_payload")
+    previous_payload = previous_payload if isinstance(previous_payload, dict) else {}
+    previous_recovery = previous_payload.get("evidence_recovery")
+    if (
+        isinstance(previous_recovery, dict)
+        and previous_recovery.get("recovery_attempted") is True
+        and previous_recovery.get("recovery_input_fingerprint") == fingerprint
+    ):
+        return {
+            "prospect_id": prospect_id,
+            "qualification_id": qualification_id,
+            "decision": "skipped_unchanged_evidence",
+            "recovery_attempted": False,
+            "fingerprint": fingerprint,
+        }
+
+    plan = plan_evidence_enrichment(prospect)
+    selected_actions = list(plan.get("selected_actions") or [])
+    previous_confidence = float(qualification.get("evidence_confidence") or 0.0)
+    context = {
+        "fingerprint": fingerprint,
+        "previous_confidence": previous_confidence,
+        "previous_entity_id": qualification.get("entity_id"),
+        "previous_observed_dimensions": qualification.get("observed_dimensions"),
+        "previous_unknown_dimensions": qualification.get("unknown_dimensions"),
+        "selected_actions": selected_actions,
+    }
+
+    if plan.get("can_reach_target_with_available_actions") is not True:
+        merged = dict(previous_payload)
+        merged["evidence_recovery"] = {
+            "recovery_attempted": True,
+            "recovery_attempted_at": _now(),
+            "recovery_input_fingerprint": fingerprint,
+            "recovery_previous_confidence": previous_confidence,
+            "recovery_new_confidence": previous_confidence,
+            "recovery_changed": False,
+            "selected_actions": selected_actions,
+            "recovery_reason": "bounded_plan_cannot_reach_confidence_floor",
+        }
+        record_recovery_metadata(qualification_id, merged)
+        return {
+            "prospect_id": prospect_id,
+            "qualification_id": qualification_id,
+            "decision": "deferred_insufficient_recovery_path",
+            "recovery_attempted": True,
+            "previous_confidence": previous_confidence,
+            "new_confidence": previous_confidence,
+            "fingerprint": fingerprint,
+        }
+
+    result = qualify_prospect(prospect, recovery_context=context)
+    return {
+        **result,
+        "decision": "requalified",
+        "recovery_attempted": True,
+        "previous_confidence": previous_confidence,
+        "new_confidence": float(result.get("evidence_confidence") or 0.0),
+        "fingerprint": fingerprint,
+    }
+
+
+def run_evidence_recovery(limit: int = 10) -> dict[str, Any]:
+    candidates = fetch_low_confidence_recovery_candidates(limit)
+    results: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    for qualification in candidates:
+        try:
+            results.append(recover_low_confidence_qualification(qualification))
+        except Exception as exc:
+            errors.append({
+                "prospect_id": str(qualification.get("prospect_id") or ""),
+                "error": f"{type(exc).__name__}:{str(exc)[:300]}",
+            })
+    return {
+        "schema_version": "qualification_evidence_recovery.v1",
+        "ok": not errors,
+        "attempted": len(candidates),
+        "requalified": sum(row.get("decision") == "requalified" for row in results),
+        "skipped_unchanged": sum(row.get("decision") == "skipped_unchanged_evidence" for row in results),
+        "deferred": sum(row.get("decision") == "deferred_insufficient_recovery_path" for row in results),
+        "failed": len(errors),
+        "results": results,
+        "errors": errors,
+        "confidence_floor": MIN_DECISION_CONFIDENCE,
+        "real_data_only": True,
+        "outreach_enabled": False,
+        "allocation_enabled": False,
+        "payment_enabled": False,
+        "finished_at": _now(),
+    }

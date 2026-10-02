@@ -130,7 +130,7 @@ def plan_evidence_enrichment(
                 capability="empire_identity_recovery",
                 target_fields=("contact_name",),
                 max_completeness_gain=contact_gain,
-                available_now=True,
+                available_now=False,
                 bounded=True,
                 rationale=(
                     "Empire Search Fabric, first-party people probing, Hunter "
@@ -153,7 +153,7 @@ def plan_evidence_enrichment(
                 capability="empire_registry_scraper",
                 target_fields=registry_fields,
                 max_completeness_gain=registry_gain,
-                available_now=True,
+                available_now=False,
                 bounded=True,
                 rationale=(
                     "Empire Registry Scraper and existing public-record "
@@ -163,10 +163,18 @@ def plan_evidence_enrichment(
             )
         )
 
-    # Prefer executable bounded actions, then largest possible completeness gain.
+    # Prefer currently trusted production capabilities. Among them, first-party
+    # site evidence is the canonical first step because it can also improve
+    # identity/contact evidence without inventing registry facts.
+    priority = {
+        "first_party_site_probe": 0,
+        "decision_maker_evidence": 1,
+        "registry_evidence": 2,
+    }
     actions.sort(
         key=lambda item: (
             not item.available_now,
+            priority.get(item.key, 99),
             -item.max_completeness_gain,
             item.key,
         )

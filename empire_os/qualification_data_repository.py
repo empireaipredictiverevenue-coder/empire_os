@@ -157,6 +157,65 @@ class QualificationDataRepository:
             if prospect_id in by_id
         ]
 
+    def fetch_low_confidence_recovery_candidates(
+        self,
+        *,
+        limit: int,
+        scoring_engine: str,
+        scoring_version: str,
+        confidence_floor: float,
+    ) -> list[dict[str, Any]]:
+        limit = max(1, min(int(limit), 25))
+        rows = self._gateway.query(
+            "prospect_qualifications",
+            (
+                "id,prospect_id,entity_id,status,evidence_confidence,"
+                "observed_dimensions,unknown_dimensions,result_payload,scored_at"
+            ),
+            filters=(
+                DataFilter.eq("scoring_engine", scoring_engine),
+                DataFilter.eq("scoring_version", scoring_version),
+                DataFilter.eq("status", "insufficient_evidence"),
+            ),
+            order=(
+                OrderSpec("evidence_confidence", descending=True, nulls_last=True),
+                OrderSpec("scored_at", descending=True, nulls_last=True),
+                OrderSpec("prospect_id", descending=False),
+            ),
+            limit=limit * 5,
+        )
+        selected: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                confidence = float(row.get("evidence_confidence") or 0.0)
+            except (TypeError, ValueError):
+                confidence = 0.0
+            if confidence >= float(confidence_floor):
+                continue
+            selected.append(dict(row))
+            if len(selected) >= limit:
+                break
+        return selected
+
+    def record_recovery_metadata(
+        self,
+        qualification_id: str,
+        result_payload: dict[str, Any],
+        *,
+        updated_at: str,
+    ) -> dict[str, Any]:
+        rows = self._gateway.update(
+            "prospect_qualifications",
+            {"id": str(qualification_id)},
+            {
+                "result_payload": JsonValue(result_payload),
+                "updated_at": updated_at,
+            },
+        )
+        if len(rows) != 1:
+            raise RuntimeError("qualification recovery metadata update failed")
+        return dict(rows[0])
+
     def fetch_latest_acquisition(
         self,
         prospect_id: str,

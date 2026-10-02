@@ -231,3 +231,40 @@ def test_exact_prospect_fetch_is_bounded_and_requires_single_row():
     gateway.queue_query([])
     with pytest.raises(RuntimeError, match="not found or ambiguous"):
         QualificationDataRepository(gateway).fetch_prospect("missing")
+
+
+def test_low_confidence_recovery_candidates_are_bounded_and_sorted_by_confidence():
+    gateway = FakeGateway()
+    gateway.queue_query([
+        {"id":"q-high","prospect_id":"p-high","status":"insufficient_evidence","evidence_confidence":0.49},
+        {"id":"q-floor","prospect_id":"p-floor","status":"insufficient_evidence","evidence_confidence":0.50},
+        {"id":"q-low","prospect_id":"p-low","status":"insufficient_evidence","evidence_confidence":0.20},
+    ])
+    repository = QualificationDataRepository(gateway)
+    rows = repository.fetch_low_confidence_recovery_candidates(
+        limit=2,
+        scoring_engine="empire_os.lead_scoring",
+        scoring_version="v2",
+        confidence_floor=0.50,
+    )
+    assert [row["prospect_id"] for row in rows] == ["p-high", "p-low"]
+    query = gateway.queries[0]
+    assert query["table"] == "prospect_qualifications"
+    assert query["limit"] == 10
+    assert any(item.column == "status" and item.value == "insufficient_evidence" for item in query["filters"])
+    assert query["order"][0].column == "evidence_confidence"
+    assert query["order"][0].descending is True
+
+
+def test_recovery_metadata_updates_only_existing_qualification_payload():
+    gateway = FakeGateway()
+    repository = QualificationDataRepository(gateway)
+    payload = {"evidence_recovery": {"recovery_attempted": True}}
+    result = repository.record_recovery_metadata(
+        "q1", payload, updated_at="2026-10-02T10:00:00+00:00"
+    )
+    assert result["id"] == "q1"
+    table, match, values = gateway.updates[0]
+    assert table == "prospect_qualifications"
+    assert match == {"id":"q1"}
+    assert values["result_payload"] == JsonValue(payload)

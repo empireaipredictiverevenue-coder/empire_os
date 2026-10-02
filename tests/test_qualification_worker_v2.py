@@ -480,3 +480,103 @@ def test_legacy_autonomous_entrypoint_is_vendor_neutral_v2_wrapper(monkeypatch):
     assert result["ok"] is True
     assert result["qualification_id"] == "q1"
     assert result["scoring_version"] == "v2"
+
+
+def test_low_confidence_recovery_delegates_to_repository(monkeypatch):
+    seen = {}
+    class Repo:
+        def fetch_low_confidence_recovery_candidates(self, **kwargs):
+            seen.update(kwargs)
+            return [{"id":"q1","prospect_id":"p1","evidence_confidence":0.49}]
+    monkeypatch.setattr(worker, "_qualification_repository", lambda: Repo())
+    rows = worker.fetch_low_confidence_recovery_candidates(7)
+    assert rows[0]["prospect_id"] == "p1"
+    assert seen == {
+        "limit":7,
+        "scoring_engine":worker.SCORING_ENGINE,
+        "scoring_version":worker.SCORING_VERSION,
+        "confidence_floor":worker.MIN_DECISION_CONFIDENCE,
+    }
+
+
+def test_recovery_same_fingerprint_is_skipped_without_network(monkeypatch):
+    prospect = _prospect()
+    q = {
+        "id":"q1",
+        "prospect_id":prospect["id"],
+        "evidence_confidence":0.30,
+        "observed_dimensions":["market_fit"],
+        "unknown_dimensions":["business_presence"],
+        "entity_id":None,
+        "result_payload":{},
+    }
+    monkeypatch.setattr(worker,"fetch_prospect",lambda pid: prospect)
+    monkeypatch.setattr(worker,"fetch_latest_acquisition",lambda pid: None)
+    fp = worker._recovery_fingerprint(prospect,None,q)
+    q["result_payload"]={"evidence_recovery":{"recovery_attempted":True,"recovery_input_fingerprint":fp}}
+    monkeypatch.setattr(worker,"plan_evidence_enrichment",lambda p: (_ for _ in ()).throw(AssertionError("no planner/network work")))
+    result=worker.recover_low_confidence_qualification(q)
+    assert result["decision"]=="skipped_unchanged_evidence"
+    assert result["recovery_attempted"] is False
+
+
+def test_recovery_deferred_plan_records_attempt_and_does_not_enrich(monkeypatch):
+    prospect = _prospect()
+    q = {
+        "id":"q1","prospect_id":prospect["id"],"evidence_confidence":0.20,
+        "observed_dimensions":["market_fit"],"unknown_dimensions":["business_presence"],
+        "entity_id":None,"result_payload":{"existing":"keep"},
+    }
+    monkeypatch.setattr(worker,"fetch_prospect",lambda pid: prospect)
+    monkeypatch.setattr(worker,"fetch_latest_acquisition",lambda pid: None)
+    monkeypatch.setattr(worker,"plan_evidence_enrichment",lambda p:{"can_reach_target_with_available_actions":False,"selected_actions":[]})
+    recorded={}
+    monkeypatch.setattr(worker,"record_recovery_metadata",lambda qid,payload: recorded.update({"id":qid,"payload":payload}) or {})
+    monkeypatch.setattr(worker,"qualify_prospect",lambda *a,**k: (_ for _ in ()).throw(AssertionError("must not enrich")))
+    result=worker.recover_low_confidence_qualification(q)
+    assert result["decision"]=="deferred_insufficient_recovery_path"
+    assert recorded["payload"]["existing"]=="keep"
+    meta=recorded["payload"]["evidence_recovery"]
+    assert meta["recovery_changed"] is False
+    assert meta["recovery_reason"]=="bounded_plan_cannot_reach_confidence_floor"
+
+
+def test_recovery_requalifies_when_bounded_plan_can_reach_target(monkeypatch):
+    prospect = _prospect()
+    q = {
+        "id":"q1","prospect_id":prospect["id"],"evidence_confidence":0.30,
+        "observed_dimensions":["market_fit"],"unknown_dimensions":["business_presence"],
+        "entity_id":None,"result_payload":{},
+    }
+    monkeypatch.setattr(worker,"fetch_prospect",lambda pid: prospect)
+    monkeypatch.setattr(worker,"fetch_latest_acquisition",lambda pid: None)
+    monkeypatch.setattr(worker,"plan_evidence_enrichment",lambda p:{"can_reach_target_with_available_actions":True,"selected_actions":[{"key":"first_party_site_probe"}]})
+    seen={}
+    def fake_qualify(p, *, recovery_context=None):
+        seen.update(recovery_context or {})
+        return {"prospect_id":p["id"],"qualification_id":"q1","evidence_confidence":0.55,"identity_resolved":True}
+    monkeypatch.setattr(worker,"qualify_prospect",fake_qualify)
+    result=worker.recover_low_confidence_qualification(q)
+    assert result["decision"]=="requalified"
+    assert result["previous_confidence"]==0.30
+    assert result["new_confidence"]==0.55
+    assert seen["previous_confidence"]==0.30
+    assert seen["selected_actions"][0]["key"]=="first_party_site_probe"
+
+
+def test_recovery_cycle_reports_bounded_truth(monkeypatch):
+    monkeypatch.setattr(worker,"fetch_low_confidence_recovery_candidates",lambda limit:[{"prospect_id":"p1"},{"prospect_id":"p2"}])
+    def recover(row):
+        if row["prospect_id"]=="p1":
+            return {"decision":"skipped_unchanged_evidence"}
+        return {"decision":"deferred_insufficient_recovery_path"}
+    monkeypatch.setattr(worker,"recover_low_confidence_qualification",recover)
+    result=worker.run_evidence_recovery(2)
+    assert result["attempted"]==2
+    assert result["requalified"]==0
+    assert result["skipped_unchanged"]==1
+    assert result["deferred"]==1
+    assert result["confidence_floor"]==0.50
+    assert result["outreach_enabled"] is False
+    assert result["allocation_enabled"] is False
+    assert result["payment_enabled"] is False
