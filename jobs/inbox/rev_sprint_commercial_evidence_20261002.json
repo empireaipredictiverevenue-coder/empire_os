@@ -1,0 +1,25 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/commercial_evidence_auto_verifier.py",
+    "scripts/refresh_commercial_exchange.py",
+    "tests/test_refresh_commercial_exchange_empiredb.py",
+    "tests/test_commercial_exchange_contract.py"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T13:01:20.795992+00:00",
+  "job_id": "rev_sprint_commercial_evidence_20261002",
+  "kind": "code_task",
+  "lease_resources": [
+    "path:empire_os/commercial_evidence_auto_verifier.py",
+    "path:scripts/refresh_commercial_exchange.py"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "REVENUE SPRINT. Diagnose the current real blocker: Revenue Exchange has real qualified supply but zero verified per-lead market prices and zero verified active buyer capacity. Inspect existing commercial evidence, capacity-readiness and exchange projection owners. Implement only a root-cause production-code improvement if verified buyer-stated price/capacity evidence is being lost, misclassified, or not surfaced for review. Do not invent price/capacity, do not send outreach, do not lower verification thresholds. If the blocker is genuinely missing buyer evidence rather than code, make no fake change and return the exact next evidence fields/accounts needed. Preserve EmpireDB canonical truth and OBSERVE/founder gates.",
+  "pytest_targets": [
+    "tests/test_refresh_commercial_exchange_empiredb.py",
+    "tests/test_commercial_exchange_contract.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
