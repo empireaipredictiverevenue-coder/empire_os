@@ -1,0 +1,14 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [],
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T23:09:48.249461+00:00",
+  "job_id": "coder-plan-coder_job_a4eafdbddc2e4d19b40df670991e9da1",
+  "kind": "code_task",
+  "lease_resources": [],
+  "max_runtime_seconds": 600,
+  "prompt": "Produce a concise advisory implementation PLAN ONLY for the following EmpireOS task. Do not edit files, emit deployment commands, perform production actions, contact external parties, mutate databases, move funds, or expand authority. Identify affected modules, focused tests, main risks, dependencies, and approval gates.\n\nTASK:\nIndependently verify the new Empire Intelligence Optimization Fabric V2 foundation: docs/architecture/intelligence_optimization_fabric_v2.md, empire_os/optimization_problem_factory.py, empire_os/solver_intelligence.py, empire_os/optimization_benchmark_ledger.py and their tests. Check deterministic problem identity, UNKNOWN preservation, no invented economics, safe decomposition, cross-partition constraint handling, solver routing fail-closed behavior, external QPU gating, benchmark fingerprint binding, cost/latency evidence semantics, no quantum-advantage claim, no authority expansion, and compatibility with existing quantum_optimization.py, hybrid_optimization.py and action_portfolio_optimization.py. Report issues only; do not mutate production state.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
