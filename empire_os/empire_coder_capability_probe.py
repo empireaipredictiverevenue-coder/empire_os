@@ -66,7 +66,7 @@ def probe_empire_coder_structured_patch(
     *,
     model: str = "qwen2.5-coder:1.5b",
     base_url: str = "http://127.0.0.1:11435",
-    branch: str = "feature/revenue-intelligence-v2",
+    branch: str = "agent/data-cloud-wave4",
     work_root: str | Path = "/var/tmp/empire-coder-capability",
 ) -> EmpireCoderProbeResult:
     root = Path(repo_root).resolve()

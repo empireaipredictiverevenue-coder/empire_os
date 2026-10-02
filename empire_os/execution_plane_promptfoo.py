@@ -17,7 +17,7 @@ CANDIDATE_PATCH_ROOT = Path(
     "runtime/execution_plane/candidate_patches"
 )
 PROMPTFOO_BIN = Path("/opt/empire/promptfoo/bin/promptfoo")
-BASE_BRANCH = "feature/revenue-intelligence-v2"
+BASE_BRANCH = "agent/data-cloud-wave4"
 
 
 def _now() -> str:

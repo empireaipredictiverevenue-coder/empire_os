@@ -15,7 +15,7 @@ from typing import Any
 from uuid import uuid4
 
 
-DEFAULT_BASE_BRANCH = "feature/revenue-intelligence-v2"
+DEFAULT_BASE_BRANCH = "agent/data-cloud-wave4"
 
 
 class CandidateVerificationError(RuntimeError):

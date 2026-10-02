@@ -40,9 +40,10 @@ SCHEMA_VERSION = "empire.hermes.control_job.v1"
 RESULT_SCHEMA_VERSION = "empire.hermes.control_result.v1"
 
 DEFAULT_CONTROL_BRANCH = "ops/hermes-control"
-DEFAULT_BASE_BRANCH = "feature/revenue-intelligence-v2"
-DATA_CLOUD_CLOSEOUT_BRANCH = "agent/data-cloud-wave4"
-ALLOWED_BASE_BRANCHES = frozenset({DEFAULT_BASE_BRANCH, DATA_CLOUD_CLOSEOUT_BRANCH})
+DEFAULT_BASE_BRANCH = "agent/data-cloud-wave4"
+DATA_CLOUD_CLOSEOUT_BRANCH = DEFAULT_BASE_BRANCH
+LEGACY_REVENUE_BRANCH = "feature/revenue-intelligence-v2"
+ALLOWED_BASE_BRANCHES = frozenset({DEFAULT_BASE_BRANCH, LEGACY_REVENUE_BRANCH})
 DEFAULT_REMOTE = "origin"
 
 JOB_PATH_PREFIX = "jobs/inbox/"

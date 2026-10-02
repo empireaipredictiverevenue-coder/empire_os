@@ -23,9 +23,10 @@ from empire_os.execution_lease import (
 
 
 JOB_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
-DEFAULT_BRANCH = "feature/revenue-intelligence-v2"
-DATA_CLOUD_CLOSEOUT_BRANCH = "agent/data-cloud-wave4"
-ALLOWED_BASE_BRANCHES = frozenset({DEFAULT_BRANCH, DATA_CLOUD_CLOSEOUT_BRANCH})
+DEFAULT_BRANCH = "agent/data-cloud-wave4"
+DATA_CLOUD_CLOSEOUT_BRANCH = DEFAULT_BRANCH
+LEGACY_REVENUE_BRANCH = "feature/revenue-intelligence-v2"
+ALLOWED_BASE_BRANCHES = frozenset({DEFAULT_BRANCH, LEGACY_REVENUE_BRANCH})
 DEFAULT_PI_BIN = Path("/opt/empire/pi-agent/bin/pi")
 DEFAULT_PI_CONFIG = Path("/etc/empire_os/pi-agent")
 DEFAULT_WORK_ROOT = Path("/var/tmp/empire-pi")

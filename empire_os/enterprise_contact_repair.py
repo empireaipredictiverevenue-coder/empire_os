@@ -492,7 +492,7 @@ def _reconcile_moved_head(
 
 def _retry_branch_push() -> dict[str, Any]:
     branch, _head, dirty = _main_state()
-    if branch != "feature/revenue-intelligence-v2" or dirty:
+    if branch not in ALLOWED_BASE_BRANCHES or dirty:
         return {
             "status": "PUSH_RETRY_BLOCKED",
             "reason": (

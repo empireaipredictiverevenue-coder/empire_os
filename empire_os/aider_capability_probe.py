@@ -57,7 +57,7 @@ def _run(
 def probe_aider_mutation(
     repo_root: str | Path = "/srv/empire_os",
     *,
-    branch: str = "feature/revenue-intelligence-v2",
+    branch: str = "agent/data-cloud-wave4",
     work_root: str | Path = "/var/tmp/empire-aider-capability",
     model: str | None = None,
 ) -> AiderProbeResult:

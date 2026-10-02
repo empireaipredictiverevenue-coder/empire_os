@@ -8,6 +8,13 @@ from empire_os.execution_plane_promptfoo import (
 )
 
 
+
+
+def fake_candidate_clone(tmp_path):
+    clone = tmp_path / "candidate-clone"
+    clone.mkdir(parents=True, exist_ok=True)
+    return clone
+
 def write_request(root, request_id="ai-1"):
     patch = (
         root
@@ -45,6 +52,11 @@ def test_promptfoo_pass_is_persisted_but_never_auto_promoted(
     binary = tmp_path / "promptfoo"
     binary.write_text("", encoding="utf-8")
     monkeypatch.setattr(module, "PROMPTFOO_BIN", binary)
+    monkeypatch.setattr(
+        module,
+        "_prepare_candidate_clone",
+        lambda *_args, **_kwargs: fake_candidate_clone(tmp_path),
+    )
 
     monkeypatch.setattr(
         module.subprocess,
@@ -70,6 +82,11 @@ def test_promptfoo_failure_is_persisted(tmp_path, monkeypatch):
     binary.write_text("", encoding="utf-8")
     monkeypatch.setattr(module, "PROMPTFOO_BIN", binary)
     monkeypatch.setattr(
+        module,
+        "_prepare_candidate_clone",
+        lambda *_args, **_kwargs: fake_candidate_clone(tmp_path),
+    )
+    monkeypatch.setattr(
         module.subprocess,
         "run",
         lambda *args, **kwargs: subprocess.CompletedProcess(
@@ -89,6 +106,11 @@ def test_pending_worker_skips_completed_requests(tmp_path, monkeypatch):
     binary = tmp_path / "promptfoo"
     binary.write_text("", encoding="utf-8")
     monkeypatch.setattr(module, "PROMPTFOO_BIN", binary)
+    monkeypatch.setattr(
+        module,
+        "_prepare_candidate_clone",
+        lambda *_args, **_kwargs: fake_candidate_clone(tmp_path),
+    )
     calls = []
 
     def fake_run(*args, **kwargs):
