@@ -176,6 +176,25 @@ def main() -> int:
             ),
         )
 
+    existing_ready = [
+        row
+        for row in persisted
+        if (
+            isinstance(row.get("response"), dict)
+            and row["response"].get("review_state") == "review_ready"
+            and row["response"].get("reconciliation_state") == "REVIEW_READY"
+            and str(row["response"].get("candidate_id") or "").strip()
+        )
+    ]
+    ready_ids = {
+        str(row["response"]["candidate_id"])
+        for row in existing_ready
+    }
+    for update in readiness.get("updates") or []:
+        candidate_id = str(update.get("candidate_id") or "").strip()
+        if candidate_id:
+            ready_ids.add(candidate_id)
+
     payload = {
         **bridge,
         "mx_rows": mx_rows,
@@ -184,11 +203,11 @@ def main() -> int:
         "persisted": persisted,
         "persisted_candidate_count": len(persisted),
         "review_readiness": readiness,
+        "review_ready_count": len(ready_ids),
+        "governed_promotion_candidate_ids": sorted(ready_ids),
         "database_write_performed": bool(args.persist and persisted),
         "canonical_promotion_performed": False,
-        "founder_promotion_required": bool(
-            args.persist and readiness.get("review_ready_count", 0)
-        ),
+        "founder_promotion_required": bool(args.persist and ready_ids),
         "outbound_authorized": False,
         "actual_revenue": False,
     }
@@ -207,7 +226,7 @@ def main() -> int:
         "blocked_company_count": bridge["blocked_company_count"],
         "suppressed_count": len(suppressed),
         "persisted_candidate_count": len(persisted),
-        "review_ready_count": readiness.get("review_ready_count", 0),
+        "review_ready_count": payload["review_ready_count"],
         "canonical_promotion_performed": False,
         "founder_promotion_required": payload["founder_promotion_required"],
         "outbound_authorized": False,

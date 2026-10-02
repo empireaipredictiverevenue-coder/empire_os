@@ -15,3 +15,13 @@ def test_runner_is_fail_closed_before_canonical_promotion():
     assert '"canonical_promotion_performed": False' in text
     assert '"outbound_authorized": False' in text
     assert "promote_buyer_scout_candidate_to_prospect" not in text
+
+
+def test_runner_counts_existing_review_ready_rpc_state():
+    text = (
+        ROOT / "scripts/bridge_offer_contacts_to_buyer_holding.py"
+    ).read_text()
+    assert '"review_state") == "review_ready"' in text
+    assert '"reconciliation_state") == "REVIEW_READY"' in text
+    assert '"governed_promotion_candidate_ids"' in text
+    assert '"founder_promotion_required": bool(args.persist and ready_ids)' in text
