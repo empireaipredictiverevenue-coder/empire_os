@@ -32,3 +32,19 @@ def test_fresh_founder_service_factory_mounts_coding_team_status_route():
     assert CODING_TEAM_PATH in paths
     assert "/v1/founder-execution-plane/status" in paths
     assert "/health" in paths
+
+
+PREDICTIVE_REVENUE_DEMO_PATH = "/v1/predictive-revenue/demo"
+PREDICTIVE_REVENUE_DEMO_LIVE_PATH = "/v1/predictive-revenue/demo/live"
+
+
+def test_live_founder_service_mounts_predictive_revenue_demo_routes():
+    paths = _documented_paths(app)
+    assert PREDICTIVE_REVENUE_DEMO_PATH in paths
+    assert PREDICTIVE_REVENUE_DEMO_LIVE_PATH in paths
+
+
+def test_fresh_founder_service_mounts_predictive_revenue_demo_routes():
+    paths = _documented_paths(build_founder_dashboard_service())
+    assert PREDICTIVE_REVENUE_DEMO_PATH in paths
+    assert PREDICTIVE_REVENUE_DEMO_LIVE_PATH in paths
