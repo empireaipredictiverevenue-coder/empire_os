@@ -83,7 +83,7 @@ Canonical architecture:
 - [ ] Calibrated probability-of-success source from verified outcome cohorts
 - [ ] Calibrated time-to-revenue distributions
 - [ ] Prediction intervals / coverage monitoring
-- [ ] Forecast-vs-actual calibration board
+- [x] Forecast-vs-actual calibration board — CODED + LIVE-VERIFIED fail-closed on zero verified outcomes (2026-10-02)
 - [ ] Causal/experiment decision packet integration
 - [ ] Capital/portfolio packet integration
 - [ ] Economic Memory feedback from Quant prediction → verified outcome
@@ -124,7 +124,7 @@ Data & Decision Intelligence:
 - [ ] Unified predictive analytics: demand/revenue/GP/conversion/churn/capacity/search forecasts with uncertainty
 - [ ] Unified prescriptive layer: next-best decision + risk-adjusted expected value + value-of-information
 - [ ] Unified causal layer: experiments/holdouts/incrementality/forecast-vs-actual
-- [ ] Calibration board: Brier/forecast error/interval coverage/drift where applicable
+- [x] Calibration board: Brier/forecast error/interval coverage/drift where applicable — CODED + LIVE-VERIFIED; unsupported metrics remain UNKNOWN without verified cohort (2026-10-02)
 - [ ] Risk & resilience read model: downside, concentration, capacity and operational risk
 - [ ] Capital/portfolio read model: expected return, capital at risk, opportunity cost and diversification
 - [ ] Economic Memory join across prediction → action → verified outcome
