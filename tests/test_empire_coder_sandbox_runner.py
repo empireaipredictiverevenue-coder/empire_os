@@ -79,3 +79,55 @@ def test_empire_coder_rejects_arbitrary_base_branch():
             lease_resources=("domain:data_cloud_test",),
             base_branch="main",
         ).validate()
+
+
+def test_structured_patch_runtime_env_pins_proven_llama_cpp(monkeypatch):
+    import os
+    from empire_os.empire_coder_sandbox_runner import (
+        _structured_patch_runtime_env,
+    )
+
+    keys = (
+        "EMPIRE_CODER_LLAMA_CPP_ENABLED",
+        "EMPIRE_CODER_LLAMA_CPP_MODEL",
+        "EMPIRE_CODER_LLAMA_CPP_CAPABILITY",
+        "EMPIRE_CODER_LLAMA_CPP_ROLES",
+        "EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS",
+    )
+    for key in keys:
+        monkeypatch.delenv(key, raising=False)
+
+    with _structured_patch_runtime_env(
+        True,
+        model="qwen2.5-coder:1.5b",
+    ):
+        assert os.environ["EMPIRE_CODER_LLAMA_CPP_ENABLED"] == "true"
+        assert os.environ["EMPIRE_CODER_LLAMA_CPP_MODEL"] == "qwen2.5-coder:1.5b"
+        assert os.environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] == "3"
+        assert os.environ["EMPIRE_CODER_LLAMA_CPP_ROLES"] == "planner,writer,verifier"
+        assert os.environ["EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS"] == "30"
+
+    for key in keys:
+        assert key not in os.environ
+
+
+def test_structured_patch_runtime_env_restores_existing_values(monkeypatch):
+    import os
+    from empire_os.empire_coder_sandbox_runner import (
+        _structured_patch_runtime_env,
+    )
+
+    monkeypatch.setenv("EMPIRE_CODER_LLAMA_CPP_ENABLED", "false")
+    monkeypatch.setenv("EMPIRE_CODER_LLAMA_CPP_MODEL", "existing-model")
+    monkeypatch.setenv("EMPIRE_CODER_LLAMA_CPP_CAPABILITY", "1")
+    monkeypatch.setenv("EMPIRE_CODER_LLAMA_CPP_ROLES", "planner")
+    monkeypatch.setenv("EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS", "120")
+
+    with _structured_patch_runtime_env(True, model="probe-model"):
+        assert os.environ["EMPIRE_CODER_LLAMA_CPP_MODEL"] == "probe-model"
+
+    assert os.environ["EMPIRE_CODER_LLAMA_CPP_ENABLED"] == "false"
+    assert os.environ["EMPIRE_CODER_LLAMA_CPP_MODEL"] == "existing-model"
+    assert os.environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] == "1"
+    assert os.environ["EMPIRE_CODER_LLAMA_CPP_ROLES"] == "planner"
+    assert os.environ["EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS"] == "120"

@@ -7,6 +7,7 @@ branch for independent verification.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 import os
 from pathlib import Path
@@ -20,7 +21,10 @@ from empire_os.aider_builder import (
     run_aider_mutation,
 )
 from empire_os.aider_model_selector import select_usable_aider_model
-from empire_os.builder_capabilities import builder_capability_ready
+from empire_os.builder_capabilities import (
+    builder_capability_ready,
+    builder_capability_snapshot,
+)
 from empire_os.coder import EmpireCoder
 from empire_os.coder.models import VerificationVerdict
 from empire_os.execution_lease import ExecutionLeaseError, ExecutionLeaseManager
@@ -36,6 +40,44 @@ DEFAULT_WORK_ROOT = Path("/var/tmp/empire-coder-sandbox")
 
 class EmpireCoderSandboxError(RuntimeError):
     pass
+
+
+@contextmanager
+def _structured_patch_runtime_env(
+    enabled: bool,
+    *,
+    model: str | None = None,
+):
+    """Pin proven structured-patch work to the proven llama.cpp backend."""
+    keys = (
+        "EMPIRE_CODER_LLAMA_CPP_ENABLED",
+        "EMPIRE_CODER_LLAMA_CPP_MODEL",
+        "EMPIRE_CODER_LLAMA_CPP_CAPABILITY",
+        "EMPIRE_CODER_LLAMA_CPP_ROLES",
+        "EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS",
+    )
+    previous = {key: os.environ.get(key) for key in keys}
+    try:
+        if enabled:
+            os.environ["EMPIRE_CODER_LLAMA_CPP_ENABLED"] = "true"
+            os.environ["EMPIRE_CODER_LLAMA_CPP_MODEL"] = (
+                str(model or "qwen2.5-coder:1.5b").strip()
+                or "qwen2.5-coder:1.5b"
+            )
+            os.environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] = "3"
+            os.environ["EMPIRE_CODER_LLAMA_CPP_ROLES"] = (
+                "planner,writer,verifier"
+            )
+            # If llama.cpp unexpectedly becomes unavailable, keep the legacy
+            # Ollama fallback bounded instead of allowing a multi-minute hang.
+            os.environ["EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS"] = "30"
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 @dataclass(frozen=True)
@@ -195,6 +237,16 @@ def run_empire_coder_sandbox_job(
             "structured_patch_mutation",
             path=capability_path,
         )
+        capability_snapshot = builder_capability_snapshot(capability_path)
+        structured_capability = (
+            ((capability_snapshot.get("workers") or {})
+             .get("empire_coder") or {})
+            .get("structured_patch_mutation") or {}
+        )
+        structured_model = (
+            str(structured_capability.get("model") or "").strip()
+            or "qwen2.5-coder:1.5b"
+        )
         preference = str(
             os.getenv("EMPIRE_CODER_MUTATION_BACKEND") or "auto"
         ).strip().lower()
@@ -214,6 +266,7 @@ def run_empire_coder_sandbox_job(
             "preference": preference,
             "aider_ready": aider_ready,
             "structured_patch_ready": structured_ready,
+            "structured_patch_model": structured_model,
             "capability_ledger_observed": ledger_exists,
             "attempt_order": list(backend_order),
         }
@@ -282,29 +335,33 @@ def run_empire_coder_sandbox_job(
                     continue
 
                 try:
-                    coder = EmpireCoder(
-                        clone,
-                        runtime_root=clone / "runtime/coder",
-                    )
-                    task = coder.create_task(job.objective)
-                    context = coder.build_context(
-                        task.id,
-                        terms=(job.department, job.capability),
-                        budget_chars=8000,
-                    )
-                    candidate = coder.propose_structured_patch(
-                        task.id,
-                        (
-                            "Implement exactly one smallest safe DEVELOPMENT "
-                            "patch for the task objective. Return only the "
-                            "machine-checkable structured patch requested by "
-                            "Empire Coder. Do not touch deployment, services, "
-                            "production databases, outbound, credentials, "
-                            "payments, funds or revenue truth.\n\nTASK:\n"
-                            + job.objective
-                        ),
-                        context,
-                    )
+                    with _structured_patch_runtime_env(
+                        structured_ready,
+                        model=structured_model,
+                    ):
+                        coder = EmpireCoder(
+                            clone,
+                            runtime_root=clone / "runtime/coder",
+                        )
+                        task = coder.create_task(job.objective)
+                        context = coder.build_context(
+                            task.id,
+                            terms=(job.department, job.capability),
+                            budget_chars=8000,
+                        )
+                        candidate = coder.propose_structured_patch(
+                            task.id,
+                            (
+                                "Implement exactly one smallest safe DEVELOPMENT "
+                                "patch for the task objective. Return only the "
+                                "machine-checkable structured patch requested by "
+                                "Empire Coder. Do not touch deployment, services, "
+                                "production databases, outbound, credentials, "
+                                "payments, funds or revenue truth.\n\nTASK:\n"
+                                + job.objective
+                            ),
+                            context,
+                        )
                 except Exception as exc:
                     result["backend_attempts"].append({
                         "backend": "structured_patch",
