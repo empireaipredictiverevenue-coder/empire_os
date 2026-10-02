@@ -10,6 +10,7 @@ Group=root
 WorkingDirectory=/srv/empire_os
 EnvironmentFile=-/etc/empire_os.env
 EnvironmentFile=-/etc/empiredb.env
+EnvironmentFile=-/etc/empire_revenue_exchange.env
 Environment=PYTHONPATH=/srv/empire_os
 Environment=EMPIRE_DATA_BACKEND=empiredb
 Environment=CRAWLER_TIMEOUT=600

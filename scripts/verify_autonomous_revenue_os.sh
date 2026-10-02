@@ -31,6 +31,7 @@ grep -q 'EMPIRE_REVENUE_LOOP_INTERNAL_WRITE=1' deploy/systemd/empire-autonomous-
 
 ! grep -q 'runtime/secrets/outbound.env' deploy/systemd/empire-autonomous-revenue-os.service
 grep -q 'Environment=EMPIRE_DATA_BACKEND=empiredb' deploy/systemd/empire-autonomous-revenue-os.service
+grep -q 'EnvironmentFile=-/etc/empire_revenue_exchange.env' deploy/systemd/empire-autonomous-revenue-os.service
 grep -q 'ProtectHome=true' deploy/systemd/empire-autonomous-revenue-os.service
 
 bash -n scripts/activate_autonomous_revenue_os_v1.sh
