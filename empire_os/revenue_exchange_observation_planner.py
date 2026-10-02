@@ -200,6 +200,114 @@ def plan_revenue_exchange_observations(
     }
 
 
+
+
+def _commercial_exchange_is_canonical(
+    commercial_exchange: Mapping[str, Any],
+) -> bool:
+    return (
+        _clean(commercial_exchange.get("source"))
+        == "canonical_empiredb_projection"
+        and _clean(commercial_exchange.get("candidate_selection"))
+        == "qualification_driven"
+        and _clean(commercial_exchange.get("execution_authority")) == "none"
+        and commercial_exchange.get("actual_revenue") is False
+    )
+
+
+def project_market_evidence_from_commercial_exchange(
+    commercial_exchange: Mapping[str, Any],
+) -> tuple[list[MarketEvidence], list[MarketEvidence]]:
+    """Aggregate canonical exchange-ready supply and active market capacity.
+
+    Commercial Exchange observed buyer rates are intentionally ignored here;
+    they are not verified Revenue Exchange price evidence.
+    """
+    if not _commercial_exchange_is_canonical(commercial_exchange):
+        return [], []
+
+    observed_at = _clean(commercial_exchange.get("observed_at")) or "unknown"
+    snapshot_ref = f"runtime:commercial_exchange:{observed_at}"
+
+    supply_groups: dict[tuple[str, str], dict[str, Any]] = {}
+    allowed_supply_states = {"allocation_candidate", "overflow_no_capacity"}
+    for raw in commercial_exchange.get("inventory") or []:
+        if not isinstance(raw, Mapping):
+            continue
+        if _clean(raw.get("state")) not in allowed_supply_states:
+            continue
+        niche = _clean(raw.get("niche_family"))
+        metro = _clean(raw.get("metro"))
+        if not niche or not metro:
+            continue
+        key = _market_key(niche, metro)
+        group = supply_groups.setdefault(
+            key,
+            {"niche": niche, "metro": metro, "count": 0, "refs": [snapshot_ref]},
+        )
+        group["count"] += 1
+        prospect_id = _clean(raw.get("prospect_id"))
+        corridor = _clean(raw.get("corridor_key"))
+        if prospect_id and len(group["refs"]) < 27:
+            group["refs"].append(f"prospect:{prospect_id}")
+        if corridor and len(group["refs"]) < 28:
+            group["refs"].append(corridor)
+
+    inventory = [
+        MarketEvidence(
+            niche=group["niche"],
+            metro=group["metro"],
+            count=int(group["count"]),
+            source="canonical_empiredb_commercial_exchange_inventory",
+            evidence_refs=tuple(dict.fromkeys(group["refs"])),
+            canonical_empiredb=True,
+            market_specific=True,
+        )
+        for _, group in sorted(supply_groups.items())
+    ]
+
+    active_capacity: dict[tuple[str, str], int] = {}
+    capacity_refs: dict[tuple[str, str], list[str]] = {}
+    for raw in commercial_exchange.get("buyer_seats") or []:
+        if not isinstance(raw, Mapping):
+            continue
+        if _clean(raw.get("seat_state")) != "active_capacity":
+            continue
+        niche = _clean(raw.get("niche_family"))
+        metro = _clean(raw.get("metro"))
+        if not niche or not metro:
+            continue
+        key = _market_key(niche, metro)
+        try:
+            remaining = int(raw.get("remaining_capacity") or 0)
+        except (TypeError, ValueError):
+            remaining = 0
+        if remaining < 0:
+            continue
+        active_capacity[key] = active_capacity.get(key, 0) + remaining
+        refs = capacity_refs.setdefault(key, [snapshot_ref])
+        buyer_id = _clean(raw.get("buyer_id"))
+        if buyer_id and len(refs) < 27:
+            refs.append(f"buyer:{buyer_id}")
+
+    # The buyer-seat projection is complete for this Commercial Exchange refresh.
+    # Therefore every observed supply market gets an explicit active-capacity
+    # observation, including zero when no activated matching seat exists.
+    capacity = []
+    for key, group in sorted(supply_groups.items()):
+        refs = capacity_refs.get(key, [snapshot_ref])
+        capacity.append(MarketEvidence(
+            niche=group["niche"],
+            metro=group["metro"],
+            count=int(active_capacity.get(key, 0)),
+            source="canonical_empiredb_commercial_exchange_buyer_capacity",
+            evidence_refs=tuple(dict.fromkeys(refs)),
+            canonical_empiredb=True,
+            market_specific=True,
+        ))
+
+    return inventory, capacity
+
 def plan_from_runtime_artifacts(
     *,
     commercial_exchange: Mapping[str, Any],
@@ -207,34 +315,10 @@ def plan_from_runtime_artifacts(
     commercial_catalog: Mapping[str, Any],
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
-    rejected_inventory: list[MarketEvidence] = []
     source = _clean(commercial_exchange.get("source"))
-    for row in commercial_exchange.get("inventory") or []:
-        if not isinstance(row, Mapping):
-            continue
-        rejected_inventory.append(MarketEvidence(
-            niche=_clean(row.get("niche_family") or row.get("niche")),
-            metro=_clean(row.get("territory") or row.get("metro")),
-            count=int(row.get("qualified_inventory_count") or 0),
-            source=source,
-            evidence_refs=tuple(),
-            canonical_empiredb=(source == "canonical_empiredb_market_evidence"),
-            market_specific=True,
-        ))
-
-    capacity: list[MarketEvidence] = []
-    if int(buyer_capacity_readiness.get("capacity_verified") or 0) > 0:
-        # The v1 runtime snapshot is aggregate-only. Even a positive aggregate
-        # cannot become market-specific exchange capacity.
-        capacity.append(MarketEvidence(
-            niche="",
-            metro="",
-            count=int(buyer_capacity_readiness.get("capacity_verified") or 0),
-            source="canonical_empiredb_buyer_capacity_readiness_aggregate",
-            evidence_refs=("runtime:buyer_capacity_readiness/latest.json",),
-            canonical_empiredb=True,
-            market_specific=False,
-        ))
+    inventory, capacity = project_market_evidence_from_commercial_exchange(
+        commercial_exchange
+    )
 
     prices: list[MarketPriceEvidence] = []
     for row in commercial_catalog.get("products") or []:
@@ -249,23 +333,39 @@ def plan_from_runtime_artifacts(
             unit=_clean(pb.get("unit")),
             state=_clean(pb.get("state")),
             source="canonical_empiredb_commercial_product_catalog",
-            evidence_refs=tuple(_clean(ref) for ref in (row.get("evidence_refs") or ()) if _clean(ref)),
+            evidence_refs=tuple(
+                _clean(ref)
+                for ref in (row.get("evidence_refs") or ())
+                if _clean(ref)
+            ),
             canonical_empiredb=True,
         ))
 
     result = plan_revenue_exchange_observations(
-        inventory=rejected_inventory,
+        inventory=inventory,
         capacity=capacity,
         prices=prices,
         generated_at=generated_at,
     )
     result["runtime_source_truth"] = {
         "commercial_exchange_source": source or None,
+        "commercial_exchange_canonical": _commercial_exchange_is_canonical(
+            commercial_exchange
+        ),
+        "qualified_market_supply_count": sum(item.count for item in inventory),
+        "qualified_market_count": len(inventory),
+        "active_market_capacity_count": sum(item.count for item in capacity),
         "buyer_capacity_snapshot_is_market_specific": False,
-        "buyer_capacity_verified_count": int(buyer_capacity_readiness.get("capacity_verified") or 0),
+        "buyer_capacity_verified_count": int(
+            buyer_capacity_readiness.get("capacity_verified") or 0
+        ),
         "ready_catalog_product_count": sum(
-            bool(isinstance(row, Mapping) and row.get("binding_terms_ready") is True)
+            bool(
+                isinstance(row, Mapping)
+                and row.get("binding_terms_ready") is True
+            )
             for row in commercial_catalog.get("products") or []
         ),
+        "commercial_exchange_observed_rates_promoted_to_verified_price": False,
     }
     return result

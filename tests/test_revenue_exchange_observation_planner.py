@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from empire_os.revenue_exchange_observation_planner import (
     MarketEvidence, MarketPriceEvidence, plan_revenue_exchange_observations,
-    plan_from_runtime_artifacts,
+    plan_from_runtime_artifacts, project_market_evidence_from_commercial_exchange,
 )
 NOW=datetime(2026,10,2,10,0,tzinfo=timezone.utc)
 
@@ -78,3 +78,79 @@ def test_current_runtime_shape_fails_closed_without_writes():
     assert 'canonical_market_inventory_unavailable' in payload['global_blockers']
     assert 'verified_market_capacity_unavailable' in payload['global_blockers']
     assert 'verified_per_lead_price_unavailable' in payload['global_blockers']
+
+
+def test_canonical_commercial_exchange_projects_identity_ready_supply_and_zero_active_capacity():
+    commercial_exchange={
+        'source':'canonical_empiredb_projection',
+        'candidate_selection':'qualification_driven',
+        'execution_authority':'none',
+        'actual_revenue':False,
+        'observed_at':'2026-10-02T09:53:45+00:00',
+        'inventory':[
+            {'state':'overflow_no_capacity','niche_family':'roofing','metro':'dallas, tx','prospect_id':'p1','corridor_key':'c1'},
+            {'state':'overflow_no_capacity','niche_family':'roofing','metro':'dallas, tx','prospect_id':'p2','corridor_key':'c1'},
+            {'state':'blocked_missing_evidence','niche_family':'roofing','metro':'dallas, tx','prospect_id':'p3','corridor_key':'c1'},
+            {'state':'allocated','niche_family':'roofing','metro':'dallas, tx','prospect_id':'p4','corridor_key':'c1'},
+        ],
+        'buyer_seats':[
+            {'seat_state':'blocked_missing_evidence','niche_family':'roofing','metro':'dallas, tx','remaining_capacity':50,'buyer_id':'b1','observed_rate':125.0},
+        ],
+    }
+    payload=plan_from_runtime_artifacts(
+        commercial_exchange=commercial_exchange,
+        buyer_capacity_readiness={'capacity_verified':0},
+        commercial_catalog={'products':[]},
+        generated_at=NOW,
+    )
+    assert payload['market_candidate_count']==1
+    assert payload['proposal_ready_count']==0
+    candidate=payload['candidates'][0]
+    assert candidate['market_key']=='roofing::dallas, tx'
+    assert candidate['blockers']==['verified_per_lead_price_missing']
+    truth=payload['runtime_source_truth']
+    assert truth['qualified_market_supply_count']==2
+    assert truth['qualified_market_count']==1
+    assert truth['active_market_capacity_count']==0
+    assert truth['commercial_exchange_observed_rates_promoted_to_verified_price'] is False
+    assert 'canonical_market_inventory_unavailable' not in payload['global_blockers']
+    assert 'verified_market_capacity_unavailable' not in payload['global_blockers']
+    assert payload['global_blockers']==['verified_per_lead_price_unavailable']
+    assert payload['database_write'] is False
+
+
+def test_active_capacity_counts_only_activated_matching_market_seats():
+    commercial_exchange={
+        'source':'canonical_empiredb_projection',
+        'candidate_selection':'qualification_driven',
+        'execution_authority':'none',
+        'actual_revenue':False,
+        'observed_at':'2026-10-02T09:53:45+00:00',
+        'inventory':[
+            {'state':'allocation_candidate','niche_family':'solar','metro':'phoenix, az','prospect_id':'p1','corridor_key':'c1'},
+        ],
+        'buyer_seats':[
+            {'seat_state':'active_capacity','niche_family':'solar','metro':'phoenix, az','remaining_capacity':3,'buyer_id':'b1','observed_rate':500.0},
+            {'seat_state':'blocked_missing_evidence','niche_family':'solar','metro':'phoenix, az','remaining_capacity':100,'buyer_id':'b2','observed_rate':999.0},
+            {'seat_state':'active_capacity','niche_family':'solar','metro':'tucson, az','remaining_capacity':9,'buyer_id':'b3','observed_rate':700.0},
+        ],
+    }
+    inventory,capacity=project_market_evidence_from_commercial_exchange(commercial_exchange)
+    assert len(inventory)==1
+    assert inventory[0].count==1
+    assert len(capacity)==1
+    assert capacity[0].count==3
+    assert all('500' not in ref and '999' not in ref for ref in capacity[0].evidence_refs)
+
+
+def test_noncanonical_commercial_exchange_never_projects_market_evidence():
+    inventory,capacity=project_market_evidence_from_commercial_exchange({
+        'source':'canonical_supabase_projection',
+        'candidate_selection':'qualification_driven',
+        'execution_authority':'none',
+        'actual_revenue':False,
+        'inventory':[{'state':'overflow_no_capacity','niche_family':'roofing','metro':'dallas, tx'}],
+        'buyer_seats':[],
+    })
+    assert inventory==[]
+    assert capacity==[]
