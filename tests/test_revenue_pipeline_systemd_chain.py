@@ -3,11 +3,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_enrichment_hands_off_to_review_materializer():
+def test_enrichment_hands_off_directly_to_gtm():
     text = (
         ROOT / "deploy/systemd/empire-buyer-deferred-enrichment.service"
     ).read_text()
-    assert "OnSuccess=empire-buyer-review-materializer.service" in text
+    assert "OnSuccess=empire-gtm-pipeline.service" in text
+    assert "OnSuccess=empire-buyer-review-materializer.service" not in text
 
 
 def test_review_materializer_hands_off_to_gtm():
