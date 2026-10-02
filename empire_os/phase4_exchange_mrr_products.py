@@ -196,6 +196,7 @@ def build_exchange_mrr_product_plan() -> dict[str, Any]:
             "delivery_requires_verified_destination": True,
             "legacy_sqlite_not_used": True,
             "legacy_payment_rail_not_used": True,
+            "legacy_usdc_solana_not_used": True,
         },
         "canonical_settlement_rail": "USDT_BSC",
         "pricing_authority": "founder_approved_2026_09_24",

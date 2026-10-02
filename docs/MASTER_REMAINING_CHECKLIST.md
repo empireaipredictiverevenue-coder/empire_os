@@ -572,7 +572,7 @@ Implementation state:
 - [x] Search Intelligence pricing
 - [ ] Storm pricing
 - [x] Data/API pricing
-- [ ] Seats/territories
+- [x] Seats/territories
 - [ ] Managed-growth pricing
 - [x] Enterprise/private-capital pricing
 - [ ] White-label/channel pricing
