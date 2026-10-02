@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import os
 
 from empire_os.coder import EmpireCoder
 from empire_os.coder.audit import AuditTrail
@@ -21,6 +22,32 @@ from empire_os.hermes_control import (
     fetch_control_refs,
     read_control_json,
 )
+
+
+_LOCAL_PLANNER_ENV_KEYS = frozenset({
+    "EMPIRE_CODER_LLAMA_CPP_ENABLED",
+    "EMPIRE_CODER_LLAMA_CPP_URL",
+    "EMPIRE_CODER_LLAMA_CPP_MODEL",
+    "EMPIRE_CODER_LLAMA_CPP_CAPABILITY",
+    "EMPIRE_CODER_LLAMA_CPP_ROLES",
+    "EMPIRE_CODER_LLAMA_CPP_TIMEOUT_SECONDS",
+})
+
+
+def _load_local_planner_environment(root: Path) -> None:
+    path = root / ".env.empire_coder"
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key not in _LOCAL_PLANNER_ENV_KEYS or key in os.environ:
+            continue
+        value = value.strip().strip('"').strip("'")
+        os.environ[key] = value
 
 
 def _local_planner_capability(coder: EmpireCoder) -> int:
@@ -42,6 +69,7 @@ def delegate_oversized_plans(
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     runtime = Path(runtime_root or root / "runtime/coder").resolve()
+    _load_local_planner_environment(root)
     coder = EmpireCoder(root, runtime_root=runtime)
     queue = LocalJobQueue(root, runtime_root=runtime)
     local_capability = _local_planner_capability(coder)

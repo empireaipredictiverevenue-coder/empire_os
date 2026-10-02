@@ -142,3 +142,20 @@ def test_successful_hermes_plan_reconciles_then_retires_context(monkeypatch, tmp
     assert "focused tests" in proposal["refined"]
     assert not (runtime / "context" / f"{task.id}.json").exists()
     assert (runtime / "context_retired" / f"{task.id}.json").exists()
+
+
+def test_local_planner_environment_loads_only_allowlisted_keys(monkeypatch, tmp_path):
+    from empire_os.coder import plan_delegation as module
+    root, _ = _workspace(tmp_path)
+    (root / ".env.empire_coder").write_text(
+        "EMPIRE_CODER_LLAMA_CPP_ENABLED=true\n"
+        "EMPIRE_CODER_LLAMA_CPP_CAPABILITY=2\n"
+        "SECRET_SHOULD_NOT_LOAD=nope\n"
+    )
+    monkeypatch.delenv("EMPIRE_CODER_LLAMA_CPP_ENABLED", raising=False)
+    monkeypatch.delenv("EMPIRE_CODER_LLAMA_CPP_CAPABILITY", raising=False)
+    monkeypatch.delenv("SECRET_SHOULD_NOT_LOAD", raising=False)
+    module._load_local_planner_environment(root)
+    assert __import__('os').environ["EMPIRE_CODER_LLAMA_CPP_ENABLED"] == "true"
+    assert __import__('os').environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] == "2"
+    assert "SECRET_SHOULD_NOT_LOAD" not in __import__('os').environ
