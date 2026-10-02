@@ -318,6 +318,68 @@ class BuyerDeferredEnrichmentQueue:
         )
         return rows[: max(1, min(int(limit), 25))]
 
+    def claim_due(
+        self,
+        *,
+        limit: int = 10,
+        worker_id: str,
+        lease_seconds: int = 420,
+        now: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        owner = str(worker_id or "").strip()
+        if not owner:
+            raise ValueError("worker_id required")
+        current = (now or _now()).astimezone(timezone.utc)
+        safe_limit = max(1, min(int(limit), 25))
+        safe_lease = max(60, min(int(lease_seconds), 1800))
+
+        def mutate(data: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+            rows: list[dict[str, Any]] = []
+            for row in data.values():
+                if not isinstance(row, dict):
+                    continue
+                status = str(row.get("status") or "")
+                if status == "running":
+                    lease_expires = _parse(row.get("lease_expires_at"))
+                    if lease_expires is not None and lease_expires <= current:
+                        row.update({
+                            "status": "deferred",
+                            "lease_owner": None,
+                            "lease_expires_at": None,
+                            "updated_at": _iso(current),
+                        })
+                        status = "deferred"
+                if status not in {"pending", "deferred"}:
+                    continue
+                retry_at = _parse(row.get("next_retry_at"))
+                if retry_at is not None and retry_at > current:
+                    continue
+                rows.append(row)
+
+            rows.sort(
+                key=lambda row: (
+                    -_effective_priority(row, now=current),
+                    -_priority(row.get("priority_score")),
+                    int(row.get("attempts") or 0),
+                    str(row.get("created_at") or ""),
+                    str(row.get("prospect_id") or ""),
+                )
+            )
+            selected = rows[:safe_limit]
+            expires = _iso(current + timedelta(seconds=safe_lease))
+            claimed: list[dict[str, Any]] = []
+            for row in selected:
+                row.update({
+                    "status": "running",
+                    "lease_owner": owner,
+                    "lease_expires_at": expires,
+                    "updated_at": _iso(current),
+                })
+                claimed.append(dict(row))
+            return claimed
+
+        return list(_locked_update(self.deferred_path, mutate))
+
     def defer_again(
         self,
         prospect_id: str,
@@ -340,6 +402,8 @@ class BuyerDeferredEnrichmentQueue:
                 "next_retry_at": _iso(
                     now + timedelta(minutes=max(5, int(retry_minutes)))
                 ),
+                "lease_owner": None,
+                "lease_expires_at": None,
             })
         _locked_update(self.deferred_path, mutate)
 
@@ -353,6 +417,8 @@ class BuyerDeferredEnrichmentQueue:
                 "outcome": str(outcome or "resolved"),
                 "updated_at": _iso(),
                 "next_retry_at": None,
+                "lease_owner": None,
+                "lease_expires_at": None,
             })
         _locked_update(self.deferred_path, mutate)
 

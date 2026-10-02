@@ -72,3 +72,69 @@ def test_due_deprioritises_retry_saturated_site_failure(tmp_path):
         "evidence-rich",
         "saturated",
     ]
+
+
+def test_claim_due_prevents_duplicate_worker_claims(tmp_path):
+    q = _queue(tmp_path)
+    for prospect_id in ("p1", "p2", "p3", "p4"):
+        q.enqueue({
+            "prospect_id": prospect_id,
+            "reason": "no_contact_evidence",
+            "priority_score": 90,
+        })
+
+    first = q.claim_due(limit=2, worker_id="worker-a")
+    second = q.claim_due(limit=2, worker_id="worker-b")
+
+    first_ids = {row["prospect_id"] for row in first}
+    second_ids = {row["prospect_id"] for row in second}
+    assert first_ids
+    assert second_ids
+    assert first_ids.isdisjoint(second_ids)
+
+
+def test_expired_claim_is_recovered_by_another_worker(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "p1",
+        "reason": "no_contact_evidence",
+        "priority_score": 90,
+    })
+    now = datetime.now(timezone.utc)
+    first = q.claim_due(
+        limit=1,
+        worker_id="worker-a",
+        lease_seconds=60,
+        now=now,
+    )
+    assert first[0]["lease_owner"] == "worker-a"
+
+    recovered = q.claim_due(
+        limit=1,
+        worker_id="worker-b",
+        lease_seconds=60,
+        now=now + timedelta(seconds=61),
+    )
+    assert recovered[0]["prospect_id"] == "p1"
+    assert recovered[0]["lease_owner"] == "worker-b"
+
+
+def test_defer_again_clears_worker_lease(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "p1",
+        "reason": "no_contact_evidence",
+        "priority_score": 90,
+    })
+    q.claim_due(limit=1, worker_id="worker-a")
+    q.defer_again(
+        "p1",
+        reason="no_bound_contact",
+        attempts=1,
+        retry_minutes=5,
+    )
+    import json
+    row = json.loads((tmp_path / "deferred.json").read_text())["p1"]
+    assert row["status"] == "deferred"
+    assert row["lease_owner"] is None
+    assert row["lease_expires_at"] is None

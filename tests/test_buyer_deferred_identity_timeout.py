@@ -75,7 +75,7 @@ def test_targeted_probe_budget_exhaustion_is_durably_redeferred(monkeypatch):
         def __init__(self):
             self.deferred = []
             FakeQueue.instance = self
-        def due(self, *, limit):
+        def claim_due(self, *, limit, worker_id, lease_seconds):
             return [{
                 "prospect_id": "p1",
                 "attempts": 0,
@@ -123,7 +123,7 @@ def test_high_priority_retry_backoff_is_fast_but_bounded():
     assert worker._retry_minutes(item, 2) == 20
     assert worker._retry_minutes(item, 3) == 40
     assert worker._retry_minutes(item, 4) == 60
-    assert worker._retry_minutes(item, 8) == 60
+    assert worker._retry_minutes(item, 8) == 180
 
 
 def test_normal_retry_backoff_preserves_existing_cadence():
@@ -132,4 +132,4 @@ def test_normal_retry_backoff_preserves_existing_cadence():
     assert worker._retry_minutes(item, 2) == 60
     assert worker._retry_minutes(item, 3) == 120
     assert worker._retry_minutes(item, 4) == 240
-    assert worker._retry_minutes(item, 8) == 240
+    assert worker._retry_minutes(item, 8) == 180

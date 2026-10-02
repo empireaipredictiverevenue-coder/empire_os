@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import fcntl
 import json
+import os
 import subprocess
 import sys
 import urllib.parse
@@ -461,9 +463,22 @@ def _propose_review(
         and response.get("review_id")
     )
 
-def run_cycle(*, limit: int = 5) -> dict[str, Any]:
+def run_cycle(
+    *,
+    limit: int = 5,
+    worker_id: str | None = None,
+    materialize_calls: bool = True,
+) -> dict[str, Any]:
     queue = BuyerDeferredEnrichmentQueue()
-    due = queue.due(limit=limit)
+    owner = (
+        str(worker_id or "").strip()
+        or f"buyer-enrichment:{os.getpid()}"
+    )
+    due = queue.claim_due(
+        limit=limit,
+        worker_id=owner,
+        lease_seconds=420,
+    )
     processed = proposed = call_ready = deferred_again = identities_recovered = 0
     errors: list[str] = []
     results: list[dict[str, Any]] = []
@@ -687,10 +702,15 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                 f"{prospect_id}:{type(exc).__name__}:{str(exc)[:240]}"
             )
 
-    call_plans = materialize_call_plans()
+    call_plans = (
+        materialize_call_plans()
+        if materialize_calls
+        else {"count": 0}
+    )
     return {
         "schema_version": "empire.buyer_deferred_enrichment.v1",
         "mode": "INTERNAL_ENRICHMENT",
+        "worker_id": owner,
         "processed": processed,
         "network_probes_used": network_probes,
         "network_probe_budget": network_probe_budget,
@@ -711,9 +731,81 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
     }
 
 
+def run_parallel_cycle(
+    *,
+    limit: int = 16,
+    workers: int = 4,
+) -> dict[str, Any]:
+    total_limit = max(1, min(int(limit), 25))
+    worker_count = max(1, min(int(workers), 4, total_limit))
+    base = total_limit // worker_count
+    remainder = total_limit % worker_count
+    lane_limits = [
+        base + (1 if index < remainder else 0)
+        for index in range(worker_count)
+    ]
+    lane_limits = [value for value in lane_limits if value > 0]
+
+    lanes: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=len(lane_limits)) as executor:
+        futures = {
+            executor.submit(
+                run_cycle,
+                limit=lane_limit,
+                worker_id=f"buyer-enrichment:{os.getpid()}:lane-{index+1}",
+                materialize_calls=False,
+            ): index
+            for index, lane_limit in enumerate(lane_limits)
+        }
+        for future in as_completed(futures):
+            lanes.append(future.result())
+
+    call_plans = materialize_call_plans()
+    queue = BuyerDeferredEnrichmentQueue()
+    numeric = (
+        "processed",
+        "network_probes_used",
+        "network_probe_budget",
+        "buyer_reviews_proposed",
+        "identities_recovered",
+        "deferred_again",
+        "call_ready_added",
+    )
+    merged = {
+        key: sum(int(row.get(key) or 0) for row in lanes)
+        for key in numeric
+    }
+    merged.update({
+        "schema_version": "empire.buyer_deferred_enrichment.v2",
+        "mode": "INTERNAL_ENRICHMENT_PARALLEL",
+        "worker_count": len(lane_limits),
+        "lane_limits": lane_limits,
+        "errors": [
+            error
+            for row in lanes
+            for error in (row.get("errors") or [])
+        ],
+        "queue": queue.snapshot(),
+        "call_plans": {
+            "count": call_plans.get("count", 0),
+            "execution_allowed": False,
+        },
+        "live_calls_placed": 0,
+        "execution_allowed": False,
+        "authority_expansion": False,
+        "results": [
+            result
+            for row in lanes
+            for result in (row.get("results") or [])
+        ],
+    })
+    return merged
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=5)
+    parser.add_argument("--limit", type=int, default=16)
+    parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
 
     DEFERRED_LOCK.parent.mkdir(parents=True, exist_ok=True)
@@ -732,7 +824,10 @@ def main() -> int:
             }, indent=2, sort_keys=True))
             return 0
 
-        result = run_cycle(limit=max(1, min(args.limit, 25)))
+        result = run_parallel_cycle(
+            limit=max(1, min(args.limit, 25)),
+            workers=max(1, min(args.workers, 4)),
+        )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
 
