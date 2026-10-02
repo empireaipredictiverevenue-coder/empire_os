@@ -522,3 +522,27 @@ def test_pipeline_prioritizes_fresh_reviews_and_excludes_stale_backlog():
     assert "order=proposed_at.desc" in pending_path
     assert "proposed_at=gte." in pending_path
     assert "2026-09-14T16%3A00%3A00%2B00%3A00" in pending_path
+
+
+def test_pipeline_only_uses_fresh_approved_contacts_as_duplicate_blockers():
+    seen_paths = []
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            seen_paths.append(path)
+            return []
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        raise AssertionError((method, path))
+
+    run_gtm_pipeline(request, now=NOW)
+
+    approved_path = next(
+        path for path in seen_paths
+        if "status=eq.approved" in path
+    )
+    assert "reviewed_at=gte." in approved_path
+    assert "order=reviewed_at.desc" in approved_path
+    assert "2026-09-14T16%3A00%3A00%2B00%3A00" in approved_path

@@ -345,9 +345,12 @@ def run_gtm_pipeline(
     if not isinstance(pending, list):
         raise ValueError("pending review projection must be a list")
 
+    approved_cutoff = current - timedelta(days=7)
     approved_query = urlencode({
-        "select": "contact_email",
+        "select": "contact_email,reviewed_at",
         "status": "eq.approved",
+        "reviewed_at": f"gte.{approved_cutoff.isoformat()}",
+        "order": "reviewed_at.desc",
         "limit": "100",
     })
     approved_rows = request(
