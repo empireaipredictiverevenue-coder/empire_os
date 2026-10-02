@@ -623,10 +623,10 @@ Protected paths remain untouched:
 
 Completion backlog:
 - [ ] Review every registered `ACTIVE_BUILD`, `SALVAGE_CANDIDATE`, `REBUILD_LATER` and `FOUNDER_GATE` asset against the current canonical architecture
-- [ ] Finish Permit Intelligence product/runtime integration
-- [ ] Finish Property Intelligence product/runtime integration
-- [ ] Finish Private Capital / Roll-Up Intelligence product/runtime integration
-- [ ] Finish Storm / Weather Intelligence and Storm Leads Multiplier integration
+- [x] Finish Permit Intelligence product/runtime integration
+- [x] Finish Property Intelligence product/runtime integration
+- [x] Finish Private Capital / Roll-Up Intelligence product/runtime integration
+- [x] Finish Storm / Weather Intelligence and Storm Leads Multiplier integration
 - [ ] Finish Satellite / Volumetric / spatial-intelligence recovery where evidence quality supports it
 - [ ] Finish Warehouse / Industrial / Idle-Asset Radar recovery or explicitly retain as INCUBATE
 - [ ] Finish Revenue Pulse restoration on canonical Revenue Truth
