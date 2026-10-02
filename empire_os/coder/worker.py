@@ -221,7 +221,7 @@ class CoderTaskWorker:
         )
 
         if job.kind is JobKind.PLAN:
-            proposal = self.coder.polished_model_output(
+            proposal = self.coder.planner_model_draft(
                 task.id,
                 (
                     "Produce a concise implementation PLAN ONLY for the task. "
@@ -234,14 +234,14 @@ class CoderTaskWorker:
                 ),
                 context,
                 max_output_chars=1800,
-                role="planner",
             )
             return {
                 "kind": job.kind.value,
                 "stage": proposal.stage.value,
                 "candidate_count": len(proposal.candidate_drafts),
                 "revision_count": proposal.revision_count,
-                "refined": bool(str(proposal.refined or "").strip()),
+                "drafted": bool(str(proposal.draft or "").strip()),
+                "refined": False,
                 "actionable_patch": False,
                 "proposal_persisted": True,
                 "production_mutation": False,
