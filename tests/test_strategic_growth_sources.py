@@ -28,3 +28,20 @@ def test_market_capture_adapter_preserves_truth_and_unknowns():
     assert scored['score'] is not None
     assert scored['execution_authority']=='none'
     assert scored['outreach_enabled'] is False
+
+from empire_os.strategic_growth_sources import candidates_from_marketing_plan
+
+
+def test_marketing_plan_adapter_creates_unranked_zero_paid_and_gated_outbound_hypotheses():
+    rows=candidates_from_marketing_plan({
+        'key':'search_growth_gtm','name':'Search Growth','state':'ACTIVE_BUILD',
+        'product_keys':['search_intelligence_suite'],'icps':['growth_team'],
+        'channels':['search','governed_outbound'],
+        'proof_requirements':['observed_search_evidence'],
+    })
+    assert len(rows)==2
+    by_channel={row['channel']:row for row in rows}
+    assert by_channel['search']['estimated_external_cost_cents']==0
+    assert by_channel['search']['evidence_confidence'] is None
+    assert score_strategy_candidate(by_channel['search'])['score'] is None
+    assert by_channel['governed_outbound']['authority_required']=='founder_gate'

@@ -88,3 +88,66 @@ def candidate_from_market_capture(analysis: Mapping[str, Any]) -> dict[str, Any]
         "owner_department": "strategy",
         "authority_required": "observe",
     }
+
+ZERO_PAID_CHANNELS = frozenset({
+    'website','search','content','free_tool','report','demo','partner','referral',
+    'co_marketing','api_trial','account_brief','research_report','portfolio_brief',
+    'opportunity_brief','landing','executive_demo'
+})
+
+
+def candidates_from_marketing_plan(plan: Mapping[str, Any]) -> list[dict[str, Any]]:
+    key=_text(plan.get('key'))
+    state=_text(plan.get('state')).upper()
+    if not key or state not in {'ACTIVE_BUILD','INCUBATE'}:
+        return []
+    channels=[_text(x) for x in plan.get('channels') or [] if _text(x)]
+    icps=[_text(x) for x in plan.get('icps') or [] if _text(x)]
+    products=[_text(x) for x in plan.get('product_keys') or [] if _text(x)]
+    proof=[_text(x) for x in plan.get('proof_requirements') or [] if _text(x)]
+    rows=[]
+    for channel in channels:
+        strategy_type='zero_paid_acquisition' if channel in ZERO_PAID_CHANNELS else 'buyer_acquisition'
+        rows.append({
+            'strategy_id':f'marketing:{key}:{channel}',
+            'strategy_type':strategy_type,
+            'thesis':f'Test {plan.get("name") or key} through {channel} using only proof-backed claims.',
+            'target_market':key,
+            'territory':None,
+            'target_icp':icps[0] if icps else 'unknown',
+            'target_roles':[],
+            'channel':channel,
+            'offer_key':products[0] if products else None,
+            'evidence_refs':[f'marketing_plan:{key}'],
+            'evidence_confidence':None,
+            'expected_upside_cents':None,
+            'estimated_external_cost_cents':0 if channel in ZERO_PAID_CHANNELS else None,
+            'time_to_signal_days':None,
+            'speed_to_signal':None,
+            'reversibility':None,
+            'strategic_fit':None,
+            'product_market_fit':None,
+            'buyer_accessibility':None,
+            'data_advantage':None,
+            'distribution_advantage':None,
+            'competitive_gap':None,
+            'learning_value':None,
+            'moat_contribution':None,
+            'operational_simplicity':None,
+            'external_cost_efficiency':1.0 if channel in ZERO_PAID_CHANNELS else None,
+            'dependencies':['commercial_marketing_registry'],
+            'risks':proof,
+            'experiment':{
+                'hypothesis':f'{channel} can generate qualified evidence for {key}.',
+                'baseline':'unknown until first observed channel sample',
+                'intervention':f'run governed {channel} experiment after evidence review',
+                'target_metric':'qualified_commercial_signal',
+                'measurement_window':'30 days',
+                'minimum_evidence_threshold':'1 observed qualified signal',
+                'expected_learning':f'whether {channel} is viable for {key}',
+            },
+            'kill_criteria':['no observed qualified signal within measurement window'],
+            'owner_department':'marketing',
+            'authority_required':'observe' if channel != 'governed_outbound' else 'founder_gate',
+        })
+    return rows
