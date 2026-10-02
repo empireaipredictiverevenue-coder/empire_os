@@ -812,7 +812,7 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [ ] Space Agent founder workspace wired to local llama.cpp via authenticated proxy fallback — CODED; live model verification pending
 - [ ] Space Agent Founder/department Mission Control workspace
 - [x] Founder Execution Plane read API — LIVE; tool-health read surface verified
-- [ ] Founder execution-ledger read API — CODED; service restart/runtime verification pending
+- [x] Founder execution-ledger read API — LIVE VERIFIED 2026-10-02
 - [x] Control Fabric execution-plane registration — LIVE VERIFIED 2026-10-02
 - [ ] Swarm V6 verification hook for candidate worker output
 - [ ] Promptfoo AI-policy/eval hook for agent-produced behavioral changes
@@ -848,7 +848,7 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Install/verify Pi runtime — v0.87.1 healthy; coding promotion still gated by structured tool-call probe
 - [x] Install/verify Agent Reach runtime — isolated runtime healthy
 - [x] Install/verify Space Agent runtime — loopback 127.0.0.1:3010 healthy
-- [ ] Verify Founder execution-plane API live
+- [x] Verify Founder execution-plane API live — VERIFIED 2026-10-02
 - [ ] Run first bounded Hermes build through central mutation lease
 - [ ] Run first bounded Pi build through sandbox + independent candidate verification — native Pi mutation demoted on current qwen2.5-coder:1.5b after repeated structured-tool-call probe failure
 - [ ] Empire Coder disposable-clone structured-patch fallback — CODED; live capability probe + proposal proof pending
