@@ -10,6 +10,7 @@ def test_commercial_exchange_service_is_read_only_runtime_materializer():
     ).read_text()
 
     assert "EnvironmentFile=/etc/empire_os.env" in text
+    assert "EnvironmentFile=/etc/empiredb.env" in text
     assert "scripts/refresh_commercial_exchange.py" in text
     assert "ProtectSystem=strict" in text
     assert "ReadWritePaths=/srv/empire_os/runtime" in text

@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=/srv/empire_os
 EnvironmentFile=/etc/empire_os.env
+EnvironmentFile=/etc/empiredb.env
 Environment=PYTHONPATH=/srv/empire_os
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/refresh_commercial_exchange.py --repo-root /srv/empire_os --limit 200
 NoNewPrivileges=true

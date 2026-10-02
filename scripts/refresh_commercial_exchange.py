@@ -1,48 +1,51 @@
 #!/usr/bin/env python3
-"""Refresh Phase 4 Commercial Exchange snapshot from canonical Supabase truth."""
+"""Refresh Phase 4 Commercial Exchange snapshot from canonical EmpireDB truth."""
 from __future__ import annotations
 
 import argparse
 import json
-import urllib.parse
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 from empire_os.buyer_allocation import fetch_buyer_rows
+from empire_os.buyer_allocation_repository import (
+    BUYER_COLUMNS,
+    IDENTITY_COLUMNS,
+    QUALIFICATION_COLUMNS,
+    BuyerAllocationDataRepository,
+)
+from empire_os.canonical_data_gateway import (
+    CanonicalDataGateway,
+    empiredb_gateway_from_environment,
+)
 from empire_os.commercial_exchange_inventory import (
     build_exchange_snapshot,
     write_exchange_snapshot,
 )
-from empire_os.sb import request_json
+from empire_os.data_query import DataFilter, OrderSpec
 from empire_os.niche_taxonomy import normalise
-from empire_os.buyer_allocation_repository import BuyerAllocationDataRepository
-from empire_os.canonical_data_gateway import gateway_from_environment
-from empire_os.runtime_env import load_runtime_env
 
 
-def reader(path: str, params: dict[str, str]) -> Any:
-    query = urllib.parse.urlencode(params)
-    return request_json("GET", f"{path}?{query}")
+PROSPECT_COLUMNS = "id,business_name,niche,metro,created_at,status"
+FULFILMENT_COLUMNS = "prospect_id,state"
+SOURCE = "canonical_empiredb_projection"
 
 
-def fetch_prospects(limit: int) -> list[dict[str, Any]]:
-    rows = reader(
-        "/rest/v1/prospects",
-        {
-            "select": "id,business_name,niche,metro,created_at,status",
-            "order": "created_at.desc",
-            "limit": str(max(1, min(int(limit), 500))),
-        },
+def fetch_prospects(
+    gateway: CanonicalDataGateway,
+    limit: int,
+) -> list[dict[str, Any]]:
+    return gateway.query(
+        "prospects",
+        PROSPECT_COLUMNS,
+        order=(OrderSpec("created_at", descending=True),),
+        limit=max(1, min(int(limit), 500)),
     )
-    return [row for row in (rows or []) if isinstance(row, dict)]
-
-
-def _in_filter(ids: list[str]) -> str:
-    return "in.(" + ",".join(ids) + ")"
 
 
 def fetch_qualification_map(
+    gateway: CanonicalDataGateway,
     prospect_ids: list[str],
 ) -> dict[str, dict[str, Any] | None]:
     result: dict[str, dict[str, Any] | None] = {
@@ -51,25 +54,19 @@ def fetch_qualification_map(
     if not prospect_ids:
         return result
 
-    rows = reader(
-        "/rest/v1/prospect_qualifications",
-        {
-            "select": (
-                "id,prospect_id,entity_id,score,tier,status,"
-                "scoring_engine,scoring_version,evidence_confidence,"
-                "observed_dimensions,unknown_dimensions,scored_at"
-            ),
-            "prospect_id": _in_filter(prospect_ids),
-            "scoring_engine": "eq.empire_os.lead_scoring",
-            "scoring_version": "in.(v2,v1)",
-            "order": "scored_at.desc",
-            "limit": str(max(2, len(prospect_ids) * 2)),
-        },
+    rows = gateway.query(
+        "prospect_qualifications",
+        QUALIFICATION_COLUMNS,
+        filters=(
+            DataFilter.in_("prospect_id", prospect_ids),
+            DataFilter.eq("scoring_engine", "empire_os.lead_scoring"),
+            DataFilter.in_("scoring_version", ("v2", "v1")),
+        ),
+        order=(OrderSpec("scored_at", descending=True),),
+        limit=max(2, min(len(prospect_ids) * 2, 1000)),
     )
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in rows or []:
-        if not isinstance(row, dict):
-            continue
+    for row in rows:
         pid = str(row.get("prospect_id") or "").strip()
         if pid:
             grouped[pid].append(row)
@@ -79,9 +76,7 @@ def fetch_qualification_map(
             chosen = next(
                 (
                     row for row in candidates
-                    if normalise(
-                        row.get("scoring_version") or "v1"
-                    ) == version
+                    if normalise(row.get("scoring_version") or "v1") == version
                 ),
                 None,
             )
@@ -92,6 +87,7 @@ def fetch_qualification_map(
 
 
 def fetch_identity_map(
+    gateway: CanonicalDataGateway,
     prospect_ids: list[str],
 ) -> dict[str, dict[str, Any] | None]:
     result: dict[str, dict[str, Any] | None] = {
@@ -100,22 +96,18 @@ def fetch_identity_map(
     if not prospect_ids:
         return result
 
-    rows = reader(
-        "/rest/v1/prospect_entity_links",
-        {
-            "select": (
-                "prospect_id,entity_id,match_score,active,created_at"
-            ),
-            "prospect_id": _in_filter(prospect_ids),
-            "active": "eq.true",
-            "order": "created_at.desc",
-            "limit": str(max(2, len(prospect_ids) * 2)),
-        },
+    rows = gateway.query(
+        "prospect_entity_links",
+        IDENTITY_COLUMNS,
+        filters=(
+            DataFilter.in_("prospect_id", prospect_ids),
+            DataFilter.eq("active", True),
+        ),
+        order=(OrderSpec("created_at", descending=True),),
+        limit=max(2, min(len(prospect_ids) * 2, 1000)),
     )
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in rows or []:
-        if not isinstance(row, dict):
-            continue
+    for row in rows:
         pid = str(row.get("prospect_id") or "").strip()
         if pid:
             grouped[pid].append(row)
@@ -128,50 +120,43 @@ def fetch_identity_map(
 
 
 def fetch_allocated_prospect_ids(
+    gateway: CanonicalDataGateway,
     prospect_ids: list[str],
 ) -> set[str]:
     if not prospect_ids:
         return set()
 
-    rows = reader(
-        "/rest/v1/fulfilment_orders",
-        {
-            "select": "prospect_id,state",
-            "prospect_id": _in_filter(prospect_ids),
-            "state": "not.in.(rejected,cancelled)",
-            "limit": str(max(1, len(prospect_ids) * 2)),
-        },
+    rows = gateway.query(
+        "fulfilment_orders",
+        FULFILMENT_COLUMNS,
+        filters=(
+            DataFilter.in_("prospect_id", prospect_ids),
+            DataFilter.not_in("state", ("rejected", "cancelled")),
+        ),
+        limit=max(1, min(len(prospect_ids) * 2, 1000)),
     )
     return {
         str(row.get("prospect_id") or "").strip()
-        for row in (rows or [])
-        if isinstance(row, dict)
-        and str(row.get("prospect_id") or "").strip()
+        for row in rows
+        if str(row.get("prospect_id") or "").strip()
     }
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--repo-root", default="/srv/empire_os")
-    parser.add_argument("--limit", type=int, default=200)
-    args = parser.parse_args()
-
-    prospects = fetch_prospects(args.limit)
+def build_runtime_snapshot(
+    gateway: CanonicalDataGateway,
+    *,
+    limit: int,
+) -> dict[str, Any]:
+    prospects = fetch_prospects(gateway, limit)
     prospect_ids = [
         str(row.get("id") or "").strip()
         for row in prospects
         if str(row.get("id") or "").strip()
     ]
-
-    qualifications = fetch_qualification_map(prospect_ids)
-    identity_links = fetch_identity_map(prospect_ids)
-    buyer_repository = BuyerAllocationDataRepository(
-        gateway_from_environment(
-            load_runtime_env("/etc/empire_os.env")
-        )
-    )
-    buyers = fetch_buyer_rows(buyer_repository)
-    allocated = fetch_allocated_prospect_ids(prospect_ids)
+    qualifications = fetch_qualification_map(gateway, prospect_ids)
+    identity_links = fetch_identity_map(gateway, prospect_ids)
+    buyers = fetch_buyer_rows(BuyerAllocationDataRepository(gateway))
+    allocated = fetch_allocated_prospect_ids(gateway, prospect_ids)
 
     snapshot = build_exchange_snapshot(
         prospects=prospects,
@@ -180,6 +165,7 @@ def main() -> int:
         buyers=buyers,
         allocated_prospect_ids=allocated,
     )
+    snapshot["source"] = SOURCE
     snapshot["prospects_scanned"] = len(prospects)
     snapshot["qualification_rows_available"] = sum(
         value is not None for value in qualifications.values()
@@ -188,10 +174,23 @@ def main() -> int:
         value is not None for value in identity_links.values()
     )
     snapshot["buyers_scanned"] = len(buyers)
+    snapshot["canonical_backend"] = gateway.snapshot().primary_backend.value
+    return snapshot
 
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo-root", default="/srv/empire_os")
+    parser.add_argument("--limit", type=int, default=200)
+    args = parser.parse_args()
+
+    gateway = empiredb_gateway_from_environment()
+    snapshot = build_runtime_snapshot(gateway, limit=args.limit)
     write_exchange_snapshot(Path(args.repo_root), snapshot)
     print(json.dumps({
         "ok": True,
+        "source": snapshot["source"],
+        "canonical_backend": snapshot["canonical_backend"],
         "prospects_scanned": snapshot["prospects_scanned"],
         "inventory_count": snapshot["inventory_count"],
         "overflow_count": snapshot["overflow_count"],
