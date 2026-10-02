@@ -1,3 +1,4 @@
+import json
 import subprocess
 
 import pytest
@@ -497,3 +498,81 @@ def test_mutation_lease_requirement_tracks_hermes_authority():
 
     assert observe.requires_mutation_lease is False
     assert internal_write.requires_mutation_lease is True
+
+
+def test_omniroute_probe_updates_canonical_model_health(monkeypatch, tmp_path):
+    from empire_os import hermes_control
+
+    receipts = tmp_path / "receipts.jsonl"
+    health = tmp_path / "model_health.json"
+    monkeypatch.setenv("LLM_RECEIPT_PATH", str(receipts))
+    monkeypatch.setenv("LLM_HEALTH_PATH", str(health))
+    monkeypatch.setattr(
+        hermes_control,
+        "_fetch_omniroute_catalog",
+        lambda **kwargs: (
+            "openrouter/openrouter/free",
+            "openrouter/cohere/north-mini-code:free",
+        ),
+    )
+    outcomes = {
+        "openrouter/openrouter/free": (False, "network:TimeoutError"),
+        "openrouter/cohere/north-mini-code:free": (True, "ok"),
+    }
+    monkeypatch.setattr(
+        hermes_control,
+        "_probe_omniroute_model",
+        lambda *, model, **kwargs: outcomes[model],
+    )
+    monkeypatch.delenv("EMPIRE_HERMES_MODEL_CANDIDATES", raising=False)
+
+    model, _ = hermes_control._select_omniroute_model({
+        "OPENAI_BASE_URL": "http://127.0.0.1:20128/v1",
+        "OPENAI_API_KEY": "local-key",
+    })
+
+    assert model == "openrouter/cohere/north-mini-code:free"
+    payload = json.loads(health.read_text())
+    assert payload["models"]["openrouter:openrouter/free"]["failures"] == 1
+    assert payload["models"]["openrouter:cohere/north-mini-code:free"]["successes"] == 1
+
+
+def test_omniroute_selector_skips_degraded_health_candidate(monkeypatch, tmp_path):
+    from empire_os import hermes_control
+
+    health = tmp_path / "model_health.json"
+    health.write_text(json.dumps({
+        "schema_version": "model_health.v1",
+        "models": {
+            "openrouter:openrouter/free": {
+                "status": "degraded",
+                "samples": 5,
+                "successes": 0,
+                "failures": 5,
+            }
+        },
+    }))
+    monkeypatch.setenv("LLM_HEALTH_PATH", str(health))
+    monkeypatch.setenv("LLM_RECEIPT_PATH", str(tmp_path / "receipts.jsonl"))
+    monkeypatch.setattr(
+        hermes_control,
+        "_fetch_omniroute_catalog",
+        lambda **kwargs: (
+            "openrouter/openrouter/free",
+            "openrouter/cohere/north-mini-code:free",
+        ),
+    )
+    probed = []
+    def fake_probe(*, model, **kwargs):
+        probed.append(model)
+        return True, "ok"
+    monkeypatch.setattr(hermes_control, "_probe_omniroute_model", fake_probe)
+    monkeypatch.delenv("EMPIRE_HERMES_MODEL_CANDIDATES", raising=False)
+
+    model, _ = hermes_control._select_omniroute_model({
+        "OPENAI_BASE_URL": "http://127.0.0.1:20128/v1",
+        "OPENAI_API_KEY": "local-key",
+    })
+
+    assert model == "openrouter/cohere/north-mini-code:free"
+    assert probed == ["openrouter/cohere/north-mini-code:free"]

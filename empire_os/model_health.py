@@ -26,7 +26,14 @@ WINDOW = int(os.environ.get("LLM_HEALTH_WINDOW", "50"))
 class ModelHealth:
     """Track recent success/failure/latency per provider/model."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        receipt_path: str | Path | None = None,
+        health_path: str | Path | None = None,
+    ) -> None:
+        self.receipt_path = Path(receipt_path or RECEIPT_PATH)
+        self.health_path = Path(health_path or HEALTH_PATH)
         self.samples: dict[str, deque[dict[str, Any]]] = defaultdict(
             lambda: deque(maxlen=WINDOW)
         )
@@ -36,11 +43,11 @@ class ModelHealth:
         return f"{provider}:{model}"
 
     def load_receipts(self) -> None:
-        if not RECEIPT_PATH.exists():
+        if not self.receipt_path.exists():
             return
 
         try:
-            with RECEIPT_PATH.open("r", encoding="utf-8") as fh:
+            with self.receipt_path.open("r", encoding="utf-8") as fh:
                 for line in fh:
                     line = line.strip()
                     if not line:
@@ -121,8 +128,8 @@ class ModelHealth:
         return result
 
     def save(self) -> None:
-        HEALTH_PATH.parent.mkdir(parents=True, exist_ok=True)
-        tmp = HEALTH_PATH.with_suffix(".tmp")
+        self.health_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.health_path.with_suffix(".tmp")
         tmp.write_text(
             json.dumps(
                 {
@@ -134,7 +141,7 @@ class ModelHealth:
             ) + "\n",
             encoding="utf-8",
         )
-        tmp.replace(HEALTH_PATH)
+        tmp.replace(self.health_path)
 
 
 if __name__ == "__main__":

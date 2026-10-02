@@ -812,6 +812,36 @@ def _select_omniroute_model(
             "paid inference remains disabled"
         )
 
+    health_path = Path(os.environ.get(
+        "LLM_HEALTH_PATH",
+        "/srv/empire_os/runtime/llm/model_health.json",
+    ))
+    try:
+        health_payload = json.loads(health_path.read_text(encoding="utf-8"))
+    except Exception:
+        health_payload = {}
+    health_models = health_payload.get("models") if isinstance(health_payload, dict) else {}
+    health_models = health_models if isinstance(health_models, dict) else {}
+
+    def candidate_is_healthy(model: str) -> bool:
+        provider = "openrouter" if model.startswith("openrouter/") else "omniroute"
+        model_name = model.split("/", 1)[1] if model.startswith("openrouter/") else model
+        evidence = health_models.get(f"{provider}:{model_name}")
+        if not isinstance(evidence, dict):
+            return True
+        try:
+            samples = int(evidence.get("samples") or 0)
+        except (TypeError, ValueError):
+            samples = 0
+        status = str(evidence.get("status") or "unknown").strip().lower()
+        return not (status == "degraded" and samples >= 5)
+
+    candidates = tuple(model for model in candidates if candidate_is_healthy(model))
+    if not candidates:
+        raise HermesControlError(
+            "OmniRoute has no healthy eligible zero-cost Hermes model candidates"
+        )
+
     def cooldown_seconds(reason: str) -> int | None:
         if "http_429" not in reason or "model_cooldown" not in reason:
             return None
@@ -823,12 +853,67 @@ def _select_omniroute_model(
             min(int(match.group(1)), MAX_COOLDOWN_RETRY_SECONDS),
         )
 
+    def record_probe_health(
+        model: str,
+        *,
+        ok: bool,
+        reason: str,
+        latency_ms: float,
+    ) -> None:
+        provider = "openrouter" if model.startswith("openrouter/") else "omniroute"
+        model_name = model.split("/", 1)[1] if model.startswith("openrouter/") else model
+        receipt_path = Path(os.environ.get(
+            "LLM_RECEIPT_PATH",
+            "/srv/empire_os/runtime/llm/receipts.jsonl",
+        ))
+        health_path = Path(os.environ.get(
+            "LLM_HEALTH_PATH",
+            "/srv/empire_os/runtime/llm/model_health.json",
+        ))
+        try:
+            receipt_path.parent.mkdir(parents=True, exist_ok=True)
+            event = {
+                "ts": time.time(),
+                "task": "hermes_omniroute_probe",
+                "route": "hermes_omniroute",
+                "provider": provider,
+                "model": model_name,
+                "router_score": 0.0,
+                "reasoning_gain_prior": 0.0,
+                "estimated_cost": 0.0,
+                "ok": bool(ok),
+                "attempt": 1,
+                "latency_ms": round(float(latency_ms), 1),
+            }
+            if not ok:
+                event["error"] = str(reason)[:300]
+            with receipt_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(event) + "\n")
+            from empire_os.model_health import ModelHealth
+            health = ModelHealth(
+                receipt_path=receipt_path,
+                health_path=health_path,
+            )
+            health.load_receipts()
+            health.calculate()
+            health.save()
+        except Exception:
+            # Health evidence must never make Hermes execution fail harder.
+            pass
+
     attempts: list[dict[str, str]] = []
     for index, model in enumerate(candidates):
+        probe_started = time.monotonic()
         ok, reason = _probe_omniroute_model(
             base_url=base_url,
             api_key=api_key,
             model=model,
+        )
+        record_probe_health(
+            model,
+            ok=ok,
+            reason=reason,
+            latency_ms=(time.monotonic() - probe_started) * 1000.0,
         )
         attempts.append(
             {
@@ -850,10 +935,17 @@ def _select_omniroute_model(
             delay = cooldown_seconds(reason)
             if delay is not None:
                 time.sleep(delay + 1)
+                retry_started = time.monotonic()
                 retry_ok, retry_reason = _probe_omniroute_model(
                     base_url=base_url,
                     api_key=api_key,
                     model=model,
+                )
+                record_probe_health(
+                    model,
+                    ok=retry_ok,
+                    reason=retry_reason,
+                    latency_ms=(time.monotonic() - retry_started) * 1000.0,
                 )
                 attempts.append(
                     {
