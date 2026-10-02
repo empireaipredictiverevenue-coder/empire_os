@@ -1,0 +1,14 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [],
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T23:10:37.328678+00:00",
+  "job_id": "coder-plan-coder_job_e0335cf618dc4c7d9e87b6aeed873989",
+  "kind": "code_task",
+  "lease_resources": [],
+  "max_runtime_seconds": 600,
+  "prompt": "Produce a concise advisory implementation PLAN ONLY for the following EmpireOS task. Do not edit files, emit deployment commands, perform production actions, contact external parties, mutate databases, move funds, or expand authority. Identify affected modules, focused tests, main risks, dependencies, and approval gates.\n\nTASK:\nAct as the Empire Product Verification Team. Test every canonical Empire commercial product that is not currently leased to another workstream. Digital Avatar/Recall are explicitly out of scope here because their separate team owns them; record them as externally-owned/unverified here rather than touching their files or services. Build a product-code-complete verification matrix from canonical product/catalog sources. For each product verify: product identity/code, implementation path, unit/integration tests, pricing/catalog binding where canonical evidence exists, readiness blockers, fail-closed behavior, fulfilment/order integration where applicable, and no false sellability. Run the full Predictive Revenue and Predictive Cloud battery as a first-class suite: predictive_revenue_products, predictive_revenue_formula, predictive_revenue_demo, enterprise acquisition/activation/location/pool/targets, private deployment, predictive_cloud_formula, predictive_cloud_status/API, predictive_cloud_v3, and predictive_cloud_scenario_optimization. Also test Exchange MRR and Business Optimization product suites. Do not perform outbound, checkout, payment, funds movement, binding terms, live calls, revenue recognition, DB migrations, or destructive operations. Produce evidence-backed PASS/BLOCKED/FAIL per product; UNKNOWN stays UNKNOWN. Do not mark any product verified without actual passing evidence.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
