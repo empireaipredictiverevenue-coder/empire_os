@@ -23,6 +23,9 @@ from empire_os.hunter.domain_intelligence import analyze_domain
 from empire_os.hunter.models import VerificationState
 from empire_os.hunter.verification_mesh import VerificationMesh
 from empire_os.mx_validator import MxValidator
+from empire_os.public_person_contact_evidence import (
+    collect_public_person_contact_evidence,
+)
 from empire_os.search_fabric.site_probe import probe_site
 
 
@@ -288,6 +291,37 @@ def run(
             hunter_first_party,
         )
 
+    public_person_contact = {
+        "attempted": False,
+        "evidence": [],
+        "execution_authority": "none",
+        "outbound_authorized": False,
+        "database_write_performed": False,
+    }
+    has_bound = any(
+        isinstance(item, dict)
+        and item.get("bound_to_decision_maker") is True
+        for item in (enriched.get("contact_candidates") or [])
+    )
+    decision = enriched.get("decision_maker")
+    if (
+        not has_bound
+        and isinstance(decision, dict)
+        and looks_like_person_name(decision.get("name"))
+    ):
+        public_person_contact = collect_public_person_contact_evidence(
+            business_name=candidate.business_name,
+            website=candidate.website,
+            person_name=str(decision.get("name") or ""),
+            person_title=str(decision.get("title") or ""),
+        )
+        public_evidence = public_person_contact.get("evidence") or []
+        if public_evidence:
+            enriched = merge_public_web_contact_evidence(
+                enriched,
+                public_evidence,
+            )
+
     generated_validated = []
     generated_probe = {"attempted": False, "reason": "not_needed"}
     has_bound = any(
@@ -343,6 +377,7 @@ def run(
             for item in hunter.contacts
             if item.state is VerificationState.PROBABLE
         ],
+        "public_person_contact_evidence": public_person_contact,
         "generated_smtp_contacts": generated_validated,
         "generated_smtp_probe": generated_probe,
         "mode": "OBSERVE",

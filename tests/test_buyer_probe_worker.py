@@ -397,3 +397,122 @@ def test_same_domain_bound_contact_is_not_replaced():
         }],
     )
     assert result["decision_maker"]["name"] == "Jane Smith"
+
+
+def test_public_person_evidence_precedes_generated_email_guessing(monkeypatch):
+    from types import SimpleNamespace
+
+    import empire_os.buyer_probe_worker as worker
+    from empire_os.hunter.models import DomainPattern
+
+    candidate = SimpleNamespace(
+        prospect_id="p-public",
+        business_name="Acme Roofing",
+        website="https://acme.example",
+    )
+    monkeypatch.setattr(worker, "build_candidate", lambda *args, **kwargs: candidate)
+    monkeypatch.setattr(
+        worker,
+        "probe_site",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "evidence_score": 1.0,
+            "budget_exhausted": False,
+            "people": [],
+        },
+    )
+    monkeypatch.setattr(
+        worker,
+        "enrich_candidate",
+        lambda *args, **kwargs: {
+            "decision_maker": {
+                "name": "Jane Smith",
+                "title": "CEO",
+                "decision_role": "economic_buyer",
+                "decision_score": 1.0,
+            },
+            "decision_reconciliation": {
+                "review_required": False,
+            },
+            "contact_candidates": [],
+        },
+    )
+    monkeypatch.setattr(
+        worker,
+        "analyze_domain",
+        lambda *args, **kwargs: SimpleNamespace(
+            confirmed_contacts=(),
+            contacts=(),
+            pattern=DomainPattern(
+                domain="acme.example",
+                pattern=None,
+                observations=0,
+                agreement=0.0,
+                confidence=0.0,
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        worker,
+        "collect_public_person_contact_evidence",
+        lambda **kwargs: {
+            "attempted": True,
+            "evidence": [{
+                "name": "Jane Smith",
+                "title": "CEO",
+                "email": "jane@acme.example",
+                "source_url": "https://acme.example/team/jane",
+                "source_kind": "official_site",
+                "role_corroborated": True,
+                "direct_publication": True,
+            }],
+            "execution_authority": "none",
+            "outbound_authorized": False,
+            "database_write_performed": False,
+        },
+    )
+
+    def merge(enriched, evidence):
+        assert evidence[0]["source_kind"] == "official_site"
+        return {
+            **enriched,
+            "contact_candidates": [{
+                "email": "jane@acme.example",
+                "source": "official_site",
+                "bound_to_decision_maker": True,
+            }],
+        }
+
+    monkeypatch.setattr(worker, "merge_public_web_contact_evidence", merge)
+    monkeypatch.setattr(
+        worker,
+        "_smtp_verified_generated_contacts",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("SMTP guessing should not run")
+        ),
+    )
+    monkeypatch.setattr(
+        worker,
+        "verify_contact_plan",
+        lambda enriched, *, validator, allow_company_routed=False: {
+            "verified_contacts": enriched["contact_candidates"],
+            "review_ready": True,
+            "outreach_ready": True,
+            "preferred_email": "jane@acme.example",
+            "contact_route": "person_bound",
+            "person_bound": True,
+            "routing_name": "Jane Smith",
+            "routing_title": "CEO",
+        },
+    )
+
+    result = worker.run({
+        "id": "p-public",
+        "business_name": "Acme Roofing",
+        "website": "https://acme.example",
+    })
+    assert result["review_ready"] is True
+    assert result["outreach_ready"] is True
+    assert result["preferred_email"] == "jane@acme.example"
+    assert result["generated_smtp_probe"]["attempted"] is False
+    assert result["public_person_contact_evidence"]["attempted"] is True
