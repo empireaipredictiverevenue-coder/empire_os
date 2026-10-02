@@ -809,7 +809,7 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Agent Reach public sensor adapter — LIVE public observation proven with provenance/no truth authority
 - [ ] Credentialed Agent Reach channels remain disabled pending separate architecture/risk contract
 - [x] Space Agent pinned loopback service/bootstrap — LIVE on 127.0.0.1:3010
-- [ ] Space Agent founder workspace wired to local llama.cpp via authenticated proxy fallback — CODED; live model verification pending
+- [x] Space Agent founder workspace wired to local llama.cpp via authenticated proxy fallback — LIVE VERIFIED 2026-10-02
 - [ ] Space Agent Founder/department Mission Control workspace
 - [x] Founder Execution Plane read API — LIVE; tool-health read surface verified
 - [x] Founder execution-ledger read API — LIVE VERIFIED 2026-10-02
