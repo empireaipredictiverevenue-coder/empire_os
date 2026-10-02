@@ -239,6 +239,56 @@ class ContextMemory:
             ),
         }
 
+
+    def retire(
+        self,
+        task_id: str,
+        *,
+        terminal_state: str,
+        job_id: str,
+    ) -> dict[str, Any]:
+        """Retire full rolling model context after durable terminal state exists.
+
+        The task/audit/job records remain durable. Only the reconstructable rolling
+        context snapshot is removed and replaced by a tiny lifecycle tombstone.
+        """
+        path = self._path(task_id)
+        previous = self.load(task_id)
+        version = int((previous or {}).get("version") or 0)
+        if path.exists():
+            path.unlink()
+
+        retired_root = self.store.root / "context_retired"
+        retired_root.mkdir(parents=True, exist_ok=True)
+        os.chmod(retired_root, 0o700)
+        tombstone = {
+            "task_id": task_id,
+            "job_id": str(job_id),
+            "terminal_state": str(terminal_state),
+            "retired_at": utc_now(),
+            "last_context_version": version,
+            "full_context_removed": True,
+        }
+        target = retired_root / f"{task_id}.json"
+        tmp = target.with_suffix(".json.tmp")
+        tmp.write_text(
+            json.dumps(tombstone, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        os.chmod(tmp, 0o600)
+        tmp.replace(target)
+        os.chmod(target, 0o600)
+        self.audit.record(
+            task_id=task_id,
+            event="context_retired",
+            data={
+                "job_id": str(job_id),
+                "terminal_state": str(terminal_state),
+                "last_context_version": version,
+            },
+        )
+        return tombstone
+
     def load(self, task_id: str) -> dict[str, Any] | None:
         path = self._path(task_id)
         if not path.exists():

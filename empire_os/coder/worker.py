@@ -35,6 +35,7 @@ class CoderTaskWorker:
         heartbeat_seconds: int = 30,
         max_attempts: int = 3,
         execution_lease_manager: ExecutionLeaseManager | None = None,
+        context_memory=None,
     ) -> None:
         self.coder = coder
         self.queue = queue
@@ -43,6 +44,11 @@ class CoderTaskWorker:
         self.heartbeat_seconds = max(10, int(heartbeat_seconds))
         self.max_attempts = max(1, int(max_attempts))
         self.execution_leases = execution_lease_manager
+        self.context_memory = (
+            context_memory
+            if context_memory is not None
+            else getattr(coder, "memory", None)
+        )
 
     def _execution_lease_manager(self) -> ExecutionLeaseManager:
         """Resolve the default mutation lease manager only when required.
@@ -95,6 +101,20 @@ class CoderTaskWorker:
             except Exception:
                 return
 
+    def _retire_terminal_context(
+        self,
+        job: CoderJob,
+        terminal: CoderJob,
+    ) -> None:
+        memory = self.context_memory
+        if memory is None:
+            return
+        memory.retire(
+            job.task_id,
+            terminal_state=terminal.status.value,
+            job_id=terminal.id,
+        )
+
     def run_once(self) -> CoderJob | None:
         self.queue.recover_stale(
             stale_seconds=self.stale_seconds,
@@ -126,10 +146,12 @@ class CoderTaskWorker:
             error = f"{exc.__class__.__name__}:{exc}"
             if self._transient_error(exc):
                 if job.attempts >= self.max_attempts:
-                    return self.queue.fail(
+                    terminal = self.queue.fail(
                         job,
                         f"{error}:max_attempts_exhausted",
                     )
+                    self._retire_terminal_context(job, terminal)
+                    return terminal
                 delay = min(300, 30 * (2 ** max(0, job.attempts - 1)))
                 return self.queue.retry(
                     job,
@@ -137,11 +159,15 @@ class CoderTaskWorker:
                     delay_seconds=delay,
                     max_attempts=self.max_attempts,
                 )
-            return self.queue.fail(job, error)
+            terminal = self.queue.fail(job, error)
+            self._retire_terminal_context(job, terminal)
+            return terminal
 
         stop.set()
         heartbeat.join(timeout=2)
-        return self.queue.complete(job, result)
+        terminal = self.queue.complete(job, result)
+        self._retire_terminal_context(job, terminal)
+        return terminal
 
     def _process(self, job: CoderJob) -> dict[str, Any]:
         task = self.coder.load_task(job.task_id)
