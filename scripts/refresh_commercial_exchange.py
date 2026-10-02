@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +31,16 @@ from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
 
 PROSPECT_COLUMNS = "id,business_name,niche,metro,created_at,status"
 FULFILMENT_COLUMNS = "prospect_id,state"
+COMMERCIAL_EVIDENCE_PRICE_COLUMNS = (
+    "id,evidence_kind,niche,metro,amount_cents,currency,unit,source_type,"
+    "source_reference,status,observed_at,valid_until,verified_at"
+)
 SOURCE = "canonical_empiredb_projection"
+COMMERCIAL_PRICE_SOURCE = "canonical_empiredb_commercial_evidence_registry"
+ALLOWED_COMMERCIAL_PRICE_SOURCE_TYPES = frozenset({
+    "buyer_stated", "founder_approved", "observed_contract",
+    "public_price", "provider_invoice", "internal_actual",
+})
 
 
 def fetch_qualified_candidate_ids(
@@ -183,6 +193,92 @@ def fetch_allocated_prospect_ids(
     }
 
 
+def _parse_timestamp(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def fetch_verified_market_prices(
+    gateway: CanonicalDataGateway,
+    *,
+    observed_at: datetime | None = None,
+    limit: int = 1000,
+) -> list[dict[str, Any]]:
+    now = observed_at or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        raise ValueError("observed_at must include timezone")
+    now = now.astimezone(timezone.utc)
+    rows = gateway.query(
+        "commercial_evidence_registry",
+        COMMERCIAL_EVIDENCE_PRICE_COLUMNS,
+        filters=(
+            DataFilter.eq("evidence_kind", "price"),
+            DataFilter.eq("status", "verified"),
+            DataFilter.eq("unit", "per_lead"),
+            DataFilter.eq("currency", "USD"),
+            DataFilter.is_not_null("verified_at"),
+        ),
+        order=(
+            OrderSpec("verified_at", descending=True, nulls_last=True),
+            OrderSpec("observed_at", descending=True, nulls_last=True),
+            OrderSpec("id", descending=False),
+        ),
+        limit=max(1, min(int(limit), 5000)),
+    )
+    result: list[dict[str, Any]] = []
+    for raw in rows:
+        if str(raw.get("evidence_kind") or "").strip() != "price":
+            continue
+        if str(raw.get("status") or "").strip() != "verified":
+            continue
+        if str(raw.get("unit") or "").strip() != "per_lead":
+            continue
+        if str(raw.get("currency") or "").strip().upper() != "USD":
+            continue
+        source_type = str(raw.get("source_type") or "").strip()
+        if source_type not in ALLOWED_COMMERCIAL_PRICE_SOURCE_TYPES:
+            continue
+        niche = str(raw.get("niche") or "").strip()
+        metro = str(raw.get("metro") or "").strip()
+        evidence_id = str(raw.get("id") or "").strip()
+        source_reference = str(raw.get("source_reference") or "").strip()
+        try:
+            amount_cents = int(raw.get("amount_cents") or 0)
+        except (TypeError, ValueError):
+            amount_cents = 0
+        verified_at = _parse_timestamp(raw.get("verified_at"))
+        valid_until = _parse_timestamp(raw.get("valid_until"))
+        if (
+            not niche or not metro or not evidence_id or not source_reference
+            or amount_cents <= 0 or verified_at is None
+            or (valid_until is not None and valid_until <= now)
+        ):
+            continue
+        result.append({
+            "evidence_id": evidence_id,
+            "niche": niche,
+            "metro": metro,
+            "amount_cents": amount_cents,
+            "currency": "USD",
+            "unit": "per_lead",
+            "source_type": source_type,
+            "source_reference": source_reference,
+            "observed_at": str(raw.get("observed_at") or "").strip() or None,
+            "valid_until": str(raw.get("valid_until") or "").strip() or None,
+            "verified_at": str(raw.get("verified_at") or "").strip(),
+            "evidence_ref": f"commercial_evidence:{evidence_id}",
+        })
+    return result
+
+
 def build_runtime_snapshot(
     gateway: CanonicalDataGateway,
     *,
@@ -199,6 +295,7 @@ def build_runtime_snapshot(
     identity_links = fetch_identity_map(gateway, prospect_ids)
     buyers = fetch_buyer_rows(BuyerAllocationDataRepository(gateway))
     allocated = fetch_allocated_prospect_ids(gateway, prospect_ids)
+    verified_market_prices = fetch_verified_market_prices(gateway)
 
     snapshot = build_exchange_snapshot(
         prospects=prospects,
@@ -220,6 +317,13 @@ def build_runtime_snapshot(
         value is not None for value in identity_links.values()
     )
     snapshot["buyers_scanned"] = len(buyers)
+    snapshot["verified_market_prices"] = verified_market_prices
+    snapshot["verified_market_price_count"] = len(verified_market_prices)
+    snapshot["verified_market_price_market_count"] = len({
+        (normalise(row["niche"]), normalise(row["metro"]))
+        for row in verified_market_prices
+    })
+    snapshot["commercial_price_source"] = COMMERCIAL_PRICE_SOURCE
     snapshot["canonical_backend"] = gateway.snapshot().primary_backend.value
     return snapshot
 
@@ -247,6 +351,8 @@ def main() -> int:
         ],
         "buyer_seat_count": snapshot["buyer_seat_count"],
         "corridor_count": snapshot["corridor_count"],
+        "verified_market_price_count": snapshot["verified_market_price_count"],
+        "verified_market_price_market_count": snapshot["verified_market_price_market_count"],
         "supply_gate_diagnostics": snapshot[
             "supply_gate_diagnostics"
         ],

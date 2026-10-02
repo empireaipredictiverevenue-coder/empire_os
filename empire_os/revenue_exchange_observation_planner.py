@@ -321,25 +321,29 @@ def plan_from_runtime_artifacts(
     )
 
     prices: list[MarketPriceEvidence] = []
-    for row in commercial_catalog.get("products") or []:
-        if not isinstance(row, Mapping) or row.get("binding_terms_ready") is not True:
-            continue
-        pb = row.get("price_basis") or {}
-        prices.append(MarketPriceEvidence(
-            niche=_clean(row.get("product_family")),
-            metro="",
-            amount_cents=int(pb.get("amount_cents") or 0),
-            currency=_clean(pb.get("currency") or row.get("currency")),
-            unit=_clean(pb.get("unit")),
-            state=_clean(pb.get("state")),
-            source="canonical_empiredb_commercial_product_catalog",
-            evidence_refs=tuple(
+    if _commercial_exchange_is_canonical(commercial_exchange):
+        for row in commercial_exchange.get("verified_market_prices") or []:
+            if not isinstance(row, Mapping):
+                continue
+            refs = tuple(
                 _clean(ref)
-                for ref in (row.get("evidence_refs") or ())
+                for ref in (
+                    row.get("evidence_ref"),
+                    row.get("source_reference"),
+                )
                 if _clean(ref)
-            ),
-            canonical_empiredb=True,
-        ))
+            )
+            prices.append(MarketPriceEvidence(
+                niche=_clean(row.get("niche")),
+                metro=_clean(row.get("metro")),
+                amount_cents=int(row.get("amount_cents") or 0),
+                currency=_clean(row.get("currency")),
+                unit=_clean(row.get("unit")),
+                state="VERIFIED",
+                source="canonical_empiredb_commercial_evidence_registry",
+                evidence_refs=refs,
+                canonical_empiredb=True,
+            ))
 
     result = plan_revenue_exchange_observations(
         inventory=inventory,
@@ -366,6 +370,8 @@ def plan_from_runtime_artifacts(
             )
             for row in commercial_catalog.get("products") or []
         ),
+        "verified_market_price_count": len(prices),
         "commercial_exchange_observed_rates_promoted_to_verified_price": False,
+        "commercial_catalog_prices_promoted_to_market_price": False,
     }
     return result

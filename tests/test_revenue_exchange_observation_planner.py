@@ -154,3 +154,43 @@ def test_noncanonical_commercial_exchange_never_projects_market_evidence():
     })
     assert inventory==[]
     assert capacity==[]
+
+
+def test_verified_market_price_from_commercial_evidence_completes_observation_not_allocation():
+    commercial_exchange={
+        'source':'canonical_empiredb_projection',
+        'candidate_selection':'qualification_driven',
+        'execution_authority':'none',
+        'actual_revenue':False,
+        'observed_at':'2026-10-02T10:00:00+00:00',
+        'inventory':[{'state':'overflow_no_capacity','niche_family':'roofing','metro':'dallas, tx','prospect_id':'p1','corridor_key':'c1'}],
+        'buyer_seats':[{'seat_state':'blocked_missing_evidence','niche_family':'roofing','metro':'dallas, tx','remaining_capacity':50,'buyer_id':'b1','observed_rate':500.0}],
+        'verified_market_prices':[{
+            'evidence_id':'e1','niche':'roofing','metro':'dallas, tx','amount_cents':12500,
+            'currency':'USD','unit':'per_lead','source_type':'buyer_stated',
+            'source_reference':'reply:r1:price','evidence_ref':'commercial_evidence:e1',
+            'verified_at':'2026-10-02T09:59:00+00:00',
+        }],
+    }
+    payload=plan_from_runtime_artifacts(
+        commercial_exchange=commercial_exchange,
+        buyer_capacity_readiness={'capacity_verified':0},
+        commercial_catalog={'products':[{
+            'binding_terms_ready':True,'product_family':'roofing','currency':'USD',
+            'price_basis':{'amount_cents':99900,'unit':'per_month','state':'VERIFIED'},
+            'evidence_refs':['catalog:not-market-price'],
+        }]},
+        generated_at=NOW,
+    )
+    assert payload['proposal_ready_count']==1
+    proposal=payload['candidates'][0]['proposal']
+    assert proposal['qualified_inventory_count']==1
+    assert proposal['active_buyer_capacity']==0
+    assert proposal['verified_price_per_lead_cents']==(12500,)
+    assert 'commercial_evidence:e1' in proposal['evidence']['evidence_refs']
+    assert 99900 not in proposal['verified_price_per_lead_cents']
+    truth=payload['runtime_source_truth']
+    assert truth['verified_market_price_count']==1
+    assert truth['commercial_exchange_observed_rates_promoted_to_verified_price'] is False
+    assert truth['commercial_catalog_prices_promoted_to_market_price'] is False
+    assert payload['database_write'] is False
