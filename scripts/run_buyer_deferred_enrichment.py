@@ -325,6 +325,26 @@ def _prospect_row(prospect_id: str) -> dict[str, Any] | None:
     return row
 
 
+def _canonical_target_hint(row: dict[str, Any]) -> dict[str, Any] | None:
+    """Return an unverified canonical identity hint for targeted re-verification."""
+    name = str(row.get("contact_name") or "").strip()
+    title = str(row.get("contact_title") or "").strip()
+    if not looks_like_person_name(name) or not title:
+        return None
+    _, score = classify_decision_role(title)
+    if score < 0.50:
+        return None
+    return {
+        "name": name,
+        "title": title,
+        "source": (
+            str(row.get("contact_source") or "").strip()
+            or "canonical_prospect_identity_hint"
+        ),
+        "identity_hint_only": True,
+    }
+
+
 def _retry_minutes(item: dict[str, Any], attempts: int) -> int:
     try:
         priority = int(item.get("priority_score") or 0)
@@ -692,6 +712,7 @@ def run_cycle(
     network_probes = 0
     identity_recovery_budget = 1
     identity_recovery_attempts = 0
+    canonical_identity_hints_used = 0
     public_contact_recovery_budget = 1
     public_contact_recovery_attempts = 0
 
@@ -721,6 +742,11 @@ def run_cycle(
                 "phone": candidate.phone,
                 "entity_id": candidate.entity_id,
             }
+            if not (item.get("target_people") or []):
+                canonical_hint = _canonical_target_hint(row)
+                if canonical_hint is not None:
+                    item["target_people"] = [canonical_hint]
+                    canonical_identity_hints_used += 1
 
             if not candidate.website:
                 reason = "site_unavailable"
@@ -962,6 +988,7 @@ def run_cycle(
         "network_probe_budget": network_probe_budget,
         "identity_recovery_budget": identity_recovery_budget,
         "identity_recovery_attempts": identity_recovery_attempts,
+        "canonical_identity_hints_used": canonical_identity_hints_used,
         "public_contact_recovery_budget": public_contact_recovery_budget,
         "public_contact_recovery_attempts": public_contact_recovery_attempts,
         "buyer_reviews_proposed": proposed,
@@ -1053,6 +1080,7 @@ def run_parallel_cycle(
         "network_probe_budget",
         "identity_recovery_budget",
         "identity_recovery_attempts",
+        "canonical_identity_hints_used",
         "public_contact_recovery_budget",
         "public_contact_recovery_attempts",
         "buyer_reviews_proposed",

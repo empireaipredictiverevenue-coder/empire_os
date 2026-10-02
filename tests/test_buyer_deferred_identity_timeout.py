@@ -223,3 +223,62 @@ def test_slow_recovery_stages_are_bounded_per_lane(monkeypatch):
     assert result["public_contact_recovery_budget"] == 1
     assert len(identity_calls) == 1
     assert len(public_calls) == 1
+
+
+def test_canonical_target_hint_requires_real_decision_identity():
+    assert worker._canonical_target_hint({
+        "contact_name": "Jane Smith",
+        "contact_title": "Founder",
+        "contact_source": "official_site_current",
+    }) == {
+        "name": "Jane Smith",
+        "title": "Founder",
+        "source": "official_site_current",
+        "identity_hint_only": True,
+    }
+    assert worker._canonical_target_hint({
+        "contact_name": "Case Studies",
+        "contact_title": "Founder",
+    }) is None
+    assert worker._canonical_target_hint({
+        "contact_name": "Jane Smith",
+        "contact_title": "Marketing Assistant",
+    }) is None
+
+
+def test_run_cycle_reuses_canonical_identity_as_target_hint(monkeypatch):
+    captured = {}
+
+    class FakeQueue:
+        def claim_due(self, **_kwargs):
+            return [{"prospect_id":"p1","attempts":0,"reason":"no_decision_maker"}]
+        def defer_again(self, *args, **kwargs):
+            pass
+        def resolve(self, *args, **kwargs):
+            pass
+        def mark_call_ready(self, *args, **kwargs):
+            return False
+        def snapshot(self):
+            return {}
+
+    monkeypatch.setattr(worker, "BuyerDeferredEnrichmentQueue", FakeQueue)
+    monkeypatch.setattr(worker, "_prospect_rows", lambda _ids: {"p1": {
+        "id":"p1","business_name":"Acme Roofing","niche":"roofing",
+        "metro":"Dallas, TX","address":"","phone":"","website":"https://acme.test",
+        "buy_signal_score":90,"status":"new","notes":"",
+        "contact_name":"Jane Smith","contact_title":"Founder",
+        "contact_source":"official_site_current","contacted_status":"","created_at":"",
+    }})
+    def targeted(_candidate, item, **_kwargs):
+        captured["people"] = item["target_people"]
+        return ({"rejection_reason":"target_contact_not_verified"}, 1)
+    monkeypatch.setattr(worker, "_targeted_enterprise_probe", targeted)
+    monkeypatch.setattr(worker, "_direct_public_contact_recovery", lambda _c, r: r)
+    monkeypatch.setattr(worker, "_persist_recovered_identity", lambda *a, **k: False)
+    monkeypatch.setattr(worker, "rejection_reason", lambda _r: "target_contact_not_verified")
+    monkeypatch.setattr(worker, "materialize_call_plans", lambda: {"count":0})
+
+    result = worker.run_cycle(limit=1)
+    assert captured["people"][0]["name"] == "Jane Smith"
+    assert captured["people"][0]["identity_hint_only"] is True
+    assert result["canonical_identity_hints_used"] == 1
