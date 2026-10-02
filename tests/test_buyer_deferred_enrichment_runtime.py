@@ -8,7 +8,7 @@ def test_deferred_enrichment_service_uses_bounded_batch():
         ROOT / "deploy/systemd/empire-buyer-deferred-enrichment.service"
     ).read_text()
     assert (
-        "run_buyer_deferred_enrichment.py --limit 16 --workers 4"
+        "run_buyer_deferred_enrichment.py --limit 48 --workers 8"
         in unit
     )
     assert "TimeoutStartSec=300" in unit
@@ -27,12 +27,13 @@ def test_deferred_enrichment_network_timeouts_fit_bounded_cycle():
     assert "hard_timeout_seconds=28.0" not in script
 
 
-def test_parallel_enrichment_is_bounded_to_four_lanes():
+def test_parallel_enrichment_is_bounded_to_eight_lanes():
     script = (
         ROOT / "scripts/run_buyer_deferred_enrichment.py"
     ).read_text()
     assert "ThreadPoolExecutor" in script
-    assert "min(int(workers), 4, total_limit)" in script
+    assert "min(int(workers), 8, total_limit)" in script
+    assert "min(int(limit), 48)" in script
     assert "lease_seconds=420" in script
     assert "live_calls_placed" in script
     assert '"execution_allowed": False' in script

@@ -11,7 +11,7 @@ WorkingDirectory=/srv/empire_os
 EnvironmentFile=/etc/empiredb.env
 Environment=PYTHONPATH=/srv/empire_os
 EnvironmentFile=/srv/empire_os/runtime/secrets/outbound.env
-ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_deferred_enrichment.py --limit 16 --workers 4
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_deferred_enrichment.py --limit 48 --workers 8
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

@@ -965,11 +965,11 @@ def run_cycle(
 
 def run_parallel_cycle(
     *,
-    limit: int = 16,
-    workers: int = 4,
+    limit: int = 48,
+    workers: int = 8,
 ) -> dict[str, Any]:
-    total_limit = max(1, min(int(limit), 25))
-    worker_count = max(1, min(int(workers), 4, total_limit))
+    total_limit = max(1, min(int(limit), 48))
+    worker_count = max(1, min(int(workers), 8, total_limit))
     base = total_limit // worker_count
     remainder = total_limit % worker_count
     lane_limits = [
@@ -1037,8 +1037,8 @@ def run_parallel_cycle(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=16)
-    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--limit", type=int, default=48)
+    parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
 
     DEFERRED_LOCK.parent.mkdir(parents=True, exist_ok=True)
@@ -1058,8 +1058,8 @@ def main() -> int:
             return 0
 
         result = run_parallel_cycle(
-            limit=max(1, min(args.limit, 25)),
-            workers=max(1, min(args.workers, 4)),
+            limit=max(1, min(args.limit, 48)),
+            workers=max(1, min(args.workers, 8)),
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
