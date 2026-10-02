@@ -1,0 +1,27 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/managed_service_first_cash_readiness.py",
+    "scripts/build_managed_service_first_cash_readiness.py",
+    "tests/test_managed_service_first_cash_readiness.py",
+    "docs/architecture/managed_service_first_cash_readiness_v1.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T20:28:23.201790+00:00",
+  "job_id": "managed-service-first-cash-readiness-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:managed_service_first_cash_readiness",
+    "path:empire_os/managed_service_first_cash_readiness.py",
+    "path:scripts/build_managed_service_first_cash_readiness.py",
+    "path:tests/test_managed_service_first_cash_readiness.py",
+    "path:docs/architecture/managed_service_first_cash_readiness_v1.md"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "REVENUE FIRST. Build a read-only Managed Service first-cash readiness packet using the verified managed_service catalog product and canonical buyer review/outbound/reply/terms/payment evidence. Current truth includes approved managed service buyer reviews but no subscriptions/terms/payment. Rank the best person-bound candidates for a genuine commercial conversation and state exactly what evidence is still required before buyer binding, terms and payment. Do not bind a buyer, send outreach, accept terms, create payment requests or recognize revenue.",
+  "pytest_targets": [
+    "tests/test_managed_service_first_cash_readiness.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
