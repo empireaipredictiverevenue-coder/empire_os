@@ -100,3 +100,16 @@ No worker may grant itself consequential authority.
 A capability reaches DONE only with architecture + code + tests + live runtime + canonical data + Founder surface where applicable.
 
 Commercial completion additionally requires genuine buyer, terms, payment, fulfilment, outcome and revenue evidence. Forecasts, bids, proposals and payment requests are not revenue.
+
+## Anti-loop execution rule
+
+EmpireOS completion work must not repeat the same failed action indefinitely.
+After one evidence-backed failure on a worker/path:
+- diagnose and classify the failure;
+- persist the blocker;
+- change one of owner, scope, execution path, or prerequisite;
+- never re-run the same failing job unchanged;
+- never use blind service restart loops or model retry loops;
+- stale or obsolete work is archived, not recycled forever.
+
+A retry is allowed only when a material prerequisite changed and that change is recorded.
