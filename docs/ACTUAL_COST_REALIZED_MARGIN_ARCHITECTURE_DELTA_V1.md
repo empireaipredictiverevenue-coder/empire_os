@@ -68,3 +68,12 @@ Executable PostgreSQL tests must prove:
 - unbound, pending, or non-actual source evidence is rejected;
 - idempotent existing recognized revenue remains unchanged;
 - no extra runtime role receives recognition authority.
+
+## Least-privilege reader
+
+The recognizer must not gain direct SELECT authority on
+commercial_evidence_registry. Migration 029 adds a narrow
+get_verified_actual_cost_evidence(uuid) SECURITY DEFINER reader owned by the
+non-login migrator and executable only by empire_revenue_recognizer. The helper
+returns only the two verified, order-bound actual-cost observations required for
+the recognition decision.
