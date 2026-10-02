@@ -1,0 +1,14 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [],
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T12:20:00.753074+00:00",
+  "job_id": "strategy-growth-core-v2-review",
+  "kind": "code_task",
+  "lease_resources": [],
+  "max_runtime_seconds": 300,
+  "prompt": "Review EmpireOS strategy_operating_system.py, north_mini_agent.py, gtm_offer_strategy.py and market_domination.py. Produce an OBSERVE-only upgrade plan for a proactive Strategic Growth Intelligence v2 loop using current EmpireDB/Predictive Cloud truth, model-health routing, evidence scoring, experiments, kill criteria and learning. Identify legacy assumptions and exact files/tests. No edits.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
