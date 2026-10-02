@@ -246,6 +246,22 @@ def persist_new_external_candidates(
             "/rest/v1/rpc/propose_buyer_scout_candidate",
             payload,
         )
+        if not isinstance(response, Mapping):
+            raise RuntimeError(
+                "canonical buyer-scout persistence evidence missing"
+            )
+        if response.get("decision") != "candidate_recorded":
+            raise RuntimeError(
+                "canonical buyer-scout persistence decision invalid"
+            )
+        if str(response.get("domain") or "").strip().lower() != domain:
+            raise RuntimeError(
+                "canonical buyer-scout persistence domain mismatch"
+            )
+        if not str(response.get("candidate_id") or "").strip():
+            raise RuntimeError(
+                "canonical buyer-scout persistence candidate_id missing"
+            )
         persisted.append({
             "domain": domain,
             "response": response,

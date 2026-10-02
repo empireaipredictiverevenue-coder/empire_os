@@ -42,3 +42,12 @@ Focused tests must prove:
 - outbound and execution authority remain false/none.
 
 Rollback: remove research-seed loading; existing Search Fabric + canonical-seed behavior remains intact.
+
+## Runtime correction discovered during live verification
+The Buyer Scout systemd worker must receive `/etc/empiredb.env` from systemd.
+The non-root worker cannot rely on reading the protected file itself.
+Holding-area persistence now requires a canonical RPC response containing the
+recorded candidate ID/domain; a missing or null response fails closed and may
+not be counted as persisted.
+
+This correction changes no buyer, outbound, price, payment or revenue authority.

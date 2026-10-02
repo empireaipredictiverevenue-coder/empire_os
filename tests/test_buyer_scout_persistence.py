@@ -11,6 +11,7 @@ def test_only_new_external_candidates_are_persisted():
         return {
             "decision": "candidate_recorded",
             "candidate_id": "candidate-1",
+            "domain": "new.example",
             "outreach_authorized": False,
             "actual_revenue": False,
         }
@@ -181,3 +182,34 @@ def test_missing_scout_source_fails_closed_without_rpc():
     assert result["persisted_candidate_count"] == 0
     assert result["skipped_candidate_count"] == 1
     assert calls == []
+
+
+def test_missing_canonical_persistence_evidence_fails_closed():
+    scout = {
+        "candidates": [{
+            "domain": "missing-proof.example",
+            "website": "https://missing-proof.example",
+            "business_name": "Missing Proof Buyer",
+            "buyer_type": "direct_lead_buyer",
+            "direct_buyer_score": 80,
+            "explicit_direct_buyer_evidence": True,
+            "target_buyer_pools": ["direct_demand_buyers"],
+            "query_evidence": [{"query": "buy leads"}],
+        }]
+    }
+    reconciliation = {
+        "results": [{
+            "domain": "missing-proof.example",
+            "reconciliation_state": "NEW_EXTERNAL_BUYER_CANDIDATE",
+        }]
+    }
+    try:
+        persist_new_external_candidates(
+            scout,
+            reconciliation,
+            rpc_call=lambda *_args: None,
+        )
+    except RuntimeError as exc:
+        assert "persistence evidence missing" in str(exc)
+    else:
+        raise AssertionError("missing canonical persistence evidence must fail")
