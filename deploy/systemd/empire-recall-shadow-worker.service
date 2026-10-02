@@ -1,0 +1,29 @@
+[Unit]
+Description=EmpireOS Recall SHADOW observation worker
+After=network-online.target empire-recall-webhook.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_RECALL_VERIFIED_SPOOL=/srv/empire_os/runtime/digital_avatar/recall_ingress
+Environment=EMPIRE_RECALL_OBSERVATION_ROOT=/srv/empire_os/runtime/digital_avatar/observations
+Environment=EMPIRE_RECALL_SESSION_ROOT=/srv/empire_os/runtime/digital_avatar/sessions
+Environment=EMPIRE_RECALL_GUIDANCE_ROOT=/srv/empire_os/runtime/digital_avatar/guidance
+Environment=EMPIRE_RECALL_WORKER_POLL_SECONDS=0.25
+Environment=EMPIRE_RECALL_WORKER_MAX_ITEMS=100
+ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.recall_shadow_worker_service
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/srv/empire_os
+ReadWritePaths=/srv/empire_os/runtime
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,35 @@
+[Unit]
+Description=EmpireOS verified Recall realtime webhook ingress
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=/etc/empire_recall.env
+Environment=EMPIRE_RECALL_VERIFIED_SPOOL=/srv/empire_os/runtime/digital_avatar/recall_ingress
+Environment=EMPIRE_RECALL_MAX_PAYLOAD_BYTES=512000
+ExecStart=/srv/empire_os/.venv/bin/python -m uvicorn empire_os.recall_webhook_service:app --host 127.0.0.1 --port 8099 --workers 1
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/srv/empire_os
+ReadWritePaths=/srv/empire_os/runtime
+
+[Install]
+WantedBy=multi-user.target

@@ -40,6 +40,10 @@ RESEND_INBOUND_URL = os.getenv(
     "EMPIRE_RESEND_INBOUND_URL",
     "http://127.0.0.1:8097/webhooks/resend-inbound",
 ).strip()
+RECALL_REALTIME_URL = os.getenv(
+    "EMPIRE_RECALL_REALTIME_URL",
+    "http://127.0.0.1:8099/v1/providers/recall/realtime",
+).strip()
 CHECKOUT_INTERNAL_URL = os.getenv(
     "EMPIRE_CHECKOUT_INTERNAL_URL",
     "http://127.0.0.1:8098",
@@ -244,6 +248,49 @@ async def resend_inbound_proxy(request: Request):
     except httpx.HTTPError:
         return JSONResponse(
             {"ok": False, "error": "resend_inbound_unavailable"},
+            status_code=503,
+        )
+
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
+
+
+@app.post("/v1/providers/recall/realtime")
+async def recall_realtime_proxy(request: Request):
+    raw = await request.body()
+    if len(raw) > 512_000:
+        return JSONResponse({"ok": False}, status_code=413)
+
+    allowed_headers = {
+        "content-type",
+        "webhook-id",
+        "webhook-timestamp",
+        "webhook-signature",
+        "svix-id",
+        "svix-timestamp",
+        "svix-signature",
+    }
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() in allowed_headers
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                RECALL_REALTIME_URL,
+                content=raw,
+                headers=headers,
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"ok": False, "error": "recall_realtime_unavailable"},
             status_code=503,
         )
 

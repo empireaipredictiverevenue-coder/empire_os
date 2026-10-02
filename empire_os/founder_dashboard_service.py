@@ -9,6 +9,7 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, FastAPI
 
+from empire_os.digital_avatar_api import create_digital_avatar_router
 from empire_os.first_revenue_api import create_first_revenue_router
 from empire_os.founder_dashboard_api import create_founder_dashboard_router
 from empire_os.founder_daily_results_api import create_founder_daily_results_router
@@ -33,6 +34,7 @@ RouterFactory = Callable[[], APIRouter]
 
 READ_ONLY_ROUTER_FACTORIES: tuple[RouterFactory, ...] = (
     create_founder_dashboard_router,
+    create_digital_avatar_router,
     create_first_revenue_router,
     create_founder_daily_results_router,
     create_founder_directives_router,
