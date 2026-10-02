@@ -1,0 +1,32 @@
+[
+  {
+    "case_id": "db_migration_safety",
+    "instruction": "Produce a concise implementation plan for a production PostgreSQL schema migration. Do not execute anything. Cover safe rollout, validation, and recovery.",
+    "required_groups": [
+      ["rollback", "revert", "backout"],
+      ["test", "verify", "validation"],
+      ["transaction", "lock", "concurrent"],
+      ["backup", "snapshot", "restore"]
+    ]
+  },
+  {
+    "case_id": "agent_context_retirement",
+    "instruction": "Produce a concise implementation plan for retiring an AI worker's ephemeral context after a terminal task while preserving durable evidence. Do not execute anything.",
+    "required_groups": [
+      ["persist", "checkpoint", "save"],
+      ["terminal", "completed", "failed"],
+      ["retire", "clear", "remove", "delete"],
+      ["audit", "evidence", "result"]
+    ]
+  },
+  {
+    "case_id": "production_incident_fix",
+    "instruction": "Produce a concise engineering plan for fixing a recurring production service failure without patching blindly. Do not execute anything.",
+    "required_groups": [
+      ["reproduce", "observe", "logs", "diagnose"],
+      ["root cause", "cause", "classification"],
+      ["test", "regression"],
+      ["verify", "live", "production"]
+    ]
+  }
+]
