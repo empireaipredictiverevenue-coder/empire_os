@@ -39,7 +39,7 @@ Canonical rule:
 - [x] Intelligence Router registered in Control Fabric
 - [x] Intelligence Router assigned to Strategy, R&D and Engineering departments
 - [x] Architecture regression locks router authority to OBSERVE
-- [ ] Live route verification against installed EmpireOS model registry
+- [x] Live route verification against installed EmpireOS model registry
 - [ ] Benchmark current local model against stronger candidate model(s)
 - [ ] Matched-pair workload calibration replaces model-quality priors
 - [ ] Department-specific model routing profiles
