@@ -587,3 +587,35 @@ def test_offer_outside_standing_authority_is_routed_to_founder_review():
         "offer outside standing authority" in reason
         for reason in result.deferred_reasons
     )
+
+
+def test_legacy_software_mrr_founder_review_is_product_bound():
+    review = {
+        "id": "review-mrr",
+        "prospect_id": "prospect-mrr",
+        "contact_name": "Jane Smith",
+        "contact_title": "Founder",
+        "contact_email": "jane@example.com",
+        "offer_key": "software_mrr",
+        "company_score": 90,
+        "decision_score": 1.0,
+        "proposed_at": NOW.isoformat(),
+    }
+
+    def request(method, path, payload=None, **_kwargs):
+        if method == "GET" and path.startswith(
+            "/rest/v1/buyer_candidate_reviews?"
+        ):
+            if "status=eq.pending" in path:
+                return [review]
+            return []
+        if path.endswith("auto_review_buyer_candidate"):
+            raise RuntimeError("offer outside standing authority")
+        if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        raise AssertionError((method, path))
+
+    result = run_gtm_pipeline(request, now=NOW)
+    row = result.founder_review_required[0]
+    assert row["source_offer_key"] == "software_mrr"
+    assert row["offer_key"] == "search_growth_command"

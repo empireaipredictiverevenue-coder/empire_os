@@ -1222,3 +1222,24 @@ def test_personhood_guard_rejects_organization_names():
         "Revenue Labs",
     ):
         assert looks_like_person_name(value) is False, value
+
+
+def test_generic_software_mrr_lane_binds_to_search_growth_command():
+    from empire_os.buyer_discovery import choose_offer
+
+    assert choose_offer(
+        {
+            "niche": "insurance services",
+            "business_name": "Example Insurance Group",
+            "notes": "",
+        },
+        "functional_buyer",
+    ) == "search_growth_command"
+    assert choose_offer(
+        {
+            "niche": "business services",
+            "business_name": "Example Company",
+            "notes": "",
+        },
+        "economic_buyer",
+    ) == "search_growth_command"

@@ -412,6 +412,14 @@ def run_gtm_pipeline(
             skipped += 1
             message = str(exc)
             if "offer outside standing authority" in message:
+                source_offer_key = str(
+                    (row or {}).get("offer_key") or ""
+                ).strip() or None
+                canonical_offer_key = (
+                    "search_growth_command"
+                    if source_offer_key == "software_mrr"
+                    else source_offer_key
+                )
                 founder_review_required.append({
                     "review_id": review_id,
                     "prospect_id": str(
@@ -424,9 +432,8 @@ def run_gtm_pipeline(
                         (row or {}).get("contact_title") or ""
                     ).strip() or None,
                     "contact_email": contact or None,
-                    "offer_key": str(
-                        (row or {}).get("offer_key") or ""
-                    ).strip() or None,
+                    "offer_key": canonical_offer_key,
+                    "source_offer_key": source_offer_key,
                     "company_score": (row or {}).get("company_score"),
                     "decision_score": (row or {}).get("decision_score"),
                     "proposed_at": (row or {}).get("proposed_at"),

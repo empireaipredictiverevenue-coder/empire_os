@@ -309,8 +309,8 @@ def choose_offer(record: Mapping[str, Any], decision_role: str) -> str:
     if any(term in text for term in ("roof", "hvac", "plumb", "solar", "contractor", "restoration")):
         return "managed_service"
     if decision_role in {"economic_buyer", "functional_buyer"}:
-        return "software_mrr"
-    return "software_mrr"
+        return "search_growth_command"
+    return "search_growth_command"
 
 
 def _first_party_website(value: Any) -> str:
