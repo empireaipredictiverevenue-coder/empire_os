@@ -1,9 +1,9 @@
 [Unit]
-Description=Refresh evidence-backed Empire opportunity briefs
+Description=Refresh recurring Empire competitive intelligence
 
 [Timer]
 OnBootSec=3min
-OnUnitActiveSec=15min
+OnUnitActiveSec=30min
 AccuracySec=30s
 Persistent=true
 Unit=empire-opportunity-brief.service

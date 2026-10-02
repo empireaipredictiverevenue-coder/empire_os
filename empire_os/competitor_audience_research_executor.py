@@ -8,6 +8,7 @@ or outreach authority.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -92,6 +93,15 @@ def _result_matches_company(
         return True
 
     return False
+
+
+def _public_content_sha256(html: str | None) -> str | None:
+    if not html:
+        return None
+    normalized = _slug_words(re.sub(r"<[^>]+>", " ", str(html)))
+    if not normalized:
+        return None
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 def _html_mentions_company(html: str, company_name: str) -> bool:
@@ -192,6 +202,7 @@ def execute_account_research(
                 "first_party_domain_match": True,
                 "existing_evidence_source": False,
                 "observation_type": "public_first_party_page",
+                "content_sha256": _public_content_sha256(html),
                 "verified_fact": False,
             })
 
@@ -220,6 +231,7 @@ def execute_account_research(
             "first_party_domain_match": False,
             "existing_evidence_source": True,
             "observation_type": "reobserved_public_evidence",
+            "content_sha256": _public_content_sha256(html),
             "verified_fact": False,
         })
 
@@ -272,6 +284,7 @@ def execute_account_research(
                 "first_party_domain_match": first_party,
                 "existing_evidence_source": url in evidence_refs,
                 "observation_type": "public_search_result",
+                "content_sha256": None,
                 "verified_fact": False,
             })
 

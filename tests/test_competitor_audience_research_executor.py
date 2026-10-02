@@ -195,3 +195,88 @@ def test_irrelevant_search_results_are_rejected_before_research_state():
     assert result["buyer_intent"] is False
     assert result["commercial_intent"] is False
     assert result["outreach_enabled"] is False
+
+
+def test_direct_public_research_observations_have_stable_content_hashes():
+    first = execute_account_research(
+        _company(),
+        _context(),
+        search_fn=_search_fn,
+        fetch_fn=_fetch_fn,
+    )
+    second = execute_account_research(
+        _company(),
+        _context(),
+        search_fn=_search_fn,
+        fetch_fn=_fetch_fn,
+    )
+
+    direct_first = {
+        row["url"]: row["content_sha256"]
+        for row in first["observations"]
+        if row["observation_type"] in {
+            "public_first_party_page",
+            "reobserved_public_evidence",
+        }
+    }
+    direct_second = {
+        row["url"]: row["content_sha256"]
+        for row in second["observations"]
+        if row["observation_type"] in {
+            "public_first_party_page",
+            "reobserved_public_evidence",
+        }
+    }
+    assert direct_first
+    assert direct_first == direct_second
+    assert all(len(value) == 64 for value in direct_first.values())
+
+
+def test_direct_public_content_hash_changes_when_page_content_changes():
+    counter = {"first_party": 0}
+
+    def changing_fetch(url):
+        if url == "https://goldenspikeroofing.com/":
+            counter["first_party"] += 1
+            return (
+                "<html><body>Golden Spike Roofing Inc "
+                f"version {counter['first_party']}</body></html>"
+            )
+        return _fetch_fn(url)
+
+    first = execute_account_research(
+        _company(),
+        _context(),
+        search_fn=_search_fn,
+        fetch_fn=changing_fetch,
+    )
+    second = execute_account_research(
+        _company(),
+        _context(),
+        search_fn=_search_fn,
+        fetch_fn=changing_fetch,
+    )
+
+    def first_party_hash(payload):
+        return next(
+            row["content_sha256"]
+            for row in payload["observations"]
+            if row["observation_type"] == "public_first_party_page"
+        )
+
+    assert first_party_hash(first) != first_party_hash(second)
+
+
+def test_search_result_observations_do_not_fake_page_content_hashes():
+    result = execute_account_research(
+        _company(),
+        _context(),
+        search_fn=_search_fn,
+        fetch_fn=_fetch_fn,
+    )
+    search_rows = [
+        row for row in result["observations"]
+        if row["observation_type"] == "public_search_result"
+    ]
+    assert search_rows
+    assert all(row["content_sha256"] is None for row in search_rows)

@@ -150,9 +150,9 @@ def test_systemd_refresh_is_runtime_only():
         root / "deploy/systemd/empire-opportunity-brief.timer"
     ).read_text()
 
-    assert "scripts/refresh_opportunity_brief_chain.py" in service
+    assert "scripts/refresh_competitive_intelligence_chain.py" in service
     assert "ReadWritePaths=/srv/empire_os/runtime" in service
-    assert "OnUnitActiveSec=15min" in timer
+    assert "OnUnitActiveSec=30min" in timer
     assert "outbound" not in service.lower()
 
 
@@ -245,6 +245,6 @@ def test_systemd_refreshes_full_evidence_chain():
         root / "deploy/systemd/empire-opportunity-brief.service"
     ).read_text()
     assert "EnvironmentFile=/etc/empiredb.env" in service
-    assert "refresh_opportunity_brief_chain.py" in service
+    assert "refresh_competitive_intelligence_chain.py" in service
     assert "run_opportunity_briefs.py" not in service
     assert "ReadWritePaths=/srv/empire_os/runtime" in service
