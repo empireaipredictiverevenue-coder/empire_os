@@ -24,8 +24,17 @@ from empire_os.engineering_gauntlet import (
     evaluate_gauntlet,
 )
 from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
-from empire_os.qualification_worker_v2 import run_cycle as run_qualification_cycle
+from empire_os.qualification_worker_v2 import (
+    run_cycle as run_qualification_cycle,
+    run_evidence_recovery,
+    run_identity_catchup,
+)
 from empire_os.revenue_architecture_critic import review_revenue_architecture
+from empire_os.revenue_exchange_snapshot import (
+    build_revenue_exchange_live_snapshot,
+    write_revenue_exchange_live_snapshot,
+)
+from empire_os.revenue_exchange_transport import PostgresRevenueExchangeReader
 from empire_os.revenue_inventory import (
     BOOKED_APPOINTMENT,
     CPA_OUTCOME,
@@ -139,6 +148,11 @@ CONTINUOUS_LEAD_GENERATION = (
     == "1"
 )
 OPPORTUNITY_RADAR_PATH = Path("/srv/empire_os/runtime/opportunity_radar/latest.json")
+REVENUE_EXCHANGE_ENV_PATH = "/etc/empire_revenue_exchange.env"
+REVENUE_EXCHANGE_READER_DSN_KEY = "EMPIRE_REVENUE_EXCHANGE_READER_DSN"
+REVENUE_EXCHANGE_MAX_AGE_SECONDS = int(
+    os.environ.get("EMPIRE_REVENUE_EXCHANGE_MAX_AGE_SECONDS", "120")
+)
 
 
 def _utc_now() -> str:
@@ -240,13 +254,39 @@ def diagnose_next_revenue_action(
     snapshot: Mapping[str, Any],
 ) -> dict[str, Any]:
     counts = dict(snapshot.get("counts") or {})
+    recovery = _inventory_recovery_breakdown(snapshot)
 
-    if int(counts.get(RAW_LEAD, 0)) > 0:
+    if recovery["missing_qualification"] > 0:
         return {
-            "action": "qualify_raw_leads",
+            "action": "qualify_new_leads",
             "authority": "internal_write",
             "component": "qualification_worker_v2",
-            "reason": "raw_inventory_available",
+            "reason": "missing_qualification_evidence",
+            "candidate_count": recovery["missing_qualification"],
+        }
+    if recovery["low_confidence"] > 0:
+        return {
+            "action": "recover_qualification_evidence",
+            "authority": "internal_write",
+            "component": "qualification_worker_v2",
+            "reason": "qualification_evidence_confidence_below_floor",
+            "candidate_count": recovery["low_confidence"],
+        }
+    if recovery["missing_identity"] > 0:
+        return {
+            "action": "resolve_identity_links",
+            "authority": "internal_write",
+            "component": "qualification_worker_v2",
+            "reason": "missing_active_identity_link",
+            "candidate_count": recovery["missing_identity"],
+        }
+    if int(counts.get(RAW_LEAD, 0)) > 0:
+        return {
+            "action": "qualify_new_leads",
+            "authority": "internal_write",
+            "component": "qualification_worker_v2",
+            "reason": "raw_inventory_requires_detailed_recovery",
+            "candidate_count": int(counts.get(RAW_LEAD, 0)),
         }
     if int(counts.get(PREQUALIFIED_LEAD, 0)) > 0:
         return {
@@ -341,6 +381,89 @@ def _read_json(path: Path) -> dict[str, Any] | None:
         return None
     return value if isinstance(value, dict) else None
 
+
+
+
+def _inventory_recovery_breakdown(snapshot: Mapping[str, Any]) -> dict[str, int]:
+    counts = {
+        "missing_qualification": 0,
+        "low_confidence": 0,
+        "missing_identity": 0,
+        "non_allocatable_tier": 0,
+        "other_raw": 0,
+    }
+    for item in snapshot.get("items") or []:
+        if not isinstance(item, Mapping) or item.get("stage") != RAW_LEAD:
+            continue
+        blockers = set(item.get("blockers") or ())
+        if "missing_qualification" in blockers:
+            counts["missing_qualification"] += 1
+            continue
+        if "qualification_evidence_confidence_below_floor" in blockers:
+            counts["low_confidence"] += 1
+            continue
+        if "missing_active_identity_link" in blockers:
+            counts["missing_identity"] += 1
+            continue
+        if "qualification_tier_not_allocatable" in blockers:
+            counts["non_allocatable_tier"] += 1
+            continue
+        counts["other_raw"] += 1
+    return counts
+
+
+def _run_qualification_bundle(limit: int) -> dict[str, Any]:
+    bounded = max(1, int(limit))
+    pending = run_qualification_cycle(limit=bounded)
+    identity = run_identity_catchup(limit=bounded)
+    recovery = run_evidence_recovery(limit=bounded)
+    return {
+        "schema_version": "autonomous_revenue_qualification_bundle.v1",
+        "pending": pending,
+        "identity_catchup": identity,
+        "evidence_recovery": recovery,
+        "attempted": int(pending.get("attempted") or 0)
+        + int(identity.get("attempted") or 0)
+        + int(recovery.get("attempted") or 0),
+        "material_actions": int(pending.get("qualified") or 0)
+        + int(identity.get("identity_resolved") or 0)
+        + int(recovery.get("requalified") or 0),
+        "failed": int(pending.get("failed") or 0)
+        + int(identity.get("failed") or 0)
+        + int(recovery.get("failed") or 0),
+        "actual_revenue": False,
+        "communications_execution": False,
+        "payment_enabled": False,
+    }
+
+
+def _revenue_exchange_snapshot_due() -> bool:
+    path = Path("/srv/empire_os/runtime/revenue_exchange/latest.json")
+    try:
+        age = time.time() - path.stat().st_mtime
+    except OSError:
+        return True
+    return age >= max(30, REVENUE_EXCHANGE_MAX_AGE_SECONDS)
+
+
+def _refresh_revenue_exchange_snapshot() -> dict[str, Any]:
+    env = load_runtime_env(
+        REVENUE_EXCHANGE_ENV_PATH,
+        required=(REVENUE_EXCHANGE_READER_DSN_KEY,),
+    )
+    reader = PostgresRevenueExchangeReader(env[REVENUE_EXCHANGE_READER_DSN_KEY])
+    rows = reader(limit=500)
+    payload = build_revenue_exchange_live_snapshot(rows)
+    output = write_revenue_exchange_live_snapshot("/srv/empire_os", payload)
+    return {
+        "refreshed_at": _utc_now(),
+        "output": str(output),
+        "market_count": payload.get("market_count"),
+        "invalid_row_count": payload.get("invalid_row_count"),
+        "blockers": payload.get("blockers"),
+        "read_only": True,
+        "execution_authority": "none",
+    }
 
 def _select_lead_generation_target(
     snapshot: Mapping[str, Any],
@@ -540,15 +663,28 @@ def run_agentic_cycle(
         internal_write
         and qualification_gate["decision"] == "READY_FOR_INTERNAL_EXECUTION"
     ):
-        qualification_result = run_qualification_cycle(
+        qualification_result = _run_qualification_bundle(
             limit=max(1, int(qualification_limit))
         )
+
+    revenue_exchange_refresh: dict[str, Any] | None = None
+    if _revenue_exchange_snapshot_due():
+        try:
+            revenue_exchange_refresh = _refresh_revenue_exchange_snapshot()
+        except Exception as exc:
+            revenue_exchange_refresh = {
+                "ok": False,
+                "error": f"{type(exc).__name__}:{str(exc)[:500]}",
+                "read_only": True,
+                "execution_authority": "none",
+            }
 
     previous_state = _read_json(LATEST_STATE_PATH)
     snapshot = build_inventory_snapshot(
         repository=repository,
         limit=inventory_limit,
     )
+    recovery_breakdown = _inventory_recovery_breakdown(snapshot)
 
     lead_generation: dict[str, Any] | None = None
     lead_generation_gate: dict[str, Any] | None = None
@@ -591,10 +727,22 @@ def run_agentic_cycle(
         ],
         "qualification_gauntlet": qualification_gate,
         "qualification_result": qualification_result,
+        "revenue_exchange_refresh": revenue_exchange_refresh,
+        "lead_generation_decision": {
+            "target": target,
+            "due": _lead_generation_due(previous_state),
+            "continuous": CONTINUOUS_LEAD_GENERATION,
+            "classified": int(snapshot.get("classified") or 0),
+            "inventory_floor": INVENTORY_FLOOR,
+            "should_generate": should_generate,
+            "internal_write": bool(internal_write),
+            "gauntlet_attested": bool(gauntlet_attested),
+        },
         "lead_generation_gauntlet": lead_generation_gate,
         "lead_generation": lead_generation,
         "continuous_lead_generation": CONTINUOUS_LEAD_GENERATION,
         "inventory_floor": INVENTORY_FLOOR,
+        "inventory_recovery": recovery_breakdown,
         "inventory": snapshot,
         "review_queue": review_queue,
         "next_action": next_action,
@@ -644,7 +792,7 @@ class AutonomousRevenueLoop:
                 did_work = bool(
                     (
                         isinstance(qualification, dict)
-                        and int(qualification.get("attempted") or 0) > 0
+                        and int(qualification.get("material_actions") or 0) > 0
                     )
                     or isinstance(lead_generation, dict)
                 )

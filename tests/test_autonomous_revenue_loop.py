@@ -39,7 +39,7 @@ def test_snapshot_classifies_canonical_prequalified_inventory():
 def test_diagnosis_prioritizes_raw_qualification():
     s={"counts":{RAW_LEAD:4,PREQUALIFIED_LEAD:2,QUALIFIED_CALL:0,BOOKED_APPOINTMENT:0,CPA_OUTCOME:0}}
     a=diagnose_next_revenue_action(s)
-    assert a["action"]=="qualify_raw_leads"
+    assert a["action"]=="qualify_new_leads"
     assert a["authority"]=="internal_write"
 
 def test_diagnosis_routes_prequalified_to_review_gate():
@@ -74,3 +74,32 @@ def test_review_queue_maps_inventory_to_correct_monetization_actions():
     assert q[2]["founder_gate_required"] is True
     assert q[3]["founder_gate_required"] is False
     assert all(x["external_execution"] is False for x in q)
+
+
+def test_diagnosis_prefers_missing_qualification_recovery():
+    s={"counts":{RAW_LEAD:2,PREQUALIFIED_LEAD:1,QUALIFIED_CALL:0,BOOKED_APPOINTMENT:0,CPA_OUTCOME:0},
+       "items":[
+         {"stage":RAW_LEAD,"blockers":["missing_qualification","missing_active_identity_link"]},
+         {"stage":RAW_LEAD,"blockers":["qualification_evidence_confidence_below_floor"]},
+       ]}
+    a=diagnose_next_revenue_action(s)
+    assert a["action"]=="qualify_new_leads"
+    assert a["candidate_count"]==1
+
+def test_diagnosis_uses_evidence_recovery_when_no_missing_qualification():
+    s={"counts":{RAW_LEAD:1,PREQUALIFIED_LEAD:1,QUALIFIED_CALL:0,BOOKED_APPOINTMENT:0,CPA_OUTCOME:0},
+       "items":[
+         {"stage":RAW_LEAD,"blockers":["qualification_evidence_confidence_below_floor","missing_active_identity_link"]},
+       ]}
+    a=diagnose_next_revenue_action(s)
+    assert a["action"]=="recover_qualification_evidence"
+    assert a["candidate_count"]==1
+
+def test_diagnosis_uses_identity_recovery_when_only_identity_missing():
+    s={"counts":{RAW_LEAD:1,PREQUALIFIED_LEAD:1,QUALIFIED_CALL:0,BOOKED_APPOINTMENT:0,CPA_OUTCOME:0},
+       "items":[
+         {"stage":RAW_LEAD,"blockers":["missing_active_identity_link"]},
+       ]}
+    a=diagnose_next_revenue_action(s)
+    assert a["action"]=="resolve_identity_links"
+    assert a["candidate_count"]==1
