@@ -82,6 +82,15 @@ def _department_work_rows(
     return rows
 
 
+def _canonical_causal_outcome_refs(values: Any) -> list[str]:
+    rows = values if isinstance(values, (list, tuple, set)) else []
+    return list(dict.fromkeys(
+        ref for value in rows
+        if (ref := _clean(value)).startswith("canonical:commercial_outcomes:")
+        and ref.removeprefix("canonical:commercial_outcomes:").strip()
+    ))
+
+
 def _department_episode(row: Mapping[str, Any]) -> dict[str, Any]:
     work_id = _clean(row.get("id"))
     refs = [
@@ -115,6 +124,11 @@ def _department_episode(row: Mapping[str, Any]) -> dict[str, Any]:
             dict(row.get("result") or {})
             if isinstance(row.get("result"), Mapping)
             else {}
+        ),
+        "causal_outcome_refs": _canonical_causal_outcome_refs(
+            (row.get("result") or {}).get("causal_outcome_refs")
+            if isinstance(row.get("result"), Mapping)
+            else []
         ),
         "error": _clean(row.get("error")) or None,
         "accepted_for_retrieval": review[
@@ -192,6 +206,71 @@ def _outcome_memory(
     }
 
 
+def _plan_outcome_attributions(
+    episodes: Sequence[Mapping[str, Any]],
+    outcomes: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    by_ref = {
+        _clean(row.get("outcome_ref")): row
+        for row in outcomes
+        if _clean(row.get("outcome_ref"))
+    }
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for episode in episodes:
+        if _clean(episode.get("status")).upper() != "DONE":
+            continue
+        work_id = _clean(episode.get("work_id"))
+        for outcome_ref in _canonical_causal_outcome_refs(
+            episode.get("causal_outcome_refs")
+        ):
+            outcome = by_ref.get(outcome_ref)
+            if outcome is None:
+                continue
+            key = (work_id, outcome_ref)
+            if key in seen:
+                continue
+            seen.add(key)
+            evidence_refs = list(dict.fromkeys([
+                *[
+                    _clean(value)
+                    for value in (episode.get("evidence_refs") or [])
+                    if _clean(value)
+                ],
+                *[
+                    _clean(value)
+                    for value in (outcome.get("evidence_refs") or [])
+                    if _clean(value)
+                ],
+                outcome_ref,
+            ]))
+            rows.append({
+                "plan_id": _clean(episode.get("plan_id")) or None,
+                "step_id": _clean(episode.get("step_id")) or None,
+                "work_id": work_id or None,
+                "goal_key": _clean(episode.get("goal_key")) or None,
+                "target_component": _clean(episode.get("target_component")) or None,
+                "action": _clean(episode.get("action")) or None,
+                "outcome_ref": outcome_ref,
+                "entity_id": _clean(outcome.get("entity_id")) or None,
+                "label_kind": _clean(outcome.get("label_kind")) or None,
+                "label_value": outcome.get("label_value"),
+                "conversion_outcome": _clean(outcome.get("conversion_outcome")) or None,
+                "attribution_basis": "explicit_causal_outcome_ref",
+                "causal_attribution_claimed": True,
+                "evidence_refs": evidence_refs,
+                "synthetic": False,
+                "execution_authority": "none",
+            })
+    rows.sort(key=lambda row: (
+        _clean(row.get("plan_id")),
+        _clean(row.get("step_id")),
+        _clean(row.get("work_id")),
+        _clean(row.get("outcome_ref")),
+    ))
+    return rows
+
+
 def build_economic_memory_snapshot(
     *,
     executive_evaluation: Mapping[str, Any] | None,
@@ -218,6 +297,12 @@ def build_economic_memory_snapshot(
         for row in outcome_candidates
         if row["accepted_for_retrieval"] is True
     ]
+    plan_outcome_attributions = _plan_outcome_attributions(
+        episodes, outcome_memories
+    )
+    attributed_outcome_refs = {
+        row["outcome_ref"] for row in plan_outcome_attributions
+    }
 
     source_packet_count = int(cortex.get("packet_count") or 0)
     source_learning_ready_count = int(
@@ -250,6 +335,13 @@ def build_economic_memory_snapshot(
         ),
         "department_episodes": episodes,
         "outcome_conditioned_memories": outcome_memories,
+        "plan_outcome_attribution_count": len(plan_outcome_attributions),
+        "plan_outcome_attributions": plan_outcome_attributions,
+        "unattributed_verified_outcome_count": sum(
+            _clean(row.get("outcome_ref")) not in attributed_outcome_refs
+            for row in outcome_memories
+        ),
+        "causal_attribution_requires_explicit_outcome_ref": True,
         "department_done_is_verified_outcome": False,
         "verified_outcomes_only_for_outcome_conditioned_memory": True,
         "forecast_used_as_outcome": False,

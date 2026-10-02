@@ -146,3 +146,55 @@ def test_missing_outcome_provenance_is_rejected():
     assert result["outcome_memory_candidate_count"] == 1
     assert result["outcome_conditioned_memory_count"] == 0
     assert result["rejected_outcome_memory_count"] == 1
+
+
+def test_explicit_causal_outcome_ref_links_plan_step_to_verified_outcome():
+    packet = _verified_packet()
+    work = _work('DONE')
+    work['result'] = {
+        **work['result'],
+        'causal_outcome_refs':['canonical:commercial_outcomes:outcome-1'],
+    }
+    result = build_economic_memory_snapshot(
+        executive_evaluation=_evaluation(),
+        department_work=[work],
+        cortex_learning={
+            'packet_count':1,
+            'learning_ready_count':1,
+            'packets':[packet],
+        },
+    )
+    assert result['plan_outcome_attribution_count'] == 1
+    row = result['plan_outcome_attributions'][0]
+    assert row['plan_id'] == 'astra_plan_test'
+    assert row['step_id'] == 'step-1'
+    assert row['work_id'] == 'dept-work-1'
+    assert row['outcome_ref'] == 'canonical:commercial_outcomes:outcome-1'
+    assert row['entity_id'] == 'entity-1'
+    assert row['attribution_basis'] == 'explicit_causal_outcome_ref'
+    assert row['causal_attribution_claimed'] is True
+    assert result['unattributed_verified_outcome_count'] == 0
+    assert result['causal_attribution_requires_explicit_outcome_ref'] is True
+
+
+def test_entity_or_generic_evidence_overlap_never_creates_causal_attribution():
+    packet = _verified_packet()
+    work = _work('DONE')
+    work['result'] = {
+        **work['result'],
+        'entity_id':'entity-1',
+        'evidence_refs':['canonical:commercial_outcomes:outcome-1'],
+    }
+    work['result_evidence_refs'] = ['canonical:commercial_outcomes:outcome-1']
+    result = build_economic_memory_snapshot(
+        executive_evaluation=_evaluation(),
+        department_work=[work],
+        cortex_learning={
+            'packet_count':1,
+            'learning_ready_count':1,
+            'packets':[packet],
+        },
+    )
+    assert result['outcome_conditioned_memory_count'] == 1
+    assert result['plan_outcome_attribution_count'] == 0
+    assert result['unattributed_verified_outcome_count'] == 1
