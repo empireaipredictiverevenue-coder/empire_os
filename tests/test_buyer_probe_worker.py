@@ -246,6 +246,7 @@ def test_probe_options_are_bounded_and_removed_from_row():
         "request_timeout": 1.0,
         "time_budget_seconds": 45.0,
         "allow_company_routed": False,
+        "allow_public_person_contact_search": False,
     }
     assert "_probe_options" not in row
 
@@ -506,13 +507,69 @@ def test_public_person_evidence_precedes_generated_email_guessing(monkeypatch):
         },
     )
 
-    result = worker.run({
-        "id": "p-public",
-        "business_name": "Acme Roofing",
-        "website": "https://acme.example",
-    })
+    result = worker.run(
+        {
+            "id": "p-public",
+            "business_name": "Acme Roofing",
+            "website": "https://acme.example",
+        },
+        allow_public_person_contact_search=True,
+    )
     assert result["review_ready"] is True
     assert result["outreach_ready"] is True
     assert result["preferred_email"] == "jane@acme.example"
     assert result["generated_smtp_probe"]["attempted"] is False
     assert result["public_person_contact_evidence"]["attempted"] is True
+
+
+def test_public_person_search_is_opt_in(monkeypatch):
+    import empire_os.buyer_probe_worker as worker
+    from types import SimpleNamespace
+    from empire_os.hunter.models import DomainPattern
+
+    candidate = SimpleNamespace(
+        prospect_id="p-opt-in",
+        business_name="Acme Roofing",
+        website="https://acme.example",
+    )
+    monkeypatch.setattr(worker, "build_candidate", lambda *a, **k: candidate)
+    monkeypatch.setattr(worker, "probe_site", lambda *a, **k: {
+        "ok": True, "evidence_score": 1.0, "budget_exhausted": False,
+        "people": [],
+    })
+    monkeypatch.setattr(worker, "enrich_candidate", lambda *a, **k: {
+        "decision_maker": {
+            "name": "Jane Smith", "title": "CEO",
+            "decision_role": "economic_buyer", "decision_score": 1.0,
+        },
+        "contact_candidates": [],
+    })
+    monkeypatch.setattr(worker, "analyze_domain", lambda *a, **k: SimpleNamespace(
+        confirmed_contacts=(), contacts=(),
+        pattern=DomainPattern(
+            domain="acme.example", pattern=None, observations=0,
+            agreement=0.0, confidence=0.0,
+        ),
+    ))
+    monkeypatch.setattr(
+        worker, "collect_public_person_contact_evidence",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("public search must be opt in")
+        ),
+    )
+    monkeypatch.setattr(
+        worker, "_smtp_verified_generated_contacts",
+        lambda *a, **k: ([], {"attempted": True, "smtp_valid": 0}),
+    )
+    monkeypatch.setattr(worker, "verify_contact_plan", lambda *a, **k: {
+        "verified_contacts": [], "review_ready": False,
+        "outreach_ready": False, "preferred_email": None,
+        "contact_route": None, "person_bound": False,
+        "routing_name": None, "routing_title": None,
+    })
+
+    result = worker.run({
+        "id": "p-opt-in", "business_name": "Acme Roofing",
+        "website": "https://acme.example",
+    })
+    assert result["public_person_contact_evidence"]["attempted"] is False

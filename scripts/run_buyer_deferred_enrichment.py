@@ -340,6 +340,7 @@ def _targeted_enterprise_probe(
                 "request_timeout": 3.0,
                 "time_budget_seconds": TARGETED_PROBE_TIME_BUDGET_SECONDS,
                 "allow_company_routed": False,
+                "allow_public_person_contact_search": True,
             },
         )
         used += 1
@@ -600,6 +601,9 @@ def run_cycle(
                 result = run_buyer_probe_isolated(
                     probe_row,
                     hard_timeout_seconds=BUYER_PROBE_TIMEOUT_SECONDS,
+                    probe_options={
+                        "allow_public_person_contact_search": True,
+                    },
                 )
 
                 if not result.get("decision_maker"):
@@ -625,6 +629,9 @@ def run_cycle(
                         result = run_buyer_probe_isolated(
                             probe_row,
                             hard_timeout_seconds=BUYER_PROBE_TIMEOUT_SECONDS,
+                            probe_options={
+                                "allow_public_person_contact_search": True,
+                            },
                         )
                         if not result.get("decision_maker"):
                             result = dict(result)

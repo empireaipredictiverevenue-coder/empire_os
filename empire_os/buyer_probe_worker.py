@@ -193,6 +193,7 @@ def run(
     request_timeout: float = 4.0,
     time_budget_seconds: float = 22.0,
     allow_company_routed: bool = False,
+    allow_public_person_contact_search: bool = False,
 ) -> dict:
     candidate = build_candidate(
         row,
@@ -305,7 +306,8 @@ def run(
     )
     decision = enriched.get("decision_maker")
     if (
-        not has_bound
+        allow_public_person_contact_search
+        and not has_bound
         and isinstance(decision, dict)
         and looks_like_person_name(decision.get("name"))
     ):
@@ -430,6 +432,9 @@ def _probe_options_from_row(row: dict) -> dict:
         "request_timeout": request_timeout,
         "time_budget_seconds": time_budget,
         "allow_company_routed": bool(raw.get("allow_company_routed", False)),
+        "allow_public_person_contact_search": bool(
+            raw.get("allow_public_person_contact_search", False)
+        ),
     }
 
 
