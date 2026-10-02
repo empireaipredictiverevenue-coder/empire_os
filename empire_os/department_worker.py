@@ -14,6 +14,7 @@ from typing import Any
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.department_budget_ledger import DepartmentBudgetLedger
 from empire_os.execution_plane_dispatcher import (
     ExecutionRequest,
     dispatch_execution_request,
@@ -289,6 +290,49 @@ def run_one_department_work(
             "state": "BLOCKED",
             "work_id": blocked.id,
             "blocker": blocked.error,
+            "queue_counts": queue.counts(),
+            "execution_authority": "none",
+        }
+
+    budget_ledger = DepartmentBudgetLedger(root)
+    try:
+        budget_decision = budget_ledger.reserve(item)
+    except ValueError as exc:
+        blocked = queue.block(
+            item,
+            "invalid_budget_request",
+            {
+                "budget_error": str(exc),
+                "cash_spend_authority": False,
+                "execution_authority": "none",
+            },
+        )
+        budget_ledger.build_snapshot()
+        return {
+            "ok": True,
+            "state": "BLOCKED",
+            "work_id": blocked.id,
+            "blocker": blocked.error,
+            "queue_counts": queue.counts(),
+            "execution_authority": "none",
+        }
+    if not budget_decision.allowed:
+        blocked = queue.block(
+            item,
+            budget_decision.reason,
+            {
+                "budget": budget_decision.as_dict(),
+                "cash_spend_authority": False,
+                "execution_authority": "none",
+            },
+        )
+        budget_ledger.build_snapshot()
+        return {
+            "ok": True,
+            "state": "BLOCKED",
+            "work_id": blocked.id,
+            "blocker": blocked.error,
+            "budget": budget_decision.as_dict(),
             "queue_counts": queue.counts(),
             "execution_authority": "none",
         }

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.department_budget_ledger import build_department_budget_snapshot
 
 
 ASTRA_EXECUTIVE = Path("runtime/astra/executive_latest.json")
@@ -84,6 +85,8 @@ def evaluate_executive_plan(repo_root: str | Path) -> dict[str, Any]:
     else:
         state = "NO_ELIGIBLE_WORK"
 
+    budget = build_department_budget_snapshot(root)
+
     payload = {
         "schema_version": "empire.astra.executive_evaluation.v1",
         "mode": "OBSERVE",
@@ -94,6 +97,7 @@ def evaluate_executive_plan(repo_root: str | Path) -> dict[str, Any]:
         "undispatched_step_ids": undispatched,
         "status_counts": dict(sorted(statuses.items())),
         "result_evidence_refs": list(dict.fromkeys(evidence_refs)),
+        "budget": budget,
         "plan_success_claimed": False,
         "success_requires_observed_evidence": True,
         "external_execution_performed": False,

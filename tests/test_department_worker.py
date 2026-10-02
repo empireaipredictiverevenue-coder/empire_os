@@ -420,3 +420,26 @@ def test_execution_plane_department_adapter_defaults_to_current_allowed_branch(
     result = worker_module.run_one_department_work(tmp_path)
     assert result["state"] == "DONE"
     assert captured["request"].base_branch == "agent/data-cloud-wave4"
+
+
+def test_department_worker_blocks_unconfigured_explicit_token_budget(tmp_path, monkeypatch):
+    _write_plan(tmp_path, [
+        _step(
+            step_id='exec_step_budget_block',
+            intelligence_request={
+                'task':'reasoning',
+                'budget':{'requested_model_tokens':100},
+            },
+        )
+    ])
+    dispatch_executive_plan(tmp_path)
+    monkeypatch.setattr(
+        worker_module.subprocess,
+        'run',
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError('adapter must not run')),
+    )
+    result = worker_module.run_one_department_work(tmp_path)
+    assert result['state'] == 'BLOCKED'
+    assert result['blocker'] == 'department_token_budget_unconfigured'
+    assert result['budget']['cash_spend_authority'] is False
+    assert result['execution_authority'] == 'none'
