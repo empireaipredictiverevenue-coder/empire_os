@@ -1,0 +1,14 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [],
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-02T23:10:13.141814+00:00",
+  "job_id": "coder-plan-coder_job_d27cb4d541d44709a2a18c61530f0d83",
+  "kind": "code_task",
+  "lease_resources": [],
+  "max_runtime_seconds": 600,
+  "prompt": "Produce a concise advisory implementation PLAN ONLY for the following EmpireOS task. Do not edit files, emit deployment commands, perform production actions, contact external parties, mutate databases, move funds, or expand authority. Identify affected modules, focused tests, main risks, dependencies, and approval gates.\n\nTASK:\nIndependently review the new Predictive Revenue, Predictive Cloud, Future-Trend, Quantum Optimization, Hybrid Optimization and AGI Orchestration modules for truth-boundary regressions. Verify Unknown != 0, predicted revenue != actual revenue, quantum advantage is never claimed without benchmark evidence, and no specialist packet grants commercial/financial/accounting authority. Produce verification results only; do not modify production state.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
