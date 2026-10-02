@@ -26,6 +26,7 @@ class JobKind(str, Enum):
 class JobStatus(str, Enum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
+    DELEGATED = "DELEGATED"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
@@ -74,12 +75,14 @@ class LocalJobQueue:
         self.root = self.runtime_root / "jobs"
         self.pending = self.root / "pending"
         self.running = self.root / "running"
+        self.delegated = self.root / "delegated"
         self.completed = self.root / "completed"
         self.failed = self.root / "failed"
         for directory in (
             self.root,
             self.pending,
             self.running,
+            self.delegated,
             self.completed,
             self.failed,
         ):
@@ -116,6 +119,28 @@ class LocalJobQueue:
         with self._locked():
             self._write(self.pending / f"{job.id}.json", job)
         return job
+
+    def list_pending(
+        self,
+        *,
+        kind: JobKind | None = None,
+    ) -> list[CoderJob]:
+        with self._locked():
+            jobs = [
+                self._load_path(path)
+                for path in self.pending.glob("*.json")
+            ]
+        if kind is not None:
+            wanted = JobKind(kind)
+            jobs = [job for job in jobs if job.kind is wanted]
+        return sorted(
+            jobs,
+            key=lambda job: (
+                -max(0, min(int(job.priority), 100)),
+                str(job.created_at or ""),
+                job.id,
+            ),
+        )
 
     def quarantine_exhausted(
         self,
@@ -193,6 +218,83 @@ class LocalJobQueue:
                 self._write(destination, job)
                 return job
         return None
+
+    def delegate_pending(
+        self,
+        job_id: str,
+        *,
+        delegation: dict[str, Any],
+    ) -> CoderJob:
+        safe = self._safe_id(job_id)
+        source = self.pending / f"{safe}.json"
+        with self._locked():
+            if not source.exists():
+                return self.get(safe)
+            job = self._load_path(source)
+            if job.kind is not JobKind.PLAN:
+                raise JobQueueError("only PLAN jobs may be delegated")
+            job.status = JobStatus.DELEGATED
+            job.result = {
+                **dict(job.result or {}),
+                "delegation": dict(delegation),
+            }
+            job.error = None
+            job.retry_after = None
+            job.lease_id = None
+            job.worker_id = None
+            job.heartbeat_at = None
+            job.lease_expires_at = None
+            job.updated_at = utc_now()
+            self._write(source, job)
+            destination = self.delegated / source.name
+            source.replace(destination)
+            return job
+
+    def restore_delegated(
+        self,
+        job_id: str,
+        *,
+        error: str,
+    ) -> CoderJob:
+        safe = self._safe_id(job_id)
+        source = self.delegated / f"{safe}.json"
+        with self._locked():
+            if not source.exists():
+                return self.get(safe)
+            job = self._load_path(source)
+            job.status = JobStatus.PENDING
+            job.error = str(error)[:4000]
+            job.result = {}
+            job.updated_at = utc_now()
+            self._write(source, job)
+            destination = self.pending / source.name
+            source.replace(destination)
+            return job
+
+    def finish_delegated(
+        self,
+        job_id: str,
+        *,
+        success: bool,
+        result: dict[str, Any],
+        error: str | None = None,
+    ) -> CoderJob:
+        safe = self._safe_id(job_id)
+        source = self.delegated / f"{safe}.json"
+        with self._locked():
+            if not source.exists():
+                return self.get(safe)
+            job = self._load_path(source)
+            job.status = (
+                JobStatus.COMPLETED if success else JobStatus.FAILED
+            )
+            job.result = dict(result or {})
+            job.error = None if success else str(error or "delegated_plan_failed")[:4000]
+            job.updated_at = utc_now()
+            self._write(source, job)
+            target = self.completed if success else self.failed
+            source.replace(target / source.name)
+            return job
 
     def heartbeat(
         self,
@@ -275,6 +377,7 @@ class LocalJobQueue:
         for directory in (
             self.pending,
             self.running,
+            self.delegated,
             self.completed,
             self.failed,
         ):

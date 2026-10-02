@@ -72,14 +72,17 @@ class ModelRouter:
         objective_need = self.complexity(objective)
         excluded = set(exclude)
         role_name = str(role or "writer").strip().lower()
-        # PLAN output is advisory, short, and non-actionable. Prefer the
-        # smallest capable local planner to keep queue throughput high.
-        need = 1 if role_name == "planner" else objective_need
+        # Advisory PLAN output is non-actionable, but the model still must be
+        # capable of understanding the objective. Routing every PLAN as
+        # capability-1 caused complex architecture/database plans to burn
+        # local-model timeouts instead of failing fast or escalating.
+        need = objective_need
         candidates = sorted(
             (
                 profile
                 for profile in self.profiles
                 if role_name in profile.roles
+                and profile.capability >= need
                 and (profile.provider, profile.model) not in excluded
             ),
             key=lambda p: (

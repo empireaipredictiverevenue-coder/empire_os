@@ -32,4 +32,24 @@ echo "worker_code_sha=$WORKER_SHA"
 
 export PYTHONPATH="$WORKTREE"
 
-exec "$REPO/.venv/bin/python"   "$WORKTREE/scripts/run_hermes_control_worker.py"   --repo-root "$REPO"   --control-branch ops/hermes-control   --max-jobs 3
+echo "=== CODER PLAN RECONCILE PRE ==="
+"$REPO/.venv/bin/python" "$WORKTREE/scripts/run_coder_plan_delegation.py" \
+  --repo-root "$REPO" --phase reconcile || \
+  echo "coder_plan_reconcile_pre=failed_nonblocking" >&2
+
+echo "=== CODER PLAN DELEGATE ==="
+"$REPO/.venv/bin/python" "$WORKTREE/scripts/run_coder_plan_delegation.py" \
+  --repo-root "$REPO" --phase delegate --max-jobs 1 || \
+  echo "coder_plan_delegate=failed_nonblocking" >&2
+
+worker_rc=0
+"$REPO/.venv/bin/python" "$WORKTREE/scripts/run_hermes_control_worker.py" \
+  --repo-root "$REPO" --control-branch ops/hermes-control --max-jobs 1 || \
+  worker_rc=$?
+
+echo "=== CODER PLAN RECONCILE POST ==="
+"$REPO/.venv/bin/python" "$WORKTREE/scripts/run_coder_plan_delegation.py" \
+  --repo-root "$REPO" --phase reconcile || \
+  echo "coder_plan_reconcile_post=failed_nonblocking" >&2
+
+exit "$worker_rc"

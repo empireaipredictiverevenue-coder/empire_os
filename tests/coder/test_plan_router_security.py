@@ -86,7 +86,7 @@ def test_local_planner_ladder_routes_by_complexity():
     assert router.route(
         "Implement a new endpoint and tests",
         role="planner",
-    ).model == "qwen2.5-coder:7b"
+    ).model == "qwen2.5-coder:14b"
 
     assert router.route(
         "Review the current implementation plan",
@@ -106,7 +106,7 @@ def test_local_planner_ladder_routes_by_complexity():
     assert router.route(
         "Plan a security database migration architecture",
         role="planner",
-    ).model == "qwen2.5-coder:7b"
+    ).model == "qwen3-coder:30b"
 
 
 def test_router_does_not_escalate_on_negated_safety_guards():
@@ -143,3 +143,22 @@ def test_self_build_scope_cannot_escape_coder():
     assert validate_self_build_scope(["empire_os/coder/repo.py", "tests/coder/test_repo.py"])
     with pytest.raises(SelfBuildScopeError):
         validate_self_build_scope(["empire_os/payments.py"])
+
+
+def test_router_fails_closed_when_planner_is_below_required_capability():
+    router = ModelRouter([
+        ModelProfile(
+            "llama_cpp",
+            "qwen2.5-coder:1.5b",
+            capability=1,
+            cost_tier=0,
+            local=True,
+            roles=("planner",),
+        ),
+    ])
+    route = router.route(
+        "Review database architecture and production migration safety",
+        role="planner",
+    )
+    assert route.provider == "unconfigured"
+    assert route.model == "none"

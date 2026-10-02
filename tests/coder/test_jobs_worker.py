@@ -1,3 +1,4 @@
+import subprocess
 import os
 import time
 from types import SimpleNamespace
@@ -394,3 +395,45 @@ def test_execution_plane_implement_uses_scope_lease_and_required_tests(tmp_path)
     assert result.result["execution_plane_request_id"] == "request-scoped-good"
     assert result.result["lease_id"]
     assert worker.execution_leases.active() == []
+
+
+def test_plan_job_can_be_atomically_delegated_and_completed(tmp_path):
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    subprocess.run(["git", "init", "-q", str(workspace)], check=True)
+    runtime = workspace / "runtime" / "coder"
+    queue = LocalJobQueue(workspace, runtime_root=runtime)
+    job = queue.enqueue(task_id="task_delegate", kind=JobKind.PLAN, priority=90)
+
+    delegated = queue.delegate_pending(
+        job.id,
+        delegation={"worker":"hermes","request_id":"coder-plan:test"},
+    )
+    assert delegated.status is JobStatus.DELEGATED
+    assert not (queue.pending / f"{job.id}.json").exists()
+    assert (queue.delegated / f"{job.id}.json").exists()
+    assert queue.claim_next() is None
+
+    terminal = queue.finish_delegated(
+        job.id,
+        success=True,
+        result={"kind":"PLAN","provider":"hermes","actionable_patch":False},
+    )
+    assert terminal.status is JobStatus.COMPLETED
+    assert queue.get(job.id).status is JobStatus.COMPLETED
+    assert not (queue.delegated / f"{job.id}.json").exists()
+
+
+def test_failed_delegation_publication_restores_pending_job(tmp_path):
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    subprocess.run(["git", "init", "-q", str(workspace)], check=True)
+    runtime = workspace / "runtime" / "coder"
+    queue = LocalJobQueue(workspace, runtime_root=runtime)
+    job = queue.enqueue(task_id="task_restore", kind=JobKind.PLAN)
+    queue.delegate_pending(job.id, delegation={"worker":"hermes"})
+
+    restored = queue.restore_delegated(job.id, error="publish_failed")
+    assert restored.status is JobStatus.PENDING
+    assert restored.error == "publish_failed"
+    assert queue.get(job.id).status is JobStatus.PENDING
