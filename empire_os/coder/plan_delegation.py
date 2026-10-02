@@ -44,7 +44,7 @@ def _load_local_planner_environment(root: Path) -> None:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
-        if key not in _LOCAL_PLANNER_ENV_KEYS or key in os.environ:
+        if key not in _LOCAL_PLANNER_ENV_KEYS:
             continue
         value = value.strip().strip('"').strip("'")
         os.environ[key] = value

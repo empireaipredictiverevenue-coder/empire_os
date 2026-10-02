@@ -153,7 +153,7 @@ def test_local_planner_environment_loads_only_allowlisted_keys(monkeypatch, tmp_
         "SECRET_SHOULD_NOT_LOAD=nope\n"
     )
     monkeypatch.delenv("EMPIRE_CODER_LLAMA_CPP_ENABLED", raising=False)
-    monkeypatch.delenv("EMPIRE_CODER_LLAMA_CPP_CAPABILITY", raising=False)
+    monkeypatch.setenv("EMPIRE_CODER_LLAMA_CPP_CAPABILITY", "3")
     monkeypatch.delenv("SECRET_SHOULD_NOT_LOAD", raising=False)
     module._load_local_planner_environment(root)
     assert __import__('os').environ["EMPIRE_CODER_LLAMA_CPP_ENABLED"] == "true"
