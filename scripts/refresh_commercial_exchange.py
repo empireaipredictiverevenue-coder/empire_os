@@ -25,6 +25,7 @@ from empire_os.commercial_exchange_inventory import (
 )
 from empire_os.data_query import DataFilter, OrderSpec
 from empire_os.niche_taxonomy import normalise
+from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
 
 
 PROSPECT_COLUMNS = "id,business_name,niche,metro,created_at,status"
@@ -32,16 +33,56 @@ FULFILMENT_COLUMNS = "prospect_id,state"
 SOURCE = "canonical_empiredb_projection"
 
 
-def fetch_prospects(
+def fetch_qualified_candidate_ids(
     gateway: CanonicalDataGateway,
     limit: int,
+) -> list[str]:
+    bounded = max(1, min(int(limit), 500))
+    rows = gateway.query(
+        "prospect_qualifications",
+        "prospect_id,evidence_confidence,scored_at",
+        filters=(
+            DataFilter.eq("scoring_engine", "empire_os.lead_scoring"),
+            DataFilter.eq("scoring_version", "v2"),
+            DataFilter.eq("status", "scored"),
+            DataFilter.in_("tier", ("hot", "warm")),
+            DataFilter.gte("evidence_confidence", MIN_DECISION_CONFIDENCE),
+        ),
+        order=(
+            OrderSpec("evidence_confidence", descending=True, nulls_last=True),
+            OrderSpec("scored_at", descending=True, nulls_last=True),
+            OrderSpec("prospect_id", descending=False),
+        ),
+        limit=bounded,
+    )
+    ids: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        pid = str(row.get("prospect_id") or "").strip()
+        if pid and pid not in seen:
+            ids.append(pid)
+            seen.add(pid)
+    return ids
+
+
+def fetch_prospects_by_ids(
+    gateway: CanonicalDataGateway,
+    prospect_ids: list[str],
 ) -> list[dict[str, Any]]:
-    return gateway.query(
+    if not prospect_ids:
+        return []
+    rows = gateway.query(
         "prospects",
         PROSPECT_COLUMNS,
-        order=(OrderSpec("created_at", descending=True),),
-        limit=max(1, min(int(limit), 500)),
+        filters=(DataFilter.in_("id", prospect_ids),),
+        limit=len(prospect_ids),
     )
+    by_id = {
+        str(row.get("id") or "").strip(): dict(row)
+        for row in rows
+        if str(row.get("id") or "").strip()
+    }
+    return [by_id[pid] for pid in prospect_ids if pid in by_id]
 
 
 def fetch_qualification_map(
@@ -147,7 +188,8 @@ def build_runtime_snapshot(
     *,
     limit: int,
 ) -> dict[str, Any]:
-    prospects = fetch_prospects(gateway, limit)
+    prospect_ids = fetch_qualified_candidate_ids(gateway, limit)
+    prospects = fetch_prospects_by_ids(gateway, prospect_ids)
     prospect_ids = [
         str(row.get("id") or "").strip()
         for row in prospects
@@ -166,6 +208,10 @@ def build_runtime_snapshot(
         allocated_prospect_ids=allocated,
     )
     snapshot["source"] = SOURCE
+    snapshot["candidate_selection"] = "qualification_driven"
+    snapshot["qualified_candidates_selected"] = len(prospect_ids)
+    snapshot["qualified_v2_candidates_selected"] = len(prospect_ids)
+    snapshot["qualified_v1_fallback_candidates_selected"] = 0
     snapshot["prospects_scanned"] = len(prospects)
     snapshot["qualification_rows_available"] = sum(
         value is not None for value in qualifications.values()
@@ -191,6 +237,8 @@ def main() -> int:
         "ok": True,
         "source": snapshot["source"],
         "canonical_backend": snapshot["canonical_backend"],
+        "candidate_selection": snapshot["candidate_selection"],
+        "qualified_candidates_selected": snapshot["qualified_candidates_selected"],
         "prospects_scanned": snapshot["prospects_scanned"],
         "inventory_count": snapshot["inventory_count"],
         "overflow_count": snapshot["overflow_count"],
