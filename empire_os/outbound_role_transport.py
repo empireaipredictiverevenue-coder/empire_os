@@ -179,6 +179,57 @@ class PostgresStandingAuthorityApproverRpc:
 
                     cursor.execute(
                         """
+                        SELECT
+                          pg_catalog.has_table_privilege(
+                            current_user,
+                            'public.buyer_candidate_reviews',
+                            'SELECT'
+                          ),
+                          pg_catalog.has_table_privilege(
+                            current_user,
+                            'public.buyer_candidate_reviews',
+                            'INSERT'
+                          ),
+                          pg_catalog.has_table_privilege(
+                            current_user,
+                            'public.buyer_candidate_reviews',
+                            'UPDATE'
+                          ),
+                          pg_catalog.has_table_privilege(
+                            current_user,
+                            'public.buyer_candidate_reviews',
+                            'DELETE'
+                          ),
+                          EXISTS (
+                            SELECT 1
+                            FROM pg_catalog.pg_policy p
+                            JOIN pg_catalog.pg_class c
+                              ON c.oid=p.polrelid
+                            JOIN pg_catalog.pg_namespace n
+                              ON n.oid=c.relnamespace
+                            JOIN pg_catalog.pg_roles r
+                              ON r.rolname=current_user
+                            WHERE n.nspname='public'
+                              AND c.relname='buyer_candidate_reviews'
+                              AND p.polcmd='r'
+                              AND r.oid=ANY(p.polroles)
+                          )
+                        """
+                    )
+                    authority = cursor.fetchone()
+                    if (
+                        not authority
+                        or authority[0] is not True
+                        or any(value is True for value in authority[1:4])
+                        or authority[4] is not True
+                    ):
+                        raise OutboundProviderError(
+                            "outbound approver review visibility "
+                            "authority contract unavailable"
+                        )
+
+                    cursor.execute(
+                        """
                         SELECT metadata
                         FROM public.outbound_intents
                         WHERE id=%s

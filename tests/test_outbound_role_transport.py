@@ -264,7 +264,7 @@ def test_standing_authority_routes_closer_reply_to_closer_gate():
     assert calls[1][2]["p_daily_cap"] == 5
 
 
-def test_empiredb_standing_authority_routes_by_sequence_kind():
+def test_empiredb_standing_authority_routes_with_visibility_preflight():
     from empire_os.outbound_role_transport import (
         PostgresStandingAuthorityApproverRpc,
     )
@@ -273,6 +273,7 @@ def test_empiredb_standing_authority_routes_by_sequence_kind():
         def __init__(self):
             self.calls = []
             self.fetches = [
+                (True, False, False, False, True),
                 ({"sequence_kind": "followup"},),
                 ({"decision": "approved"},),
             ]
@@ -325,17 +326,18 @@ def test_empiredb_standing_authority_routes_by_sequence_kind():
         "SET LOCAL ROLE empire_outbound_approver"
     )
 
-    assert "SELECT metadata" in cursor.calls[1][0]
+    assert "pg_catalog.pg_policy" in cursor.calls[1][0]
+    assert "SELECT metadata" in cursor.calls[2][0]
 
     assert (
         "auto_approve_outbound_followup"
-        in cursor.calls[2][0]
+        in cursor.calls[3][0]
     )
 
-    assert cursor.calls[2][1][1] == 7
+    assert cursor.calls[3][1][1] == 7
 
 
-def test_empiredb_standing_authority_routes_by_sequence_kind():
+def test_empiredb_standing_authority_rejects_missing_review_visibility():
     from empire_os.outbound_role_transport import (
         PostgresStandingAuthorityApproverRpc,
     )
@@ -344,8 +346,7 @@ def test_empiredb_standing_authority_routes_by_sequence_kind():
         def __init__(self):
             self.calls = []
             self.fetches = [
-                ({"sequence_kind": "followup"},),
-                ({"decision": "approved"},),
+                (True, False, False, False, False),
             ]
 
         def __enter__(self):
@@ -381,26 +382,80 @@ def test_empiredb_standing_authority_routes_by_sequence_kind():
         connect_factory=lambda _dsn: Connection(cursor),
     )
 
-    result = rpc(
-        "approve_outbound_intent",
-        {
-            "p_intent_id":
-                "00000000-0000-0000-0000-000000000001",
-            "p_approved_by": "outbound_governor",
-            "p_note": "bounded",
-        },
+    with pytest.raises(
+        OutboundProviderError,
+        match="review visibility authority contract unavailable",
+    ):
+        result = rpc(
+            "approve_outbound_intent",
+            {
+                "p_intent_id":
+                    "00000000-0000-0000-0000-000000000001",
+                "p_approved_by": "outbound_governor",
+                "p_note": "bounded",
+            },
+        )
+
+    assert len(cursor.calls) == 2
+    assert "pg_catalog.pg_policy" in cursor.calls[1][0]
+
+
+def test_empiredb_standing_authority_rejects_review_write_privilege():
+    from empire_os.outbound_role_transport import (
+        PostgresStandingAuthorityApproverRpc,
     )
 
-    assert result["decision"] == "approved"
-    assert cursor.calls[0][0] == (
-        "SET LOCAL ROLE empire_outbound_approver"
+    class Cursor:
+        def __init__(self):
+            self.calls = []
+            self.fetches = [
+                (True, False, True, False, True),
+            ]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+
+        def fetchone(self):
+            return self.fetches.pop(0)
+
+    class Connection:
+        def __init__(self, cursor):
+            self._cursor = cursor
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def cursor(self):
+            return self._cursor
+
+    cursor = Cursor()
+    rpc = PostgresStandingAuthorityApproverRpc(
+        "postgresql://secret",
+        daily_cap=7,
+        connect_factory=lambda _dsn: Connection(cursor),
     )
 
-    assert "SELECT metadata" in cursor.calls[1][0]
+    with pytest.raises(
+        OutboundProviderError,
+        match="review visibility authority contract unavailable",
+    ):
+        rpc(
+            "approve_outbound_intent",
+            {
+                "p_intent_id":
+                    "00000000-0000-0000-0000-000000000001",
+                "p_approved_by": "outbound_governor",
+                "p_note": "bounded",
+            },
+        )
 
-    assert (
-        "auto_approve_outbound_followup"
-        in cursor.calls[2][0]
-    )
-
-    assert cursor.calls[2][1][1] == 7
+    assert len(cursor.calls) == 2
