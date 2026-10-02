@@ -13,13 +13,14 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 
 DEFAULT_REGISTRY = "/srv/empire_os/config/model_registry.json"
 DEFAULT_ZEN_CACHE = "/srv/empire_os/runtime/llm/opencode_zen_models.json"
+DEFAULT_HEALTH_PATH = "/srv/empire_os/runtime/llm/model_health.json"
 
 
 @dataclass(frozen=True)
@@ -108,7 +109,12 @@ class ModelSpec:
 class ModelRegistry:
     """Merged policy + provider-discovery model registry."""
 
-    def __init__(self, path: str | None = None) -> None:
+    def __init__(
+        self,
+        path: str | None = None,
+        *,
+        health_path: str | None = None,
+    ) -> None:
         self.path = Path(path or os.environ.get(
             "EMPIRE_MODEL_REGISTRY",
             DEFAULT_REGISTRY,
@@ -116,6 +122,10 @@ class ModelRegistry:
         self.zen_cache = Path(os.environ.get(
             "EMPIRE_ZEN_CATALOG_CACHE",
             DEFAULT_ZEN_CACHE,
+        ))
+        self.health_path = Path(health_path or os.environ.get(
+            "LLM_HEALTH_PATH",
+            DEFAULT_HEALTH_PATH,
         ))
         self._models = self._load()
 
@@ -131,7 +141,54 @@ class ModelRegistry:
         for spec in discovered:
             configured.setdefault(spec.model_id, spec)
 
-        return configured
+        return self._apply_health_overlay(configured)
+
+    def _apply_health_overlay(
+        self,
+        models: dict[str, ModelSpec],
+    ) -> dict[str, ModelSpec]:
+        if not self.health_path.exists():
+            return models
+        try:
+            raw = json.loads(self.health_path.read_text(encoding="utf-8"))
+        except Exception:
+            return models
+        health_models = raw.get("models") or {}
+        if not isinstance(health_models, dict):
+            return models
+
+        updated: dict[str, ModelSpec] = {}
+        for model_id, spec in models.items():
+            key = f"{spec.provider}:{spec.model}"
+            evidence = health_models.get(key)
+            if not isinstance(evidence, dict):
+                updated[model_id] = spec
+                continue
+            status = str(evidence.get("status") or "unknown").strip().lower()
+            try:
+                samples = int(evidence.get("samples") or 0)
+            except (TypeError, ValueError):
+                samples = 0
+            available = spec.available
+            if status == "degraded" and samples >= 5:
+                available = False
+            metadata = dict(spec.metadata)
+            metadata["runtime_health_evidence"] = {
+                "status": status,
+                "samples": samples,
+                "successes": int(evidence.get("successes") or 0),
+                "failures": int(evidence.get("failures") or 0),
+                "success_rate": evidence.get("success_rate"),
+                "avg_latency_ms": evidence.get("avg_latency_ms"),
+                "updated_at": evidence.get("updated_at"),
+            }
+            updated[model_id] = replace(
+                spec,
+                available=available,
+                health=status or spec.health,
+                metadata=metadata,
+            )
+        return updated
 
     def _load_file_registry(self) -> dict[str, ModelSpec]:
         if not self.path.exists():
