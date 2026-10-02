@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
 import fcntl
 import json
 import os
@@ -508,15 +509,76 @@ def _targeted_enterprise_probe(
     return best, used
 
 
+def _parse_review_time(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _fresh_existing_review(
+    *,
+    prospect_id: str,
+    contact_email: str,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    cutoff = current - timedelta(days=7)
+    params = urllib.parse.urlencode({
+        "select": "id,status,proposed_at,reviewed_at",
+        "prospect_id": f"eq.{prospect_id}",
+        "contact_email": f"eq.{contact_email.lower()}",
+        "status": "in.(pending,approved)",
+        "order": "proposed_at.desc",
+        "limit": "10",
+    })
+    rows = request_json(
+        "GET",
+        f"/rest/v1/buyer_candidate_reviews?{params}",
+    ) or []
+    if not isinstance(rows, list):
+        return None
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        timestamps = (
+            _parse_review_time(row.get("proposed_at")),
+            _parse_review_time(row.get("reviewed_at")),
+        )
+        if any(ts is not None and ts >= cutoff for ts in timestamps):
+            return row
+    return None
+
+
+def _review_idempotency_key(
+    prospect_id: str,
+    contact_email: str,
+    *,
+    now: datetime | None = None,
+) -> str:
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    day = current.date().isoformat()
+    return (
+        f"buyer-review:{prospect_id}:"
+        f"{contact_email.strip().lower()}:reverified:{day}:v2"
+    )
+
+
 def _propose_review(
     candidate,
     result: dict[str, Any],
     *,
     item: dict[str, Any] | None = None,
-) -> bool:
+) -> dict[str, Any] | None:
     decision = result.get("decision_maker")
     if not isinstance(decision, dict):
-        return False
+        return None
     try:
         score = float(decision.get("decision_score") or 0.0)
     except (TypeError, ValueError):
@@ -527,19 +589,34 @@ def _propose_review(
         enterprise_item.get("target_people")
         and result.get("enterprise_target_match") is not True
     ):
-        return False
+        return None
 
     if (
         score < 0.70
         or result.get("review_ready") is not True
         or result.get("outreach_ready") is not True
     ):
-        return False
+        return None
+
+    preferred_email = str(result.get("preferred_email") or "").strip().lower()
+    if not preferred_email:
+        return None
+
+    existing = _fresh_existing_review(
+        prospect_id=str(candidate.prospect_id),
+        contact_email=preferred_email,
+    )
+    if existing is not None:
+        return {
+            "decision": "existing_fresh",
+            "review_id": existing.get("id"),
+            "status": existing.get("status"),
+        }
 
     contact_plan = {
         "review_ready": True,
         "outreach_ready": True,
-        "preferred_email": result.get("preferred_email"),
+        "preferred_email": preferred_email,
         "decision_maker": decision,
         "verified_contacts": result.get("verified_contacts") or [],
         "contact_route": result.get("contact_route"),
@@ -554,9 +631,9 @@ def _propose_review(
     plan = build_candidate_review_plan(
         candidate,
         contact_plan,
-        idempotency_key=(
-            f"buyer-review:{candidate.prospect_id}:"
-            f"{str(result.get('preferred_email') or '').lower()}:v1"
+        idempotency_key=_review_idempotency_key(
+            str(candidate.prospect_id),
+            preferred_email,
         ),
     )
     if enterprise_item.get("account_key"):
@@ -580,10 +657,10 @@ def _propose_review(
         "/rest/v1/rpc/propose_buyer_candidate_review",
         payload=plan["params"],
     )
-    return bool(
-        isinstance(response, dict)
-        and response.get("review_id")
-    )
+    if not isinstance(response, dict) or not response.get("review_id"):
+        return None
+    return dict(response)
+
 
 def run_cycle(
     *,
@@ -601,7 +678,7 @@ def run_cycle(
         worker_id=owner,
         lease_seconds=420,
     )
-    processed = proposed = call_ready = deferred_again = identities_recovered = 0
+    processed = proposed = fresh_reused = call_ready = deferred_again = identities_recovered = 0
     errors: list[str] = []
     results: list[dict[str, Any]] = []
     rows_by_id = _prospect_rows([
@@ -792,16 +869,29 @@ def run_cycle(
             if identity_recovered:
                 identities_recovered += 1
 
-            if _propose_review(candidate, result, item=item):
+            review_result = _propose_review(candidate, result, item=item)
+            if review_result is not None:
+                review_decision = str(
+                    review_result.get("decision") or "proposed"
+                )
+                outcome = (
+                    "buyer_review_existing_fresh"
+                    if review_decision == "existing_fresh"
+                    else "buyer_review_proposed"
+                )
                 queue.resolve(
                     prospect_id,
-                    outcome="buyer_review_proposed",
+                    outcome=outcome,
                 )
-                proposed += 1
+                if review_decision == "existing_fresh":
+                    fresh_reused += 1
+                else:
+                    proposed += 1
                 processed += 1
                 results.append({
                     "prospect_id": prospect_id,
-                    "outcome": "buyer_review_proposed",
+                    "outcome": outcome,
+                    "review_id": review_result.get("review_id"),
                     "preferred_email": result.get("preferred_email"),
                     "identity_recovered": identity_recovered,
                 })
@@ -856,6 +946,7 @@ def run_cycle(
         "network_probes_used": network_probes,
         "network_probe_budget": network_probe_budget,
         "buyer_reviews_proposed": proposed,
+        "fresh_reviews_reused": fresh_reused,
         "identities_recovered": identities_recovered,
         "deferred_again": deferred_again,
         "call_ready_added": call_ready,
@@ -908,6 +999,7 @@ def run_parallel_cycle(
         "network_probes_used",
         "network_probe_budget",
         "buyer_reviews_proposed",
+        "fresh_reviews_reused",
         "identities_recovered",
         "deferred_again",
         "call_ready_added",
