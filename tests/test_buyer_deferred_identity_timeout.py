@@ -358,3 +358,11 @@ def test_open_cycle_breaker_skips_identity_recovery(monkeypatch):
     assert called["recover"] == 0
     assert result["identity_recovery_attempts"] == 0
     worker.IDENTITY_SEARCH_DEGRADED.clear()
+
+
+def test_saturated_network_retry_backoff_moves_to_long_cooldown():
+    item = {"priority_score": 100, "reason": "site_timeout"}
+    assert worker._retry_minutes(item, 4) == 360
+    assert worker._retry_minutes(item, 8) == 1440
+    assert worker._retry_minutes(item, 16) == 10080
+    assert worker._retry_minutes(item, 32) == 43200

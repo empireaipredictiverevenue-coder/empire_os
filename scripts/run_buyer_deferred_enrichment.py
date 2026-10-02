@@ -362,12 +362,14 @@ def _retry_minutes(item: dict[str, Any], attempts: int) -> int:
         "site_timeout",
         "network_probe_budget_exhausted",
     }:
+        if attempts >= 32:
+            return 30 * 24 * 60
         if attempts >= 16:
-            return 24 * 60
+            return 7 * 24 * 60
         if attempts >= 8:
-            return 6 * 60
+            return 24 * 60
         if attempts >= 4:
-            return 2 * 60
+            return 6 * 60
 
     if attempts >= 16:
         return 12 * 60

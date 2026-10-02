@@ -211,6 +211,24 @@ def _recovery_lane(item: Mapping[str, Any]) -> str:
     return "identity_recovery"
 
 
+def _recovery_prerequisite(reason: Any) -> str:
+    value = str(reason or "").strip()
+    return {
+        "site_unavailable": "verified_company_website_available",
+        "site_timeout": "first_party_site_reachable",
+        "network_probe_budget_exhausted": "network_probe_capacity_available",
+        "no_decision_maker": "named_decision_maker_evidence",
+        "no_bound_contact": "person_bound_contact_evidence",
+        "no_contact_evidence": "verified_contact_evidence",
+        "contact_not_verified": "contact_verification_evidence",
+        "target_contact_not_verified": "target_person_bound_contact_evidence",
+        "outreach_not_ready": "review_ready_contact_evidence",
+        "contact_not_ready": "review_ready_contact_evidence",
+        "role_address_only": "named_decision_role_evidence",
+        "decision_score_below_floor": "higher_authority_decision_evidence",
+    }.get(value, "new_recovery_evidence")
+
+
 def canonical_phone(value: Any) -> str:
     raw = str(value or "").strip()
     if not is_commercially_usable_phone(raw):
@@ -298,6 +316,7 @@ class BuyerDeferredEnrichmentQueue:
                     or None
                 ),
                 "reason": reason,
+                "next_prerequisite": _recovery_prerequisite(reason),
                 "status": "pending",
                 "updated_at": now,
                 "next_retry_at": existing.get("next_retry_at") or now,
@@ -447,6 +466,7 @@ class BuyerDeferredEnrichmentQueue:
             now = _now()
             row.update({
                 "reason": reason,
+                "next_prerequisite": _recovery_prerequisite(reason),
                 "attempts": max(int(attempts), int(row.get("attempts") or 0)),
                 "status": "deferred",
                 "last_attempt_at": _iso(now),
@@ -570,10 +590,18 @@ class BuyerDeferredEnrichmentQueue:
         stale_pending_count = sum(age >= 6.0 for age in pending_ages)
         pending_count = int(counts.get("pending") or 0)
         lane_counts: dict[str, int] = {}
+        prerequisite_counts: dict[str, int] = {}
         for row in deferred.values():
             if isinstance(row, Mapping) and str(row.get("status") or "") in {"pending", "deferred"}:
                 lane = _recovery_lane(row)
                 lane_counts[lane] = lane_counts.get(lane, 0) + 1
+                prerequisite = str(
+                    row.get("next_prerequisite")
+                    or _recovery_prerequisite(row.get("reason"))
+                )
+                prerequisite_counts[prerequisite] = (
+                    prerequisite_counts.get(prerequisite, 0) + 1
+                )
         backlog_health = (
             "CRITICAL"
             if oldest_pending_hours >= 24.0 or pending_count >= 1500
@@ -589,6 +617,9 @@ class BuyerDeferredEnrichmentQueue:
             "stale_pending_count": stale_pending_count,
             "backlog_health": backlog_health,
             "recovery_lane_counts": dict(sorted(lane_counts.items())),
+            "recovery_prerequisite_counts": dict(
+                sorted(prerequisite_counts.items())
+            ),
             "call_ready_total": sum(
                 1 for row in calls.values()
                 if isinstance(row, dict)

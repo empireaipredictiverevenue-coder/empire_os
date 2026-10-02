@@ -215,3 +215,37 @@ def test_snapshot_exposes_recovery_lanes(tmp_path):
     snap=q.snapshot()
     assert snap["recovery_lane_counts"]["hot_contact_recovery"] == 1
     assert snap["recovery_lane_counts"]["identity_recovery"] == 1
+
+
+def test_deferred_rows_expose_next_recovery_prerequisite(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "p-site",
+        "reason": "site_unavailable",
+        "priority_score": 90,
+    })
+    import json
+    row = json.loads((tmp_path / "deferred.json").read_text())["p-site"]
+    assert row["next_prerequisite"] == "verified_company_website_available"
+    snap = q.snapshot()
+    assert (
+        snap["recovery_prerequisite_counts"]["verified_company_website_available"]
+        == 1
+    )
+
+
+def test_defer_again_updates_recovery_prerequisite(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "p1",
+        "reason": "no_decision_maker",
+    })
+    q.defer_again(
+        "p1",
+        reason="site_timeout",
+        attempts=3,
+        retry_minutes=60,
+    )
+    import json
+    row = json.loads((tmp_path / "deferred.json").read_text())["p1"]
+    assert row["next_prerequisite"] == "first_party_site_reachable"
