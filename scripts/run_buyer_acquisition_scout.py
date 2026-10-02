@@ -150,7 +150,7 @@ def main() -> int:
 
     official_license_research = refresh_official_license_market_seeds(
         args.repo_root,
-        max_queries=max(12, min(args.max_queries // 2, 60)),
+        max_queries=max(8, min(args.max_queries // 5, 20)),
         results_per_query=min(args.results_per_query, 4),
     )
     research_seeds = [

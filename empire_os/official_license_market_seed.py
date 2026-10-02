@@ -135,7 +135,7 @@ def build_official_license_market_seeds(
             str(row.get("business_name") or "").split()
         ).strip()
         location = _location_text(row)
-        query = f'"{business}" "{location}"'
+        query = f'"{business}" {location}'
         query_rows.append((query, row))
 
     query_texts = [query for query, _ in query_rows]
