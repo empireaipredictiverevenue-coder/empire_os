@@ -28,6 +28,7 @@ COMPETITOR_MARKET = Path(
     "runtime/competitive_intelligence/"
     "competitor_market_opportunity_latest.json"
 )
+TAM_MARKET = Path("runtime/tam_market_intelligence/latest.json")
 OUTPUT = Path("runtime/opportunity_radar/latest.json")
 
 
@@ -239,11 +240,78 @@ def _competitor_candidates(
     }]
 
 
+def _tam_candidates(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    rows = payload.get("opportunity_classes")
+    rows = rows if isinstance(rows, list) else []
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        opportunity_key = _clean(row.get("opportunity_key"))
+        opportunity_class = _clean(row.get("opportunity_class"))
+        industry = _clean(row.get("industry"))
+        country_code = _clean(row.get("country_code")).upper()
+        refs = _unique([
+            _clean(value)
+            for value in (row.get("evidence_refs") or [])
+        ])
+        if not opportunity_key or not opportunity_class or not refs:
+            continue
+        tam_state = _clean(row.get("tam_state")) or "UNKNOWN"
+        output.append({
+            "opportunity_key": opportunity_key,
+            "opportunity_class": f"tam_{opportunity_class}",
+            "source": "tam_market_intelligence",
+            "title": (
+                f"{opportunity_class.replace('_', ' ').title()} — "
+                f"{industry} / {country_code}"
+            ),
+            "niche": industry or None,
+            "metro": None,
+            "country_code": country_code or None,
+            "trigger": "observed_market_expansion_evidence",
+            "observed_priority_score": None,
+            "evidence_strength": (
+                "verified_tam_context"
+                if tam_state == "VERIFIED"
+                else "observed_market_scope"
+            ),
+            "evidence_refs": refs,
+            "observed_entity_count": int(
+                row.get("observed_entity_count") or 0
+            ),
+            "tam_entity_count": row.get("tam_entity_count"),
+            "tam_state": tam_state,
+            "offer_key": None,
+            "products": [],
+            "recommended_next_actions": [
+                "deepen_market_research",
+                "validate_buyer_demand",
+            ],
+            "buyer_intent_inferred": False,
+            "demand_inferred": False,
+            "pricing_inferred": False,
+            "market_share_inferred": False,
+            "revenue_inferred": False,
+            "opportunity_factory_ready": False,
+            "factory_blockers": [
+                "canonical_buyer_intent_required",
+                "demand_evidence_required",
+                "economics_evidence_required",
+                "distribution_path_evidence_required",
+                "fulfilment_readiness_evidence_required",
+            ],
+            "execution_authority": "none",
+        })
+    return output
+
+
 def build_opportunity_radar(
     *,
     market_gps: Mapping[str, Any] | None,
     community_intent: Mapping[str, Any] | None,
     competitor_market: Mapping[str, Any] | None,
+    tam_market: Mapping[str, Any] | None = None,
     generated_at: str | None = None,
     decay_evidence_by_opportunity: Mapping[
         str, Mapping[str, Any]
@@ -263,12 +331,19 @@ def build_opportunity_radar(
         ("market_gps", market_gps, _market_candidates),
         ("community_intent", community_intent, _community_candidates),
         ("competitor_market", competitor_market, _competitor_candidates),
+        ("tam_market", tam_market, _tam_candidates),
     ):
         if isinstance(payload, Mapping):
             rows = builder(payload)
-            source_rows = (payload.get("research_queue", []) if key == "market_gps"
-                           else payload.get("pain_solution_briefs", []) if key == "community_intent"
-                           else [payload])
+            source_rows = (
+                payload.get("research_queue", [])
+                if key == "market_gps"
+                else payload.get("pain_solution_briefs", [])
+                if key == "community_intent"
+                else payload.get("opportunity_classes", [])
+                if key == "tam_market"
+                else [payload]
+            )
             source_rows = source_rows if isinstance(source_rows, list) else []
             if payload.get("available") is False or payload.get("ok") is False:
                 source_rows = []
@@ -364,6 +439,7 @@ def refresh_opportunity_radar(repo_root: Path) -> dict[str, Any]:
         market_gps=_read_json(repo_root / MARKET_GPS),
         community_intent=_read_json(repo_root / COMMUNITY_INTENT),
         competitor_market=_read_json(repo_root / COMPETITOR_MARKET),
+        tam_market=_read_json(repo_root / TAM_MARKET),
     )
     path = repo_root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)

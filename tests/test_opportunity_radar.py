@@ -179,3 +179,53 @@ def test_radar_offer_scope_is_bound_to_candidate():
     decay = result["candidates"][0]["opportunity_decay"]
     assert decay["commercial_value"]["state"] == "UNKNOWN"
     assert decay["recency_factor_candidate"] is None
+
+
+def test_radar_accepts_tam_expansion_as_research_only_source():
+    payload = build_opportunity_radar(
+        generated_at="2026-10-02T19:00:00+00:00",
+        market_gps=None,
+        community_intent=None,
+        competitor_market=None,
+        tam_market={
+            "generated_at": "2026-10-02T18:55:00+00:00",
+            "opportunity_classes": [{
+                "opportunity_key": "tam:empire:new_country:solar:GB",
+                "opportunity_class": "new_country",
+                "industry": "solar",
+                "country_code": "GB",
+                "observed_entity_count": 4,
+                "tam_entity_count": None,
+                "tam_state": "UNKNOWN",
+                "evidence_refs": ["acquisition:country:gb"],
+                "decision": "research",
+                "execution_authority": "none",
+            }],
+            "execution_authority": "none",
+        },
+    )
+    assert payload["candidate_count"] == 1
+    candidate = payload["candidates"][0]
+    assert candidate["opportunity_class"] == "tam_new_country"
+    assert candidate["source"] == "tam_market_intelligence"
+    assert candidate["country_code"] == "GB"
+    assert candidate["tam_state"] == "UNKNOWN"
+    assert candidate["tam_entity_count"] is None
+    assert candidate["buyer_intent_inferred"] is False
+    assert candidate["demand_inferred"] is False
+    assert candidate["pricing_inferred"] is False
+    assert candidate["revenue_inferred"] is False
+    assert candidate["opportunity_factory_ready"] is False
+    assert payload["source_status"]["tam_market"]["available"] is True
+    assert payload["automatic_external_execution_allowed"] is False
+
+
+def test_missing_tam_source_stays_unavailable():
+    payload = build_opportunity_radar(
+        market_gps=None,
+        community_intent=None,
+        competitor_market=None,
+        tam_market=None,
+    )
+    assert payload["source_status"]["tam_market"]["available"] is False
+    assert payload["candidate_count"] == 0
