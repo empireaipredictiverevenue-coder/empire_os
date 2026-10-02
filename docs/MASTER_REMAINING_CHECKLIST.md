@@ -443,14 +443,14 @@ reserved for genuine consequential gates.
 
 ## Revenue Pulse
 
-- [ ] Canonical Supabase inputs only
-- [ ] Real funnel conversion
-- [ ] Real revenue
-- [ ] Realized GP
-- [ ] Leak detection
+- [x] Canonical Supabase inputs only
+- [x] Real funnel conversion
+- [x] Real revenue
+- [x] Realized GP
+- [x] Leak detection
 - [ ] Opportunity alerts
 - [ ] Market/niche/territory rollups
-- [ ] Founder dashboard integration
+- [x] Founder dashboard integration
 
 ## Market Sweeps / Revenue GPS
 
