@@ -59,6 +59,10 @@ class HttpSpec:
 
 
 AUTO_REPAIR_SERVICES: tuple[ServiceSpec, ...] = (
+    ServiceSpec(
+        "autonomous_revenue_os",
+        "empire-autonomous-revenue-os.service",
+    ),
     ServiceSpec("public_gateway", "empire-public-gateway.service"),
     ServiceSpec("self_serve_checkout", "empire-self-serve-checkout.service"),
     ServiceSpec("ops_mcp", "empire-ops-mcp.service"),
@@ -75,8 +79,6 @@ AUTO_REPAIR_TIMERS: tuple[ServiceSpec, ...] = (
     ServiceSpec("buyer_acquisition_timer", "empire-buyer-acquisition-team.timer"),
     ServiceSpec("source_health_timer", "empire-source-health.timer"),
     ServiceSpec("revenue_pulse_timer", "empire-revenue-pulse.timer"),
-    ServiceSpec("acquisition_timer", "empire-acquisition.timer"),
-    ServiceSpec("qualification_timer", "empire-qualification.timer"),
     ServiceSpec("hermes_control_timer", "empire-hermes-control.timer"),
     ServiceSpec(
         "buyer_deferred_enrichment_timer",

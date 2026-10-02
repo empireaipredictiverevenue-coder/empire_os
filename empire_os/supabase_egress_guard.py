@@ -30,7 +30,6 @@ STATUS_PATH = Path(
 )
 
 MANAGED_TIMERS = (
-    "empire-acquisition.timer",
     "empire-astra-dispatcher.timer",
     "empire-astra-observer.timer",
     "empire-buyer-acquisition-scout.timer",
@@ -46,8 +45,6 @@ MANAGED_TIMERS = (
     "empire-predictive-intelligence.timer",
     "empire-predictive-revenue-enterprise-activation.timer",
     "empire-private-capital-snapshot.timer",
-    "empire-qualification-booster.timer",
-    "empire-qualification.timer",
     "empire-commercial-exchange.timer",
     "empire-outbound-governor.timer",
     "empire-department-cycle.timer",

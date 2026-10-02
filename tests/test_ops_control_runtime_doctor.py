@@ -48,7 +48,7 @@ def test_ops_control_defers_intentionally_contained_repairs():
         "findings": [
             {
                 "code": "critical_timer_down",
-                "component": "empire-acquisition.timer",
+                "component": "empire-commercial-exchange.timer",
                 "severity": "warning",
             },
             {
@@ -60,7 +60,7 @@ def test_ops_control_defers_intentionally_contained_repairs():
         "repair_plan": [
             {
                 "action": "restart_unit",
-                "target": "empire-acquisition.timer",
+                "target": "empire-commercial-exchange.timer",
             },
             {
                 "action": "restart_unit",

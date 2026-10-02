@@ -161,3 +161,21 @@ def test_coder_cooldown_failover_is_informational():
         if item.code == "coder_model_route_degraded"
     )
     assert row.severity == "info"
+
+
+def test_agentic_revenue_owner_replaces_legacy_critical_timers():
+    assert "empire-autonomous-revenue-os.service" in CRITICAL_SERVICES
+    assert "empire-acquisition.timer" not in CRITICAL_TIMERS
+    assert "empire-qualification.timer" not in CRITICAL_TIMERS
+
+
+def test_down_autonomous_revenue_owner_gets_safe_restart_plan():
+    units = healthy_units()
+    units["empire-autonomous-revenue-os.service"] = "failed"
+    findings = analyze(unit_states=units, runtime={})
+    plan = build_repair_plan(findings)
+    assert any(
+        row["action"] == "restart_unit"
+        and row["target"] == "empire-autonomous-revenue-os.service"
+        for row in plan
+    )

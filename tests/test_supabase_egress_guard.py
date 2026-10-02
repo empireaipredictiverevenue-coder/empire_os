@@ -220,3 +220,13 @@ def test_recovery_supervisor_is_never_egress_contained():
         "empire-revenue-runtime-supervisor.timer"
         not in MANAGED_TIMERS
     )
+
+
+def test_agentic_revenue_replaced_timers_are_never_egress_managed():
+    for unit in (
+        "empire-acquisition.timer",
+        "empire-qualification.timer",
+        "empire-qualification-booster.timer",
+        "empire-revenue-exchange-snapshot.timer",
+    ):
+        assert unit not in guard.MANAGED_TIMERS

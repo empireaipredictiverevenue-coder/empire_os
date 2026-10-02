@@ -81,8 +81,7 @@ def test_runtime_self_heal_units_are_allowlisted_without_outbound_authority():
         "empire-source-health.service",
         "empire-source-health.timer",
         "empire-revenue-pulse.timer",
-        "empire-acquisition.timer",
-        "empire-qualification.timer",
+        "empire-autonomous-revenue-os.service",
         "empire-hermes-control.timer",
         "empire-buyer-deferred-enrichment.service",
         "empire-buyer-deferred-enrichment.timer",
@@ -92,7 +91,6 @@ def test_runtime_self_heal_units_are_allowlisted_without_outbound_authority():
         "empire-enterprise-contact-repair.service",
         "empire-enterprise-contact-repair.timer",
         "empire-revenue-exchange-snapshot.service",
-        "empire-revenue-exchange-snapshot.timer",
     }
     assert expected.issubset(ALLOWED_UNITS)
     assert all("outbound" not in unit for unit in ALLOWED_UNITS)
@@ -139,3 +137,21 @@ def test_start_uses_non_blocking_systemctl_so_helper_stays_responsive():
         "systemctl", "--no-block", "start",
         "empire-buyer-deferred-enrichment.service",
     ]]
+
+
+def test_retired_revenue_timers_are_not_privileged_helper_targets():
+    from empire_os.ops_privileged_helper import ALLOWED_UNITS
+
+    for unit in (
+        "empire-acquisition.timer",
+        "empire-qualification.timer",
+        "empire-qualification-booster.timer",
+        "empire-revenue-exchange-snapshot.timer",
+    ):
+        assert unit not in ALLOWED_UNITS
+
+
+def test_autonomous_revenue_os_is_privileged_helper_repair_target():
+    from empire_os.ops_privileged_helper import ALLOWED_UNITS
+
+    assert "empire-autonomous-revenue-os.service" in ALLOWED_UNITS

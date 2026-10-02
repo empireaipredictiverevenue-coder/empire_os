@@ -1,6 +1,6 @@
 [Unit]
 Description=EmpireOS real acquisition source health observer
-After=network-online.target empire-acquisition.timer
+After=network-online.target empire-autonomous-revenue-os.service
 Wants=network-online.target
 
 [Service]

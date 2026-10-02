@@ -17,15 +17,15 @@ ROOT = Path("/srv/empire_os")
 RUNTIME = ROOT / "runtime"
 
 CRITICAL_SERVICES = (
+    "empire-autonomous-revenue-os.service",
     "empire-public-gateway.service",
     "empire-ops-mcp.service",
     "empire-ops-privileged-helper.service",
     "empire-cloudflared.service",
 )
-CRITICAL_TIMERS = (
-    "empire-acquisition.timer",
-    "empire-qualification.timer",
-)
+# Acquisition and qualification scheduling are owned by the long-running
+# Autonomous Revenue OS. Legacy timers are intentionally not critical.
+CRITICAL_TIMERS = ()
 REPAIRABLE_UNITS = frozenset((*CRITICAL_SERVICES, *CRITICAL_TIMERS))
 
 RUNTIME_INPUTS = {

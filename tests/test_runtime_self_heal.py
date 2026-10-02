@@ -303,3 +303,16 @@ def test_repair_allowlist_defers_nonallowed_units(monkeypatch, tmp_path):
     assert by_unit[blocked.unit]["repair"]["decision"] == (
         "CONTAINMENT_DEFERRED"
     )
+
+
+def test_agentic_revenue_owner_is_auto_repairable_but_retired_timers_are_not():
+    assert runtime_self_heal.unit_is_auto_repairable(
+        "empire-autonomous-revenue-os.service"
+    )
+    for unit in (
+        "empire-acquisition.timer",
+        "empire-qualification.timer",
+        "empire-qualification-booster.timer",
+        "empire-revenue-exchange-snapshot.timer",
+    ):
+        assert runtime_self_heal.unit_is_auto_repairable(unit) is False

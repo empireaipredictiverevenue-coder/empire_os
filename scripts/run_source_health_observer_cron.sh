@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd /srv/empire_os
 
-if systemctl is-active --quiet empire-acquisition.timer && systemctl is-enabled --quiet empire-acquisition.timer; then
+if systemctl is-active --quiet empire-autonomous-revenue-os.service && systemctl is-enabled --quiet empire-autonomous-revenue-os.service; then
   export EMPIRE_CANONICAL_ACQUISITION_SCHEDULED=true
 else
   export EMPIRE_CANONICAL_ACQUISITION_SCHEDULED=false
