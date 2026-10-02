@@ -22,3 +22,95 @@ def test_texas_rmp_rejects_unrelated_company():
     rows = texas_rmp_seeds_from_csv("Rocket Plumbing", CSV)
 
     assert rows == []
+
+
+def test_texas_tdlr_ac_company_match_returns_named_active_licensee():
+    from datetime import date
+    from empire_os.official_license_identity import (
+        texas_tdlr_ac_seeds_from_rows,
+    )
+
+    rows = texas_tdlr_ac_seeds_from_rows(
+        "Cool Air Services LLC",
+        [
+            {
+                "license_type": "A/C Contractor",
+                "business_name": "COOL AIR SERVICES INC",
+                "owner_name": "SMITH, JANE A",
+                "license_expiration_date_mmddccyy": "12/31/2027",
+            },
+            {
+                "license_type": "A/C Contractor",
+                "business_name": "COOL AIR SERVICES INC",
+                "owner_name": "OLD, OWNER",
+                "license_expiration_date_mmddccyy": "01/01/2025",
+            },
+        ],
+        as_of=date(2026, 10, 2),
+    )
+
+    assert len(rows) == 1
+    assert rows[0].person_name == "Jane A Smith"
+    assert rows[0].role == "Licensed A/C Contractor"
+    assert rows[0].source == "texas_tdlr_ac_contractor"
+    assert rows[0].license_status == "current_by_expiration"
+
+
+def test_texas_tdlr_rejects_company_name_as_owner_and_unrelated_company():
+    from datetime import date
+    from empire_os.official_license_identity import (
+        texas_tdlr_ac_seeds_from_rows,
+    )
+
+    records = [
+        {
+            "license_type": "A/C Contractor",
+            "business_name": "POWER SOURCE ELECTRIC",
+            "owner_name": "POWER SOURCE ELECTRIC",
+            "license_expiration_date_mmddccyy": "12/31/2027",
+        },
+        {
+            "license_type": "A/C Contractor",
+            "business_name": "TOTALLY DIFFERENT HVAC",
+            "owner_name": "DOE, JOHN",
+            "license_expiration_date_mmddccyy": "12/31/2027",
+        },
+    ]
+    assert texas_tdlr_ac_seeds_from_rows(
+        "Power Source Electric LLC",
+        records,
+        as_of=date(2026, 10, 2),
+    ) == []
+
+
+def test_find_official_license_principals_combines_cached_tdlr_and_rmp(
+    monkeypatch,
+):
+    import empire_os.official_license_identity as module
+
+    monkeypatch.setattr(
+        module,
+        "_load_tdlr_cache",
+        lambda: [{
+            "license_type": "A/C Contractor",
+            "business_name": "PATRIOT PLUMBING",
+            "owner_name": "DOE, JANE",
+            "license_expiration_date_mmddccyy": "12/31/2027",
+        }],
+    )
+    monkeypatch.setattr(
+        module,
+        "_fetch_texas_rmp_csv",
+        lambda timeout=12.0: CSV,
+    )
+
+    rows = module.find_official_license_principals(
+        company_name="Patriot Plumbing LLC",
+        state="TX",
+    )
+
+    assert {row["source"] for row in rows} == {
+        "texas_tdlr_ac_contractor",
+        "texas_tsbpe_rmp",
+    }
+    assert all(row["state"] == "TX" for row in rows)
