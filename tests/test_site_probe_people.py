@@ -565,3 +565,16 @@ def test_people_extractor_keeps_real_decision_people():
         "William Stapleton",
     ):
         assert sp._looks_like_visible_person_name(value) is True, value
+
+
+def test_people_extractor_rejects_organization_names_next_to_roles():
+    import empire_os.search_fabric.site_probe as sp
+
+    bad = [
+        "ClearMetric Research",
+        "Arcline Technologies",
+        "Northstar Digital",
+        "Revenue Labs",
+    ]
+    for value in bad:
+        assert sp._looks_like_visible_person_name(value) is False, value

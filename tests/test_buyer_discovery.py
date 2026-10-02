@@ -1208,3 +1208,15 @@ def test_personhood_guard_rejects_live_buyer_scout_false_people():
         "William Stapleton",
     ):
         assert looks_like_person_name(value) is True, value
+
+
+def test_personhood_guard_rejects_organization_names():
+    from empire_os.buyer_discovery import looks_like_person_name
+
+    for value in (
+        "ClearMetric Research",
+        "Arcline Technologies",
+        "Northstar Digital",
+        "Revenue Labs",
+    ):
+        assert looks_like_person_name(value) is False, value
