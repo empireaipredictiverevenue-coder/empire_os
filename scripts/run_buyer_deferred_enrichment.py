@@ -24,6 +24,12 @@ from empire_os.buyer_review_materializer import run_buyer_probe_isolated
 from empire_os.sb import request_json
 DEFERRED_LOCK = Path("/srv/empire_os/runtime/buyer_deferred_enrichment/run.lock")
 
+# Keep one enrichment cycle safely below the systemd wall. The worker is
+# evidence-seeking, not exhaustive: unresolved rows remain durable and retry.
+BUYER_PROBE_TIMEOUT_SECONDS = 18.0
+IDENTITY_RECOVERY_TIMEOUT_SECONDS = 20.0
+TARGETED_PROBE_TIME_BUDGET_SECONDS = 10.0
+
 
 def recover_identity_isolated(
     *,
@@ -306,11 +312,11 @@ def _targeted_enterprise_probe(
 
         result = run_buyer_probe_isolated(
             probe_row,
-            hard_timeout_seconds=24.0,
+            hard_timeout_seconds=BUYER_PROBE_TIMEOUT_SECONDS,
             probe_options={
                 "max_pages": 6,
-                "request_timeout": 3.5,
-                "time_budget_seconds": 14.0,
+                "request_timeout": 3.0,
+                "time_budget_seconds": TARGETED_PROBE_TIME_BUDGET_SECONDS,
                 "allow_company_routed": False,
             },
         )
@@ -558,7 +564,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                 probe_row["id"] = probe_row.pop("prospect_id")
                 result = run_buyer_probe_isolated(
                     probe_row,
-                    hard_timeout_seconds=28.0,
+                    hard_timeout_seconds=BUYER_PROBE_TIMEOUT_SECONDS,
                 )
 
                 if not result.get("decision_maker"):
@@ -566,7 +572,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                         business_name=candidate.business_name,
                         website=candidate.website,
                         metro=candidate.metro,
-                        hard_timeout_seconds=45.0,
+                        hard_timeout_seconds=IDENTITY_RECOVERY_TIMEOUT_SECONDS,
                     )
                     recovered = recovery.get("identity")
                     if isinstance(recovered, dict):
@@ -575,7 +581,7 @@ def run_cycle(*, limit: int = 5) -> dict[str, Any]:
                         probe_row["contact_source"] = recovered.get("source")
                         result = run_buyer_probe_isolated(
                             probe_row,
-                            hard_timeout_seconds=28.0,
+                            hard_timeout_seconds=BUYER_PROBE_TIMEOUT_SECONDS,
                         )
                         if not result.get("decision_maker"):
                             result = dict(result)
