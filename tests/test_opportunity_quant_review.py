@@ -65,3 +65,40 @@ def test_quant_review_builds_packet_when_all_inputs_exist():
     assert result["available_decision_packet_count"] == 1
     assert packet["actual_revenue"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_available_quant_packet_gets_stable_prediction_ref():
+    intake = {
+        "items": [{
+            "opportunity_key": "market:roofing:denver",
+            "opportunity_class": "market_research",
+            "factory_ready": True,
+            "normalization": {"quant_inputs": {
+                "probability_success": 0.5,
+                "conditional_revenue_cents": 150000,
+                "fixed_cost_cents": 30000,
+                "success_cost_cents": 30000,
+                "revenue_low_cents": 130000,
+                "revenue_high_cents": 160000,
+                "success_cost_low_cents": 25000,
+                "success_cost_high_cents": 35000,
+                "uncertainty": 0.3,
+                "time_to_revenue_days": 21,
+                "confidence": 0.7,
+            }},
+        }]
+    }
+    first = build_quant_review(intake, trials=100, seed=7)
+    second = build_quant_review(intake, trials=100, seed=7)
+    ref = first["items"][0]["prediction_ref"]
+    assert ref.startswith("quant_prediction:")
+    assert second["items"][0]["prediction_ref"] == ref
+
+
+def test_unavailable_quant_packet_has_no_prediction_ref():
+    result = build_quant_review({"items":[{
+        "opportunity_key":"market:roofing:denver",
+        "normalization":{"quant_inputs":{}},
+    }]})
+    assert result["items"][0]["decision_packet"]["status"] == "UNAVAILABLE"
+    assert result["items"][0]["prediction_ref"] is None

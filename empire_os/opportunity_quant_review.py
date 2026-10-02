@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 from pathlib import Path
 from typing import Any, Mapping
@@ -25,6 +26,21 @@ def _read(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def _prediction_ref(opportunity_key: str, packet: Mapping[str, Any]) -> str | None:
+    if str(packet.get("status") or "").strip().upper() != "AVAILABLE":
+        return None
+    material = json.dumps(
+        {
+            "opportunity_key": str(opportunity_key or "").strip(),
+            "decision_packet": dict(packet),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    return "quant_prediction:" + sha256(material).hexdigest()[:24]
 
 
 def build_quant_review(
@@ -60,6 +76,7 @@ def build_quant_review(
 
         rows.append({
             "opportunity_key": key,
+            "prediction_ref": _prediction_ref(key, packet),
             "opportunity_class": raw.get("opportunity_class"),
             "factory_ready": raw.get("factory_ready") is True,
             "quant_input_evidence": dict(
