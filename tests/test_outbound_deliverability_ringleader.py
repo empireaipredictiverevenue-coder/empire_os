@@ -254,3 +254,35 @@ def test_ringleader_holds_exhausted_reputation_slo():
     })
     assert result["posture"] == "HOLD"
     assert "reputation_error_budget_exhausted" in result["hard_holds"]
+
+
+def test_ringleader_holds_domain_continuity_failure():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "domain_continuity": {
+            "domain": "outbound.example.com",
+            "purpose": "prospecting",
+            "days_to_expiry": 365,
+            "registrar_owned": True,
+            "dns_owned": True,
+            "registrar_lock": True,
+            "auto_renew": True,
+            "nameserver_drift": True,
+            "dnssec_valid": True,
+            "dkim_selector_count": 1,
+            "dmarc_rua_owned": True,
+            "is_primary_brand_domain": False,
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "domain_continuity_hold" in result["hard_holds"]
