@@ -157,3 +157,100 @@ def test_stale_bundle_is_reported_but_not_projected():
     assert result["evidence_bundle"]["status"] == "STALE"
     assert result["ringleader"]["open_source_health"] is None
     assert result["ringleader"]["posture"] == "READY"
+
+
+
+def estate_inventory(*, include_orphan_capacity=False):
+    transports = [{
+        "id": "t1",
+        "transport_key": "transport:a",
+        "state": "ACTIVE",
+        "policy_compatible": True,
+    }]
+    domains = [{
+        "id": "d1",
+        "domain": "mail.example.com",
+        "lifecycle_state": "ACTIVE",
+    }]
+    mailboxes = [{
+        "id": "m1",
+        "mailbox_key": "sender:1",
+        "email_address": "sender@mail.example.com",
+        "domain_id": "d1",
+        "transport_id": "t1",
+        "state": "ACTIVE",
+        "reputation_credit": 50,
+    }]
+    pools = [{
+        "id": "p1",
+        "pool_key": "mailbox:primary",
+        "pool_kind": "MAILBOX",
+        "state": "ACTIVE",
+    }]
+    pool_members = [{
+        "pool_id": "p1",
+        "member_type": "MAILBOX",
+        "member_key": "sender:1",
+        "active": True,
+    }]
+    capacity_events = [{
+        "id": "c1",
+        "mailbox_key": "sender:1",
+        "domain": "mail.example.com",
+        "transport_key": "transport:a",
+        "event_type": "SET_LIMIT",
+        "capacity_limit": 20,
+        "units": 0,
+        "recorded_at": "2026-10-03T08:00:00+00:00",
+    }]
+    if include_orphan_capacity:
+        capacity_events.append({
+            "id": "c2",
+            "mailbox_key": "sender:missing",
+            "domain": "mail.example.com",
+            "event_type": "SET_LIMIT",
+            "capacity_limit": 5,
+            "units": 0,
+            "recorded_at": "2026-10-03T09:00:00+00:00",
+        })
+
+    return {
+        "transports": transports,
+        "domains": domains,
+        "mailboxes": mailboxes,
+        "pools": pools,
+        "pool_members": pool_members,
+        "capacity_events": capacity_events,
+        "seed_mailboxes": [{
+            "seed_key": "seed:gmail:1",
+            "active": True,
+            "ownership_verified": True,
+        }],
+    }
+
+
+def test_observer_reports_converged_sender_estate_without_authorizing_send():
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=fleet_context(),
+        estate_inventory=estate_inventory(),
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+    assert result["sender_estate_reconciliation"]["status"] == "CONVERGED"
+    assert result["ringleader"]["sender_estate_reconciliation"]["status"] == "CONVERGED"
+    assert result["ringleader"]["posture"] == "READY"
+    assert result["mutation_authorized"] is False
+
+
+def test_observer_propagates_sender_estate_integrity_failure_to_hold():
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=fleet_context(),
+        estate_inventory=estate_inventory(include_orphan_capacity=True),
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+    assert result["sender_estate_reconciliation"]["status"] == "HOLD"
+    assert result["ringleader"]["posture"] == "HOLD"
+    assert "sender_estate_reconciliation_hold" in result["ringleader"]["hard_holds"]
