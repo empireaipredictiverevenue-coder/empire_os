@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 
-PATH = Path("migrations/empiredb/038_outbound_content_claim_memory.sql")
+PATH = Path("migrations/empiredb/040_outbound_content_claim_memory.sql")
 
 
 def test_content_claim_memory_migration_is_append_only_and_non_authorizing():
