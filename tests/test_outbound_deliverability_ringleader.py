@@ -176,3 +176,81 @@ def test_ringleader_explains_shift_and_plans_remediation():
         task["mutation_authorized"] is False
         for task in result["remediation"]["tasks"]
     )
+
+
+def test_ringleader_blocks_cross_agent_contact_pressure():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "contact_pressure": {
+            "candidate": {
+                "person_key": "person:a",
+                "company_key": "company:x",
+            },
+            "history": [{
+                "person_key": "person:a",
+                "company_key": "company:x",
+                "occurred_at": "2026-10-02T12:00:00+00:00",
+            }],
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "contact_pressure_hold" in result["hard_holds"]
+
+
+def test_ringleader_blocks_sender_thread_hopping():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "sender_affinity": {
+            "is_existing_thread": True,
+            "prior_sender_id": "s1",
+            "prior_sender_health": "GREEN",
+            "proposed_sender_id": "s2",
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "sender_affinity_hold" in result["hard_holds"]
+
+
+def test_ringleader_holds_exhausted_reputation_slo():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "reputation_slo": {
+            "sent": 100,
+            "bounces": 3,
+            "complaints": 0,
+            "seed_tests": 10,
+            "spam_placements": 0,
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "reputation_error_budget_exhausted" in result["hard_holds"]
