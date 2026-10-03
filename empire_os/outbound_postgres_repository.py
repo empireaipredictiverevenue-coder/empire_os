@@ -235,14 +235,26 @@ class PostgresDeliverabilityEvidenceWriter:
         observed_at = row.get("observed_at") or datetime.now(timezone.utc)
         return self._insert(
             """
-            INSERT INTO public.outbound_deliverability_observations(
-              scope_key,observed_at,source,domain,mailbox_key,
-              transport_key,recipient_mx,metric_name,metric_value,
-              unit,evidence,evidence_hash,previous_evidence_hash
-            ) VALUES(
-              %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s
+            WITH inserted AS (
+              INSERT INTO public.outbound_deliverability_observations(
+                scope_key,observed_at,source,domain,mailbox_key,
+                transport_key,recipient_mx,metric_name,metric_value,
+                unit,evidence,evidence_hash,previous_evidence_hash
+              ) VALUES(
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s
+              )
+              ON CONFLICT(scope_key,evidence_hash)
+                WHERE evidence_hash IS NOT NULL
+              DO NOTHING
+              RETURNING id
             )
-            RETURNING id
+            SELECT id FROM inserted
+            UNION ALL
+            SELECT id
+              FROM public.outbound_deliverability_observations
+             WHERE scope_key = %s
+               AND evidence_hash = %s
+            LIMIT 1
             """,
             (
                 self.scope_key,
@@ -258,6 +270,8 @@ class PostgresDeliverabilityEvidenceWriter:
                 json.dumps(dict(row.get("evidence") or {}), sort_keys=True, default=str),
                 row.get("evidence_hash"),
                 row.get("previous_evidence_hash"),
+                self.scope_key,
+                row.get("evidence_hash"),
             ),
         )
 
@@ -268,17 +282,26 @@ class PostgresDeliverabilityEvidenceWriter:
             )
         return self._insert(
             """
-            INSERT INTO public.outbound_ringleader_decisions(
-              scope_key,decision_key,observed_at,posture,
-              domain,mailbox_key,transport_key,recipient_mx,
-              hard_holds,tasks,evidence,mutation_authorized,
-              evidence_hash,previous_evidence_hash
-            ) VALUES(
-              %s,%s,%s,%s,%s,%s,%s,%s,
-              %s::jsonb,%s::jsonb,%s::jsonb,FALSE,%s,%s
+            WITH inserted AS (
+              INSERT INTO public.outbound_ringleader_decisions(
+                scope_key,decision_key,observed_at,posture,
+                domain,mailbox_key,transport_key,recipient_mx,
+                hard_holds,tasks,evidence,mutation_authorized,
+                evidence_hash,previous_evidence_hash
+              ) VALUES(
+                %s,%s,%s,%s,%s,%s,%s,%s,
+                %s::jsonb,%s::jsonb,%s::jsonb,FALSE,%s,%s
+              )
+              ON CONFLICT(scope_key,decision_key) DO NOTHING
+              RETURNING id
             )
-            ON CONFLICT(scope_key,decision_key) DO NOTHING
-            RETURNING id
+            SELECT id FROM inserted
+            UNION ALL
+            SELECT id
+              FROM public.outbound_ringleader_decisions
+             WHERE scope_key = %s
+               AND decision_key = %s
+            LIMIT 1
             """,
             (
                 self.scope_key,
@@ -294,6 +317,8 @@ class PostgresDeliverabilityEvidenceWriter:
                 json.dumps(dict(row.get("evidence") or {}), sort_keys=True, default=str),
                 row.get("evidence_hash"),
                 row.get("previous_evidence_hash"),
+                self.scope_key,
+                str(row.get("decision_key") or ""),
             ),
         )
 
