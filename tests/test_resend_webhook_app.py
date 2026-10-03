@@ -1,3 +1,4 @@
+import hashlib
 from fastapi.testclient import TestClient
 
 from empire_os.resend_webhook_app import _receiving_api_key, create_app
@@ -85,6 +86,10 @@ def test_valid_signed_reply_ingests_only_inert_reply_record():
     params = calls[0][1]
     assert params["p_intent_id"] == INTENT
     assert params["p_metadata"]["untrusted_content"] is True
+    assert params["p_metadata"]["executable"] is False
+    assert params["p_metadata"]["payload_sha256"] == (
+        hashlib.sha256(b"{}").hexdigest()
+    )
     assert params["p_body_text"] == "Interested, tell me more."
     assert calls[1][0] == "classify_outbound_reply"
     assert calls[1][1]["p_classification"] == "positive"

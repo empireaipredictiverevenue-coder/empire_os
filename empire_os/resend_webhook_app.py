@@ -6,6 +6,8 @@ reply record through the dedicated reply-ingest role. It never calls an agent.
 """
 from __future__ import annotations
 
+import hashlib
+
 import os
 import re
 from email.utils import parseaddr
@@ -326,6 +328,10 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
         except (UnicodeDecodeError, OutboundProviderError):
             return JSONResponse({"ok": False}, status_code=400)
 
+        # Hash the exact signed webhook request bytes. This is evidence
+        # identity only; untrusted message content remains non-executable.
+        payload_sha256 = hashlib.sha256(raw_bytes).hexdigest()
+
         try:
             provider_event = extract_resend_provider_event(event)
         except OutboundProviderError:
@@ -432,7 +438,10 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                 "p_body_text": reply["body_text"],
                 "p_received_at": reply["received_at"],
                 "p_metadata": {
-                    "provider": "resend", "untrusted_content": True,
+                    "provider": "resend",
+                    "payload_sha256": payload_sha256,
+                    "untrusted_content": True,
+                    "executable": False,
                     "body_unavailable": bool(reply.get("body_unavailable")),
                     "in_reply_to": reply["in_reply_to"],
                     "references": reply["references"],
