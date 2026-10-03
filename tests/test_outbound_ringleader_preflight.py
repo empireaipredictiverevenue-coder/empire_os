@@ -57,3 +57,47 @@ def test_preflight_blocks_context_that_authorizes_mutation(tmp_path):
         assert "cannot_authorize_mutation" in str(exc)
     else:
         raise AssertionError("expected preflight to reject mutating context")
+
+
+
+def test_preflight_reports_current_evidence_bundle(tmp_path):
+    import json
+
+    context = tmp_path / "context.json"
+    context.write_text("{}", encoding="utf-8")
+    bundle = tmp_path / "evidence.json"
+    bundle.write_text(json.dumps({
+        "schema_version": "1",
+        "generated_at": "2026-10-03T20:00:00+00:00",
+        "sources": {},
+        "mutation_authorized": False,
+    }), encoding="utf-8")
+
+    result = evaluate_preflight(
+        base_env(),
+        context_path=context,
+        evidence_bundle_path=bundle,
+    )
+    assert result["status"] == "READY"
+    assert result["evidence_bundle_status"] in {"CURRENT", "STALE"}
+    assert result["activation_authorized"] is False
+
+
+def test_preflight_rejects_mutating_evidence_bundle(tmp_path):
+    import json
+    import pytest
+
+    bundle = tmp_path / "evidence.json"
+    bundle.write_text(json.dumps({
+        "schema_version": "1",
+        "generated_at": "2026-10-03T20:00:00+00:00",
+        "sources": {},
+        "mutation_authorized": True,
+    }), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="cannot_authorize_mutation"):
+        evaluate_preflight(
+            base_env(),
+            context_path=tmp_path / "missing.json",
+            evidence_bundle_path=bundle,
+        )
