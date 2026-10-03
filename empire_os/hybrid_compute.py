@@ -17,6 +17,7 @@ class Route(str, Enum):
     FRONTIER = "frontier"
     PREDICTIVE = "predictive"
     DETERMINISTIC = "deterministic"
+    OPTIMIZATION = "optimization"
     HUMAN_GATE = "human_gate"
 
 
@@ -34,6 +35,8 @@ class TaskKind(str, Enum):
     REASON = "reason"
     RESEARCH = "research"
     PREDICTIVE_REVENUE = "predictive_revenue"
+    QUANT = "quant"
+    OPTIMIZE = "optimize"
     OUTBOUND_DRAFT = "outbound_draft"
     OUTBOUND_SEND = "outbound_send"
     COMMERCIAL_BINDING = "commercial_binding"
@@ -173,6 +176,14 @@ def recommend_route(
     ):
         route = Route.PREDICTIVE
         reasons.append("predictive_workload")
+
+    elif request.task_kind is TaskKind.QUANT:
+        route = Route.DETERMINISTIC
+        reasons.append("deterministic_quant_workload")
+
+    elif request.task_kind is TaskKind.OPTIMIZE:
+        route = Route.OPTIMIZATION
+        reasons.append("optimization_workload")
 
     elif (
         request.requires_external_knowledge

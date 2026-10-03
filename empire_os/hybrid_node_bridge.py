@@ -20,6 +20,7 @@ ROUTE_CAPABILITIES = {
     Route.FRONTIER: "compute.frontier",
     Route.PREDICTIVE: "compute.predictive",
     Route.DETERMINISTIC: "compute.deterministic",
+    Route.OPTIMIZATION: "compute.optimization",
     Route.HUMAN_GATE: "governance.human",
 }
 
