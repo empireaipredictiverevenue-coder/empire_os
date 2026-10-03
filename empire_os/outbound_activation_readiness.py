@@ -53,12 +53,27 @@ def evaluate_activation_readiness(
     elif row.get("signed_evidence_verified") is not True:
         warnings.append("local_evidence_bundle_not_signature_enforced")
 
-    # Operational OBSERVE requires the deployed services to prove they are alive.
+    # Operational OBSERVE is timer-driven. The observer and watchdog are
+    # Type=oneshot services, so a successful completed run is normally
+    # "inactive", not "active". Require timers to remain active and require
+    # oneshot units to be healthy/not-failed instead of perpetually active.
     operational_blockers.extend(observe_blockers)
+
+    observer_healthy = row.get("observer_service_healthy")
+    if observer_healthy is None:
+        # Backward compatibility for older evidence producers.
+        observer_healthy = row.get("observer_service_active") is True
+    if observer_healthy is not True:
+        operational_blockers.append("observer_service_not_healthy")
+
+    watchdog_healthy = row.get("observer_watchdog_healthy")
+    if watchdog_healthy is None:
+        watchdog_healthy = row.get("observer_watchdog_active") is True
+    if watchdog_healthy is not True:
+        operational_blockers.append("observer_watchdog_not_healthy")
+
     for key, expected, reason in (
-        ("observer_service_active", True, "observer_service_not_active"),
         ("observer_timer_active", True, "observer_timer_not_active"),
-        ("observer_watchdog_active", True, "observer_watchdog_not_active"),
         (
             "observer_watchdog_timer_active",
             True,
