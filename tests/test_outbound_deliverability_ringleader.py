@@ -424,3 +424,38 @@ def test_ringleader_limits_high_infrastructure_concentration():
     assert result["posture"] == "LIMITED"
     assert result["infrastructure_concentration"]["posture"] == "HIGH_CONCENTRATION"
     assert any(task["action"] == "REDUCE_CONCENTRATION" for task in result["tasks"])
+
+
+def test_ringleader_holds_critical_multi_source_auth_conflict():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+        "evidence_fusion": [
+            {
+                "signal": "dkim_aligned",
+                "value": True,
+                "source": "provider",
+                "observed_at": "2026-10-03T18:00:00+00:00",
+            },
+            {
+                "signal": "dkim_aligned",
+                "value": False,
+                "source": "parsedmarc",
+                "observed_at": "2026-10-03T18:00:00+00:00",
+            },
+        ],
+    })
+    assert result["posture"] == "HOLD"
+    assert "critical_evidence_conflict" in result["hard_holds"]
+    assert any(
+        task["action"] == "RECONCILE_EVIDENCE"
+        for task in result["tasks"]
+    )
