@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-PATH = Path("migrations/empiredb/033_outbound_deliverability_control_plane.sql")
+PATH = Path("migrations/empiredb/035_outbound_deliverability_control_plane.sql")
 
 
 def test_empiredb_deliverability_migration_is_staged_append_only():
