@@ -126,8 +126,8 @@ def test_operational_observe_requires_watchdog_heartbeat_and_current_telemetry()
     blockers = result["operational_observe"]["blockers"]
     assert result["observe"]["status"] == "READY"
     assert result["operational_observe"]["status"] == "BLOCKED"
-    assert "observer_service_not_active" in blockers
-    assert "observer_watchdog_not_active" in blockers
+    assert "observer_service_not_healthy" in blockers
+    assert "observer_watchdog_not_healthy" in blockers
     assert "observer_heartbeat_not_current" in blockers
     assert "telemetry_sla_not_current" in blockers
     assert "provider_event_ingest_not_ready" in blockers
