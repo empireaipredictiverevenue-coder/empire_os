@@ -144,3 +144,19 @@ def test_replay_rebuilds_latest_asset_metrics_deterministically():
     asset = result["assets"]["mail.example.com"]
     assert asset["metrics"]["bounce_rate"] == 0.02
     assert result["mutation_authorized"] is False
+
+
+def test_latest_evidence_head_uses_read_only_scope_contract():
+    calls = []
+    repo = PostgresDeliverabilityRepository(
+        "reader-dsn",
+        "tenant-a",
+        connect_factory=connect_factory(calls),
+    )
+    # Fake row maps to id/metric_name columns; enough to exercise SQL contract.
+    value = repo.latest_evidence_head()
+    assert value == "row-1"
+    sql, params = calls[-1]
+    assert "outbound_deliverability_observations" in sql
+    assert "outbound_ringleader_decisions" in sql
+    assert params == ("tenant-a", "tenant-a")
