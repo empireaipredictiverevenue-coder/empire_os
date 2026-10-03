@@ -1,3 +1,4 @@
+import empire_os.outbound_empiredb_activation_probe as activation_probe_module
 from empire_os.outbound_empiredb_activation_probe import (
     REQUIRED_COLUMNS,
     REQUIRED_ROLES,
@@ -176,3 +177,46 @@ def test_probe_blocks_writer_update_delete_even_on_append_only_tables():
     assert "public.outbound_deliverability_observations" in (
         result["excess_writer_privileges"]
     )
+
+
+
+def test_activation_probe_cli_uses_explicit_probe_dsn(monkeypatch, capsys):
+    monkeypatch.setenv(
+        "EMPIRE_OUTBOUND_ACTIVATION_PROBE_DSN",
+        "probe-dsn",
+    )
+    seen = {}
+
+    def fake_probe(dsn):
+        seen["dsn"] = dsn
+        return {
+            "status": "READY",
+            "mutation_authorized": False,
+        }
+
+    monkeypatch.setattr(
+        activation_probe_module,
+        "probe_empiredb_deliverability",
+        fake_probe,
+    )
+    assert activation_probe_module.main() == 0
+    assert seen["dsn"] == "probe-dsn"
+    assert '"status": "READY"' in capsys.readouterr().out
+
+
+def test_activation_probe_cli_returns_nonzero_when_blocked(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "EMPIRE_OUTBOUND_ACTIVATION_PROBE_DSN",
+        "probe-dsn",
+    )
+    monkeypatch.setattr(
+        activation_probe_module,
+        "probe_empiredb_deliverability",
+        lambda _dsn: {
+            "status": "BLOCKED",
+            "mutation_authorized": False,
+        },
+    )
+    assert activation_probe_module.main() == 2
