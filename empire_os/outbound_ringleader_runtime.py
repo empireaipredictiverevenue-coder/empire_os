@@ -114,17 +114,16 @@ def persist_provider_evidence(
     }
 
 
-def persist_evidence_and_decision(
+def persist_ringleader_decision(
     *,
     scope_key: str,
-    source: str,
-    provider_payload: Mapping[str, Any],
     ringleader_context: Mapping[str, Any],
     reader: EvidenceReader,
     writer: EvidenceWriter,
     observed_at: datetime | None = None,
+    previous_hash: str | None = None,
 ) -> dict[str, Any]:
-    """Persist evidence and Ringleader decision while remaining OBSERVE-only."""
+    """Evaluate and append one OBSERVE-only Ringleader decision."""
 
     scope = str(scope_key or "").strip()
     if not scope:
@@ -132,16 +131,7 @@ def persist_evidence_and_decision(
 
     now = (observed_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     observed_iso = now.isoformat()
-
-    evidence_result = persist_provider_evidence(
-        scope_key=scope,
-        source=source,
-        provider_payload=provider_payload,
-        reader=reader,
-        writer=writer,
-        observed_at=now,
-    )
-    head = evidence_result["head_hash"]
+    head = previous_hash or reader.latest_evidence_head() or GENESIS
 
     decision = evaluate_ringleader(ringleader_context)
     if decision.get("mutation_authorized") is not False:
@@ -151,6 +141,7 @@ def persist_evidence_and_decision(
         "scope_key": scope,
         "observed_at": observed_iso,
         "posture": decision["posture"],
+        "evaluation_scope": decision.get("evaluation_scope"),
         "hard_holds": decision.get("hard_holds") or [],
         "tasks": decision.get("tasks") or [],
         "ringleader": decision,
@@ -176,10 +167,55 @@ def persist_evidence_and_decision(
 
     return {
         "scope_key": scope,
-        "observations_persisted": evidence_result["observations_persisted"],
         "decision_id": decision_write["id"],
         "decision_key": decision_key,
         "posture": decision["posture"],
         "head_hash": chained_decision["evidence_hash"],
+        "mutation_authorized": False,
+    }
+
+
+def persist_evidence_and_decision(
+    *,
+    scope_key: str,
+    source: str,
+    provider_payload: Mapping[str, Any],
+    ringleader_context: Mapping[str, Any],
+    reader: EvidenceReader,
+    writer: EvidenceWriter,
+    observed_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Persist evidence and one Ringleader decision while remaining OBSERVE-only."""
+
+    scope = str(scope_key or "").strip()
+    if not scope:
+        raise ValueError("scope_key_required")
+
+    now = (observed_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    evidence_result = persist_provider_evidence(
+        scope_key=scope,
+        source=source,
+        provider_payload=provider_payload,
+        reader=reader,
+        writer=writer,
+        observed_at=now,
+    )
+    decision_result = persist_ringleader_decision(
+        scope_key=scope,
+        ringleader_context=ringleader_context,
+        reader=reader,
+        writer=writer,
+        observed_at=now,
+        previous_hash=evidence_result["head_hash"],
+    )
+
+    return {
+        "scope_key": scope,
+        "observations_persisted": evidence_result["observations_persisted"],
+        **{
+            key: value
+            for key, value in decision_result.items()
+            if key != "scope_key"
+        },
         "mutation_authorized": False,
     }
