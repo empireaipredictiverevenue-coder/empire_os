@@ -101,3 +101,29 @@ def test_preflight_rejects_mutating_evidence_bundle(tmp_path):
             context_path=tmp_path / "missing.json",
             evidence_bundle_path=bundle,
         )
+
+
+
+def test_preflight_blocks_unsigned_bundle_when_signature_required(tmp_path):
+    import json
+    import pytest
+
+    env = base_env()
+    env["EMPIRE_OUTBOUND_REQUIRE_SIGNED_EVIDENCE_BUNDLE"] = "true"
+    env["EMPIRE_OUTBOUND_EVIDENCE_BUNDLE_HMAC_KEY"] = (
+        "empire-test-signing-key-123456"
+    )
+    bundle = tmp_path / "evidence.json"
+    bundle.write_text(json.dumps({
+        "schema_version": "1",
+        "generated_at": "2026-10-03T20:00:00+00:00",
+        "sources": {},
+        "mutation_authorized": False,
+    }), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="signature_required"):
+        evaluate_preflight(
+            env,
+            context_path=tmp_path / "missing-context.json",
+            evidence_bundle_path=bundle,
+        )
