@@ -1,0 +1,20 @@
+[Unit]
+Description=EmpireOS Ringleader outbound deliverability observer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_OUTBOUND_RINGLEADER_MODE=OBSERVE
+EnvironmentFile=-/srv/empire_os/runtime/secrets/outbound-deliverability.env
+EnvironmentFile=-/srv/empire_os/runtime/secrets/outbound.env
+ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.outbound_ringleader_observer
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/etc
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStartSec=90
