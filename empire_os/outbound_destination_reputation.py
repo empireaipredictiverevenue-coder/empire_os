@@ -5,6 +5,8 @@ from typing import Any, Mapping
 
 from empire_os.google_postmaster_v2 import normalize_compliance_status
 from empire_os.microsoft_outlook_evidence import normalize_outlook_delivery_evidence
+from empire_os.outbound_yahoo_evidence import normalize_yahoo_delivery_evidence
+from empire_os.outbound_apple_evidence import normalize_apple_delivery_evidence
 
 
 def evaluate_destination_reputation(
@@ -40,6 +42,30 @@ def evaluate_destination_reputation(
                 warnings.append("microsoft_destination_backoff")
         else:
             warnings.append("microsoft_delivery_evidence_unavailable")
+
+    elif family == "YAHOO":
+        yahoo_payload = context.get("yahoo_delivery")
+        if isinstance(yahoo_payload, Mapping):
+            yahoo = normalize_yahoo_delivery_evidence(yahoo_payload)
+            evidence["yahoo"] = yahoo
+            if yahoo["posture"] in {"HOLD_YAHOO", "HOLD_RECIPIENT"}:
+                holds.append("yahoo_destination_hold")
+            elif yahoo["posture"] in {"BACKOFF_YAHOO", "LIMIT_YAHOO"}:
+                warnings.append("yahoo_destination_limited_or_backoff")
+        else:
+            warnings.append("yahoo_delivery_evidence_unavailable")
+
+    elif family == "APPLE":
+        apple_payload = context.get("apple_delivery")
+        if isinstance(apple_payload, Mapping):
+            apple = normalize_apple_delivery_evidence(apple_payload)
+            evidence["apple"] = apple
+            if apple["posture"] == "HOLD_RECIPIENT":
+                holds.append("apple_destination_hold")
+            elif apple["posture"] == "BACKOFF_APPLE":
+                warnings.append("apple_destination_backoff")
+        else:
+            warnings.append("apple_delivery_evidence_unavailable")
 
     placement_rate = seed.get("inbox_placement_rate")
     if placement_rate is not None:
