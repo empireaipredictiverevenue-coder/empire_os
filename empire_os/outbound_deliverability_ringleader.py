@@ -33,6 +33,7 @@ from empire_os.outbound_domain_brand_safety import evaluate_domain_brand_safety
 from empire_os.outbound_account_saturation import evaluate_account_saturation
 from empire_os.outbound_evidence_fusion import fuse_evidence
 from empire_os.outbound_open_source_health import evaluate_open_source_evidence
+from empire_os.outbound_telemetry_sla import evaluate_telemetry_sla
 
 
 @dataclass(frozen=True)
@@ -130,8 +131,7 @@ def evaluate_ringleader(
     ):
         tasks.append(
             _task(
-                "REFRESH_EVIDENCE",
-            "VERIFY_RECIPIENTS",
+                "VERIFY_RECIPIENTS",
                 "recipient_quality_unverified",
                 "recipient_verifier",
             )
@@ -457,6 +457,64 @@ def evaluate_ringleader(
                 )
             )
 
+    telemetry_sla = None
+    telemetry_context = context.get("telemetry_sla")
+    if isinstance(telemetry_context, Mapping):
+        telemetry_sla = evaluate_telemetry_sla(
+            required_sources=telemetry_context.get("required_sources") or [],
+            heartbeats=telemetry_context.get("heartbeats") or [],
+            now=telemetry_context.get("now"),
+            default_max_age_minutes=int(
+                telemetry_context.get("default_max_age_minutes") or 30
+            ),
+            source_max_age_minutes=(
+                telemetry_context.get("source_max_age_minutes") or {}
+            ),
+            critical_sources=telemetry_context.get("critical_sources") or [],
+        )
+
+        if telemetry_sla["critical_blind"]:
+            if evaluation_scope in {"BATCH", "SEND"}:
+                hard_holds.append("telemetry_critical_blind")
+                tasks.append(
+                    _task(
+                        "STOP_SEND",
+                        "telemetry_critical_blind",
+                        "deliverability_observer",
+                    )
+                )
+            else:
+                tasks.append(
+                    _task(
+                        "BLOCK_SCALE",
+                        "telemetry_critical_blind",
+                        "deliverability_observer",
+                    )
+                )
+            tasks.append(
+                _task(
+                    "REFRESH_EVIDENCE",
+                    "telemetry_critical_blind",
+                    "deliverability_observer",
+                )
+            )
+        elif telemetry_sla["critical_stale"]:
+            tasks.append(
+                _task(
+                    "REFRESH_EVIDENCE",
+                    "telemetry_critical_stale",
+                    "deliverability_observer",
+                )
+            )
+        elif telemetry_sla["posture"] in {"BLIND", "STALE", "PARTIAL"}:
+            tasks.append(
+                _task(
+                    "REFRESH_EVIDENCE",
+                    f"telemetry_{telemetry_sla['posture'].lower()}",
+                    "deliverability_observer",
+                )
+            )
+
     evidence_fusion = None
     fusion_rows = context.get("evidence_fusion")
     if isinstance(fusion_rows, list):
@@ -760,6 +818,7 @@ def evaluate_ringleader(
         "sender_estate_reconciliation": sender_estate_reconciliation,
         "configuration_drift": configuration_drift,
         "infrastructure_concentration": infrastructure_concentration,
+        "telemetry_sla": telemetry_sla,
         "evidence_fusion": evidence_fusion,
         "open_source_health": open_source_health,
         "mutation_authorized": False,
