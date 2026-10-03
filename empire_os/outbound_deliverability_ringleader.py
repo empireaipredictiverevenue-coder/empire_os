@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from empire_os.outbound_domain_sovereignty import evaluate_domain_sovereignty
+from empire_os.outbound_canary import evaluate_canary
+from empire_os.outbound_deliverability_twin import simulate_batch
+from empire_os.outbound_mx_pacing import evaluate_mx_pool
+from empire_os.outbound_reputation_budget import allocate_reputation_budget
 
 
 @dataclass(frozen=True)
@@ -18,7 +22,9 @@ _PRIORITY = {
     "REPAIR_AUTH": 90,
     "REMEDIATE_DOMAIN_CONTROL": 85,
     "VERIFY_RECIPIENTS": 80,
+    "RUN_CANARY": 75,
     "MEASURE_PLACEMENT": 70,
+    "THROTTLE_MX": 65,
     "THROTTLE": 60,
     "OBSERVE": 10,
 }
@@ -79,6 +85,47 @@ def evaluate_ringleader(
     ):
         tasks.append(_task("MEASURE_PLACEMENT", "inbox_placement_unknown", "placement_lab"))
 
+    twin = None
+    planned_batch = context.get("planned_batch")
+    if isinstance(planned_batch, Mapping):
+        twin_current = dict(context.get("twin_current") or {})
+        twin = simulate_batch(twin_current, planned_batch)
+        if twin["posture"] == "HOLD":
+            hard_holds.append("pre_send_twin_hold")
+            tasks.append(_task("STOP_SEND", "pre_send_twin_hold", "deliverability_twin"))
+        elif twin["posture"] == "CANARY_ONLY":
+            tasks.append(_task("RUN_CANARY", "pre_send_twin_requires_canary", "canary_controller"))
+
+    mx_pacing = None
+    mx_pool = context.get("mx_pool")
+    if isinstance(mx_pool, Mapping):
+        mx_pacing = evaluate_mx_pool(mx_pool)
+        if mx_pacing["state"] == "HOLD":
+            tasks.append(_task("THROTTLE_MX", mx_pacing["reason"], "mx_pacing_controller"))
+        elif mx_pacing["state"] == "BACKOFF":
+            tasks.append(_task("THROTTLE_MX", mx_pacing["reason"], "mx_pacing_controller"))
+
+    canary = None
+    canary_result = context.get("canary_result")
+    if isinstance(canary_result, Mapping):
+        canary = evaluate_canary(canary_result)
+        if canary["decision"] == "HOLD":
+            hard_holds.append("canary_hold")
+            tasks.append(_task("STOP_SEND", canary["reason"], "canary_controller"))
+        elif canary["decision"] == "THROTTLE":
+            tasks.append(_task("THROTTLE", canary["reason"], "pacing_controller"))
+
+    reputation_budget = None
+    budget = context.get("reputation_budget")
+    if isinstance(budget, Mapping):
+        opportunities = budget.get("opportunities")
+        capacity = budget.get("capacity")
+        if isinstance(opportunities, list) and isinstance(capacity, int):
+            reputation_budget = allocate_reputation_budget(
+                opportunities,
+                capacity=capacity,
+            )
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -104,7 +151,16 @@ def evaluate_ringleader(
         posture = "HOLD"
     elif any(task["action"] in {"REPAIR_AUTH", "REMEDIATE_DOMAIN_CONTROL"} for task in tasks):
         posture = "REMEDIATE"
-    elif any(task["action"] in {"VERIFY_RECIPIENTS", "MEASURE_PLACEMENT", "THROTTLE"} for task in tasks):
+    elif any(
+        task["action"] in {
+            "VERIFY_RECIPIENTS",
+            "RUN_CANARY",
+            "MEASURE_PLACEMENT",
+            "THROTTLE_MX",
+            "THROTTLE",
+        }
+        for task in tasks
+    ):
         posture = "LIMITED"
     else:
         posture = "READY"
@@ -114,5 +170,9 @@ def evaluate_ringleader(
         "hard_holds": hard_holds,
         "tasks": tasks,
         "domain_sovereignty": sovereignty,
+        "deliverability_twin": twin,
+        "mx_pacing": mx_pacing,
+        "canary": canary,
+        "reputation_budget": reputation_budget,
         "mutation_authorized": False,
     }
