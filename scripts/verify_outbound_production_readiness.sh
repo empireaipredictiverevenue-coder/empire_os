@@ -26,10 +26,16 @@ check_cmd() {
 
 echo
 echo "=== RELEASE IDENTITY ==="
+release_sha="$(git rev-parse HEAD)"
 git rev-parse --short HEAD || true
 git branch --show-current || true
 
-check_cmd "RINGLEADER PREFLIGHT"   ./.venv/bin/python -m empire_os.outbound_ringleader_preflight
+check_cmd "CI RELEASE ATTESTATION" \
+  env EMPIRE_OUTBOUND_EXPECTED_SHA="$release_sha" \
+  ./.venv/bin/python -m empire_os.outbound_release_attestation
+
+check_cmd "RINGLEADER PREFLIGHT" \
+  ./.venv/bin/python -m empire_os.outbound_ringleader_preflight
 
 echo
 echo "=== RESEND PROVIDER-EVENT INGEST HEALTH ==="
