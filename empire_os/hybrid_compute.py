@@ -162,11 +162,17 @@ def recommend_route(
     )
 
     if requires_approval:
-        route = Route.DETERMINISTIC
+        # Authority-bearing actions are not compute workloads.
+        # Models may draft or reason upstream, but the actual
+        # send/bind/pay/infrastructure action terminates at the
+        # explicit governance boundary.
+        route = Route.HUMAN_GATE
         reasons.extend(
             (
                 "governed_action",
+                "human_governance_gate",
                 "authority_separate_from_compute",
+                "fail_closed",
             )
         )
 

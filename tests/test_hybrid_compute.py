@@ -68,14 +68,23 @@ def test_governed_actions_never_gain_model_authority(
 
     assert (
         decision.recommended_route
-        is Route.DETERMINISTIC
+        is Route.HUMAN_GATE
     )
+
     assert decision.requires_approval is True
     assert decision.can_execute is False
+
     assert (
         "authority_separate_from_compute"
         in decision.reason_codes
     )
+
+    assert (
+        "human_governance_gate"
+        in decision.reason_codes
+    )
+
+    assert "fail_closed" in decision.reason_codes
 
 
 def test_restricted_external_knowledge_fails_closed() -> None:

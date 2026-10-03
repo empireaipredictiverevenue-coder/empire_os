@@ -7,10 +7,15 @@ registry, grant commercial authority or promote models.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 from pathlib import Path
 from typing import Any, Mapping
+
+from empire_os.node_registry import (
+    NodeHealth,
+    NodeRegistry,
+)
 
 
 POLICY_VERSION = "empire-hybrid-compute-policy-v1"
@@ -522,5 +527,73 @@ def recommend_local(
         production_authority=False,
         reason_codes=tuple(
             reasons
+        ),
+    )
+
+
+
+def registered_healthy_local_evidence(
+    candidates: tuple[
+        LocalCandidateEvidence,
+        ...
+    ],
+    registry: NodeRegistry,
+) -> tuple[
+    LocalCandidateEvidence,
+    ...
+]:
+    """Keep only models represented by healthy canonical nodes."""
+
+    healthy_models = {
+        str(node.metadata.get("model"))
+        for node in registry.all()
+        if (
+            node.health is NodeHealth.HEALTHY
+            and node.metadata.get("model")
+        )
+    }
+
+    return tuple(
+        candidate
+        for candidate in candidates
+        if candidate.model
+        in healthy_models
+    )
+
+
+def recommend_registered_local(
+    candidates: tuple[
+        LocalCandidateEvidence,
+        ...
+    ],
+    *,
+    registry: NodeRegistry,
+    quality_floor: float,
+    latency_ceiling_ms: float | None = None,
+) -> RoutingRecommendation:
+    """Apply canonical runtime health before V4 evidence ranking."""
+
+    healthy = (
+        registered_healthy_local_evidence(
+            candidates,
+            registry,
+        )
+    )
+
+    result = recommend_local(
+        healthy,
+        quality_floor=quality_floor,
+        latency_ceiling_ms=(
+            latency_ceiling_ms
+        ),
+    )
+
+    return replace(
+        result,
+        reason_codes=(
+            result.reason_codes
+            + (
+                "canonical_node_health_applied",
+            )
         ),
     )

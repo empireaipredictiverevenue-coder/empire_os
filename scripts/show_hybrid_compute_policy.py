@@ -9,7 +9,10 @@ from pathlib import Path
 from empire_os.hybrid_compute_policy import (
     derive_provider_observations,
     load_local_evidence,
-    recommend_local,
+    recommend_registered_local,
+)
+from empire_os.node_runtime_catalog import (
+    build_runtime_registry,
 )
 
 
@@ -33,6 +36,8 @@ V3 = (
 candidates = load_local_evidence(
     LOCAL
 )
+
+registry = build_runtime_registry()
 
 provider_health = (
     derive_provider_observations(
@@ -63,8 +68,9 @@ profiles = {
 
 decisions = {
     name: asdict(
-        recommend_local(
+        recommend_registered_local(
             candidates,
+            registry=registry,
             **config,
         )
     )

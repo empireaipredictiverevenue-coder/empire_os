@@ -69,32 +69,19 @@ def test_missing_node_fails_closed():
 
 
 def test_governed_send_keeps_approval_boundary():
-    registry = NodeRegistry()
-
-    registry.register(
-        NodeSpec(
-            node_id="deterministic-control",
-            kind=NodeKind.DETERMINISTIC,
-            capabilities=frozenset(
-                {"compute.deterministic"}
-            ),
-            routes=frozenset(
-                {Route.DETERMINISTIC}
-            ),
-            health=NodeHealth.HEALTHY,
-        )
-    )
-
     plan = plan_node_execution(
         HybridRequest(
             task_kind=TaskKind.OUTBOUND_SEND
         ),
-        registry,
+        NodeRegistry(),
     )
 
-    assert plan.route is Route.DETERMINISTIC
+    assert plan.route is Route.HUMAN_GATE
     assert plan.requires_approval is True
+    assert plan.candidate_node_ids == ()
+    assert plan.fail_closed is True
     assert plan.can_execute is False
+
     assert (
         "approval_boundary_preserved"
         in plan.reason_codes

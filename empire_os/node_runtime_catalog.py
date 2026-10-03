@@ -138,6 +138,7 @@ def build_runtime_registry(
             provider="llama.cpp",
             endpoint=llama.endpoint,
             metadata={
+                "model": "qwen2.5-coder:1.5b",
                 "model_family": "qwen2.5-coder",
                 "declared_size": "1.5b",
                 "probe_status_code": (
@@ -153,9 +154,9 @@ def build_runtime_registry(
         "http://127.0.0.1:11434/api/tags"
     )
 
-    # Ollama is deliberately NOT assigned LOCAL_STRONG yet.
-    # A reachable process is not evidence that an installed model
-    # meets the quality threshold for that route.
+    # The pool itself remains unclassified. Exact model
+    # identities are registered separately below after matched
+    # benchmark evidence was produced.
     registry.register(
         NodeSpec(
             node_id="ollama-local-pool",
@@ -182,6 +183,76 @@ def build_runtime_registry(
             },
         )
     )
+
+    # Explicit benchmarked Ollama model identities.
+    #
+    # Registration exposes health/capability only.
+    # Benchmark evidence is handled independently by the
+    # Economic Scheduler and grants no execution authority.
+    for (
+        node_id,
+        model_name,
+        model_family,
+        declared_size,
+    ) in (
+        (
+            "ollama-qwen25-coder-7b",
+            "qwen2.5-coder:7b",
+            "qwen2.5-coder",
+            "7b",
+        ),
+        (
+            "ollama-qwen25-coder-14b",
+            "qwen2.5-coder:14b",
+            "qwen2.5-coder",
+            "14b",
+        ),
+        (
+            "ollama-qwen3-coder-30b",
+            "qwen3-coder:30b",
+            "qwen3-coder",
+            "30b",
+        ),
+    ):
+        registry.register(
+            NodeSpec(
+                node_id=node_id,
+                kind=NodeKind.COMPUTE,
+                capabilities=frozenset(
+                    {
+                        "compute.local.strong",
+                        "inference.coder",
+                        "inference.local.ollama",
+                    }
+                ),
+                routes=frozenset(
+                    {Route.LOCAL_STRONG}
+                ),
+                health=_health(ollama),
+                authority=NodeAuthority.OBSERVE,
+                provider="ollama",
+                endpoint=ollama.endpoint,
+                metadata={
+                    "model": model_name,
+                    "model_family": model_family,
+                    "declared_size": declared_size,
+                    "health_source":
+                        "ollama-local-pool",
+                    "benchmark_evidence_required":
+                        True,
+                    "economic_memory_required":
+                        True,
+                    "route_classification":
+                        "benchmark_verified_shadow",
+                    "execution_enabled": False,
+                    "production_authority": False,
+                    "probe_status_code":
+                        ollama.status_code,
+                    "probe_error":
+                        ollama.error,
+                },
+            )
+        )
 
     return registry
 

@@ -46,3 +46,23 @@ quality/latency evidence, then pass through the existing Empire authority
 boundary.
 
 Readiness is not authority.
+
+## Canonical Node Fabric health integration
+
+V4 recommendations now intersect matched benchmark evidence with canonical
+Node Fabric health before recommending a local model.
+
+Registered local model identities:
+
+- qwen2.5-coder:1.5b — LOCAL_SMALL
+- qwen2.5-coder:7b — LOCAL_STRONG
+- qwen2.5-coder:14b — LOCAL_STRONG
+- qwen3-coder:30b — LOCAL_STRONG
+
+A benchmarked model that is not represented by a healthy canonical runtime node
+is excluded from the current shadow recommendation.
+
+This remains recommendation-only. Node health does not grant execution,
+commercial, outbound, payment or infrastructure authority.
+
+All founder-gated actions terminate at HUMAN_GATE.

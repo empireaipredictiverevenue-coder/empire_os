@@ -41,27 +41,28 @@ def fake_fetch(url):
 
 
 def test_full_fabric_combines_all_layers():
-    r = build_full_node_registry(
+    registry = build_full_node_registry(
         probe=healthy_probe,
         fetch=fake_fetch,
     )
 
-    # 3 live compute surfaces
-    # 3 domain nodes
-    # 10 canonical intelligence nodes
+    # 6 runtime/model nodes
+    # 3 canonical domain nodes
+    # 10 founder intelligence nodes
     # 1 search intelligence node
-    assert len(r.all()) == 17
+    assert len(registry.all()) == 20
 
 
 def test_fabric_never_inherits_authority():
-    r = build_full_node_registry(
+    registry = build_full_node_registry(
         probe=healthy_probe,
         fetch=fake_fetch,
     )
 
     assert all(
-        n.authority is NodeAuthority.OBSERVE
-        for n in r.all()
+        node.authority
+        is NodeAuthority.OBSERVE
+        for node in registry.all()
     )
 
 
@@ -70,6 +71,8 @@ def test_snapshot_exposes_no_execution():
         probe=healthy_probe,
         fetch=fake_fetch,
     )
+
+    assert snapshot["node_count"] == 20
 
     assert (
         snapshot["production_authority"]
@@ -80,5 +83,3 @@ def test_snapshot_exposes_no_execution():
         snapshot["execution_enabled"]
         is False
     )
-
-    assert snapshot["node_count"] == 17
