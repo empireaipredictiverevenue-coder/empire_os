@@ -12,6 +12,9 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.decision_identity import (
+    build_decision_identity,
+)
 from empire_os.node_registry import (
     NodeHealth,
     NodeRegistry,
@@ -596,4 +599,63 @@ def recommend_registered_local(
                 "canonical_node_health_applied",
             )
         ),
+    )
+
+
+def build_hybrid_shadow_decision_identity(
+    recommendation: RoutingRecommendation,
+    *,
+    state_ref: str,
+    task_key: str,
+    prediction_ref: str | None = None,
+) -> dict[str, Any]:
+    """Create stable provenance for a V4 shadow recommendation.
+
+    This does not apply the route and can never become causal execution
+    evidence by itself.
+    """
+
+    if (
+        not recommendation.selected_candidate_id
+        or not recommendation.selected_provider
+        or not recommendation.selected_model
+    ):
+        raise ValueError(
+            "routing recommendation has no selected candidate"
+        )
+
+    if recommendation.route_applied is not False:
+        raise ValueError(
+            "V4 shadow recommendation unexpectedly applied route"
+        )
+
+    if recommendation.can_execute is not False:
+        raise ValueError(
+            "V4 shadow recommendation unexpectedly executable"
+        )
+
+    if recommendation.production_authority is not False:
+        raise ValueError(
+            "V4 shadow recommendation unexpectedly has production authority"
+        )
+
+    return build_decision_identity(
+        decision_kind="hybrid_compute_routing",
+        task_key=task_key,
+        state_ref=state_ref,
+        provider_key=(
+            recommendation.selected_provider
+        ),
+        model_key=(
+            recommendation.selected_model
+        ),
+        candidate_id=(
+            recommendation.selected_candidate_id
+        ),
+        prediction_ref=prediction_ref,
+        source_ref=(
+            f"hybrid_policy:{POLICY_VERSION}"
+        ),
+        shadow_only=True,
+        selection_authority_ref=None,
     )

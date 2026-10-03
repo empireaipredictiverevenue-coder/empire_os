@@ -18,6 +18,9 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from empire_os.agi_memory import review_memory_item
+from empire_os.decision_identity import (
+    review_decision_identity,
+)
 
 
 EXECUTIVE_EVALUATION = Path(
@@ -91,8 +94,11 @@ def _canonical_causal_outcome_refs(values: Any) -> list[str]:
     ))
 
 
-def _department_episode(row: Mapping[str, Any]) -> dict[str, Any]:
+def _department_episode(
+    row: Mapping[str, Any],
+) -> dict[str, Any]:
     work_id = _clean(row.get("id"))
+
     refs = [
         _clean(value)
         for value in (
@@ -102,41 +108,127 @@ def _department_episode(row: Mapping[str, Any]) -> dict[str, Any]:
         )
         if _clean(value)
     ]
+
+    result = (
+        dict(row.get("result") or {})
+        if isinstance(
+            row.get("result"),
+            Mapping,
+        )
+        else {}
+    )
+
+    raw_identity = result.get(
+        "decision_identity"
+    )
+
+    decision_identity = None
+    decision_identity_blockers: list[str] = []
+
+    if isinstance(
+        raw_identity,
+        Mapping,
+    ):
+        review = review_decision_identity(
+            raw_identity
+        )
+
+        decision_identity_blockers = list(
+            review.get("blockers")
+            or []
+        )
+
+        if review.get("valid") is True:
+            decision_identity = dict(
+                review.get("identity")
+                or {}
+            )
+
     item = {
         "memory_type": "episodic",
-        "ref": f"department_work:{work_id}" if work_id else "",
+        "ref":
+            f"department_work:{work_id}"
+            if work_id
+            else "",
         "evidence_refs": refs,
         "verified_outcome": False,
         "synthetic": False,
     }
+
     review = review_memory_item(item)
+
     return {
         **item,
-        "work_id": work_id or None,
-        "plan_id": _clean(row.get("plan_id")) or None,
-        "step_id": _clean(row.get("step_id")) or None,
-        "goal_key": _clean(row.get("goal_key")) or None,
-        "department_keys": list(row.get("department_keys") or []),
-        "target_component": _clean(row.get("target_component")) or None,
-        "action": _clean(row.get("action")) or None,
-        "status": _clean(row.get("status")).upper() or None,
-        "result": (
-            dict(row.get("result") or {})
-            if isinstance(row.get("result"), Mapping)
-            else {}
-        ),
-        "causal_outcome_refs": _canonical_causal_outcome_refs(
-            (row.get("result") or {}).get("causal_outcome_refs")
-            if isinstance(row.get("result"), Mapping)
-            else []
-        ),
-        "error": _clean(row.get("error")) or None,
-        "accepted_for_retrieval": review[
-            "accepted_for_retrieval"
-        ],
-        "memory_blockers": review["blockers"],
-        "department_done_is_verified_outcome": False,
-        "execution_authority": "none",
+        "work_id":
+            work_id or None,
+        "plan_id":
+            _clean(
+                row.get("plan_id")
+            )
+            or None,
+        "step_id":
+            _clean(
+                row.get("step_id")
+            )
+            or None,
+        "goal_key":
+            _clean(
+                row.get("goal_key")
+            )
+            or None,
+        "department_keys":
+            list(
+                row.get(
+                    "department_keys"
+                )
+                or []
+            ),
+        "target_component":
+            _clean(
+                row.get(
+                    "target_component"
+                )
+            )
+            or None,
+        "action":
+            _clean(
+                row.get("action")
+            )
+            or None,
+        "status":
+            _clean(
+                row.get("status")
+            ).upper()
+            or None,
+        "result":
+            result,
+        "causal_outcome_refs":
+            _canonical_causal_outcome_refs(
+                result.get(
+                    "causal_outcome_refs"
+                )
+            ),
+        "decision_identity":
+            decision_identity,
+        "decision_identity_valid":
+            decision_identity is not None,
+        "decision_identity_blockers":
+            decision_identity_blockers,
+        "error":
+            _clean(
+                row.get("error")
+            )
+            or None,
+        "accepted_for_retrieval":
+            review[
+                "accepted_for_retrieval"
+            ],
+        "memory_blockers":
+            review["blockers"],
+        "department_done_is_verified_outcome":
+            False,
+        "execution_authority":
+            "none",
     }
 
 
@@ -271,6 +363,243 @@ def _plan_outcome_attributions(
     return rows
 
 
+
+def _decision_outcome_attributions(
+    episodes: Sequence[Mapping[str, Any]],
+    plan_attributions: Sequence[
+        Mapping[str, Any]
+    ],
+) -> list[dict[str, Any]]:
+    episodes_by_work = {
+        _clean(
+            row.get("work_id")
+        ): row
+        for row in episodes
+        if _clean(
+            row.get("work_id")
+        )
+    }
+
+    rows: list[dict[str, Any]] = []
+
+    for attribution in plan_attributions:
+        work_id = _clean(
+            attribution.get("work_id")
+        )
+
+        episode = episodes_by_work.get(
+            work_id
+        )
+
+        if episode is None:
+            continue
+
+        identity = episode.get(
+            "decision_identity"
+        )
+
+        if not isinstance(
+            identity,
+            Mapping,
+        ):
+            continue
+
+        if (
+            identity.get(
+                "causal_eligible"
+            )
+            is not True
+        ):
+            continue
+
+        expected_execution_ref = (
+            f"department_work:{work_id}"
+        )
+
+        if (
+            _clean(
+                identity.get(
+                    "execution_ref"
+                )
+            )
+            != expected_execution_ref
+        ):
+            continue
+
+        outcome_ref = _clean(
+            attribution.get(
+                "outcome_ref"
+            )
+        )
+
+        if not outcome_ref:
+            continue
+
+        evidence_refs = list(
+            dict.fromkeys(
+                value
+                for value in (
+                    *(
+                        attribution.get(
+                            "evidence_refs"
+                        )
+                        or []
+                    ),
+                    _clean(
+                        identity.get(
+                            "source_ref"
+                        )
+                    ),
+                    _clean(
+                        identity.get(
+                            "selection_authority_ref"
+                        )
+                    ),
+                    expected_execution_ref,
+                    _clean(
+                        identity.get(
+                            "prediction_ref"
+                        )
+                    ),
+                    outcome_ref,
+                )
+                if _clean(value)
+            )
+        )
+
+        rows.append({
+            "plan_id":
+                attribution.get(
+                    "plan_id"
+                ),
+            "step_id":
+                attribution.get(
+                    "step_id"
+                ),
+            "work_id":
+                work_id,
+            "decision_ref":
+                _clean(
+                    identity.get(
+                        "decision_ref"
+                    )
+                ),
+            "decision_kind":
+                _clean(
+                    identity.get(
+                        "decision_kind"
+                    )
+                ),
+            "task_key":
+                _clean(
+                    identity.get(
+                        "task_key"
+                    )
+                ),
+            "state_ref":
+                _clean(
+                    identity.get(
+                        "state_ref"
+                    )
+                ),
+            "provider_key":
+                _clean(
+                    identity.get(
+                        "provider_key"
+                    )
+                )
+                or None,
+            "model_key":
+                _clean(
+                    identity.get(
+                        "model_key"
+                    )
+                )
+                or None,
+            "candidate_id":
+                _clean(
+                    identity.get(
+                        "candidate_id"
+                    )
+                )
+                or None,
+            "prediction_ref":
+                _clean(
+                    identity.get(
+                        "prediction_ref"
+                    )
+                )
+                or None,
+            "selection_authority_ref":
+                _clean(
+                    identity.get(
+                        "selection_authority_ref"
+                    )
+                ),
+            "execution_ref":
+                expected_execution_ref,
+            "outcome_ref":
+                outcome_ref,
+            "entity_id":
+                attribution.get(
+                    "entity_id"
+                ),
+            "label_kind":
+                attribution.get(
+                    "label_kind"
+                ),
+            "label_value":
+                attribution.get(
+                    "label_value"
+                ),
+            "conversion_outcome":
+                attribution.get(
+                    "conversion_outcome"
+                ),
+            "attribution_basis":
+                (
+                    "executed_decision_plus_"
+                    "explicit_causal_outcome_ref"
+                ),
+            "decision_execution_verified":
+                True,
+            "shadow_decision":
+                False,
+            "causal_attribution_claimed":
+                True,
+            "evidence_refs":
+                evidence_refs,
+            "synthetic":
+                False,
+            "model_weight_mutation_authorized":
+                False,
+            "execution_authority":
+                "none",
+        })
+
+    rows.sort(
+        key=lambda row: (
+            _clean(
+                row.get("plan_id")
+            ),
+            _clean(
+                row.get("step_id")
+            ),
+            _clean(
+                row.get("work_id")
+            ),
+            _clean(
+                row.get("decision_ref")
+            ),
+            _clean(
+                row.get("outcome_ref")
+            ),
+        )
+    )
+
+    return rows
+
+
 def build_economic_memory_snapshot(
     *,
     executive_evaluation: Mapping[str, Any] | None,
@@ -300,6 +629,14 @@ def build_economic_memory_snapshot(
     plan_outcome_attributions = _plan_outcome_attributions(
         episodes, outcome_memories
     )
+
+    decision_outcome_attributions = (
+        _decision_outcome_attributions(
+            episodes,
+            plan_outcome_attributions,
+        )
+    )
+
     attributed_outcome_refs = {
         row["outcome_ref"] for row in plan_outcome_attributions
     }
@@ -337,11 +674,20 @@ def build_economic_memory_snapshot(
         "outcome_conditioned_memories": outcome_memories,
         "plan_outcome_attribution_count": len(plan_outcome_attributions),
         "plan_outcome_attributions": plan_outcome_attributions,
+        "decision_outcome_attribution_count": len(
+            decision_outcome_attributions
+        ),
+        "decision_outcome_attributions": (
+            decision_outcome_attributions
+        ),
         "unattributed_verified_outcome_count": sum(
             _clean(row.get("outcome_ref")) not in attributed_outcome_refs
             for row in outcome_memories
         ),
         "causal_attribution_requires_explicit_outcome_ref": True,
+        "decision_causal_attribution_requires_execution": True,
+        "shadow_decisions_receive_causal_credit": False,
+        "decision_identity_grants_execution_authority": False,
         "department_done_is_verified_outcome": False,
         "verified_outcomes_only_for_outcome_conditioned_memory": True,
         "forecast_used_as_outcome": False,

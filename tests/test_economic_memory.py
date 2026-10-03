@@ -198,3 +198,250 @@ def test_entity_or_generic_evidence_overlap_never_creates_causal_attribution():
     assert result['outcome_conditioned_memory_count'] == 1
     assert result['plan_outcome_attribution_count'] == 0
     assert result['unattributed_verified_outcome_count'] == 1
+
+
+def test_shadow_decision_never_receives_causal_outcome_credit():
+    from empire_os.decision_identity import (
+        build_decision_identity,
+    )
+
+    packet = _verified_packet()
+    work = _work("DONE")
+
+    identity = build_decision_identity(
+        decision_kind="hybrid_compute_routing",
+        task_key="predictive_reasoning",
+        state_ref="opportunity:1",
+        source_ref=(
+            "hybrid_policy:"
+            "empire-hybrid-compute-policy-v1"
+        ),
+        provider_key="ollama",
+        model_key="qwen3-coder:30b",
+        candidate_id=(
+            "qwen3-coder-30b-ollama"
+        ),
+        prediction_ref=(
+            "quant_prediction:test"
+        ),
+        shadow_only=True,
+    )
+
+    work["result"] = {
+        **work["result"],
+        "decision_identity":
+            identity,
+        "causal_outcome_refs": [
+            "canonical:commercial_outcomes:"
+            "outcome-1"
+        ],
+    }
+
+    result = build_economic_memory_snapshot(
+        executive_evaluation=_evaluation(),
+        department_work=[work],
+        cortex_learning={
+            "packet_count": 1,
+            "learning_ready_count": 1,
+            "packets": [packet],
+        },
+    )
+
+    assert (
+        result[
+            "plan_outcome_attribution_count"
+        ]
+        == 1
+    )
+
+    assert (
+        result[
+            "decision_outcome_attribution_count"
+        ]
+        == 0
+    )
+
+    assert (
+        result[
+            "shadow_decisions_receive_causal_credit"
+        ]
+        is False
+    )
+
+
+def test_executed_nonshadow_decision_can_receive_verified_outcome_credit():
+    from empire_os.decision_identity import (
+        bind_execution_evidence,
+        build_decision_identity,
+    )
+
+    packet = _verified_packet()
+    work = _work("DONE")
+
+    identity = build_decision_identity(
+        decision_kind=(
+            "bounded_internal_decision"
+        ),
+        task_key="predictive_reasoning",
+        state_ref="opportunity:1",
+        source_ref=(
+            "runtime:bounded_decision:1"
+        ),
+        provider_key="local",
+        model_key="qwen3-coder:30b",
+        candidate_id=(
+            "qwen3-coder-30b-ollama"
+        ),
+        prediction_ref=(
+            "quant_prediction:test"
+        ),
+        shadow_only=False,
+        selection_authority_ref=(
+            "authority:test:bounded"
+        ),
+    )
+
+    identity = bind_execution_evidence(
+        identity,
+        execution_ref=(
+            "department_work:"
+            "dept-work-1"
+        ),
+    )
+
+    work["result"] = {
+        **work["result"],
+        "decision_identity":
+            identity,
+        "causal_outcome_refs": [
+            "canonical:commercial_outcomes:"
+            "outcome-1"
+        ],
+    }
+
+    result = build_economic_memory_snapshot(
+        executive_evaluation=_evaluation(),
+        department_work=[work],
+        cortex_learning={
+            "packet_count": 1,
+            "learning_ready_count": 1,
+            "packets": [packet],
+        },
+    )
+
+    assert (
+        result[
+            "decision_outcome_attribution_count"
+        ]
+        == 1
+    )
+
+    row = result[
+        "decision_outcome_attributions"
+    ][0]
+
+    assert (
+        row["decision_ref"]
+        == identity["decision_ref"]
+    )
+
+    assert (
+        row["prediction_ref"]
+        == "quant_prediction:test"
+    )
+
+    assert (
+        row["model_key"]
+        == "qwen3-coder:30b"
+    )
+
+    assert (
+        row["outcome_ref"]
+        == (
+            "canonical:commercial_outcomes:"
+            "outcome-1"
+        )
+    )
+
+    assert (
+        row["attribution_basis"]
+        == (
+            "executed_decision_plus_"
+            "explicit_causal_outcome_ref"
+        )
+    )
+
+    assert (
+        row["decision_execution_verified"]
+        is True
+    )
+
+    assert (
+        row["model_weight_mutation_authorized"]
+        is False
+    )
+
+    assert row["execution_authority"] == "none"
+
+
+def test_wrong_execution_ref_cannot_receive_decision_credit():
+    from empire_os.decision_identity import (
+        bind_execution_evidence,
+        build_decision_identity,
+    )
+
+    packet = _verified_packet()
+    work = _work("DONE")
+
+    identity = build_decision_identity(
+        decision_kind="bounded_internal_decision",
+        task_key="predictive_reasoning",
+        state_ref="opportunity:1",
+        source_ref="runtime:bounded_decision:1",
+        shadow_only=False,
+        selection_authority_ref=(
+            "authority:test:bounded"
+        ),
+    )
+
+    identity = bind_execution_evidence(
+        identity,
+        execution_ref=(
+            "department_work:"
+            "different-work"
+        ),
+    )
+
+    work["result"] = {
+        **work["result"],
+        "decision_identity":
+            identity,
+        "causal_outcome_refs": [
+            "canonical:commercial_outcomes:"
+            "outcome-1"
+        ],
+    }
+
+    result = build_economic_memory_snapshot(
+        executive_evaluation=_evaluation(),
+        department_work=[work],
+        cortex_learning={
+            "packet_count": 1,
+            "learning_ready_count": 1,
+            "packets": [packet],
+        },
+    )
+
+    assert (
+        result[
+            "plan_outcome_attribution_count"
+        ]
+        == 1
+    )
+
+    assert (
+        result[
+            "decision_outcome_attribution_count"
+        ]
+        == 0
+    )
