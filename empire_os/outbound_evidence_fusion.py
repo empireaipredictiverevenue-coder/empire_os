@@ -158,3 +158,102 @@ def fuse_evidence(
         "posture": "INVESTIGATE" if critical_conflicts else "OBSERVE" if conflicts else "CONSENSUS",
         "mutation_authorized": False,
     }
+
+
+
+def build_ringleader_context_from_fusion(
+    fused: Mapping[str, Any],
+    *,
+    evaluation_scope: str = "FLEET",
+    minimum_confidence: float = 0.60,
+) -> dict[str, Any]:
+    """Project consensus-only fused signals into a bounded Ringleader context."""
+
+    scope = str(evaluation_scope or "FLEET").upper()
+    if scope not in {"FLEET", "BATCH", "SEND"}:
+        raise ValueError("unsupported_ringleader_evaluation_scope")
+
+    signals = fused.get("signals")
+    signals = dict(signals) if isinstance(signals, Mapping) else {}
+    context: dict[str, Any] = {"evaluation_scope": scope}
+    gaps: list[str] = []
+
+    def trusted(name: str):
+        row = signals.get(name)
+        if not isinstance(row, Mapping):
+            return None
+        if row.get("status") != "CONSENSUS":
+            return None
+        try:
+            confidence = float(row.get("confidence") or 0)
+        except (TypeError, ValueError):
+            return None
+        if confidence < minimum_confidence:
+            return None
+        return row.get("value")
+
+    health = trusted("deliverability_health")
+    if health in {"GREEN", "AMBER", "RED", "HOLD"}:
+        context["deliverability"] = {"health": health}
+    else:
+        gaps.append("deliverability_health")
+
+    policy = trusted("provider_policy_permitted")
+    if isinstance(policy, bool):
+        context["provider_policy_permits_use_case"] = policy
+    else:
+        gaps.append("provider_policy_permitted")
+
+    authentication: dict[str, bool] = {}
+    for name in ("spf_aligned", "dkim_aligned", "dmarc_valid", "tls_ready"):
+        value = trusted(name)
+        if isinstance(value, bool):
+            authentication[name] = value
+        else:
+            gaps.append(name)
+    if authentication:
+        context["authentication"] = authentication
+
+    sovereignty_keys = (
+        "registrar_account_owned",
+        "dns_authority_owned",
+        "mfa_enabled",
+        "domain_lock_enabled",
+        "auto_renew_enabled",
+        "dns_zone_exported",
+        "dmarc_rua_empire_owned",
+        "provider_portable_sender_identity",
+        "recovery_path_verified",
+    )
+    sovereignty: dict[str, Any] = {}
+    domain = trusted("domain")
+    if isinstance(domain, str) and domain.strip():
+        sovereignty["domain"] = domain.strip()
+    purpose = trusted("domain_purpose")
+    if isinstance(purpose, str) and purpose.strip():
+        sovereignty["purpose"] = purpose.strip()
+    for name in sovereignty_keys:
+        value = trusted(name)
+        if isinstance(value, bool):
+            sovereignty[name] = value
+        else:
+            gaps.append(name)
+    if sovereignty:
+        context["domain_sovereignty"] = sovereignty
+
+    critical_conflicts = list(fused.get("critical_conflicts") or [])
+    posture = (
+        "CONFLICT"
+        if critical_conflicts
+        else "INCOMPLETE"
+        if gaps
+        else "CURRENT"
+    )
+
+    return {
+        "context": context,
+        "evidence_posture": posture,
+        "gaps": sorted(set(gaps)),
+        "critical_conflicts": critical_conflicts,
+        "mutation_authorized": False,
+    }
