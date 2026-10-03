@@ -2,6 +2,7 @@
 Description=EmpireOS Ringleader observer heartbeat watchdog
 After=empire-outbound-ringleader-observer.timer
 Wants=empire-outbound-ringleader-observer.timer
+OnFailure=empire-outbound-ringleader-observer.service
 
 [Service]
 Type=oneshot
