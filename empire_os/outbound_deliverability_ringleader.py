@@ -9,6 +9,10 @@ from empire_os.outbound_canary import evaluate_canary
 from empire_os.outbound_deliverability_twin import simulate_batch
 from empire_os.outbound_mx_pacing import evaluate_mx_pool
 from empire_os.outbound_reputation_budget import allocate_reputation_budget
+from empire_os.outbound_reputation_escrow import update_reputation_credit
+from empire_os.outbound_verification_depth import verification_plan
+from empire_os.outbound_root_cause import detect_metric_shift, rank_candidate_causes
+from empire_os.outbound_remediation_planner import plan_remediation
 
 
 @dataclass(frozen=True)
@@ -126,6 +130,44 @@ def evaluate_ringleader(
                 capacity=capacity,
             )
 
+    verification_depth = None
+    verification_context = context.get("verification_context")
+    if isinstance(verification_context, Mapping):
+        verification_depth = verification_plan(verification_context)
+        if verification_depth["outcome"] == "HOLD":
+            hard_holds.append("recipient_verification_risk_hold")
+            tasks.append(_task("STOP_SEND", "recipient_verification_risk_hold", "recipient_verifier"))
+        elif verification_depth["outcome"] == "ESCALATE":
+            tasks.append(_task("VERIFY_RECIPIENTS", "deeper_verification_required", "recipient_verifier"))
+
+    reputation_escrow = None
+    escrow_context = context.get("reputation_escrow")
+    if isinstance(escrow_context, Mapping):
+        state = dict(escrow_context.get("state") or {})
+        observation = dict(escrow_context.get("observation") or {})
+        reputation_escrow = update_reputation_credit(state, observation)
+        if reputation_escrow["state"] == "QUARANTINED":
+            hard_holds.append("reputation_credit_exhausted")
+            tasks.append(_task("STOP_SEND", "reputation_credit_exhausted", "reputation_escrow"))
+        elif reputation_escrow["state"] == "LIMITED":
+            tasks.append(_task("THROTTLE", "reputation_credit_low", "reputation_escrow"))
+
+    root_cause = None
+    remediation = None
+    shift_context = context.get("metric_shift")
+    if isinstance(shift_context, Mapping):
+        before = dict(shift_context.get("before") or {})
+        after = dict(shift_context.get("after") or {})
+        change_events = shift_context.get("changes") or []
+        metric_shift = detect_metric_shift(before, after)
+        if metric_shift["shift_detected"]:
+            ranked = rank_candidate_causes(change_events, metric_shift)
+            root_cause = {
+                "metric_shift": metric_shift,
+                "candidate_causes": ranked["candidates"],
+            }
+            remediation = plan_remediation(ranked["candidates"])
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -174,5 +216,9 @@ def evaluate_ringleader(
         "mx_pacing": mx_pacing,
         "canary": canary,
         "reputation_budget": reputation_budget,
+        "verification_depth": verification_depth,
+        "reputation_escrow": reputation_escrow,
+        "root_cause": root_cause,
+        "remediation": remediation,
         "mutation_authorized": False,
     }
