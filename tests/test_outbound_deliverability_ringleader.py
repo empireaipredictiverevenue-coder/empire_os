@@ -364,3 +364,63 @@ def test_ringleader_limits_yahoo_destination_on_transient_deferral():
     })
     assert result["posture"] == "LIMITED"
     assert result["destination_reputation"]["posture"] == "LIMIT_DESTINATION"
+
+
+def test_ringleader_holds_critical_sender_configuration_drift():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+        "configuration_attestation": {
+            "previous": {
+                "domain": "mail.example.com",
+                "nameservers": ["ns1.example"],
+                "spf_record": "v=spf1 include:a -all",
+                "dkim_selectors": ["s1"],
+                "dmarc_record": "v=DMARC1; p=none",
+                "transport_key": "t1",
+                "return_path_domain": "rp.example.com",
+            },
+            "current": {
+                "domain": "mail.example.com",
+                "nameservers": ["ns1.example"],
+                "spf_record": "v=spf1 include:a -all",
+                "dkim_selectors": ["unexpected"],
+                "dmarc_record": "v=DMARC1; p=none",
+                "transport_key": "t1",
+                "return_path_domain": "rp.example.com",
+            },
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "critical_configuration_drift" in result["hard_holds"]
+
+
+def test_ringleader_limits_high_infrastructure_concentration():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+        "infrastructure_concentration": [
+            {"enabled": True, "domain": "a", "transport_key": "t1", "ip_pool_key": "p1"},
+            {"enabled": True, "domain": "b", "transport_key": "t1", "ip_pool_key": "p1"},
+            {"enabled": True, "domain": "c", "transport_key": "t1", "ip_pool_key": "p1"},
+        ],
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["infrastructure_concentration"]["posture"] == "HIGH_CONCENTRATION"
+    assert any(task["action"] == "REDUCE_CONCENTRATION" for task in result["tasks"])
