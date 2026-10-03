@@ -1,4 +1,9 @@
+from datetime import datetime, timezone
+
 from empire_os.outbound_estate_reconciliation import reconcile_sender_estate
+
+
+NOW = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
 
 
 def base_inventory():
@@ -169,3 +174,37 @@ def test_no_verified_seed_mailbox_is_degraded():
     )
     assert result["status"] == "DEGRADED"
     assert "no_active_verified_seed_mailboxes" in result["warnings"]
+
+
+
+def test_expired_capacity_lease_degrades_until_explicit_release():
+    args = base_inventory()
+    capacity = list(args[5]) + [{
+        "id": "c2",
+        "mailbox_key": "sender:1",
+        "domain": "mail.example.com",
+        "transport_key": "transport:a",
+        "event_type": "RESERVE",
+        "units": 5,
+        "capacity_limit": None,
+        "reservation_key": "res:expired",
+        "idempotency_key": "idem:expired:reserve",
+        "lease_expires_at": "2026-10-03T11:00:00+00:00",
+        "recorded_at": "2026-10-03T10:00:00+00:00",
+    }]
+    result = reconcile_sender_estate(
+        transports=args[0],
+        domains=args[1],
+        mailboxes=args[2],
+        pools=args[3],
+        pool_members=args[4],
+        capacity_events=capacity,
+        seed_mailboxes=args[6],
+        now=NOW,
+    )
+    assert result["status"] == "DEGRADED"
+    assert "capacity_reservation_recovery_required" in result["warnings"]
+    reservations = result["capacity_reservations"]
+    assert reservations["expired_reserved_units"] == 5
+    assert reservations["recovery_actions"][0]["action"] == "APPEND_RELEASE"
+    assert reservations["recovery_actions"][0]["mutation_authorized"] is False
