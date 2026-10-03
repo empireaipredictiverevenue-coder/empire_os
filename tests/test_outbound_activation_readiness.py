@@ -169,3 +169,40 @@ def test_live_send_requires_fleet_and_new_governance_layers():
     assert "account_saturation_not_ready" in blockers
     assert "source_reputation_not_ready" in blockers
     assert "content_family_reputation_not_ready" in blockers
+
+
+
+def test_operational_observe_accepts_completed_healthy_oneshot_services():
+    evidence = observe_ready(
+        observer_service_active=False,
+        observer_watchdog_active=False,
+        observer_service_healthy=True,
+        observer_watchdog_healthy=True,
+        observer_timer_active=True,
+        observer_watchdog_timer_active=True,
+        observer_heartbeat_status="CURRENT",
+        telemetry_sla_posture="CURRENT",
+        provider_event_ingest_ready=True,
+    )
+    result = evaluate_activation_readiness(evidence)
+    assert result["observe"]["status"] == "READY"
+    assert result["operational_observe"]["status"] == "READY"
+    assert "observer_service_not_healthy" not in result["operational_observe"]["blockers"]
+    assert "observer_watchdog_not_healthy" not in result["operational_observe"]["blockers"]
+
+
+def test_failed_oneshot_service_blocks_operational_observe():
+    evidence = observe_ready(
+        observer_service_active=False,
+        observer_watchdog_active=False,
+        observer_service_healthy=False,
+        observer_watchdog_healthy=True,
+        observer_timer_active=True,
+        observer_watchdog_timer_active=True,
+        observer_heartbeat_status="CURRENT",
+        telemetry_sla_posture="CURRENT",
+        provider_event_ingest_ready=True,
+    )
+    result = evaluate_activation_readiness(evidence)
+    assert result["operational_observe"]["status"] == "BLOCKED"
+    assert "observer_service_not_healthy" in result["operational_observe"]["blockers"]
