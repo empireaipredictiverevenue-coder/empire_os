@@ -20,6 +20,8 @@ from empire_os.outbound_domain_continuity import evaluate_domain_continuity
 from empire_os.outbound_health_forecast import forecast_reputation_health
 from empire_os.outbound_destination_reputation import evaluate_destination_reputation
 from empire_os.outbound_recipient_domain_policy import evaluate_recipient_domain_policy
+from empire_os.outbound_config_attestation import detect_configuration_drift
+from empire_os.outbound_infrastructure_concentration import evaluate_concentration
 
 
 @dataclass(frozen=True)
@@ -37,6 +39,7 @@ _PRIORITY = {
     "MEASURE_PLACEMENT": 70,
     "THROTTLE_MX": 65,
     "THROTTLE": 60,
+    "REDUCE_CONCENTRATION": 55,
     "OBSERVE": 10,
 }
 
@@ -307,6 +310,56 @@ def evaluate_ringleader(
                 )
             )
 
+    configuration_drift = None
+    attestation_context = context.get("configuration_attestation")
+    if isinstance(attestation_context, Mapping):
+        previous_configuration = dict(attestation_context.get("previous") or {})
+        current_configuration = dict(attestation_context.get("current") or {})
+        configuration_drift = detect_configuration_drift(
+            previous_configuration,
+            current_configuration,
+        )
+        if configuration_drift["posture"] == "HOLD":
+            hard_holds.append("critical_configuration_drift")
+            tasks.append(
+                _task(
+                    "STOP_SEND",
+                    "critical_sender_infrastructure_drift",
+                    "domain_sovereignty",
+                )
+            )
+        elif configuration_drift["posture"] == "REMEDIATE":
+            tasks.append(
+                _task(
+                    "REMEDIATE_DOMAIN_CONTROL",
+                    "sender_infrastructure_drift",
+                    "domain_sovereignty",
+                )
+            )
+
+    infrastructure_concentration = None
+    concentration_context = context.get("infrastructure_concentration")
+    if isinstance(concentration_context, list):
+        infrastructure_concentration = evaluate_concentration(
+            concentration_context
+        )
+        if infrastructure_concentration["posture"] == "HIGH_CONCENTRATION":
+            tasks.append(
+                _task(
+                    "REDUCE_CONCENTRATION",
+                    "sender_infrastructure_concentration_high",
+                    "pool_allocator",
+                )
+            )
+        elif infrastructure_concentration["posture"] == "MODERATE_CONCENTRATION":
+            tasks.append(
+                _task(
+                    "OBSERVE",
+                    "sender_infrastructure_concentration_moderate",
+                    "pool_allocator",
+                )
+            )
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -339,6 +392,7 @@ def evaluate_ringleader(
             "MEASURE_PLACEMENT",
             "THROTTLE_MX",
             "THROTTLE",
+            "REDUCE_CONCENTRATION",
         }
         for task in tasks
     ):
@@ -367,5 +421,7 @@ def evaluate_ringleader(
         "health_forecast": health_forecast,
         "destination_reputation": destination_reputation,
         "recipient_domain_policy": recipient_domain_policy,
+        "configuration_drift": configuration_drift,
+        "infrastructure_concentration": infrastructure_concentration,
         "mutation_authorized": False,
     }
