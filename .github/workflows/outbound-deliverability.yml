@@ -85,6 +85,9 @@ jobs:
             empire_os/outbound_postgres_repository.py \
             empire_os/outbound_state_replay.py \
             empire_os/outbound_ringleader_runtime.py \
+            empire_os/outbound_mx_family.py \
+            empire_os/microsoft_outlook_evidence.py \
+            empire_os/outbound_destination_reputation.py \
             empire_os/google_postmaster_v2.py \
             empire_os/founder_outbound_deliverability_api.py \
             empire_os/funnel.py
@@ -112,4 +115,6 @@ jobs:
             tests/test_empiredb_outbound_deliverability_migration.py \
             tests/test_founder_outbound_deliverability_api.py \
             tests/test_google_postmaster_v2.py \
+            tests/test_outbound_destination_intelligence.py \
+            tests/test_outbound_destination_reputation.py \
             tests/test_outbound_governor.py
