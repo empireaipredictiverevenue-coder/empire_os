@@ -314,7 +314,7 @@ def collect_production_readiness(
             and provider_ingest.get("success") is True
         ),
         "provider_policy_verified": provider_policy_verified,
-        "domain_sovereignty_ready": sovereignty.get("status") == "READY",
+        "domain_sovereignty_ready": sovereignty.get("status") == "SOVEREIGN",
         "authentication_ready": auth_ready,
         "persistence_required": (
             preflight.get("persistence_required") is True
