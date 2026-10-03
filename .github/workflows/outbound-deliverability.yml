@@ -12,6 +12,7 @@ on:
       - "tests/test_outbound_*.py"
       - "tests/test_empiredb_outbound_deliverability_migration.py"
       - "tests/test_founder_outbound_deliverability_api.py"
+      - "tests/test_google_postmaster_v2.py"
       - "docs/outbound_*.md"
       - "docs/empire_native_deliverability_stack.md"
       - ".github/workflows/outbound-deliverability.yml"
@@ -110,4 +111,5 @@ jobs:
             tests/test_outbound_ringleader_runtime.py \
             tests/test_empiredb_outbound_deliverability_migration.py \
             tests/test_founder_outbound_deliverability_api.py \
+            tests/test_google_postmaster_v2.py \
             tests/test_outbound_governor.py
