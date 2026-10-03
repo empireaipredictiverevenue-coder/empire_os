@@ -254,3 +254,39 @@ def test_observer_propagates_sender_estate_integrity_failure_to_hold():
     assert result["sender_estate_reconciliation"]["status"] == "HOLD"
     assert result["ringleader"]["posture"] == "HOLD"
     assert "sender_estate_reconciliation_hold" in result["ringleader"]["hard_holds"]
+
+
+
+def test_observer_marks_expired_capacity_lease_for_reconciliation_not_auto_release():
+    inventory = estate_inventory()
+    inventory["capacity_events"].append({
+        "id": "c-expired",
+        "mailbox_key": "sender:1",
+        "domain": "mail.example.com",
+        "transport_key": "transport:a",
+        "event_type": "RESERVE",
+        "units": 4,
+        "capacity_limit": None,
+        "reservation_key": "res:expired",
+        "idempotency_key": "idem:expired:reserve",
+        "lease_expires_at": "2026-10-03T11:00:00+00:00",
+        "recorded_at": "2026-10-03T10:00:00+00:00",
+    })
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=fleet_context(),
+        estate_inventory=inventory,
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+    reconciliation = result["sender_estate_reconciliation"]
+    assert reconciliation["status"] == "DEGRADED"
+    assert "capacity_reservation_recovery_required" in reconciliation["warnings"]
+    assert result["ringleader"]["posture"] == "REMEDIATE"
+    assert any(
+        task["action"] == "RECONCILE_ESTATE"
+        for task in result["ringleader"]["tasks"]
+    )
+    assert reconciliation["capacity_reservations"]["recovery_actions"][0][
+        "mutation_authorized"
+    ] is False
