@@ -1,0 +1,10 @@
+[Unit]
+Description=Continuously repair active Empire Coder runtime ownership
+[Timer]
+OnActiveSec=5s
+OnUnitInactiveSec=30s
+AccuracySec=2s
+Persistent=true
+Unit=empire-coder-runtime-ownership-repair.service
+[Install]
+WantedBy=timers.target

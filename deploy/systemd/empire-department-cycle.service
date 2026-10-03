@@ -11,7 +11,7 @@ WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 EnvironmentFile=/etc/empire_os.env
 EnvironmentFile=/etc/empiredb.env
-ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_department_cycle.py --max-items 4 --timeout-seconds 120
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_department_cycle.py --max-items 20 --timeout-seconds 120
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

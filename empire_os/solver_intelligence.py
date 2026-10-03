@@ -10,6 +10,10 @@ from importlib.util import find_spec
 import os
 from typing import Any, Mapping
 
+from empire_os.solver_adapters.greedy_binary import (
+    is_safe_monotone_greedy_problem,
+)
+
 from empire_os.solver_adapters.exact_binary import DEFAULT_MAX_VARIABLES
 
 
@@ -64,19 +68,34 @@ def discover_solver_runtime(
         "built_in_solvers": {
             "classical_exact_reference": True,
             "classical_greedy_reference": True,
+            "empire_branch_bound": True,
+            "empire_annealing": True,
+            "empire_parallel_tempering": True,
+            "empire_qaoa_simulator": True,
+            "empire_tabu": True,
         },
         "empire_adapters": {
             "classical_exact_reference": True,
             "classical_greedy_reference": True,
-            "ortools_cp_sat": True,
-            "pyomo_mip": False,
-            "local_bqm_quantum_inspired": True,
-            "dwave_hybrid_cqm": False,
+            "empire_branch_bound": True,
+            "empire_annealing": True,
+            "empire_parallel_tempering": True,
+            "empire_qaoa_simulator": True,
+            "empire_tabu": True,
+        },
+        "market_reference_adapters": {
+            "ortools_cp_sat": bool(packages.get("ortools")),
+            "dwave_local_simulated_annealing": (
+                bool(packages.get("dimod"))
+                and bool(packages.get("dwave_samplers"))
+            ),
+            "dwave_hybrid_cqm": bool(packages.get("dwave_system")),
             "ibm_qaoa": False,
             "amazon_braket_qaoa": False,
             "pennylane_qaoa": False,
         },
-        "external_provider_execution_enabled": any(provider_flags.values()),
+        "third_party_service_execution_enabled": False,
+        "external_provider_execution_enabled": False,
         "external_solver_called": False,
         "credentials_inspected": False,
         "execution_authority": "none",
@@ -130,6 +149,99 @@ def build_solver_candidates(
     flags = dict(runtime.get("provider_flags") or {})
 
     candidates = [
+        {
+            "solver": "empire_branch_bound",
+            "family": "empire_classical_branch_bound",
+            "representation": "BINARY_LINEAR",
+            "installed": True,
+            "empire_adapter_implemented": True,
+            "external": False,
+            "explicit_provider_enable": None,
+            "runnable": (
+                str(problem.get("variable_type") or "").strip().upper()
+                == "BINARY"
+                and not bool(
+                    dict(problem.get("objective") or {}).get("quadratic")
+                )
+                and problem.get("time_budget_ms") is not None
+            ),
+            "blockers": (
+                []
+                if (
+                    str(problem.get("variable_type") or "").strip().upper()
+                    == "BINARY"
+                    and not bool(
+                        dict(problem.get("objective") or {}).get("quadratic")
+                    )
+                    and problem.get("time_budget_ms") is not None
+                )
+                else ["binary_linear_problem_with_time_budget_required"]
+            ),
+            "empire_owned": True,
+            "purpose": "primary_candidate",
+        },
+        {
+            "solver": "empire_annealing",
+            "family": "empire_quantum_inspired_annealing",
+            "representation": "QUBO",
+            "installed": True,
+            "empire_adapter_implemented": True,
+            "external": False,
+            "explicit_provider_enable": None,
+            "runnable": "QUBO" in reps,
+            "blockers": [] if "QUBO" in reps else ["qubo_representation_required"],
+            "empire_owned": True,
+            "purpose": "benchmark_only",
+        },
+        {
+            "solver": "empire_parallel_tempering",
+            "family": "empire_quantum_inspired_parallel_tempering",
+            "representation": "QUBO",
+            "installed": True,
+            "empire_adapter_implemented": True,
+            "external": False,
+            "explicit_provider_enable": None,
+            "runnable": "QUBO" in reps,
+            "blockers": [] if "QUBO" in reps else ["qubo_representation_required"],
+            "empire_owned": True,
+            "purpose": "benchmark_only",
+        },
+        {
+            "solver": "empire_tabu",
+            "family": "empire_quantum_inspired_tabu",
+            "representation": "QUBO",
+            "installed": True,
+            "empire_adapter_implemented": True,
+            "external": False,
+            "explicit_provider_enable": None,
+            "runnable": "QUBO" in reps,
+            "blockers": [] if "QUBO" in reps else ["qubo_representation_required"],
+            "empire_owned": True,
+            "purpose": "benchmark_only",
+        },
+        {
+            "solver": "empire_qaoa_simulator",
+            "family": "empire_quantum_qaoa_statevector_simulator",
+            "representation": "QUBO",
+            "installed": True,
+            "empire_adapter_implemented": True,
+            "external": False,
+            "explicit_provider_enable": None,
+            "runnable": (
+                "QUBO" in reps
+                and int(problem.get("variable_count") or 0) <= 10
+            ),
+            "blockers": (
+                []
+                if (
+                    "QUBO" in reps
+                    and int(problem.get("variable_count") or 0) <= 10
+                )
+                else ["qubo_and_statevector_limit_required"]
+            ),
+            "empire_owned": True,
+            "purpose": "benchmark_only",
+        },
         _candidate(
             key="ortools_cp_sat",
             family="classical_cp_sat",
@@ -207,6 +319,22 @@ def build_solver_candidates(
         )
 
     for row in candidates:
+        if row.get("solver") in {
+            "ortools_cp_sat",
+            "pyomo_mip",
+            "local_bqm_quantum_inspired",
+            "ibm_qaoa",
+            "amazon_braket_qaoa",
+            "pennylane_qaoa",
+            "dwave_hybrid_cqm",
+        }:
+            row["market_reference_only"] = True
+            row["purpose"] = "market_reference_only"
+            row["runnable"] = False
+            row["blockers"] = sorted(set([
+                *row.get("blockers", []),
+                "third_party_runtime_not_allowed",
+            ]))
         if (
             row["solver"] in {"ortools_cp_sat", "pyomo_mip"}
             and problem.get("time_budget_ms") is None
@@ -266,31 +394,58 @@ def route_solver(
         primary_quality = "OPTIMAL_REFERENCE"
         primary_reason = "small_binary_ir_exact_reference"
     else:
-        ortools = next(
-            (row for row in candidates if row["solver"] == "ortools_cp_sat"),
+        branch_bound = next(
+            (
+                row
+                for row in candidates
+                if row["solver"] == "empire_branch_bound"
+            ),
             None,
         )
-        if ortools and ortools["runnable"]:
-            primary = "ortools_cp_sat"
-            primary_quality = "SOLVER_REFERENCE"
-            primary_reason = "scalable_classical_adapter_ready"
-        elif workload_type in SUPPORTED_EXACT_WORKLOADS:
+        if branch_bound and branch_bound["runnable"]:
+            primary = "empire_branch_bound"
+            primary_quality = "BOUNDED_EXACT_OR_INCUMBENT"
+            primary_reason = "empire_owned_scalable_binary_linear_solver"
+        elif is_safe_monotone_greedy_problem(problem):
             primary = "classical_greedy_reference"
             primary_quality = "HEURISTIC_REFERENCE"
-            primary_reason = "safe_workload_specific_builtin_fallback"
+            primary_reason = "empire_owned_safe_monotone_fallback"
         else:
             primary = None
             primary_quality = "UNAVAILABLE"
-            primary_reason = "no_implemented_solver_for_workload"
+            primary_reason = "no_empire_owned_solver_for_workload"
 
     benchmark_lanes: list[dict[str, Any]] = []
     for row in candidates:
-        if row["family"] in {"classical_cp_sat", "classical_mip"}:
+        if row["solver"] == "empire_branch_bound":
             if row["solver"] != primary:
                 benchmark_lanes.append({
                     **row,
-                    "purpose": "classical_reference",
+                    "purpose": "empire_reference",
                 })
+            continue
+        if row["solver"] in {
+            "empire_annealing",
+            "empire_parallel_tempering",
+            "empire_tabu",
+        }:
+            benchmark_lanes.append({
+                **row,
+                "purpose": "empire_quantum_inspired_benchmark",
+            })
+            continue
+        if row["solver"] == "empire_qaoa_simulator":
+            benchmark_lanes.append({
+                **row,
+                "purpose": "empire_quantum_simulator_benchmark",
+            })
+            continue
+        if row.get("market_reference_only") is True:
+            benchmark_lanes.append({
+                **row,
+                "runnable": False,
+                "purpose": "market_reference_only",
+            })
             continue
         if row["external"] and not allow_external_qpu_benchmark:
             benchmark_lanes.append({
@@ -319,17 +474,29 @@ def route_solver(
         "fallback_chain": [
             *(
                 ["classical_exact_reference"]
-                if str(problem.get("variable_type") or "").strip().upper()
-                == "BINARY"
+                if exact_ir_supported
                 else []
             ),
-            "ortools_cp_sat",
+            *(
+                ["empire_branch_bound"]
+                if (
+                    str(problem.get("variable_type") or "").strip().upper()
+                    == "BINARY"
+                    and not bool(
+                        dict(problem.get("objective") or {}).get("quadratic")
+                    )
+                    and problem.get("time_budget_ms") is not None
+                )
+                else []
+            ),
             *(
                 ["classical_greedy_reference"]
-                if workload_type in SUPPORTED_EXACT_WORKLOADS
+                if is_safe_monotone_greedy_problem(problem)
                 else []
             ),
         ],
+        "production_solver_origin": "empire_owned",
+        "third_party_runtime_allowed": False,
         "solver_execution_ready": primary is not None,
         "queue_class": (
             "optimization:small"

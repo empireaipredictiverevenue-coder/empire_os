@@ -1,0 +1,19 @@
+[Unit]
+Description=EmpireOS Search Intelligence loopback read API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=-/etc/empire_os.env
+EnvironmentFile=/etc/empire_search_intelligence.env
+ExecStart=/srv/empire_os/.venv/bin/python -m uvicorn empire_os.search_intelligence.service:app --host 127.0.0.1 --port 8771 --workers 1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

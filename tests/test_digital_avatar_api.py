@@ -1,3 +1,5 @@
+import json
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -535,3 +537,298 @@ def test_mode_transition_preview_requires_single_step_and_never_executes():
     assert body["decision"]["policy_eligible"] is True
     assert body["decision"]["execution_allowed"] is False
     assert body["decision"]["blockers"] == ["runtime_observe_only"]
+
+
+def test_private_guidance_read_endpoint(monkeypatch, tmp_path):
+    root = tmp_path / "guidance"
+    root.mkdir()
+    (root / "meeting-001.json").write_text(
+        '{"meeting_id":"meeting-001","private_to_owner":true,'
+        '"speech_execution":false,"execution_authority":"none"}'
+    )
+    monkeypatch.setenv("EMPIRE_RECALL_GUIDANCE_ROOT", str(root))
+
+    response = client().get(
+        "/v1/digital-avatar/meetings/meeting-001/guidance"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["read_only"] is True
+    assert body["private_to_owner"] is True
+    assert body["speech_execution"] is False
+    assert body["execution_authority"] == "none"
+    assert body["guidance"]["meeting_id"] == "meeting-001"
+
+
+def test_private_guidance_rejects_path_traversal(monkeypatch, tmp_path):
+    monkeypatch.setenv("EMPIRE_RECALL_GUIDANCE_ROOT", str(tmp_path))
+    response = client().get(
+        "/v1/digital-avatar/meetings/..%2Fsecret/guidance"
+    )
+    assert response.status_code in {404, 422}
+
+
+def test_private_meeting_state_read_endpoint(monkeypatch, tmp_path):
+    root = tmp_path / "meeting_state"
+    root.mkdir()
+    payload = {
+        "meeting_id": "meeting-001",
+        "avatar_id": "avatar-phil-v1",
+        "lifecycle_status": "in_call_recording",
+        "lifecycle_sub_code": None,
+        "joined_meeting": True,
+        "waiting_room": False,
+        "recording_active": True,
+        "terminal": False,
+        "fatal": False,
+        "observation_count": 1,
+        "latest_buyer_utterance": {"text": "Need proof"},
+        "recommended_action": {"action_key": "present_verified_case_evidence"},
+        "response_task": {"requires_human_approval": True},
+        "human_takeover_required": False,
+        "blockers": [],
+        "mode": "OBSERVE",
+        "private_to_owner": True,
+        "speech_execution": False,
+        "chat_execution": False,
+        "commercial_execution": False,
+        "execution_authority": "none",
+    }
+    (root / "meeting-001.json").write_text(json.dumps(payload))
+    monkeypatch.setenv("EMPIRE_RECALL_MEETING_STATE_ROOT", str(root))
+
+    response = client().get(
+        "/v1/digital-avatar/meetings/meeting-001/state"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["read_only"] is True
+    assert body["private_to_owner"] is True
+    assert body["speech_execution"] is False
+    assert body["chat_execution"] is False
+    assert body["commercial_execution"] is False
+    assert body["execution_authority"] == "none"
+    assert body["state"]["recording_active"] is True
+    assert body["state"]["latest_buyer_utterance"]["text"] == "Need proof"
+
+
+def test_private_meeting_state_missing_returns_404(monkeypatch, tmp_path):
+    monkeypatch.setenv("EMPIRE_RECALL_MEETING_STATE_ROOT", str(tmp_path))
+    response = client().get(
+        "/v1/digital-avatar/meetings/meeting-001/state"
+    )
+    assert response.status_code == 404
+
+
+def test_recall_shadow_activation_preview_is_complete_and_nonexecuting():
+    response = client().post(
+        "/v1/digital-avatar/providers/recall/shadow-activation/preview",
+        json={
+            "identity": identity_payload(),
+            "meeting_id": "meeting-001",
+            "platform": "zoom",
+            "meeting_url": "https://zoom.us/j/123456789",
+            "bot_name": "Phil — Empire AI Digital Avatar",
+            "public_realtime_url": (
+                "https://empire-ai.co.uk/v1/providers/recall/realtime"
+            ),
+            "account_name": "Example Buyer",
+            "objective": "qualify fit and agree next step",
+            "owner_join_approval": {
+                "meeting_id": "meeting-001",
+                "approved_by": "Phil Livesley",
+                "approval_evidence_ref": (
+                    "approval:recall-shadow:meeting-001:v1"
+                ),
+                "approved_at": "2026-10-02T18:00:00+00:00",
+                "expires_at": "2026-10-02T20:00:00+00:00",
+                "allow_adhoc": False,
+            },
+            "region": "eu-central-1",
+            "now": "2026-10-02T18:30:00+00:00",
+            "recording_consent_evidence_ref": "consent:meeting:001",
+            "webhook_verification_evidence_ref": (
+                "config:recall-signing:v1"
+            ),
+            "proof_refs": ["evidence:case:7"],
+            "join_at": "2026-10-02T19:00:00+00:00",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "SHADOW_PREVIEW"
+    assert body["read_only"] is True
+    assert body["session_persistence_performed"] is False
+    assert body["provider_api_call_performed"] is False
+    assert body["live_join_execution"] is False
+    assert body["speech_execution"] is False
+    assert body["chat_send_execution"] is False
+    assert body["commercial_execution"] is False
+    assert body["execution_authority"] == "none"
+    activation = body["activation"]
+    assert activation["manifest"]["session"]["meeting_id"] == "meeting-001"
+    assert activation["bot_plan"]["request_body"]["metadata"][
+        "empire_avatar_id"
+    ] == "avatar-phil-v1"
+    assert activation["join_request"]["live_join_authorized"] is True
+    assert activation["live_join_performed"] is False
+
+
+def test_recall_shadow_activation_preview_rejects_wrong_meeting_approval():
+    response = client().post(
+        "/v1/digital-avatar/providers/recall/shadow-activation/preview",
+        json={
+            "identity": identity_payload(),
+            "meeting_id": "meeting-001",
+            "platform": "zoom",
+            "meeting_url": "https://zoom.us/j/123456789",
+            "bot_name": "Phil — Empire AI Digital Avatar",
+            "public_realtime_url": (
+                "https://empire-ai.co.uk/v1/providers/recall/realtime"
+            ),
+            "account_name": "Example Buyer",
+            "objective": "qualify fit and agree next step",
+            "owner_join_approval": {
+                "meeting_id": "meeting-999",
+                "approved_by": "Phil Livesley",
+                "approval_evidence_ref": "approval:wrong-meeting",
+                "approved_at": "2026-10-02T18:00:00+00:00",
+                "expires_at": "2026-10-02T20:00:00+00:00",
+            },
+            "region": "eu-central-1",
+            "now": "2026-10-02T18:30:00+00:00",
+            "recording_consent_evidence_ref": "consent:meeting:001",
+            "webhook_verification_evidence_ref": (
+                "config:recall-signing:v1"
+            ),
+            "join_at": "2026-10-02T19:00:00+00:00",
+        },
+    )
+    assert response.status_code == 422
+    assert "meeting mismatch" in response.json()["detail"]
+
+
+def test_recall_shadow_activation_materialize_is_local_only(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "EMPIRE_RECALL_SESSION_ROOT",
+        str(tmp_path / "sessions"),
+    )
+    monkeypatch.setenv(
+        "EMPIRE_RECALL_ACTIVATION_ROOT",
+        str(tmp_path / "activations"),
+    )
+    response = client().post(
+        "/v1/digital-avatar/providers/recall/shadow-activation/materialize",
+        json={
+            "identity": identity_payload(),
+            "meeting_id": "meeting-materialize-001",
+            "platform": "zoom",
+            "meeting_url": "https://zoom.us/j/123456789",
+            "bot_name": "Phil — Empire AI Digital Avatar",
+            "public_realtime_url": (
+                "https://empire-ai.co.uk/v1/providers/recall/realtime"
+            ),
+            "account_name": "Example Buyer",
+            "objective": "qualify fit and agree next step",
+            "owner_join_approval": {
+                "meeting_id": "meeting-materialize-001",
+                "approved_by": "Phil Livesley",
+                "approval_evidence_ref": "approval:shadow:materialize:v1",
+                "approved_at": "2026-10-02T18:00:00+00:00",
+                "expires_at": "2026-10-02T20:00:00+00:00",
+                "allow_adhoc": False,
+            },
+            "region": "eu-central-1",
+            "now": "2026-10-02T18:30:00+00:00",
+            "recording_consent_evidence_ref": "consent:meeting:001",
+            "webhook_verification_evidence_ref": "config:recall-signing:v1",
+            "proof_refs": ["evidence:case:7"],
+            "join_at": "2026-10-02T19:00:00+00:00",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "SHADOW_PREPARED"
+    assert body["local_persistence_only"] is True
+    assert body["provider_api_call_performed"] is False
+    assert body["live_join_execution"] is False
+    assert body["speech_execution"] is False
+    assert body["execution_authority"] == "none"
+    assert body["record"]["live_join_performed"] is False
+    assert (
+        tmp_path / "sessions" / "meeting-materialize-001.json"
+    ).is_file()
+    assert (
+        tmp_path / "activations" / "meeting-materialize-001.json"
+    ).is_file()
+
+    read_response = client().get(
+        "/v1/digital-avatar/meetings/meeting-materialize-001/activation"
+    )
+    assert read_response.status_code == 200
+    read_body = read_response.json()
+    assert read_body["read_only"] is True
+    assert read_body["provider_api_call_execution"] is False
+    assert read_body["execution_authority"] == "none"
+    assert read_body["activation"]["execution_state"] == "prepared"
+    assert read_body["activation"]["live_join_performed"] is False
+
+
+def test_private_draft_read_endpoint(monkeypatch, tmp_path):
+    root = tmp_path / "private_drafts"
+    target = root / "meeting-001"
+    target.mkdir(parents=True)
+    payload = {
+        "meeting_id": "meeting-001",
+        "avatar_id": "avatar-phil-v1",
+        "task_sha256": "a" * 64,
+        "status": "ready_for_human_review",
+        "unresolved_refs": [],
+        "draft": {
+            "meeting_id": "meeting-001",
+            "avatar_id": "avatar-phil-v1",
+            "text": "Yes. I can show you verified proof.",
+            "claims": [],
+            "provider_key": "test",
+            "source_ref": "draft:test",
+            "blockers": [],
+            "ready_for_human_review": True,
+            "mode": "COPILOT_PREVIEW",
+            "transmission_performed": False,
+            "speech_execution_allowed": False,
+            "execution_authority": "none",
+        },
+        "provider_call_performed": True,
+        "duplicate": False,
+        "private_to_owner": True,
+        "human_approval_required": True,
+        "transmission_performed": False,
+        "speech_execution_allowed": False,
+        "execution_authority": "none",
+    }
+    (target / "latest.json").write_text(json.dumps(payload))
+    monkeypatch.setenv("EMPIRE_AVATAR_PRIVATE_DRAFT_ROOT", str(root))
+
+    response = client().get(
+        "/v1/digital-avatar/meetings/meeting-001/draft"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "COPILOT_PREVIEW"
+    assert body["read_only"] is True
+    assert body["private_to_owner"] is True
+    assert body["human_approval_required"] is True
+    assert body["transmission_performed"] is False
+    assert body["speech_execution_allowed"] is False
+    assert body["execution_authority"] == "none"
+    assert body["draft"]["draft"]["text"] == (
+        "Yes. I can show you verified proof."
+    )
+
+
+def test_private_draft_missing_returns_404(monkeypatch, tmp_path):
+    monkeypatch.setenv("EMPIRE_AVATAR_PRIVATE_DRAFT_ROOT", str(tmp_path))
+    response = client().get(
+        "/v1/digital-avatar/meetings/meeting-001/draft"
+    )
+    assert response.status_code == 404

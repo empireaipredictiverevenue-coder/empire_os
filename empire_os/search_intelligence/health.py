@@ -21,7 +21,7 @@ def search_health(config: SearchIntelligenceConfig | None = None) -> dict:
             "writes_enabled": False,
         },
         "repository": {
-            "status": "migration_prepared_not_activated",
-            "canonical_database": "supabase",
+            "status": "canonical_repository_runtime_gated",
+            "canonical_database": "empiredb",
         },
     }

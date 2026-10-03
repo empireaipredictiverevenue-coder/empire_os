@@ -9,10 +9,16 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=-/etc/empire_recall.env
 Environment=EMPIRE_RECALL_VERIFIED_SPOOL=/srv/empire_os/runtime/digital_avatar/recall_ingress
+Environment=EMPIRE_RECALL_STATUS_SPOOL=/srv/empire_os/runtime/digital_avatar/recall_status_ingress
 Environment=EMPIRE_RECALL_OBSERVATION_ROOT=/srv/empire_os/runtime/digital_avatar/observations
+Environment=EMPIRE_RECALL_LIFECYCLE_ROOT=/srv/empire_os/runtime/digital_avatar/meeting_lifecycle
+Environment=EMPIRE_RECALL_LIFECYCLE_LATEST_ROOT=/srv/empire_os/runtime/digital_avatar/lifecycle_latest
 Environment=EMPIRE_RECALL_SESSION_ROOT=/srv/empire_os/runtime/digital_avatar/sessions
 Environment=EMPIRE_RECALL_GUIDANCE_ROOT=/srv/empire_os/runtime/digital_avatar/guidance
+Environment=EMPIRE_RECALL_RUNTIME_STATE_ROOT=/srv/empire_os/runtime/digital_avatar/runtime_state
+Environment=EMPIRE_RECALL_MEETING_STATE_ROOT=/srv/empire_os/runtime/digital_avatar/meeting_state
 Environment=EMPIRE_RECALL_WORKER_POLL_SECONDS=0.25
 Environment=EMPIRE_RECALL_WORKER_MAX_ITEMS=100
 ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.recall_shadow_worker_service
@@ -20,8 +26,17 @@ Restart=always
 RestartSec=2
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 ReadOnlyPaths=/srv/empire_os
 ReadWritePaths=/srv/empire_os/runtime
 

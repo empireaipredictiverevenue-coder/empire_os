@@ -1,0 +1,38 @@
+[Unit]
+Description=EmpireOS Digital Avatar canonical close-readiness enrichment
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_DATA_BACKEND=empiredb
+EnvironmentFile=-/etc/empire_os.env
+EnvironmentFile=-/etc/empiredb.env
+EnvironmentFile=-/etc/empire_avatar_close_readiness.env
+ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.digital_avatar_close_readiness_service
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/srv/empire_os
+ReadWritePaths=/srv/empire_os/runtime
+TimeoutStopSec=20
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

@@ -45,6 +45,7 @@ def test_response_task_is_private_and_non_speaking():
     assert task.recommended_action_key == "present_verified_case_evidence"
     assert "meeting:turn:7" in task.approved_evidence_refs
     assert "evidence:case:7" in task.approved_evidence_refs
+    assert "terms:pilot:v1" in task.approved_evidence_refs
     assert task.requires_human_approval is True
     assert task.speech_execution_allowed is False
     assert task.execution_authority == "none"

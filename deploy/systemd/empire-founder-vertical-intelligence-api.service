@@ -1,0 +1,30 @@
+[Unit]
+Description=EmpireOS Founder Vertical Intelligence Read API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+
+EnvironmentFile=-/etc/empire_os.env
+EnvironmentFile=-/etc/empiredb.env
+Environment=PYTHONPATH=/srv/empire_os
+
+ExecStart=/srv/empire_os/.venv/bin/uvicorn empire_os.founder_vertical_intelligence_service:app --host 127.0.0.1 --port 8772
+
+Restart=on-failure
+RestartSec=3
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+ReadOnlyPaths=/srv/empire_os
+ReadWritePaths=/srv/empire_os/runtime
+
+[Install]
+WantedBy=multi-user.target

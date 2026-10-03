@@ -1,7 +1,5 @@
 import pytest
 
-pytest.importorskip("ortools")
-
 from empire_os.intelligence_optimization_fabric import (
     build_optimization_fabric_plan,
 )
@@ -74,6 +72,7 @@ def test_runtime_executes_generic_exact_primary_for_small_problem():
 
 
 def test_runtime_benchmarks_cp_sat_against_same_exact_problem():
+    pytest.importorskip("ortools")
     problem = _scenario_problem()
     plan = build_optimization_fabric_plan(
         problem,
@@ -133,7 +132,7 @@ def test_generic_exact_reference_fails_closed_above_universal_limit():
     assert result["max_variables"] == DEFAULT_MAX_VARIABLES
 
 
-def test_runtime_parallelizes_proven_independent_large_cp_sat_problem():
+def test_runtime_parallelizes_proven_independent_large_empire_problem():
     from empire_os.optimization_problem_factory import build_problem_ir
 
     variables = [
@@ -187,7 +186,7 @@ def test_runtime_parallelizes_proven_independent_large_cp_sat_problem():
         max_variables_per_shard=10,
     )
 
-    assert plan["primary_solver"] == "ortools_cp_sat"
+    assert plan["primary_solver"] == "empire_branch_bound"
     assert plan["decomposition"]["strategy"] == "independent_shards"
 
     executed = execute_primary_solver(plan, max_workers=2)
@@ -195,8 +194,70 @@ def test_runtime_parallelizes_proven_independent_large_cp_sat_problem():
 
     assert executed["status"] == "AVAILABLE"
     assert result["strategy"] == "independent_shards"
+    assert result["solver"] == "empire_branch_bound"
+    assert result["solver_origin"] == "empire_owned"
+    assert result["third_party_runtime_dependency"] is False
     assert result["shard_count"] == 2
     assert result["selected_variables"] == ["x::19", "x::9"]
     assert result["objective_value"] == 30.0
     assert result["constraints_satisfied"] is True
     assert result["execution_authority"] == "none"
+
+
+def test_runtime_executes_empire_branch_bound_for_large_owned_problem():
+    from empire_os.optimization_problem_factory import build_problem_ir
+
+    variables = [
+        {
+            "variable": f"x::{index}",
+            "evidence_refs": [f"evidence:{index}"],
+        }
+        for index in range(30)
+    ]
+    problem = build_problem_ir(
+        workload_key="empire-large-runtime",
+        workload_type="generic_binary_portfolio",
+        source_schema_version="fixture.v1",
+        variable_type="BINARY",
+        variables=variables,
+        objective={
+            "sense": "MAXIMIZE",
+            "linear": {
+                row["variable"]: index + 1
+                for index, row in enumerate(variables)
+            },
+            "quadratic": {},
+        },
+        constraints=[
+            {
+                "name": "choose_one",
+                "coefficients": {
+                    row["variable"]: 1
+                    for row in variables
+                },
+                "sense": "<=",
+                "rhs": 1,
+            }
+        ],
+        time_budget_ms=1000,
+        representations=("CQM",),
+    )
+    plan = build_optimization_fabric_plan(
+        problem,
+        runtime=discover_solver_runtime(),
+        exact_variable_limit=24,
+    )
+
+    assert plan["primary_solver"] == "empire_branch_bound"
+    assert plan["solver_route"]["production_solver_origin"] == "empire_owned"
+    assert plan["solver_route"]["third_party_runtime_allowed"] is False
+
+    executed = execute_primary_solver(plan)
+
+    assert executed["status"] == "AVAILABLE"
+    assert executed["result"]["solver"] == "empire_branch_bound"
+    assert executed["result"]["selected_variables"] == ["x::29"]
+    assert executed["result"]["objective_value"] == 30.0
+    assert executed["result"]["constraints_satisfied"] is True
+    assert executed["result"]["external_solver_called"] is False
+    assert executed["execution_authority"] == "none"

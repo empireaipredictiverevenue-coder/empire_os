@@ -86,6 +86,13 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 1800,
     },
+    "optimization_fabric": {
+        "path": Path(
+            "runtime/predictive_cloud/optimization_fabric_latest.json"
+        ),
+        "time_keys": ("generated_at", "observed_at"),
+        "fresh_seconds": 1800,
+    },
     "conversion_intelligence": {
         "path": Path("runtime/conversion/latest.json"),
         "time_keys": ("observed_at", "generated_at"),
@@ -500,6 +507,90 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
                 "cloud_forward_score"
             ),
             "actual_revenue": payload.get("actual_revenue"),
+        }
+    if name == "optimization_fabric":
+        capabilities = payload.get("capabilities")
+        capabilities = (
+            capabilities if isinstance(capabilities, Mapping) else {}
+        )
+        return {
+            "status": payload.get("status"),
+            "exact_binary_reference": capabilities.get(
+                "exact_binary_reference"
+            ),
+            "empire_branch_bound": capabilities.get(
+                "empire_branch_bound"
+            ),
+            "partitioned_empire_branch_bound": capabilities.get(
+                "partitioned_empire_branch_bound"
+            ),
+            "safe_qubo_compiler": capabilities.get(
+                "safe_qubo_compiler"
+            ),
+            "empire_quantum_inspired_annealing": capabilities.get(
+                "empire_quantum_inspired_annealing"
+            ),
+            "empire_parallel_tempering": capabilities.get(
+                "empire_parallel_tempering"
+            ),
+            "empire_qaoa_simulator": capabilities.get(
+                "empire_qaoa_simulator"
+            ),
+            "benchmark_arena": capabilities.get("benchmark_arena"),
+            "solver_performance_memory": capabilities.get(
+                "solver_performance_memory"
+            ),
+            "solver_policy": capabilities.get("solver_policy"),
+            "qpu_provider_contract": capabilities.get(
+                "qpu_provider_contract"
+            ),
+            "compute_job_protocol": capabilities.get(
+                "compute_job_protocol"
+            ),
+            "greedy_binary_fallback": capabilities.get(
+                "greedy_binary_fallback"
+            ),
+            "whole_business_optimization": capabilities.get(
+                "whole_business_optimization"
+            ),
+            "business_optimization_domain_count": (
+                dict(payload.get("business_optimization_product") or {}).get(
+                    "domain_count"
+                )
+            ),
+            "business_optimization_automation_enabled": (
+                dict(
+                    payload.get("business_optimization_automation") or {}
+                ).get("automation_enabled")
+            ),
+            "business_optimization_ready_workload_count": (
+                dict(
+                    payload.get("business_optimization_automation") or {}
+                ).get("ready_workload_count")
+            ),
+            "business_optimization_blocked_workload_count": (
+                dict(
+                    payload.get("business_optimization_automation") or {}
+                ).get("blocked_workload_count")
+            ),
+            "business_optimization_decision_changed_count": (
+                dict(
+                    payload.get("business_optimization_automation") or {}
+                ).get("decision_changed_count")
+            ),
+            "external_qpu_enabled_count": payload.get(
+                "external_qpu_enabled_count"
+            ),
+            "external_qpu_adapter_ready_count": payload.get(
+                "external_qpu_adapter_ready_count"
+            ),
+            "external_qpu_called": payload.get("external_qpu_called"),
+            "automatic_production_routing": payload.get(
+                "automatic_production_routing"
+            ),
+            "quantum_advantage_claimed": payload.get(
+                "quantum_advantage_claimed"
+            ),
         }
     if name == "tag_intelligence":
         return {

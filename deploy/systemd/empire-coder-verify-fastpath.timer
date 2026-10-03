@@ -1,0 +1,10 @@
+[Unit]
+Description=Continuously drain deterministic Empire Coder VERIFY jobs
+[Timer]
+OnActiveSec=5s
+OnUnitInactiveSec=5s
+AccuracySec=1s
+Persistent=true
+Unit=empire-coder-verify-fastpath.service
+[Install]
+WantedBy=timers.target

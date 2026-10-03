@@ -1,5 +1,10 @@
 from pathlib import Path
+import asyncio
+import json
+
+import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from empire_os.public_gateway import (
     _inline_script_hashes,
@@ -271,6 +276,116 @@ def test_recall_proxy_forwards_raw_body_and_verification_headers(monkeypatch):
     lowered = {k.lower(): v for k, v in captured["headers"].items()}
     assert lowered["webhook-id"] == "msg-1"
     assert lowered["webhook-timestamp"] == "1790964000"
+    assert lowered["webhook-signature"] == "v1,AAAA"
+    assert "authorization" not in lowered
+    assert captured["timeout"] == 5.0
+
+
+def test_recall_status_proxy_forwards_only_verification_headers(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        content = b'{"accepted":true}'
+        status_code = 200
+        headers = {"content-type": "application/json"}
+
+    class FakeAsyncClient:
+        def __init__(self, timeout):
+            captured["timeout"] = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, *, content, headers):
+            captured["url"] = url
+            captured["content"] = content
+            captured["headers"] = dict(headers)
+            return FakeResponse()
+
+    monkeypatch.setattr(
+        "empire_os.public_gateway.httpx.AsyncClient",
+        FakeAsyncClient,
+    )
+
+    raw = b'{"event":"bot.in_call_recording"}'
+    response = client.post(
+        "/v1/providers/recall/status",
+        content=raw,
+        headers={
+            "Content-Type": "application/json",
+            "Webhook-Id": "msg-status-1",
+            "Webhook-Timestamp": "1790964000",
+            "Webhook-Signature": "v1,AAAA",
+            "Authorization": "must-not-forward",
+        },
+    )
+    assert response.status_code == 200
+    assert captured["content"] == raw
+    assert captured["url"].endswith("/v1/providers/recall/status")
+    lowered = {k.lower(): v for k, v in captured["headers"].items()}
+    assert lowered["webhook-id"] == "msg-status-1"
+    assert lowered["webhook-timestamp"] == "1790964000"
+    assert lowered["webhook-signature"] == "v1,AAAA"
+    assert "authorization" not in lowered
+    assert captured["timeout"] == 5.0
+
+
+def test_recall_status_proxy_rejects_oversize():
+    response = client.post(
+        "/v1/providers/recall/status",
+        content=b"x" * 512001,
+    )
+    assert response.status_code == 413
+
+
+def test_recall_lifecycle_proxy_forwards_only_verification_headers(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        content = b'{"accepted":true}'
+        status_code = 200
+        headers = {"content-type": "application/json"}
+
+    class FakeAsyncClient:
+        def __init__(self, timeout):
+            captured["timeout"] = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, *, content, headers):
+            captured["url"] = url
+            captured["content"] = content
+            captured["headers"] = dict(headers)
+            return FakeResponse()
+
+    monkeypatch.setattr(
+        "empire_os.public_gateway.httpx.AsyncClient",
+        FakeAsyncClient,
+    )
+    raw = b'{"event":"bot.in_call_recording"}'
+    response = client.post(
+        "/v1/providers/recall/lifecycle",
+        content=raw,
+        headers={
+            "Content-Type": "application/json",
+            "Webhook-Id": "msg-lifecycle-1",
+            "Webhook-Timestamp": "1790964000",
+            "Webhook-Signature": "v1,AAAA",
+            "Authorization": "must-not-forward",
+        },
+    )
+    assert response.status_code == 200
+    assert captured["content"] == raw
+    assert captured["url"].endswith("/v1/providers/recall/lifecycle")
+    lowered = {k.lower(): v for k, v in captured["headers"].items()}
+    assert lowered["webhook-id"] == "msg-lifecycle-1"
     assert lowered["webhook-signature"] == "v1,AAAA"
     assert "authorization" not in lowered
     assert captured["timeout"] == 5.0

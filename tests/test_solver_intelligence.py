@@ -68,69 +68,63 @@ def test_small_supported_problem_prefers_exact_classical_reference():
     assert route["quantum_advantage_claimed"] is False
 
 
-def test_large_problem_falls_back_to_safe_builtin_without_adapter():
+def test_large_problem_falls_back_to_safe_builtin_without_time_budget():
     route = route_solver(_problem(25), runtime=_runtime(), exact_variable_limit=24)
 
     assert route["primary_solver"] == "classical_greedy_reference"
     assert route["queue_class"] == "optimization:scalable"
+    assert route["production_solver_origin"] == "empire_owned"
+    assert route["third_party_runtime_allowed"] is False
     assert None not in route["fallback_chain"]
 
 
-def test_qpu_lane_requires_both_explicit_route_authority_and_provider_enable():
+def test_large_bounded_problem_prefers_empire_branch_bound():
+    route = route_solver(
+        _problem(25, time_budget_ms=1000),
+        runtime=_runtime(),
+        exact_variable_limit=24,
+    )
+
+    assert route["primary_solver"] == "empire_branch_bound"
+    assert route["primary_reference_quality"] == "BOUNDED_EXACT_OR_INCUMBENT"
+    assert route["routing_reason"] == (
+        "empire_owned_scalable_binary_linear_solver"
+    )
+    assert "ortools_cp_sat" not in route["fallback_chain"]
+
+
+def test_third_party_solver_lanes_are_market_reference_only():
     runtime = _runtime(
-        packages={"qiskit": True},
+        packages={"qiskit": True, "ortools": True},
         provider_flags={"ibm_quantum": True},
-        empire_adapters={"ibm_qaoa": True},
+        empire_adapters={"ibm_qaoa": True, "ortools_cp_sat": True},
     )
 
-    blocked = route_solver(
-        _problem(3),
-        runtime=runtime,
-        allow_external_qpu_benchmark=False,
-    )
-    ibm = next(
-        row for row in blocked["benchmark_lanes"]
-        if row["solver"] == "ibm_qaoa"
-    )
-    assert ibm["runnable"] is False
-    assert "external_qpu_benchmark_not_authorized_for_route" in ibm["blockers"]
-
-    route_only = route_solver(
-        _problem(3),
-        runtime=runtime,
-        allow_external_qpu_benchmark=True,
-    )
-    ibm = next(
-        row for row in route_only["benchmark_lanes"]
-        if row["solver"] == "ibm_qaoa"
-    )
-    assert ibm["runnable"] is False
-    assert "cost_budget_required_for_external_solver" in ibm["blockers"]
-
-    budgeted_cost_only = route_solver(
-        _problem(3, cost_budget_minor_units=100),
-        runtime=runtime,
-        allow_external_qpu_benchmark=True,
-    )
-    ibm = next(
-        row for row in budgeted_cost_only["benchmark_lanes"]
-        if row["solver"] == "ibm_qaoa"
-    )
-    assert ibm["runnable"] is False
-    assert "time_budget_required_for_external_solver" in ibm["blockers"]
-
-    allowed = route_solver(
+    route = route_solver(
         _problem(
-            3,
+            25,
             cost_budget_minor_units=100,
             time_budget_ms=5000,
         ),
         runtime=runtime,
+        exact_variable_limit=24,
         allow_external_qpu_benchmark=True,
     )
+
+    assert route["primary_solver"] == "empire_branch_bound"
     ibm = next(
-        row for row in allowed["benchmark_lanes"]
+        row for row in route["benchmark_lanes"]
         if row["solver"] == "ibm_qaoa"
     )
-    assert ibm["runnable"] is True
-    assert allowed["production_promotion_ready"] is False
+    ortools = next(
+        row for row in route["benchmark_lanes"]
+        if row["solver"] == "ortools_cp_sat"
+    )
+    assert ibm["runnable"] is False
+    assert ibm["purpose"] == "market_reference_only"
+    assert "third_party_runtime_not_allowed" in ibm["blockers"]
+    assert ortools["runnable"] is False
+    assert ortools["purpose"] == "market_reference_only"
+    assert "third_party_runtime_not_allowed" in ortools["blockers"]
+    assert route["third_party_runtime_allowed"] is False
+    assert route["production_solver_origin"] == "empire_owned"

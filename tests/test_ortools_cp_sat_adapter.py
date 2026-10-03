@@ -87,8 +87,15 @@ def test_router_discovers_installed_cp_sat_and_routes_bounded_generic_workload()
     )
 
     assert runtime["packages"]["ortools"] is True
-    assert runtime["empire_adapters"]["ortools_cp_sat"] is True
-    assert plan["primary_solver"] == "ortools_cp_sat"
+    assert runtime["market_reference_adapters"]["ortools_cp_sat"] is True
+    assert plan["primary_solver"] == "empire_branch_bound"
+    lane = next(
+        row for row in plan["solver_route"]["benchmark_lanes"]
+        if row["solver"] == "ortools_cp_sat"
+    )
+    assert lane["runnable"] is False
+    assert lane["purpose"] == "market_reference_only"
+    assert "third_party_runtime_not_allowed" in lane["blockers"]
     assert plan["solver_execution_ready"] is True
     assert plan["production_promotion_ready"] is False
 
@@ -109,4 +116,5 @@ def test_router_does_not_route_cp_sat_without_time_budget():
     )
     assert cp_sat["runnable"] is False
     assert "time_budget_required" in cp_sat["blockers"]
-    assert plan["primary_solver"] is None
+    assert plan["primary_solver"] == "classical_greedy_reference"
+    assert plan["solver_execution_ready"] is True

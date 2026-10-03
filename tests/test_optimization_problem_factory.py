@@ -8,6 +8,7 @@ from empire_os.optimization_problem_factory import (
     build_problem_ir,
     compile_action_portfolio_problem,
     compile_allocation_problem,
+    validate_problem_integrity,
 )
 from empire_os.quantum_optimization import build_allocation_optimization_problem
 
@@ -242,3 +243,19 @@ def test_decomposition_blocks_cross_partition_quadratic_objective():
     assert plan["blockers"]["cross_partition_quadratic_terms"] == [
         "x::north|x::south"
     ]
+
+def test_problem_integrity_detects_post_fingerprint_mutation():
+    packet = _basic_ir()
+    packet["constraints"].append({
+        "name": "mutated_after_fingerprint",
+        "coefficients": {"x::a": 1, "x::b": 1},
+        "sense": "<=",
+        "rhs": 1,
+    })
+
+    integrity = validate_problem_integrity(packet)
+
+    assert integrity["status"] == "UNAVAILABLE"
+    assert integrity["integrity_valid"] is False
+    assert "problem_fingerprint_mismatch" in integrity["blockers"]
+    assert "constraint_count_mismatch" in integrity["blockers"]

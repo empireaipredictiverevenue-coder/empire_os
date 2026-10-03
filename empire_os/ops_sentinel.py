@@ -25,7 +25,10 @@ CRITICAL_SERVICES = (
 )
 # Acquisition and qualification scheduling are owned by the long-running
 # Autonomous Revenue OS. Legacy timers are intentionally not critical.
-CRITICAL_TIMERS = ()
+# Recurring competitive intelligence remains a distinct evidence-refresh owner.
+CRITICAL_TIMERS = (
+    "empire-opportunity-brief.timer",
+)
 REPAIRABLE_UNITS = frozenset((*CRITICAL_SERVICES, *CRITICAL_TIMERS))
 
 RUNTIME_INPUTS = {
@@ -35,6 +38,10 @@ RUNTIME_INPUTS = {
     "acquisition": RUNTIME / "acquisition/latest.json",
     "buyer_review": RUNTIME / "buyer_review_materializer/latest.json",
     "coder_model_health": RUNTIME / "coder/model_health.json",
+    "competitive_intelligence_refresh": (
+        RUNTIME
+        / "competitive_intelligence/refresh_chain_latest.json"
+    ),
 }
 
 
@@ -134,6 +141,67 @@ def analyze(
                     ),
                     "canonical_ingest_authorized": False,
                     "blockers": source.get("blockers") or [],
+                },
+            ))
+
+    competitive = runtime.get("competitive_intelligence_refresh") or {}
+    if competitive:
+        expires_text = str(competitive.get("expires_at") or "").strip()
+        expires_at = None
+        if expires_text:
+            try:
+                expires_at = datetime.fromisoformat(
+                    expires_text.replace("Z", "+00:00")
+                )
+            except ValueError:
+                expires_at = None
+        if competitive.get("ok") is False:
+            findings.append(Finding(
+                "competitive_intelligence_refresh_failed",
+                "warning",
+                "competitive_intelligence_refresh",
+                "Recurring competitive intelligence has a critical-stage failure",
+                False,
+                82,
+                {
+                    "critical_failures": (
+                        competitive.get("critical_failures") or []
+                    ),
+                    "degraded_stages": (
+                        competitive.get("degraded_stages") or []
+                    ),
+                },
+            ))
+        elif (
+            expires_at is not None
+            and expires_at.tzinfo is not None
+            and expires_at.astimezone(timezone.utc)
+            <= datetime.now(timezone.utc)
+        ):
+            findings.append(Finding(
+                "competitive_intelligence_refresh_stale",
+                "warning",
+                "competitive_intelligence_refresh",
+                "Recurring competitive intelligence snapshot is expired",
+                False,
+                80,
+                {
+                    "expires_at": expires_text,
+                    "freshness": competitive.get("freshness"),
+                },
+            ))
+        elif competitive.get("degraded") is True:
+            findings.append(Finding(
+                "competitive_intelligence_provider_degraded",
+                "info",
+                "competitive_intelligence_refresh",
+                "Competitive intelligence is current with provider degradation",
+                False,
+                55,
+                {
+                    "degraded_stages": (
+                        competitive.get("degraded_stages") or []
+                    ),
                 },
             ))
 

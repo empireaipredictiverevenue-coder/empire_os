@@ -90,7 +90,7 @@ def test_action_portfolio_fabric_does_not_advertise_unvalidated_qubo():
     assert plan["primary_solver"] == "classical_exact_reference"
 
 
-def test_large_unknown_workload_has_no_fake_builtin_solver():
+def test_large_monotone_workload_uses_safe_generic_greedy_fallback():
     variables = [
         {"variable": f"x::{index}", "evidence_refs": [f"ev:{index}"]}
         for index in range(25)
@@ -119,9 +119,74 @@ def test_large_unknown_workload_has_no_fake_builtin_solver():
     )
 
     assert plan["status"] == "AVAILABLE"
+    assert plan["primary_solver"] == "classical_greedy_reference"
+    assert plan["solver_execution_ready"] is True
+    assert plan["solver_route"]["routing_reason"] == (
+        "empire_owned_safe_monotone_fallback"
+    )
+    assert plan["execution_authority"] == "none"
+
+
+
+def test_large_non_monotone_workload_still_fails_closed_without_solver():
+    variables = [
+        {"variable": f"x::{index}", "evidence_refs": [f"ev:{index}"]}
+        for index in range(25)
+    ]
+    problem = build_problem_ir(
+        workload_key="unsupported_future_workload",
+        workload_type="future_workload",
+        source_schema_version="fixture.v1",
+        variable_type="BINARY",
+        variables=variables,
+        objective={
+            "sense": "MAXIMIZE",
+            "linear": {
+                row["variable"]: (1 if index else -1)
+                for index, row in enumerate(variables)
+            },
+            "quadratic": {},
+        },
+        constraints=[],
+        representations=("CQM",),
+    )
+    plan = build_optimization_fabric_plan(
+        problem,
+        runtime=_empty_runtime(),
+        exact_variable_limit=24,
+    )
+
     assert plan["primary_solver"] is None
     assert plan["solver_execution_ready"] is False
     assert plan["solver_route"]["routing_reason"] == (
-        "no_implemented_solver_for_workload"
+        "no_empire_owned_solver_for_workload"
     )
-    assert plan["execution_authority"] == "none"
+
+def test_fabric_rejects_mutated_problem_before_solver_routing():
+    problem = build_problem_ir(
+        workload_key="integrity_fixture",
+        workload_type="future_workload",
+        source_schema_version="fixture.v1",
+        variable_type="BINARY",
+        variables=[
+            {"variable": "x::1", "evidence_refs": ["ev:1"]}
+        ],
+        objective={
+            "sense": "MAXIMIZE",
+            "linear": {"x::1": 1},
+            "quadratic": {},
+        },
+        constraints=[],
+        representations=("CQM",),
+    )
+    problem["objective"]["linear"]["x::1"] = 999
+
+    plan = build_optimization_fabric_plan(
+        problem,
+        runtime=_empty_runtime(),
+    )
+
+    assert plan["status"] == "UNAVAILABLE"
+    assert plan["reason"] == "optimization_problem_integrity_failed"
+    assert plan["integrity"]["integrity_valid"] is False
+    assert "problem_fingerprint_mismatch" in plan["integrity"]["blockers"]

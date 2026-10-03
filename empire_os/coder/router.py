@@ -69,31 +69,41 @@ class ModelRouter:
         role: str = "planner",
         exclude: Iterable[tuple[str, str]] = (),
     ) -> ModelRoute:
-        """Return a local advisory fallback even when capability is below need.
+        """Return the best local advisory fallback.
 
-        This is intentionally separate from route(): normal routing remains
-        capability-strict. Callers must explicitly opt into degraded advisory
-        behavior after an external-provider availability failure.
+        Prefer a local model that still meets the objective capability. Only
+        degrade below the required capability when no adequate local profile
+        remains healthy. This keeps provider outages from silently collapsing
+        hard architecture/database planning onto the smallest model.
         """
         excluded = set(exclude)
         role_name = str(role or "planner").strip().lower()
-        candidates = sorted(
-            (
-                profile
-                for profile in self.profiles
-                if profile.local
-                and role_name in profile.roles
-                and (profile.provider, profile.model) not in excluded
-            ),
-            key=lambda p: (
-                p.provider != "llama_cpp",
-                p.cost_tier,
-                -p.capability,
-                p.provider,
-                p.model,
-            ),
-        )
-        if not candidates:
+        need = self.complexity(objective)
+        local = [
+            profile
+            for profile in self.profiles
+            if profile.local
+            and role_name in profile.roles
+            and (profile.provider, profile.model) not in excluded
+        ]
+        sufficient = [p for p in local if p.capability >= need]
+        if sufficient:
+            chosen = sorted(
+                sufficient,
+                key=lambda p: (p.cost_tier, -p.capability, p.provider, p.model),
+            )[0]
+            return ModelRoute(
+                chosen.provider,
+                chosen.model,
+                (
+                    f"local_provider_fallback; role={role_name}; "
+                    f"objective_complexity={need}; "
+                    f"capability={chosen.capability}"
+                ),
+                local=True,
+                cost_tier=chosen.cost_tier,
+            )
+        if not local:
             return ModelRoute(
                 "unconfigured",
                 "none",
@@ -101,13 +111,16 @@ class ModelRouter:
                 local=False,
                 cost_tier=0,
             )
-        chosen = candidates[0]
+        chosen = sorted(
+            local,
+            key=lambda p: (-p.capability, p.cost_tier, p.provider, p.model),
+        )[0]
         return ModelRoute(
             chosen.provider,
             chosen.model,
             (
                 f"degraded_local_fallback; role={role_name}; "
-                f"objective_complexity={self.complexity(objective)}; "
+                f"objective_complexity={need}; "
                 f"capability={chosen.capability}"
             ),
             local=True,

@@ -114,53 +114,42 @@ fingerprinted work packets suitable for queues and horizontally scaled workers.
 Large workloads use proven-safe independent shards or a coordinator pattern for
 global constraints. Solver backends are replaceable provider adapters.
 
+## Quantum-inspired and external provider lanes
+
+Empire quantum-inspired and quantum-simulation lanes are owned by EmpireOS and run without provider SDKs or network services.
+
+Current owned lanes:
+- Empire Annealing: bounded simulated annealing over the safe QUBO subset.
+- Empire Parallel Tempering: replica-exchange Monte Carlo for harder QUBO landscapes.
+- Empire QAOA Simulator: bounded p=1 statevector simulation using the Python standard library only.
+- Safe QUBO compiler: only proven constraint shapes are encoded.
+
+All quantum-style results are benchmark evidence with qpu_called=false, third_party_runtime_dependency=false and quantum_advantage_claimed=false.
+
 ## First scalable classical adapter
 
-Google OR-Tools CP-SAT is the first optional scalable classical adapter. The
-repository records it under the optimization optional dependency group as
-ortools>=9.15,<10. The adapter is lazy-loaded and supports binary linear
-Empire Optimization IR only in V1. It requires an explicit wall-clock budget,
-independently validates returned assignments against the original unscaled
-constraints, and never invents compute cost.
+Empire Branch-and-Bound is the scalable classical binary-linear solver. It uses deterministic ordering, objective bounds, partial-constraint pruning and explicit node/time budgets.
 
-Current upstream review on 2026-10-02 found OR-Tools v9.15 with Python 3.14
-support and Apache licensing. Qiskit Optimization itself was archived in July
-2026; future IBM/Qiskit integration should target the maintained optimization
-mapper/addon path after a separate adapter review rather than embedding the
-archived package.
+Safe independent partitions may execute Empire Branch-and-Bound in parallel. Cross-partition constraints fail closed into global-coordinator-required state.
+
+OR-Tools is optional market-reference tooling only and is not a production runtime dependency or fallback.
 
 ## Initial solver policy
 
-1. Small bounded problems: exact classical reference where supported.
-2. Larger combinatorial problems: strong classical lane first.
-3. Quantum-inspired / CQM / QUBO / QAOA: benchmark candidates only.
-4. External QPU: opt-in benchmark lane only.
-5. Every candidate must be validated against identical constraints and objective.
+1. Small bounded binary problems: Empire exact reference.
+2. Larger binary-linear problems: Empire Branch-and-Bound.
+3. Safe monotone fallback: Empire greedy.
+4. Safe QUBO research: Empire Annealing and Parallel Tempering.
+5. Small safe QUBOs: Empire QAOA statevector simulator.
+6. Benchmark Arena compares identical problem fingerprints.
+7. Solver memory recommends only after repeated feasibility and quality evidence.
+8. Recommendation never expands business execution authority.
 
 ## Open-source intake direction
 
-Prefer provider adapters and bounded pattern adoption over ownership inversion.
-Strong current candidates include Apache-2.0 OR-Tools for classical
-combinatorial optimization and Apache-2.0 quantum SDK ecosystems such as
-PennyLane/Amazon Braket integrations where appropriate. Qiskit, D-Wave Ocean
-and other current projects require source/license/security review before any
-runtime dependency is introduced.
+Open-source and commercial tools are research and competitive-reference inputs only. Empire may study permissively licensed algorithms, patterns and benchmarks, but production solver ownership remains EmpireOS.
 
-Current adapter intake notes (2026-10-02):
-- D-Wave Ocean / dwave-samplers: strong candidate for the first local
-  quantum-inspired BQM benchmark lane because it exposes local simulated
-  annealing, simulated quantum annealing, tabu and related samplers under
-  permissive open-source licensing.
-- PennyLane: strong candidate for provider-neutral QAOA / hybrid experiment
-  adapters after the common QUBO/Hamiltonian compiler is hardened; current
-  upstream packaging includes Python 3.14 support.
-- Qiskit: do not adopt the archived qiskit-optimization package. Evaluate the
-  maintained qiskit-addon-opt-mapper path plus current runtime/provider APIs
-  behind an Empire adapter.
-- External QPU runtimes remain benchmark-only and require explicit provider,
-  route, time and compute-cost budgets before any remote call.
-
-No external SDK becomes the canonical evidence store or authority plane.
+Optional market-reference packages are isolated from normal execution and do not feed production Solver Policy. No third-party solver service, credential, provider SDK or network solver call is permitted in the Empire production optimization path.
 
 ## Worker assignment
 
@@ -179,3 +168,81 @@ out of scope.
 - no quantum-advantage claim
 - existing quantum/hybrid/action-portfolio regressions remain green
 - no production deployment or authority expansion
+
+## Queue-safe compute jobs
+
+The compute-job protocol turns an AVAILABLE fabric plan into immutable,
+deterministic, tenant-scoped work packets. It supports one root job or
+independent shards only when decomposition proves no cross-shard constraints.
+Each job carries its parent/problem fingerprints, solver, time/cost budgets,
+recommendation-only flag and execution_authority=none. Reconciliation validates
+the combined assignment against the original parent constraints before any
+result can be treated as usable optimization evidence.
+
+## Solver fallback policy
+
+The owned runtime uses:
+- Empire exact binary reference;
+- Empire Branch-and-Bound;
+- Empire greedy only for the proven-safe monotone subset;
+- Empire Annealing and Parallel Tempering on the safe QUBO subset;
+- Empire QAOA Simulator for bounded small-QUBO experiments.
+
+Third-party market references never become automatic fallback or routing.
+
+## Benchmark Arena and solver memory
+
+Benchmark Arena automatically compares eligible Empire-owned solvers on the same immutable fingerprint: exact, Branch-and-Bound, Annealing, Parallel Tempering and QAOA Simulator.
+
+Solver Performance Memory aggregates repeated evidence by workload shape. Solver Policy may issue recommendation-only advice when the workload shape matches and the lane is available.
+
+The automatic business optimization heartbeat invokes Benchmark Arena only on bounded safe problems; market references are excluded by default.
+
+## External QPU boundary
+
+No external QPU/provider service is part of the current architecture.
+
+The future hardware boundary is an Empire-owned interface concept: capabilities, submit, sample, measure and calibration. Today its implementations are local software simulation and quantum-inspired compute.
+
+Provider credentials, cloud-QPU submissions and external solver spending are disabled.
+
+## Current production-truth boundary
+
+This V2 foundation is an OBSERVE/recommendation system. Local optimization
+solvers may execute mathematical compute, but no commercial allocation,
+outreach, publishing, payment, accounting, infrastructure mutation or other
+business side effect follows from a solver result without the existing
+domain-specific authority gates.
+
+## External QPU provider sequence
+
+The current sequence is fully Empire-owned:
+
+1. canonical Empire Optimization IR;
+2. exact classical reference;
+3. Empire Branch-and-Bound and safe sharding;
+4. safe QUBO compiler;
+5. Empire Annealing;
+6. Empire Parallel Tempering;
+7. Empire QAOA statevector simulator;
+8. Benchmark Arena and Solver Performance Memory;
+9. future Empire-controlled QPU backend.
+
+No third-party provider appears in the production sequence.
+
+## IR integrity boundary
+
+Every canonical optimization IR is fingerprinted over its semantic workload,
+variables, objective, constraints, evidence, budgets and representations. The
+fabric recomputes the fingerprint before routing, and low-level solver/QUBO/
+shard/QPU boundaries fail closed when a packet was mutated after construction.
+Variable and constraint counts plus truth/authority invariants are validated
+separately so metadata tampering cannot convert prediction into execution.
+
+## Third-party provider state
+
+The earlier bounded external-provider experiment is superseded by the founder rule that the production optimization stack is Empire-owned.
+
+D-Wave cloud/provider SDK components were removed from the active venv. Third-party solver services, credentials and network calls are disabled. Local permissive tools may remain only in the isolated market-reference extra for competitive benchmarking and do not feed production routing.
+
+Current quantum-style runtime is Empire Annealing, Empire Parallel Tempering and Empire QAOA Simulator, all with qpu_called=false and execution_authority=none.

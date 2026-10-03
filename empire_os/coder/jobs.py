@@ -179,6 +179,7 @@ class LocalJobQueue:
         *,
         worker_id: str | None = None,
         lease_seconds: int = 240,
+        kind: JobKind | None = None,
     ) -> CoderJob | None:
         now = datetime.now(timezone.utc)
         lease_for = max(60, int(lease_seconds))
@@ -186,6 +187,8 @@ class LocalJobQueue:
             candidates: list[tuple[int, str, Path, CoderJob]] = []
             for source in self.pending.glob("*.json"):
                 candidate = self._load_path(source)
+                if kind is not None and candidate.kind is not kind:
+                    continue
                 retry_after = self._parse_ts(candidate.retry_after)
                 if retry_after is not None and retry_after > now:
                     continue
@@ -218,6 +221,45 @@ class LocalJobQueue:
                 self._write(destination, job)
                 return job
         return None
+
+    def claim_specific(
+        self,
+        job_id: str,
+        *,
+        worker_id: str | None = None,
+        lease_seconds: int = 240,
+    ) -> CoderJob | None:
+        """Atomically claim one known pending job without disturbing queue order."""
+        safe = self._safe_id(job_id)
+        source = self.pending / f"{safe}.json"
+        now = datetime.now(timezone.utc)
+        lease_for = max(60, int(lease_seconds))
+        with self._locked():
+            if not source.exists():
+                return None
+            candidate = self._load_path(source)
+            retry_after = self._parse_ts(candidate.retry_after)
+            if retry_after is not None and retry_after > now:
+                return None
+            destination = self.running / source.name
+            try:
+                source.replace(destination)
+            except FileNotFoundError:
+                return None
+            job = self._load_path(destination)
+            job.status = JobStatus.RUNNING
+            job.attempts += 1
+            job.error = None
+            job.lease_id = f"lease_{uuid4().hex}"
+            job.worker_id = str(worker_id or f"pid:{os.getpid()}")
+            job.heartbeat_at = now.isoformat()
+            job.lease_expires_at = (
+                now + timedelta(seconds=lease_for)
+            ).isoformat()
+            job.retry_after = None
+            job.updated_at = utc_now()
+            self._write(destination, job)
+            return job
 
     def delegate_pending(
         self,
@@ -406,11 +448,17 @@ class LocalJobQueue:
             error=None,
         )
 
-    def fail(self, job: CoderJob, error: str) -> CoderJob:
+    def fail(
+        self,
+        job: CoderJob,
+        error: str,
+        *,
+        result: dict[str, Any] | None = None,
+    ) -> CoderJob:
         return self._finish(
             job,
             status=JobStatus.FAILED,
-            result={},
+            result=dict(result or {}),
             error=str(error)[:4000],
         )
 

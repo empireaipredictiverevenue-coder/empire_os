@@ -79,7 +79,7 @@ Canonical architecture:
 - [x] Verified Cortex outcome → outcome-conditioned Economic Memory bridge — CODED; DONE work alone is never outcome truth
 - [x] Predictive Cloud status exposes Economic Memory read surface — CODED
 - [x] Live Opportunity/Quant loop proof — 24 candidates, 13 research observations, 15 normalized scores, 21 QUALIFY / 3 DISCOVER, 0 fabricated Quant packets — 2026-09-22
-- [ ] Live EmpireOS verification of Quant endpoints and opportunity Quant Review
+- [x] Live EmpireOS verification of Quant endpoints and opportunity Quant Review
 - [ ] Calibrated probability-of-success source from verified outcome cohorts
 - [ ] Calibrated time-to-revenue distributions
 - [ ] Prediction intervals / coverage monitoring
@@ -128,8 +128,8 @@ Data & Decision Intelligence:
 - [ ] Risk & resilience read model: downside, concentration, capacity and operational risk
 - [ ] Capital/portfolio read model: expected return, capital at risk, opportunity cost and diversification
 - [ ] Economic Memory join across prediction → action → verified outcome
-- [ ] Predictive Cloud API/read-model convergence
-- [ ] Predictive Cloud Founder Console surface
+- [x] Predictive Cloud API/read-model convergence
+- [x] Predictive Cloud Founder Console surface
 - [ ] Real production evidence through the full prediction → outcome → calibration loop
 
 Predictive Cloud truth rule:
@@ -171,7 +171,7 @@ Verification / activation:
 - [x] Run one real OBSERVE Opportunity Loop against current snapshots — 24 radar candidates / 5 researched / 7 observations / 3 AI plans queued
 - [x] Confirm bounded real Opportunity Research produces observations only — VERIFIED; no buyer intent/revenue authority inferred
 - [x] Confirm Factory Intake blocks missing normalized signals rather than inferring them — VERIFIED; 24/24 blocked, 0 factory-ready
-- [ ] Install/enable autonomous Opportunity Loop timer if tests pass
+- [x] Install/enable autonomous Opportunity Loop timer if tests pass
 - [ ] Confirm Astra dispatcher invokes one deduped Opportunity Loop without external mutation
 
 Next wiring:
@@ -879,3 +879,364 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Batch 1 focused tests pass on live EmpireOS server
 - [x] Founder business-agent status endpoint verified live
 - [x] Builder capability ledger verified live after Pi + Empire Coder probes
+
+
+## Digital Avatar / Empire Presence — Architecture-First Build
+
+Canonical architecture:
+- `docs/DIGITAL_AVATAR_ARCHITECTURE_CONTRACT_V1.md`
+- `docs/DIGITAL_AVATAR_COPILOT_TURN_DELTA_V1.md`
+- `docs/DIGITAL_AVATAR_CLOSE_AUTHORITY_DELTA_V1.md`
+
+Truth rule: local/server worktree tests are not production activation. Live
+meeting join, speech and commercial authority remain separately founder-gated.
+
+- [x] Digital Avatar architecture contract + promotion ladder
+- [x] Provider-neutral identity/session/mode/authority model
+- [x] Verified Recall webhook HMAC ingress + fail-closed raw-body verification
+- [x] Signed bot metadata binding to Empire meeting/avatar/platform/mode
+- [x] Private verified event spool + async SHADOW worker
+- [x] Monotonic lifecycle state; out-of-order provider events cannot roll back state
+- [x] Founder-safe private meeting-state read model
+- [x] Predictive Revenue private next-best-action guidance
+- [x] Grounded response task with approved evidence refs
+- [x] Buyer-safe production evidence resolver: meeting observations, products,
+      verified price, approved commercial terms and canonical outcomes
+- [x] Internal acquisition cost / fulfilment cost / margin stripped from buyer-facing evidence
+- [x] Async private draft worker; incomplete evidence performs zero model calls
+- [x] Content-addressed draft dedupe prevents repeated inference spend
+- [x] Founder private draft read endpoint; no send/speech authority
+- [x] Voice/visual identity profile and registry foundations
+- [x] Recall Output Media Presence preparation + short-lived Presence token
+- [x] Human-approved one-turn speech render/ticket architecture
+- [x] PCM SHA-256/size/sample-rate binding + one-time ticket claim/finalization
+- [x] Server-only Presence audio push; browser cannot mint/request speech turns
+- [x] Playback timeout/error burns ticket into reconciliation-required state
+- [x] Deterministic full approved-turn composition test + replay rejection
+- [x] Digital Avatar/Recall server worktree regression: 407 tests passed, RC=0
+- [x] Avatar/Recall compile + git diff whitespace verification clean
+
+### Digital Avatar live promotion gates — NOT DONE
+
+- [ ] Provision Recall region/API key/workspace verification secret without exposing values
+- [ ] Install/activate bounded Recall webhook + SHADOW worker services
+- [ ] Reload public gateway and verify signed Recall endpoint live
+- [ ] First controlled real meeting join in SHADOW mode
+- [ ] Verify signed lifecycle + transcript evidence in live runtime
+- [ ] Verify Founder meeting-state surface against that live meeting
+- [ ] Enable private grounded-draft worker only after explicit model/cost decision
+- [ ] Verify first live private grounded draft from canonical evidence
+- [ ] Provision Presence signing/audio-push secrets and activate Presence service
+- [ ] Start Recall Output Media for one controlled COPILOT meeting
+- [ ] Founder explicitly approves one exact turn/text fingerprint
+- [ ] Execute one approved speech turn and verify browser playback/ticket finalization
+- [ ] Confirm meeting-side audio heard; browser completion alone is not delivery proof
+- [ ] Run bounded Copilot shadow period with latency/error/cost evidence
+- [ ] Separate founder decision before REPRESENT authority
+- [ ] Separate delegated authority contract before NEGOTIATE/CLOSE
+- [ ] No Avatar payment/funds/revenue-recognition authority unless separately architected
+
+
+## Digital Avatar Clone Fleet — Architecture-First Build
+
+Canonical architecture:
+- `docs/DIGITAL_AVATAR_CLONE_FLEET_ARCHITECTURE_V1.md`
+
+Truth rule: Clone Fleet V1 is a deterministic tenant/identity policy layer only.
+It does not activate canonical tenant persistence or modify Migration 018.
+
+- [x] Clone Fleet architecture contract completed before implementation
+- [x] Tenant-scoped avatar binding model
+- [x] Existing TenantMembership + tenant_isolation policy reused
+- [x] Cross-tenant avatar access fails closed
+- [x] Disabled memberships/bindings fail closed
+- [x] Avatar ID / owner / consent mismatch blocks runtime preparation
+- [x] Duplicate identical bindings are idempotent
+- [x] Conflicting or cross-tenant avatar rebinding fails closed
+- [x] Fleet runtime binding grants OBSERVE / zero execution authority only
+- [x] Focused Clone Fleet tests: 13 passed, RC=0
+- [x] Adjacent Digital Avatar/Recall regression: 397 passed, RC=0
+- [x] Compile + git diff check clean
+- [x] Protected Migration 018 hash unchanged
+
+### Clone Fleet live/persistence gates — NOT DONE
+
+- [ ] Trusted authenticated tenant-membership source for fleet HTTP surfaces
+- [ ] Founder/tenant read-only fleet surface against trusted membership
+- [ ] Canonical EmpireDB fleet persistence architecture
+- [ ] Explicit approval before any tenant-context migration or Migration 018 change
+- [ ] Tenant-scoped voice/visual asset storage contract
+- [ ] Usage/quota/metering integration from verified runtime events
+- [ ] Multi-avatar scheduling / concurrency contract
+- [ ] White-label tenant configuration contract
+- [ ] Live cross-tenant isolation proof after canonical persistence exists
+
+### Clone Fleet read model — engineering verified
+
+- [x] Read-model architecture delta completed before implementation
+- [x] Tenant-only fleet snapshot projection
+- [x] Consent evidence references redacted from fleet read payload
+- [x] Cross-tenant avatars invisible in list and item lookup
+- [x] Disabled membership denied
+- [x] Active/disabled clone status visible only inside owning tenant
+- [x] Read model grants zero mutation/meeting/speech/commercial authority
+- [x] Clone Fleet focused regression: 20 passed, RC=0
+- [x] Adjacent Digital Avatar/Recall regression: 407 passed, RC=0
+- [x] Compile/diff verification clean; Migration 018 unchanged
+- [ ] HTTP exposure remains blocked until trusted tenant authentication exists
+
+### Clone Fleet concurrency planner — engineering verified
+
+- [x] Concurrency architecture delta completed before implementation
+- [x] Same avatar overlapping meeting denied
+- [x] Different tenant-owned avatars may overlap within verified tenant capacity
+- [x] Capacity comes from explicit evidence-backed policy, not plan-name assumptions
+- [x] Cross-tenant reservations do not consume another tenant's quota
+- [x] Global canonical meeting-ID collision fails closed
+- [x] Exact boundary end/start does not count as overlap
+- [x] Identical reservation is idempotent and performs no provider call
+- [x] SHADOW/COPILOT-only V1 mode ceiling; REPRESENT/NEGOTIATE/CLOSE rejected
+- [x] Fleet-focused regression: 34 passed, RC=0
+- [x] Adjacent Digital Avatar/Recall regression: 424 passed, RC=0
+- [x] Compile/diff clean; Migration 018 unchanged
+- [ ] Persistent reservation/scheduler remains a future separately approved architecture slice
+
+### Clone Fleet workforce dispatch — engineering verified
+
+- [x] Dispatch architecture delta completed before implementation
+- [x] Deterministic clone routing composed with identity/consent validation
+- [x] Concurrency/capacity check composed before dispatch readiness
+- [x] Ambiguous routing stops before identity/provider work
+- [x] Missing or mismatched clone identity/consent blocks dispatch
+- [x] Same-avatar overlap and tenant-capacity exhaustion block dispatch
+- [x] Preferred eligible clone supported without authority expansion
+- [x] Dispatch request time validation fails closed before routing
+- [x] Dispatch remains recommendation-only; no reservation/provider/calendar/join side effect
+- [x] Fleet-focused regression: 56 passed, RC=0
+- [x] Adjacent Digital Avatar/Recall regression: 446 passed, RC=0
+- [x] Compile/diff clean; Migration 018 unchanged
+
+### Clone Fleet concurrency / routing / assignment — engineering verified
+
+- [x] Concurrency architecture delta completed before implementation
+- [x] Same clone cannot overlap meetings
+- [x] Different clones may overlap until evidence-backed tenant capacity is reached
+- [x] Canonical meeting ID conflicts fail closed
+- [x] Cross-tenant reservation conflicts fail closed without data exposure
+- [x] SHADOW/COPILOT scheduling ceiling enforced
+- [x] Concurrency focused regression: 14 passed
+- [x] Routing architecture delta recorded and canonical router independently verified
+- [x] Capability routing selects unique qualified clone only
+- [x] Ambiguous qualified set requires human selection
+- [x] Preferred clone must remain qualified
+- [x] Routing focused regression: 13 passed, RC=0
+- [x] Assignment architecture delta completed before composition implementation
+- [x] Capability + validated runtime + concurrency composed into one assignment decision
+- [x] Busy capable clone may be filtered while another capable available clone is selected
+- [x] Preferred busy clone is not silently substituted
+- [x] Runtime-binding absence blocks candidate
+- [x] Idempotent duplicate reservation preserved without provider calls
+- [x] Fleet combined regression: 59 passed, RC=0
+- [x] Adjacent Digital Avatar/Recall regression after assignment: 458 passed, RC=0
+- [x] Compile/diff checks clean; protected Migration 018 unchanged
+- [ ] Reservation persistence/provider scheduling remains unimplemented and gated
+
+### Digital Avatar specialist bridge — engineering verified
+
+- [x] Specialist bridge architecture delta completed before implementation
+- [x] One visible avatar remains the sole meeting-response owner
+- [x] Specialist summaries require explicit truth class + evidence refs
+- [x] Missing/unavailable specialist domains remain unresolved
+- [x] Duplicate specialist ownership for one domain fails closed
+- [x] Authority-bearing or externally acting specialist packets are rejected
+- [x] Private chain-of-thought cannot enter the meeting advisory packet
+- [x] Fleet + specialist focused regression: 80 passed, RC=0
+- [x] Adjacent Digital Avatar/Recall regression: 474 passed, RC=0
+- [x] Compile/diff clean; Migration 018 unchanged
+
+### Clone Fleet continuity memory — engineering verified
+
+- [x] Continuity-memory architecture delta completed before implementation
+- [x] Tenant/avatar-scoped bounded history projection
+- [x] Raw audio/transcript text excluded from continuity context
+- [x] Same-tenant other-avatar history excluded
+- [x] Same avatar under another tenant fails closed
+- [x] Viewer/disabled membership denied for runtime continuity
+- [x] Observed meeting history is not automatically commercial proof
+- [x] Explicit verified commercial outcome + Cortex eligibility required for proof flag
+- [x] Continuity focused regression: 10 passed
+- [x] Combined fleet regression after memory: 69 passed, RC=0
+- [x] Adjacent Avatar/Recall regression remained green
+
+### Digital Avatar specialist consultation — engineering verified
+
+- [x] Specialist consultation architecture delta completed before implementation
+- [x] Reuses canonical Empire departments; no new specialist-agent registry
+- [x] Sales/Product/Engineering/Data-Quant/R&D/Marketing/Strategy mappings verified
+- [x] Duplicate domains dedupe deterministically
+- [x] Specialist count bounded and truncation explicit
+- [x] Unknown/missing department owner fails closed
+- [x] SHADOW/COPILOT ceiling enforced
+- [x] No department work queued and no external/speech/commercial authority granted
+- [x] Specialist focused regression: 18 passed, RC=0
+- [x] Adjacent Digital Avatar/Fleet/Recall regression: 509 passed, RC=0
+
+### Clone Fleet verified usage metering — engineering verified
+
+- [x] Metering architecture delta completed before implementation
+- [x] Only VERIFIED provider lifecycle with done+joined+terminal+nonfatal state meters usage
+- [x] Planned/assigned/dispatch-ready/waiting/active/fatal states do not meter
+- [x] Deterministic tenant/avatar/meeting usage identity
+- [x] UTC billing period derivation verified at month boundary
+- [x] Exact duplicate usage dedupes; conflicting duplicate fails closed
+- [x] Cross-tenant aggregation fails closed
+- [x] Monthly verified usage converts to SaaS UsageObservation only
+- [x] No commercial-terms binding, invoice, payment or revenue authority in meter
+- [x] Legacy tenants.py SQLite metering is not used
+- [x] Metering focused tests: 15 passed
+- [x] Fleet/specialist focused regression after metering: 136 passed, RC=0
+- [x] Full Digital Avatar/Recall regression after metering: 547 passed, RC=0
+- [x] Compile/diff clean; protected Migration 018 unchanged
+- [ ] Persisted canonical tenant usage remains gated on tenant-context architecture
+
+### Clone Fleet SaaS readiness / role templates — engineering verified
+
+- [x] SaaS quota/billing-readiness architecture reuses canonical freshness and billing-preview contracts
+- [x] Verified clone usage feeds quota readiness without new quota arithmetic
+- [x] Verified overage terms can produce USDT charge preview only
+- [x] Stale usage/subscription/isolation evidence blocks readiness
+- [x] Missing terms/pricing evidence blocks charge preview
+- [x] SaaS metering/readiness focused tests: 26 passed
+- [x] Full Digital Avatar/Recall regression after SaaS readiness: 558 passed, RC=0
+- [x] Clone role-template architecture completed before implementation
+- [x] Founder Executive / Sales Closer / Account Manager / Product / Technical templates defined
+- [x] Templates contain capabilities + consultation defaults only
+- [x] Templates do not create identity, consent or execution authority
+- [x] Routing uses materialized validated fleet binding, not template name
+- [x] Role-template focused tests: 11 passed
+- [x] Full Digital Avatar/Recall regression after role templates: 569 passed, RC=0
+
+### Clone Fleet tenant-scoped multimodal media binding — engineering verified
+
+- [x] Media-binding architecture delta completed before final hardening
+- [x] Reuses immutable voice/visual registries; does not move/store raw media
+- [x] Voice-only, visual-only and voice+visual bindings supported
+- [x] Fleet runtime / identity / owner / consent coherence enforced
+- [x] Deterministic self-verifying media binding key
+- [x] Explicit voice_ready / visual_ready / multimodal_ready state
+- [x] Voice/visual profile refs cannot be reused across tenant/avatar bindings
+- [x] Provider engine voice/avatar IDs cannot be reused across tenant/avatar bindings
+- [x] Exact duplicate media binding is idempotent
+- [x] No render, meeting transmission, speech, commercial, payment or revenue authority
+- [x] Media + underlying registry focused regression: 21 passed, RC=0
+- [x] Full Digital Avatar/Recall regression after media binding: 588 passed, RC=0
+
+### Digital Avatar multimodal activation readiness — engineering verified
+
+- [x] Activation-readiness architecture delta completed before implementation
+- [x] Uses tenant-scoped media binding + canonical voice/visual engine registries
+- [x] Voice readiness requires self-hosted + streaming + clone-capable + explicitly available engine
+- [x] Visual readiness requires self-hosted + realtime + audio-driven + commercially ready + explicitly available engine
+- [x] Voice / visual / multimodal requirements evaluated independently
+- [x] No fallback engine silently selected
+- [x] No render, provider call, join, output-media start, speech or visual execution authority
+- [x] Activation focused regression: 22 passed, RC=0
+- [x] Full Digital Avatar/Recall regression after activation readiness: 598 passed, RC=0
+
+### Fleet Recall launch preparation / activation scoping — engineering verified
+
+- [x] Tenant-scoped Recall launch-preparation architecture completed before implementation
+- [x] Launch preparation reuses canonical Recall bot plan + session manifest
+- [x] SHADOW-only launch; COPILOT/REPRESENT/NEGOTIATE/CLOSE rejected
+- [x] Fleet tenant/avatar/owner/consent coherence enforced
+- [x] Mandatory visible AI bot identity preserved
+- [x] Recording consent and webhook-verification evidence required
+- [x] No session persistence, provider call, bot creation, join or speech at launch-prep layer
+- [x] Launch-focused tests: 27 passed, RC=0
+- [x] Full Digital Avatar/Recall regression after launch preparation: 612 passed, RC=0
+- [x] Existing Recall time-bounded join approval/activation chain reused rather than duplicated
+- [x] Fleet-scoped activation wrapper validates tenant/avatar/owner/consent + approval owner
+- [x] Fleet activation focused regression: 18 passed
+- [ ] Live Recall materialization/execution remains gated by explicit meeting-bound approval and production activation
+
+### Fleet Recall materialization / live-execution adapter — engineering verified
+
+- [x] Tenant-namespaced activation materialization architecture completed before implementation
+- [x] Tenant scope derived from SHA-256 tenant identity; raw tenant ID is not a filesystem path component
+- [x] Same meeting ID across different tenants materializes to isolated roots
+- [x] Same tenant/meeting conflicting activation fingerprint fails closed
+- [x] Exact materialization is idempotent
+- [x] Materialization performs no Recall provider call or meeting join
+- [x] Fleet activation/materialization focused regression: 28 passed, RC=0
+- [x] Fleet-scoped live-execution adapter architecture completed before implementation
+- [x] Execution adapter default-off unless live_execution_requested=true
+- [x] Existing time-bounded meeting owner approval is still revalidated at provider boundary
+- [x] Tenant scope + activation fingerprint validated before provider transport
+- [x] Canonical one-time execution and reconciliation-required semantics reused
+- [x] Live-execution adapter tested with fake Recall transport only: 19 passed, RC=0
+- [x] Replay produces zero second provider calls
+- [x] Ambiguous provider failure requires reconciliation and forbids blind retry
+- [x] Full Digital Avatar/Meeting Gateway/Recall regression: 632 passed, RC=0
+- [ ] REAL Recall provider execution remains explicitly approval-gated for a named meeting
+
+### Empire Digital Avatar commercial packaging / pricing proposal — founder decision pending
+
+- [x] Founder approved product packaging: Copilot / Workforce / White-Label Workforce
+- [x] Commercial packaging bridge implemented without hard-coded active pricing
+- [x] No verified Digital Avatar product currently exists in canonical runtime catalog
+- [x] Missing/unverified catalog product fails closed as not commercially ready
+- [x] Pricing/economics proposal V1 written as PROPOSED only
+- [x] Proposed monthly pricing: Copilot $1,500 / Workforce $5,000 / White-Label $12,500
+- [x] Proposed implementation fees: $1,500 / $5,000 / $15,000
+- [x] Proposed included active avatars: 1 / 5 / 15
+- [x] Proposed verified meetings/month: 40 / 150 / 400
+- [x] Proposed concurrency entitlement targets: 1 / 3 / 10
+- [x] Proposed verified-meeting overage: $35 / $30 / $25
+- [x] Proposed enterprise expansion recurring floor: $15,000/month
+- [x] Proposed target policy margin 75%; minimum policy margin 70%
+- [x] Cost ceilings explicitly policy proposals, not observed actual costs
+- [x] Founder price approval can verify price only; cost/margin/binding remains gated
+- [x] Pricing/package/catalog focused regression: 29 passed
+- [x] Full Digital Avatar/Recall/catalog regression: 661 passed, RC=0
+- [ ] FOUNDER APPROVAL REQUIRED: exact Digital Avatar pricing/economics ladder
+- [ ] Observe/verify real fulfilment cost + meeting-duration + concurrency capacity
+- [ ] Governed canonical product/version proposal after pricing approval
+- [ ] Independent catalog verification before binding_terms_ready
+- [ ] Checkout/payment activation remains separately gated
+
+### All-products pre-market testing — campaigns remain gated
+
+- [x] All-products pre-market architecture contract added
+- [x] 86/86 canonical product rows classified individually
+- [x] Catalog split verified: 26 verified sellable / 9 active pending / 51 inactive recovery
+- [x] Digital Avatar 3 products remain proposal-only/off-catalog
+- [x] Cross-product + strict product-code/smoke-gate gauntlet: 211 passed, RC=0
+- [x] Campaign gate hardened: catalog verification alone is insufficient
+- [x] Exact product-code live-smoke evidence now required for campaign readiness
+- [x] Live Search Intelligence service healthy; 9 canonical non-solar search products READY
+- [x] Self-serve checkout live-smoked: HTTP 200 but product count=0; no instant-purchase campaign claims allowed
+- [x] UK solar artefacts exist but current verified source proof=false; solar remains smoke-blocked
+- [x] Private Capital current snapshot fail-closes with zero evidence; remains smoke-blocked
+- [x] Permit/Property product contracts live but fulfilment packet not yet proven; remain smoke-blocked
+- [x] Managed Opportunity Intelligence live demo shows 22 candidates but 0 factory-ready; remains smoke-blocked
+- [x] 9 Predictive Revenue/Commercial Exchange active-pending products remain campaign-blocked
+- [x] 51 recovered MRR products remain inactive/campaign-blocked
+- [ ] Campaign activation stays paused until all 26 commercially verified products pass Stage-2 live production smoke, per founder direction
+
+### Stage-2 vertical / solar product smoke refinement
+
+- [x] Permit real production runtime: 6,657 signals / 6,104 resolved / current 2026-10-02 evidence
+- [x] Permit deeper product integration: 6,495 provenance-backed opportunities; no fabricated buyer/delivery truth
+- [x] Property real production runtime: 6,658 evidence items; evidence available
+- [x] Founder vertical intelligence read router added and tested: 12 passed, RC=0
+- [ ] Founder dashboard service restart required to deploy new Permit/Property/Private-Capital read routes
+- [ ] Live loopback verify new vertical routes after restart
+- [x] Private Capital remains correctly UNKNOWN with zero canonical evidence
+- [x] All 13 localized Solar SKUs classified individually
+- [x] Solar-specific source contracts: GB/AU/IE/DE/FR
+- [x] Solar source research gaps: CA/NZ/ES/IT/NL/BE/PT
+- [x] US Solar source pack missing and explicitly blocked
+- [x] GB has 2 exact-product ready artifacts but retained source provenance is incomplete
+- [x] Solar exact-SKU focused regression: 9 passed
+- [x] No Solar SKU currently campaign-ready under strict product-code proof gate
+- [x] Current strict campaign-ready count remains 9

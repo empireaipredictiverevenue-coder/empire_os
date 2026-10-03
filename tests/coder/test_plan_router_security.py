@@ -164,7 +164,7 @@ def test_router_fails_closed_when_planner_is_below_required_capability():
     assert route.model == "none"
 
 
-def test_degraded_local_router_prefers_loopback_planner_under_capability():
+def test_degraded_local_router_prefers_capability_sufficient_local_model():
     router = ModelRouter([
         ModelProfile(
             "ollama",
@@ -193,7 +193,7 @@ def test_degraded_local_router_prefers_loopback_planner_under_capability():
         objective,
         role="planner",
     )
-    assert degraded.provider == "llama_cpp"
-    assert degraded.model == "qwen2.5-coder:1.5b"
+    assert degraded.provider == "ollama"
+    assert degraded.model == "qwen3-coder:30b"
     assert degraded.local is True
-    assert "degraded_local_fallback" in degraded.reason
+    assert "local_provider_fallback" in degraded.reason

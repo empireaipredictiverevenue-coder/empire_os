@@ -1,0 +1,12 @@
+[Unit]
+Description=Drain EmpireOS VERIFY evidence jobs continuously
+
+[Timer]
+OnActiveSec=5s
+OnUnitInactiveSec=5s
+AccuracySec=1s
+Persistent=true
+Unit=empire-coder-verify-drain.service
+
+[Install]
+WantedBy=timers.target

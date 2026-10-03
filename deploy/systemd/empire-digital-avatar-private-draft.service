@@ -1,0 +1,37 @@
+[Unit]
+Description=EmpireOS Digital Avatar private grounded-draft worker
+After=network-online.target empire-recall-shadow-worker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=-/etc/empire_recall.env
+Environment=EMPIRE_RECALL_GUIDANCE_ROOT=/srv/empire_os/runtime/digital_avatar/guidance
+Environment=EMPIRE_RECALL_OBSERVATION_ROOT=/srv/empire_os/runtime/digital_avatar/observations
+Environment=EMPIRE_AVATAR_PRIVATE_DRAFT_ROOT=/srv/empire_os/runtime/digital_avatar/private_drafts
+Environment=EMPIRE_AVATAR_PRIVATE_DRAFT_STATUS=/srv/empire_os/runtime/digital_avatar/private_draft_status.json
+ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.digital_avatar_private_draft_service
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/srv/empire_os
+ReadWritePaths=/srv/empire_os/runtime
+
+[Install]
+WantedBy=multi-user.target

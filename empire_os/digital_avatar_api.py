@@ -1,6 +1,8 @@
 """Read/preview API for Empire Digital Avatar V1."""
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -24,6 +26,13 @@ from empire_os.digital_avatar_mode_transition import (
     assess_avatar_mode_transition,
 )
 from empire_os.digital_avatar_response_draft import validate_avatar_response_draft
+from empire_os.digital_avatar_runtime_read import (
+    read_avatar_activation_state,
+    read_avatar_guidance,
+    read_avatar_meeting_state,
+    read_avatar_meeting_outcome,
+    read_avatar_private_draft,
+)
 from empire_os.digital_avatar_response_task import build_realtime_response_task
 from empire_os.digital_avatar_shadow import build_shadow_guidance
 from empire_os.digital_avatar_strategy import build_avatar_meeting_strategy
@@ -35,7 +44,12 @@ from empire_os.digital_avatar_turn import (
     assess_avatar_turn_for_approval,
 )
 from empire_os.recall_meeting_adapter import normalize_verified_recall_event
+from empire_os.recall_shadow_activation import prepare_recall_shadow_activation
+from empire_os.recall_shadow_activation_store import (
+    materialize_recall_shadow_activation,
+)
 from empire_os.recall_shadow_bot_plan import build_recall_shadow_bot_plan
+from empire_os.recall_shadow_join import RecallShadowJoinApproval
 from empire_os.recall_shadow_pipeline import (
     RecallVerifiedEvent,
     build_recall_shadow_pipeline_preview,
@@ -173,6 +187,41 @@ class RecallShadowBotPlanRequest(BaseModel):
     join_at: str | None = None
 
 
+class RecallShadowJoinApprovalRequest(BaseModel):
+    meeting_id: str
+    approved_by: str
+    approval_evidence_ref: str
+    approved_at: str
+    expires_at: str
+    allow_adhoc: bool = False
+
+
+class RecallShadowActivationPreviewRequest(BaseModel):
+    identity: AvatarIdentityRequest
+    meeting_id: str
+    platform: MeetingPlatform
+    meeting_url: str
+    bot_name: str
+    public_realtime_url: str
+    account_name: str
+    objective: str
+    owner_join_approval: RecallShadowJoinApprovalRequest
+    region: str
+    now: str
+    recording_consent_evidence_ref: str
+    webhook_verification_evidence_ref: str
+    conversation_id: str | None = None
+    opportunity_id: str | None = None
+    proof_refs: list[str] = Field(default_factory=list)
+    commercial_terms_ref: str | None = None
+    predictive_inputs: dict = Field(default_factory=dict)
+    action_candidates: list[dict] = Field(default_factory=list)
+    commercial_policy: AvatarCommercialPolicyRequest | None = None
+    close_proposal: AvatarCloseProposalRequest | None = None
+    participant_roles: dict[str, MeetingSpeakerRole | str] = Field(default_factory=dict)
+    join_at: str | None = None
+
+
 class AvatarTurnClaimRequest(BaseModel):
     text: str
     truth_class: AvatarClaimTruth
@@ -294,6 +343,38 @@ def _close_proposal(
     return AvatarCloseProposal(**data)
 
 
+def _recall_activation_packet(req: RecallShadowActivationPreviewRequest):
+    return prepare_recall_shadow_activation(
+        identity=_identity(req.identity),
+        meeting_id=req.meeting_id,
+        platform=req.platform,
+        meeting_url=req.meeting_url,
+        bot_name=req.bot_name,
+        public_realtime_url=req.public_realtime_url,
+        account_name=req.account_name,
+        objective=req.objective,
+        owner_join_approval=RecallShadowJoinApproval(
+            **req.owner_join_approval.model_dump()
+        ),
+        region=req.region,
+        now=req.now,
+        recording_consent_evidence_ref=req.recording_consent_evidence_ref,
+        webhook_verification_evidence_ref=(
+            req.webhook_verification_evidence_ref
+        ),
+        conversation_id=req.conversation_id,
+        opportunity_id=req.opportunity_id,
+        proof_refs=req.proof_refs,
+        commercial_terms_ref=req.commercial_terms_ref,
+        predictive_inputs=req.predictive_inputs,
+        action_candidates=req.action_candidates,
+        commercial_policy=_commercial_policy(req.commercial_policy),
+        close_proposal=_close_proposal(req.close_proposal),
+        participant_roles=req.participant_roles,
+        join_at=req.join_at,
+    )
+
+
 def _turn_draft(req: AvatarTurnApprovalPreviewRequest) -> AvatarTurnDraft:
     session = _session(req.session)
     claims = tuple(
@@ -331,6 +412,153 @@ def create_digital_avatar_router() -> APIRouter:
             "close_execution": False,
             "payment_execution": False,
             "execution_authority": "none",
+        }
+
+    @router.get("/meetings/{meeting_id}/guidance")
+    def meeting_guidance(meeting_id: str):
+        root = os.getenv(
+            "EMPIRE_RECALL_GUIDANCE_ROOT",
+            "/srv/empire_os/runtime/digital_avatar/guidance",
+        )
+        try:
+            guidance = read_avatar_guidance(
+                root=root,
+                meeting_id=meeting_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if guidance is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Digital Avatar guidance not available",
+            )
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "private_to_owner": True,
+            "speech_execution": False,
+            "execution_authority": "none",
+            "guidance": guidance,
+        }
+
+    @router.get("/meetings/{meeting_id}/state")
+    def meeting_state(meeting_id: str):
+        root = os.getenv(
+            "EMPIRE_RECALL_MEETING_STATE_ROOT",
+            "/srv/empire_os/runtime/digital_avatar/meeting_state",
+        )
+        try:
+            state = read_avatar_meeting_state(
+                root=root,
+                meeting_id=meeting_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if state is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Digital Avatar meeting state not available",
+            )
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "private_to_owner": True,
+            "speech_execution": False,
+            "chat_execution": False,
+            "commercial_execution": False,
+            "execution_authority": "none",
+            "state": state,
+        }
+
+    @router.get("/meetings/{meeting_id}/draft")
+    def meeting_private_draft(meeting_id: str):
+        root = os.getenv(
+            "EMPIRE_AVATAR_PRIVATE_DRAFT_ROOT",
+            "/srv/empire_os/runtime/digital_avatar/private_drafts",
+        )
+        try:
+            draft = read_avatar_private_draft(
+                root=root,
+                meeting_id=meeting_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if draft is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Digital Avatar private draft not available",
+            )
+        return {
+            "mode": "COPILOT_PREVIEW",
+            "read_only": True,
+            "private_to_owner": True,
+            "human_approval_required": True,
+            "transmission_performed": False,
+            "speech_execution_allowed": False,
+            "execution_authority": "none",
+            "draft": draft,
+        }
+
+    @router.get("/meetings/{meeting_id}/outcome")
+    def meeting_outcome(meeting_id: str):
+        root = os.getenv(
+            "EMPIRE_AVATAR_MEETING_OUTCOME_ROOT",
+            "/srv/empire_os/runtime/digital_avatar/meeting_outcomes",
+        )
+        try:
+            outcome = read_avatar_meeting_outcome(
+                root=root,
+                meeting_id=meeting_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if outcome is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Digital Avatar meeting outcome not available",
+            )
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "private_to_owner": True,
+            "verified_commercial_outcome": False,
+            "revenue_recognized": False,
+            "cortex_customer_label_eligible": False,
+            "automatic_follow_up_send_allowed": False,
+            "commercial_execution": False,
+            "payment_execution": False,
+            "execution_authority": "none",
+            "outcome": outcome,
+        }
+
+    @router.get("/meetings/{meeting_id}/activation")
+    def meeting_activation(meeting_id: str):
+        root = os.getenv(
+            "EMPIRE_RECALL_ACTIVATION_ROOT",
+            "/srv/empire_os/runtime/digital_avatar/activation_plans",
+        )
+        try:
+            activation = read_avatar_activation_state(
+                root=root,
+                meeting_id=meeting_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if activation is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Digital Avatar activation state not available",
+            )
+        return {
+            "mode": "OBSERVE",
+            "read_only": True,
+            "private_to_owner": True,
+            "provider_api_call_execution": False,
+            "speech_execution": False,
+            "chat_send_execution": False,
+            "commercial_execution": False,
+            "execution_authority": "none",
+            "activation": activation,
         }
 
     @router.post("/providers/recall/event/preview")
@@ -400,6 +628,64 @@ def create_digital_avatar_router() -> APIRouter:
             "live_join_execution": False,
             "execution_authority": "none",
             "plan": plan.as_dict(),
+        }
+
+    @router.post("/providers/recall/shadow-activation/preview")
+    def recall_shadow_activation_preview(
+        req: RecallShadowActivationPreviewRequest,
+    ):
+        try:
+            packet = _recall_activation_packet(req)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "SHADOW_PREVIEW",
+            "read_only": True,
+            "provider": "recall",
+            "session_persistence_performed": False,
+            "provider_api_call_performed": False,
+            "live_join_execution": False,
+            "speech_execution": False,
+            "chat_send_execution": False,
+            "commercial_execution": False,
+            "execution_authority": "none",
+            "activation": packet.as_dict(),
+        }
+
+    @router.post("/providers/recall/shadow-activation/materialize")
+    def recall_shadow_activation_materialize(
+        req: RecallShadowActivationPreviewRequest,
+    ):
+        session_root = os.getenv(
+            "EMPIRE_RECALL_SESSION_ROOT",
+            "/srv/empire_os/runtime/digital_avatar/sessions",
+        )
+        activation_root = os.getenv(
+            "EMPIRE_RECALL_ACTIVATION_ROOT",
+            "/srv/empire_os/runtime/digital_avatar/activation_plans",
+        )
+        try:
+            packet = _recall_activation_packet(req)
+            record = materialize_recall_shadow_activation(
+                packet=packet,
+                session_root=session_root,
+                activation_root=activation_root,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "mode": "SHADOW_PREPARED",
+            "provider": "recall",
+            "local_persistence_only": True,
+            "session_persistence_performed": True,
+            "activation_record_persisted": True,
+            "provider_api_call_performed": False,
+            "live_join_execution": False,
+            "speech_execution": False,
+            "chat_send_execution": False,
+            "commercial_execution": False,
+            "execution_authority": "none",
+            "record": record.as_dict(),
         }
 
     @router.post("/copilot/handoff/preview")

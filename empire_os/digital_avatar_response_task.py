@@ -18,6 +18,9 @@ class AvatarRealtimeResponseTask:
     approved_evidence_refs: tuple[str, ...]
     commercial_terms_ref: str | None
     constraints: tuple[str, ...]
+    specialist_context: tuple[Mapping[str, Any], ...] = ()
+    specialist_context_ready: bool = True
+    specialist_context_blockers: tuple[str, ...] = ()
     mode: str = "COPILOT_PREVIEW"
     output_channel: str = "private_draft"
     requires_human_approval: bool = True
@@ -59,6 +62,7 @@ def build_realtime_response_task(
             for ref in (
                 utterance_ref,
                 *strategy.proof_refs,
+                strategy.commercial_terms_ref,
                 *additional_evidence_refs,
             )
             if str(ref or "").strip()

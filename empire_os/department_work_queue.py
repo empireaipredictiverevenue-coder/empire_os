@@ -330,6 +330,37 @@ class DepartmentWorkQueue:
             current.replace(target / current.name)
             return active
 
+    def _active_execution_lease_expiry(
+        self,
+        job_id: str,
+        now: datetime,
+    ) -> datetime | None:
+        path = self.repo_root / "runtime/execution_plane/leases.json"
+        try:
+            rows = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        if not isinstance(rows, list):
+            return None
+        active: list[datetime] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("job_id") or "") != str(job_id):
+                continue
+            raw = str(row.get("expires_at") or "").strip()
+            if not raw:
+                continue
+            try:
+                expiry = datetime.fromisoformat(raw)
+            except ValueError:
+                continue
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            if expiry > now:
+                active.append(expiry)
+        return max(active) if active else None
+
     def recover_stale(
         self,
         *,
@@ -350,6 +381,15 @@ class DepartmentWorkQueue:
                 if expiry.tzinfo is None:
                     expiry = expiry.replace(tzinfo=timezone.utc)
                 if expiry > now:
+                    continue
+                execution_expiry = self._active_execution_lease_expiry(
+                    item.id,
+                    now,
+                )
+                if execution_expiry is not None:
+                    item.lease_expires_at = execution_expiry.isoformat()
+                    item.updated_at = self._now()
+                    self._write(path, item)
                     continue
                 if item.attempts >= max(1, int(max_attempts)):
                     item.status = DepartmentWorkStatus.FAILED

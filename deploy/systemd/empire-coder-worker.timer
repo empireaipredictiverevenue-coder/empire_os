@@ -1,0 +1,12 @@
+[Unit]
+Description=Continuously drain EmpireOS Coder proposal queue
+
+[Timer]
+OnActiveSec=5s
+OnUnitInactiveSec=5s
+AccuracySec=1s
+Persistent=true
+Unit=empire-coder-worker.service
+
+[Install]
+WantedBy=timers.target

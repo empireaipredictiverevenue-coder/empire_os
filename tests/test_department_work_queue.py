@@ -144,3 +144,38 @@ def test_queue_does_not_reopen_real_evidence_blocker(tmp_path):
     assert existing.status is DepartmentWorkStatus.BLOCKED
     assert existing.error == "insufficient_verified_outcome_cohort"
     assert queue.counts()["blocked"] == 1
+
+
+def test_stale_department_lease_is_extended_while_execution_lease_active(tmp_path):
+    import json
+    from datetime import datetime, timedelta, timezone
+    queue = DepartmentWorkQueue(tmp_path)
+    work, _ = queue.enqueue_step(
+        plan_id="astra_plan_execution_lease",
+        step=step(step_id="exec_step_execution_lease"),
+    )
+    claimed = queue.claim_next(worker_id="worker:test", lease_seconds=60)
+    running_path = queue.running / f"{claimed.id}.json"
+    packet = json.loads(running_path.read_text())
+    packet["lease_expires_at"] = (
+        datetime.now(timezone.utc) - timedelta(seconds=5)
+    ).isoformat()
+    running_path.write_text(json.dumps(packet))
+
+    leases = tmp_path / "runtime/execution_plane/leases.json"
+    leases.parent.mkdir(parents=True, exist_ok=True)
+    execution_expiry = datetime.now(timezone.utc) + timedelta(minutes=10)
+    leases.write_text(json.dumps([{
+        "lease_id": "exec_lease_test",
+        "job_id": claimed.id,
+        "owner": "empire_coder",
+        "resources": ["path:test"],
+        "expires_at": execution_expiry.isoformat(),
+    }]))
+
+    recovered = queue.recover_stale()
+    assert recovered == []
+    assert queue.counts()["running"] == 1
+    refreshed = queue._load(running_path)
+    assert refreshed.status is DepartmentWorkStatus.RUNNING
+    assert datetime.fromisoformat(refreshed.lease_expires_at) >= execution_expiry

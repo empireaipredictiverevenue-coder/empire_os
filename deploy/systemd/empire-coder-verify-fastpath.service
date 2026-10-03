@@ -1,0 +1,22 @@
+[Unit]
+Description=EmpireOS deterministic VERIFY fast-path
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment="PYTEST_ADDOPTS=-p no:cacheprovider"
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_coder_verify_fastpath.py --max-jobs 2 --timeout-seconds 900
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime/coder
+RestrictSUIDSGID=true
+LockPersonality=true
+IPAddressDeny=any
+TimeoutStartSec=950

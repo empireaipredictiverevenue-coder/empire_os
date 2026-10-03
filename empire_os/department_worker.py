@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 from typing import Any
 
+from empire_os.canonical_data_gateway import DataGatewayUnavailable
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
 from empire_os.department_work_queue import DepartmentWorkQueue
@@ -126,22 +127,40 @@ def _coder_bridge(repo_root: Path, item: Any) -> dict[str, Any]:
         "authority."
     )
     task = coder.create_task(objective)
+    payload = {
+        "department_work_id": item.id,
+        "astra_plan_id": item.plan_id,
+        "astra_step_id": item.step_id,
+        "execution_authority": "none",
+        "terms": [
+            *item.department_keys,
+            item.target_component,
+            item.action,
+        ],
+        "budget_chars": 7000,
+    }
+    intelligence = (
+        item.intelligence_request
+        if isinstance(item.intelligence_request, dict)
+        else {}
+    )
+    promotion_contract = intelligence.get("promotion_contract")
+    if isinstance(promotion_contract, dict):
+        payload["promotion_contract"] = dict(promotion_contract)
+    for source_key, payload_key in (
+        ("item_ids", "completion_item_ids"),
+        ("checklist_lines", "completion_checklist_lines"),
+        ("workstreams", "completion_workstreams"),
+    ):
+        values = intelligence.get(source_key)
+        if isinstance(values, list):
+            payload[payload_key] = list(values)
+
     job = queue.enqueue(
         task_id=task.id,
         kind=JobKind.PLAN,
         priority=item.priority,
-        payload={
-            "department_work_id": item.id,
-            "astra_plan_id": item.plan_id,
-            "astra_step_id": item.step_id,
-            "execution_authority": "none",
-            "terms": [
-                *item.department_keys,
-                item.target_component,
-                item.action,
-            ],
-            "budget_chars": 7000,
-        },
+        payload=payload,
     )
     return {
         "adapter": "empire_coder_plan_bridge",

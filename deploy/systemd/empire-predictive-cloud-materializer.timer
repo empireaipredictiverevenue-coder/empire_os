@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh EmpireOS Predictive Cloud owned materializers
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=120s
+AccuracySec=5s
+Persistent=true
+Unit=empire-predictive-cloud-materializer.service
+
+[Install]
+WantedBy=timers.target

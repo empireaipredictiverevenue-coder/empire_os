@@ -111,3 +111,73 @@ def test_unknown_speaker_without_binding_does_not_become_buyer():
     assert snapshot.guidance.latest_buyer_utterance is None
     assert snapshot.response_task is None
     assert "buyer_utterance_not_observed" in snapshot.guidance.blockers
+
+
+def specialist_packet(*, available=True):
+    from empire_os.digital_avatar_meeting_specialist_bridge import (
+        AvatarSpecialistAdvisory,
+        build_avatar_meeting_advisory_packet,
+    )
+    from empire_os.digital_avatar_turn import AvatarClaimTruth
+
+    item = AvatarSpecialistAdvisory(
+        domain="pricing",
+        source_component="empire.pricing",
+        summary=("Use verified price evidence." if available else ""),
+        truth_class=AvatarClaimTruth.VERIFIED,
+        evidence_refs=(
+            ("commercial_evidence:11111111-1111-4111-8111-111111111111",)
+            if available else ()
+        ),
+        available=available,
+        blockers=(() if available else ("verified_price_missing",)),
+    )
+    return build_avatar_meeting_advisory_packet(
+        meeting_id="meeting-001",
+        avatar_id="avatar-phil-v1",
+        required_domains=("pricing",),
+        advisories=(item,),
+    )
+
+
+def test_no_specialist_packet_preserves_default_response_task_behavior():
+    snapshot = build_recall_shadow_guidance_snapshot(
+        manifest=manifest(),
+        observations=[buyer_observation()],
+    )
+    assert snapshot.response_task is not None
+    assert snapshot.response_task.specialist_context == ()
+    assert snapshot.response_task.specialist_context_ready is True
+    assert snapshot.response_task.specialist_context_blockers == ()
+
+
+def test_validated_specialist_packet_attaches_context_and_underlying_refs():
+    snapshot = build_recall_shadow_guidance_snapshot(
+        manifest=manifest(),
+        observations=[buyer_observation()],
+        specialist_packet=specialist_packet(),
+    )
+    task = snapshot.response_task
+    assert task is not None
+    assert task.specialist_context_ready is True
+    assert task.specialist_context[0]["domain"] == "pricing"
+    assert (
+        "commercial_evidence:11111111-1111-4111-8111-111111111111"
+        in task.approved_evidence_refs
+    )
+    assert task.speech_execution_allowed is False
+    assert task.execution_authority == "none"
+
+
+def test_unresolved_specialist_packet_marks_response_task_blocked():
+    snapshot = build_recall_shadow_guidance_snapshot(
+        manifest=manifest(),
+        observations=[buyer_observation()],
+        specialist_packet=specialist_packet(available=False),
+    )
+    task = snapshot.response_task
+    assert task is not None
+    assert task.specialist_context_ready is False
+    assert task.specialist_context_blockers == (
+        "specialist_domain_unresolved:pricing",
+    )

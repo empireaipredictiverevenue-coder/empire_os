@@ -14,6 +14,7 @@ from empire_os.optimization_problem_factory import (
     build_decomposition_plan,
     compile_action_portfolio_problem,
     compile_allocation_problem,
+    validate_problem_integrity,
 )
 from empire_os.solver_intelligence import route_solver
 
@@ -41,6 +42,17 @@ def build_optimization_fabric_plan(
             "status": "UNAVAILABLE",
             "reason": "optimization_problem_unavailable",
             "problem_fingerprint": problem.get("problem_fingerprint"),
+            "execution_authority": "none",
+        }
+
+    integrity = validate_problem_integrity(problem)
+    if _status(integrity) != "AVAILABLE":
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "UNAVAILABLE",
+            "reason": "optimization_problem_integrity_failed",
+            "problem_fingerprint": problem.get("problem_fingerprint"),
+            "integrity": integrity,
             "execution_authority": "none",
         }
 
@@ -89,6 +101,12 @@ def build_optimization_fabric_plan(
         ),
         "solver_execution_ready": solver_route.get(
             "solver_execution_ready"
+        ) is True,
+        "production_solver_origin": solver_route.get(
+            "production_solver_origin"
+        ),
+        "third_party_runtime_allowed": solver_route.get(
+            "third_party_runtime_allowed"
         ) is True,
         "qaoa_model_eligible": "QUBO" in reps,
         "cqm_model_eligible": "CQM" in reps,

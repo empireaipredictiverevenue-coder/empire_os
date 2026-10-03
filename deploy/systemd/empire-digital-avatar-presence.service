@@ -1,0 +1,33 @@
+[Unit]
+Description=EmpireOS Digital Avatar Presence browser runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=-/etc/empire_avatar_presence.env
+ExecStart=/srv/empire_os/.venv/bin/uvicorn empire_os.digital_avatar_presence_service:app --host 127.0.0.1 --port 8100 --workers 1
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/srv/empire_os
+ReadWritePaths=/srv/empire_os/runtime
+
+[Install]
+WantedBy=multi-user.target

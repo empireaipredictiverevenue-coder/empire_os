@@ -7,7 +7,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from empire_os.recall_webhook_api import VerifiedRecallEnvelope
 
@@ -112,3 +112,71 @@ class FileRecallVerifiedSpool:
             duplicate=False,
             payload_sha256=envelope.verification.payload_sha256,
         )
+
+
+@dataclass(frozen=True)
+class DecodedRecallSpoolRecord:
+    queue_id: str
+    raw_payload: bytes
+    payload: Mapping[str, Any]
+    verification: Mapping[str, Any]
+    verification_ref: str
+    payload_sha256: str
+    received_at: str
+
+
+def decode_verified_spool_record(
+    record: Mapping[str, Any],
+) -> DecodedRecallSpoolRecord:
+    if record.get("schema_version") != "empire.recall_verified_spool.v1":
+        raise ValueError("unsupported Recall spool schema")
+
+    queue_id = str(record.get("queue_id") or "").strip()
+    verification = record.get("verification")
+    if not isinstance(verification, Mapping):
+        raise ValueError("verification mapping required")
+    if verification.get("verified") is not True:
+        raise ValueError("spool verification evidence missing")
+
+    payload_sha = str(
+        verification.get("payload_sha256") or ""
+    ).strip()
+    webhook_id = str(
+        verification.get("webhook_id") or ""
+    ).strip()
+    timestamp = str(
+        verification.get("webhook_timestamp") or ""
+    ).strip()
+    if not queue_id or not payload_sha or not webhook_id or not timestamp:
+        raise ValueError("spool verification identity incomplete")
+
+    encoded = str(record.get("raw_payload_base64") or "").strip()
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except Exception as exc:
+        raise ValueError("spool payload encoding invalid") from exc
+    if sha256(raw).hexdigest() != payload_sha:
+        raise ValueError("spool payload hash mismatch")
+
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("spool payload is not valid JSON") from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError("spool payload must be a JSON object")
+
+    received_at = str(record.get("received_at") or "").strip()
+    if not received_at:
+        raise ValueError("spool received_at required")
+    verification_ref = (
+        f"recall-verification:{webhook_id}:{timestamp}:{payload_sha[:24]}"
+    )
+    return DecodedRecallSpoolRecord(
+        queue_id=queue_id,
+        raw_payload=raw,
+        payload=payload,
+        verification=dict(verification),
+        verification_ref=verification_ref,
+        payload_sha256=payload_sha,
+        received_at=received_at,
+    )

@@ -115,7 +115,11 @@ class CoderTaskWorker:
             job_id=terminal.id,
         )
 
-    def run_once(self) -> CoderJob | None:
+    def run_once(
+        self,
+        *,
+        kind: JobKind | None = None,
+    ) -> CoderJob | None:
         self.queue.recover_stale(
             stale_seconds=self.stale_seconds,
             max_attempts=self.max_attempts,
@@ -126,6 +130,7 @@ class CoderTaskWorker:
         job = self.queue.claim_next(
             worker_id=f"pid:{os.getpid()}",
             lease_seconds=self.lease_seconds,
+            kind=kind,
         )
         if job is None:
             return None

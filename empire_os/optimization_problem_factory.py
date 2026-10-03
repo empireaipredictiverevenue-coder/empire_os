@@ -276,6 +276,147 @@ def build_problem_ir(
     }
 
 
+def compute_problem_fingerprint(problem: Mapping[str, Any]) -> str:
+    """Recompute the semantic fingerprint of an existing V2 IR packet."""
+    variables = [
+        dict(row)
+        for row in (problem.get("variables") or ())
+        if isinstance(row, Mapping)
+    ]
+    variables.sort(key=lambda row: _text(row.get("variable")))
+
+    objective_packet = dict(problem.get("objective") or {})
+    objective = {
+        **objective_packet,
+        "sense": _text(objective_packet.get("sense")).upper(),
+        "linear": dict(objective_packet.get("linear") or {}),
+        "quadratic": dict(objective_packet.get("quadratic") or {}),
+    }
+
+    constraints = []
+    for index, raw in enumerate(problem.get("constraints") or ()):
+        if not isinstance(raw, Mapping):
+            continue
+        packet = dict(raw)
+        packet["name"] = (
+            _text(packet.get("name")) or f"constraint::{index}"
+        )
+        packet["coefficients"] = dict(
+            packet.get("coefficients") or {}
+        )
+        sense = _text(packet.get("sense"))
+        packet["sense"] = "==" if sense == "=" else sense
+        constraints.append(packet)
+    constraints.sort(key=lambda row: str(row["name"]))
+
+    refs = tuple(sorted({
+        _text(ref)
+        for ref in (problem.get("evidence_refs") or ())
+        if _text(ref)
+    }))
+    reps = tuple(sorted({
+        _text(value).upper()
+        for value in (problem.get("representations") or ())
+        if _text(value)
+    }))
+
+    payload = {
+        "workload_key": _text(problem.get("workload_key")),
+        "workload_type": _text(problem.get("workload_type")),
+        "tenant_id": _text(problem.get("tenant_id")) or None,
+        "variable_type": _text(problem.get("variable_type")).upper(),
+        "variables": variables,
+        "objective": objective,
+        "constraints": constraints,
+        "evidence_refs": refs,
+        "time_budget_ms": problem.get("time_budget_ms"),
+        "cost_budget_minor_units": problem.get(
+            "cost_budget_minor_units"
+        ),
+        "representations": reps,
+    }
+    return _fingerprint(payload)
+
+
+def validate_problem_integrity(
+    problem: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Fail closed when a supposedly immutable optimization IR was mutated."""
+    if _text(problem.get("status")).upper() != "AVAILABLE":
+        return {
+            "schema_version": "empire.optimization.problem-integrity.v1",
+            "status": "UNAVAILABLE",
+            "reason": "optimization_problem_unavailable",
+            "integrity_valid": False,
+            "execution_authority": "none",
+        }
+
+    observed = _text(problem.get("problem_fingerprint"))
+    blockers: list[str] = []
+    if not observed:
+        blockers.append("problem_fingerprint_missing")
+
+    try:
+        expected = compute_problem_fingerprint(problem)
+    except (TypeError, ValueError) as exc:
+        return {
+            "schema_version": "empire.optimization.problem-integrity.v1",
+            "status": "UNAVAILABLE",
+            "reason": "problem_fingerprint_recompute_failed",
+            "detail": str(exc),
+            "integrity_valid": False,
+            "execution_authority": "none",
+        }
+
+    if observed and observed != expected:
+        blockers.append("problem_fingerprint_mismatch")
+
+    variables = [
+        row
+        for row in (problem.get("variables") or ())
+        if isinstance(row, Mapping)
+    ]
+    constraints = [
+        row
+        for row in (problem.get("constraints") or ())
+        if isinstance(row, Mapping)
+    ]
+    if problem.get("variable_count") != len(variables):
+        blockers.append("variable_count_mismatch")
+    if problem.get("constraint_count") != len(constraints):
+        blockers.append("constraint_count_mismatch")
+    if problem.get("execution_authority") != "none":
+        blockers.append("execution_authority_not_none")
+    if problem.get("actual_revenue") is not False:
+        blockers.append("actual_revenue_truth_boundary_invalid")
+    if problem.get("prediction_only") is not True:
+        blockers.append("prediction_only_boundary_invalid")
+    if problem.get("unknown_is_zero") is not False:
+        blockers.append("unknown_semantics_invalid")
+    if problem.get("queueable") is not True:
+        blockers.append("queueable_contract_invalid")
+
+    if blockers:
+        return {
+            "schema_version": "empire.optimization.problem-integrity.v1",
+            "status": "UNAVAILABLE",
+            "reason": "optimization_problem_integrity_failed",
+            "integrity_valid": False,
+            "observed_problem_fingerprint": observed or None,
+            "expected_problem_fingerprint": expected,
+            "blockers": sorted(set(blockers)),
+            "execution_authority": "none",
+        }
+
+    return {
+        "schema_version": "empire.optimization.problem-integrity.v1",
+        "status": "AVAILABLE",
+        "problem_fingerprint": expected,
+        "integrity_valid": True,
+        "execution_authority": "none",
+    }
+
+
 def compile_allocation_problem(
     problem: Mapping[str, Any],
     *,

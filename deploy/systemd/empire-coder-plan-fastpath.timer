@@ -1,0 +1,12 @@
+[Unit]
+Description=Drain EmpireOS deterministic PLAN fast-path every 15 seconds
+
+[Timer]
+OnActiveSec=5s
+OnUnitInactiveSec=15s
+AccuracySec=2s
+Persistent=true
+Unit=empire-coder-plan-fastpath.service
+
+[Install]
+WantedBy=timers.target

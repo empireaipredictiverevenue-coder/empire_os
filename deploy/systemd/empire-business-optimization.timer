@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EmpireOS business optimization cycle every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=20s
+Persistent=true
+Unit=empire-business-optimization.service
+
+[Install]
+WantedBy=timers.target

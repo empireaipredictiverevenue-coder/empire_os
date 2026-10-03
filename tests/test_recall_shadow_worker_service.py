@@ -76,6 +76,11 @@ def test_run_once_processes_verified_spool(monkeypatch, tmp_path):
     monkeypatch.setattr(worker, "OBSERVATION_ROOT", observation_root)
     monkeypatch.setattr(worker, "SESSION_ROOT", tmp_path / "sessions")
     monkeypatch.setattr(worker, "GUIDANCE_ROOT", tmp_path / "guidance")
+    monkeypatch.setattr(worker, "STATUS_SPOOL_ROOT", tmp_path / "status")
+    monkeypatch.setattr(worker, "LIFECYCLE_ROOT", tmp_path / "lifecycle")
+    monkeypatch.setattr(worker, "LIFECYCLE_LATEST_ROOT", tmp_path / "lifecycle_latest")
+    monkeypatch.setattr(worker, "RUNTIME_STATE_ROOT", tmp_path / "runtime_state")
+    monkeypatch.setattr(worker, "MEETING_STATE_ROOT", tmp_path / "meeting_state")
     monkeypatch.setattr(worker, "MAX_ITEMS", 10)
 
     result = worker.run_once()
@@ -147,6 +152,11 @@ def test_run_once_refreshes_private_guidance(monkeypatch, tmp_path):
     monkeypatch.setattr(worker, "OBSERVATION_ROOT", observation_root)
     monkeypatch.setattr(worker, "SESSION_ROOT", session_root)
     monkeypatch.setattr(worker, "GUIDANCE_ROOT", guidance_root)
+    monkeypatch.setattr(worker, "STATUS_SPOOL_ROOT", tmp_path / "status")
+    monkeypatch.setattr(worker, "LIFECYCLE_ROOT", tmp_path / "lifecycle")
+    monkeypatch.setattr(worker, "LIFECYCLE_LATEST_ROOT", tmp_path / "lifecycle_latest")
+    monkeypatch.setattr(worker, "RUNTIME_STATE_ROOT", tmp_path / "runtime_state")
+    monkeypatch.setattr(worker, "MEETING_STATE_ROOT", tmp_path / "meeting_state")
     monkeypatch.setattr(worker, "MAX_ITEMS", 10)
 
     result = worker.run_once()
@@ -159,3 +169,104 @@ def test_run_once_refreshes_private_guidance(monkeypatch, tmp_path):
     assert snapshot["private_to_owner"] is True
     assert snapshot["speech_execution"] is False
     assert snapshot["response_task"]["requires_human_approval"] is True
+    assert result["meeting_state_refreshed"] == 1
+    state = json.loads(
+        (tmp_path / "meeting_state" / "meeting-001.json").read_text()
+    )
+    assert state["latest_buyer_utterance"]["text"] == "Hello"
+    assert state["private_to_owner"] is True
+    assert state["speech_execution"] is False
+    assert state["execution_authority"] == "none"
+
+
+def make_lifecycle_envelope():
+    payload = {
+        "event": "bot.in_call_recording",
+        "data": {
+            "data": {
+                "code": "in_call_recording",
+                "sub_code": None,
+                "updated_at": "2026-10-02T18:00:00+00:00",
+            },
+            "bot": {
+                "id": "bot-123",
+                "metadata": {
+                    "empire_meeting_id": "meeting-001",
+                    "empire_avatar_id": "avatar-phil-v1",
+                    "empire_platform": "zoom",
+                    "empire_mode": "shadow",
+                    "execution_authority": "none",
+                },
+            },
+        },
+    }
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    key = b"0123456789abcdef0123456789abcdef"
+    secret = "whsec_" + base64.b64encode(key).decode("ascii")
+    webhook_id = "msg_lifecycle_worker"
+    timestamp = "1790964000"
+    signed = webhook_id.encode() + b"." + timestamp.encode() + b"." + raw
+    signature = base64.b64encode(
+        hmac.new(key, signed, hashlib.sha256).digest()
+    ).decode("ascii")
+    headers = {
+        "webhook-id": webhook_id,
+        "webhook-timestamp": timestamp,
+        "webhook-signature": f"v1,{signature}",
+    }
+    verification = verify_recall_request(
+        secret=secret,
+        headers=headers,
+        raw_payload=raw,
+    )
+    return VerifiedRecallEnvelope(
+        raw_payload=raw,
+        headers=headers,
+        verification=verification,
+        received_at="2026-10-02T18:00:00+00:00",
+    )
+
+
+def test_run_once_processes_lifecycle_spool(monkeypatch, tmp_path):
+    status_root = tmp_path / "status"
+    lifecycle_root = tmp_path / "lifecycle"
+    FileRecallVerifiedSpool(status_root).enqueue(make_lifecycle_envelope())
+
+    monkeypatch.setattr(worker, "SPOOL_ROOT", tmp_path / "spool")
+    monkeypatch.setattr(worker, "OBSERVATION_ROOT", tmp_path / "observations")
+    monkeypatch.setattr(worker, "SESSION_ROOT", tmp_path / "sessions")
+    monkeypatch.setattr(worker, "GUIDANCE_ROOT", tmp_path / "guidance")
+    monkeypatch.setattr(worker, "STATUS_SPOOL_ROOT", status_root)
+    monkeypatch.setattr(worker, "LIFECYCLE_ROOT", lifecycle_root)
+    monkeypatch.setattr(worker, "LIFECYCLE_LATEST_ROOT", tmp_path / "lifecycle_latest")
+    monkeypatch.setattr(worker, "RUNTIME_STATE_ROOT", tmp_path / "runtime_state")
+    monkeypatch.setattr(worker, "MEETING_STATE_ROOT", tmp_path / "meeting_state")
+    monkeypatch.setattr(worker, "MAX_ITEMS", 10)
+
+    result = worker.run_once()
+    assert result["processed"] == 0
+    assert result["lifecycle_processed"] == 1
+    assert result["lifecycle_failed"] == 0
+    assert result["polling_performed"] is False
+    files = list(lifecycle_root.glob("*.json"))
+    assert len(files) == 1
+    record = json.loads(files[0].read_text())
+    assert record["truth_class"] == "VERIFIED"
+    assert record["lifecycle"]["status_code"] == "in_call_recording"
+    assert record["lifecycle"]["recording_active"] is True
+    assert result["runtime_state_refreshed"] == 1
+    assert result["runtime_state_failed"] == 0
+    runtime_state = json.loads(
+        (tmp_path / "runtime_state" / "meeting-001.json").read_text()
+    )
+    assert runtime_state["status_code"] == "in_call_recording"
+    assert runtime_state["recording_active"] is True
+    assert runtime_state["speech_execution"] is False
+    assert runtime_state["execution_authority"] == "none"
+    assert result["meeting_state_refreshed"] == 1
+    state = json.loads(
+        (tmp_path / "meeting_state" / "meeting-001.json").read_text()
+    )
+    assert state["lifecycle_status"] == "in_call_recording"
+    assert state["recording_active"] is True
+    assert "private_guidance_not_available" in state["blockers"]

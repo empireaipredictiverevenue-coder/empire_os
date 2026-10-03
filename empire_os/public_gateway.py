@@ -8,6 +8,7 @@ and closer mutation endpoints.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -17,7 +18,9 @@ import uuid
 from pathlib import Path
 
 import httpx
-from fastapi import Body, FastAPI, Query, Request
+from fastapi import Body, FastAPI, Query, Request, WebSocket
+from websockets.asyncio.client import connect as presence_ws_connect
+from websockets.exceptions import ConnectionClosed
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -43,6 +46,22 @@ RESEND_INBOUND_URL = os.getenv(
 RECALL_REALTIME_URL = os.getenv(
     "EMPIRE_RECALL_REALTIME_URL",
     "http://127.0.0.1:8099/v1/providers/recall/realtime",
+).strip()
+RECALL_STATUS_URL = os.getenv(
+    "EMPIRE_RECALL_STATUS_URL",
+    "http://127.0.0.1:8099/v1/providers/recall/status",
+).strip()
+RECALL_LIFECYCLE_URL = os.getenv(
+    "EMPIRE_RECALL_LIFECYCLE_URL",
+    "http://127.0.0.1:8099/v1/providers/recall/lifecycle",
+).strip()
+PRESENCE_INTERNAL_URL = os.getenv(
+    "EMPIRE_AVATAR_PRESENCE_INTERNAL_URL",
+    "http://127.0.0.1:8100",
+).rstrip("/")
+PRESENCE_WS_URL = os.getenv(
+    "EMPIRE_AVATAR_PRESENCE_WS_URL",
+    "ws://127.0.0.1:8100/avatar/presence/ws",
 ).strip()
 CHECKOUT_INTERNAL_URL = os.getenv(
     "EMPIRE_CHECKOUT_INTERNAL_URL",
@@ -100,8 +119,22 @@ async def security_headers(request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = _site_csp(request.url.path)
+    if request.url.path.startswith("/avatar/presence"):
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self'; "
+            "connect-src 'self' wss://empire-ai.co.uk "
+            "wss://meeting-data.bot.recall.ai; "
+            "img-src 'self' data:; media-src 'self' blob:; "
+            "object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+        )
+    else:
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = _site_csp(
+            request.url.path
+        )
     return response
 
 
@@ -291,6 +324,92 @@ async def recall_realtime_proxy(request: Request):
     except httpx.HTTPError:
         return JSONResponse(
             {"ok": False, "error": "recall_realtime_unavailable"},
+            status_code=503,
+        )
+
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
+
+
+@app.post("/v1/providers/recall/status")
+async def recall_status_proxy(request: Request):
+    raw = await request.body()
+    if len(raw) > 512_000:
+        return JSONResponse({"ok": False}, status_code=413)
+
+    allowed_headers = {
+        "content-type",
+        "webhook-id",
+        "webhook-timestamp",
+        "webhook-signature",
+        "svix-id",
+        "svix-timestamp",
+        "svix-signature",
+    }
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() in allowed_headers
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                RECALL_STATUS_URL,
+                content=raw,
+                headers=headers,
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"ok": False, "error": "recall_status_unavailable"},
+            status_code=503,
+        )
+
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get(
+            "content-type",
+            "application/json",
+        ),
+    )
+
+
+@app.post("/v1/providers/recall/lifecycle")
+async def recall_lifecycle_proxy(request: Request):
+    raw = await request.body()
+    if len(raw) > 512_000:
+        return JSONResponse({"ok": False}, status_code=413)
+
+    allowed_headers = {
+        "content-type",
+        "webhook-id",
+        "webhook-timestamp",
+        "webhook-signature",
+        "svix-id",
+        "svix-timestamp",
+        "svix-signature",
+    }
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() in allowed_headers
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                RECALL_LIFECYCLE_URL,
+                content=raw,
+                headers=headers,
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"ok": False, "error": "recall_lifecycle_unavailable"},
             status_code=503,
         )
 
@@ -769,3 +888,172 @@ async def research_enquiry(request: Request):
 async def research_event(request: Request):
     from empire_os.owned_campaign_http import handle_intake
     return await handle_intake(request, 'event', origin=PUBLIC_BASE_URL)
+
+
+# NOTE: Presence routes are intentionally exact allowlisted paths. They proxy to
+# the loopback Digital Avatar Presence service and grant no execution authority.
+async def _avatar_presence_http_proxy(
+    request: Request,
+    *,
+    internal_path: str,
+) -> Response:
+    headers = {}
+    cookie = request.headers.get("cookie")
+    if cookie:
+        headers["cookie"] = cookie
+    accept = request.headers.get("accept")
+    if accept:
+        headers["accept"] = accept
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            upstream = await client.get(
+                f"{PRESENCE_INTERNAL_URL}{internal_path}",
+                params=list(request.query_params.multi_items()),
+                headers=headers,
+            )
+    except httpx.HTTPError:
+        return JSONResponse(
+            {"ok": False, "error": "avatar_presence_unavailable"},
+            status_code=503,
+        )
+
+    forwarded = {}
+    for name in (
+        "content-type",
+        "set-cookie",
+        "cache-control",
+        "pragma",
+        "referrer-policy",
+    ):
+        value = upstream.headers.get(name)
+        if value:
+            forwarded[name] = value
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        headers=forwarded,
+    )
+
+
+@app.get("/avatar/presence")
+async def avatar_presence_page_proxy(request: Request):
+    return await _avatar_presence_http_proxy(
+        request,
+        internal_path="/avatar/presence",
+    )
+
+
+@app.get("/avatar/presence/runtime.js")
+async def avatar_presence_runtime_js_proxy(request: Request):
+    return await _avatar_presence_http_proxy(
+        request,
+        internal_path="/avatar/presence/runtime.js",
+    )
+
+
+@app.get("/avatar/presence/runtime.css")
+async def avatar_presence_runtime_css_proxy(request: Request):
+    return await _avatar_presence_http_proxy(
+        request,
+        internal_path="/avatar/presence/runtime.css",
+    )
+
+
+@app.websocket("/avatar/presence/ws")
+async def avatar_presence_ws_proxy(websocket: WebSocket):
+    cookie = str(websocket.headers.get("cookie") or "").strip()
+    if not cookie or "empire_avatar_presence=" not in cookie:
+        await websocket.close(
+            code=4401,
+            reason="presence_cookie_required",
+        )
+        return
+
+    accepted = False
+    try:
+        async with presence_ws_connect(
+            PRESENCE_WS_URL,
+            additional_headers={"cookie": cookie},
+            proxy=None,
+            open_timeout=5.0,
+            close_timeout=2.0,
+            max_size=262_144,
+            max_queue=16,
+        ) as upstream:
+            await websocket.accept()
+            accepted = True
+
+            async def client_to_presence():
+                while True:
+                    message = await websocket.receive()
+                    message_type = message.get("type")
+                    if message_type == "websocket.disconnect":
+                        return
+                    text_value = message.get("text")
+                    if text_value is None:
+                        # Browser Presence protocol is JSON text only.
+                        await websocket.close(
+                            code=4400,
+                            reason="presence_text_frames_required",
+                        )
+                        return
+                    if len(text_value.encode("utf-8")) > 262_144:
+                        await websocket.close(
+                            code=4409,
+                            reason="presence_frame_too_large",
+                        )
+                        return
+                    await upstream.send(text_value)
+
+            async def presence_to_client():
+                try:
+                    async for message in upstream:
+                        if isinstance(message, bytes):
+                            # Loopback Presence protocol must remain JSON text.
+                            await websocket.close(
+                                code=1011,
+                                reason="presence_upstream_protocol_invalid",
+                            )
+                            return
+                        if len(message.encode("utf-8")) > 262_144:
+                            await websocket.close(
+                                code=1011,
+                                reason="presence_upstream_frame_too_large",
+                            )
+                            return
+                        await websocket.send_text(message)
+                except ConnectionClosed:
+                    return
+
+            client_task = asyncio.create_task(client_to_presence())
+            upstream_task = asyncio.create_task(presence_to_client())
+            done, pending = await asyncio.wait(
+                {client_task, upstream_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(
+                    *pending,
+                    return_exceptions=True,
+                )
+            for task in done:
+                exception = task.exception()
+                if exception is not None:
+                    raise exception
+    except Exception:
+        try:
+            await websocket.close(
+                code=1011,
+                reason="presence_upstream_unavailable",
+            )
+        except RuntimeError:
+            pass
+        return
+
+    if accepted:
+        try:
+            await websocket.close(code=1000)
+        except RuntimeError:
+            pass

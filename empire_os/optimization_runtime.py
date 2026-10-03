@@ -4,7 +4,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
-from empire_os.optimization_shards import solve_partitioned_cp_sat
+from empire_os.optimization_shards import (
+    solve_partitioned_empire_branch_bound,
+)
 from empire_os.optimization_benchmark_ledger import (
     build_solver_run_evidence,
     compare_solver_runs,
@@ -13,7 +15,10 @@ from empire_os.solver_adapters.exact_binary import (
     DEFAULT_MAX_VARIABLES,
     solve_exact_binary,
 )
-from empire_os.solver_adapters.ortools_cp_sat import solve_cp_sat
+from empire_os.solver_adapters.greedy_binary import solve_greedy_binary
+from empire_os.solver_adapters.empire_branch_bound import (
+    solve_empire_branch_bound,
+)
 
 
 SCHEMA_VERSION = "empire.optimization.runtime.v1"
@@ -61,7 +66,7 @@ def execute_primary_solver(
             problem,
             max_variables=exact_variable_limit,
         )
-    elif solver == "ortools_cp_sat":
+    elif solver == "empire_branch_bound":
         decomposition = fabric_plan.get("decomposition")
         decomposition = (
             decomposition
@@ -69,19 +74,17 @@ def execute_primary_solver(
             else {}
         )
         if decomposition.get("strategy") == "independent_shards":
-            result = solve_partitioned_cp_sat(
+            result = solve_partitioned_empire_branch_bound(
                 problem,
                 max_variables_per_shard=int(
                     fabric_plan.get("max_variables_per_shard") or 5000
                 ),
                 max_parallel_workers=max_workers,
-                cp_sat_workers_per_shard=1,
             )
         else:
-            result = solve_cp_sat(
-                problem,
-                max_workers=max_workers,
-            )
+            result = solve_empire_branch_bound(problem)
+    elif solver == "classical_greedy_reference":
+        result = solve_greedy_binary(problem)
     else:
         return {
             "schema_version": SCHEMA_VERSION,
@@ -112,7 +115,7 @@ def compare_cp_sat_with_exact_reference(
     cp_sat_max_workers: int = 1,
     observed_at: str | None = None,
 ) -> dict[str, Any]:
-    """Benchmark CP-SAT against the exact IR reference on the same small problem."""
+    """Market-reference benchmark: CP-SAT vs Empire exact on one problem."""
     if _status(fabric_plan) != "AVAILABLE":
         return {
             "schema_version": "empire.optimization.reference-comparison.v1",
@@ -133,6 +136,8 @@ def compare_cp_sat_with_exact_reference(
         problem,
         max_variables=exact_variable_limit,
     )
+    from empire_os.solver_adapters.ortools_cp_sat import solve_cp_sat
+
     cp_sat = solve_cp_sat(
         problem,
         max_workers=cp_sat_max_workers,
@@ -199,7 +204,7 @@ def compare_cp_sat_with_exact_reference(
 def compare_local_qubo_with_exact_reference(
     fabric_plan: Mapping[str, Any],
     *,
-    exact_variable_limit: int = 24,
+    exact_variable_limit: int = DEFAULT_MAX_VARIABLES,
     num_reads: int = 100,
     num_sweeps: int = 1000,
     seed: int = 1729,
@@ -207,8 +212,8 @@ def compare_local_qubo_with_exact_reference(
 ) -> dict[str, Any]:
     """Benchmark local quantum-inspired annealing against the exact reference."""
     from empire_os.optimization_qubo import build_safe_qubo
-    from empire_os.solver_adapters.dwave_local import (
-        solve_simulated_annealing,
+    from empire_os.solver_adapters.empire_annealing import (
+        solve_empire_annealing,
     )
 
     if _status(fabric_plan) != "AVAILABLE":
@@ -232,10 +237,10 @@ def compare_local_qubo_with_exact_reference(
         max_variables=exact_variable_limit,
     )
     qubo = build_safe_qubo(problem)
-    annealed = solve_simulated_annealing(
+    annealed = solve_empire_annealing(
         qubo,
         num_reads=num_reads,
-        num_sweeps=num_sweeps,
+        sweeps_per_read=num_sweeps,
         seed=seed,
     )
     if (
@@ -274,16 +279,16 @@ def compare_local_qubo_with_exact_reference(
     )
     candidate_run = build_solver_run_evidence(
         problem=problem,
-        solver="dwave_local_simulated_annealing",
-        solver_family="quantum_inspired_simulated_annealing",
+        solver="empire_annealing",
+        solver_family="empire_quantum_inspired_annealing",
         hardware_class="cpu",
         objective_value=annealed["objective_value"],
         constraints_satisfied=annealed["constraints_satisfied"],
         wall_clock_ms=annealed["wall_clock_ms"],
         compute_cost_minor_units=None,
-        provider="dwave_open_source_local",
+        provider="empire_os",
         observed_at=timestamp,
-        run_ref="runtime:dwave_local_simulated_annealing",
+        run_ref="runtime:empire_annealing",
         external=False,
     )
     comparison = compare_solver_runs(

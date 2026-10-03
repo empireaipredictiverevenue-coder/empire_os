@@ -39,6 +39,68 @@ SecretProvider = Callable[[], str]
 VerifiedEnvelopeSink = Callable[[VerifiedRecallEnvelope], Any]
 
 
+async def _accept_verified_request(
+    *,
+    request: Request,
+    secret_provider: SecretProvider,
+    verified_envelope_sink: VerifiedEnvelopeSink,
+    queue_error_detail: str,
+) -> dict[str, Any]:
+    try:
+        secret = str(secret_provider() or "").strip()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="recall_verification_secret_unavailable",
+        ) from exc
+    if not secret:
+        raise HTTPException(
+            status_code=503,
+            detail="recall_verification_secret_unavailable",
+        )
+
+    raw_payload = await request.body()
+    headers = {
+        str(key).lower(): str(value)
+        for key, value in request.headers.items()
+    }
+    try:
+        verification = verify_recall_request(
+            secret=secret,
+            headers=headers,
+            raw_payload=raw_payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="recall_webhook_verification_failed",
+        ) from exc
+
+    received_at = datetime.fromtimestamp(
+        int(verification.webhook_timestamp),
+        tz=timezone.utc,
+    ).isoformat()
+    envelope = VerifiedRecallEnvelope(
+        raw_payload=raw_payload,
+        headers=headers,
+        verification=verification,
+        received_at=received_at,
+    )
+    try:
+        verified_envelope_sink(envelope)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=queue_error_detail,
+        ) from exc
+    return {
+        "accepted": True,
+        "verified": True,
+        "processed_inline": False,
+        "execution_authority": "none",
+    }
+
+
 def create_recall_webhook_router(
     *,
     secret_provider: SecretProvider,
@@ -51,60 +113,34 @@ def create_recall_webhook_router(
 
     @router.post("/realtime")
     async def realtime(request: Request):
-        try:
-            secret = str(secret_provider() or "").strip()
-        except Exception as exc:
-            raise HTTPException(
-                status_code=503,
-                detail="recall_verification_secret_unavailable",
-            ) from exc
-        if not secret:
-            raise HTTPException(
-                status_code=503,
-                detail="recall_verification_secret_unavailable",
-            )
-
-        raw_payload = await request.body()
-        headers = {
-            str(key).lower(): str(value)
-            for key, value in request.headers.items()
-        }
-        try:
-            verification = verify_recall_request(
-                secret=secret,
-                headers=headers,
-                raw_payload=raw_payload,
-            )
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=401,
-                detail="recall_webhook_verification_failed",
-            ) from exc
-
-
-        received_at = datetime.fromtimestamp(
-            int(verification.webhook_timestamp),
-            tz=timezone.utc,
-        ).isoformat()
-        envelope = VerifiedRecallEnvelope(
-            raw_payload=raw_payload,
-            headers=headers,
-            verification=verification,
-            received_at=received_at,
+        return await _accept_verified_request(
+            request=request,
+            secret_provider=secret_provider,
+            verified_envelope_sink=verified_envelope_sink,
+            queue_error_detail="recall_verified_event_queue_unavailable",
         )
-        try:
-            verified_envelope_sink(envelope)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=503,
-                detail="recall_verified_event_queue_unavailable",
-            ) from exc
 
-        return {
-            "accepted": True,
-            "verified": True,
-            "processed_inline": False,
-            "execution_authority": "none",
-        }
+    return router
+
+
+def create_recall_lifecycle_webhook_router(
+    *,
+    secret_provider: SecretProvider,
+    verified_envelope_sink: VerifiedEnvelopeSink,
+) -> APIRouter:
+    router = APIRouter(
+        prefix="/v1/providers/recall",
+        tags=["recall-lifecycle-webhook"],
+    )
+
+    @router.post("/lifecycle")
+    @router.post("/status", include_in_schema=False)
+    async def lifecycle(request: Request):
+        return await _accept_verified_request(
+            request=request,
+            secret_provider=secret_provider,
+            verified_envelope_sink=verified_envelope_sink,
+            queue_error_detail="recall_lifecycle_queue_unavailable",
+        )
 
     return router

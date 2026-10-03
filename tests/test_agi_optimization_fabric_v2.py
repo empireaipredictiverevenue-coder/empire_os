@@ -34,8 +34,8 @@ def test_agi_detects_missing_solver_lane_for_v2_optimization_fabric():
             {
                 "action_key": "retain",
                 "scenario_values_cents": {
-                    "base": 7000,
-                    "downside": 6500,
+                    "base": -1000,
+                    "downside": -2000,
                 },
                 "action_cost_cents": 500,
                 "evidence_refs": ["action:retain"],
@@ -110,7 +110,7 @@ def test_agi_detects_missing_solver_lane_for_v2_optimization_fabric():
     assert review["optimization_fabric_v2"] is True
     assert review["solver_execution_ready"] is False
     assert review["solver_routing_reason"] == (
-        "no_implemented_solver_for_workload"
+        "no_empire_owned_solver_for_workload"
     )
     assert packet["recommended_cognitive_workstream"]["workstream"] == (
         "establish_compatible_solver_lane"

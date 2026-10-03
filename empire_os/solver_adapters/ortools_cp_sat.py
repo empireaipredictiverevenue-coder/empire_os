@@ -13,6 +13,8 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Mapping
 import time
 
+from empire_os.optimization_problem_factory import validate_problem_integrity
+
 
 SCHEMA_VERSION = "empire.solver_adapter.ortools_cp_sat.v1"
 MAX_DECIMAL_PLACES = 8
@@ -139,6 +141,16 @@ def solve_cp_sat(
             "reason": "optimization_problem_unavailable",
             "execution_authority": "none",
         }
+    integrity = validate_problem_integrity(problem)
+    if str(integrity.get("status") or "").upper() != "AVAILABLE":
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "UNAVAILABLE",
+            "reason": "optimization_problem_integrity_failed",
+            "integrity": integrity,
+            "execution_authority": "none",
+        }
+
     if _text(problem.get("variable_type")).upper() != "BINARY":
         return {
             "schema_version": SCHEMA_VERSION,

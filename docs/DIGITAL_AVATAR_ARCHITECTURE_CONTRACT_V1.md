@@ -139,3 +139,203 @@ Prepared modules:
 The webhook router is intentionally not mounted or activated in production yet.
 Secret provisioning, public route activation and service restart remain explicit
 production gates.
+
+
+## End-to-end SHADOW pre-production proof — 2026-10-02
+
+Verified in one integrated test:
+1. prepare a meeting-bound SHADOW activation packet;
+2. include canonical Empire meeting/avatar/platform metadata in the Recall bot plan;
+3. verify a signed raw Recall webhook before parsing;
+4. enqueue only verified payloads into a private atomic spool;
+5. asynchronously normalize the event into OBSERVED meeting evidence;
+6. apply only explicit participant-role bindings;
+7. refresh Predictive Revenue meeting guidance;
+8. produce a private response task requiring human approval.
+
+The integrated path performs no speech, chat send, commercial action, payment,
+canonical revenue write or live Recall API call.
+
+Current production activation blockers observed on the server:
+- RECALL_REGION missing;
+- RECALL_API_KEY missing;
+- RECALL_WORKSPACE_VERIFICATION_SECRET missing;
+- public gateway Recall route not loaded in the running gateway process;
+- Recall webhook unit not installed in /etc/systemd/system;
+- Recall SHADOW worker unit not installed in /etc/systemd/system.
+
+The Cloudflare/public tunnel itself is present. Privileged systemd installation
+and restart operations are staged but were not executed by the remote relay.
+
+## SHADOW activation ledger and deduplication — 2026-10-02
+
+Approved meeting preparation is now split from provider execution.
+
+- `shadow-activation/preview` remains read-only.
+- `shadow-activation/materialize` may persist only the private session manifest
+  and a tamper-evident activation record.
+- The activation fingerprint covers the full Empire meeting manifest, Recall
+  Create Bot body and time-bounded owner approval.
+- A conflicting plan under the same meeting ID fails closed and cannot overwrite
+  the previously materialized session.
+- Provider API credentials are never stored in the activation record.
+- Live Create Bot execution is not exposed through the Founder API.
+
+Provider execution uses a two-phase local ledger:
+`prepared -> in_flight -> completed`.
+If the provider outcome is ambiguous, state becomes `reconciliation_required`
+and automatic re-execution is blocked.
+
+Recall direct Create Bot does not provide automatic bot deduplication, so Empire
+uses its own meeting-bound activation record and bot metadata mapping. Ambiguous
+outcomes can be reconciled using Recall List Bots filtered by
+`empire_meeting_id` and `empire_avatar_id`:
+- exactly one bot -> `completed_reconciled`;
+- zero bots -> `reconciliation_no_bot_found`;
+- multiple bots -> `reconciliation_conflict`.
+
+No reconciliation path automatically creates another bot.
+
+## Architecture delta — Grounded Copilot + governed Presence — 2026-10-02
+
+Change class: Architecture delta within the existing Digital Avatar domain.
+Canonical business database: EmpireDB PostgreSQL. Supabase is not used as
+Digital Avatar commercial truth.
+
+### End-to-end diagram
+
+```text
+SIGNED MEETING PROVIDER EVENTS
+  -> VERIFY RAW WEBHOOK
+  -> PRIVATE VERIFIED SPOOL
+  -> MEETING OBSERVATION / LIFECYCLE
+  -> PRIVATE MEETING STATE
+  -> PREDICTIVE REVENUE / NEXT-BEST ACTION
+  -> RESPONSE TASK
+  -> BUYER-SAFE EVIDENCE RESOLUTION
+  -> GROUNDED PRIVATE DRAFT
+  -> HUMAN REVIEW / APPROVAL
+  -> VOICE RENDER
+  -> ONE-TURN SPEECH TICKET
+  -> PRESENCE OUTPUT MEDIA
+  -> PLAYBACK ACK / FINALIZE
+  -> OUTCOME EVIDENCE / CORTEX
+```
+
+### Canonical truth boundaries
+
+Meeting speech and bot lifecycle are OBSERVED only after provider signature
+verification. Signed Recall bot metadata binds provider events to the Empire
+meeting/avatar/session and must remain SHADOW/zero-authority for shadow ingress.
+
+Business knowledge supplied to a response model is resolved, not prompted from
+memory. Production-safe evidence classes are:
+- signed meeting observations;
+- verified commercial price evidence from EmpireDB;
+- verified public commercial-product projection from EmpireDB;
+- approved buyer-facing commercial terms from EmpireDB;
+- specific canonical commercial outcomes with provenance.
+
+Internal acquisition cost, fulfilment cost, expected margin and other internal
+economics are never part of buyer-facing Avatar evidence packs.
+
+### Response and inference contract
+
+Realtime ingestion remains deterministic and model-free. Private drafting is a
+separate asynchronous lane so meeting event acknowledgement is never coupled to
+LLM latency or availability.
+
+A response task contains only approved evidence refs. The production evidence
+resolver must resolve every required ref before model drafting. Missing or
+invalid evidence produces `blocked_evidence` and zero model calls.
+
+Generated drafts are validated after inference. Model citations outside the
+approved evidence set fail closed. A valid draft remains private to the owner,
+requires human approval, performs no transmission and grants no speech or
+commercial authority.
+
+Unchanged task + evidence content is content-addressed and deduplicated to avoid
+repeated inference spend.
+
+### Presence and one-turn speech authority
+
+Recall Output Media is the transport for future meeting audio/video Presence.
+The Presence webpage is not an authority source and cannot request or mint a
+speech turn.
+
+Speech authority is granted only by a short-lived, meeting/avatar/bot-bound,
+text/audio-bound one-turn ticket created after explicit owner approval.
+The ticket binds exact PCM SHA-256, byte length and sample rate. It is claimed
+before audio delivery and cannot be reused.
+
+Presence may receive server-pushed PCM only for an already-claimed in-flight
+ticket. Browser completion acknowledgement must bind the same ticket and audio
+hash. Completed delivery finalizes the ticket; ambiguous delivery becomes
+`reconciliation_required` and never returns to reusable state.
+
+A speech ticket grants `approved_turn_audio_only`. It grants no negotiation,
+commercial terms, payment, outbound, database-write or revenue authority.
+
+### Execution ownership / worker leases
+
+Canonical owners for this delta:
+- Recall ingress/lifecycle: `recall_webhook_*`, `recall_*ingest_worker.py`;
+- meeting read state: `recall_meeting_*state.py`;
+- grounded evidence: `digital_avatar_*evidence*.py`;
+- private drafting: `digital_avatar_private_draft_*.py`;
+- owner read surfaces: `digital_avatar_runtime_read.py`, `digital_avatar_api.py`;
+- voice/render identity: `digital_avatar_voice_*.py`, visual profile modules;
+- speech authority: `digital_avatar_speech*.py`;
+- Presence transport: `digital_avatar_presence_*.py` and Recall Output Media
+  adapters.
+
+No second implementation may own these same responsibilities. Concurrent agent
+work must extend the canonical owner or stop and reconcile before mutation.
+
+### Failure / recovery behavior
+
+Provider-signature failure: reject before parsing.
+Queue/spool unavailable: return retryable failure; do not process inline.
+Model unavailable: preserve observations/guidance; no draft is fabricated.
+Evidence unresolved: block drafting; do not weaken evidence requirements.
+Presence disconnected/ambiguous: do not transmit audio.
+Playback timeout/failure: mark transmission reconciliation-required.
+Lifecycle events arriving out of order: preserve monotonic newest state.
+Ambiguous Create Bot result: reconcile by canonical signed metadata; never
+blindly create another bot.
+
+SHADOW remains the universal fail-safe mode. Loss of any external dependency
+must not grant broader authority or create alternate truth paths.
+
+### Promotion gates
+
+Current permitted build state remains pre-production / OBSERVE unless separately
+approved. Promotion is sequential:
+1. SHADOW ingress and Founder state verified live;
+2. private grounded Copilot draft verified live with no transmission;
+3. one controlled owner-approved speech turn with disclosed AI identity;
+4. repeated bounded Copilot speech shadow period with latency/error evidence;
+5. REPRESENT only after a separate founder authority decision;
+6. NEGOTIATE/CLOSE only after separate delegated commercial-authority approval.
+
+Live Recall credentials, service installation/restart, meeting join and speech
+remain explicit production gates. Binding terms, payment/funds movement and
+revenue recognition remain outside speech authority.
+
+### Definition of DONE for this delta
+
+DONE requires architecture + scoped code + focused/adjacent/negative tests +
+compile/static checks + clean diff checks + live runtime verification + Founder
+read surface verification. A prepared systemd unit, passing test or local
+rehearsal is not production completion.
+
+Required production evidence before calling Copilot speech live:
+- deployed intended HEAD;
+- signed provider webhook observed;
+- correct meeting/avatar/bot binding;
+- private state visible through Founder surface;
+- grounded draft cites canonical evidence only;
+- explicit owner approval evidence;
+- one-turn ticket consumed exactly once;
+- Presence playback acknowledgement or reconciliation state;
+- zero commercial/payment/revenue authority throughout.

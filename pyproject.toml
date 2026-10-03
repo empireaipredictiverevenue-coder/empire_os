@@ -47,10 +47,8 @@ observability = [
     "opentelemetry-sdk==1.44.0",
     "opentelemetry-exporter-otlp-proto-http==1.44.0",
 ]
-optimization = [
+market-benchmarks = [
     "ortools>=9.15,<10",
-]
-quantum-inspired = [
     "dimod>=0.12.21,<0.13",
     "dwave-samplers>=1.7,<2",
 ]

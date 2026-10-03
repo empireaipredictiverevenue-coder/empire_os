@@ -6,6 +6,10 @@ from empire_os.digital_avatar import (
     AvatarMeetingSession,
     DigitalAvatarIdentity,
 )
+from empire_os.digital_avatar_authority import (
+    AvatarCloseProposal,
+    AvatarCommercialAuthorityPolicy,
+)
 from empire_os.meeting_gateway import MeetingSpeakerRole
 from empire_os.recall_shadow_session import (
     RecallShadowSessionManifest,
@@ -100,3 +104,56 @@ def test_manifest_requires_recording_consent():
     object.__setattr__(bad, "recording_consent_evidence_ref", "")
     with pytest.raises(ValueError, match="recording consent evidence"):
         bad.validate()
+
+
+def test_manifest_round_trips_delegated_commercial_envelope(tmp_path):
+    value = manifest()
+    policy = AvatarCommercialAuthorityPolicy(
+        allowed_product_codes=("PREDICTIVE-REVENUE-PILOT",),
+        approved_terms_refs=("terms:pilot:v1",),
+        allowed_currencies=("USD",),
+        max_discount_bps=1000,
+        max_contract_months=3,
+    )
+    proposal = AvatarCloseProposal(
+        product_code="PREDICTIVE-REVENUE-PILOT",
+        list_price_cents=500000,
+        proposed_price_cents=475000,
+        currency="USD",
+        contract_months=1,
+        terms_ref="terms:pilot:v1",
+        evidence_refs=(
+            "commercial_product_code:PREDICTIVE-REVENUE-PILOT",
+            "commercial_evidence:11111111-1111-4111-8111-111111111111",
+        ),
+    )
+    object.__setattr__(value, "commercial_policy", policy)
+    object.__setattr__(value, "close_proposal", proposal)
+
+    path = save_recall_shadow_session(
+        root=tmp_path / "sessions",
+        manifest=value,
+    )
+    loaded = load_recall_shadow_session(path)
+    assert loaded.commercial_policy.max_discount_bps == 1000
+    assert loaded.close_proposal.proposed_price_cents == 475000
+    assert loaded.close_proposal.terms_ref == "terms:pilot:v1"
+    raw = json.loads(path.read_text())
+    assert raw["commercial_policy"]["max_contract_months"] == 3
+    assert raw["close_proposal"]["evidence_refs"][0].startswith(
+        "commercial_product_code:"
+    )
+
+
+def test_manifest_rejects_unpaired_commercial_envelope():
+    value = manifest()
+    object.__setattr__(
+        value,
+        "commercial_policy",
+        AvatarCommercialAuthorityPolicy(
+            allowed_product_codes=("PREDICTIVE-REVENUE-PILOT",),
+            approved_terms_refs=("terms:pilot:v1",),
+        ),
+    )
+    with pytest.raises(ValueError, match="must be paired"):
+        value.validate()

@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from empire_os.digital_avatar_meeting_memory import build_avatar_meeting_memory
+from empire_os.digital_avatar_meeting_specialist_bridge import (
+    AvatarMeetingAdvisoryPacket,
+)
 from empire_os.digital_avatar_response_task import (
     AvatarRealtimeResponseTask,
     build_realtime_response_task,
@@ -15,6 +18,9 @@ from empire_os.digital_avatar_response_task import (
 from empire_os.digital_avatar_shadow import (
     AvatarShadowGuidance,
     build_shadow_guidance,
+)
+from empire_os.digital_avatar_specialist_response_context import (
+    attach_specialist_context_to_response_task,
 )
 from empire_os.meeting_gateway import (
     MeetingObservation,
@@ -93,6 +99,7 @@ def build_recall_shadow_guidance_snapshot(
     *,
     manifest: RecallShadowSessionManifest,
     observations: Iterable[MeetingObservation],
+    specialist_packet: AvatarMeetingAdvisoryPacket | None = None,
 ) -> RecallShadowGuidanceSnapshot:
     manifest.validate()
     bound = apply_manifest_roles(
@@ -125,6 +132,11 @@ def build_recall_shadow_guidance_snapshot(
             memory=memory,
             strategy=guidance.strategy,
         )
+        if specialist_packet is not None:
+            response_task = attach_specialist_context_to_response_task(
+                task=response_task,
+                packet=specialist_packet,
+            )
 
     return RecallShadowGuidanceSnapshot(
         meeting_id=manifest.session.meeting_id,
@@ -140,6 +152,7 @@ def refresh_recall_shadow_guidance(
     session_path: str | Path,
     observation_root: str | Path,
     output_path: str | Path,
+    specialist_packet: AvatarMeetingAdvisoryPacket | None = None,
 ) -> RecallShadowGuidanceSnapshot:
     manifest = load_recall_shadow_session(session_path)
     observations = []
@@ -154,6 +167,7 @@ def refresh_recall_shadow_guidance(
     snapshot = build_recall_shadow_guidance_snapshot(
         manifest=manifest,
         observations=observations,
+        specialist_packet=specialist_packet,
     )
     target = Path(output_path)
     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)

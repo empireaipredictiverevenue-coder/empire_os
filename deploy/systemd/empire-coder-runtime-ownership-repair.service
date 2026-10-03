@@ -1,0 +1,19 @@
+[Unit]
+Description=Repair active Empire Coder runtime ownership anomalies
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/repair_coder_runtime_ownership.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime/coder
+RestrictSUIDSGID=true
+LockPersonality=true
+IPAddressDeny=any
+TimeoutStartSec=30

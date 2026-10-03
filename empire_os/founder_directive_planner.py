@@ -1,6 +1,7 @@
 """Automatic planning coordinator for captured Founder Directives."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -43,6 +44,8 @@ def plan_captured_directives(
     # Reconcile previously queued plans first.
     reconciled = 0
     failures = 0
+    failed_this_cycle: set[str] = set()
+    now = datetime.now(timezone.utc)
     for row in store.list(statuses={"planning"}):
         if not row.coder_job_id:
             continue
@@ -63,17 +66,58 @@ def plan_captured_directives(
             )
             reconciled += 1
         elif job.status is JobStatus.FAILED:
+            prior = (
+                row.plan_result
+                if isinstance(row.plan_result, dict)
+                else {}
+            )
+            retry_count = int(prior.get("retry_count") or 0) + 1
+            retry_after = (
+                now + timedelta(minutes=min(60, 10 * retry_count))
+            ).isoformat()
             store.update(
                 row.id,
                 status="plan_failed",
                 plan_result={
-                    "error": str(job.error or "plan_failed")[:2000]
+                    "error": str(job.error or "plan_failed")[:2000],
+                    "retry_count": retry_count,
+                    "failed_at": now.isoformat(),
+                    "retry_after": retry_after,
+                    "max_retries": 3,
                 },
             )
+            failed_this_cycle.add(row.id)
             failures += 1
 
     queued = 0
-    for row in store.list(statuses={"captured", "plan_failed"})[:max(1, min(int(limit), 20))]:
+    candidates = store.list(statuses={"captured", "plan_failed"})
+    eligible = []
+    for row in candidates:
+        if row.id in failed_this_cycle:
+            continue
+        if row.status == "plan_failed":
+            prior = (
+                row.plan_result
+                if isinstance(row.plan_result, dict)
+                else {}
+            )
+            if int(prior.get("retry_count") or 0) >= 3:
+                continue
+            retry_after_text = str(prior.get("retry_after") or "").strip()
+            if retry_after_text:
+                try:
+                    retry_after = datetime.fromisoformat(
+                        retry_after_text.replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    retry_after = now
+                if retry_after.tzinfo is None:
+                    retry_after = retry_after.replace(tzinfo=timezone.utc)
+                if retry_after > now:
+                    continue
+        eligible.append(row)
+
+    for row in eligible[:max(1, min(int(limit), 20))]:
         task = coder.create_task(
             _plan_objective(
                 row.text,
@@ -114,6 +158,11 @@ def plan_captured_directives(
         "queued": queued,
         "reconciled": reconciled,
         "plan_failures": failures,
+        "retry_policy": {
+            "max_retries": 3,
+            "base_cooldown_minutes": 10,
+            "immediate_same_cycle_retry": False,
+        },
         "directive_count": snapshot["directive_count"],
         "status_counts": snapshot["status_counts"],
         "founder_gate_count": snapshot["founder_gate_count"],
