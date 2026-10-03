@@ -313,3 +313,54 @@ def test_ringleader_preemptively_throttles_worsening_reputation_forecast():
         task["reason"] == "forecast_threshold_breach_risk"
         for task in result["tasks"]
     )
+
+
+def test_ringleader_holds_unconsented_consumer_mailbox_prospecting():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "recipient_domain_policy": {
+            "recipient_domain": "gmail.com",
+            "traffic_class": "prospecting",
+            "consented": False,
+            "existing_relationship": False,
+            "person_company_bound": True,
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "recipient_domain_policy_hold" in result["hard_holds"]
+
+
+def test_ringleader_limits_yahoo_destination_on_transient_deferral():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "destination_reputation": {
+            "mx_family": "YAHOO",
+            "yahoo_delivery": {
+                "smtp_code": 421,
+                "response": "421 temporary deferral",
+            },
+            "seed_placement": {"inbox_placement_rate": 0.97},
+        },
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["destination_reputation"]["posture"] == "LIMIT_DESTINATION"
