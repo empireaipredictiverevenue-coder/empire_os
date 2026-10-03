@@ -18,6 +18,7 @@ from empire_os.outbound_sender_affinity import resolve_sender_affinity
 from empire_os.outbound_reputation_slo import evaluate_reputation_slo
 from empire_os.outbound_domain_continuity import evaluate_domain_continuity
 from empire_os.outbound_health_forecast import forecast_reputation_health
+from empire_os.outbound_destination_reputation import evaluate_destination_reputation
 
 
 @dataclass(frozen=True)
@@ -234,6 +235,27 @@ def evaluate_ringleader(
                 )
             )
 
+    destination_reputation = None
+    destination_context = context.get("destination_reputation")
+    if isinstance(destination_context, Mapping):
+        destination_reputation = evaluate_destination_reputation(destination_context)
+        if destination_reputation["posture"] == "HOLD_DESTINATION":
+            tasks.append(
+                _task(
+                    "THROTTLE_MX",
+                    "destination_reputation_hold",
+                    "mx_pacing_controller",
+                )
+            )
+        elif destination_reputation["posture"] == "LIMIT_DESTINATION":
+            tasks.append(
+                _task(
+                    "THROTTLE_MX",
+                    "destination_reputation_limited",
+                    "mx_pacing_controller",
+                )
+            )
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -291,5 +313,6 @@ def evaluate_ringleader(
         "reputation_slo": reputation_slo,
         "domain_continuity": domain_continuity,
         "health_forecast": health_forecast,
+        "destination_reputation": destination_reputation,
         "mutation_authorized": False,
     }
