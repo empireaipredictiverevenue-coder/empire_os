@@ -30,6 +30,7 @@ from empire_os.outbound_contact_evidence_freshness import (
     evaluate_contact_evidence_freshness,
 )
 from empire_os.outbound_domain_brand_safety import evaluate_domain_brand_safety
+from empire_os.outbound_account_saturation import evaluate_account_saturation
 from empire_os.outbound_evidence_fusion import fuse_evidence
 from empire_os.outbound_open_source_health import evaluate_open_source_evidence
 
@@ -53,6 +54,7 @@ _PRIORITY = {
     "RUN_CANARY": 75,
     "MEASURE_PLACEMENT": 70,
     "THROTTLE_MX": 65,
+    "THROTTLE_CORRIDOR": 64,
     "THROTTLE": 60,
     "REDUCE_CONCENTRATION": 55,
     "OBSERVE": 10,
@@ -233,6 +235,46 @@ def evaluate_ringleader(
                 "candidate_causes": ranked["candidates"],
             }
             remediation = plan_remediation(ranked["candidates"])
+
+    account_saturation = None
+    account_saturation_context = context.get("account_saturation")
+    if (
+        evaluation_scope == "SEND"
+        and isinstance(account_saturation_context, Mapping)
+    ):
+        saturation_candidate = dict(
+            account_saturation_context.get("candidate") or {}
+        )
+        saturation_history = account_saturation_context.get("history") or []
+        account_saturation = evaluate_account_saturation(
+            saturation_candidate,
+            saturation_history,
+        )
+        if account_saturation["decision"] == "HOLD_NEW_OUTREACH":
+            hard_holds.append("account_saturation_hold")
+            tasks.append(
+                _task(
+                    "STOP_SEND",
+                    account_saturation["reason"],
+                    "account_pressure_guard",
+                )
+            )
+        elif account_saturation["decision"] == "THROTTLE_CORRIDOR":
+            tasks.append(
+                _task(
+                    "THROTTLE_CORRIDOR",
+                    account_saturation["reason"],
+                    "corridor_pacing_controller",
+                )
+            )
+        elif account_saturation["decision"] == "ESCALATE":
+            tasks.append(
+                _task(
+                    "VERIFY_RECIPIENTS",
+                    account_saturation["reason"],
+                    "recipient_verifier",
+                )
+            )
 
     contact_pressure = None
     pressure_context = context.get("contact_pressure")
@@ -676,6 +718,7 @@ def evaluate_ringleader(
             "RUN_CANARY",
             "MEASURE_PLACEMENT",
             "THROTTLE_MX",
+            "THROTTLE_CORRIDOR",
             "THROTTLE",
             "REDUCE_CONCENTRATION",
             "BLOCK_SCALE",
@@ -700,6 +743,7 @@ def evaluate_ringleader(
         "reputation_escrow": reputation_escrow,
         "root_cause": root_cause,
         "remediation": remediation,
+        "account_saturation": account_saturation,
         "contact_pressure": contact_pressure,
         "sender_affinity": sender_affinity,
         "reputation_slo": reputation_slo,
