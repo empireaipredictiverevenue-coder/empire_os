@@ -26,7 +26,8 @@ Before any activation:
 4. Verify the canonical backend is EmpireDB/PostgreSQL.
 5. Run `empire_os.outbound_empiredb_activation_probe` read-only against live EmpireDB.
 6. Verify targeted outbound CI is green.
-7. Verify the Outbound Governor remains the only live-send eligibility authority.
+7. Copy the successful workflow's `outbound_release_attestation.json` artifact to the runtime path and verify its SHA exactly matches deployed `git HEAD`; stale, absent or mismatched attestations block readiness.
+8. Verify the Outbound Governor remains the only live-send eligibility authority.
 
 Never infer production schema state from GitHub alone.
 
@@ -125,6 +126,14 @@ After schema/roles are explicitly activated, bind dedicated DSNs:
 `EMPIRE_OUTBOUND_DELIVERABILITY_WRITER_DSN=<dedicated append-only writer>`
 
 Never reuse broad application/migrator credentials for the observer runtime.
+
+CI release evidence:
+
+`EMPIRE_OUTBOUND_RELEASE_ATTESTATION_PATH=/srv/empire_os/runtime/outbound/outbound_release_attestation.json`
+
+`EMPIRE_OUTBOUND_RELEASE_ATTESTATION_MAX_AGE_HOURS=168`
+
+The read-only production verifier requires that attestation to be CURRENT and bound to the exact deployed SHA.
 
 ## Gate 4 — telemetry policy and provider-event visibility
 
