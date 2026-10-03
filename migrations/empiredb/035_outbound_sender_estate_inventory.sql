@@ -144,14 +144,23 @@ CREATE TABLE IF NOT EXISTS public.outbound_capacity_ledger (
     domain TEXT NOT NULL,
     transport_key TEXT,
     recipient_mx TEXT,
-    capacity_limit INTEGER NOT NULL CHECK (capacity_limit >= 0),
-    reserved INTEGER NOT NULL DEFAULT 0 CHECK (reserved >= 0),
-    consumed INTEGER NOT NULL DEFAULT 0 CHECK (consumed >= 0),
-    released INTEGER NOT NULL DEFAULT 0 CHECK (released >= 0),
+    event_type TEXT NOT NULL CHECK (
+        event_type IN (
+            'SET_LIMIT','RESERVE','CONSUME','RELEASE','RESET'
+        )
+    ),
+    units INTEGER NOT NULL DEFAULT 0 CHECK (units >= 0),
+    capacity_limit INTEGER CHECK (
+        capacity_limit IS NULL OR capacity_limit >= 0
+    ),
     reason TEXT NOT NULL,
     evidence JSONB NOT NULL DEFAULT '{}'::jsonb,
     recorded_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    CHECK (reserved + consumed >= released)
+    CHECK (
+        (event_type = 'SET_LIMIT' AND capacity_limit IS NOT NULL)
+        OR
+        (event_type <> 'SET_LIMIT' AND capacity_limit IS NULL)
+    )
 );
 
 CREATE INDEX IF NOT EXISTS idx_outbound_capacity_mailbox_day
@@ -189,7 +198,7 @@ COMMENT ON TABLE public.outbound_sender_pools IS
 COMMENT ON TABLE public.outbound_pool_members IS
     'Explicit membership of domains, mailboxes, transports, MX families or seeds in stable pools.';
 COMMENT ON TABLE public.outbound_capacity_ledger IS
-    'Append-only capacity accounting evidence; does not itself authorize sends.';
+    'Append-only SET_LIMIT/RESERVE/CONSUME/RELEASE/RESET capacity events; replayable and non-authorizing.';
 COMMENT ON TABLE public.outbound_seed_mailboxes IS
     'Empire-controlled placement-test mailbox identities; never synthetic engagement actors.';
 
