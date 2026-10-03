@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 
-PATH = Path("migrations/empiredb/036_outbound_capacity_reservation_leases.sql")
+PATH = Path("migrations/empiredb/038_outbound_capacity_reservation_leases.sql")
 
 
 def test_capacity_reservation_migration_is_staged_and_non_authorizing():
