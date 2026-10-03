@@ -48,6 +48,9 @@ def evaluate_preflight(
     reader_dsn = str(env.get("EMPIRE_OUTBOUND_DELIVERABILITY_READER_DSN") or "").strip()
     writer_dsn = str(env.get("EMPIRE_OUTBOUND_DELIVERABILITY_WRITER_DSN") or "").strip()
     require_persistence = _truthy(env.get("EMPIRE_OUTBOUND_REQUIRE_PERSISTENCE"))
+    enable_estate_reconciliation = _truthy(
+        env.get("EMPIRE_OUTBOUND_ENABLE_ESTATE_RECONCILIATION")
+    )
 
     blockers: list[str] = []
     warnings: list[str] = []
@@ -67,6 +70,9 @@ def evaluate_preflight(
         blockers.append("persistence_required_but_unconfigured")
     elif not reader_dsn:
         warnings.append("empiredb_persistence_unconfigured")
+
+    if enable_estate_reconciliation and not reader_dsn:
+        blockers.append("estate_reconciliation_requires_empiredb_reader")
 
     path = context_path or Path(
         str(
@@ -105,6 +111,7 @@ def evaluate_preflight(
         "telemetry_source": source,
         "persistence_configured": bool(reader_dsn and writer_dsn),
         "persistence_required": require_persistence,
+        "estate_reconciliation_enabled": enable_estate_reconciliation,
         "context_path": str(path),
         "evidence_bundle_path": str(bundle_path),
         "evidence_bundle_status": bundle["status"],
