@@ -1,3 +1,4 @@
+import empire_os.outbound_release_attestation as release_attestation_module
 from datetime import datetime, timezone
 import json
 
@@ -120,3 +121,39 @@ def test_loader_validates_on_disk_attestation(tmp_path):
     )
     assert result["status"] == "CURRENT"
     assert result["path"] == str(path)
+
+
+
+def test_release_attestation_cli_returns_zero_only_for_current(
+    tmp_path,
+    monkeypatch,
+):
+    path = tmp_path / "attestation.json"
+    path.write_text(json.dumps(payload()), encoding="utf-8")
+    monkeypatch.setenv("EMPIRE_OUTBOUND_EXPECTED_SHA", SHA)
+    monkeypatch.setenv(
+        "EMPIRE_OUTBOUND_RELEASE_ATTESTATION_PATH",
+        str(path),
+    )
+    monkeypatch.setenv(
+        "EMPIRE_OUTBOUND_RELEASE_ATTESTATION_MAX_AGE_HOURS",
+        "9999",
+    )
+    assert release_attestation_module.main() == 0
+
+
+def test_release_attestation_cli_blocks_sha_mismatch(
+    tmp_path,
+    monkeypatch,
+):
+    path = tmp_path / "attestation.json"
+    path.write_text(json.dumps(payload()), encoding="utf-8")
+    monkeypatch.setenv(
+        "EMPIRE_OUTBOUND_EXPECTED_SHA",
+        "b" * 40,
+    )
+    monkeypatch.setenv(
+        "EMPIRE_OUTBOUND_RELEASE_ATTESTATION_PATH",
+        str(path),
+    )
+    assert release_attestation_module.main() == 2
