@@ -249,6 +249,7 @@ def evaluate_ringleader(
         account_saturation = evaluate_account_saturation(
             saturation_candidate,
             saturation_history,
+            now=account_saturation_context.get("now"),
         )
         if account_saturation["decision"] == "HOLD_NEW_OUTREACH":
             hard_holds.append("account_saturation_hold")
