@@ -18,6 +18,10 @@ from empire_os.outbound_deliverability_service import (
     metric_rows,
 )
 from empire_os.outbound_founder_alerts import build_founder_alert
+from empire_os.outbound_evidence_bundle import (
+    load_evidence_bundle,
+    project_bundle_to_ringleader,
+)
 from empire_os.outbound_postgres_repository import (
     configured_deliverability_repository_from_env,
     configured_deliverability_writer_from_env,
@@ -30,6 +34,9 @@ from empire_os.outbound_ringleader_runtime import (
 
 DEFAULT_CONTEXT_PATH = Path(
     "/srv/empire_os/runtime/outbound/ringleader_context.json"
+)
+DEFAULT_EVIDENCE_BUNDLE_PATH = Path(
+    "/srv/empire_os/runtime/outbound/evidence_bundle.json"
 )
 
 
@@ -48,11 +55,50 @@ def load_observer_context(path: Path = DEFAULT_CONTEXT_PATH) -> dict[str, Any]:
     return payload
 
 
+
+def merge_observer_context(
+    supplied: Mapping[str, Any] | None,
+    bundle_projection: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Merge evidence-derived context underneath explicit runtime safety context."""
+
+    explicit = dict(supplied or {})
+    if explicit.get("mutation_authorized") is True:
+        raise RuntimeError("observe_context_cannot_authorize_mutation")
+
+    projected_wrapper = dict(bundle_projection or {})
+    if projected_wrapper.get("mutation_authorized") is True:
+        raise RuntimeError("evidence_projection_cannot_authorize_mutation")
+    projected = projected_wrapper.get("context")
+    projected = dict(projected) if isinstance(projected, Mapping) else {}
+
+    merged = dict(projected)
+    for key, value in explicit.items():
+        if (
+            key in {"authentication", "placement", "deliverability"}
+            and isinstance(value, Mapping)
+            and isinstance(merged.get(key), Mapping)
+        ):
+            merged[key] = {**dict(merged[key]), **dict(value)}
+        elif (
+            key == "open_source_evidence"
+            and isinstance(value, Mapping)
+            and isinstance(merged.get(key), Mapping)
+        ):
+            merged[key] = {**dict(merged[key]), **dict(value)}
+        else:
+            merged[key] = value
+
+    merged["mutation_authorized"] = False
+    return merged
+
+
 def observe_once(
     provider: DeliverabilityMetricsProvider,
     *,
     scope_key: str,
     context: Mapping[str, Any] | None = None,
+    evidence_bundle: Mapping[str, Any] | None = None,
     reader=None,
     writer=None,
     source: str = "resend",
@@ -69,9 +115,12 @@ def observe_once(
     raw = rolling_windows(provider, now=now)
     health = build_health_from_windows(raw)
 
-    supplied = dict(context or {})
-    if supplied.get("mutation_authorized") is True:
-        raise RuntimeError("observe_context_cannot_authorize_mutation")
+    bundle_projection = (
+        project_bundle_to_ringleader(evidence_bundle)
+        if isinstance(evidence_bundle, Mapping)
+        else {"context": {}, "warnings": [], "mutation_authorized": False}
+    )
+    supplied = merge_observer_context(context, bundle_projection)
 
     ringleader_context = {
         **supplied,
@@ -129,6 +178,18 @@ def observe_once(
         "mode": "OBSERVE",
         "scope_key": scope,
         "health": health,
+        "evidence_bundle": {
+            "status": (
+                str(evidence_bundle.get("status"))
+                if isinstance(evidence_bundle, Mapping)
+                else "UNCONFIGURED"
+            ),
+            "warnings": (
+                list(evidence_bundle.get("warnings") or [])
+                if isinstance(evidence_bundle, Mapping)
+                else []
+            ),
+        },
         "ringleader": decision,
         "founder_alert": build_founder_alert(decision),
         "persistence": persistence,
@@ -161,6 +222,14 @@ def main() -> int:
     )
     context = load_observer_context(context_path)
 
+    evidence_bundle_path = Path(
+        os.getenv(
+            "EMPIRE_OUTBOUND_EVIDENCE_BUNDLE_PATH",
+            str(DEFAULT_EVIDENCE_BUNDLE_PATH),
+        )
+    )
+    evidence_bundle = load_evidence_bundle(evidence_bundle_path)
+
     reader = configured_deliverability_repository_from_env()
     writer = configured_deliverability_writer_from_env()
     require_persistence = _truthy(
@@ -173,6 +242,7 @@ def main() -> int:
         ResendMetricsProvider(),
         scope_key=scope_key,
         context=context,
+        evidence_bundle=evidence_bundle,
         reader=reader,
         writer=writer,
         source=telemetry_source,
