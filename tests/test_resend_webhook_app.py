@@ -425,3 +425,40 @@ def test_direct_founder_inbox_is_mirrored_without_reply_automation(
     assert options["idempotency_key"] == (
         "reply-forward/em_founder_1"
     )
+
+
+
+def test_health_reports_signed_ingest_readiness_without_secret_values(monkeypatch):
+    monkeypatch.setenv("RESEND_RECEIVING_API_KEY", "re_receiving_test")
+    app = create_app(
+        verify_webhook=lambda _: event(),
+        fetch_email=lambda _: fetched(),
+        reply_rpc=lambda *_: None,
+        webhook_secret="whsec_super_secret",
+        reply_to="reply@mail.empire-ai.co.uk",
+    )
+    r = TestClient(app).get("/health")
+    assert r.status_code == 200
+    payload = r.json()
+    assert payload["ok"] is True
+    assert payload["ready"] is True
+    assert payload["signature_verification_configured"] is True
+    assert payload["reply_to_configured"] is True
+    assert payload["reply_receiving_ready"] is True
+    assert payload["ingest_transport"] == "injected"
+    assert "whsec_super_secret" not in str(payload)
+    assert "re_receiving_test" not in str(payload)
+
+
+def test_health_is_not_ready_without_webhook_secret():
+    app = create_app(
+        verify_webhook=lambda _: event(),
+        fetch_email=lambda _: fetched(),
+        reply_rpc=lambda *_: None,
+        webhook_secret="",
+        reply_to="reply@mail.empire-ai.co.uk",
+    )
+    payload = TestClient(app).get("/health").json()
+    assert payload["ok"] is True
+    assert payload["ready"] is False
+    assert payload["signature_verification_configured"] is False

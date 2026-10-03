@@ -1,0 +1,18 @@
+{
+  "mutation_authorized": false,
+  "telemetry_policy": {
+    "required_sources": [
+      "provider_metrics",
+      "provider_event_ingest"
+    ],
+    "critical_sources": [
+      "provider_metrics",
+      "provider_event_ingest"
+    ],
+    "default_max_age_minutes": 30,
+    "source_max_age_minutes": {
+      "evidence_bundle": 30
+    }
+  },
+  "telemetry_heartbeats": []
+}

@@ -1,0 +1,12 @@
+[Unit]
+Description=Check EmpireOS Ringleader observer heartbeat every five minutes
+
+[Timer]
+OnBootSec=7min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=empire-outbound-ringleader-watchdog.service
+
+[Install]
+WantedBy=timers.target

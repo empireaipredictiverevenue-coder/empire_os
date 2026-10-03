@@ -1,0 +1,324 @@
+# Ringleader Deliverability Activation Runbook
+
+## Status
+
+This runbook prepares the Empire-owned outbound deliverability control plane for production.
+It does **not** authorize DNS changes, sender provisioning, database activation, or live sends.
+
+Current safe state on branch `agent/outbound-deliverability-v1`:
+
+- Ringleader execution mode: OBSERVE only
+- outbound migrations 035-043: staged in source control, not assumed applied
+- least-privilege reader/writer role contract: staged, not assumed provisioned
+- observer + watchdog systemd units/timers: staged, not assumed installed/enabled
+- Resend inbound health contract + local loopback probe: staged
+- sender-estate reconciliation: feature-gated
+- DNS/transports/live sender authority: unchanged
+- live sends: still controlled by the existing Outbound Governor and explicit batch approval
+
+## Gate 0 — reconcile production truth
+
+Before any activation:
+
+1. Preserve the current production branch and all uncommitted work.
+2. Verify the latest live EmpireDB migration number and current outbound schema.
+3. Verify migrations 035-043 do not collide with newer live migration numbers; renumber before apply if required.
+4. Verify the canonical backend is EmpireDB/PostgreSQL.
+5. Run `empire_os.outbound_empiredb_activation_probe` read-only against live EmpireDB.
+6. Verify targeted outbound CI is green.
+7. Copy the successful workflow's `outbound_release_attestation.json` artifact to the runtime path and verify its SHA exactly matches deployed `git HEAD`; stale, absent or mismatched attestations block readiness.
+8. Verify the Outbound Governor remains the only live-send eligibility authority.
+
+Never infer production schema state from GitHub alone.
+
+## Gate 1 — EmpireDB schema approval
+
+Requires explicit founder database-activation approval.
+
+Staged outbound migrations:
+
+- 033 — deliverability control plane and append-only Ringleader evidence
+- 034 — policy governance / policy-shadow history
+- 035 — canonical sender estate: transports, domains, mailboxes, pools, capacity, seeds
+- 036 — reservation/idempotency/lease fields for append-only capacity accounting
+- 037 — acquisition-source reputation memory
+- 038 — content-family reputation and claim-verification memory
+- 039 — fleet capacity/resilience readiness certificates
+- 040 — parent-company/corridor/event-kind dimensions for account saturation
+- 041 — telemetry observer heartbeats and CURRENT/PARTIAL/STALE/BLIND SLA snapshots
+
+Before apply:
+
+- review every SQL file against the live schema
+- verify constraints and indexes
+- verify there is no destructive DML
+- verify migrations remain non-authorizing
+- run transactionally in a verification environment where available
+- prepare the rollback/recovery path
+- re-run the read-only EmpireDB activation probe after apply
+
+The activation probe must confirm all required tables **and** the 036/040 upgrade columns.
+
+## Gate 2 — least-privilege database roles
+
+Requires explicit authority-expansion approval.
+
+Staged role contract:
+
+`deploy/empiredb/outbound_deliverability_roles.sql`
+
+Approval-gated provisioner:
+
+`scripts/provision_outbound_deliverability_roles.sh`
+
+Required permission roles:
+
+- `empire_outbound_deliverability_reader`
+- `empire_outbound_deliverability_writer`
+
+Reader contract:
+
+- SELECT on the outbound deliverability/read-model surface
+- no INSERT/UPDATE/DELETE
+- no DDL
+- no send/approval/payment authority
+
+Writer contract:
+
+- SELECT + INSERT only on:
+  - `public.outbound_deliverability_observations`
+  - `public.outbound_ringleader_decisions`
+- no UPDATE or DELETE anywhere
+- no INSERT on sender estate, capacity ledger, suppressions, commercial terms or payment state
+
+The activation probe must fail if the writer has excess privileges.
+
+The provisioning script must remain blocked unless:
+
+`EMPIRE_OUTBOUND_ROLE_PROVISION_APPROVED=YES`
+
+and a dedicated migrator DSN is supplied.
+
+## Gate 3 — runtime configuration
+
+Runtime secret/config file:
+
+`/srv/empire_os/runtime/secrets/outbound-deliverability.env`
+
+Required safe baseline:
+
+`EMPIRE_OUTBOUND_RINGLEADER_MODE=OBSERVE`
+
+`EMPIRE_OUTBOUND_SCOPE_KEY=empire`
+
+`EMPIRE_OUTBOUND_TELEMETRY_SOURCE=resend`
+
+Keep persistence disabled until Gate 1 + Gate 2 are complete:
+
+`EMPIRE_OUTBOUND_REQUIRE_PERSISTENCE=false`
+
+`EMPIRE_OUTBOUND_ENABLE_ESTATE_RECONCILIATION=false`
+
+After schema/roles are explicitly activated, bind dedicated DSNs:
+
+`EMPIRE_OUTBOUND_DELIVERABILITY_READER_DSN=<dedicated reader>`
+
+`EMPIRE_OUTBOUND_DELIVERABILITY_WRITER_DSN=<dedicated append-only writer>`
+
+Never reuse broad application/migrator credentials for the observer runtime.
+
+CI release evidence:
+
+`EMPIRE_OUTBOUND_RELEASE_ATTESTATION_PATH=/srv/empire_os/runtime/outbound/outbound_release_attestation.json`
+
+`EMPIRE_OUTBOUND_RELEASE_ATTESTATION_MAX_AGE_HOURS=168`
+
+The read-only production verifier requires that attestation to be CURRENT and bound to the exact deployed SHA.
+
+## Gate 4 — telemetry policy and provider-event visibility
+
+Ringleader context:
+
+`/srv/empire_os/runtime/outbound/ringleader_context.json`
+
+Start from:
+
+`config/outbound_ringleader_context.example.json`
+
+Minimum telemetry policy for the current Resend stack:
+
+- required: `provider_metrics`
+- required: `provider_event_ingest`
+- both critical
+- provider metrics heartbeat is generated by the Ringleader observer
+- provider event-ingest heartbeat is generated from the local Resend webhook health endpoint
+- local probes are loopback HTTP only; external arbitrary probe URLs are rejected
+
+Resend inbound health:
+
+`http://127.0.0.1:8097/health`
+
+The health response exposes readiness booleans only; it must never expose secret values.
+
+Telemetry postures:
+
+- CURRENT — required observers are fresh and healthy
+- PARTIAL — observer alive but coverage incomplete
+- STALE — observer exists but heartbeat exceeds SLA
+- BLIND — required observer missing or failed
+
+Critical BLIND telemetry:
+
+- SEND/BATCH scope -> HOLD
+- FLEET scope -> BLOCK_SCALE + REFRESH_EVIDENCE
+
+## Gate 5 — OBSERVE service installation
+
+Requires explicit production service-install/enable approval.
+
+Stage/install:
+
+- `empire-outbound-ringleader-observer.service`
+- `empire-outbound-ringleader-observer.timer`
+- `empire-outbound-ringleader-watchdog.service`
+- `empire-outbound-ringleader-watchdog.timer`
+
+Observer properties:
+
+- OBSERVE mode only
+- no `--execute`
+- hardened systemd sandbox
+- runtime directory is the only writable path
+- one cycle every five minutes
+- successful cycles atomically write:
+  `/srv/empire_os/runtime/outbound/ringleader_observer_heartbeat.json`
+
+Watchdog properties:
+
+- read-only
+- checks heartbeat every five minutes
+- heartbeat older than 15 minutes -> watchdog failure
+- bounded `OnFailure` self-heal can only start the existing OBSERVE observer service
+- no send/DNS/database authority expansion
+
+Run one manual OBSERVE smoke before enabling timers.
+
+## Gate 6 — operational OBSERVE acceptance
+
+`operational_observe.status` must be READY.
+
+Required production evidence:
+
+- observer service active
+- observer timer active
+- watchdog service healthy
+- watchdog timer active
+- observer heartbeat CURRENT
+- telemetry SLA CURRENT
+- provider-event ingest ready
+- rolling 1d/7d/30d provider metrics produced
+- Ringleader evaluates FLEET scope
+- `mutation_authorized=false`
+- persistence, if required, passes the EmpireDB schema/role probe
+- repeated evidence writes are idempotent
+- signed evidence policy is satisfied when enabled
+- provider outage/telemetry blindness fails closed
+- observer execution does not change live send count or send authority
+
+## Gate 7 — sender estate and capacity convergence
+
+Requires migrations 035/036/040 plus the read-only EmpireDB binding.
+
+Enable only after explicit DB activation:
+
+`EMPIRE_OUTBOUND_ENABLE_ESTATE_RECONCILIATION=true`
+
+Acceptance:
+
+- canonical transport/domain/mailbox/pool membership converges
+- capacity ledger replays deterministically
+- unknown mailbox capacity events HOLD
+- identity/domain/transport mismatches HOLD
+- expired capacity leases require explicit append-only RELEASE recovery
+- no lease expiry silently creates new capacity
+- sender estate reports CONVERGED before scaling
+
+## Gate 8 — fleet readiness and resilience
+
+Before scaling approved volume, produce a Fleet Readiness Certificate.
+
+It must evaluate:
+
+- approved daily target volume
+- mailbox and domain capacity
+- maximum domain share
+- primary brand domain exclusion from prospecting capacity
+- Empire ownership / sovereignty / brand safety
+- N-1 transport survival
+- N-1 domain survival
+- N-1 IP-pool survival
+- infrastructure concentration
+- seed-provider coverage
+- failover benchmark evidence
+- sender-estate convergence
+
+A capacity gap is reported; it is never bypassed by rotation.
+
+Provisioning proposals are proposal-only and may request:
+
+- additional Empire-owned, non-deceptive outreach domains
+- additional bounded mailbox capacity
+- an additional benchmarked transport
+- reduced IP-pool concentration
+- additional Empire-owned seed coverage
+
+They never register domains, mutate DNS or enable sending automatically.
+
+## Gate 9 — message, lead-source and account governance
+
+Before any live-send gate:
+
+- claim-to-evidence verification must pass
+- sensitive pricing/outcome/urgency/relationship claims require canonical evidence
+- contact evidence must be current
+- hard bounce or opt-out after verification invalidates the contact
+- acquisition source reputation must not be quarantined
+- content-family reputation must not be quarantined
+- new/learning content families require canary behavior
+- company/parent-group saturation must be clear
+- open conversations take precedence over new cold outreach
+- saturated corridors throttle only that corridor
+
+## Gate 10 — exact-batch live-send gate
+
+There is deliberately no automatic transition from OBSERVE to live sending.
+
+`live_send.status` may reach `READY_FOR_SEND_GATE` only when operational OBSERVE is READY and all live prerequisites are true, including:
+
+- outbound governor live-ready
+- canonical suppression clearance
+- recipient verification ready
+- seed placement measured
+- sender pool ready
+- provider/transport policy compatible
+- capacity reservation integrity ready
+- claim evidence ready
+- source/content reputation ready
+- account saturation ready
+- Fleet Readiness Certificate = READY
+- founder live-send approval present
+- approval is bound to the **exact batch**
+
+Even then:
+
+`send_authorized=false`
+
+The final send remains a separate governed execution step.
+
+## Production principle
+
+Ringleader supervises reputation, observability, capacity and fleet resilience.
+
+The Outbound Governor controls send eligibility.
+
+No telemetry signal, readiness certificate, policy model or self-heal path may silently create live-send authority.

@@ -715,3 +715,86 @@ export function getFounderMailboxDraftPreview(
   );
 }
 
+
+
+
+export type DeliverabilityDomainSnapshot = {
+  sent?: number;
+  delivered?: number;
+  bounced?: number;
+  bounced_permanent?: number;
+  bounced_transient?: number;
+  complained?: number;
+  suppressed?: number;
+  failed?: number;
+  delivery_delayed?: number;
+  delivery_rate?: number;
+  bounce_rate?: number;
+  complaint_rate?: number;
+};
+
+export type DeliverabilityWindow = DeliverabilityDomainSnapshot & {
+  health?: "GREEN" | "AMBER" | "HOLD" | string;
+  permanent_bounce_rate?: number;
+  suppression_rate?: number;
+  hard_holds?: string[];
+  warnings?: string[];
+  domains?: Record<string, DeliverabilityDomainSnapshot>;
+  inbox_placement_rate?: number | null;
+  inbox_placement_status?: string;
+};
+
+export type FounderOutboundDeliverability = {
+  overall_health?: "GREEN" | "AMBER" | "HOLD" | string;
+  source?: string;
+  windows?: Record<string, DeliverabilityWindow>;
+  inbox_placement?: {
+    status?: string;
+    reason?: string;
+  };
+  founder_alert?: {
+    severity?: string;
+    posture?: string;
+    hard_holds?: string[];
+    tasks?: Array<{
+      action?: string;
+      reason?: string;
+      owner?: string;
+      priority?: number;
+    }>;
+    fingerprint?: string;
+    notification_policy?: string;
+    mutation_authorized?: boolean;
+  } | null;
+  canonical_evidence_store?: {
+    configured?: boolean;
+    latest_decision?: {
+      id?: string;
+      decision_key?: string;
+      observed_at?: string;
+      posture?: string;
+      hard_holds?: string[];
+      tasks?: Array<Record<string, unknown>>;
+      mutation_authorized?: boolean;
+    } | null;
+    replay?: {
+      assets?: Record<
+        string,
+        {
+          asset_key?: string;
+          metrics?: Record<string, number | string | null>;
+          last_observed_at?: string;
+          last_source?: string;
+        }
+      >;
+      replay_source?: string;
+      mutation_authorized?: boolean;
+    } | null;
+  };
+};
+
+export function getFounderOutboundDeliverability() {
+  return getFounderRead<FounderOutboundDeliverability>(
+    "/v1/founder-outbound-deliverability",
+  );
+}

@@ -258,6 +258,8 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                founder_inbox: str | None = None,
                resend_module: Any | None = None) -> FastAPI:
     app = FastAPI(title="Empire Resend Inbound", docs_url=None, redoc_url=None)
+    custom_verify_webhook = verify_webhook is not None
+    custom_fetch_email = fetch_email is not None
     if verify_webhook is None or fetch_email is None:
         default_verify, default_fetch = _defaults()
         verify_webhook = verify_webhook or default_verify
@@ -296,7 +298,35 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
 
     @app.get("/health")
     async def health():
-        return {"ok": True, "mode": "OBSERVE", "provider": "resend"}
+        signature_ready = bool(secret and verify_webhook)
+        receiving_credential_ready = bool(
+            custom_fetch_email or _receiving_api_key()
+        )
+        reply_receiving_ready = bool(
+            signature_ready
+            and reply_base
+            and fetch_email
+            and receiving_credential_ready
+        )
+        ingest_transport = (
+            "injected"
+            if reply_rpc is not None
+            else "postgres"
+            if os.getenv("EMPIRE_REPLY_INGEST_DSN", "").strip()
+            else "supabase_bridge"
+        )
+        return {
+            "ok": True,
+            "ready": signature_ready,
+            "mode": "OBSERVE",
+            "provider": "resend",
+            "signature_verification_configured": signature_ready,
+            "reply_to_configured": bool(reply_base),
+            "receiving_api_key_configured": receiving_credential_ready,
+            "reply_receiving_ready": reply_receiving_ready,
+            "ingest_transport": ingest_transport,
+            "custom_verifier": custom_verify_webhook,
+        }
 
     @app.post("/webhooks/resend-inbound")
     async def inbound(request: Request):
