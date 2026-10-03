@@ -6,6 +6,7 @@ from empire_os.outbound_evidence_bundle import (
     load_evidence_bundle,
     project_bundle_to_ringleader,
 )
+from empire_os.outbound_evidence_bundle_auth import sign_evidence_bundle
 
 
 NOW = datetime(2026, 10, 3, 20, 0, tzinfo=timezone.utc)
@@ -79,3 +80,38 @@ def test_missing_bundle_is_safe_absence(tmp_path):
     bundle = load_evidence_bundle(tmp_path / "missing.json", now=NOW)
     assert bundle["status"] == "ABSENT"
     assert bundle["mutation_authorized"] is False
+
+
+
+def test_required_signature_accepts_valid_empire_signed_bundle(tmp_path):
+    import json
+
+    key = "empire-test-signing-key-123456"
+    bundle = sign_evidence_bundle({
+        "schema_version": "1",
+        "generated_at": NOW.isoformat(),
+        "sources": {"parsedmarc": {"domain": "example.com", "records": []}},
+        "mutation_authorized": False,
+    }, key=key)
+    path = tmp_path / "signed.json"
+    path.write_text(json.dumps(bundle), encoding="utf-8")
+
+    loaded = load_evidence_bundle(
+        path,
+        now=NOW,
+        hmac_key=key,
+        require_signature=True,
+    )
+    assert loaded["signature_status"] == "VERIFIED"
+
+
+def test_required_signature_rejects_unsigned_bundle(tmp_path):
+    path = tmp_path / "unsigned.json"
+    write_bundle(path)
+    with pytest.raises(RuntimeError, match="signature_required"):
+        load_evidence_bundle(
+            path,
+            now=NOW,
+            hmac_key="empire-test-signing-key-123456",
+            require_signature=True,
+        )
