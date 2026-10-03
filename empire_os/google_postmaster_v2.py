@@ -73,3 +73,101 @@ class GooglePostmasterV2Provider:
         if not isinstance(payload, dict):
             raise RuntimeError("postmaster_invalid_stats_payload")
         return payload
+
+
+
+def default_metric_definitions() -> list[dict[str, object]]:
+    """Current Gmail Postmaster v2 metrics relevant to Ringleader."""
+    return [
+        {
+            "name": "spam_rate",
+            "baseMetric": {"standardMetric": "SPAM_RATE"},
+        },
+        {
+            "name": "spf_success_rate",
+            "baseMetric": {"standardMetric": "AUTH_SUCCESS_RATE"},
+            "filter": 'auth_type = "spf"',
+        },
+        {
+            "name": "dkim_success_rate",
+            "baseMetric": {"standardMetric": "AUTH_SUCCESS_RATE"},
+            "filter": 'auth_type = "dkim"',
+        },
+        {
+            "name": "dmarc_success_rate",
+            "baseMetric": {"standardMetric": "AUTH_SUCCESS_RATE"},
+            "filter": 'auth_type = "dmarc"',
+        },
+        {
+            "name": "tls_outbound_rate",
+            "baseMetric": {"standardMetric": "TLS_ENCRYPTION_RATE"},
+            "filter": 'traffic_direction = "outbound"',
+        },
+        {
+            "name": "reject_error_rate",
+            "baseMetric": {"standardMetric": "DELIVERY_ERROR_RATE"},
+            "filter": 'error_type = "reject"',
+        },
+        {
+            "name": "temp_fail_error_rate",
+            "baseMetric": {"standardMetric": "DELIVERY_ERROR_RATE"},
+            "filter": 'error_type = "temp_fail"',
+        },
+    ]
+
+
+def normalize_compliance_status(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Convert Google compliance evidence to a bounded Ringleader signal."""
+
+    spf = dict(payload.get("spfStatus") or payload.get("spf_status") or {})
+    dkim = dict(payload.get("dkimStatus") or payload.get("dkim_status") or {})
+    dmarc = dict(payload.get("dmarcStatus") or payload.get("dmarc_status") or {})
+    verdict = dict(
+        payload.get("deliverabilityStatusVerdict")
+        or payload.get("deliverability_status_verdict")
+        or {}
+    )
+
+    def _state(value: Mapping[str, Any]) -> str:
+        nested = value.get("state")
+        if isinstance(nested, Mapping):
+            return str(nested.get("state") or nested.get("status") or "").upper()
+        return str(nested or value.get("status") or "").upper()
+
+    reason = str(verdict.get("reason") or "").upper()
+    verdict_state = _state(verdict)
+
+    hard_reasons = {
+        "SPAM_RATE_HIGH",
+        "SENDER_NOT_COMPLIANT",
+        "SMTP_ERRORS_HIGH",
+    }
+    evidence_holds = []
+    if not spf:
+        evidence_holds.append("gmail_spf_compliance_unknown")
+    if not dkim:
+        evidence_holds.append("gmail_dkim_compliance_unknown")
+    if not dmarc:
+        evidence_holds.append("gmail_dmarc_compliance_unknown")
+
+    if reason in hard_reasons:
+        posture = "HOLD_GMAIL"
+    elif reason == "MESSAGE_VOLUME_LOW":
+        posture = "OBSERVE"
+    elif verdict_state and "COMPLIANT" not in verdict_state:
+        posture = "LIMIT_GMAIL"
+    else:
+        posture = "GREEN"
+
+    return {
+        "posture": posture,
+        "reason": reason or None,
+        "spf_state": _state(spf) or None,
+        "dkim_state": _state(dkim) or None,
+        "dmarc_state": _state(dmarc) or None,
+        "deliverability_state": verdict_state or None,
+        "evidence_holds": evidence_holds,
+        "scope": "gmail_destination_only",
+    }
