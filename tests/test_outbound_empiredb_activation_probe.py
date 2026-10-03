@@ -43,12 +43,25 @@ class FakeCursor:
         elif "has_table_privilege" in normalized:
             table = params[1]
             writer_expected = table in REQUIRED_WRITER_TABLES
+            writer_select = (
+                self.privileges
+                if writer_expected
+                else bool(self.excess_writer)
+            )
             writer_insert = (
                 self.privileges
                 if writer_expected
                 else bool(self.excess_writer)
             )
-            self._row = (self.privileges, writer_insert)
+            writer_update = bool(self.excess_writer)
+            writer_delete = bool(self.excess_writer)
+            self._row = (
+                self.privileges,
+                writer_select,
+                writer_insert,
+                writer_update,
+                writer_delete,
+            )
         else:
             self._row = None
 
@@ -148,5 +161,18 @@ def test_probe_blocks_excess_writer_insert_authority():
     assert result["privileges_ready"] is False
     assert result["excess_writer_privileges"]
     assert "public.outbound_capacity_ledger" in (
+        result["excess_writer_privileges"]
+    )
+
+
+
+def test_probe_blocks_writer_update_delete_even_on_append_only_tables():
+    cursor = FakeCursor(excess_writer=True)
+    result = probe_empiredb_deliverability(
+        "probe-dsn",
+        connect_factory=factory(cursor),
+    )
+    assert result["status"] == "BLOCKED"
+    assert "public.outbound_deliverability_observations" in (
         result["excess_writer_privileges"]
     )
