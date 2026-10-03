@@ -136,10 +136,21 @@ def observe_once(
     }
 
 
+def _truthy(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def main() -> int:
     mode = os.getenv("EMPIRE_OUTBOUND_RINGLEADER_MODE", "OBSERVE").strip().upper()
     if mode != "OBSERVE":
         raise RuntimeError("ringleader_observer_supports_observe_only")
+
+    telemetry_source = os.getenv(
+        "EMPIRE_OUTBOUND_TELEMETRY_SOURCE",
+        "resend",
+    ).strip().lower()
+    if telemetry_source != "resend":
+        raise RuntimeError("unsupported_ringleader_telemetry_source")
 
     scope_key = os.getenv("EMPIRE_OUTBOUND_SCOPE_KEY", "empire").strip()
     context_path = Path(
@@ -152,6 +163,11 @@ def main() -> int:
 
     reader = configured_deliverability_repository_from_env()
     writer = configured_deliverability_writer_from_env()
+    require_persistence = _truthy(
+        os.getenv("EMPIRE_OUTBOUND_REQUIRE_PERSISTENCE")
+    )
+    if require_persistence and (reader is None or writer is None):
+        raise RuntimeError("ringleader_persistence_required_but_unconfigured")
 
     result = observe_once(
         ResendMetricsProvider(),
@@ -159,7 +175,7 @@ def main() -> int:
         context=context,
         reader=reader,
         writer=writer,
-        source="resend",
+        source=telemetry_source,
     )
     print(json.dumps(result, sort_keys=True, default=str))
     return 0
