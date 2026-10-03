@@ -1,4 +1,5 @@
 from empire_os.outbound_empiredb_activation_probe import (
+    REQUIRED_COLUMNS,
     REQUIRED_ROLES,
     REQUIRED_TABLES,
     probe_empiredb_deliverability,
@@ -6,8 +7,16 @@ from empire_os.outbound_empiredb_activation_probe import (
 
 
 class FakeCursor:
-    def __init__(self, *, tables=True, roles=True, privileges=True):
+    def __init__(
+        self,
+        *,
+        tables=True,
+        columns=True,
+        roles=True,
+        privileges=True,
+    ):
         self.tables = tables
+        self.columns = columns
         self.roles = roles
         self.privileges = privileges
         self._row = None
@@ -24,6 +33,8 @@ class FakeCursor:
         self.calls.append((normalized, params))
         if "to_regclass" in normalized:
             self._row = (self.tables,)
+        elif "information_schema.columns" in normalized:
+            self._row = (self.columns,)
         elif "FROM pg_roles" in normalized:
             self._row = (self.roles,)
         elif "has_table_privilege" in normalized:
@@ -65,6 +76,11 @@ def test_probe_is_read_only_and_ready_when_schema_roles_privileges_exist():
     assert result["mutation_authorized"] is False
     assert cursor.calls[0][0] == "SET TRANSACTION READ ONLY"
     assert len(result["required_tables"]) == len(REQUIRED_TABLES)
+    assert result["required_columns"] == {
+        table: list(columns)
+        for table, columns in REQUIRED_COLUMNS.items()
+    }
+    assert result["columns_ready"] is True
     assert result["required_roles"] == list(REQUIRED_ROLES)
 
 
@@ -89,3 +105,21 @@ def test_probe_blocks_when_schema_is_missing():
     assert result["status"] == "BLOCKED"
     assert result["schema_ready"] is False
     assert result["privileges_ready"] is False
+
+
+
+def test_probe_blocks_when_required_upgrade_columns_are_missing():
+    cursor = FakeCursor(columns=False)
+    result = probe_empiredb_deliverability(
+        "probe-dsn",
+        connect_factory=factory(cursor),
+    )
+    assert result["status"] == "BLOCKED"
+    assert result["tables_ready"] is True
+    assert result["columns_ready"] is False
+    assert result["schema_ready"] is False
+    assert result["missing_columns"]
+    assert any(
+        value.endswith(".reservation_key")
+        for value in result["missing_columns"]
+    )
