@@ -19,6 +19,7 @@ from empire_os.outbound_deliverability_service import (
 )
 from empire_os.outbound_founder_alerts import build_founder_alert
 from empire_os.outbound_evidence_bundle import (
+    DEFAULT_EVIDENCE_BUNDLE_PATH,
     load_evidence_bundle,
     project_bundle_to_ringleader,
 )
@@ -34,9 +35,6 @@ from empire_os.outbound_ringleader_runtime import (
 
 DEFAULT_CONTEXT_PATH = Path(
     "/srv/empire_os/runtime/outbound/ringleader_context.json"
-)
-DEFAULT_EVIDENCE_BUNDLE_PATH = Path(
-    "/srv/empire_os/runtime/outbound/evidence_bundle.json"
 )
 
 
