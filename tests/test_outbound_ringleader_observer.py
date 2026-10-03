@@ -109,3 +109,51 @@ def test_observer_fails_closed_on_half_configured_persistence():
             reader=MemoryReader(),
             writer=None,
         )
+
+
+
+def test_observer_consumes_current_open_source_bundle_as_fleet_evidence():
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=fleet_context(),
+        evidence_bundle={
+            "status": "CURRENT",
+            "warnings": [],
+            "sources": {
+                "checkdmarc": {
+                    "domain": "mail.example.com",
+                    "spf": {"valid": True, "record": "v=spf1 -all"},
+                    "dmarc": {"valid": False, "error": "invalid record"},
+                },
+            },
+            "mutation_authorized": False,
+        },
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+    assert result["evidence_bundle"]["status"] == "CURRENT"
+    assert result["ringleader"]["posture"] == "HOLD"
+    assert "open_source_evidence_hold" in result["ringleader"]["hard_holds"]
+
+
+def test_stale_bundle_is_reported_but_not_projected():
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=fleet_context(),
+        evidence_bundle={
+            "status": "STALE",
+            "warnings": ["evidence_bundle_stale"],
+            "sources": {
+                "checkdmarc": {
+                    "domain": "mail.example.com",
+                    "dmarc": {"valid": False},
+                },
+            },
+            "mutation_authorized": False,
+        },
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+    assert result["evidence_bundle"]["status"] == "STALE"
+    assert result["ringleader"]["open_source_health"] is None
+    assert result["ringleader"]["posture"] == "READY"
