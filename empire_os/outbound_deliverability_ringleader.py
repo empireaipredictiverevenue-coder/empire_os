@@ -16,6 +16,7 @@ from empire_os.outbound_remediation_planner import plan_remediation
 from empire_os.outbound_contact_pressure import evaluate_contact_pressure
 from empire_os.outbound_sender_affinity import resolve_sender_affinity
 from empire_os.outbound_reputation_slo import evaluate_reputation_slo
+from empire_os.outbound_domain_continuity import evaluate_domain_continuity
 
 
 @dataclass(frozen=True)
@@ -199,6 +200,26 @@ def evaluate_ringleader(
             hard_holds.append("reputation_error_budget_exhausted")
             tasks.append(_task("STOP_SEND", "reputation_error_budget_exhausted", "reputation_slo"))
 
+    domain_continuity = None
+    continuity_context = context.get("domain_continuity")
+    if isinstance(continuity_context, Mapping):
+        from datetime import date
+        domain_continuity = evaluate_domain_continuity(
+            continuity_context,
+            today=date.today(),
+        )
+        if domain_continuity["posture"] == "HOLD":
+            hard_holds.append("domain_continuity_hold")
+            tasks.append(_task("STOP_SEND", "domain_continuity_hold", "domain_sovereignty"))
+        elif domain_continuity["posture"] == "REMEDIATE":
+            tasks.append(
+                _task(
+                    "REMEDIATE_DOMAIN_CONTROL",
+                    "domain_continuity_remediation_required",
+                    "domain_sovereignty",
+                )
+            )
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -254,5 +275,6 @@ def evaluate_ringleader(
         "contact_pressure": contact_pressure,
         "sender_affinity": sender_affinity,
         "reputation_slo": reputation_slo,
+        "domain_continuity": domain_continuity,
         "mutation_authorized": False,
     }
