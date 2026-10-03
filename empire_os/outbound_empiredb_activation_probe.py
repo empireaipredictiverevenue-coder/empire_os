@@ -1,6 +1,8 @@
 """Read-only EmpireDB readiness probe for outbound deliverability persistence."""
 from __future__ import annotations
 
+import json
+import os
 from typing import Any, Callable
 
 
@@ -238,3 +240,18 @@ def probe_empiredb_deliverability(
         raise EmpireDBActivationProbeError(
             "empiredb_deliverability_probe_failed"
         ) from exc
+
+
+
+def main() -> int:
+    dsn = (
+        os.getenv("EMPIRE_OUTBOUND_ACTIVATION_PROBE_DSN", "").strip()
+        or os.getenv("EMPIREDB_MIGRATOR_DSN", "").strip()
+    )
+    result = probe_empiredb_deliverability(dsn)
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["status"] == "READY" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
