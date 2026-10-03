@@ -23,6 +23,7 @@ from empire_os.outbound_recipient_domain_policy import evaluate_recipient_domain
 from empire_os.outbound_config_attestation import detect_configuration_drift
 from empire_os.outbound_infrastructure_concentration import evaluate_concentration
 from empire_os.outbound_evidence_fusion import fuse_evidence
+from empire_os.outbound_open_source_health import evaluate_open_source_evidence
 
 
 @dataclass(frozen=True)
@@ -407,6 +408,47 @@ def evaluate_ringleader(
                 )
             )
 
+    open_source_health = None
+    open_source_bundle = context.get("open_source_evidence")
+    if isinstance(open_source_bundle, Mapping):
+        open_source_health = evaluate_open_source_evidence(
+            open_source_bundle
+        )
+        if open_source_health["posture"] == "HOLD":
+            hard_holds.append("open_source_evidence_hold")
+            tasks.append(
+                _task(
+                    "STOP_SEND",
+                    "open_source_deliverability_hold",
+                    "evidence_fusion",
+                )
+            )
+            tasks.append(
+                _task(
+                    "REPAIR_AUTH",
+                    "open_source_authentication_failure",
+                    "auth_observer",
+                )
+            )
+        elif open_source_health["posture"] == "REMEDIATE":
+            warnings = set(open_source_health["warnings"])
+            if any(item.startswith("dns_") for item in warnings):
+                tasks.append(
+                    _task(
+                        "REMEDIATE_DOMAIN_CONTROL",
+                        "open_source_dns_drift",
+                        "domain_sovereignty",
+                    )
+                )
+            if any("authentication" in item or "dmarc_" in item for item in warnings):
+                tasks.append(
+                    _task(
+                        "REPAIR_AUTH",
+                        "open_source_authentication_degraded",
+                        "auth_observer",
+                    )
+                )
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -471,5 +513,6 @@ def evaluate_ringleader(
         "configuration_drift": configuration_drift,
         "infrastructure_concentration": infrastructure_concentration,
         "evidence_fusion": evidence_fusion,
+        "open_source_health": open_source_health,
         "mutation_authorized": False,
     }
