@@ -290,3 +290,121 @@ def test_observer_marks_expired_capacity_lease_for_reconciliation_not_auto_relea
     assert reconciliation["capacity_reservations"]["recovery_actions"][0][
         "mutation_authorized"
     ] is False
+
+
+
+def test_observer_emits_provider_metrics_heartbeat_when_telemetry_policy_enabled():
+    ctx = fleet_context()
+    ctx["telemetry_policy"] = {
+        "required_sources": ["provider_metrics"],
+        "critical_sources": ["provider_metrics"],
+        "default_max_age_minutes": 30,
+    }
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=ctx,
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+    telemetry = result["telemetry_context"]
+    assert telemetry is not None
+    assert telemetry["required_sources"] == ["provider_metrics"]
+    assert telemetry["heartbeats"][0]["source"] == "provider_metrics"
+    assert result["ringleader"]["telemetry_sla"]["posture"] == "CURRENT"
+    assert result["mutation_authorized"] is False
+
+
+def test_observer_blocks_scale_when_required_event_ingest_heartbeat_missing():
+    ctx = fleet_context()
+    ctx["telemetry_policy"] = {
+        "required_sources": [
+            "provider_metrics",
+            "provider_event_ingest",
+        ],
+        "critical_sources": [
+            "provider_metrics",
+            "provider_event_ingest",
+        ],
+        "default_max_age_minutes": 30,
+    }
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=ctx,
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+    assert result["ringleader"]["posture"] == "LIMITED"
+    assert result["ringleader"]["telemetry_sla"]["posture"] == "BLIND"
+    assert result["ringleader"]["hard_holds"] == []
+    assert any(
+        task["action"] == "BLOCK_SCALE"
+        and task["reason"] == "telemetry_critical_blind"
+        for task in result["ringleader"]["tasks"]
+    )
+
+
+def test_observer_accepts_current_external_event_ingest_heartbeat():
+    ctx = fleet_context()
+    ctx["telemetry_policy"] = {
+        "required_sources": [
+            "provider_metrics",
+            "provider_event_ingest",
+        ],
+        "critical_sources": [
+            "provider_metrics",
+            "provider_event_ingest",
+        ],
+        "default_max_age_minutes": 30,
+    }
+    ctx["telemetry_heartbeats"] = [{
+        "source": "provider_event_ingest",
+        "observed_at": "2026-10-03T11:55:00+00:00",
+        "success": True,
+        "coverage": True,
+        "details": {"consumer": "resend_webhook"},
+    }]
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=ctx,
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+    assert result["ringleader"]["telemetry_sla"]["posture"] == "CURRENT"
+    assert not any(
+        task["action"] == "BLOCK_SCALE"
+        for task in result["ringleader"]["tasks"]
+    )
+    assert result["ringleader"]["mutation_authorized"] is False
+
+
+def test_observer_reports_stale_external_event_ingest_heartbeat():
+    ctx = fleet_context()
+    ctx["telemetry_policy"] = {
+        "required_sources": [
+            "provider_metrics",
+            "provider_event_ingest",
+        ],
+        "critical_sources": [
+            "provider_metrics",
+            "provider_event_ingest",
+        ],
+        "default_max_age_minutes": 30,
+    }
+    ctx["telemetry_heartbeats"] = [{
+        "source": "provider_event_ingest",
+        "observed_at": "2026-10-03T10:00:00+00:00",
+        "success": True,
+        "coverage": True,
+    }]
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=ctx,
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+    assert result["ringleader"]["telemetry_sla"]["posture"] == "STALE"
+    assert any(
+        task["action"] == "REFRESH_EVIDENCE"
+        and task["reason"] == "telemetry_critical_stale"
+        for task in result["ringleader"]["tasks"]
+    )
