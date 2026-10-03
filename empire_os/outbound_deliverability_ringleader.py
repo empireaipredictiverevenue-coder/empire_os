@@ -38,6 +38,7 @@ _PRIORITY = {
     "RECONCILE_EVIDENCE": 88,
     "REMEDIATE_DOMAIN_CONTROL": 85,
     "REFRESH_EVIDENCE": 82,
+    "VERIFY_PROVIDER_POLICY": 82,
     "VERIFY_RECIPIENTS": 80,
     "RUN_CANARY": 75,
     "MEASURE_PLACEMENT": 70,
@@ -476,6 +477,7 @@ def evaluate_ringleader(
         posture = "REMEDIATE"
     elif any(
         task["action"] in {
+            "VERIFY_PROVIDER_POLICY",
             "VERIFY_RECIPIENTS",
             "RUN_CANARY",
             "MEASURE_PLACEMENT",
