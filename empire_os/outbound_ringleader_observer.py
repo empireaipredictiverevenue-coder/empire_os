@@ -18,6 +18,7 @@ from empire_os.outbound_deliverability_service import (
     metric_rows,
 )
 from empire_os.outbound_founder_alerts import build_founder_alert
+from empire_os.outbound_telemetry_probe import probe_loopback_health
 from empire_os.outbound_estate_reconciliation import reconcile_sender_estate
 from empire_os.outbound_evidence_bundle import (
     DEFAULT_EVIDENCE_BUNDLE_PATH,
@@ -97,6 +98,7 @@ def build_observer_telemetry_context(
     *,
     now: datetime,
     evidence_bundle: Mapping[str, Any] | None = None,
+    telemetry_probe=None,
 ) -> dict[str, Any] | None:
     policy = supplied.get("telemetry_policy")
     if not isinstance(policy, Mapping):
@@ -126,6 +128,25 @@ def build_observer_telemetry_context(
             "observer": "outbound_ringleader_observer",
         },
     })
+
+    known_sources = {
+        str(row.get("source") or row.get("source_key") or "").strip()
+        for row in heartbeats
+        if isinstance(row, Mapping)
+    }
+    probe = telemetry_probe
+    if (
+        "provider_event_ingest" in required_sources
+        and "provider_event_ingest" not in known_sources
+        and probe is not None
+    ):
+        heartbeats.append(
+            probe(
+                "provider_event_ingest",
+                "http://127.0.0.1:8097/health",
+                now=now,
+            )
+        )
 
     if isinstance(evidence_bundle, Mapping):
         generated_at = evidence_bundle.get("generated_at")
@@ -162,6 +183,7 @@ def observe_once(
     context: Mapping[str, Any] | None = None,
     evidence_bundle: Mapping[str, Any] | None = None,
     estate_inventory: Mapping[str, Any] | None = None,
+    telemetry_probe=None,
     reader=None,
     writer=None,
     source: str = "resend",
@@ -202,6 +224,7 @@ def observe_once(
         supplied,
         now=now,
         evidence_bundle=evidence_bundle,
+        telemetry_probe=telemetry_probe,
     )
 
     ringleader_context = {
@@ -356,6 +379,7 @@ def main() -> int:
         context=context,
         evidence_bundle=evidence_bundle,
         estate_inventory=estate_inventory,
+        telemetry_probe=probe_loopback_health,
         reader=reader,
         writer=writer,
         source=telemetry_source,
