@@ -13,6 +13,7 @@ def evaluate_activation_readiness(
 ) -> dict[str, Any]:
     row = dict(evidence or {})
     observe_blockers: list[str] = []
+    operational_blockers: list[str] = []
     live_blockers: list[str] = []
     warnings: list[str] = []
 
@@ -52,8 +53,38 @@ def evaluate_activation_readiness(
     elif row.get("signed_evidence_verified") is not True:
         warnings.append("local_evidence_bundle_not_signature_enforced")
 
-    # Live sending has strictly more requirements than OBSERVE.
-    live_blockers.extend(observe_blockers)
+    # Operational OBSERVE requires the deployed services to prove they are alive.
+    operational_blockers.extend(observe_blockers)
+    for key, expected, reason in (
+        ("observer_service_active", True, "observer_service_not_active"),
+        ("observer_timer_active", True, "observer_timer_not_active"),
+        ("observer_watchdog_active", True, "observer_watchdog_not_active"),
+        (
+            "observer_watchdog_timer_active",
+            True,
+            "observer_watchdog_timer_not_active",
+        ),
+        (
+            "observer_heartbeat_status",
+            "CURRENT",
+            "observer_heartbeat_not_current",
+        ),
+        (
+            "telemetry_sla_posture",
+            "CURRENT",
+            "telemetry_sla_not_current",
+        ),
+        (
+            "provider_event_ingest_ready",
+            True,
+            "provider_event_ingest_not_ready",
+        ),
+    ):
+        if row.get(key) != expected:
+            operational_blockers.append(reason)
+
+    # Live sending has strictly more requirements than operational OBSERVE.
+    live_blockers.extend(operational_blockers)
 
     for key, reason in (
         ("outbound_governor_live_ready", "outbound_governor_not_live_ready"),
@@ -62,18 +93,45 @@ def evaluate_activation_readiness(
         ("seed_placement_measured", "seed_placement_not_measured"),
         ("sender_pool_ready", "sender_pool_not_ready"),
         ("transport_policy_compatible", "transport_policy_not_compatible"),
+        ("capacity_reservation_ready", "capacity_reservation_not_ready"),
+        ("claim_evidence_ready", "claim_evidence_not_ready"),
+        ("account_saturation_ready", "account_saturation_not_ready"),
+        ("source_reputation_ready", "source_reputation_not_ready"),
+        (
+            "content_family_reputation_ready",
+            "content_family_reputation_not_ready",
+        ),
         ("founder_live_send_approved", "founder_live_send_approval_missing"),
+        (
+            "exact_batch_approval_bound",
+            "exact_batch_approval_binding_missing",
+        ),
     ):
         if row.get(key) is not True:
             live_blockers.append(reason)
 
+    fleet_readiness_status = str(
+        row.get("fleet_readiness_status") or ""
+    ).upper()
+    if fleet_readiness_status != "READY":
+        live_blockers.append("fleet_readiness_not_ready")
+
     observe_status = "READY" if not observe_blockers else "BLOCKED"
-    live_status = "READY_FOR_EXPLICIT_APPROVAL" if not live_blockers else "BLOCKED"
+    operational_status = (
+        "READY" if not operational_blockers else "BLOCKED"
+    )
+    live_status = (
+        "READY_FOR_SEND_GATE" if not live_blockers else "BLOCKED"
+    )
 
     return {
         "observe": {
             "status": observe_status,
             "blockers": observe_blockers,
+        },
+        "operational_observe": {
+            "status": operational_status,
+            "blockers": operational_blockers,
         },
         "live_send": {
             "status": live_status,
