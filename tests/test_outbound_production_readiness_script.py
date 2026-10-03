@@ -10,6 +10,9 @@ def test_production_readiness_probe_is_read_only():
     lowered = text.lower()
 
     assert "no migration / no role change / no service change / no send" in lowered
+    assert "outbound_release_attestation" in text
+    assert "EMPIRE_OUTBOUND_EXPECTED_SHA" in text
+    assert "release_sha=\"$(git rev-parse HEAD)\"" in text
     assert "outbound_ringleader_preflight" in text
     assert "outbound_ringleader_watchdog" in text
     assert "outbound_empiredb_activation_probe" in text
