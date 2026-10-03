@@ -15,6 +15,7 @@ from empire_os.outbound_state_replay import replay_health_state
 def create_founder_outbound_deliverability_router(
     provider=None,
     repository=None,
+    readiness_provider=None,
 ) -> APIRouter:
     source = provider or ResendMetricsProvider()
     evidence_repository = (
@@ -42,10 +43,22 @@ def create_founder_outbound_deliverability_router(
                 canonical["latest_decision"] = decisions[0] if decisions else None
                 canonical["replay"] = replay_health_state(observations)
 
+            readiness = None
+            if readiness_provider is not None:
+                try:
+                    readiness = readiness_provider()
+                except Exception as readiness_exc:
+                    readiness = {
+                        "status": "UNAVAILABLE",
+                        "error_type": type(readiness_exc).__name__,
+                        "send_authorized": False,
+                    }
+
             return {
                 **health,
                 "founder_alert": build_founder_alert(health),
                 "canonical_evidence_store": canonical,
+                "production_readiness": readiness,
             }
         except Exception as exc:
             raise HTTPException(
