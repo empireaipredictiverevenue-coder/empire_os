@@ -17,6 +17,7 @@ from empire_os.outbound_contact_pressure import evaluate_contact_pressure
 from empire_os.outbound_sender_affinity import resolve_sender_affinity
 from empire_os.outbound_reputation_slo import evaluate_reputation_slo
 from empire_os.outbound_domain_continuity import evaluate_domain_continuity
+from empire_os.outbound_health_forecast import forecast_reputation_health
 
 
 @dataclass(frozen=True)
@@ -220,6 +221,19 @@ def evaluate_ringleader(
                 )
             )
 
+    health_forecast = None
+    forecast_history = context.get("health_history")
+    if isinstance(forecast_history, list):
+        health_forecast = forecast_reputation_health(forecast_history)
+        if health_forecast["posture"] == "PREEMPTIVE_THROTTLE":
+            tasks.append(
+                _task(
+                    "THROTTLE",
+                    "forecast_threshold_breach_risk",
+                    "reputation_forecaster",
+                )
+            )
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -276,5 +290,6 @@ def evaluate_ringleader(
         "sender_affinity": sender_affinity,
         "reputation_slo": reputation_slo,
         "domain_continuity": domain_continuity,
+        "health_forecast": health_forecast,
         "mutation_authorized": False,
     }
