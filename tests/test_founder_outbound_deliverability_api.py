@@ -71,3 +71,47 @@ def test_founder_deliverability_route_exposes_canonical_empiredb_history():
         canonical["replay"]["assets"]["mail.example.com"]["metrics"]["bounce_rate"]
         == 0.01
     )
+
+
+
+def test_founder_deliverability_route_exposes_production_readiness_snapshot():
+    app = FastAPI()
+    app.include_router(
+        create_founder_outbound_deliverability_router(
+            FakeProvider(),
+            repository=None,
+            readiness_provider=lambda: {
+                "status": "OBSERVE_OPERATIONAL",
+                "send_authorized": False,
+                "activation": {
+                    "live_send": {"status": "BLOCKED"}
+                },
+            },
+        )
+    )
+    response = TestClient(app).get("/v1/founder-outbound-deliverability")
+    assert response.status_code == 200
+    readiness = response.json()["production_readiness"]
+    assert readiness["status"] == "OBSERVE_OPERATIONAL"
+    assert readiness["send_authorized"] is False
+
+
+def test_readiness_provider_failure_does_not_hide_deliverability_health():
+    def fail():
+        raise RuntimeError("snapshot unavailable")
+
+    app = FastAPI()
+    app.include_router(
+        create_founder_outbound_deliverability_router(
+            FakeProvider(),
+            repository=None,
+            readiness_provider=fail,
+        )
+    )
+    response = TestClient(app).get("/v1/founder-outbound-deliverability")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["overall_health"] == "GREEN"
+    assert payload["production_readiness"]["status"] == "UNAVAILABLE"
+    assert payload["production_readiness"]["send_authorized"] is False
+    assert payload["production_readiness"]["error_type"] == "RuntimeError"
