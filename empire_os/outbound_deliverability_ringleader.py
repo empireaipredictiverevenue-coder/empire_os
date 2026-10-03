@@ -536,7 +536,15 @@ def evaluate_ringleader(
 
     if hard_holds:
         posture = "HOLD"
-    elif any(task["action"] in {"REPAIR_AUTH", "REMEDIATE_DOMAIN_CONTROL", "RECONCILE_EVIDENCE"} for task in tasks):
+    elif any(
+        task["action"] in {
+            "REPAIR_AUTH",
+            "RECONCILE_ESTATE",
+            "REMEDIATE_DOMAIN_CONTROL",
+            "RECONCILE_EVIDENCE",
+        }
+        for task in tasks
+    ):
         posture = "REMEDIATE"
     elif any(
         task["action"] in {
