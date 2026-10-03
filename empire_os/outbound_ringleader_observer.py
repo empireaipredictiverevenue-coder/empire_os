@@ -226,7 +226,18 @@ def main() -> int:
             str(DEFAULT_EVIDENCE_BUNDLE_PATH),
         )
     )
-    evidence_bundle = load_evidence_bundle(evidence_bundle_path)
+    bundle_hmac_key = os.getenv(
+        "EMPIRE_OUTBOUND_EVIDENCE_BUNDLE_HMAC_KEY",
+        "",
+    )
+    require_signed_bundle = _truthy(
+        os.getenv("EMPIRE_OUTBOUND_REQUIRE_SIGNED_EVIDENCE_BUNDLE")
+    )
+    evidence_bundle = load_evidence_bundle(
+        evidence_bundle_path,
+        hmac_key=bundle_hmac_key or None,
+        require_signature=require_signed_bundle,
+    )
 
     reader = configured_deliverability_repository_from_env()
     writer = configured_deliverability_writer_from_env()
