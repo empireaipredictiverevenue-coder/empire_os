@@ -207,6 +207,26 @@ class LLMGateway:
 
         provider = provider.lower()
 
+        if provider in {"llamacpp", "llama_cpp"}:
+            from empire_os.coder.llama_cpp_provider import (
+                LlamaCppProvider,
+            )
+
+            return LlamaCppProvider(
+                base_url=(
+                    _env("EMPIRE_LLM_LLAMA_CPP_URL")
+                    or _env("EMPIRE_CODER_LLAMA_CPP_URL")
+                    or "http://127.0.0.1:11435"
+                ),
+                timeout_seconds=timeout,
+                model=(
+                    model
+                    or _env("EMPIRE_LLM_LLAMA_CPP_MODEL")
+                    or _env("EMPIRE_CODER_LLAMA_CPP_MODEL")
+                    or "qwen2.5-coder:1.5b"
+                ),
+            )
+
         if provider == "ollama":
             return OllamaClient(
                 model=model or _env("OLLAMA_MODEL", "qwen2.5:7b"),
@@ -292,7 +312,14 @@ class LLMGateway:
                     "temperature": temperature,
                 }
 
-                if provider.lower() in {"openrouter", "opencode", "opencode_zen", "zen"}:
+                if provider.lower() in {
+                    "openrouter",
+                    "opencode",
+                    "opencode_zen",
+                    "zen",
+                    "llamacpp",
+                    "llama_cpp",
+                }:
                     kwargs["max_tokens"] = max_tokens
 
                 started = time.monotonic()
