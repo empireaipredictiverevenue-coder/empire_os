@@ -44,6 +44,10 @@ CREATE INDEX IF NOT EXISTS idx_outbound_deliv_obs_transport_time
 CREATE INDEX IF NOT EXISTS idx_outbound_deliv_obs_mx_time
     ON public.outbound_deliverability_observations(scope_key, recipient_mx, observed_at DESC);
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_outbound_deliv_obs_evidence_hash
+    ON public.outbound_deliverability_observations(scope_key, evidence_hash)
+    WHERE evidence_hash IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS public.outbound_ringleader_decisions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     scope_key TEXT NOT NULL DEFAULT 'empire',
