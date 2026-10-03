@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 
-PATH = Path("migrations/empiredb/040_outbound_account_saturation_dimensions.sql")
+PATH = Path("migrations/empiredb/042_outbound_account_saturation_dimensions.sql")
 
 
 def test_account_saturation_migration_is_staged_and_non_authorizing():
