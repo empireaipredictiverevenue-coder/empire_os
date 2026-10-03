@@ -503,3 +503,87 @@ def test_ringleader_limits_when_provider_policy_is_unverified():
         task["action"] == "VERIFY_PROVIDER_POLICY"
         for task in result["tasks"]
     )
+
+
+
+def test_ringleader_quarantines_bad_lead_source_for_send_scope():
+    events = [{"source_key": "scraper:bad", "kind": "sent", "count": 20}]
+    events += [
+        {"source_key": "scraper:bad", "kind": "hard_bounce"}
+        for _ in range(2)
+    ]
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "lead_source_reputation": {
+            "source_key": "scraper:bad",
+            "events": events,
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "lead_source_reputation_quarantine" in result["hard_holds"]
+    assert result["lead_source_reputation"]["posture"] == "QUARANTINE"
+
+
+def test_ringleader_requires_deeper_verification_for_learning_source():
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "lead_source_reputation": {
+            "source_key": "scout:new",
+            "events": [
+                {"source_key": "scout:new", "kind": "sent", "count": 3}
+            ],
+        },
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["lead_source_reputation"]["posture"] == "LEARNING"
+    assert any(
+        task["action"] == "VERIFY_RECIPIENTS"
+        and task["reason"] == "lead_source_requires_deeper_verification"
+        for task in result["tasks"]
+    )
+
+
+def test_fleet_scope_ignores_per_lead_source_reputation():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+        "lead_source_reputation": {
+            "source_key": "scraper:bad",
+            "events": [
+                {"source_key": "scraper:bad", "kind": "sent", "count": 20},
+                {"source_key": "scraper:bad", "kind": "complaint"},
+            ],
+        },
+    })
+    assert result["posture"] == "READY"
+    assert result["lead_source_reputation"] is None
