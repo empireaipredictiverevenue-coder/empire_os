@@ -129,3 +129,74 @@ def test_deliverability_context_can_hard_hold_provider_policy_mismatch():
     )
     assert result["decision"] == "HOLD"
     assert "provider_policy_prohibits_use_case" in result["checks"]["hard_holds"]
+
+
+
+def test_verified_claim_evidence_does_not_block_green_intent():
+    result = evaluate_outbound(
+        review(),
+        context(
+            claim_evidence={
+                "claims": [{
+                    "text": "Buyer has a current public permit",
+                    "kind": "observed_fact",
+                    "evidence_ref": "permit:1",
+                }],
+                "evidence_index": {
+                    "permit:1": {
+                        "verified": True,
+                        "source_kind": "public_record",
+                        "canonical": False,
+                        "expires_at": "2099-01-01T00:00:00+00:00",
+                    }
+                },
+            }
+        ),
+    )
+    assert result["decision"] == "READY_FOR_HUMAN_APPROVAL"
+    assert result["checks"]["claim_evidence"]["decision"] == "VERIFIED"
+
+
+def test_unsupported_claim_is_hard_hold_at_governor():
+    result = evaluate_outbound(
+        review(),
+        context(
+            claim_evidence={
+                "claims": [{
+                    "text": "Buyer is definitely losing £100k",
+                    "kind": "performance_outcome",
+                    "evidence_ref": "missing:1",
+                }],
+                "evidence_index": {},
+            }
+        ),
+    )
+    assert result["decision"] == "HOLD"
+    assert "claim_evidence_ref_unresolved" in result["checks"]["hard_holds"]
+
+
+def test_noncanonical_sensitive_claim_is_hard_hold_at_governor():
+    result = evaluate_outbound(
+        review(),
+        context(
+            claim_evidence={
+                "claims": [{
+                    "text": "Price is £5,000 per month",
+                    "kind": "pricing",
+                    "evidence_ref": "price:1",
+                }],
+                "evidence_index": {
+                    "price:1": {
+                        "verified": True,
+                        "source_kind": "official_site_current",
+                        "canonical": False,
+                    }
+                },
+            }
+        ),
+    )
+    assert result["decision"] == "HOLD"
+    assert (
+        "sensitive_claim_requires_canonical_evidence"
+        in result["checks"]["hard_holds"]
+    )
