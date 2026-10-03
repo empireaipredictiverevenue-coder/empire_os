@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 
-PATH = Path("migrations/empiredb/039_outbound_fleet_readiness_certificates.sql")
+PATH = Path("migrations/empiredb/041_outbound_fleet_readiness_certificates.sql")
 
 
 def test_fleet_readiness_certificate_migration_is_append_only_and_non_authorizing():
