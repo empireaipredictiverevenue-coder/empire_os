@@ -34,6 +34,7 @@ _PRIORITY = {
     "MIGRATE_TRANSPORT": 95,
     "REPAIR_AUTH": 90,
     "REMEDIATE_DOMAIN_CONTROL": 85,
+    "REFRESH_EVIDENCE": 82,
     "VERIFY_RECIPIENTS": 80,
     "RUN_CANARY": 75,
     "MEASURE_PLACEMENT": 70,
@@ -76,13 +77,27 @@ def evaluate_ringleader(
         tasks.append(_task("STOP_SEND", "deliverability_hold", "outbound_governor"))
     elif health in {"AMBER", "RED"}:
         tasks.append(_task("THROTTLE", f"deliverability_{health.lower()}", "pacing_controller"))
+    elif health != "GREEN":
+        tasks.append(
+            _task(
+                "REFRESH_EVIDENCE",
+                "deliverability_health_unverified",
+                "deliverability_observer",
+            )
+        )
 
     provider_policy = context.get("provider_policy_permits_use_case")
     if provider_policy is False:
         hard_holds.append("provider_policy_mismatch")
         tasks.append(_task("MIGRATE_TRANSPORT", "provider_policy_mismatch", "transport_adapter"))
     elif provider_policy is not True:
-        tasks.append(_task("OBSERVE", "provider_policy_unverified", "policy_observer"))
+        tasks.append(
+            _task(
+                "REFRESH_EVIDENCE",
+                "provider_policy_unverified",
+                "policy_observer",
+            )
+        )
 
     auth = dict(context.get("authentication") or {})
     missing_auth = [
@@ -99,7 +114,8 @@ def evaluate_ringleader(
     ):
         tasks.append(
             _task(
-                "VERIFY_RECIPIENTS",
+                "REFRESH_EVIDENCE",
+            "VERIFY_RECIPIENTS",
                 "recipient_quality_unverified",
                 "recipient_verifier",
             )
