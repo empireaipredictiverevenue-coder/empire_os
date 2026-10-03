@@ -203,9 +203,23 @@ class ModelRouter:
         budget_remaining: float | None = None,
         remaining_queries: int | None = None,
         untrusted_input: bool = False,
+        excluded_model_ids: set[str] | frozenset[str] | None = None,
+        excluded_providers: set[str] | frozenset[str] | None = None,
     ) -> RouteDecision:
         task = (task or "reasoning").strip().lower()
         stakes = (stakes or "normal").strip().lower()
+
+        excluded_model_ids = {
+            str(value).strip()
+            for value in (excluded_model_ids or ())
+            if str(value).strip()
+        }
+
+        excluded_providers = {
+            str(value).strip().lower()
+            for value in (excluded_providers or ())
+            if str(value).strip()
+        }
 
         signals = self._signals(
             task=task,
@@ -260,10 +274,31 @@ class ModelRouter:
             "high": 1,
             "critical": 2,
         }
+        hard_unhealthy_states = {
+            "blocked",
+            "blocked_observed",
+            "unavailable",
+            "unhealthy",
+            "offline",
+            "backoff",
+            "disabled",
+            "failed",
+            "error",
+            "circuit_open",
+        }
+
         candidates = [
             m for m in candidates
             if m.provider.lower() not in self.blocked_providers
             and m.model.lower() not in self.blocked_models
+            and m.model_id not in excluded_model_ids
+            and m.provider.lower() not in excluded_providers
+            and getattr(m, "available", True) is not False
+            and str(
+                getattr(m, "health", "unknown")
+                or "unknown"
+            ).strip().lower()
+            not in hard_unhealthy_states
             and (not untrusted_input or m.allow_untrusted_input)
             and stakes_rank.get(stakes, 0)
             <= stakes_rank.get(m.max_stakes, 2)

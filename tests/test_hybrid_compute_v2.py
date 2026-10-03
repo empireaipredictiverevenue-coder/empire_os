@@ -313,7 +313,7 @@ def test_governed_action_requires_no_model_promotion():
         result.hybrid_decision[
             "recommended_route"
         ]
-        == Route.DETERMINISTIC.value
+        == Route.HUMAN_GATE.value
     )
     assert (
         result.recommended_capability["status"]

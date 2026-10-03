@@ -155,6 +155,9 @@ class LLMGateway:
         self.calls = 0
         self.failures = 0
 
+        # Compute-routing safety only. This does not grant business authority.
+        self._runtime_blocked_providers: set[str] = set()
+
     def policy(self, task: str) -> tuple[str, str]:
         """Compatibility shim.
 
@@ -179,6 +182,8 @@ class LLMGateway:
         require_vision: bool = False,
         budget_remaining: float | None = None,
         remaining_queries: int | None = None,
+        excluded_model_ids: set[str] | frozenset[str] | None = None,
+        excluded_providers: set[str] | frozenset[str] | None = None,
     ) -> RouteDecision:
         return self.router.route(
             task=task,
@@ -189,6 +194,8 @@ class LLMGateway:
             require_vision=require_vision,
             budget_remaining=budget_remaining,
             remaining_queries=remaining_queries,
+            excluded_model_ids=excluded_model_ids,
+            excluded_providers=excluded_providers,
         )
 
     def describe(self) -> dict:
@@ -283,113 +290,307 @@ class LLMGateway:
         budget_remaining: float | None = None,
         remaining_queries: int | None = None,
     ) -> str:
-        decision = self.route(
-            messages,
-            task=task,
-            system=system,
-            stakes=stakes,
-            require_reasoning=require_reasoning,
-            require_vision=require_vision,
-            budget_remaining=budget_remaining,
-            remaining_queries=remaining_queries,
+        """Execute with bounded health-aware model fallback."""
+
+        timeout = int(
+            _env(
+                "EMPIRE_LLM_TIMEOUT",
+                "60",
+            )
         )
 
-        provider = decision.model.provider
-        model = decision.model.model
-        timeout = int(_env("EMPIRE_LLM_TIMEOUT", "60"))
-        attempts = int(_env("EMPIRE_LLM_RETRIES", "2"))
+        attempts = max(
+            0,
+            min(
+                int(
+                    _env(
+                        "EMPIRE_LLM_RETRIES",
+                        "2",
+                    )
+                ),
+                5,
+            ),
+        )
+
+        max_fallbacks = max(
+            0,
+            min(
+                int(
+                    _env(
+                        "EMPIRE_LLM_FALLBACK_MODELS",
+                        "2",
+                    )
+                ),
+                5,
+            ),
+        )
+
+        excluded_model_ids: set[str] = set()
+
+        excluded_providers = set(
+            self._runtime_blocked_providers
+        )
+
+        hard_failure_markers = (
+            "http 401",
+            "http 403",
+            "freetiererror",
+            "zen_failed",
+            "unauthorized",
+            "forbidden",
+            "permission denied",
+            "no_gemini_key",
+            "no_api_key",
+            "unknown_llm_provider",
+        )
 
         last_error = ""
 
-        for attempt in range(attempts + 1):
-            self.calls += 1
-
+        for fallback_index in range(
+            max_fallbacks + 1
+        ):
             try:
-                client = self._client(provider, model, timeout)
-                kwargs = {
-                    "messages": messages,
-                    "system": system,
-                    "temperature": temperature,
-                }
-
-                if provider.lower() in {
-                    "openrouter",
-                    "opencode",
-                    "opencode_zen",
-                    "zen",
-                    "llamacpp",
-                    "llama_cpp",
-                }:
-                    kwargs["max_tokens"] = max_tokens
-
-                started = time.monotonic()
-                result = client.chat(**kwargs)
-                latency_ms = round((time.monotonic() - started) * 1000, 1)
-
-                if result is None or not str(result).strip():
-                    raise GatewayError("empty_llm_response")
-
-                # Provider adapters may return {"error": ...} as a string
-                # instead of raising. Never record those as successful calls.
-                result_text = str(result).strip()
-                try:
-                    parsed_result = json.loads(result_text)
-                except (json.JSONDecodeError, TypeError):
-                    parsed_result = None
-
-                if isinstance(parsed_result, dict) and parsed_result.get("error"):
-                    raise GatewayError(
-                        f"provider_error:{parsed_result.get('error')}"
-                    )
-
-                self._receipt(
+                decision = self.route(
+                    messages,
                     task=task,
-                    route=decision.route,
-                    provider=provider,
-                    model=getattr(client, "model", model),
-                    score=decision.score,
-                    reasoning_gain=decision.reasoning_gain,
-                    estimated_cost=decision.estimated_cost,
-                    ok=True,
-                    attempt=attempt + 1,
-                    latency_ms=latency_ms,
+                    system=system,
+                    stakes=stakes,
+                    require_reasoning=require_reasoning,
+                    require_vision=require_vision,
+                    budget_remaining=budget_remaining,
+                    remaining_queries=remaining_queries,
+                    excluded_model_ids=excluded_model_ids,
+                    excluded_providers=excluded_providers,
                 )
-                return str(result)
-
             except Exception as exc:
-                self.failures += 1
-                last_error = f"{type(exc).__name__}: {exc}"
-
-                self._receipt(
-                    task=task,
-                    route=decision.route,
-                    provider=provider,
-                    model=model,
-                    score=decision.score,
-                    reasoning_gain=decision.reasoning_gain,
-                    estimated_cost=decision.estimated_cost,
-                    ok=False,
-                    attempt=attempt + 1,
-                    latency_ms=latency_ms if "latency_ms" in locals() else None,
-                    error=last_error[:300],
+                route_error = (
+                    f"{type(exc).__name__}: {exc}"
                 )
 
-                if attempt < attempts:
-                    delay = min(2 ** attempt, 8)
-                    logger.warning(
-                        "LLM failure task=%s provider=%s model=%s attempt=%d/%d; "
-                        "retry in %ss: %s",
-                        task,
+                if last_error:
+                    raise GatewayError(
+                        f"{last_error}; "
+                        "fallback_route_failed:"
+                        f"{route_error}"
+                    ) from exc
+
+                raise GatewayError(
+                    route_error
+                ) from exc
+
+            provider = (
+                decision.model.provider
+            )
+
+            model = (
+                decision.model.model
+            )
+
+            model_id = str(
+                getattr(
+                    decision.model,
+                    "model_id",
+                    model,
+                )
+            )
+
+            for attempt in range(
+                attempts + 1
+            ):
+                self.calls += 1
+                latency_ms = None
+
+                try:
+                    client = self._client(
                         provider,
                         model,
-                        attempt + 1,
-                        attempts + 1,
-                        delay,
-                        last_error[:160],
+                        timeout,
                     )
-                    time.sleep(delay)
 
-        raise GatewayError(last_error or "llm_failed")
+                    kwargs = {
+                        "messages": messages,
+                        "system": system,
+                        "temperature": temperature,
+                    }
+
+                    if provider.lower() in {
+                        "openrouter",
+                        "opencode",
+                        "opencode_zen",
+                        "zen",
+                        "llamacpp",
+                        "llama_cpp",
+                    }:
+                        kwargs[
+                            "max_tokens"
+                        ] = max_tokens
+
+                    started = (
+                        time.monotonic()
+                    )
+
+                    result = client.chat(
+                        **kwargs
+                    )
+
+                    latency_ms = round(
+                        (
+                            time.monotonic()
+                            - started
+                        )
+                        * 1000,
+                        1,
+                    )
+
+                    if (
+                        result is None
+                        or not str(
+                            result
+                        ).strip()
+                    ):
+                        raise GatewayError(
+                            "empty_llm_response"
+                        )
+
+                    result_text = str(
+                        result
+                    ).strip()
+
+                    try:
+                        parsed = json.loads(
+                            result_text
+                        )
+                    except (
+                        json.JSONDecodeError,
+                        TypeError,
+                    ):
+                        parsed = None
+
+                    if (
+                        isinstance(
+                            parsed,
+                            dict,
+                        )
+                        and parsed.get(
+                            "error"
+                        )
+                    ):
+                        raise GatewayError(
+                            "provider_error:"
+                            f"{parsed.get('error')}"
+                        )
+
+                    self._receipt(
+                        task=task,
+                        route=decision.route,
+                        provider=provider,
+                        model=getattr(
+                            client,
+                            "model",
+                            model,
+                        ),
+                        score=decision.score,
+                        reasoning_gain=(
+                            decision.reasoning_gain
+                        ),
+                        estimated_cost=(
+                            decision.estimated_cost
+                        ),
+                        ok=True,
+                        attempt=attempt + 1,
+                        latency_ms=latency_ms,
+                    )
+
+                    return str(result)
+
+                except Exception as exc:
+                    self.failures += 1
+
+                    last_error = (
+                        f"{type(exc).__name__}: "
+                        f"{exc}"
+                    )
+
+                    self._receipt(
+                        task=task,
+                        route=decision.route,
+                        provider=provider,
+                        model=model,
+                        score=decision.score,
+                        reasoning_gain=(
+                            decision.reasoning_gain
+                        ),
+                        estimated_cost=(
+                            decision.estimated_cost
+                        ),
+                        ok=False,
+                        attempt=attempt + 1,
+                        latency_ms=latency_ms,
+                        error=last_error[:300],
+                    )
+
+                    lower_error = (
+                        last_error.lower()
+                    )
+
+                    hard_failure = any(
+                        marker in lower_error
+                        for marker
+                        in hard_failure_markers
+                    )
+
+                    if hard_failure:
+                        key = provider.lower()
+
+                        excluded_providers.add(
+                            key
+                        )
+
+                        self._runtime_blocked_providers.add(
+                            key
+                        )
+
+                        logger.warning(
+                            "LLM provider circuit opened "
+                            "provider=%s model=%s "
+                            "error=%s",
+                            provider,
+                            model,
+                            last_error[:160],
+                        )
+
+                        break
+
+                    if attempt < attempts:
+                        delay = min(
+                            2 ** attempt,
+                            8,
+                        )
+
+                        time.sleep(delay)
+
+            excluded_model_ids.add(
+                model_id
+            )
+
+            if fallback_index < max_fallbacks:
+                logger.warning(
+                    "LLM fallback task=%s "
+                    "failed_model=%s "
+                    "failed_provider=%s "
+                    "fallback=%d/%d",
+                    task,
+                    model_id,
+                    provider,
+                    fallback_index + 1,
+                    max_fallbacks,
+                )
+
+        raise GatewayError(
+            last_error
+            or "llm_failed_after_fallback"
+        )
+
 
     def structured_chat(
         self,
