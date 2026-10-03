@@ -131,20 +131,34 @@ def probe_empiredb_deliverability(
                             """
                             SELECT
                               has_table_privilege(%s, %s, 'SELECT'),
-                              has_table_privilege(%s, %s, 'INSERT')
+                              has_table_privilege(%s, %s, 'SELECT'),
+                              has_table_privilege(%s, %s, 'INSERT'),
+                              has_table_privilege(%s, %s, 'UPDATE'),
+                              has_table_privilege(%s, %s, 'DELETE')
                             """,
                             (
                                 REQUIRED_ROLES[0],
                                 table,
                                 REQUIRED_ROLES[1],
                                 table,
+                                REQUIRED_ROLES[1],
+                                table,
+                                REQUIRED_ROLES[1],
+                                table,
+                                REQUIRED_ROLES[1],
+                                table,
                             ),
                         )
-                        row = cursor.fetchone() or (False, False)
+                        row = cursor.fetchone() or (
+                            False, False, False, False, False
+                        )
                         privileges[table] = {
                             "reader_select": bool(row[0]),
-                            "writer_insert": bool(row[1]),
-                            "writer_insert_expected": table in writer_tables,
+                            "writer_select": bool(row[1]),
+                            "writer_insert": bool(row[2]),
+                            "writer_update": bool(row[3]),
+                            "writer_delete": bool(row[4]),
+                            "writer_access_expected": table in writer_tables,
                         }
 
         missing_tables = sorted(
@@ -162,8 +176,11 @@ def probe_empiredb_deliverability(
             if (
                 not state["reader_select"]
                 or (
-                    state["writer_insert_expected"]
-                    and not state["writer_insert"]
+                    state["writer_access_expected"]
+                    and (
+                        not state["writer_select"]
+                        or not state["writer_insert"]
+                    )
                 )
             )
         )
@@ -171,8 +188,15 @@ def probe_empiredb_deliverability(
             table
             for table, state in privileges.items()
             if (
-                not state["writer_insert_expected"]
-                and state["writer_insert"]
+                (
+                    not state["writer_access_expected"]
+                    and (
+                        state["writer_select"]
+                        or state["writer_insert"]
+                    )
+                )
+                or state["writer_update"]
+                or state["writer_delete"]
             )
         )
 
