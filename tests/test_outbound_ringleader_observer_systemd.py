@@ -67,6 +67,7 @@ def test_ringleader_watchdog_service_is_read_only_and_independent():
     assert "ProtectHome=true" in text
     assert "ReadOnlyPaths=/etc /srv/empire_os/runtime" in text
     assert "ReadWritePaths=" not in text
+    assert "OnFailure=empire-outbound-ringleader-observer.service" in text
 
 
 def test_ringleader_watchdog_timer_checks_after_observer_has_had_time_to_run():
