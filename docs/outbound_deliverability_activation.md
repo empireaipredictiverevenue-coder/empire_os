@@ -8,7 +8,7 @@ It does **not** authorize DNS changes, sender provisioning, database activation,
 Current safe state on branch `agent/outbound-deliverability-v1`:
 
 - Ringleader execution mode: OBSERVE only
-- outbound migrations 033-041: staged in source control, not assumed applied
+- outbound migrations 035-043: staged in source control, not assumed applied
 - least-privilege reader/writer role contract: staged, not assumed provisioned
 - observer + watchdog systemd units/timers: staged, not assumed installed/enabled
 - Resend inbound health contract + local loopback probe: staged
@@ -22,7 +22,7 @@ Before any activation:
 
 1. Preserve the current production branch and all uncommitted work.
 2. Verify the latest live EmpireDB migration number and current outbound schema.
-3. Verify migrations 033-041 do not collide with newer live migration numbers; renumber before apply if required.
+3. Verify migrations 035-043 do not collide with newer live migration numbers; renumber before apply if required.
 4. Verify the canonical backend is EmpireDB/PostgreSQL.
 5. Run `empire_os.outbound_empiredb_activation_probe` read-only against live EmpireDB.
 6. Verify targeted outbound CI is green.
