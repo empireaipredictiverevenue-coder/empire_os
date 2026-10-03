@@ -484,3 +484,22 @@ def test_ringleader_holds_invalid_dmarc_from_open_source_observer():
     assert result["posture"] == "HOLD"
     assert "open_source_evidence_hold" in result["hard_holds"]
     assert any(task["action"] == "REPAIR_AUTH" for task in result["tasks"])
+
+
+def test_ringleader_limits_when_provider_policy_is_unverified():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+    })
+    assert result["posture"] == "LIMITED"
+    assert any(
+        task["action"] == "VERIFY_PROVIDER_POLICY"
+        for task in result["tasks"]
+    )
