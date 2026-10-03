@@ -645,3 +645,60 @@ def test_ringleader_runs_canary_for_learning_content_family():
         and task["reason"] == "content_family_requires_canary"
         for task in result["tasks"]
     )
+
+
+
+def test_ringleader_reverifies_stale_contact_evidence():
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "contact_evidence_freshness": {
+            "source_kind": "official_site_current",
+            "verified_at": "2020-01-01T00:00:00+00:00",
+        },
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["contact_evidence_freshness"]["decision"] == "REVERIFY"
+    assert any(
+        task["action"] == "VERIFY_RECIPIENTS"
+        and task["reason"] == "contact_evidence_reverification_required"
+        for task in result["tasks"]
+    )
+
+
+def test_ringleader_holds_contact_with_post_verification_hard_bounce():
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "contact_evidence_freshness": {
+            "source_kind": "official_site_current",
+            "verified_at": "2020-01-01T00:00:00+00:00",
+            "last_hard_bounce_at": "2020-01-02T00:00:00+00:00",
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "contact_evidence_freshness_hold" in result["hard_holds"]
+    assert (
+        result["contact_evidence_freshness"]["reason"]
+        == "hard_bounce_after_verification"
+    )
