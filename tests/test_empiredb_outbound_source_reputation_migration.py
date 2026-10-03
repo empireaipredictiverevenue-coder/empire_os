@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 
-PATH = Path("migrations/empiredb/037_outbound_source_reputation_memory.sql")
+PATH = Path("migrations/empiredb/039_outbound_source_reputation_memory.sql")
 
 
 def test_source_reputation_migration_is_append_only_and_non_authorizing():
