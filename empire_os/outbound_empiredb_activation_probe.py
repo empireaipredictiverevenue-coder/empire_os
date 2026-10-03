@@ -43,6 +43,11 @@ REQUIRED_COLUMNS = {
     ),
 }
 
+REQUIRED_WRITER_TABLES = (
+    "public.outbound_deliverability_observations",
+    "public.outbound_ringleader_decisions",
+)
+
 REQUIRED_ROLES = (
     "empire_outbound_deliverability_reader",
     "empire_outbound_deliverability_writer",
@@ -120,6 +125,7 @@ def probe_empiredb_deliverability(
                     and all(table_state.values())
                     and all(column_state.values())
                 ):
+                    writer_tables = set(REQUIRED_WRITER_TABLES)
                     for table in REQUIRED_TABLES:
                         cursor.execute(
                             """
@@ -138,6 +144,7 @@ def probe_empiredb_deliverability(
                         privileges[table] = {
                             "reader_select": bool(row[0]),
                             "writer_insert": bool(row[1]),
+                            "writer_insert_expected": table in writer_tables,
                         }
 
         missing_tables = sorted(
@@ -152,7 +159,21 @@ def probe_empiredb_deliverability(
         privilege_gaps = sorted(
             table
             for table, state in privileges.items()
-            if not state["reader_select"] or not state["writer_insert"]
+            if (
+                not state["reader_select"]
+                or (
+                    state["writer_insert_expected"]
+                    and not state["writer_insert"]
+                )
+            )
+        )
+        excess_writer_privileges = sorted(
+            table
+            for table, state in privileges.items()
+            if (
+                not state["writer_insert_expected"]
+                and state["writer_insert"]
+            )
         )
 
         ready = (
@@ -160,6 +181,7 @@ def probe_empiredb_deliverability(
             and not missing_columns
             and not missing_roles
             and not privilege_gaps
+            and not excess_writer_privileges
         )
         return {
             "status": "READY" if ready else "BLOCKED",
@@ -167,12 +189,18 @@ def probe_empiredb_deliverability(
             "tables_ready": not missing_tables,
             "columns_ready": not missing_columns,
             "roles_ready": not missing_roles,
-            "privileges_ready": not privilege_gaps if privileges else False,
+            "privileges_ready": (
+                not privilege_gaps and not excess_writer_privileges
+                if privileges
+                else False
+            ),
             "missing_tables": missing_tables,
             "missing_columns": missing_columns,
             "missing_roles": missing_roles,
             "privilege_gaps": privilege_gaps,
+            "excess_writer_privileges": excess_writer_privileges,
             "required_tables": list(REQUIRED_TABLES),
+            "required_writer_tables": list(REQUIRED_WRITER_TABLES),
             "required_columns": {
                 table: list(columns)
                 for table, columns in REQUIRED_COLUMNS.items()
