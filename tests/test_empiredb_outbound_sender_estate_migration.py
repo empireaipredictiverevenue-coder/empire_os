@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 
-PATH = Path("migrations/empiredb/035_outbound_sender_estate_inventory.sql")
+PATH = Path("migrations/empiredb/037_outbound_sender_estate_inventory.sql")
 
 
 def test_sender_estate_migration_is_staged_and_non_authorizing():
