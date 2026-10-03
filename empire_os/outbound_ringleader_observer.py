@@ -19,6 +19,10 @@ from empire_os.outbound_deliverability_service import (
 )
 from empire_os.outbound_founder_alerts import build_founder_alert
 from empire_os.outbound_telemetry_probe import probe_loopback_health
+from empire_os.outbound_observer_heartbeat import (
+    DEFAULT_OBSERVER_HEARTBEAT_PATH,
+    write_observer_heartbeat,
+)
 from empire_os.outbound_estate_reconciliation import reconcile_sender_estate
 from empire_os.outbound_evidence_bundle import (
     DEFAULT_EVIDENCE_BUNDLE_PATH,
@@ -360,6 +364,8 @@ def main() -> int:
     if require_persistence and (reader is None or writer is None):
         raise RuntimeError("ringleader_persistence_required_but_unconfigured")
 
+    cycle_now = datetime.now(timezone.utc)
+
     estate_inventory = None
     enable_estate_reconciliation = _truthy(
         os.getenv("EMPIRE_OUTBOUND_ENABLE_ESTATE_RECONCILIATION")
@@ -370,7 +376,7 @@ def main() -> int:
                 "estate_reconciliation_requires_empiredb_reader"
             )
         estate_inventory = reader.sender_estate_inventory(
-            capacity_date=datetime.now(timezone.utc).date().isoformat()
+            capacity_date=cycle_now.date().isoformat()
         )
 
     result = observe_once(
@@ -383,7 +389,21 @@ def main() -> int:
         reader=reader,
         writer=writer,
         source=telemetry_source,
+        now=cycle_now,
     )
+
+    heartbeat_path = Path(
+        os.getenv(
+            "EMPIRE_OUTBOUND_OBSERVER_HEARTBEAT_PATH",
+            str(DEFAULT_OBSERVER_HEARTBEAT_PATH),
+        )
+    )
+    write_observer_heartbeat(
+        result,
+        path=heartbeat_path,
+        now=cycle_now,
+    )
+
     print(json.dumps(result, sort_keys=True, default=str))
     return 0
 
