@@ -898,3 +898,139 @@ def test_ringleader_throttles_saturated_corridor_without_global_hard_hold():
         task["action"] == "THROTTLE_CORRIDOR"
         for task in result["tasks"]
     )
+
+
+
+def test_ringleader_holds_send_when_critical_telemetry_is_blind():
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "telemetry_sla": {
+            "now": "2026-10-03T20:30:00+00:00",
+            "required_sources": [
+                "provider_metrics",
+                "provider_event_ingest",
+            ],
+            "critical_sources": [
+                "provider_metrics",
+                "provider_event_ingest",
+            ],
+            "heartbeats": [{
+                "source": "provider_metrics",
+                "observed_at": "2026-10-03T20:25:00+00:00",
+                "success": True,
+                "coverage": True,
+            }],
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "telemetry_critical_blind" in result["hard_holds"]
+    assert result["telemetry_sla"]["posture"] == "BLIND"
+    assert any(
+        task["action"] == "STOP_SEND"
+        and task["reason"] == "telemetry_critical_blind"
+        for task in result["tasks"]
+    )
+
+
+def test_ringleader_blocks_scale_not_healthy_traffic_when_fleet_telemetry_blind():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+        "telemetry_sla": {
+            "now": "2026-10-03T20:30:00+00:00",
+            "required_sources": ["provider_event_ingest"],
+            "critical_sources": ["provider_event_ingest"],
+            "heartbeats": [],
+        },
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["hard_holds"] == []
+    assert any(
+        task["action"] == "BLOCK_SCALE"
+        and task["reason"] == "telemetry_critical_blind"
+        for task in result["tasks"]
+    )
+    assert any(
+        task["action"] == "REFRESH_EVIDENCE"
+        and task["reason"] == "telemetry_critical_blind"
+        for task in result["tasks"]
+    )
+
+
+def test_ringleader_limits_on_stale_critical_telemetry():
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "telemetry_sla": {
+            "now": "2026-10-03T20:30:00+00:00",
+            "required_sources": ["provider_metrics"],
+            "critical_sources": ["provider_metrics"],
+            "heartbeats": [{
+                "source": "provider_metrics",
+                "observed_at": "2026-10-03T18:00:00+00:00",
+                "success": True,
+                "coverage": True,
+            }],
+            "default_max_age_minutes": 30,
+        },
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["hard_holds"] == []
+    assert result["telemetry_sla"]["posture"] == "STALE"
+    assert any(
+        task["action"] == "REFRESH_EVIDENCE"
+        and task["reason"] == "telemetry_critical_stale"
+        for task in result["tasks"]
+    )
+
+
+def test_unverified_recipient_creates_verification_task_without_runtime_error():
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": False},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+    })
+    assert result["posture"] == "LIMITED"
+    assert any(
+        task["action"] == "VERIFY_RECIPIENTS"
+        and task["reason"] == "recipient_quality_unverified"
+        for task in result["tasks"]
+    )
