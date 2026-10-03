@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
+DEFAULT_EVIDENCE_BUNDLE_PATH = Path(
+    "/srv/empire_os/runtime/outbound/evidence_bundle.json"
+)
+
 SUPPORTED_SOURCES = {
     "checkdmarc",
     "parsedmarc",
