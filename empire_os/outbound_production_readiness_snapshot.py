@@ -35,6 +35,13 @@ def build_production_readiness_snapshot(
         or release.get("persistence_required")
     )
 
+    release_status = str(release.get("status") or "").upper()
+    release_attestation_valid = (
+        release_status == "CURRENT"
+        if release_status
+        else release.get("targeted_ci_green") is True
+    )
+
     db_ready = db.get("status") == "READY"
     provider_event_ready = (
         provider_event.get("success") is True
@@ -42,7 +49,11 @@ def build_production_readiness_snapshot(
     )
 
     evidence = {
-        "targeted_ci_green": release.get("targeted_ci_green") is True,
+        "targeted_ci_green": (
+            release.get("targeted_ci_green") is True
+            and release_attestation_valid
+        ),
+        "release_attestation_status": release_status or None,
         "observer_preflight_ready": preflight.get("status") == "READY",
         "observer_mode": preflight.get("mode"),
         "telemetry_available": release.get("telemetry_available") is True,
