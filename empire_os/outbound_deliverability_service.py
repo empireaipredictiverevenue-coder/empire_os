@@ -34,12 +34,9 @@ def metric_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
-def build_rolling_health(
-    provider: DeliverabilityMetricsProvider,
-    *,
-    now: datetime | None = None,
+def build_health_from_windows(
+    raw: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
-    raw = rolling_windows(provider, now=now)
     windows = {
         label: build_deliverability_snapshot(metric_rows(payload))
         for label, payload in raw.items()
@@ -60,3 +57,11 @@ def build_rolling_health(
             "reason": "delivery_event_does_not_prove_inbox_placement",
         },
     }
+
+
+def build_rolling_health(
+    provider: DeliverabilityMetricsProvider,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    return build_health_from_windows(rolling_windows(provider, now=now))
