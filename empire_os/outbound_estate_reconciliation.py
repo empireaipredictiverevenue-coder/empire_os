@@ -7,9 +7,11 @@ modifies inventory, capacity, DNS, transports, or send authority.
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime
 from typing import Any, Iterable, Mapping
 
 from empire_os.outbound_sender_estate import build_sender_estate
+from empire_os.outbound_capacity_reservation import replay_capacity_reservations
 
 
 def reconcile_sender_estate(
@@ -21,6 +23,7 @@ def reconcile_sender_estate(
     pool_members: Iterable[Mapping[str, Any]],
     capacity_events: Iterable[Mapping[str, Any]],
     seed_mailboxes: Iterable[Mapping[str, Any]] = (),
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     transport_rows = [dict(row) for row in transports]
     domain_rows = [dict(row) for row in domains]
@@ -225,6 +228,27 @@ def reconcile_sender_estate(
         capacity_rows,
     )
 
+    reservation_integrity = None
+    if now is not None:
+        reservation_integrity = replay_capacity_reservations(
+            capacity_rows,
+            now=now,
+        )
+        if reservation_integrity["status"] == "HOLD":
+            hard_holds.append("capacity_reservation_integrity_hold")
+            issues.append({
+                "kind": "capacity_reservation_integrity_hold",
+                "anomalies": reservation_integrity["anomalies"],
+            })
+        elif reservation_integrity["status"] == "RECOVERY_REQUIRED":
+            warnings.append("capacity_reservation_recovery_required")
+            issues.append({
+                "kind": "capacity_reservation_recovery_required",
+                "expired_reserved_units": reservation_integrity[
+                    "expired_reserved_units"
+                ],
+            })
+
     if mailbox_rows and sender_estate["eligible_count"] == 0:
         warnings.append("no_eligible_senders")
 
@@ -251,6 +275,7 @@ def reconcile_sender_estate(
         "warnings": warnings,
         "issues": issues,
         "sender_estate": sender_estate,
+        "capacity_reservations": reservation_integrity,
         "inventory": {
             "transports": len(transport_rows),
             "domains": len(domain_rows),
