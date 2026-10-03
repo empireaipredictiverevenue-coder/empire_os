@@ -18,6 +18,7 @@ from empire_os.outbound_deliverability_service import (
     metric_rows,
 )
 from empire_os.outbound_founder_alerts import build_founder_alert
+from empire_os.outbound_estate_reconciliation import reconcile_sender_estate
 from empire_os.outbound_evidence_bundle import (
     DEFAULT_EVIDENCE_BUNDLE_PATH,
     load_evidence_bundle,
@@ -97,6 +98,7 @@ def observe_once(
     scope_key: str,
     context: Mapping[str, Any] | None = None,
     evidence_bundle: Mapping[str, Any] | None = None,
+    estate_inventory: Mapping[str, Any] | None = None,
     reader=None,
     writer=None,
     source: str = "resend",
@@ -120,6 +122,18 @@ def observe_once(
     )
     supplied = merge_observer_context(context, bundle_projection)
 
+    estate_reconciliation = None
+    if isinstance(estate_inventory, Mapping):
+        estate_reconciliation = reconcile_sender_estate(
+            transports=estate_inventory.get("transports") or [],
+            domains=estate_inventory.get("domains") or [],
+            mailboxes=estate_inventory.get("mailboxes") or [],
+            pools=estate_inventory.get("pools") or [],
+            pool_members=estate_inventory.get("pool_members") or [],
+            capacity_events=estate_inventory.get("capacity_events") or [],
+            seed_mailboxes=estate_inventory.get("seed_mailboxes") or [],
+        )
+
     ringleader_context = {
         **supplied,
         "evaluation_scope": "FLEET",
@@ -128,6 +142,8 @@ def observe_once(
             "health": health["overall_health"],
         },
     }
+    if estate_reconciliation is not None:
+        ringleader_context["sender_estate_reconciliation"] = estate_reconciliation
     decision = evaluate_ringleader(ringleader_context)
     if decision.get("mutation_authorized") is not False:
         raise RuntimeError("observer_must_remain_non_mutating")
@@ -189,6 +205,7 @@ def observe_once(
             ),
         },
         "ringleader": decision,
+        "sender_estate_reconciliation": estate_reconciliation,
         "founder_alert": build_founder_alert(decision),
         "persistence": persistence,
         "mutation_authorized": False,
@@ -247,11 +264,25 @@ def main() -> int:
     if require_persistence and (reader is None or writer is None):
         raise RuntimeError("ringleader_persistence_required_but_unconfigured")
 
+    estate_inventory = None
+    enable_estate_reconciliation = _truthy(
+        os.getenv("EMPIRE_OUTBOUND_ENABLE_ESTATE_RECONCILIATION")
+    )
+    if enable_estate_reconciliation:
+        if reader is None:
+            raise RuntimeError(
+                "estate_reconciliation_requires_empiredb_reader"
+            )
+        estate_inventory = reader.sender_estate_inventory(
+            capacity_date=datetime.now(timezone.utc).date().isoformat()
+        )
+
     result = observe_once(
         ResendMetricsProvider(),
         scope_key=scope_key,
         context=context,
         evidence_bundle=evidence_bundle,
+        estate_inventory=estate_inventory,
         reader=reader,
         writer=writer,
         source=telemetry_source,
