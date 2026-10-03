@@ -164,3 +164,44 @@ def test_latest_evidence_head_uses_read_only_scope_contract():
     assert "outbound_deliverability_observations" in sql
     assert "outbound_ringleader_decisions" in sql
     assert params == ("tenant-a", "tenant-a")
+
+
+
+def test_sender_estate_inventory_is_scope_scoped_and_read_only():
+    calls = []
+    repo = PostgresDeliverabilityRepository(
+        "reader-dsn",
+        "tenant-a",
+        connect_factory=connect_factory(calls),
+    )
+
+    result = repo.sender_estate_inventory(capacity_date="2026-10-03")
+
+    assert set(result) == {
+        "transports",
+        "domains",
+        "mailboxes",
+        "pools",
+        "pool_members",
+        "capacity_events",
+        "seed_mailboxes",
+    }
+
+    sql_calls = [
+        call for call in calls
+        if call[0] not in {
+            "CONNECT",
+            "SET TRANSACTION READ ONLY",
+            "SET LOCAL ROLE empire_outbound_deliverability_reader",
+            "SELECT set_config('app.scope_key', %s, true)",
+        }
+    ]
+    assert len(sql_calls) == 7
+    assert all("WHERE scope_key = %s" in sql for sql, _ in sql_calls)
+    capacity_sql, capacity_params = next(
+        (sql, params)
+        for sql, params in sql_calls
+        if "outbound_capacity_ledger" in sql
+    )
+    assert "capacity_date = %s::date" in capacity_sql
+    assert capacity_params == ("tenant-a", "2026-10-03")
