@@ -8,6 +8,7 @@ on:
       - "empire_os/microsoft_outlook_evidence.py"
       - "empire_os/founder_outbound_deliverability_api.py"
       - "empire_os/founder_dashboard_service.py"
+      - "empire_os/resend_webhook_app.py"
       - "apps/search-command-centre/src/app/founder/deliverability/**"
       - "apps/search-command-centre/src/app/founder/page.tsx"
       - "apps/search-command-centre/src/lib/founder-api.ts"
@@ -15,8 +16,19 @@ on:
       - "migrations/empiredb/033_outbound_deliverability_control_plane.sql"
       - "migrations/empiredb/034_outbound_policy_governance.sql"
       - "migrations/empiredb/035_outbound_sender_estate_inventory.sql"
+      - "migrations/empiredb/036_outbound_capacity_reservation_leases.sql"
+      - "migrations/empiredb/037_outbound_source_reputation_memory.sql"
+      - "migrations/empiredb/038_outbound_content_claim_memory.sql"
+      - "migrations/empiredb/039_outbound_fleet_readiness_certificates.sql"
+      - "migrations/empiredb/040_outbound_account_saturation_dimensions.sql"
+      - "migrations/empiredb/041_outbound_telemetry_sla.sql"
       - "config/outbound_deliverability.env.example"
+      - "config/outbound_ringleader_context.example.json"
+      - "deploy/empiredb/outbound_deliverability_roles.sql"
       - "deploy/systemd/empire-outbound-ringleader-observer.*"
+      - "deploy/systemd/empire-outbound-ringleader-watchdog.*"
+      - "scripts/provision_outbound_deliverability_roles.sh"
+      - "scripts/verify_outbound_production_readiness.sh"
       - "tests/test_outbound_*.py"
       - "tests/test_empiredb_outbound_*.py"
       - "tests/test_founder_outbound_deliverability_api.py"
@@ -33,11 +45,24 @@ on:
       - "empire_os/microsoft_outlook_evidence.py"
       - "empire_os/founder_outbound_deliverability_api.py"
       - "empire_os/founder_dashboard_service.py"
+      - "empire_os/resend_webhook_app.py"
       - "empire_os/funnel.py"
       - "migrations/empiredb/033_outbound_deliverability_control_plane.sql"
       - "migrations/empiredb/034_outbound_policy_governance.sql"
+      - "migrations/empiredb/035_outbound_sender_estate_inventory.sql"
+      - "migrations/empiredb/036_outbound_capacity_reservation_leases.sql"
+      - "migrations/empiredb/037_outbound_source_reputation_memory.sql"
+      - "migrations/empiredb/038_outbound_content_claim_memory.sql"
+      - "migrations/empiredb/039_outbound_fleet_readiness_certificates.sql"
+      - "migrations/empiredb/040_outbound_account_saturation_dimensions.sql"
+      - "migrations/empiredb/041_outbound_telemetry_sla.sql"
       - "config/outbound_deliverability.env.example"
+      - "config/outbound_ringleader_context.example.json"
+      - "deploy/empiredb/outbound_deliverability_roles.sql"
       - "deploy/systemd/empire-outbound-ringleader-observer.*"
+      - "deploy/systemd/empire-outbound-ringleader-watchdog.*"
+      - "scripts/provision_outbound_deliverability_roles.sh"
+      - "scripts/verify_outbound_production_readiness.sh"
       - "tests/test_outbound_*.py"
       - "tests/test_empiredb_outbound_*.py"
       - "tests/test_founder_outbound_deliverability_api.py"
@@ -75,6 +100,7 @@ jobs:
             empire_os/google_postmaster_v2.py \
             empire_os/microsoft_outlook_evidence.py \
             empire_os/founder_outbound_deliverability_api.py \
+            empire_os/resend_webhook_app.py \
             empire_os/funnel.py
 
       - name: Targeted outbound tests
@@ -83,10 +109,55 @@ jobs:
             tests/test_outbound_*.py \
             tests/test_empiredb_outbound_*.py \
             tests/test_founder_outbound_deliverability_api.py \
-            tests/test_google_postmaster_v2.py
+            tests/test_google_postmaster_v2.py \
+            tests/test_resend_webhook_app.py
 
       - name: Founder deliverability UI typecheck
         working-directory: apps/search-command-centre
         run: |
           npm ci
           npx tsc --noEmit
+
+      - name: Build outbound release attestation
+        if: ${{ success() }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          payload = {
+              "schema_version": "1",
+              "workflow": "outbound-deliverability",
+              "sha": os.environ["GITHUB_SHA"],
+              "ref": os.environ["GITHUB_REF"],
+              "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "targeted_ci_green": True,
+              "compile_green": True,
+              "tests_green": True,
+              "founder_ui_typecheck_green": True,
+              "database_activation_authorized": False,
+              "service_activation_authorized": False,
+              "dns_mutation_authorized": False,
+              "provisioning_authorized": False,
+              "send_authorized": False,
+          }
+          path = Path("artifacts/outbound_release_attestation.json")
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload outbound release attestation
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: outbound-release-attestation-${{ github.sha }}
+          path: artifacts/outbound_release_attestation.json
+          if-no-files-found: error
+          retention-days: 30
