@@ -182,8 +182,9 @@ class PostgresDeliverabilityRepository:
             """
             SELECT
               id,scope_key,capacity_date,mailbox_key,domain,transport_key,
-              recipient_mx,event_type,units,capacity_limit,reason,evidence,
-              recorded_at
+              recipient_mx,event_type,units,capacity_limit,
+              reservation_key,idempotency_key,lease_expires_at,
+              reason,evidence,recorded_at
             FROM public.outbound_capacity_ledger
             WHERE scope_key = %s
               AND capacity_date = %s::date
