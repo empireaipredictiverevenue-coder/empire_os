@@ -28,7 +28,11 @@ class FakeCursor:
         return False
 
     def execute(self, sql, params=None):
-        self.calls.append((" ".join(str(sql).split()), params))
+        normalized = " ".join(str(sql).split())
+        self.calls.append((normalized, params))
+        if "FROM (" in normalized and "evidence_hash" in normalized:
+            self.description = [Column("evidence_hash")]
+            self._rows = [("row-1",)]
 
     def fetchall(self):
         return list(self._rows)
