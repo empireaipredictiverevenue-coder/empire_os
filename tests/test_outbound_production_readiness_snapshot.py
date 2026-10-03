@@ -178,3 +178,32 @@ def test_all_authority_outputs_remain_false():
         "send_authorized",
     ):
         assert result[key] is False
+
+
+
+def test_current_release_attestation_is_accepted():
+    release = base_release()
+    release["status"] = "CURRENT"
+    result = build(release_evidence=release)
+    assert result["status"] == "OBSERVE_OPERATIONAL"
+    assert result["evidence"]["targeted_ci_green"] is True
+    assert result["evidence"]["release_attestation_status"] == "CURRENT"
+
+
+def test_stale_release_attestation_blocks_even_when_matrix_flags_are_green():
+    release = base_release()
+    release["status"] = "STALE"
+    result = build(release_evidence=release)
+    assert result["status"] == "BLOCKED"
+    assert result["evidence"]["targeted_ci_green"] is False
+    assert "targeted_ci_not_green" in (
+        result["activation"]["observe"]["blockers"]
+    )
+
+
+def test_invalid_release_attestation_blocks_even_when_matrix_flags_are_green():
+    release = base_release()
+    release["status"] = "INVALID"
+    result = build(release_evidence=release)
+    assert result["status"] == "BLOCKED"
+    assert result["evidence"]["targeted_ci_green"] is False
