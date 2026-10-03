@@ -39,13 +39,14 @@ def evaluate_source_reputation(
     if not key:
         raise ValueError("source_key_required")
 
+    rows = [dict(row) for row in events]
+
     counts: Counter[str] = Counter()
     sent = 0
     score = 0.0
     revenue = 0.0
 
-    for raw in events:
-        row = dict(raw)
+    for row in rows:
         if str(row.get("source_key") or "").strip() != key:
             continue
 
@@ -68,8 +69,8 @@ def evaluate_source_reputation(
     explicit_sent = max(
         [
             max(0, int(dict(row).get("sent_total") or 0))
-            for row in events
-            if str(dict(row).get("source_key") or "").strip() == key
+            for row in rows
+            if str(row.get("source_key") or "").strip() == key
         ]
         or [0]
     )
