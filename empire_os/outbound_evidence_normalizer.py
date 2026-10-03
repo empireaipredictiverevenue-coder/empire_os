@@ -75,6 +75,11 @@ def normalize_evidence(
             if key in row:
                 metrics[key] = 1 if row[key] is True else 0
 
+    elif source == "arf":
+        if row.get("complaint") is True:
+            metrics["complained"] = 1
+        metrics["arf_report"] = 1
+
     else:
         raise ValueError("unsupported_deliverability_evidence_source")
 
