@@ -286,3 +286,30 @@ def test_ringleader_holds_domain_continuity_failure():
     })
     assert result["posture"] == "HOLD"
     assert "domain_continuity_hold" in result["hard_holds"]
+
+
+def test_ringleader_preemptively_throttles_worsening_reputation_forecast():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "health_history": [
+            {"bounce_rate": 0.010, "inbox_placement_rate": 0.97},
+            {"bounce_rate": 0.018, "inbox_placement_rate": 0.96},
+            {"bounce_rate": 0.024, "inbox_placement_rate": 0.95},
+        ],
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["health_forecast"]["posture"] == "PREEMPTIVE_THROTTLE"
+    assert any(
+        task["reason"] == "forecast_threshold_breach_risk"
+        for task in result["tasks"]
+    )
