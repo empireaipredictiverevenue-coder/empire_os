@@ -10,12 +10,12 @@ def test_outbound_ci_tracks_current_production_surfaces():
 
     for required in (
         "empire_os/resend_webhook_app.py",
-        "migrations/empiredb/036_outbound_capacity_reservation_leases.sql",
-        "migrations/empiredb/037_outbound_source_reputation_memory.sql",
-        "migrations/empiredb/038_outbound_content_claim_memory.sql",
-        "migrations/empiredb/039_outbound_fleet_readiness_certificates.sql",
-        "migrations/empiredb/040_outbound_account_saturation_dimensions.sql",
-        "migrations/empiredb/041_outbound_telemetry_sla.sql",
+        "migrations/empiredb/038_outbound_capacity_reservation_leases.sql",
+        "migrations/empiredb/039_outbound_source_reputation_memory.sql",
+        "migrations/empiredb/040_outbound_content_claim_memory.sql",
+        "migrations/empiredb/041_outbound_fleet_readiness_certificates.sql",
+        "migrations/empiredb/042_outbound_account_saturation_dimensions.sql",
+        "migrations/empiredb/043_outbound_telemetry_sla.sql",
         "deploy/empiredb/outbound_deliverability_roles.sql",
         "deploy/systemd/empire-outbound-ringleader-watchdog.*",
         "scripts/provision_outbound_deliverability_roles.sh",
