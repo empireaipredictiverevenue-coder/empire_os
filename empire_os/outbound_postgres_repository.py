@@ -110,6 +110,110 @@ class PostgresDeliverabilityRepository:
         value = rows[0].get("evidence_hash")
         return str(value) if value else None
 
+    def sender_estate_inventory(
+        self,
+        *,
+        capacity_date: str,
+    ) -> dict[str, list[dict[str, Any]]]:
+        date_value = str(capacity_date or "").strip()
+        if not date_value:
+            raise ValueError("capacity_date_required")
+
+        transports = self._read(
+            """
+            SELECT
+              id,scope_key,transport_key,provider,traffic_class,state,
+              policy_compatible,configuration,evidence,created_at,updated_at
+            FROM public.outbound_transports
+            WHERE scope_key = %s
+            ORDER BY transport_key
+            """,
+            (self.scope_key,),
+        )
+        domains = self._read(
+            """
+            SELECT
+              id,scope_key,domain,purpose,lifecycle_state,primary_brand,
+              registrar_controlled,dns_controlled,registrar_provider,
+              dns_provider,expires_on,desired_dns_fingerprint,
+              observed_dns_fingerprint,sovereignty_evidence,
+              created_at,updated_at
+            FROM public.outbound_domains
+            WHERE scope_key = %s
+            ORDER BY domain
+            """,
+            (self.scope_key,),
+        )
+        mailboxes = self._read(
+            """
+            SELECT
+              id,scope_key,mailbox_key,email_address,domain_id,transport_id,
+              state,daily_cap,reputation_credit,identity_evidence,
+              created_at,updated_at
+            FROM public.outbound_mailboxes
+            WHERE scope_key = %s
+            ORDER BY mailbox_key
+            """,
+            (self.scope_key,),
+        )
+        pools = self._read(
+            """
+            SELECT
+              id,scope_key,pool_key,pool_kind,purpose,state,policy,
+              created_at,updated_at
+            FROM public.outbound_sender_pools
+            WHERE scope_key = %s
+            ORDER BY pool_key
+            """,
+            (self.scope_key,),
+        )
+        pool_members = self._read(
+            """
+            SELECT
+              id,scope_key,pool_id,member_type,member_key,active,evidence,
+              created_at
+            FROM public.outbound_pool_members
+            WHERE scope_key = %s
+            ORDER BY pool_id,member_type,member_key
+            """,
+            (self.scope_key,),
+        )
+        capacity_events = self._read(
+            """
+            SELECT
+              id,scope_key,capacity_date,mailbox_key,domain,transport_key,
+              recipient_mx,event_type,units,capacity_limit,reason,evidence,
+              recorded_at
+            FROM public.outbound_capacity_ledger
+            WHERE scope_key = %s
+              AND capacity_date = %s::date
+            ORDER BY recorded_at,id
+            """,
+            (self.scope_key, date_value),
+        )
+        seed_mailboxes = self._read(
+            """
+            SELECT
+              id,scope_key,seed_key,mailbox_provider,recipient_mx_family,
+              active,ownership_verified,evidence,created_at,updated_at
+            FROM public.outbound_seed_mailboxes
+            WHERE scope_key = %s
+            ORDER BY seed_key
+            """,
+            (self.scope_key,),
+        )
+
+        return {
+            "transports": transports,
+            "domains": domains,
+            "mailboxes": mailboxes,
+            "pools": pools,
+            "pool_members": pool_members,
+            "capacity_events": capacity_events,
+            "seed_mailboxes": seed_mailboxes,
+        }
+
+
     def observations(self, *, limit: int = 200) -> Sequence[Mapping[str, Any]]:
         return self._read(
             """
