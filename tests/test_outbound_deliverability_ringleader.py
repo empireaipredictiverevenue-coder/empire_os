@@ -702,3 +702,66 @@ def test_ringleader_holds_contact_with_post_verification_hard_bounce():
         result["contact_evidence_freshness"]["reason"]
         == "hard_bounce_after_verification"
     )
+
+
+
+def test_ringleader_holds_unsafe_outreach_domain_identity():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+        "domain_brand_safety": {
+            "domain": "empire-revenue.co.uk",
+            "purpose": "prospecting",
+            "primary_brand_domain": "empire-ai.co.uk",
+            "empire_owned": True,
+            "registrar_controlled": True,
+            "third_party_impersonation": False,
+            "deceptive_typo_variant": True,
+            "brand_disclosure_present": True,
+            "relationship_to_empire_disclosed": True,
+            "idn_reviewed": False,
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "domain_brand_safety_hold" in result["hard_holds"]
+
+
+def test_ringleader_remediates_missing_outreach_brand_disclosure():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+        "domain_brand_safety": {
+            "domain": "empire-revenue.co.uk",
+            "purpose": "prospecting",
+            "primary_brand_domain": "empire-ai.co.uk",
+            "empire_owned": True,
+            "registrar_controlled": True,
+            "third_party_impersonation": False,
+            "deceptive_typo_variant": False,
+            "brand_disclosure_present": True,
+            "relationship_to_empire_disclosed": False,
+            "idn_reviewed": False,
+        },
+    })
+    assert result["posture"] == "REMEDIATE"
+    assert any(
+        task["action"] == "REMEDIATE_DOMAIN_CONTROL"
+        and task["reason"] == "domain_brand_safety_remediation_required"
+        for task in result["tasks"]
+    )
