@@ -1,0 +1,92 @@
+name: outbound-deliverability
+
+on:
+  pull_request:
+    paths:
+      - "empire_os/outbound_*.py"
+      - "empire_os/google_postmaster_v2.py"
+      - "empire_os/microsoft_outlook_evidence.py"
+      - "empire_os/founder_outbound_deliverability_api.py"
+      - "empire_os/founder_dashboard_service.py"
+      - "apps/search-command-centre/src/app/founder/deliverability/**"
+      - "apps/search-command-centre/src/app/founder/page.tsx"
+      - "apps/search-command-centre/src/lib/founder-api.ts"
+      - "empire_os/funnel.py"
+      - "migrations/empiredb/033_outbound_deliverability_control_plane.sql"
+      - "migrations/empiredb/034_outbound_policy_governance.sql"
+      - "migrations/empiredb/035_outbound_sender_estate_inventory.sql"
+      - "config/outbound_deliverability.env.example"
+      - "deploy/systemd/empire-outbound-ringleader-observer.*"
+      - "tests/test_outbound_*.py"
+      - "tests/test_empiredb_outbound_*.py"
+      - "tests/test_founder_outbound_deliverability_api.py"
+      - "tests/test_google_postmaster_v2.py"
+      - "docs/outbound_*.md"
+      - "docs/empire_native_deliverability_stack.md"
+      - ".github/workflows/outbound-deliverability.yml"
+  push:
+    branches:
+      - "agent/outbound-deliverability-v1"
+    paths:
+      - "empire_os/outbound_*.py"
+      - "empire_os/google_postmaster_v2.py"
+      - "empire_os/microsoft_outlook_evidence.py"
+      - "empire_os/founder_outbound_deliverability_api.py"
+      - "empire_os/founder_dashboard_service.py"
+      - "empire_os/funnel.py"
+      - "migrations/empiredb/033_outbound_deliverability_control_plane.sql"
+      - "migrations/empiredb/034_outbound_policy_governance.sql"
+      - "config/outbound_deliverability.env.example"
+      - "deploy/systemd/empire-outbound-ringleader-observer.*"
+      - "tests/test_outbound_*.py"
+      - "tests/test_empiredb_outbound_*.py"
+      - "tests/test_founder_outbound_deliverability_api.py"
+      - "tests/test_google_postmaster_v2.py"
+      - ".github/workflows/outbound-deliverability.yml"
+
+jobs:
+  targeted-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: apps/search-command-centre/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Compile outbound subsystem
+        run: |
+          python -m compileall -q \
+            empire_os/outbound_*.py \
+            empire_os/google_postmaster_v2.py \
+            empire_os/microsoft_outlook_evidence.py \
+            empire_os/founder_outbound_deliverability_api.py \
+            empire_os/funnel.py
+
+      - name: Targeted outbound tests
+        run: |
+          pytest -q \
+            tests/test_outbound_*.py \
+            tests/test_empiredb_outbound_*.py \
+            tests/test_founder_outbound_deliverability_api.py \
+            tests/test_google_postmaster_v2.py
+
+      - name: Founder deliverability UI typecheck
+        working-directory: apps/search-command-centre
+        run: |
+          npm ci
+          npx tsc --noEmit

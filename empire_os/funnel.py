@@ -20,13 +20,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
-# Load /root/empire_os/.env into os.environ if not already set, so
-# per-process toggles like EXCLUDE_TEST_FROM_FUNNEL_COUNTS work even
-# when the parent shell didn't source .env. Idempotent: existing
-# os.environ keys are not overwritten.
+# Load the legacy local .env into os.environ when it is both present and
+# readable. CI and least-privilege runtimes may be unable to stat /root;
+# inability to inspect this optional compatibility file must never break import.
 _ENV_PATH = Path("/root/empire_os/.env")
-if _ENV_PATH.exists():
-    try:
+try:
+    if _ENV_PATH.exists():
         for _ln in _ENV_PATH.read_text().splitlines():
             _ln = _ln.strip()
             if not _ln or _ln.startswith("#") or "=" not in _ln:
@@ -36,8 +35,8 @@ if _ENV_PATH.exists():
             _v = _v.strip().strip('"').strip("'")
             if _k and _k not in os.environ:
                 os.environ[_k] = _v
-    except Exception:
-        pass
+except (OSError, PermissionError):
+    pass
 
 
 class FunnelState(str, Enum):

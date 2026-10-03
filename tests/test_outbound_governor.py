@@ -101,3 +101,31 @@ def test_auto_flags_are_rejected_outside_guarded_execute():
         OutboundGovernorPolicy(mode="OBSERVE", allow_auto_approval=True)
     with pytest.raises(ValueError, match="GUARDED_EXECUTE"):
         OutboundGovernorPolicy(mode="OBSERVE", allow_auto_send=True)
+
+
+def test_fake_reply_prefix_is_hard_hold():
+    result = evaluate_outbound(review(subject="Re: quick question"), context())
+    assert result["decision"] == "HOLD"
+    assert "deceptive_reply_or_forward_prefix" in result["checks"]["hard_holds"]
+
+
+def test_deliverability_context_can_hard_hold_provider_policy_mismatch():
+    result = evaluate_outbound(
+        review(),
+        context(
+            deliverability={
+                "provider_policy_permits_use_case": False,
+                "spf_aligned": True,
+                "dkim_aligned": True,
+                "dmarc_valid": True,
+                "tls_ready": True,
+                "recipient_verified": True,
+                "bounce_rate": 0.01,
+                "complaint_rate": 0.0,
+                "daily_cap": 30,
+                "volume_spike_ratio": 1.0,
+            }
+        ),
+    )
+    assert result["decision"] == "HOLD"
+    assert "provider_policy_prohibits_use_case" in result["checks"]["hard_holds"]
