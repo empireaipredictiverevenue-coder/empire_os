@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 
-PATH = Path("migrations/empiredb/041_outbound_telemetry_sla.sql")
+PATH = Path("migrations/empiredb/043_outbound_telemetry_sla.sql")
 
 
 def test_telemetry_sla_migration_is_append_only_and_non_authorizing():
