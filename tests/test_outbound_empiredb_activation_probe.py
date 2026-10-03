@@ -2,6 +2,7 @@ from empire_os.outbound_empiredb_activation_probe import (
     REQUIRED_COLUMNS,
     REQUIRED_ROLES,
     REQUIRED_TABLES,
+    REQUIRED_WRITER_TABLES,
     probe_empiredb_deliverability,
 )
 
@@ -14,11 +15,13 @@ class FakeCursor:
         columns=True,
         roles=True,
         privileges=True,
+        excess_writer=False,
     ):
         self.tables = tables
         self.columns = columns
         self.roles = roles
         self.privileges = privileges
+        self.excess_writer = excess_writer
         self._row = None
         self.calls = []
 
@@ -38,7 +41,14 @@ class FakeCursor:
         elif "FROM pg_roles" in normalized:
             self._row = (self.roles,)
         elif "has_table_privilege" in normalized:
-            self._row = (self.privileges, self.privileges)
+            table = params[1]
+            writer_expected = table in REQUIRED_WRITER_TABLES
+            writer_insert = (
+                self.privileges
+                if writer_expected
+                else bool(self.excess_writer)
+            )
+            self._row = (self.privileges, writer_insert)
         else:
             self._row = None
 
@@ -82,6 +92,8 @@ def test_probe_is_read_only_and_ready_when_schema_roles_privileges_exist():
     }
     assert result["columns_ready"] is True
     assert result["required_roles"] == list(REQUIRED_ROLES)
+    assert result["required_writer_tables"] == list(REQUIRED_WRITER_TABLES)
+    assert result["excess_writer_privileges"] == []
 
 
 def test_probe_blocks_when_roles_are_missing():
@@ -122,4 +134,19 @@ def test_probe_blocks_when_required_upgrade_columns_are_missing():
     assert any(
         value.endswith(".reservation_key")
         for value in result["missing_columns"]
+    )
+
+
+
+def test_probe_blocks_excess_writer_insert_authority():
+    cursor = FakeCursor(excess_writer=True)
+    result = probe_empiredb_deliverability(
+        "probe-dsn",
+        connect_factory=factory(cursor),
+    )
+    assert result["status"] == "BLOCKED"
+    assert result["privileges_ready"] is False
+    assert result["excess_writer_privileges"]
+    assert "public.outbound_capacity_ledger" in (
+        result["excess_writer_privileges"]
     )
