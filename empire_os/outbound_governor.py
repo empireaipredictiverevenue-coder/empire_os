@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from empire_os.outbound_deliverability import evaluate_sender_health, lint_first_touch
+from empire_os.outbound_claim_evidence import evaluate_claim_evidence
 
 POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
 ALLOWED_CHANNELS = {"email"}
@@ -137,6 +138,22 @@ def evaluate_outbound(
     if company_score < policy.min_company_score:
         evidence.append("company_score_below_policy")
 
+    claim_evidence = None
+    claim_context = context.get("claim_evidence")
+    if isinstance(claim_context, Mapping):
+        claims = claim_context.get("claims") or []
+        evidence_index = claim_context.get("evidence_index") or {}
+        if isinstance(claims, list) and isinstance(evidence_index, Mapping):
+            claim_evidence = evaluate_claim_evidence(
+                claims,
+                evidence_index,
+                now=now,
+            )
+            hard.extend(claim_evidence["hard_holds"])
+            evidence.extend(claim_evidence["evidence_holds"])
+        else:
+            hard.append("claim_evidence_context_invalid")
+
     deliverability = None
     deliverability_context = context.get("deliverability")
     if isinstance(deliverability_context, Mapping):
@@ -179,5 +196,6 @@ def evaluate_outbound(
             "provider_ready": provider_ready,
             "deliverability": deliverability,
             "content_recommendations": content_lint["recommendations"],
+            "claim_evidence": claim_evidence,
         },
     }
