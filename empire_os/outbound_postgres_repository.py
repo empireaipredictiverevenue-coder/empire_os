@@ -85,6 +85,31 @@ class PostgresDeliverabilityRepository:
                 "EmpireDB deliverability read failed"
             ) from exc
 
+    def latest_evidence_head(self) -> str | None:
+        rows = self._read(
+            """
+            SELECT evidence_hash
+            FROM (
+                SELECT evidence_hash,created_at,id
+                  FROM public.outbound_deliverability_observations
+                 WHERE scope_key = %s
+                   AND evidence_hash IS NOT NULL
+                UNION ALL
+                SELECT evidence_hash,created_at,id
+                  FROM public.outbound_ringleader_decisions
+                 WHERE scope_key = %s
+                   AND evidence_hash IS NOT NULL
+            ) evidence_chain
+            ORDER BY created_at DESC,id DESC
+            LIMIT 1
+            """,
+            (self.scope_key, self.scope_key),
+        )
+        if not rows:
+            return None
+        value = rows[0].get("evidence_hash")
+        return str(value) if value else None
+
     def observations(self, *, limit: int = 200) -> Sequence[Mapping[str, Any]]:
         return self._read(
             """
