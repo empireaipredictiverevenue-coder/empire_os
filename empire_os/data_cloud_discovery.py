@@ -52,7 +52,7 @@ APPROVED_VENDOR_BOUNDARIES = {
     "empire_os/legacy_data_egress.py": "migration_containment",
     "empire_os/supabase_egress_guard.py": "migration_containment",
     "empire_os/reliability_agent.py": "migration_observer",
-    "empire_os/astra_token_transport.py": "legacy_observer_adapter",
+    "empire_os/astra_token_transport.py": "retired_observer_adapter_marker",
     "scripts/run_supabase_egress_guard.py": "migration_containment",
 }
 

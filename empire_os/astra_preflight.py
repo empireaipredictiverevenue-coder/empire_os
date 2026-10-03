@@ -21,9 +21,7 @@ class AstraRuntimePreflight:
     env_permissions_secure: bool
     observe_mode_configured: bool
     observer_dsn_configured: bool
-    observer_token_rpc_configured: bool
-    observer_token_file_exists: bool
-    observer_token_permissions_secure: bool
+    legacy_transport_configured: bool
     observer_transport_configured: bool
     policy_bindings_complete: bool
     service_installed: bool
@@ -74,19 +72,18 @@ def assess_runtime_preflight(
     secure = env_permissions_secure(env_file) if exists else False
     mode_ok = str(values.get("EMPIRE_ASTRA_MODE", "")).strip().upper() == "OBSERVE"
     dsn_ok = bool(str(values.get("EMPIRE_ASTRA_OBSERVER_DSN", "")).strip())
-    token_file_raw = str(values.get("EMPIRE_ASTRA_OBSERVER_TOKEN_FILE", "")).strip()
-    token_file = Path(token_file_raw) if token_file_raw else None
-    token_file_exists = bool(token_file and token_file.is_file())
-    token_file_secure = bool(
-        token_file_exists and (token_file.stat().st_mode & 0o077) == 0
+
+    legacy_transport_configured = any(
+        bool(str(values.get(key, "")).strip())
+        for key in (
+            "EMPIRE_ASTRA_SUPABASE_URL",
+            "EMPIRE_ASTRA_SUPABASE_PUBLISHABLE_KEY",
+            "EMPIRE_ASTRA_OBSERVER_TOKEN_FILE",
+        )
     )
-    token_rpc_configured = all(bool(str(values.get(key, "")).strip()) for key in (
-        "EMPIRE_ASTRA_SUPABASE_URL",
-        "EMPIRE_ASTRA_SUPABASE_PUBLISHABLE_KEY",
-        "EMPIRE_ASTRA_OBSERVER_TOKEN_FILE",
-    ))
-    token_rpc_ok = token_rpc_configured and token_file_exists and token_file_secure
-    transport_ok = dsn_ok or token_rpc_ok
+
+    # EmpireDB is the sole canonical Astra transport.
+    transport_ok = dsn_ok and not legacy_transport_configured
     source_health_static = bool(
         str(values.get("EMPIRE_ASTRA_SOURCE_HEALTH_OK", "")).strip()
     )
@@ -114,10 +111,8 @@ def assess_runtime_preflight(
         blockers.append("observer_env_permissions_insecure")
     if not mode_ok:
         blockers.append("observe_mode_not_configured")
-    if token_rpc_configured and not token_file_exists:
-        blockers.append("observer_token_file_missing")
-    elif token_rpc_configured and not token_file_secure:
-        blockers.append("observer_token_permissions_insecure")
+    if legacy_transport_configured:
+        blockers.append("legacy_supabase_transport_configured")
     if not transport_ok:
         blockers.append("observer_transport_not_configured")
     if source_health_file_raw and not source_health_file_exists:
@@ -139,9 +134,7 @@ def assess_runtime_preflight(
         env_permissions_secure=secure,
         observe_mode_configured=mode_ok,
         observer_dsn_configured=dsn_ok,
-        observer_token_rpc_configured=token_rpc_configured,
-        observer_token_file_exists=token_file_exists,
-        observer_token_permissions_secure=token_file_secure,
+        legacy_transport_configured=legacy_transport_configured,
         observer_transport_configured=transport_ok,
         policy_bindings_complete=policy_ok,
         service_installed=service_installed,

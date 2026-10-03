@@ -11,7 +11,6 @@ from empire_os.astra_observer import (
     AstraObserverError,
     run_observer_cycle,
 )
-from empire_os.astra_token_transport import SupabaseTokenAstraRpc
 from empire_os.outcome_role_transport import OutcomeTransportError
 
 
@@ -42,16 +41,11 @@ def parser() -> argparse.ArgumentParser:
 
 
 def _rpc_config():
-    url = os.getenv("EMPIRE_ASTRA_SUPABASE_URL", "").strip()
-    key = os.getenv("EMPIRE_ASTRA_SUPABASE_PUBLISHABLE_KEY", "").strip()
-    token_file = os.getenv("EMPIRE_ASTRA_OBSERVER_TOKEN_FILE", "").strip()
-    if url or key or token_file:
-        if not (url and key and token_file):
-            raise AstraObserverError("incomplete token-authenticated Astra RPC config")
-        def factory(_dsn, _role):
-            return SupabaseTokenAstraRpc(url, key, token_file)
-        return "token-rpc", factory
-    return os.getenv("EMPIRE_ASTRA_OBSERVER_DSN", ""), None
+    """Return the canonical EmpireDB observer DSN.
+
+    Astra has no hosted-database or token-RPC fallback.
+    """
+    return os.getenv("EMPIRE_ASTRA_OBSERVER_DSN", "").strip(), None
 
 
 def main(argv=None) -> int:
