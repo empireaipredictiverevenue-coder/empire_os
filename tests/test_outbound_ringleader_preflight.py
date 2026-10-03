@@ -127,3 +127,29 @@ def test_preflight_blocks_unsigned_bundle_when_signature_required(tmp_path):
             context_path=tmp_path / "missing-context.json",
             evidence_bundle_path=bundle,
         )
+
+
+
+def test_preflight_blocks_estate_reconciliation_without_empiredb_reader(tmp_path):
+    env = base_env()
+    env["EMPIRE_OUTBOUND_ENABLE_ESTATE_RECONCILIATION"] = "true"
+    result = evaluate_preflight(
+        env,
+        context_path=tmp_path / "missing-context.json",
+    )
+    assert result["status"] == "BLOCKED"
+    assert "estate_reconciliation_requires_empiredb_reader" in result["blockers"]
+    assert result["estate_reconciliation_enabled"] is True
+
+
+def test_preflight_allows_estate_reconciliation_with_paired_db_bindings(tmp_path):
+    env = base_env()
+    env["EMPIRE_OUTBOUND_ENABLE_ESTATE_RECONCILIATION"] = "true"
+    env["EMPIRE_OUTBOUND_DELIVERABILITY_READER_DSN"] = "reader"
+    env["EMPIRE_OUTBOUND_DELIVERABILITY_WRITER_DSN"] = "writer"
+    result = evaluate_preflight(
+        env,
+        context_path=tmp_path / "missing-context.json",
+    )
+    assert result["status"] == "READY"
+    assert result["estate_reconciliation_enabled"] is True
