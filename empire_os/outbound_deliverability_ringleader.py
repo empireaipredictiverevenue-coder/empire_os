@@ -97,7 +97,7 @@ def evaluate_ringleader(
     elif provider_policy is not True:
         tasks.append(
             _task(
-                "REFRESH_EVIDENCE",
+                "VERIFY_PROVIDER_POLICY",
                 "provider_policy_unverified",
                 "policy_observer",
             )
