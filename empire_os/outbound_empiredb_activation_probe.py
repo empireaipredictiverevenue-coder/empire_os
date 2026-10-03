@@ -13,6 +13,13 @@ REQUIRED_TABLES = (
     "public.outbound_contact_pressure_events",
     "public.outbound_policy_manifests",
     "public.outbound_policy_shadow_runs",
+    "public.outbound_transports",
+    "public.outbound_domains",
+    "public.outbound_mailboxes",
+    "public.outbound_sender_pools",
+    "public.outbound_pool_members",
+    "public.outbound_capacity_ledger",
+    "public.outbound_seed_mailboxes",
 )
 
 REQUIRED_ROLES = (
