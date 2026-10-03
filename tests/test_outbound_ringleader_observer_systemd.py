@@ -10,7 +10,10 @@ def test_ringleader_observer_service_is_observe_only_and_hardened():
     ).read_text(encoding="utf-8")
 
     assert "EMPIRE_OUTBOUND_RINGLEADER_MODE=OBSERVE" in text
+    assert "EMPIRE_OUTBOUND_TELEMETRY_SOURCE=resend" in text
+    assert "EMPIRE_OUTBOUND_REQUIRE_PERSISTENCE=false" in text
     assert "-m empire_os.outbound_ringleader_observer" in text
+    assert "ExecStartPre=/srv/empire_os/.venv/bin/python -m empire_os.outbound_ringleader_preflight" in text
     assert "--execute" not in text
     assert "NoNewPrivileges=true" in text
     assert "ProtectSystem=strict" in text
