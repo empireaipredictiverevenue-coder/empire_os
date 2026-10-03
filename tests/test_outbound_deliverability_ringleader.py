@@ -96,3 +96,83 @@ def test_ringleader_holds_provider_policy_mismatch():
     })
     assert result["posture"] == "HOLD"
     assert any(task["action"] == "MIGRATE_TRANSPORT" for task in result["tasks"])
+
+
+def test_ringleader_holds_when_reputation_credit_is_exhausted():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "reputation_escrow": {
+            "state": {"credit": 20},
+            "observation": {"complaints": 1},
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "reputation_credit_exhausted" in result["hard_holds"]
+
+
+def test_ringleader_escalates_deeper_verification_for_catch_all():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "verification_context": {
+            "predicted_value": 10000,
+            "contact_confidence": 0.8,
+            "historical_domain_bounce_rate": 0.01,
+            "catch_all": True,
+        },
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["verification_depth"]["outcome"] == "ESCALATE"
+    assert any(task["action"] == "VERIFY_RECIPIENTS" for task in result["tasks"])
+
+
+def test_ringleader_explains_shift_and_plans_remediation():
+    result = evaluate_ringleader({
+        "deliverability": {"health": "AMBER"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "metric_shift": {
+            "before": {"bounce_rate": 0.01},
+            "after": {"bounce_rate": 0.04},
+            "changes": [{
+                "kind": "recipient_source_changed",
+                "change_id": "source-change-1",
+                "evidence_strength": 0.9,
+                "temporal_proximity": 1.0,
+                "affected_metrics": ["bounce_rate"],
+            }],
+        },
+    })
+    assert result["root_cause"]["metric_shift"]["shift_detected"] is True
+    assert result["remediation"]["posture"] == "REMEDIATE"
+    assert all(
+        task["mutation_authorized"] is False
+        for task in result["remediation"]["tasks"]
+    )
