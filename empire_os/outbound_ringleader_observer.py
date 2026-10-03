@@ -132,6 +132,7 @@ def observe_once(
             pool_members=estate_inventory.get("pool_members") or [],
             capacity_events=estate_inventory.get("capacity_events") or [],
             seed_mailboxes=estate_inventory.get("seed_mailboxes") or [],
+            now=now,
         )
 
     ringleader_context = {
