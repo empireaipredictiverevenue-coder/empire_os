@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from empire_os.outbound_deliverability import evaluate_sender_health, lint_first_touch
+
 POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
 ALLOWED_CHANNELS = {"email"}
 ALLOWED_EVIDENCE_SOURCES = {
@@ -88,6 +90,17 @@ def evaluate_outbound(
         repairable.append("missing_subject")
     repairable.extend(_body_checks(str(review.get("body_text") or "")))
 
+    content_lint = lint_first_touch(
+        {
+            "subject": review.get("subject"),
+            "body_text": review.get("body_text"),
+            "from": context.get("sender") or review.get("sender"),
+            "is_reply": context.get("is_reply"),
+            "attachment_count": context.get("attachment_count", 0),
+        }
+    )
+    hard.extend(content_lint["hard_holds"])
+
     expires_at = _parse_time(review.get("expires_at"))
     if expires_at is None:
         hard.append("invalid_expiry")
@@ -124,6 +137,13 @@ def evaluate_outbound(
     if company_score < policy.min_company_score:
         evidence.append("company_score_below_policy")
 
+    deliverability = None
+    deliverability_context = context.get("deliverability")
+    if isinstance(deliverability_context, Mapping):
+        deliverability = evaluate_sender_health(deliverability_context)
+        hard.extend(deliverability["hard_holds"])
+        evidence.extend(deliverability["evidence_holds"])
+
     provider_ready = context.get("provider_ready") is True
     if hard:
         action = "HOLD"
@@ -157,5 +177,7 @@ def evaluate_outbound(
             "repairable": repairable,
             "evidence_holds": evidence,
             "provider_ready": provider_ready,
+            "deliverability": deliverability,
+            "content_recommendations": content_lint["recommendations"],
         },
     }
