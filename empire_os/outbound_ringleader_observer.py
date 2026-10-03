@@ -92,6 +92,69 @@ def merge_observer_context(
     return merged
 
 
+def build_observer_telemetry_context(
+    supplied: Mapping[str, Any],
+    *,
+    now: datetime,
+    evidence_bundle: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    policy = supplied.get("telemetry_policy")
+    if not isinstance(policy, Mapping):
+        return None
+
+    required_sources = [
+        str(value).strip()
+        for value in policy.get("required_sources") or []
+        if str(value or "").strip()
+    ]
+    if not required_sources:
+        return None
+
+    external = supplied.get("telemetry_heartbeats")
+    heartbeats = [
+        dict(row)
+        for row in external or []
+        if isinstance(row, Mapping)
+    ]
+    heartbeats.append({
+        "source": "provider_metrics",
+        "observed_at": now.isoformat(),
+        "success": True,
+        "coverage": True,
+        "details": {
+            "windows": ["1d", "7d", "30d"],
+            "observer": "outbound_ringleader_observer",
+        },
+    })
+
+    if isinstance(evidence_bundle, Mapping):
+        generated_at = evidence_bundle.get("generated_at")
+        if generated_at:
+            heartbeats.append({
+                "source": "evidence_bundle",
+                "observed_at": generated_at,
+                "success": evidence_bundle.get("status") in {"CURRENT", "STALE"},
+                "coverage": evidence_bundle.get("status") == "CURRENT",
+                "details": {
+                    "status": evidence_bundle.get("status"),
+                    "signature_status": evidence_bundle.get("signature_status"),
+                },
+            })
+
+    return {
+        "now": now.isoformat(),
+        "required_sources": required_sources,
+        "critical_sources": list(policy.get("critical_sources") or []),
+        "default_max_age_minutes": int(
+            policy.get("default_max_age_minutes") or 30
+        ),
+        "source_max_age_minutes": dict(
+            policy.get("source_max_age_minutes") or {}
+        ),
+        "heartbeats": heartbeats,
+    }
+
+
 def observe_once(
     provider: DeliverabilityMetricsProvider,
     *,
@@ -135,6 +198,12 @@ def observe_once(
             now=now,
         )
 
+    telemetry_context = build_observer_telemetry_context(
+        supplied,
+        now=now,
+        evidence_bundle=evidence_bundle,
+    )
+
     ringleader_context = {
         **supplied,
         "evaluation_scope": "FLEET",
@@ -143,6 +212,8 @@ def observe_once(
             "health": health["overall_health"],
         },
     }
+    if telemetry_context is not None:
+        ringleader_context["telemetry_sla"] = telemetry_context
     if estate_reconciliation is not None:
         ringleader_context["sender_estate_reconciliation"] = estate_reconciliation
     decision = evaluate_ringleader(ringleader_context)
@@ -206,6 +277,7 @@ def observe_once(
             ),
         },
         "ringleader": decision,
+        "telemetry_context": telemetry_context,
         "sender_estate_reconciliation": estate_reconciliation,
         "founder_alert": build_founder_alert(decision),
         "persistence": persistence,
