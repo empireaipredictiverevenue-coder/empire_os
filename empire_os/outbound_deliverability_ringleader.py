@@ -22,6 +22,7 @@ from empire_os.outbound_destination_reputation import evaluate_destination_reput
 from empire_os.outbound_recipient_domain_policy import evaluate_recipient_domain_policy
 from empire_os.outbound_config_attestation import detect_configuration_drift
 from empire_os.outbound_infrastructure_concentration import evaluate_concentration
+from empire_os.outbound_evidence_fusion import fuse_evidence
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,7 @@ _PRIORITY = {
     "STOP_SEND": 100,
     "MIGRATE_TRANSPORT": 95,
     "REPAIR_AUTH": 90,
+    "RECONCILE_EVIDENCE": 88,
     "REMEDIATE_DOMAIN_CONTROL": 85,
     "REFRESH_EVIDENCE": 82,
     "VERIFY_RECIPIENTS": 80,
@@ -376,6 +378,35 @@ def evaluate_ringleader(
                 )
             )
 
+    evidence_fusion = None
+    fusion_rows = context.get("evidence_fusion")
+    if isinstance(fusion_rows, list):
+        evidence_fusion = fuse_evidence(fusion_rows)
+        if evidence_fusion["posture"] == "INVESTIGATE":
+            hard_holds.append("critical_evidence_conflict")
+            tasks.append(
+                _task(
+                    "STOP_SEND",
+                    "critical_deliverability_evidence_conflict",
+                    "evidence_fusion",
+                )
+            )
+            tasks.append(
+                _task(
+                    "RECONCILE_EVIDENCE",
+                    "critical_deliverability_evidence_conflict",
+                    "evidence_fusion",
+                )
+            )
+        elif evidence_fusion["conflicts"]:
+            tasks.append(
+                _task(
+                    "RECONCILE_EVIDENCE",
+                    "deliverability_evidence_conflict",
+                    "evidence_fusion",
+                )
+            )
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -399,7 +430,7 @@ def evaluate_ringleader(
 
     if hard_holds:
         posture = "HOLD"
-    elif any(task["action"] in {"REPAIR_AUTH", "REMEDIATE_DOMAIN_CONTROL"} for task in tasks):
+    elif any(task["action"] in {"REPAIR_AUTH", "REMEDIATE_DOMAIN_CONTROL", "RECONCILE_EVIDENCE"} for task in tasks):
         posture = "REMEDIATE"
     elif any(
         task["action"] in {
@@ -439,5 +470,6 @@ def evaluate_ringleader(
         "recipient_domain_policy": recipient_domain_policy,
         "configuration_drift": configuration_drift,
         "infrastructure_concentration": infrastructure_concentration,
+        "evidence_fusion": evidence_fusion,
         "mutation_authorized": False,
     }
