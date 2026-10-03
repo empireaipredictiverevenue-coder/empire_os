@@ -23,4 +23,8 @@ def test_sender_estate_migration_is_staged_and_non_authorizing():
     assert " delete " not in lowered
     assert "insert into" not in lowered
     assert "provider credentials remain outside empiredb" in lowered
-    assert "does not itself authorize sends" in lowered
+    assert "set_limit" in lowered
+    assert "reserve" in lowered
+    assert "consume" in lowered
+    assert "release" in lowered
+    assert "replayable and non-authorizing" in lowered
