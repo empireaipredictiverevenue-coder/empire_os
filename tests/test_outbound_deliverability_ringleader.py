@@ -765,3 +765,57 @@ def test_ringleader_remediates_missing_outreach_brand_disclosure():
         and task["reason"] == "domain_brand_safety_remediation_required"
         for task in result["tasks"]
     )
+
+
+
+def test_ringleader_blocks_scale_without_stopping_healthy_fleet():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+        "fleet_readiness_certificate": {
+            "status": "HOLD",
+            "blockers": ["safe_sender_capacity_gap"],
+            "send_authorized": False,
+        },
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["hard_holds"] == []
+    assert any(
+        task["action"] == "BLOCK_SCALE"
+        and task["reason"] == "fleet_readiness_hold"
+        for task in result["tasks"]
+    )
+
+
+def test_ringleader_ignores_fleet_certificate_at_send_scope():
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "fleet_readiness_certificate": {
+            "status": "HOLD",
+            "blockers": ["safe_sender_capacity_gap"],
+        },
+    })
+    assert result["fleet_readiness_certificate"] is None
+    assert not any(
+        task["action"] == "BLOCK_SCALE"
+        for task in result["tasks"]
+    )
