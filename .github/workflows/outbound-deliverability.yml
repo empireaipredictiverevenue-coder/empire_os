@@ -1,0 +1,46 @@
+name: outbound-deliverability
+
+on:
+  pull_request:
+    paths:
+      - "empire_os/outbound_*.py"
+      - "empire_os/google_postmaster_v2.py"
+      - "empire_os/founder_outbound_deliverability_api.py"
+      - "empire_os/founder_dashboard_service.py"
+      - "tests/test_outbound_*.py"
+      - "tests/test_founder_outbound_deliverability_api.py"
+      - "docs/outbound_*.md"
+      - "docs/empire_native_deliverability_stack.md"
+      - ".github/workflows/outbound-deliverability.yml"
+  push:
+    branches:
+      - "agent/outbound-deliverability-v1"
+    paths:
+      - "empire_os/outbound_*.py"
+      - "empire_os/google_postmaster_v2.py"
+      - "empire_os/founder_outbound_deliverability_api.py"
+      - "empire_os/founder_dashboard_service.py"
+      - "tests/test_outbound_*.py"
+      - "tests/test_founder_outbound_deliverability_api.py"
+      - ".github/workflows/outbound-deliverability.yml"
+
+jobs:
+  targeted-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Compile changed subsystem
+        run: |
+          python -m compileall -q             empire_os/outbound_deliverability.py             empire_os/outbound_deliverability_provider.py             empire_os/outbound_deliverability_ringleader.py             empire_os/outbound_deliverability_service.py             empire_os/outbound_deliverability_snapshot.py             empire_os/outbound_deliverability_twin.py             empire_os/outbound_domain_sovereignty.py             empire_os/outbound_warmup.py             empire_os/outbound_mx_pacing.py             empire_os/outbound_reputation_budget.py             empire_os/outbound_reputation_economic_memory.py             empire_os/outbound_reputation_escrow.py             empire_os/outbound_root_cause.py             empire_os/outbound_remediation_planner.py             empire_os/outbound_send_compiler.py             empire_os/outbound_transport_benchmark.py             empire_os/outbound_provider_policy_registry.py             empire_os/outbound_verification_depth.py             empire_os/outbound_canary.py             empire_os/outbound_commercial_feedback.py             empire_os/outbound_reputation_graph.py             empire_os/google_postmaster_v2.py
+      - name: Targeted tests
+        run: |
+          pytest -q             tests/test_outbound_deliverability.py             tests/test_outbound_deliverability_snapshot.py             tests/test_outbound_deliverability_service.py             tests/test_outbound_deliverability_ringleader.py             tests/test_outbound_advanced_deliverability.py             tests/test_outbound_deliverability_moat.py             tests/test_outbound_reputation_controls.py             tests/test_outbound_reputation_memory.py             tests/test_outbound_send_compiler.py             tests/test_outbound_warmup.py             tests/test_founder_outbound_deliverability_api.py             tests/test_outbound_governor.py
