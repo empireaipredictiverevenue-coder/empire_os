@@ -837,6 +837,7 @@ def test_ringleader_blocks_new_outreach_when_company_conversation_exists():
         "placement": {"measured": True},
         "domain_sovereignty": sovereign_domain(),
         "account_saturation": {
+            "now": "2026-10-03T12:00:00+00:00",
             "candidate": {
                 "company_key": "company:a",
                 "parent_company_key": "parent:p",
@@ -845,14 +846,16 @@ def test_ringleader_blocks_new_outreach_when_company_conversation_exists():
             "history": [{
                 "company_key": "company:a",
                 "event_kind": "reply_received",
-                "occurred_at": "2099-01-01T00:00:00+00:00",
+                "occurred_at": "2026-10-02T10:00:00+00:00",
             }],
         },
     })
-    # Future-dated history is ignored; replace with a safe past date relative to
-    # any contemporary runtime by using a very recent static 2026 event in the
-    # dedicated unit test. This integration verifies the field remains scoped.
-    assert result["account_saturation"] is not None
+    assert result["posture"] == "HOLD"
+    assert "account_saturation_hold" in result["hard_holds"]
+    assert (
+        result["account_saturation"]["reason"]
+        == "existing_company_conversation_takes_precedence"
+    )
 
 
 def test_ringleader_throttles_saturated_corridor_without_global_hard_hold():
@@ -880,6 +883,7 @@ def test_ringleader_throttles_saturated_corridor_without_global_hard_hold():
         "placement": {"measured": True},
         "domain_sovereignty": sovereign_domain(),
         "account_saturation": {
+            "now": "2026-10-03T12:00:00+00:00",
             "candidate": {
                 "company_key": "company:target",
                 "parent_company_key": "parent:target",
