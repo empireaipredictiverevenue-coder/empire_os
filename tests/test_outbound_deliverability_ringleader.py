@@ -459,3 +459,28 @@ def test_ringleader_holds_critical_multi_source_auth_conflict():
         task["action"] == "RECONCILE_EVIDENCE"
         for task in result["tasks"]
     )
+
+
+def test_ringleader_holds_invalid_dmarc_from_open_source_observer():
+    result = evaluate_ringleader({
+        "evaluation_scope": "FLEET",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "domain_sovereignty": sovereign_domain(),
+        "open_source_evidence": {
+            "checkdmarc": {
+                "domain": "mail.example.com",
+                "spf": {"valid": True, "record": "v=spf1 -all"},
+                "dmarc": {"valid": False, "error": "invalid"},
+            }
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "open_source_evidence_hold" in result["hard_holds"]
+    assert any(task["action"] == "REPAIR_AUTH" for task in result["tasks"])
