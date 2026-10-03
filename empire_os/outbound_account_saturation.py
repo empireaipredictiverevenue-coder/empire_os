@@ -35,7 +35,15 @@ def evaluate_account_saturation(
     corridor_window_days: int = 7,
     corridor_cap: int = 20,
 ) -> dict[str, Any]:
-    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    if now is None:
+        timestamp = datetime.now(timezone.utc)
+    elif isinstance(now, datetime):
+        timestamp = now.astimezone(timezone.utc)
+    else:
+        parsed_now = _parse_ts(now)
+        if parsed_now is None:
+            raise ValueError("now_must_be_valid_timestamp")
+        timestamp = parsed_now
     company_key = str(candidate.get("company_key") or "").strip()
     parent_key = str(candidate.get("parent_company_key") or "").strip()
     corridor_key = str(candidate.get("corridor_key") or "").strip()
