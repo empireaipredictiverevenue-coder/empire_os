@@ -92,6 +92,10 @@ jobs:
             empire_os/outbound_apple_evidence.py \
             empire_os/outbound_arf_report.py \
             empire_os/outbound_recipient_domain_policy.py \
+            empire_os/outbound_policy_shadow.py \
+            empire_os/outbound_counterfactual_replay.py \
+            empire_os/outbound_config_attestation.py \
+            empire_os/outbound_infrastructure_concentration.py \
             empire_os/google_postmaster_v2.py \
             empire_os/founder_outbound_deliverability_api.py \
             empire_os/funnel.py
@@ -123,4 +127,6 @@ jobs:
             tests/test_outbound_destination_reputation.py \
             tests/test_outbound_destination_extended.py \
             tests/test_outbound_arf_report.py \
+            tests/test_outbound_policy_engineering.py \
+            tests/test_outbound_counterfactual_replay.py \
             tests/test_outbound_governor.py
