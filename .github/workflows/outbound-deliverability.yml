@@ -27,13 +27,19 @@ on:
     paths:
       - "empire_os/outbound_*.py"
       - "empire_os/google_postmaster_v2.py"
+      - "empire_os/microsoft_outlook_evidence.py"
       - "empire_os/founder_outbound_deliverability_api.py"
       - "empire_os/founder_dashboard_service.py"
       - "empire_os/funnel.py"
       - "migrations/empiredb/033_outbound_deliverability_control_plane.sql"
+      - "migrations/empiredb/034_outbound_policy_governance.sql"
+      - "config/outbound_deliverability.env.example"
+      - "deploy/systemd/empire-outbound-ringleader-observer.*"
       - "tests/test_outbound_*.py"
       - "tests/test_empiredb_outbound_deliverability_migration.py"
+      - "tests/test_empiredb_outbound_policy_governance_migration.py"
       - "tests/test_founder_outbound_deliverability_api.py"
+      - "tests/test_google_postmaster_v2.py"
       - ".github/workflows/outbound-deliverability.yml"
 
 jobs:
