@@ -26,6 +26,9 @@ from empire_os.outbound_source_reputation import evaluate_source_reputation
 from empire_os.outbound_content_family_reputation import (
     evaluate_content_family_reputation,
 )
+from empire_os.outbound_contact_evidence_freshness import (
+    evaluate_contact_evidence_freshness,
+)
 from empire_os.outbound_evidence_fusion import fuse_evidence
 from empire_os.outbound_open_source_health import evaluate_open_source_evidence
 
@@ -455,6 +458,33 @@ def evaluate_ringleader(
                     )
                 )
 
+    contact_evidence_freshness = None
+    freshness_context = context.get("contact_evidence_freshness")
+    if (
+        evaluation_scope in {"BATCH", "SEND"}
+        and isinstance(freshness_context, Mapping)
+    ):
+        contact_evidence_freshness = evaluate_contact_evidence_freshness(
+            freshness_context,
+        )
+        if contact_evidence_freshness["decision"] == "HOLD":
+            hard_holds.append("contact_evidence_freshness_hold")
+            tasks.append(
+                _task(
+                    "STOP_SEND",
+                    contact_evidence_freshness["reason"],
+                    "recipient_verifier",
+                )
+            )
+        elif contact_evidence_freshness["decision"] == "REVERIFY":
+            tasks.append(
+                _task(
+                    "VERIFY_RECIPIENTS",
+                    "contact_evidence_reverification_required",
+                    "recipient_verifier",
+                )
+            )
+
     content_family_reputation = None
     content_family_context = context.get("content_family_reputation")
     if (
@@ -623,6 +653,7 @@ def evaluate_ringleader(
         "health_forecast": health_forecast,
         "destination_reputation": destination_reputation,
         "recipient_domain_policy": recipient_domain_policy,
+        "contact_evidence_freshness": contact_evidence_freshness,
         "content_family_reputation": content_family_reputation,
         "lead_source_reputation": lead_source_reputation,
         "sender_estate_reconciliation": sender_estate_reconciliation,
