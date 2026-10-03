@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -186,3 +187,31 @@ def load_release_attestation(
         **result,
         "path": str(path),
     }
+
+
+
+def main() -> int:
+    expected_sha = os.getenv(
+        "EMPIRE_OUTBOUND_EXPECTED_SHA",
+        "",
+    ).strip()
+    path = Path(
+        os.getenv(
+            "EMPIRE_OUTBOUND_RELEASE_ATTESTATION_PATH",
+            str(DEFAULT_RELEASE_ATTESTATION_PATH),
+        )
+    )
+    max_age_hours = int(
+        os.getenv("EMPIRE_OUTBOUND_RELEASE_ATTESTATION_MAX_AGE_HOURS", "168")
+    )
+    result = load_release_attestation(
+        path=path,
+        expected_sha=expected_sha,
+        max_age_hours=max_age_hours,
+    )
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["status"] == "CURRENT" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
