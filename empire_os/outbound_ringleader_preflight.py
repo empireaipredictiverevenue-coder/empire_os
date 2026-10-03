@@ -82,7 +82,17 @@ def evaluate_preflight(
             or BUNDLE_DEFAULT_PATH
         )
     )
-    bundle = load_evidence_bundle(bundle_path)
+    bundle_hmac_key = str(
+        env.get("EMPIRE_OUTBOUND_EVIDENCE_BUNDLE_HMAC_KEY") or ""
+    )
+    require_signed_bundle = _truthy(
+        env.get("EMPIRE_OUTBOUND_REQUIRE_SIGNED_EVIDENCE_BUNDLE")
+    )
+    bundle = load_evidence_bundle(
+        bundle_path,
+        hmac_key=bundle_hmac_key or None,
+        require_signature=require_signed_bundle,
+    )
     if bundle["status"] == "STALE":
         warnings.append("evidence_bundle_stale")
     elif bundle["status"] == "ABSENT":
@@ -98,6 +108,8 @@ def evaluate_preflight(
         "context_path": str(path),
         "evidence_bundle_path": str(bundle_path),
         "evidence_bundle_status": bundle["status"],
+        "signed_evidence_required": require_signed_bundle,
+        "evidence_signature_status": bundle.get("signature_status"),
         "blockers": blockers,
         "warnings": warnings,
         "activation_authorized": False,
