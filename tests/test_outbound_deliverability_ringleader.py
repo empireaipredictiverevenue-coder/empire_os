@@ -587,3 +587,61 @@ def test_fleet_scope_ignores_per_lead_source_reputation():
     })
     assert result["posture"] == "READY"
     assert result["lead_source_reputation"] is None
+
+
+
+def test_ringleader_quarantines_bad_content_family():
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "content_family_reputation": {
+            "family_key": "template:bad",
+            "events": [
+                {"family_key": "template:bad", "kind": "sent", "count": 20},
+                {"family_key": "template:bad", "kind": "complaint"},
+            ],
+        },
+    })
+    assert result["posture"] == "HOLD"
+    assert "content_family_reputation_quarantine" in result["hard_holds"]
+    assert result["content_family_reputation"]["posture"] == "QUARANTINE"
+
+
+def test_ringleader_runs_canary_for_learning_content_family():
+    result = evaluate_ringleader({
+        "evaluation_scope": "SEND",
+        "deliverability": {"health": "GREEN"},
+        "provider_policy_permits_use_case": True,
+        "authentication": {
+            "spf_aligned": True,
+            "dkim_aligned": True,
+            "dmarc_valid": True,
+            "tls_ready": True,
+        },
+        "recipient_quality": {"verified": True},
+        "placement": {"measured": True},
+        "domain_sovereignty": sovereign_domain(),
+        "content_family_reputation": {
+            "family_key": "template:new",
+            "events": [
+                {"family_key": "template:new", "kind": "sent", "count": 3}
+            ],
+        },
+    })
+    assert result["posture"] == "LIMITED"
+    assert result["content_family_reputation"]["posture"] == "LEARNING"
+    assert any(
+        task["action"] == "RUN_CANARY"
+        and task["reason"] == "content_family_requires_canary"
+        for task in result["tasks"]
+    )
