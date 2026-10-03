@@ -29,6 +29,7 @@ from empire_os.outbound_content_family_reputation import (
 from empire_os.outbound_contact_evidence_freshness import (
     evaluate_contact_evidence_freshness,
 )
+from empire_os.outbound_domain_brand_safety import evaluate_domain_brand_safety
 from empire_os.outbound_evidence_fusion import fuse_evidence
 from empire_os.outbound_open_source_health import evaluate_open_source_evidence
 
@@ -259,6 +260,30 @@ def evaluate_ringleader(
         if reputation_slo["status"] == "EXHAUSTED":
             hard_holds.append("reputation_error_budget_exhausted")
             tasks.append(_task("STOP_SEND", "reputation_error_budget_exhausted", "reputation_slo"))
+
+    domain_brand_safety = None
+    domain_brand_context = context.get("domain_brand_safety")
+    if isinstance(domain_brand_context, Mapping):
+        domain_brand_safety = evaluate_domain_brand_safety(
+            domain_brand_context
+        )
+        if domain_brand_safety["posture"] == "HOLD":
+            hard_holds.append("domain_brand_safety_hold")
+            tasks.append(
+                _task(
+                    "STOP_SEND",
+                    "domain_brand_safety_hold",
+                    "domain_sovereignty",
+                )
+            )
+        elif domain_brand_safety["posture"] == "REMEDIATE":
+            tasks.append(
+                _task(
+                    "REMEDIATE_DOMAIN_CONTROL",
+                    "domain_brand_safety_remediation_required",
+                    "domain_sovereignty",
+                )
+            )
 
     domain_continuity = None
     continuity_context = context.get("domain_continuity")
@@ -649,6 +674,7 @@ def evaluate_ringleader(
         "contact_pressure": contact_pressure,
         "sender_affinity": sender_affinity,
         "reputation_slo": reputation_slo,
+        "domain_brand_safety": domain_brand_safety,
         "domain_continuity": domain_continuity,
         "health_forecast": health_forecast,
         "destination_reputation": destination_reputation,
