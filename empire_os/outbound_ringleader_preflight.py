@@ -6,6 +6,11 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.outbound_evidence_bundle import (
+    DEFAULT_EVIDENCE_BUNDLE_PATH as BUNDLE_DEFAULT_PATH,
+    load_evidence_bundle,
+)
+
 
 DEFAULT_CONTEXT_PATH = Path(
     "/srv/empire_os/runtime/outbound/ringleader_context.json"
@@ -35,6 +40,7 @@ def evaluate_preflight(
     env: Mapping[str, str],
     *,
     context_path: Path | None = None,
+    evidence_bundle_path: Path | None = None,
 ) -> dict[str, Any]:
     mode = str(env.get("EMPIRE_OUTBOUND_RINGLEADER_MODE") or "OBSERVE").strip().upper()
     scope_key = str(env.get("EMPIRE_OUTBOUND_SCOPE_KEY") or "").strip()
@@ -70,6 +76,18 @@ def evaluate_preflight(
     )
     _load_context(path)
 
+    bundle_path = evidence_bundle_path or Path(
+        str(
+            env.get("EMPIRE_OUTBOUND_EVIDENCE_BUNDLE_PATH")
+            or BUNDLE_DEFAULT_PATH
+        )
+    )
+    bundle = load_evidence_bundle(bundle_path)
+    if bundle["status"] == "STALE":
+        warnings.append("evidence_bundle_stale")
+    elif bundle["status"] == "ABSENT":
+        warnings.append("evidence_bundle_absent")
+
     return {
         "status": "READY" if not blockers else "BLOCKED",
         "mode": mode,
@@ -78,6 +96,8 @@ def evaluate_preflight(
         "persistence_configured": bool(reader_dsn and writer_dsn),
         "persistence_required": require_persistence,
         "context_path": str(path),
+        "evidence_bundle_path": str(bundle_path),
+        "evidence_bundle_status": bundle["status"],
         "blockers": blockers,
         "warnings": warnings,
         "activation_authorized": False,
