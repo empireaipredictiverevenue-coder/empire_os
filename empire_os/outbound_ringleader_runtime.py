@@ -49,17 +49,16 @@ def _decision_key(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def persist_evidence_and_decision(
+def persist_provider_evidence(
     *,
     scope_key: str,
     source: str,
     provider_payload: Mapping[str, Any],
-    ringleader_context: Mapping[str, Any],
     reader: EvidenceReader,
     writer: EvidenceWriter,
     observed_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """Persist evidence and Ringleader decision while remaining OBSERVE-only."""
+    """Normalize and append provider evidence to the Reputation Passport."""
 
     scope = str(scope_key or "").strip()
     if not scope:
@@ -67,7 +66,6 @@ def persist_evidence_and_decision(
 
     now = (observed_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     observed_iso = now.isoformat()
-
     head = reader.latest_evidence_head() or GENESIS
     persisted: list[dict[str, Any]] = []
 
@@ -108,6 +106,43 @@ def persist_evidence_and_decision(
         })
         head = chained["evidence_hash"]
 
+    return {
+        "scope_key": scope,
+        "observations_persisted": persisted,
+        "head_hash": head,
+        "mutation_authorized": False,
+    }
+
+
+def persist_evidence_and_decision(
+    *,
+    scope_key: str,
+    source: str,
+    provider_payload: Mapping[str, Any],
+    ringleader_context: Mapping[str, Any],
+    reader: EvidenceReader,
+    writer: EvidenceWriter,
+    observed_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Persist evidence and Ringleader decision while remaining OBSERVE-only."""
+
+    scope = str(scope_key or "").strip()
+    if not scope:
+        raise ValueError("scope_key_required")
+
+    now = (observed_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    observed_iso = now.isoformat()
+
+    evidence_result = persist_provider_evidence(
+        scope_key=scope,
+        source=source,
+        provider_payload=provider_payload,
+        reader=reader,
+        writer=writer,
+        observed_at=now,
+    )
+    head = evidence_result["head_hash"]
+
     decision = evaluate_ringleader(ringleader_context)
     if decision.get("mutation_authorized") is not False:
         raise RuntimeError("ringleader_runtime_must_remain_observe_only")
@@ -141,7 +176,7 @@ def persist_evidence_and_decision(
 
     return {
         "scope_key": scope,
-        "observations_persisted": persisted,
+        "observations_persisted": evidence_result["observations_persisted"],
         "decision_id": decision_write["id"],
         "decision_key": decision_key,
         "posture": decision["posture"],
