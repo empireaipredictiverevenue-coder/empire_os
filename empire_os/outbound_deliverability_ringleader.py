@@ -450,6 +450,31 @@ def evaluate_ringleader(
                     )
                 )
 
+    sender_estate_reconciliation = None
+    reconciliation_context = context.get("sender_estate_reconciliation")
+    if isinstance(reconciliation_context, Mapping):
+        sender_estate_reconciliation = dict(reconciliation_context)
+        reconciliation_status = str(
+            sender_estate_reconciliation.get("status") or "UNKNOWN"
+        ).upper()
+        if reconciliation_status == "HOLD":
+            hard_holds.append("sender_estate_reconciliation_hold")
+            tasks.append(
+                _task(
+                    "STOP_SEND",
+                    "sender_estate_reconciliation_hold",
+                    "sender_estate_reconciler",
+                )
+            )
+        elif reconciliation_status == "DEGRADED":
+            tasks.append(
+                _task(
+                    "RECONCILE_ESTATE",
+                    "sender_estate_reconciliation_degraded",
+                    "sender_estate_reconciler",
+                )
+            )
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -513,6 +538,7 @@ def evaluate_ringleader(
         "health_forecast": health_forecast,
         "destination_reputation": destination_reputation,
         "recipient_domain_policy": recipient_domain_policy,
+        "sender_estate_reconciliation": sender_estate_reconciliation,
         "configuration_drift": configuration_drift,
         "infrastructure_concentration": infrastructure_concentration,
         "evidence_fusion": evidence_fusion,
