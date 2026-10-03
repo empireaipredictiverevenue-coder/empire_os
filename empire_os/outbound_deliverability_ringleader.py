@@ -23,6 +23,9 @@ from empire_os.outbound_recipient_domain_policy import evaluate_recipient_domain
 from empire_os.outbound_config_attestation import detect_configuration_drift
 from empire_os.outbound_infrastructure_concentration import evaluate_concentration
 from empire_os.outbound_source_reputation import evaluate_source_reputation
+from empire_os.outbound_content_family_reputation import (
+    evaluate_content_family_reputation,
+)
 from empire_os.outbound_evidence_fusion import fuse_evidence
 from empire_os.outbound_open_source_health import evaluate_open_source_evidence
 
@@ -452,6 +455,42 @@ def evaluate_ringleader(
                     )
                 )
 
+    content_family_reputation = None
+    content_family_context = context.get("content_family_reputation")
+    if (
+        evaluation_scope in {"BATCH", "SEND"}
+        and isinstance(content_family_context, Mapping)
+    ):
+        family_key = str(
+            content_family_context.get("family_key") or ""
+        ).strip()
+        family_events = content_family_context.get("events") or []
+        if family_key:
+            content_family_reputation = evaluate_content_family_reputation(
+                family_key,
+                family_events,
+            )
+            if content_family_reputation["posture"] == "QUARANTINE":
+                hard_holds.append("content_family_reputation_quarantine")
+                tasks.append(
+                    _task(
+                        "STOP_SEND",
+                        "content_family_reputation_quarantine",
+                        "message_preflight",
+                    )
+                )
+            elif content_family_reputation["posture"] in {
+                "DEGRADED",
+                "LEARNING",
+            }:
+                tasks.append(
+                    _task(
+                        "RUN_CANARY",
+                        "content_family_requires_canary",
+                        "canary_controller",
+                    )
+                )
+
     lead_source_reputation = None
     source_reputation_context = context.get("lead_source_reputation")
     if (
@@ -584,6 +623,7 @@ def evaluate_ringleader(
         "health_forecast": health_forecast,
         "destination_reputation": destination_reputation,
         "recipient_domain_policy": recipient_domain_policy,
+        "content_family_reputation": content_family_reputation,
         "lead_source_reputation": lead_source_reputation,
         "sender_estate_reconciliation": sender_estate_reconciliation,
         "configuration_drift": configuration_drift,
