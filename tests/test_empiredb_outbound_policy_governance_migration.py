@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-PATH = Path("migrations/empiredb/034_outbound_policy_governance.sql")
+PATH = Path("migrations/empiredb/036_outbound_policy_governance.sql")
 
 
 def test_policy_governance_migration_is_append_only_and_non_activating():
