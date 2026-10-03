@@ -19,6 +19,7 @@ from empire_os.outbound_reputation_slo import evaluate_reputation_slo
 from empire_os.outbound_domain_continuity import evaluate_domain_continuity
 from empire_os.outbound_health_forecast import forecast_reputation_health
 from empire_os.outbound_destination_reputation import evaluate_destination_reputation
+from empire_os.outbound_recipient_domain_policy import evaluate_recipient_domain_policy
 
 
 @dataclass(frozen=True)
@@ -282,6 +283,30 @@ def evaluate_ringleader(
                 )
             )
 
+    recipient_domain_policy = None
+    recipient_domain_context = context.get("recipient_domain_policy")
+    if isinstance(recipient_domain_context, Mapping):
+        recipient_domain_policy = evaluate_recipient_domain_policy(
+            recipient_domain_context
+        )
+        if recipient_domain_policy["decision"] == "HOLD":
+            hard_holds.append("recipient_domain_policy_hold")
+            tasks.append(
+                _task(
+                    "STOP_SEND",
+                    recipient_domain_policy["reason"],
+                    "recipient_policy",
+                )
+            )
+        elif recipient_domain_policy["decision"] == "ESCALATE":
+            tasks.append(
+                _task(
+                    "VERIFY_RECIPIENTS",
+                    recipient_domain_policy["reason"],
+                    "recipient_verifier",
+                )
+            )
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -341,5 +366,6 @@ def evaluate_ringleader(
         "domain_continuity": domain_continuity,
         "health_forecast": health_forecast,
         "destination_reputation": destination_reputation,
+        "recipient_domain_policy": recipient_domain_policy,
         "mutation_authorized": False,
     }
