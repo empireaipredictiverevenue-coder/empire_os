@@ -60,3 +60,15 @@ def test_founder_alert_dedupes_by_stable_fingerprint():
 
 def test_no_alert_for_clean_ready_state():
     assert build_founder_alert({"posture": "READY", "hard_holds": []}) is None
+
+
+def test_normalizer_maps_arf_complaint_to_canonical_complaint_metric():
+    rows = normalize_evidence("arf", {
+        "observed_at": "2026-10-03T12:00:00Z",
+        "domain": "mail.example.com",
+        "complaint": True,
+        "feedback_type": "abuse",
+    })
+    values = {row["metric_name"]: row["metric_value"] for row in rows}
+    assert values["complained"] == 1
+    assert values["arf_report"] == 1
