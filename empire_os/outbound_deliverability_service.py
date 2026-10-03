@@ -11,7 +11,7 @@ from empire_os.outbound_deliverability_provider import (
 from empire_os.outbound_deliverability_snapshot import build_deliverability_snapshot
 
 
-def _rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+def metric_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     data = payload.get("data")
     if isinstance(data, list):
         rows: list[dict[str, Any]] = []
@@ -41,7 +41,7 @@ def build_rolling_health(
 ) -> dict[str, Any]:
     raw = rolling_windows(provider, now=now)
     windows = {
-        label: build_deliverability_snapshot(_rows(payload))
+        label: build_deliverability_snapshot(metric_rows(payload))
         for label, payload in raw.items()
     }
 
