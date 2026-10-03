@@ -30,18 +30,19 @@ def evaluate_telemetry_sla(
     *,
     required_sources: Iterable[str],
     heartbeats: Iterable[Mapping[str, Any]],
-    now: datetime | str,
+    now: datetime | str | None = None,
     default_max_age_minutes: int = 30,
     source_max_age_minutes: Mapping[str, int] | None = None,
     critical_sources: Iterable[str] = (),
 ) -> dict[str, Any]:
-    timestamp = (
-        now.astimezone(timezone.utc)
-        if isinstance(now, datetime)
-        else _parse_ts(now)
-    )
-    if timestamp is None:
-        raise ValueError("now_must_be_valid_timestamp")
+    if now is None:
+        timestamp = datetime.now(timezone.utc)
+    elif isinstance(now, datetime):
+        timestamp = now.astimezone(timezone.utc)
+    else:
+        timestamp = _parse_ts(now)
+        if timestamp is None:
+            raise ValueError("now_must_be_valid_timestamp")
 
     required = list(dict.fromkeys(
         str(value or "").strip()
