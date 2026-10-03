@@ -13,6 +13,9 @@ from empire_os.outbound_reputation_escrow import update_reputation_credit
 from empire_os.outbound_verification_depth import verification_plan
 from empire_os.outbound_root_cause import detect_metric_shift, rank_candidate_causes
 from empire_os.outbound_remediation_planner import plan_remediation
+from empire_os.outbound_contact_pressure import evaluate_contact_pressure
+from empire_os.outbound_sender_affinity import resolve_sender_affinity
+from empire_os.outbound_reputation_slo import evaluate_reputation_slo
 
 
 @dataclass(frozen=True)
@@ -168,6 +171,34 @@ def evaluate_ringleader(
             }
             remediation = plan_remediation(ranked["candidates"])
 
+    contact_pressure = None
+    pressure_context = context.get("contact_pressure")
+    if isinstance(pressure_context, Mapping):
+        candidate = dict(pressure_context.get("candidate") or {})
+        history = pressure_context.get("history") or []
+        contact_pressure = evaluate_contact_pressure(candidate, history)
+        if contact_pressure["decision"] == "HOLD":
+            hard_holds.append("contact_pressure_hold")
+            tasks.append(_task("STOP_SEND", contact_pressure["reason"], "contact_pressure_guard"))
+
+    sender_affinity = None
+    affinity_context = context.get("sender_affinity")
+    if isinstance(affinity_context, Mapping):
+        sender_affinity = resolve_sender_affinity(affinity_context)
+        if sender_affinity["decision"] == "HOLD":
+            hard_holds.append("sender_affinity_hold")
+            tasks.append(_task("STOP_SEND", sender_affinity["reason"], "sender_affinity"))
+        elif sender_affinity["decision"] == "ESCALATE":
+            tasks.append(_task("OBSERVE", sender_affinity["reason"], "sender_affinity"))
+
+    reputation_slo = None
+    slo_context = context.get("reputation_slo")
+    if isinstance(slo_context, Mapping):
+        reputation_slo = evaluate_reputation_slo(slo_context)
+        if reputation_slo["status"] == "EXHAUSTED":
+            hard_holds.append("reputation_error_budget_exhausted")
+            tasks.append(_task("STOP_SEND", "reputation_error_budget_exhausted", "reputation_slo"))
+
     sovereignty = evaluate_domain_sovereignty(context.get("domain_sovereignty"))
     if sovereignty["status"] in {"HOLD", "WEAK"}:
         tasks.append(
@@ -220,5 +251,8 @@ def evaluate_ringleader(
         "reputation_escrow": reputation_escrow,
         "root_cause": root_cause,
         "remediation": remediation,
+        "contact_pressure": contact_pressure,
+        "sender_affinity": sender_affinity,
+        "reputation_slo": reputation_slo,
         "mutation_authorized": False,
     }
