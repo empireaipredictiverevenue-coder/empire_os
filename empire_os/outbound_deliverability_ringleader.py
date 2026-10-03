@@ -477,6 +477,7 @@ def evaluate_ringleader(
         posture = "REMEDIATE"
     elif any(
         task["action"] in {
+            "REFRESH_EVIDENCE",
             "VERIFY_PROVIDER_POLICY",
             "VERIFY_RECIPIENTS",
             "RUN_CANARY",
