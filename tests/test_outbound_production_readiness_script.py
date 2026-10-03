@@ -5,18 +5,13 @@ ROOT = Path(__file__).resolve().parents[1]
 PATH = ROOT / "scripts/verify_outbound_production_readiness.sh"
 
 
-def test_production_readiness_probe_is_read_only():
+def test_production_readiness_wrapper_is_read_only_and_uses_canonical_doctor():
     text = PATH.read_text(encoding="utf-8")
     lowered = text.lower()
 
     assert "no migration / no role change / no service change / no send" in lowered
-    assert "outbound_release_attestation" in text
-    assert "EMPIRE_OUTBOUND_EXPECTED_SHA" in text
-    assert "release_sha=\"$(git rev-parse HEAD)\"" in text
-    assert "outbound_ringleader_preflight" in text
-    assert "outbound_ringleader_watchdog" in text
-    assert "outbound_empiredb_activation_probe" in text
-    assert "http://127.0.0.1:8097/health" in text
+    assert "empire_os.outbound_production_doctor" in text
+    assert "exec ./.venv/bin/python -m empire_os.outbound_production_doctor" in text
 
     for forbidden in (
         "systemctl start ",
@@ -31,16 +26,10 @@ def test_production_readiness_probe_is_read_only():
     ):
         assert forbidden not in lowered
 
-    assert "database_activation_authorized=false" in text
-    assert "service_activation_authorized=false" in text
-    assert "dns_mutation_authorized=false" in text
-    assert "provisioning_authorized=false" in text
-    assert "send_authorized=false" in text
 
-
-def test_production_readiness_probe_fails_closed_on_missing_db_probe_dsn():
+def test_production_readiness_wrapper_contains_no_duplicate_gate_logic():
     text = PATH.read_text(encoding="utf-8")
-    assert "EMPIRE_OUTBOUND_ACTIVATION_PROBE_DSN" in text
-    assert "EMPIREDB_MIGRATOR_DSN" in text
-    assert "RESULT: BLOCKED" in text
-    assert "exit 2" in text
+    assert "outbound_release_attestation" not in text
+    assert "outbound_empiredb_activation_probe" not in text
+    assert "curl " not in text
+    assert "systemctl is-active" not in text
