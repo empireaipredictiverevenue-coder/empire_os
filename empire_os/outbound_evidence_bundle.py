@@ -11,6 +11,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.outbound_evidence_bundle_auth import (
+    verify_evidence_bundle_signature,
+)
+
 
 DEFAULT_EVIDENCE_BUNDLE_PATH = Path(
     "/srv/empire_os/runtime/outbound/evidence_bundle.json"
@@ -43,6 +47,8 @@ def load_evidence_bundle(
     *,
     now: datetime | None = None,
     max_age_minutes: int = 30,
+    hmac_key: str | None = None,
+    require_signature: bool = False,
 ) -> dict[str, Any]:
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
 
@@ -65,6 +71,17 @@ def load_evidence_bundle(
         raise RuntimeError("evidence_bundle_cannot_authorize_mutation")
     if str(raw.get("schema_version") or "") != "1":
         raise RuntimeError("unsupported_evidence_bundle_schema")
+
+    signature = raw.get("signature")
+    signature_status = "UNSIGNED"
+    if signature is not None:
+        if not str(hmac_key or ""):
+            raise RuntimeError("evidence_bundle_signature_key_missing")
+        if not verify_evidence_bundle_signature(raw, key=str(hmac_key)):
+            raise RuntimeError("evidence_bundle_signature_invalid")
+        signature_status = "VERIFIED"
+    elif require_signature:
+        raise RuntimeError("evidence_bundle_signature_required")
 
     generated_at = _parse_time(raw.get("generated_at"))
     age = current - generated_at
@@ -93,6 +110,8 @@ def load_evidence_bundle(
 
     stale = age > timedelta(minutes=max_age_minutes)
     warnings = []
+    if signature_status == "UNSIGNED":
+        warnings.append("evidence_bundle_unsigned")
     if stale:
         warnings.append("evidence_bundle_stale")
     if unknown:
@@ -104,6 +123,7 @@ def load_evidence_bundle(
         "schema_version": "1",
         "generated_at": generated_at.isoformat(),
         "age_seconds": max(0, int(age.total_seconds())),
+        "signature_status": signature_status,
         "sources": sources,
         "ignored_sources": sorted(unknown),
         "warnings": warnings,
