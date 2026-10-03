@@ -58,6 +58,10 @@ def evaluate_ringleader(
 
     policy = policy or RingleaderPolicy()
     context = dict(context or {})
+    evaluation_scope = str(context.get("evaluation_scope") or "SEND").upper()
+    if evaluation_scope not in {"FLEET", "BATCH", "SEND"}:
+        raise ValueError("unsupported_ringleader_evaluation_scope")
+
     tasks: list[dict[str, Any]] = []
     hard_holds: list[str] = []
 
@@ -85,19 +89,38 @@ def evaluate_ringleader(
         tasks.append(_task("REPAIR_AUTH", ",".join(missing_auth), "auth_observer"))
 
     recipient_quality = dict(context.get("recipient_quality") or {})
-    if recipient_quality.get("verified") is not True:
-        tasks.append(_task("VERIFY_RECIPIENTS", "recipient_quality_unverified", "recipient_verifier"))
+    if (
+        evaluation_scope in {"BATCH", "SEND"}
+        and recipient_quality.get("verified") is not True
+    ):
+        tasks.append(
+            _task(
+                "VERIFY_RECIPIENTS",
+                "recipient_quality_unverified",
+                "recipient_verifier",
+            )
+        )
 
     placement = dict(context.get("placement") or {})
     if (
-        policy.require_inbox_placement_evidence_before_scale
+        evaluation_scope in {"BATCH", "SEND"}
+        and policy.require_inbox_placement_evidence_before_scale
         and placement.get("measured") is not True
     ):
-        tasks.append(_task("MEASURE_PLACEMENT", "inbox_placement_unknown", "placement_lab"))
+        tasks.append(
+            _task(
+                "MEASURE_PLACEMENT",
+                "inbox_placement_unknown",
+                "placement_lab",
+            )
+        )
 
     twin = None
     planned_batch = context.get("planned_batch")
-    if isinstance(planned_batch, Mapping):
+    if (
+        evaluation_scope in {"BATCH", "SEND"}
+        and isinstance(planned_batch, Mapping)
+    ):
         twin_current = dict(context.get("twin_current") or {})
         twin = simulate_batch(twin_current, planned_batch)
         if twin["posture"] == "HOLD":
@@ -138,7 +161,10 @@ def evaluate_ringleader(
 
     verification_depth = None
     verification_context = context.get("verification_context")
-    if isinstance(verification_context, Mapping):
+    if (
+        evaluation_scope in {"BATCH", "SEND"}
+        and isinstance(verification_context, Mapping)
+    ):
         verification_depth = verification_plan(verification_context)
         if verification_depth["outcome"] == "HOLD":
             hard_holds.append("recipient_verification_risk_hold")
@@ -176,7 +202,7 @@ def evaluate_ringleader(
 
     contact_pressure = None
     pressure_context = context.get("contact_pressure")
-    if isinstance(pressure_context, Mapping):
+    if evaluation_scope == "SEND" and isinstance(pressure_context, Mapping):
         candidate = dict(pressure_context.get("candidate") or {})
         history = pressure_context.get("history") or []
         contact_pressure = evaluate_contact_pressure(candidate, history)
@@ -186,7 +212,7 @@ def evaluate_ringleader(
 
     sender_affinity = None
     affinity_context = context.get("sender_affinity")
-    if isinstance(affinity_context, Mapping):
+    if evaluation_scope == "SEND" and isinstance(affinity_context, Mapping):
         sender_affinity = resolve_sender_affinity(affinity_context)
         if sender_affinity["decision"] == "HOLD":
             hard_holds.append("sender_affinity_hold")
@@ -297,6 +323,7 @@ def evaluate_ringleader(
 
     return {
         "posture": posture,
+        "evaluation_scope": evaluation_scope,
         "hard_holds": hard_holds,
         "tasks": tasks,
         "domain_sovereignty": sovereignty,
