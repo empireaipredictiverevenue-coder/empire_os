@@ -46,6 +46,7 @@ _PRIORITY = {
     "RECONCILE_EVIDENCE": 88,
     "RECONCILE_ESTATE": 87,
     "REMEDIATE_DOMAIN_CONTROL": 85,
+    "BLOCK_SCALE": 84,
     "REFRESH_EVIDENCE": 82,
     "VERIFY_PROVIDER_POLICY": 82,
     "VERIFY_RECIPIENTS": 80,
@@ -582,6 +583,33 @@ def evaluate_ringleader(
                     )
                 )
 
+    fleet_readiness_certificate = None
+    readiness_context = context.get("fleet_readiness_certificate")
+    if (
+        evaluation_scope == "FLEET"
+        and isinstance(readiness_context, Mapping)
+    ):
+        fleet_readiness_certificate = dict(readiness_context)
+        readiness_status = str(
+            fleet_readiness_certificate.get("status") or "UNKNOWN"
+        ).upper()
+        if readiness_status == "HOLD":
+            tasks.append(
+                _task(
+                    "BLOCK_SCALE",
+                    "fleet_readiness_hold",
+                    "fleet_capacity_planner",
+                )
+            )
+        elif readiness_status == "LIMITED":
+            tasks.append(
+                _task(
+                    "BLOCK_SCALE",
+                    "fleet_readiness_limited",
+                    "fleet_capacity_planner",
+                )
+            )
+
     sender_estate_reconciliation = None
     reconciliation_context = context.get("sender_estate_reconciliation")
     if isinstance(reconciliation_context, Mapping):
@@ -650,6 +678,7 @@ def evaluate_ringleader(
             "THROTTLE_MX",
             "THROTTLE",
             "REDUCE_CONCENTRATION",
+            "BLOCK_SCALE",
         }
         for task in tasks
     ):
@@ -682,6 +711,7 @@ def evaluate_ringleader(
         "contact_evidence_freshness": contact_evidence_freshness,
         "content_family_reputation": content_family_reputation,
         "lead_source_reputation": lead_source_reputation,
+        "fleet_readiness_certificate": fleet_readiness_certificate,
         "sender_estate_reconciliation": sender_estate_reconciliation,
         "configuration_drift": configuration_drift,
         "infrastructure_concentration": infrastructure_concentration,
