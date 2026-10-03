@@ -22,6 +22,7 @@ from empire_os.outbound_destination_reputation import evaluate_destination_reput
 from empire_os.outbound_recipient_domain_policy import evaluate_recipient_domain_policy
 from empire_os.outbound_config_attestation import detect_configuration_drift
 from empire_os.outbound_infrastructure_concentration import evaluate_concentration
+from empire_os.outbound_source_reputation import evaluate_source_reputation
 from empire_os.outbound_evidence_fusion import fuse_evidence
 from empire_os.outbound_open_source_health import evaluate_open_source_evidence
 
@@ -450,6 +451,42 @@ def evaluate_ringleader(
                     )
                 )
 
+    lead_source_reputation = None
+    source_reputation_context = context.get("lead_source_reputation")
+    if (
+        evaluation_scope in {"BATCH", "SEND"}
+        and isinstance(source_reputation_context, Mapping)
+    ):
+        source_key = str(
+            source_reputation_context.get("source_key") or ""
+        ).strip()
+        source_events = source_reputation_context.get("events") or []
+        if source_key:
+            lead_source_reputation = evaluate_source_reputation(
+                source_key,
+                source_events,
+            )
+            if lead_source_reputation["posture"] == "QUARANTINE":
+                hard_holds.append("lead_source_reputation_quarantine")
+                tasks.append(
+                    _task(
+                        "STOP_SEND",
+                        "lead_source_reputation_quarantine",
+                        "recipient_verifier",
+                    )
+                )
+            elif lead_source_reputation["posture"] in {
+                "DEGRADED",
+                "LEARNING",
+            }:
+                tasks.append(
+                    _task(
+                        "VERIFY_RECIPIENTS",
+                        "lead_source_requires_deeper_verification",
+                        "recipient_verifier",
+                    )
+                )
+
     sender_estate_reconciliation = None
     reconciliation_context = context.get("sender_estate_reconciliation")
     if isinstance(reconciliation_context, Mapping):
@@ -538,6 +575,7 @@ def evaluate_ringleader(
         "health_forecast": health_forecast,
         "destination_reputation": destination_reputation,
         "recipient_domain_policy": recipient_domain_policy,
+        "lead_source_reputation": lead_source_reputation,
         "sender_estate_reconciliation": sender_estate_reconciliation,
         "configuration_drift": configuration_drift,
         "infrastructure_concentration": infrastructure_concentration,
