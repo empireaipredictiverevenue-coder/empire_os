@@ -430,3 +430,58 @@ def test_direct_founder_inbox_is_mirrored_without_reply_automation(
     assert options["idempotency_key"] == (
         "reply-forward/em_founder_1"
     )
+
+def test_signed_provider_lifecycle_without_empire_intent_is_ignored():
+    candidate = provider_event("email.delivered")
+    candidate["data"]["tags"] = {
+        "campaign": "external_or_legacy_campaign",
+        "review_id": "review-1",
+    }
+
+    app = create_app(
+        verify_webhook=lambda _: candidate,
+        fetch_email=lambda _: (_ for _ in ()).throw(
+            AssertionError("must not fetch")
+        ),
+        reply_rpc=lambda *_: (_ for _ in ()).throw(
+            AssertionError("must not write")
+        ),
+        webhook_secret="whsec_test",
+        reply_to="replies@empire-ai.co.uk",
+    )
+
+    r = TestClient(app).post(
+        "/webhooks/resend-inbound",
+        content="{}",
+        headers=HEADERS,
+    )
+
+    assert r.status_code == 200
+    assert r.json()["ignored"] is True
+
+
+def test_signed_provider_lifecycle_with_malformed_empire_intent_fails_closed():
+    candidate = provider_event("email.delivered")
+    candidate["data"]["tags"] = {
+        "intent_id": "not-a-uuid",
+    }
+
+    app = create_app(
+        verify_webhook=lambda _: candidate,
+        fetch_email=lambda _: (_ for _ in ()).throw(
+            AssertionError("must not fetch")
+        ),
+        reply_rpc=lambda *_: (_ for _ in ()).throw(
+            AssertionError("must not write")
+        ),
+        webhook_secret="whsec_test",
+        reply_to="replies@empire-ai.co.uk",
+    )
+
+    r = TestClient(app).post(
+        "/webhooks/resend-inbound",
+        content="{}",
+        headers=HEADERS,
+    )
+
+    assert r.status_code == 400

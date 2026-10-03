@@ -184,7 +184,21 @@ def extract_resend_provider_event(event: dict[str, Any]) -> dict[str, Any] | Non
     if not isinstance(recipients, list) or len(recipients) != 1:
         raise OutboundProviderError("provider event requires one recipient")
     recipient = _email(recipients[0])
-    intent_id = _intent_uuid(_resend_tag(data.get("tags"), "intent_id"))
+
+    # Account-level Resend lifecycle events can be validly signed while
+    # carrying no Empire intent correlation. A missing correlation is not
+    # malformed Empire evidence: acknowledge/ignore it upstream.
+    #
+    # A PRESENT but malformed intent_id still fails closed through
+    # _intent_uuid below.
+    raw_intent_id = _resend_tag(
+        data.get("tags"),
+        "intent_id",
+    )
+    if not raw_intent_id:
+        return None
+
+    intent_id = _intent_uuid(raw_intent_id)
     suppress = event_type in {"complained", "suppressed"}
     if event_type == "bounced":
         bounce = data.get("bounce") if isinstance(data.get("bounce"), dict) else {}

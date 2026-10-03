@@ -250,12 +250,46 @@ def test_extract_provider_event_only_suppresses_permanent_bounce():
     assert extract_resend_provider_event(temporary)["suppress"] is False
 
 
-def test_extract_provider_event_rejects_missing_intent_tag():
-    with pytest.raises(OutboundProviderError, match="intent id"):
-        extract_resend_provider_event({
-            "type": "email.delivered",
-            "data": {"email_id": "em_123", "to": ["buyer@example.com"]},
-        })
+def test_extract_provider_event_ignores_missing_intent_tag():
+    event = {
+        "type": "email.delivered",
+        "data": {
+            "email_id": "em_uncorrelated_1",
+            "from": "Phil <phil@mail.empire-ai.co.uk>",
+            "to": ["buyer@example.com"],
+            "subject": "Quick question",
+            "tags": {
+                "campaign": "legacy_or_external_campaign",
+                "review_id": "review-1",
+            },
+            "created_at": "2026-10-03T12:56:14Z",
+        },
+    }
+
+    assert extract_resend_provider_event(event) is None
+
+
+def test_extract_provider_event_rejects_malformed_nonempty_intent_tag():
+    event = {
+        "type": "email.delivered",
+        "data": {
+            "email_id": "em_bad_intent_1",
+            "from": "Phil <phil@mail.empire-ai.co.uk>",
+            "to": ["buyer@example.com"],
+            "subject": "Quick question",
+            "tags": {
+                "intent_id": "not-a-uuid",
+            },
+            "created_at": "2026-10-03T12:56:14Z",
+        },
+    }
+
+    with pytest.raises(
+        OutboundProviderError,
+        match="intent id",
+    ):
+        extract_resend_provider_event(event)
+
 
 def test_extract_reply_records_signed_metadata_when_body_fetch_is_unavailable():
     intent_id = "00000000-0000-0000-0000-000000000001"
