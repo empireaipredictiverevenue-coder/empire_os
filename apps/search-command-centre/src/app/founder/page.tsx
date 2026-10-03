@@ -418,6 +418,10 @@ export default async function FounderPage() {
                   <Drill href="/evidence" title="Evidence timeline" />
                   <Drill href="/founder/solar" title="UK Solar Intelligence" />
                   <Drill href="/founder/mail" title="Empire Mail" />
+                  <Drill
+                    href="/founder/deliverability"
+                    title="Ringleader Deliverability"
+                  />
                 </div>
               </section>
             </div>
