@@ -408,3 +408,48 @@ def test_observer_reports_stale_external_event_ingest_heartbeat():
         and task["reason"] == "telemetry_critical_stale"
         for task in result["ringleader"]["tasks"]
     )
+
+
+
+def test_observer_can_probe_local_provider_event_ingest_health():
+    calls = []
+
+    def probe(source, url, *, now):
+        calls.append((source, url, now))
+        return {
+            "source": source,
+            "observed_at": now.isoformat(),
+            "success": True,
+            "coverage": True,
+            "details": {
+                "provider": "resend",
+                "signature_verification_configured": True,
+            },
+        }
+
+    ctx = fleet_context()
+    ctx["telemetry_policy"] = {
+        "required_sources": [
+            "provider_metrics",
+            "provider_event_ingest",
+        ],
+        "critical_sources": [
+            "provider_metrics",
+            "provider_event_ingest",
+        ],
+    }
+    result = observe_once(
+        FakeProvider(),
+        scope_key="tenant-a",
+        context=ctx,
+        telemetry_probe=probe,
+        now=datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert calls[0][0] == "provider_event_ingest"
+    assert calls[0][1] == "http://127.0.0.1:8097/health"
+    assert result["ringleader"]["telemetry_sla"]["posture"] == "CURRENT"
+    assert not any(
+        task["action"] == "BLOCK_SCALE"
+        for task in result["ringleader"]["tasks"]
+    )
