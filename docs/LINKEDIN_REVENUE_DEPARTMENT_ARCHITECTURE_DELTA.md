@@ -106,3 +106,57 @@ Focused tests cover:
 - canonical ERV-first ranking;
 - evidence-only content briefs;
 - no live outbound or posting authority.
+
+
+## Buyer Scout integration
+
+The first channel feed is the existing Phase 4 Buyer Acquisition Scout snapshot:
+
+`runtime/buyer_acquisition/scout_latest.json`
+
+The adapter intentionally separates three evidence classes:
+
+- **verified buying-committee member** — requires upstream `person_id`,
+  `name`, and `evidence_ref`;
+- **observed decision-maker candidate** — may preserve a first-party name/title
+  for later verification but cannot become the primary contact automatically;
+- **observed contact candidate** — first-party email/phone evidence may be shown
+  for verification but is not person-bound or send-authorized by this layer.
+
+Observed trigger terms from Buyer Scout can become channel signals only when the
+source snapshot has a valid non-future observation timestamp and a first-party
+website evidence reference.
+
+## Review packet output
+
+The snapshot exposes:
+
+- ranked account opportunities;
+- ICP fit and trigger evidence;
+- verified and unverified decision-maker states;
+- observed contact candidates;
+- signal count, signal diversity and freshest-signal age;
+- canonical Expected Revenue Value when evidence is complete;
+- evidence-led first-touch drafts;
+- content briefs;
+- suppression/fatigue/reply sequence state;
+- deterministic next research action;
+- review-ready counts and predicted ERV totals.
+
+Predicted ERV totals remain forecasts, not booked or recognized revenue.
+
+## Prepared runtime
+
+Source-controlled runtime units are prepared at:
+
+- `deploy/systemd/empire-linkedin-revenue-department.service`
+- `deploy/systemd/empire-linkedin-revenue-department.timer`
+
+The service writes only under `/srv/empire_os/runtime`, runs as `ubuntu`,
+uses `ProtectSystem=strict`, and does not invoke an outbound provider or
+LinkedIn endpoint.
+
+The timer is intentionally bounded to a 30-minute internal refresh cadence.
+Adding these unit files to the repository does **not** install, enable, start or
+restart them in production. Production activation remains a separate governed
+step.
