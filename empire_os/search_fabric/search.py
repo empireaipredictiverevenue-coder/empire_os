@@ -1038,10 +1038,37 @@ def search_domains(query: str, num: int = 20, *, use_cache: bool = True) -> List
         )
     return domains
 
-def search_domains_parallel(queries: List[str], num: int = 15) -> Dict[str, List[str]]:
+def search_domains_parallel(
+    queries: List[str],
+    num: int = 15,
+    *,
+    max_workers: int | None = None,
+) -> Dict[str, List[str]]:
     """Search multiple queries in parallel (threaded)."""
     if not queries:
         return {}
+
+    try:
+        worker_budget = int(
+            max_workers
+            if max_workers is not None
+            else os.environ.get(
+                "EMPIRE_SEARCH_PARALLEL_WORKERS",
+                "5",
+            )
+        )
+    except (TypeError, ValueError):
+        worker_budget = 5
+
+    workers = max(
+        1,
+        min(
+            worker_budget,
+            12,
+            len(queries),
+        ),
+    )
+
     out = {}
     totals = Counter()
 
@@ -1056,12 +1083,13 @@ def search_domains_parallel(queries: List[str], num: int = 15) -> Dict[str, List
         finally:
             del _run_local.stats
 
-    with ThreadPoolExecutor(max_workers=min(5, len(queries))) as ex:
+    with ThreadPoolExecutor(max_workers=workers) as ex:
         for q, domains, stats in ex.map(_one, queries):
             out[q] = domains
             totals.update(stats)
     print(json.dumps({"search_fabric_run": {
         "queries": len(queries), "queries_with_domains": sum(bool(v) for v in out.values()),
+        "workers": workers,
         "diagnostics": dict(sorted(totals.items())), "fresh_only": True,
     }}, sort_keys=True), file=sys.stderr)
     return out
