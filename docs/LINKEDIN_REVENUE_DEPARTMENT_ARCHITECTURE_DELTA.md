@@ -15,6 +15,41 @@ The channel loop is:
 This is a channel-specific orchestration layer over existing EmpireOS
 intelligence. It is not a second commercial truth system.
 
+## Empire-first operating contract
+
+This capability is built first as **Empire AI's own revenue department**.
+
+Primary proof loop:
+
+```
+EMPIRE ICP
+-> PUBLIC / FIRST-PARTY SIGNALS
+-> DURABLE INTENT CAPTURE
+-> IDENTITY RESOLUTION
+-> PREDICTIVE REVENUE / OPPORTUNITY VALUE
+-> RANKED NEXT-BEST ACCOUNTS
+-> GOVERNED OUTREACH REVIEW
+-> CONVERSATION
+-> COMMERCIAL TERMS
+-> PAYMENT
+-> FULFILMENT
+-> VERIFIED OUTCOME
+-> ECONOMIC MEMORY
+```
+
+The internal product benchmark is not lead count, message count, impressions or
+reply volume. It is progression from **predicted commercial value to realised
+commercial value**.
+
+A qualified intent discovery must never exist only in chat, an agent scratchpad,
+or a transient search result. It must enter durable evidence storage immediately,
+then remain unresolved until identity is proven. Once the business identity is
+verified, the candidate progresses through the existing EmpireDB-governed
+holding/canonical acquisition path.
+
+External productisation comes after Empire has used this loop to create repeatable
+verified commercial outcomes.
+
 ## Architecture contract
 
 The implementation MUST reuse canonical EmpireOS primitives:
@@ -193,7 +228,7 @@ Rules:
 - Buyer Scout must probe the first-party site and recover business/contact
   evidence before the account can progress.
 - Intent-led roofing/HVAC/solar/plumbing opportunities use the
-  `intent_driven_home_service_growth` ICP lane. This is intentionally
+  `home_service_growth_intent` ICP lane. This is intentionally
   separate from the NYC permit-driven `high_ticket_home_service` lane.
 - The original public pain URL, observation time, pain taxonomy and intent
   summary remain attached through Buyer Scout into LinkedIn Revenue
