@@ -48,7 +48,6 @@ LOG_PATH = Path(
         "/srv/empire_os/runtime/feedback/crawler_runs.jsonl",
     )
 )
-LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 MAX_RUN_SEC = int(os.environ.get("CRAWLER_TIMEOUT", "1800"))
 
@@ -65,6 +64,7 @@ def log(level, msg, **fields):
         "msg": msg,
         **fields,
     }
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with LOG_PATH.open("a") as fh:
         fh.write(json.dumps(event, default=str) + "\n")
     print(json.dumps(event, default=str))
