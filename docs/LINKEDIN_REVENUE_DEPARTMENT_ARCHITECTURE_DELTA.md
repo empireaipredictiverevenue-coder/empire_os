@@ -244,4 +244,3 @@ Scheduled intent collection remains bounded and source-health aware. Roofing and
 other home-service pain searches rotate alongside general B2B searches. A
 first-party URL enables identity research; its absence keeps the signal stored
 and unresolved rather than inventing a company.
-
