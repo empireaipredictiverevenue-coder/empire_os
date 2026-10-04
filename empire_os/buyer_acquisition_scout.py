@@ -46,7 +46,7 @@ CONTINUOUS_COMMERCIAL_LANE_BY_ICP = {
     "legal_plaintiff_growth_firm": "legal_services",
     "insurance_distribution_growth": "insurance",
     "high_ticket_home_service": "permit_home_services",
-    "intent_driven_home_service_growth": "intent_home_services",
+    "home_service_growth_intent": "home_service_growth",
 }
 
 
@@ -388,7 +388,7 @@ def run_buyer_scout(
         for seed_pool in seed_pools:
             provenance.setdefault(host, []).append({
                 "source": (
-                    "community_intent_seed"
+                    "intent_signal_seed"
                     if intent_signal_id
                     else "canonical_prospect_seed"
                 ),
@@ -620,7 +620,7 @@ def run_buyer_scout(
         candidates.append({
             "domain": domain,
             "discovery_source": (
-                "community_intent_seed"
+                "intent_signal_seed"
                 if domain in intent_seed_domains
                 else (
                     "canonical_prospect_seed"
