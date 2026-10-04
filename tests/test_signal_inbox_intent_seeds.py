@@ -1,10 +1,11 @@
 import json
 
-from empire_os.signal_inbox import intent_seed_records
+from empire_os.intent_seed_bridge import load_intent_seed_records
 
 
 def test_intent_signal_projects_to_review_only_home_service_seed(tmp_path):
-    inbox = tmp_path / "signal_inbox.json"
+    inbox = tmp_path / "runtime/acquisition/signal_inbox.json"
+    inbox.parent.mkdir(parents=True)
     inbox.write_text(json.dumps({
         "sig-roof-1": {
             "signal_id": "sig-roof-1",
@@ -39,7 +40,7 @@ def test_intent_signal_projects_to_review_only_home_service_seed(tmp_path):
         }
     }), encoding="utf-8")
 
-    rows = intent_seed_records(inbox=inbox)
+    rows = load_intent_seed_records(tmp_path)
 
     assert len(rows) == 1
     row = rows[0]
@@ -47,7 +48,7 @@ def test_intent_signal_projects_to_review_only_home_service_seed(tmp_path):
     assert row["website"] == (
         "https://intent-roof.example/roof-replacement"
     )
-    assert row["icp_profile_key"] == "home_service_growth_intent"
+    assert row["icp_profile_key"] == "intent_driven_home_service_growth"
     assert row["seed_intent_signal_id"] == "sig-roof-1"
     assert row["seed_intent_score"] == 86
     assert row["seed_intent_band"] == "high"
@@ -59,7 +60,8 @@ def test_intent_signal_projects_to_review_only_home_service_seed(tmp_path):
 
 
 def test_low_intent_or_missing_first_party_url_is_not_promoted(tmp_path):
-    inbox = tmp_path / "signal_inbox.json"
+    inbox = tmp_path / "runtime/acquisition/signal_inbox.json"
+    inbox.parent.mkdir(parents=True)
     inbox.write_text(json.dumps({
         "low": {
             "signal_id": "low",
@@ -93,11 +95,12 @@ def test_low_intent_or_missing_first_party_url_is_not_promoted(tmp_path):
         },
     }), encoding="utf-8")
 
-    assert intent_seed_records(inbox=inbox) == []
+    assert load_intent_seed_records(tmp_path) == []
 
 
 def test_intent_seed_dedupes_same_first_party_domain(tmp_path):
-    inbox = tmp_path / "signal_inbox.json"
+    inbox = tmp_path / "runtime/acquisition/signal_inbox.json"
+    inbox.parent.mkdir(parents=True)
     base = {
         "status": "unresolved",
         "source": "reddit_intent",
@@ -130,7 +133,7 @@ def test_intent_seed_dedupes_same_first_party_domain(tmp_path):
         encoding="utf-8",
     )
 
-    rows = intent_seed_records(inbox=inbox)
+    rows = load_intent_seed_records(tmp_path)
 
     assert len(rows) == 1
     assert rows[0]["seed_intent_signal_id"] == "newer"
