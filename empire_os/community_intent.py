@@ -27,10 +27,21 @@ PLATFORM_DOMAINS = {
 
 INTENT_PATTERNS = (
     re.compile(r"\b(need|looking for|searching for|seeking)\b", re.I),
+    re.compile(
+        r"\bneed(?:ing)?\b.{0,36}\b(?:more\s+)?(?:qualified\s+)?"
+        r"(?:leads?|appointments?|customers?|clients?)\b",
+        re.I,
+    ),
     re.compile(r"\b(recommend|recommendation|anyone using|what tool|which tool)\b", re.I),
     re.compile(r"\b(struggling|frustrated|stuck|pain point|problem with)\b", re.I),
     re.compile(r"\b(budget|quote|rfp|switching|replace)\b", re.I),
     re.compile(r"\b(losing|wasting).{0,24}\b(time|money|revenue|leads)\b", re.I),
+    re.compile(
+        r"\b(?:google|paid|search)\s+ads?\b.{0,48}"
+        r"\b(?:not\s+(?:consistently\s+)?profitable|"
+        r"poor\s+roi|negative\s+roi|unprofitable)\b",
+        re.I,
+    ),
     re.compile(r"\bhow (do|can) (i|we).{0,40}\b(scale|automate|grow|find|get)\b", re.I),
 )
 
