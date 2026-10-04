@@ -283,6 +283,11 @@ def intent_seed_records(
                 "seed_intent_band": str(
                     observation.get("intent_band") or ""
                 ).strip() or None,
+                "seed_intent_observed_at": str(
+                    observation.get("observed_at")
+                    or row.get("created_at")
+                    or ""
+                ).strip() or None,
                 "seed_intent_pain_points": list(
                     observation.get("pain_points") or ()
                 ),
