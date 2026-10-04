@@ -190,6 +190,32 @@ def _sequence_recommendation(
     }
 
 
+def _next_research_action(blockers: Iterable[str]) -> str:
+    ordered = list(blockers or ())
+    if "suppressed" in ordered:
+        return "stop_suppressed"
+    if "decision_maker_unresolved" in ordered:
+        return "resolve_decision_maker"
+    if "decision_maker_verification_required" in ordered:
+        return "verify_observed_decision_maker"
+    if "contact_unverified" in ordered:
+        return "verify_contact_channel"
+    if "buying_signal_unknown" in ordered:
+        return "acquire_fresh_buying_signal"
+    if "message_proof_unavailable" in ordered:
+        return "acquire_message_proof"
+    if any(
+        value in ordered
+        for value in (
+            "max_30d_touch_count_reached",
+            "contact_cooldown_active",
+            "invalid_or_future_touch_evidence",
+        )
+    ):
+        return "hold_for_contact_policy"
+    return "review_ranked_opportunity"
+
+
 def build_linkedin_revenue_opportunity(
     record: Mapping[str, Any],
     *,
@@ -208,6 +234,26 @@ def build_linkedin_revenue_opportunity(
     committee = build_buying_committee(
         record.get("first_party_people") or ()
     )
+    observed_people_candidates = [
+        {
+            "name": _text(raw.get("name")) or None,
+            "title": _text(raw.get("title")) or None,
+            "evidence_ref": _text(raw.get("evidence_ref")) or None,
+            "verification_state": "OBSERVED_UNVERIFIED",
+        }
+        for raw in (record.get("observed_people_candidates") or ())
+        if isinstance(raw, Mapping) and _text(raw.get("name"))
+    ]
+    contact_candidates = [
+        {
+            "kind": _text(raw.get("kind")) or "unknown",
+            "value": _text(raw.get("value")) or None,
+            "evidence_ref": _text(raw.get("evidence_ref")) or None,
+            "verification_state": "OBSERVED_UNVERIFIED",
+        }
+        for raw in (record.get("contact_candidates") or ())
+        if isinstance(raw, Mapping) and _text(raw.get("value"))
+    ]
     primary = committee.get("primary")
     observed_signals = _observed_signals(
         record.get("signals") or (),
@@ -247,7 +293,11 @@ def build_linkedin_revenue_opportunity(
 
     blockers: list[str] = []
     if primary is None:
-        blockers.append("decision_maker_unresolved")
+        blockers.append(
+            "decision_maker_verification_required"
+            if observed_people_candidates
+            else "decision_maker_unresolved"
+        )
     elif primary.get("contact_verified") is not True:
         blockers.append("contact_unverified")
     if not observed_signals:
@@ -290,10 +340,30 @@ def build_linkedin_revenue_opportunity(
             "notes_present": bool(_text(record.get("notes"))),
             "invented_account_facts": False,
         },
-        "stage_03_decision_makers": committee,
+        "stage_03_decision_makers": {
+            **committee,
+            "observed_unverified_candidates": observed_people_candidates,
+            "observed_contact_candidates": contact_candidates,
+            "resolution_state": (
+                "VERIFIED_PRIMARY"
+                if primary and primary.get("contact_verified") is True
+                else (
+                    "OBSERVED_CANDIDATE_REQUIRES_VERIFICATION"
+                    if observed_people_candidates
+                    else "UNKNOWN"
+                )
+            ),
+        },
         "stage_04_buying_signals": {
             "state": "OBSERVED_SIGNALS" if observed_signals else "UNKNOWN",
             "observed_signal_count": len(observed_signals),
+            "unique_signal_type_count": len({
+                row["signal_type"] for row in observed_signals
+            }),
+            "freshest_signal_age_days": (
+                observed_signals[0]["age_days"]
+                if observed_signals else None
+            ),
             "signals": observed_signals,
             "binding_intent_verified": False,
         },
@@ -331,6 +401,9 @@ def build_linkedin_revenue_opportunity(
         "review_readiness": {
             "ready_for_human_review": not blockers,
             "blockers": blockers,
+            "recommended_next_research_action": _next_research_action(
+                blockers
+            ),
             "suppressed": suppressed,
             "linkedin_automation_enabled": False,
             "outreach_authorized": False,
@@ -363,16 +436,40 @@ def scout_candidate_to_linkedin_record(
     """
     website = _text(candidate.get("website"))
     people: list[dict[str, Any]] = []
+    observed_people_candidates: list[dict[str, Any]] = []
     for raw in candidate.get("first_party_people") or ():
-        if not isinstance(raw, Mapping):
+        if not isinstance(raw, Mapping) or not _text(raw.get("name")):
             continue
+        evidence_ref = _text(raw.get("evidence_ref")) or website
+        observed_people_candidates.append({
+            "name": _text(raw.get("name")),
+            "title": _text(raw.get("title")) or None,
+            "evidence_ref": evidence_ref or None,
+        })
         if (
-            not _text(raw.get("person_id"))
-            or not _text(raw.get("name"))
-            or not _text(raw.get("evidence_ref"))
+            _text(raw.get("person_id"))
+            and _text(raw.get("evidence_ref"))
         ):
-            continue
-        people.append(dict(raw))
+            people.append(dict(raw))
+
+    contact_candidates: list[dict[str, Any]] = []
+    if website:
+        for value in candidate.get("first_party_emails") or ():
+            email = _text(value)
+            if email:
+                contact_candidates.append({
+                    "kind": "email",
+                    "value": email,
+                    "evidence_ref": website,
+                })
+        for value in candidate.get("first_party_phones") or ():
+            phone = _text(value)
+            if phone:
+                contact_candidates.append({
+                    "kind": "phone",
+                    "value": phone,
+                    "evidence_ref": website,
+                })
 
     signals: list[dict[str, Any]] = []
     if website and observed_at:
@@ -409,6 +506,8 @@ def scout_candidate_to_linkedin_record(
             candidate.get("target_icp_profile_keys") or ()
         ),
         "first_party_people": people,
+        "observed_people_candidates": observed_people_candidates,
+        "contact_candidates": contact_candidates,
         "signals": signals,
         "source_evidence_ref": website or None,
         "enterprise_target": (
