@@ -1,89 +1,106 @@
-import json
-
-from scripts.run_buyer_acquisition_scout import (
-    _community_intent_seed_records,
-)
+from empire_os.intent_seed_bridge import build_intent_seed_records
 
 
-def test_signal_inbox_intent_with_first_party_url_becomes_scout_seed(tmp_path):
-    path = tmp_path / "runtime/acquisition/signal_inbox.json"
-    path.parent.mkdir(parents=True)
-    path.write_text(json.dumps({
-        "sig-roof-1": {
-            "signal_id": "sig-roof-1",
-            "status": "unresolved",
-            "source": "reddit_intent",
-            "niche": "roofing",
-            "lead_score": 86,
-            "url": "https://reddit.com/r/Roofing/comments/example",
-            "last_seen_at": "2026-10-04T08:00:00+00:00",
-            "raw": {
-                "entity_kind": "signal",
-                "evidence_urls": [
-                    "https://roofing-company.example/roof-replacement"
+def _signal(
+    *,
+    signal_id="sig-1",
+    source="reddit_intent",
+    status="unresolved",
+    niche="roofing",
+    score=82,
+    band="high",
+    evidence_urls=None,
+):
+    return {
+        "signal_id": signal_id,
+        "status": status,
+        "last_seen_at": "2026-10-04T08:00:00+00:00",
+        "source": source,
+        "niche": niche,
+        "url": "https://www.reddit.com/r/roofing/comments/example/",
+        "lead_score": score,
+        "raw": {
+            "entity_kind": "signal",
+            "outreach_authority": "none",
+            "evidence_urls": list(
+                evidence_urls
+                or ["https://3pointcontracting.com/roof-replacement/"]
+            ),
+            "community_intent": {
+                "source": "reddit",
+                "url": (
+                    "https://www.reddit.com/r/roofing/comments/example/"
+                ),
+                "title": "Need more qualified roofing appointments",
+                "text": (
+                    "We need 2-4 more qualified appointments per week. "
+                    "Google Ads have not been consistently profitable."
+                ),
+                "observed_at": "2026-10-04T07:30:00+00:00",
+                "niche": niche,
+                "intent_score": score,
+                "intent_band": band,
+                "pain_points": [
+                    "lead_generation",
+                    "revenue_growth",
                 ],
-                "community_intent": {
-                    "title": "Need more qualified appointments",
-                    "text": (
-                        "Google Ads has not been consistently profitable "
-                        "and we need more leads."
-                    ),
-                    "observed_at": "2026-10-04T07:45:00+00:00",
-                    "intent_score": 86,
-                    "intent_band": "high",
-                    "pain_points": [
-                        "lead_generation",
-                        "revenue_growth",
-                    ],
-                },
             },
         },
-    }), encoding="utf-8")
+    }
 
-    rows = _community_intent_seed_records(tmp_path)
+
+def test_high_intent_roofing_signal_becomes_review_only_scout_seed():
+    rows = build_intent_seed_records({"sig-1": _signal()})
 
     assert len(rows) == 1
     row = rows[0]
+    assert row["business_name"] == ""
     assert row["website"] == (
-        "https://roofing-company.example/roof-replacement"
+        "https://3pointcontracting.com/roof-replacement/"
     )
     assert row["icp_profile_key"] == (
         "intent_driven_home_service_growth"
     )
-    assert row["seed_intent_signal_id"] == "sig-roof-1"
-    assert row["intent_score"] == 86
-    assert row["intent_band"] == "high"
-    assert row["intent_observed_at"] == (
-        "2026-10-04T07:45:00+00:00"
+    assert row["seed_intent_signal_id"] == "sig-1"
+    assert row["seed_intent_score"] == 82
+    assert row["seed_intent_band"] == "high"
+    assert row["seed_intent_pain_points"] == [
+        "lead_generation",
+        "revenue_growth",
+    ]
+    assert row["outreach_authorized"] is False
+    assert row["execution_authority"] == "none"
+
+
+def test_social_platform_urls_are_not_promoted_as_business_seeds():
+    signal = _signal(
+        evidence_urls=[
+            "https://www.reddit.com/r/roofing/comments/example/",
+            "https://www.linkedin.com/posts/example",
+        ],
     )
-    assert row["intent_evidence_url"] == (
-        "https://reddit.com/r/Roofing/comments/example"
-    )
+    assert build_intent_seed_records({"sig-1": signal}) == []
 
 
-def test_signal_without_first_party_url_remains_unpromoted(tmp_path):
-    path = tmp_path / "runtime/acquisition/signal_inbox.json"
-    path.parent.mkdir(parents=True)
-    path.write_text(json.dumps({
-        "sig-unknown": {
-            "signal_id": "sig-unknown",
-            "status": "unresolved",
-            "source": "agent_research_intent",
-            "niche": "roofing",
-            "lead_score": 90,
-            "url": "https://reddit.com/r/Roofing/comments/unknown",
-            "raw": {
-                "entity_kind": "signal",
-                "community_intent": {
-                    "title": "Need more leads",
-                    "text": "Need more leads for our roofing company.",
-                    "intent_score": 90,
-                    "intent_band": "high",
-                    "pain_points": ["lead_generation"],
-                    "evidence_urls": [],
-                },
-            },
-        },
-    }), encoding="utf-8")
+def test_low_intent_without_medium_or_high_band_is_held_back():
+    signal = _signal(score=20, band="low")
+    assert build_intent_seed_records({"sig-1": signal}) == []
 
-    assert _community_intent_seed_records(tmp_path) == []
+
+def test_resolved_signal_is_not_reseeded():
+    signal = _signal(status="resolved")
+    assert build_intent_seed_records({"sig-1": signal}) == []
+
+
+def test_domains_are_deduplicated_using_freshest_signal():
+    newer = _signal(signal_id="newer")
+    older = _signal(signal_id="older")
+    older["last_seen_at"] = "2026-10-03T08:00:00+00:00"
+
+    rows = build_intent_seed_records({
+        "older": older,
+        "newer": newer,
+    })
+
+    assert len(rows) == 1
+    assert rows[0]["seed_intent_signal_id"] == "newer"
