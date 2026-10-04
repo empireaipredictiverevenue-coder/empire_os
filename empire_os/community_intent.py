@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable, Mapping
 import requests
 
 from empire_os.candidate_quality import assess_candidate
-from empire_os.community_intent_taxonomy import assess_intent
+from empire_os.community_intent_v2 import assess_intent_v2
 from empire_os.lead_sources import LeadCandidate
 from empire_os.signal_inbox import enqueue_signal
 
@@ -157,12 +157,18 @@ def normalize_search_result(
 
     score, band = score_intent(text)
     pain_points = classify_pain_points(text)
-    assessment = assess_intent(
+    assessment = assess_intent_v2(
         text,
-        source=source,
-        observed_at=(result.get("published_at") or result.get("date")),
+        source_mode=(
+            "reddit_public_search"
+            if source == "reddit"
+            else "linkedin_public_search"
+        ),
+        observed_at=_clean(
+            result.get("published_at") or result.get("date")
+        ),
     )
-    if band == "low" and not pain_points and not assessment.intent_categories:
+    if band == "low" and not pain_points and not assessment.intent_types:
         return None
 
     return IntentObservation(
@@ -228,12 +234,12 @@ def parse_reddit_atom(
             continue
         score, band = score_intent(combined)
         pain_points = classify_pain_points(combined)
-        assessment = assess_intent(
+        assessment = assess_intent_v2(
             combined,
-            source="reddit",
+            source_mode="reddit_atom",
             observed_at=observed_at,
         )
-        if band == "low" and not pain_points and not assessment.intent_categories:
+        if band == "low" and not pain_points and not assessment.intent_types:
             continue
 
         seen.add(url)
