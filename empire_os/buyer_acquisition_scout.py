@@ -640,6 +640,11 @@ def run_buyer_scout(
                     "intent_evidence_url"
                 )
             ),
+            "intent_summary": (
+                canonical_seed_by_domain.get(domain, {}).get(
+                    "intent_summary"
+                )
+            ),
             "business_name": record["business_name"],
             "business_name_source": record["business_name_source"],
             "site_business_names": record["site_business_names"],
