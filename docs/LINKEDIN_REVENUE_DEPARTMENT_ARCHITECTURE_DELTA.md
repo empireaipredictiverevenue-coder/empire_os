@@ -160,3 +160,53 @@ The timer is intentionally bounded to a 30-minute internal refresh cadence.
 Adding these unit files to the repository does **not** install, enable, start or
 restart them in production. Production activation remains a separate governed
 step.
+
+
+## Intent persistence and automation bridge — 4 October 2026
+
+The LinkedIn Revenue Department does not own discovery persistence. Public
+commercial pain and intent must survive outside chat/agent context and enter the
+existing governed acquisition fabric.
+
+Canonical progression:
+
+```
+PUBLIC INTENT OBSERVATION
+-> runtime/acquisition/signal_inbox.json
+-> FIRST-PARTY URL / IDENTITY EVIDENCE
+-> BUYER ACQUISITION SCOUT RESEARCH CANDIDATE
+-> BUYER SCOUT HOLDING / RECONCILIATION
+-> CANONICAL PROSPECT ONLY AFTER IDENTITY GATES
+-> LINKEDIN REVENUE DEPARTMENT
+-> PREDICTIVE PRIORITISATION / REVIEW
+```
+
+Rules:
+
+- Every scheduled Reddit/LinkedIn observation is queued as a signal, not a
+  prospect.
+- Agent/web discoveries use `scripts/capture_intent_evidence.py` and enter the
+  same signal inbox.
+- A social/community identity is never inferred merely from username or prose.
+- Medium/high intent with a public external first-party URL may become a
+  bounded Buyer Scout seed.
+- Buyer Scout must probe the first-party site and recover business/contact
+  evidence before the account can progress.
+- Intent-led roofing/HVAC/solar/plumbing opportunities use the
+  `intent_driven_home_service_growth` ICP lane. This is intentionally
+  separate from the NYC permit-driven `high_ticket_home_service` lane.
+- The original public pain URL, observation time, pain taxonomy and intent
+  summary remain attached through Buyer Scout into LinkedIn Revenue
+  `stage_04_buying_signals`.
+- Intent score is evidence prioritisation only. It is not budget, binding
+  intent, probability of purchase, qualification, revenue or authority.
+- No live outreach, LinkedIn automation, content posting, commercial terms or
+  payment authority is granted by this bridge.
+- Canonical writes continue through the configured EmpireDB gateway; no new
+  Supabase-authoritative path is introduced.
+
+Scheduled intent collection remains bounded and source-health aware. Roofing and
+other home-service pain searches rotate alongside general B2B searches. A
+first-party URL enables identity research; its absence keeps the signal stored
+and unresolved rather than inventing a company.
+
