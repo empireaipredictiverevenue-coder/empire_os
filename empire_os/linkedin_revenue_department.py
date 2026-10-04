@@ -586,7 +586,7 @@ def scout_candidate_to_linkedin_record(
             "observed_at": intent_observed_at,
             "evidence_ref": intent_evidence_ref,
             "source": _text(candidate.get("discovery_source"))
-            or "intent_signal_seed",
+            or "community_intent_seed",
             "confidence": None,
         })
 
