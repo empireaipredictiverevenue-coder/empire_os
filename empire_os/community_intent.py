@@ -105,9 +105,9 @@ def _clean(value: Any) -> str:
     return " ".join(str(value or "").split())
 
 
-_URL_PATTERN = re.compile(r"https?://[^\\s<>\"']+", re.I)
+_URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.I)
 _HREF_PATTERN = re.compile(
-    r"""href\\s*=\\s*[\"']([^\"']+)[\"']""",
+    r"""href\s*=\s*["']([^"']+)["']""",
     re.I,
 )
 _NON_BUSINESS_HOSTS = {
