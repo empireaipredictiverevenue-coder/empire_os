@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping
+from urllib.parse import urlparse
 
 import requests
 
@@ -94,6 +95,7 @@ class IntentObservation:
     pain_points: tuple[str, ...] = ()
     intent_score: int = 0
     intent_band: str = "low"
+    evidence_urls: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -101,6 +103,167 @@ class IntentObservation:
 
 def _clean(value: Any) -> str:
     return " ".join(str(value or "").split())
+
+
+_URL_PATTERN = re.compile(r"https?://[^\\s<>\"']+", re.I)
+_HREF_PATTERN = re.compile(
+    r"""href\\s*=\\s*[\"']([^\"']+)[\"']""",
+    re.I,
+)
+_NON_BUSINESS_HOSTS = {
+    "reddit.com", "old.reddit.com", "www.reddit.com",
+    "linkedin.com", "www.linkedin.com",
+    "facebook.com", "www.facebook.com",
+    "x.com", "www.x.com", "twitter.com", "www.twitter.com",
+    "youtube.com", "www.youtube.com",
+}
+
+
+def _host(value: Any) -> str:
+    try:
+        host = urlparse(str(value or "").strip()).netloc.casefold()
+    except ValueError:
+        return ""
+    return host.split("@")[-1].split(":")[0]
+
+
+def extract_external_evidence_urls(
+    value: Any,
+    *,
+    platform: str = "",
+) -> tuple[str, ...]:
+    """Extract public first-party URL candidates without asserting identity."""
+    text = str(value or "")
+    candidates = [
+        *(_HREF_PATTERN.findall(text)),
+        *(_URL_PATTERN.findall(text)),
+    ]
+    platform_hosts = {
+        host.casefold()
+        for host in PLATFORM_DOMAINS.get(
+            str(platform or "").strip().casefold(),
+            (),
+        )
+    }
+    urls: list[str] = []
+    seen: set[str] = set()
+    for raw in candidates:
+        url = str(raw or "").strip().rstrip(".,);]")
+        host = _host(url)
+        if (
+            not url.startswith(("http://", "https://"))
+            or not host
+            or host in _NON_BUSINESS_HOSTS
+            or any(host == item or host.endswith("." + item)
+                   for item in platform_hosts)
+            or url in seen
+        ):
+            continue
+        seen.add(url)
+        urls.append(url)
+    return tuple(urls[:10])
+
+
+def normalize_external_intent_evidence(
+    *,
+    source: str,
+    url: str,
+    title: str = "",
+    text: str = "",
+    author: str = "",
+    observed_at: str = "",
+    engagement: int = 0,
+    query: str = "",
+    metro: str = "",
+    niche: str = "",
+    evidence_urls: Iterable[str] = (),
+    now: datetime | None = None,
+) -> IntentObservation:
+    """Normalize agent/web research into the same durable intent contract."""
+    source_key = re.sub(
+        r"[^a-z0-9_]+",
+        "_",
+        str(source or "").strip().casefold(),
+    ).strip("_")
+    source_url = _clean(url)
+    combined = _clean(f"{title} {text}")
+    if not source_key:
+        raise ValueError("intent source required")
+    if not source_url.startswith(("http://", "https://")):
+        raise ValueError("public evidence URL required")
+    if not combined:
+        raise ValueError("intent evidence text required")
+
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    observed = _clean(observed_at)
+    if observed:
+        try:
+            parsed = datetime.fromisoformat(observed.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("invalid intent observed_at") from exc
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.astimezone(timezone.utc)
+        if parsed > current:
+            raise ValueError("future intent evidence rejected")
+        observed = parsed.isoformat()
+    else:
+        observed = current.isoformat()
+
+    score, band = score_intent(combined, engagement=engagement)
+    pain_points = classify_pain_points(combined)
+    urls = list(extract_external_evidence_urls(
+        combined,
+        platform=source_key,
+    ))
+    for raw in evidence_urls:
+        candidate = _clean(raw)
+        if (
+            candidate.startswith(("http://", "https://"))
+            and candidate not in urls
+            and _host(candidate)
+            and _host(candidate) not in _NON_BUSINESS_HOSTS
+        ):
+            urls.append(candidate)
+
+    return IntentObservation(
+        source=source_key,
+        url=source_url,
+        title=_clean(title),
+        text=_clean(text),
+        author=_clean(author),
+        observed_at=observed,
+        engagement=max(0, int(engagement or 0)),
+        query=_clean(query),
+        metro=_clean(metro),
+        niche=_clean(niche),
+        pain_points=pain_points,
+        intent_score=score,
+        intent_band=band,
+        evidence_urls=tuple(urls[:10]),
+    )
+
+
+def capture_external_intent_evidence(
+    *,
+    enqueue_fn: Callable[..., Mapping[str, Any]] = enqueue_signal,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Persist one externally discovered public intent observation safely."""
+    observation = normalize_external_intent_evidence(**kwargs)
+    candidate = observation_to_signal(observation)
+    quality = assess_candidate(candidate)
+    result = enqueue_fn(candidate, quality=quality)
+    return {
+        **dict(result),
+        "intent_score": observation.intent_score,
+        "intent_band": observation.intent_band,
+        "pain_points": list(observation.pain_points),
+        "evidence_urls": list(observation.evidence_urls),
+        "canonical_prospect_created": False,
+        "outreach_authority": "none",
+        "execution_authority": "none",
+    }
 
 
 def classify_pain_points(text: str) -> tuple[str, ...]:
@@ -170,6 +333,7 @@ def normalize_search_result(
         pain_points=pain_points,
         intent_score=score,
         intent_band=band,
+        evidence_urls=extract_external_evidence_urls(text, platform=source),
     )
 
 
@@ -201,7 +365,12 @@ def parse_reddit_atom(
         )
         content = entry.findtext("a:content", default="", namespaces=ns)
         summary = entry.findtext("a:summary", default="", namespaces=ns)
-        body = _clean(_HTML_TAG.sub(" ", content or summary or ""))
+        raw_body = content or summary or ""
+        body = _clean(_HTML_TAG.sub(" ", raw_body))
+        evidence_urls = extract_external_evidence_urls(
+            raw_body,
+            platform="reddit",
+        )
 
         url = ""
         for link in entry.findall("a:link", ns):
@@ -241,6 +410,7 @@ def parse_reddit_atom(
                 pain_points=pain_points,
                 intent_score=score,
                 intent_band=band,
+                evidence_urls=evidence_urls,
             )
         )
 
@@ -348,6 +518,7 @@ def observation_to_signal(observation: IntentObservation) -> LeadCandidate:
             "community_intent": observation.as_dict(),
             "entity_kind": "signal",
             "outreach_authority": "none",
+            "evidence_urls": list(observation.evidence_urls),
         },
     )
 
