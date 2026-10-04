@@ -67,4 +67,5 @@ jobs:
             tests/test_signal_resolver.py \
             tests/test_opportunity_radar.py \
             tests/test_opportunity_factory_intake.py \
-            tests/test_linkedin_revenue_department.py
+            tests/test_linkedin_revenue_department.py \
+            tests/test_linkedin_revenue_department_systemd.py
