@@ -106,6 +106,40 @@ ICP_PROFILES: tuple[dict[str, Any], ...] = (
         "priority_score": 94,
     },
     {
+        "profile_key": "intent_driven_home_service_growth",
+        "name": "Intent-led Home Service Growth Prospect",
+        "buyer_pools": [
+            "local_and_smb_buyers", "software_and_advisory_buyers",
+        ],
+        "industry_signals": [
+            "roofing", "roofer", "hvac", "solar", "restoration",
+            "plumbing", "siding", "gutter", "general contractor",
+            "home services",
+        ],
+        "decision_maker_roles": [
+            "owner", "founder", "ceo", "general manager",
+            "sales director", "marketing director", "head of growth",
+        ],
+        "likely_problems": [
+            "insufficient qualified appointments",
+            "paid acquisition not consistently profitable",
+            "lead volatility",
+            "weak service mix economics",
+            "need for measurable local growth",
+        ],
+        "buying_triggers": [
+            "need more leads", "qualified appointments", "google ads",
+            "paid search", "lead generation", "marketing help",
+            "growth", "higher margin", "new service line", "siding",
+        ],
+        "product_codes": [
+            "managed_service", "search_growth_command",
+            "local_search_grid", "competitor_search_gap",
+            "tag_intelligence_monitor",
+        ],
+        "priority_score": 99,
+    },
+    {
         "profile_key": "agency_white_label_partner",
         "name": "Agency / White-label Partner",
         "buyer_pools": ["agency_and_reseller_buyers"],
