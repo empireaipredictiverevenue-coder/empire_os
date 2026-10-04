@@ -528,7 +528,7 @@ def test_provider_degradation_is_not_false_identity_unresolved(
 
     monkeypatch.setattr(
         bia,
-        "search_resilient",
+        "search_reliable",
         lambda *a, **k: {
             "organic": [],
             "searchParameters": {

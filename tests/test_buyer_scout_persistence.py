@@ -250,3 +250,138 @@ def test_missing_canonical_persistence_evidence_fails_closed():
         assert "persistence evidence missing" in str(exc)
     else:
         raise AssertionError("missing canonical persistence evidence must fail")
+
+
+def test_verified_identity_provenance_is_preserved_in_holding_rpc():
+    calls = []
+
+    def rpc(method, path, payload):
+        calls.append(
+            (
+                method,
+                path,
+                payload,
+            )
+        )
+
+        return {
+            "decision":
+                "candidate_recorded",
+            "candidate_id":
+                "verified-identity-candidate",
+            "domain":
+                "verified.example",
+            "outreach_authorized":
+                False,
+            "actual_revenue":
+                False,
+        }
+
+    scout = {
+        "candidates": [{
+            "domain":
+                "verified.example",
+            "website":
+                "https://verified.example",
+            "business_name":
+                "Verified Example Ltd",
+            "canonical_identity_verified":
+                True,
+            "candidate_state":
+                "RESEARCH_EVIDENCE_ONLY",
+            "query_evidence": [{
+                "source":
+                    "verified_identity_intent",
+            }],
+            "query_evidence_count":
+                1,
+            "first_party_people": [{
+                "name":
+                    "Jane Example",
+                "title":
+                    "Owner",
+                "source_url":
+                    "https://verified.example/about",
+                "confidence":
+                    0.91,
+                "first_party":
+                    True,
+            }],
+            "people_count":
+                1,
+            "intent_signal_id":
+                "sig-verified-1",
+            "intent_signal_source":
+                "reddit_intent",
+            "outreach_authorized":
+                False,
+        }]
+    }
+
+    reconciliation = {
+        "results": [{
+            "domain":
+                "verified.example",
+            "reconciliation_state":
+                "NEW_EXTERNAL_BUYER_CANDIDATE",
+        }]
+    }
+
+    result = (
+        persist_new_external_candidates(
+            scout,
+            reconciliation,
+            rpc_call=rpc,
+        )
+    )
+
+    assert (
+        result[
+            "persisted_candidate_count"
+        ]
+        == 1
+    )
+
+    assert (
+        result[
+            "canonical_promotion_performed"
+        ]
+        is False
+    )
+
+    assert (
+        result[
+            "outbound_sent"
+        ]
+        is False
+    )
+
+    assert len(calls) == 1
+
+    method, path, payload = (
+        calls[0]
+    )
+
+    assert method == "POST"
+
+    assert path.endswith(
+        "propose_buyer_scout_candidate"
+    )
+
+    assert (
+        payload[
+            "p_provenance"
+        ][
+            "canonical_identity_verified"
+        ]
+        is True
+    )
+
+    assert (
+        payload[
+            "p_provenance"
+        ][
+            "outreach_authorized"
+        ]
+        is False
+    )

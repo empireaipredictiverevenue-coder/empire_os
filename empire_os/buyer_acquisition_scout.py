@@ -669,7 +669,121 @@ def run_buyer_scout(
             for item in provenance[domain]
             if str(item.get("icp_profile_key") or "")
         })
-        credible_people = _credible_first_party_people(evidence)
+        credible_people = list(
+            _credible_first_party_people(
+                evidence
+            )
+        )
+
+        seed_first_party_people = [
+            dict(person)
+            for person in (
+                seed.get(
+                    "seed_first_party_people"
+                )
+                or []
+            )
+            if (
+                isinstance(
+                    person,
+                    Mapping,
+                )
+                and person.get(
+                    "first_party"
+                )
+                is True
+                and float(
+                    person.get(
+                        "confidence"
+                    )
+                    or 0.0
+                )
+                >= 0.70
+                and str(
+                    person.get(
+                        "name"
+                    )
+                    or ""
+                ).strip()
+                and str(
+                    person.get(
+                        "title"
+                    )
+                    or ""
+                ).strip()
+                and str(
+                    person.get(
+                        "source_url"
+                    )
+                    or ""
+                ).strip()
+            )
+        ]
+
+        existing_people = {
+            (
+                str(
+                    person.get(
+                        "name"
+                    )
+                    or ""
+                ).strip().lower(),
+                str(
+                    person.get(
+                        "title"
+                    )
+                    or ""
+                ).strip().lower(),
+                str(
+                    person.get(
+                        "source_url"
+                    )
+                    or ""
+                ).strip().lower(),
+            )
+            for person in credible_people
+            if isinstance(
+                person,
+                Mapping,
+            )
+        }
+
+        for person in seed_first_party_people:
+            key = (
+                str(
+                    person.get(
+                        "name"
+                    )
+                    or ""
+                ).strip().lower(),
+                str(
+                    person.get(
+                        "title"
+                    )
+                    or ""
+                ).strip().lower(),
+                str(
+                    person.get(
+                        "source_url"
+                    )
+                    or ""
+                ).strip().lower(),
+            )
+
+            if key in existing_people:
+                continue
+
+            credible_people.append(
+                person
+            )
+
+            existing_people.add(
+                key
+            )
+
+        credible_people = (
+            credible_people[:10]
+        )
         icp = assess_icp_candidate(
             {
                 **record,
@@ -799,6 +913,11 @@ def run_buyer_scout(
             "business_name_source": record["business_name_source"],
             "site_business_names": record["site_business_names"],
             "canonical_seed_identity_corroborated": seed_corroborated,
+            "canonical_identity_verified": bool(
+                seed.get(
+                    "seed_canonical_identity_verified"
+                )
+            ),
             "permit_territory_state": (
                 "NYC_FIRST_PARTY_EVIDENCE"
                 if nyc_territory

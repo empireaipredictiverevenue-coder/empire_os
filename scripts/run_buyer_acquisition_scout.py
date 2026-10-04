@@ -14,6 +14,7 @@ from empire_os.official_license_market_seed import (
     refresh_official_license_market_seeds,
 )
 from empire_os.intent_seed_bridge import load_intent_seed_records
+from empire_os.verified_identity_seed_bridge import load_verified_identity_seed_records
 from empire_os.sb import request_json
 SEED_LANES = (
     (
@@ -167,6 +168,16 @@ def main() -> int:
     )
     seed_records.extend(intent_seeds)
 
+    verified_identity_seeds = (
+        load_verified_identity_seed_records(
+            args.repo_root,
+            limit=12,
+        )
+    )
+    seed_records.extend(
+        verified_identity_seeds
+    )
+
     payload = refresh_buyer_scout(
         args.repo_root,
         max_queries=args.max_queries,
@@ -188,6 +199,9 @@ def main() -> int:
             "canonical_seed_fallback_used"
         ],
         "intent_seed_input_count": len(intent_seeds),
+        "verified_identity_seed_input_count": len(
+            verified_identity_seeds
+        ),
         "intent_seed_domain_count": payload[
             "intent_seed_domain_count"
         ],

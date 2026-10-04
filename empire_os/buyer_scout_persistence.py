@@ -199,7 +199,11 @@ def persist_new_external_candidates(
                 )
                 else None
             ),
-            "canonical_identity_verified": False,
+            "canonical_identity_verified": bool(
+                candidate.get(
+                    "canonical_identity_verified"
+                )
+            ),
             "commercial_terms_verified": False,
             "outreach_authorized": False,
             "icp_profile_keys": list(
