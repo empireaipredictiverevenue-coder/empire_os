@@ -158,3 +158,106 @@ def test_search_disabled_never_calls_search_fabric(monkeypatch):
     assert result["candidate_count"] == 1
     assert result["outbound_sent"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_intent_seed_supplements_search_and_uses_non_permit_home_service_lane(
+    monkeypatch,
+):
+    plan = {
+        "priority_targets": [],
+        "product_priority_targets": [],
+        "icp_priority_targets": [{
+            "priority_score": 120,
+            "icp_profile_key": "intent_driven_home_service_growth",
+            "research_queries": {
+                "local_and_smb_buyers": ["roofing growth"],
+            },
+        }],
+    }
+
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {
+            query: ["generic-search.example"]
+            for query in queries
+        },
+    )
+
+    def fake_probe(url, **_kwargs):
+        if "intent-roof.example" in url:
+            return {
+                "ok": True,
+                "canonical_url": "https://intent-roof.example",
+                "final_url": "https://intent-roof.example",
+                "business_names": ["Intent Roof LLC"],
+                "title": "Intent Roof LLC",
+                "description": (
+                    "Roofing and siding contractor serving local homeowners."
+                ),
+                "emails": ["owner@intent-roof.example"],
+                "phones": ["+16105550123"],
+                "people": [{"name": "Wade Example", "title": "Owner"}],
+                "pages_checked": [{
+                    "visible_text": (
+                        "Roofing siding replacement estimates local service."
+                    ),
+                }],
+                "evidence_score": 0.95,
+            }
+        return _evidence(url)
+
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        fake_probe,
+    )
+
+    result = run_buyer_scout(
+        plan,
+        canonical_seed_records=[{
+            "website": "https://intent-roof.example/roof-replacement",
+            "niche": "roofing",
+            "icp_profile_key": "intent_driven_home_service_growth",
+            "seed_buyer_pools": [
+                "local_and_smb_buyers",
+                "software_and_advisory_buyers",
+            ],
+            "seed_product_code": "managed_service",
+            "seed_intent_signal_id": "sig-roof-1",
+            "intent_score": 86,
+            "intent_band": "high",
+            "intent_observed_at": "2026-10-04T08:00:00+00:00",
+            "intent_pain_points": [
+                "lead_generation",
+                "revenue_growth",
+            ],
+            "intent_evidence_url": (
+                "https://reddit.com/r/Roofing/comments/example"
+            ),
+            "intent_summary": (
+                "Need more qualified appointments. Google Ads has not "
+                "been consistently profitable and we need marketing help."
+            ),
+        }],
+        max_domains=10,
+        max_probes=10,
+    )
+
+    assert result["search_domain_count"] == 1
+    assert result["intent_seed_domain_count"] == 1
+    assert result["intent_seed_supplement_used"] is True
+    row = next(
+        item for item in result["candidates"]
+        if item["domain"] == "intent-roof.example"
+    )
+    assert row["discovery_source"] == "community_intent_seed"
+    assert row["business_name"] == "Intent Roof LLC"
+    assert row["business_name_source"] == "first_party_site_identity"
+    assert row["intent_signal_id"] == "sig-roof-1"
+    assert row["intent_score"] == 86
+    assert row["intent_band"] == "high"
+    assert row["continuous_commercial_lane"] == "intent_home_services"
+    assert row["continuous_lane_candidate"] is True
+    assert row["outreach_authorized"] is False
+    assert result["database_write_performed"] is False
+    assert result["outbound_sent"] is False
