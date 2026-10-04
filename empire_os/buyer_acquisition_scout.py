@@ -46,6 +46,7 @@ CONTINUOUS_COMMERCIAL_LANE_BY_ICP = {
     "legal_plaintiff_growth_firm": "legal_services",
     "insurance_distribution_growth": "insurance",
     "high_ticket_home_service": "permit_home_services",
+    "intent_driven_home_service_growth": "intent_home_services",
 }
 
 
@@ -340,8 +341,10 @@ def run_buyer_scout(
     search_has_domains = search_domain_count > 0
     seed_domain_count = 0
     opportunity_seed_domain_count = 0
+    intent_seed_domain_count = 0
     canonical_seed_by_domain: dict[str, dict[str, Any]] = {}
     opportunity_seed_domains: set[str] = set()
+    intent_seed_domains: set[str] = set()
 
     for raw in canonical_seed_records or []:
         if not isinstance(raw, Mapping):
@@ -355,13 +358,18 @@ def run_buyer_scout(
         opportunity_key = str(
             row.get("seed_opportunity_key") or ""
         ).strip()
+        intent_signal_id = str(
+            row.get("seed_intent_signal_id") or ""
+        ).strip()
 
         # Preserve the existing generic fallback contract: ordinary
         # canonical seeds are only considered when Search Fabric returned
         # nothing. Opportunity-linked seeds are narrower recovery evidence
         # for an already-qualified opportunity, so they may supplement
         # search results without claiming buyer intent or authorizing send.
-        if opportunity_key:
+        if intent_signal_id:
+            intent_seed_domains.add(host)
+        elif opportunity_key:
             opportunity_seed_domains.add(host)
         elif search_has_domains:
             continue
@@ -379,17 +387,33 @@ def run_buyer_scout(
 
         for seed_pool in seed_pools:
             provenance.setdefault(host, []).append({
-                "source": "canonical_prospect_seed",
+                "source": (
+                    "community_intent_seed"
+                    if intent_signal_id
+                    else "canonical_prospect_seed"
+                ),
                 "recovery_source": row.get("recovery_source"),
                 "query": None,
                 "buyer_pool": seed_pool,
                 "target_kind": (
-                    "opportunity_seed"
-                    if opportunity_key
-                    else "canonical_seed"
+                    "intent_seed"
+                    if intent_signal_id
+                    else (
+                        "opportunity_seed"
+                        if opportunity_key
+                        else "canonical_seed"
+                    )
                 ),
                 "corridor_key": row.get("seed_corridor_key"),
                 "opportunity_key": opportunity_key or None,
+                "intent_signal_id": intent_signal_id or None,
+                "intent_score": row.get("intent_score"),
+                "intent_band": row.get("intent_band"),
+                "intent_pain_points": list(
+                    row.get("intent_pain_points") or []
+                ),
+                "intent_evidence_url": row.get("intent_evidence_url"),
+                "intent_summary": row.get("intent_summary"),
                 "product_code": row.get("seed_product_code"),
                 "icp_profile_key": profile_key or None,
                 "buying_triggers": [],
@@ -400,6 +424,7 @@ def run_buyer_scout(
 
     seed_domain_count = len(canonical_seed_by_domain)
     opportunity_seed_domain_count = len(opportunity_seed_domains)
+    intent_seed_domain_count = len(intent_seed_domains)
 
     ranked_domains = sorted(
         provenance,
@@ -503,6 +528,7 @@ def run_buyer_scout(
                         if seed_niche
                         else ""
                     ),
+                    str(seed.get("intent_summary") or ""),
                 ]
             ).strip(),
         }
@@ -577,9 +603,13 @@ def run_buyer_scout(
         candidates.append({
             "domain": domain,
             "discovery_source": (
-                "canonical_prospect_seed"
-                if domain in canonical_seed_by_domain
-                else "search_fabric"
+                "community_intent_seed"
+                if domain in intent_seed_domains
+                else (
+                    "canonical_prospect_seed"
+                    if domain in canonical_seed_by_domain
+                    else "search_fabric"
+                )
             ),
             "canonical_seed_prospect_id": (
                 str(canonical_seed_by_domain.get(domain, {}).get("id"))
@@ -588,6 +618,27 @@ def run_buyer_scout(
             ),
             "canonical_seed_niche": (
                 canonical_seed_by_domain.get(domain, {}).get("niche")
+            ),
+            "intent_signal_id": (
+                canonical_seed_by_domain.get(domain, {}).get(
+                    "seed_intent_signal_id"
+                )
+            ),
+            "intent_score": (
+                canonical_seed_by_domain.get(domain, {}).get("intent_score")
+            ),
+            "intent_band": (
+                canonical_seed_by_domain.get(domain, {}).get("intent_band")
+            ),
+            "intent_pain_points": list(
+                canonical_seed_by_domain.get(domain, {}).get(
+                    "intent_pain_points"
+                ) or []
+            ),
+            "intent_evidence_url": (
+                canonical_seed_by_domain.get(domain, {}).get(
+                    "intent_evidence_url"
+                )
             ),
             "business_name": record["business_name"],
             "business_name_source": record["business_name_source"],
@@ -690,11 +741,15 @@ def run_buyer_scout(
         "search_domain_count": search_domain_count,
         "canonical_seed_domain_count": seed_domain_count,
         "opportunity_seed_domain_count": opportunity_seed_domain_count,
+        "intent_seed_domain_count": intent_seed_domain_count,
         "canonical_seed_fallback_used": bool(
             seed_domain_count and search_domain_count == 0
         ),
         "opportunity_seed_supplement_used": bool(
             opportunity_seed_domain_count and search_domain_count > 0
+        ),
+        "intent_seed_supplement_used": bool(
+            intent_seed_domain_count and search_domain_count > 0
         ),
         "domain_count": len(ranked_domains),
         "probed_domain_count": min(len(ranked_domains), max_probes),
