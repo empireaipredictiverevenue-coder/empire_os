@@ -59,7 +59,7 @@ def test_high_intent_roofing_signal_becomes_review_only_scout_seed():
         "https://3pointcontracting.com/roof-replacement/"
     )
     assert row["icp_profile_key"] == (
-        "home_service_growth_intent"
+        "intent_driven_home_service_growth"
     )
     assert row["seed_intent_signal_id"] == "sig-1"
     assert row["seed_intent_score"] == 82
