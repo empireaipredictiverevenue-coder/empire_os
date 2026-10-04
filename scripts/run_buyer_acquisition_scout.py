@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 import urllib.parse
 
 from empire_os.buyer_acquisition_scout import refresh_buyer_scout
@@ -143,7 +144,7 @@ def main() -> int:
     seed_records = _canonical_seed_records(per_lane=8)
     intent_seeds = intent_seed_records(
         inbox=(
-            __import__("pathlib").Path(args.repo_root)
+            Path(args.repo_root)
             / "runtime/acquisition/signal_inbox.json"
         ),
         limit=args.intent_seed_limit,
