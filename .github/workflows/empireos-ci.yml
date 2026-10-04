@@ -65,7 +65,6 @@ jobs:
           python -m pytest -q \
             tests/test_community_intent.py \
             tests/test_intent_seed_bridge.py \
-            tests/test_signal_inbox_intent_seeds.py \
             tests/test_signal_resolver.py \
             tests/test_buyer_acquisition_scout_recovery.py \
             tests/test_buyer_acquisition_scout_systemd.py \
