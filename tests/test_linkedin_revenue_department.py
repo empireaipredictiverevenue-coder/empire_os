@@ -1,8 +1,11 @@
 from datetime import datetime, timezone
 
 from empire_os.linkedin_revenue_department import (
+    build_linkedin_revenue_department_from_scout_snapshot,
     build_linkedin_revenue_department_snapshot,
     build_linkedin_revenue_opportunity,
+    refresh_linkedin_revenue_department,
+    scout_candidate_to_linkedin_record,
 )
 
 
@@ -184,3 +187,133 @@ def test_content_brief_is_evidence_only_and_does_not_post():
     assert content["evidence"][0]["summary"] == "Opened a new office in Manchester"
     assert content["invented_claims"] is False
     assert content["post_enabled"] is False
+
+
+
+def test_scout_adapter_uses_observed_site_trigger_without_inventing_people():
+    record = scout_candidate_to_linkedin_record(
+        {
+            "business_name": "Northwind Labs",
+            "website": "https://northwind.example",
+            "description": "Expanding sales team.",
+            "observed_buying_triggers": ["hiring"],
+            "first_party_people": [
+                {"name": "Unresolved Person", "title": "VP Sales"}
+            ],
+            "target_icp_profile_keys": [
+                "predictive_revenue_home_services_platform"
+            ],
+        },
+        observed_at="2026-10-03T12:00:00+00:00",
+    )
+
+    assert record["signals"] == [{
+        "signal_type": "public_buying_trigger_term",
+        "summary": "Observed public trigger term: hiring",
+        "observed_at": "2026-10-03T12:00:00+00:00",
+        "evidence_ref": "https://northwind.example",
+        "source": "buyer_acquisition_scout_first_party_site",
+        "confidence": None,
+    }]
+    assert record["first_party_people"] == []
+    assert record["source_evidence_ref"] == "https://northwind.example"
+
+
+def test_scout_snapshot_projects_into_nine_stage_review_lane():
+    scout = {
+        "schema_version": "empire.buyer_acquisition_scout.v1",
+        "generated_at": "2026-10-03T12:00:00Z",
+        "candidates": [{
+            "business_name": "Northwind Labs",
+            "website": "https://northwind.example",
+            "description": "Home services platform expanding and hiring.",
+            "buyer_type": "qualified_end_buyer",
+            "target_buyer_pools": ["enterprise_and_data_buyers"],
+            "target_product_codes": [
+                "predictive_revenue_intelligence_os"
+            ],
+            "target_icp_profile_keys": [
+                "predictive_revenue_home_services_platform"
+            ],
+            "observed_buying_triggers": ["expansion", "hiring"],
+            "first_party_people": [{
+                **_person(),
+                "evidence_ref": "https://northwind.example/team",
+            }],
+            "query_evidence_count": 3,
+            "candidate_state": "RESEARCH_EVIDENCE_ONLY",
+            "canonical_identity_verified": False,
+            "commercial_terms_verified": False,
+        }],
+    }
+
+    result = build_linkedin_revenue_department_from_scout_snapshot(
+        scout,
+        now=NOW,
+    )
+
+    assert result["source"] == "buyer_acquisition_scout"
+    assert result["candidate_count"] == 1
+    assert result["observed_signal_candidate_count"] == 1
+    assert result["resolved_decision_maker_count"] == 1
+    assert result["verified_contact_count"] == 1
+    assert result["outreach_draft_count"] == 1
+    assert result["human_review_ready_count"] == 1
+    assert result["live_outbound_enabled"] is False
+    assert result["database_write_performed"] is False
+    assert result["content_posted"] is False
+
+
+def test_scout_future_snapshot_does_not_create_observed_signal_time():
+    result = build_linkedin_revenue_department_from_scout_snapshot(
+        {
+            "schema_version": "empire.buyer_acquisition_scout.v1",
+            "generated_at": "2026-10-05T12:00:00Z",
+            "candidates": [{
+                "business_name": "Future Signal Co",
+                "website": "https://future.example",
+                "observed_buying_triggers": ["funding"],
+                "first_party_people": [_person()],
+            }],
+        },
+        now=NOW,
+    )
+
+    assert result["source_snapshot_fresh_enough_for_signal_time"] is False
+    assert result["observed_signal_candidate_count"] == 0
+    assert "buying_signal_unknown" in result["items"][0][
+        "review_readiness"
+    ]["blockers"]
+
+
+def test_refresh_writes_runtime_snapshot_without_database_or_outbound(tmp_path):
+    source = tmp_path / "runtime/buyer_acquisition/scout_latest.json"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        """
+{
+  "schema_version": "empire.buyer_acquisition_scout.v1",
+  "generated_at": "2026-10-03T12:00:00Z",
+  "candidates": [
+    {
+      "business_name": "Evidence Co",
+      "website": "https://evidence.example",
+      "observed_buying_triggers": ["expansion"]
+    }
+  ]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = refresh_linkedin_revenue_department(tmp_path)
+    output = (
+        tmp_path
+        / "runtime/buyer_acquisition/linkedin_revenue_department_latest.json"
+    )
+
+    assert output.exists()
+    assert result["candidate_count"] == 1
+    assert result["database_write_performed"] is False
+    assert result["outbound_sent"] is False
+    assert result["execution_authority"] == "none"
