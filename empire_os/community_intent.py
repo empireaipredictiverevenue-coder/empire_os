@@ -68,7 +68,11 @@ PAIN_TAXONOMY: dict[str, tuple[re.Pattern[str], ...]] = {
     ),
     "revenue_growth": (
         re.compile(r"\b(revenue|mrr|arr|growth|profit|margin|cac|ltv|churn)\b", re.I),
-        re.compile(r"\b(growth stalled|plateau|losing money)\b", re.I),
+        re.compile(
+            r"\b(growth stalled|plateau|losing money|unprofitable|"
+            r"not (?:consistently )?profitable|negative roi|poor roi)\b",
+            re.I,
+        ),
     ),
     "storm_demand": (
         re.compile(r"\b(hail|storm|wind damage|roof damage|restoration)\b", re.I),
