@@ -68,7 +68,7 @@ def _profile_for_niche(niche: str) -> tuple[str, list[str]]:
     key = str(niche or "").strip().casefold().replace(" ", "_")
     if key in HOME_SERVICE_INTENT_NICHES:
         return (
-            "intent_driven_home_service_growth",
+            "home_service_growth_intent",
             ["local_and_smb_buyers", "software_and_advisory_buyers"],
         )
     if "legal" in key or "law" in key:
