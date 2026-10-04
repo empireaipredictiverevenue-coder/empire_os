@@ -126,6 +126,14 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "time_keys": ("generated_at", "observed_at"),
         "fresh_seconds": 2700,
     },
+    "linkedin_revenue_department": {
+        "path": Path(
+            "runtime/buyer_acquisition/"
+            "linkedin_revenue_department_latest.json"
+        ),
+        "time_keys": ("generated_at", "source_generated_at"),
+        "fresh_seconds": 2700,
+    },
     "astra": {
         "path": Path("runtime/astra/latest.json"),
         "time_keys": ("observed_at", "generated_at"),
@@ -350,6 +358,48 @@ def _summary(name: str, payload: Mapping[str, Any]) -> dict[str, Any]:
                 "database_write_performed"
             ),
             "outbound_sent": payload.get("outbound_sent"),
+        }
+    if name == "linkedin_revenue_department":
+        return {
+            "candidate_count": payload.get("candidate_count"),
+            "observed_signal_candidate_count": payload.get(
+                "observed_signal_candidate_count"
+            ),
+            "resolved_decision_maker_count": payload.get(
+                "resolved_decision_maker_count"
+            ),
+            "verified_contact_count": payload.get(
+                "verified_contact_count"
+            ),
+            "outreach_draft_count": payload.get(
+                "outreach_draft_count"
+            ),
+            "human_review_ready_count": payload.get(
+                "human_review_ready_count"
+            ),
+            "reply_classified_count": payload.get(
+                "reply_classified_count"
+            ),
+            "positive_reply_count": payload.get(
+                "positive_reply_count"
+            ),
+            "economic_value_available_count": payload.get(
+                "economic_value_available_count"
+            ),
+            "predicted_expected_revenue_value_cents_total": payload.get(
+                "predicted_expected_revenue_value_cents_total"
+            ),
+            "linkedin_automation_enabled": payload.get(
+                "linkedin_automation_enabled"
+            ),
+            "live_outbound_enabled": payload.get(
+                "live_outbound_enabled"
+            ),
+            "database_write_performed": payload.get(
+                "database_write_performed"
+            ),
+            "outbound_sent": payload.get("outbound_sent"),
+            "content_posted": payload.get("content_posted"),
         }
     if name == "opportunity_radar":
         return {
