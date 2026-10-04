@@ -106,7 +106,7 @@ ICP_PROFILES: tuple[dict[str, Any], ...] = (
         "priority_score": 94,
     },
     {
-        "profile_key": "intent_driven_home_service_growth",
+        "profile_key": "home_service_growth_intent",
         "name": "Intent-led Home Service Growth Prospect",
         "buyer_pools": [
             "local_and_smb_buyers", "software_and_advisory_buyers",
