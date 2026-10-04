@@ -164,6 +164,14 @@ def persist_new_external_candidates(
                 "economic_capacity_state"
             ),
             "budget_verified": False,
+            "intent_signal_id": candidate.get("intent_signal_id"),
+            "intent_signal_source": candidate.get("intent_signal_source"),
+            "intent_score": candidate.get("intent_score"),
+            "intent_band": candidate.get("intent_band"),
+            "intent_pain_points": list(
+                candidate.get("intent_pain_points") or []
+            ),
+            "intent_evidence_url": candidate.get("intent_evidence_url"),
         }
         provenance = {
             "commercial_research_profile": commercial_research_profile(
@@ -211,6 +219,14 @@ def persist_new_external_candidates(
             ),
             "why_now_state": candidate.get("why_now_state"),
             "personalization_requires_verified_evidence": True,
+            "intent_signal_id": candidate.get("intent_signal_id"),
+            "intent_signal_source": candidate.get("intent_signal_source"),
+            "intent_score": candidate.get("intent_score"),
+            "intent_band": candidate.get("intent_band"),
+            "intent_pain_points": list(
+                candidate.get("intent_pain_points") or []
+            ),
+            "intent_evidence_url": candidate.get("intent_evidence_url"),
         }
 
         payload = {
