@@ -447,7 +447,7 @@ def test_scout_intent_seed_becomes_linkedin_why_now_evidence():
             "business_name": "Intent Roof LLC",
             "website": "https://intent-roof.example",
             "description": "Roofing and siding contractor.",
-            "discovery_source": "community_intent_seed",
+            "discovery_source": "intent_signal_seed",
             "intent_signal_id": "sig-roof-1",
             "intent_score": 86,
             "intent_band": "high",
@@ -466,7 +466,7 @@ def test_scout_intent_seed_becomes_linkedin_why_now_evidence():
             }],
             "first_party_emails": ["owner@intent-roof.example"],
             "target_icp_profile_keys": [
-                "intent_driven_home_service_growth"
+                "home_service_growth_intent"
             ],
             "target_product_codes": ["managed_service"],
             "target_buyer_pools": ["local_and_smb_buyers"],
