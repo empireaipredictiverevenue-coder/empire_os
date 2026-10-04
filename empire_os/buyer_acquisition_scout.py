@@ -388,7 +388,7 @@ def run_buyer_scout(
         for seed_pool in seed_pools:
             provenance.setdefault(host, []).append({
                 "source": (
-                    "intent_signal_seed"
+                    "community_intent_seed"
                     if intent_signal_id
                     else "canonical_prospect_seed"
                 ),
@@ -620,7 +620,7 @@ def run_buyer_scout(
         candidates.append({
             "domain": domain,
             "discovery_source": (
-                "intent_signal_seed"
+                "community_intent_seed"
                 if domain in intent_seed_domains
                 else (
                     "canonical_prospect_seed"
