@@ -5,7 +5,7 @@ domains through Empire Search Fabric, probes first-party sites, and writes a
 runtime evidence artifact.
 
 It does not create buyers/prospects, send outreach, accept terms, or write to
-Supabase. A discovered company is a research candidate only until reconciled
+the canonical business database. A discovered company is a research candidate only until reconciled
 through canonical identity/review flows.
 """
 from __future__ import annotations
