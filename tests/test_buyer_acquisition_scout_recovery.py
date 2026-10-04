@@ -249,7 +249,7 @@ def test_intent_seed_supplements_search_and_uses_non_permit_home_service_lane(
         item for item in result["candidates"]
         if item["domain"] == "intent-roof.example"
     )
-    assert row["discovery_source"] == "intent_signal_seed"
+    assert row["discovery_source"] == "community_intent_seed"
     assert row["business_name"] == "Intent Roof LLC"
     assert row["business_name_source"] == "first_party_site_identity"
     assert row["intent_signal_id"] == "sig-roof-1"
