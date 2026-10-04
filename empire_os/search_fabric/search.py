@@ -44,7 +44,6 @@ from .decoder import decode_document
 # Configuration
 # ──────────────────────────────────────────────────────────────────────
 CACHE_DIR = Path(os.environ.get("EMPIRE_SEARCH_CACHE", "/srv/empire_os/runtime/search/cache"))
-CACHE_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_TTL = 86400  # 24 hours
 
 # Proxy configuration (comma-separated: "http://user:pass@host:port,http://...")
@@ -289,6 +288,7 @@ def _get_cache(engine: str, query: str, num: int) -> Optional[dict]:
 def _set_cache(engine: str, query: str, num: int, data: dict):
     path = _cache_key(engine, query, num)
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps({"ts": time.time(), "data": data}))
         tmp.replace(path)

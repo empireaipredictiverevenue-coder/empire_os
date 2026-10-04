@@ -10,9 +10,10 @@ def test_buyer_scout_service_is_bounded_observe_only():
     ).read_text()
 
     assert "run_buyer_acquisition_scout.py" in text
-    assert "--max-queries 30" in text
-    assert "--max-domains 50" in text
-    assert "--max-probes 24" in text
+    assert "--max-queries 12" in text
+    assert "--results-per-query 6" in text
+    assert "--max-domains 30" in text
+    assert "--max-probes 12" in text
     assert "EnvironmentFile=/etc/empiredb.env" in text
     assert "ProtectSystem=strict" in text
     assert "ReadWritePaths=/srv/empire_os/runtime" in text
@@ -67,3 +68,12 @@ def test_buyer_scout_service_labels_pipeline_stages():
         "PROMOTION PLAN",
     ):
         assert stage in text
+
+def test_buyer_scout_service_refreshes_linkedin_revenue_review():
+    text = (
+        ROOT / "deploy/systemd/empire-buyer-acquisition-scout.service"
+    ).read_text()
+
+    assert "BUYER SCOUT: LINKEDIN REVENUE REVIEW" in text
+    assert "build_linkedin_revenue_department.py" in text
+    assert "outbound_governor" not in text

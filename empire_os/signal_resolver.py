@@ -114,7 +114,7 @@ def candidate_from_signal(signal: Mapping[str, Any]) -> tuple[LeadCandidate | No
         )
     if source == "courtlistener":
         return None, "court_party_requires_external_identity_resolution"
-    if source in {"reddit_intent", "linkedin_intent"}:
+    if source.endswith("_intent"):
         return None, "community_signal_requires_external_identity_resolution"
     return None, "unsupported_signal_resolution_source"
 

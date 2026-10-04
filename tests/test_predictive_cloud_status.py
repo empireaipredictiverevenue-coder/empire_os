@@ -467,6 +467,55 @@ def test_status_exposes_buyer_scout_icp_evidence_counts(tmp_path):
     assert summary["outbound_sent"] is False
 
 
+def test_status_exposes_linkedin_revenue_department_without_send_authority(
+    tmp_path,
+):
+    write_json(
+        tmp_path,
+        "runtime/buyer_acquisition/linkedin_revenue_department_latest.json",
+        {
+            "generated_at": "2026-10-04T09:10:00+00:00",
+            "source_generated_at": "2026-10-04T09:05:00+00:00",
+            "candidate_count": 18,
+            "observed_signal_candidate_count": 12,
+            "resolved_decision_maker_count": 6,
+            "verified_contact_count": 4,
+            "outreach_draft_count": 5,
+            "human_review_ready_count": 3,
+            "reply_classified_count": 2,
+            "positive_reply_count": 1,
+            "economic_value_available_count": 2,
+            "predicted_expected_revenue_value_cents_total": 125000.0,
+            "linkedin_automation_enabled": False,
+            "live_outbound_enabled": False,
+            "database_write_performed": False,
+            "outbound_sent": False,
+            "content_posted": False,
+            "execution_authority": "none",
+        },
+    )
+
+    result = build_predictive_cloud_status(
+        tmp_path,
+        now=datetime.fromisoformat("2026-10-04T09:15:00+00:00"),
+    )
+    component = result["components"]["linkedin_revenue_department"]
+    summary = component["summary"]
+
+    assert component["freshness"] == "fresh"
+    assert summary["candidate_count"] == 18
+    assert summary["human_review_ready_count"] == 3
+    assert summary["positive_reply_count"] == 1
+    assert summary["economic_value_available_count"] == 2
+    assert summary["predicted_expected_revenue_value_cents_total"] == 125000.0
+    assert summary["linkedin_automation_enabled"] is False
+    assert summary["live_outbound_enabled"] is False
+    assert summary["database_write_performed"] is False
+    assert summary["outbound_sent"] is False
+    assert summary["content_posted"] is False
+    assert component["execution_authority"] == "none"
+
+
 def test_status_exposes_media_os_runtime_without_external_authority(tmp_path):
     write_json(
         tmp_path,

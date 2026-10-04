@@ -13,6 +13,7 @@ from empire_os.buyer_public_research_seed import (
 from empire_os.official_license_market_seed import (
     refresh_official_license_market_seeds,
 )
+from empire_os.intent_seed_bridge import load_intent_seed_records
 from empire_os.sb import request_json
 SEED_LANES = (
     (
@@ -140,6 +141,7 @@ def main() -> int:
     parser.add_argument("--results-per-query", type=int, default=8)
     parser.add_argument("--max-domains", type=int, default=40)
     parser.add_argument("--max-probes", type=int, default=20)
+    parser.add_argument("--intent-seed-limit", type=int, default=12)
     args = parser.parse_args()
 
     public_research = refresh_public_research_seeds(
@@ -158,15 +160,20 @@ def main() -> int:
         *(official_license_research.get("seeds") or []),
     ]
 
+    seed_records = _canonical_seed_records(per_lane=8)
+    intent_seeds = load_intent_seed_records(
+        args.repo_root,
+        limit=args.intent_seed_limit,
+    )
+    seed_records.extend(intent_seeds)
+
     payload = refresh_buyer_scout(
         args.repo_root,
         max_queries=args.max_queries,
         results_per_query=args.results_per_query,
         max_domains=args.max_domains,
         max_probes=args.max_probes,
-        canonical_seed_records=_canonical_seed_records(
-            per_lane=8,
-        ),
+        canonical_seed_records=seed_records,
         research_seed_records=research_seeds,
     )
     print(json.dumps({
@@ -179,6 +186,13 @@ def main() -> int:
         ],
         "canonical_seed_fallback_used": payload[
             "canonical_seed_fallback_used"
+        ],
+        "intent_seed_input_count": len(intent_seeds),
+        "intent_seed_domain_count": payload[
+            "intent_seed_domain_count"
+        ],
+        "intent_seed_supplement_used": payload[
+            "intent_seed_supplement_used"
         ],
         "candidate_count": payload["candidate_count"],
         "official_license_query_count": official_license_research[
