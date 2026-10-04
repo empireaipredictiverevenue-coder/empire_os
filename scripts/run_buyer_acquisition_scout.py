@@ -4,12 +4,11 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
-from pathlib import Path
 import urllib.parse
 
 from empire_os.buyer_acquisition_scout import refresh_buyer_scout
+from empire_os.intent_seed_bridge import load_intent_seed_records
 from empire_os.sb import request_json
-from empire_os.signal_inbox import intent_seed_records
 
 SEED_LANES = (
     (
@@ -142,11 +141,8 @@ def main() -> int:
     args = parser.parse_args()
 
     seed_records = _canonical_seed_records(per_lane=8)
-    intent_seeds = intent_seed_records(
-        inbox=(
-            Path(args.repo_root)
-            / "runtime/acquisition/signal_inbox.json"
-        ),
+    intent_seeds = load_intent_seed_records(
+        args.repo_root,
         limit=args.intent_seed_limit,
     )
     seed_records.extend(intent_seeds)
