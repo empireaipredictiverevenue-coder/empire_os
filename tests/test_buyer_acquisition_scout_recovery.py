@@ -169,7 +169,7 @@ def test_intent_seed_supplements_search_and_uses_non_permit_home_service_lane(
         "product_priority_targets": [],
         "icp_priority_targets": [{
             "priority_score": 120,
-            "icp_profile_key": "home_service_growth_intent",
+            "icp_profile_key": "intent_driven_home_service_growth",
             "research_queries": {
                 "local_and_smb_buyers": ["roofing growth"],
             },
@@ -217,7 +217,7 @@ def test_intent_seed_supplements_search_and_uses_non_permit_home_service_lane(
         canonical_seed_records=[{
             "website": "https://intent-roof.example/roof-replacement",
             "niche": "roofing",
-            "icp_profile_key": "home_service_growth_intent",
+            "icp_profile_key": "intent_driven_home_service_growth",
             "seed_buyer_pools": [
                 "local_and_smb_buyers",
                 "software_and_advisory_buyers",
@@ -226,7 +226,7 @@ def test_intent_seed_supplements_search_and_uses_non_permit_home_service_lane(
             "seed_intent_signal_id": "sig-roof-1",
             "seed_intent_score": 86,
             "seed_intent_band": "high",
-                        "seed_intent_pain_points": [
+            "seed_intent_pain_points": [
                 "lead_generation",
                 "revenue_growth",
             ],
@@ -255,7 +255,7 @@ def test_intent_seed_supplements_search_and_uses_non_permit_home_service_lane(
     assert row["intent_signal_id"] == "sig-roof-1"
     assert row["intent_score"] == 86
     assert row["intent_band"] == "high"
-    assert row["continuous_commercial_lane"] == "home_service_growth"
+    assert row["continuous_commercial_lane"] == "intent_home_services"
     assert row["continuous_lane_candidate"] is True
     assert row["outreach_authorized"] is False
     assert result["database_write_performed"] is False
