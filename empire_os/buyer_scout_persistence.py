@@ -216,6 +216,8 @@ def persist_new_external_candidates(
             "intent_signal_source": candidate.get("intent_signal_source"),
             "intent_score": candidate.get("intent_score"),
             "intent_band": candidate.get("intent_band"),
+            "intent_observed_at": candidate.get("intent_observed_at"),
+            "intent_summary": candidate.get("intent_summary"),
             "intent_pain_points": list(
                 candidate.get("intent_pain_points") or []
             ),
