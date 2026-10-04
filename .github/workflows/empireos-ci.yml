@@ -68,4 +68,5 @@ jobs:
             tests/test_opportunity_radar.py \
             tests/test_opportunity_factory_intake.py \
             tests/test_linkedin_revenue_department.py \
-            tests/test_linkedin_revenue_department_systemd.py
+            tests/test_linkedin_revenue_department_systemd.py \
+            tests/test_predictive_cloud_status.py::test_status_exposes_linkedin_revenue_department_without_send_authority
