@@ -931,6 +931,7 @@ def search(query: str, num: int = 10, engine: Optional[str] = None, *, use_cache
                     **cached.get("searchParameters", {}),
                     "quality_gate": "lexical_v2",
                     "cache": True,
+                    "search_state": "RESULTS",
                 }
                 return cached
 
@@ -975,6 +976,7 @@ def search(query: str, num: int = 10, engine: Optional[str] = None, *, use_cache
                 "engine": eng["name"],
                 "quality_gate": "lexical_v2",
                 "cache": False,
+                "search_state": "RESULTS",
             },
             "credits_left": 999999,
         }
@@ -985,9 +987,14 @@ def search(query: str, num: int = 10, engine: Optional[str] = None, *, use_cache
     # All engines failed
     return {
         "organic": [],
-        "searchParameters": {"q": query, "num": num, "engine": "none"},
+        "searchParameters": {
+            "q": query,
+            "num": num,
+            "engine": "none",
+            "search_state": "PROVIDER_DEGRADED",
+        },
         "credits_left": 999999,
-        "error": "All engines failed"
+        "error": "All engines failed",
     }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1110,3 +1117,285 @@ if __name__ == "__main__":
 
     res = search(q, num=n, engine=eng)
     print(json.dumps(res, indent=2))
+
+
+def _last_known_good_cache(
+    query: str,
+    num: int,
+) -> dict | None:
+    """Return quality-gated historical Search Fabric evidence.
+
+    Used only after live providers are operationally degraded. Historical
+    evidence remains discovery-only and retains explicit stale provenance.
+    """
+    candidates: list[tuple[float, dict]] = []
+
+    for path in CACHE_DIR.glob("*.json"):
+        try:
+            payload = json.loads(
+                path.read_text(
+                    encoding="utf-8"
+                )
+            )
+        except Exception:
+            continue
+
+        params = payload.get(
+            "searchParameters",
+            {},
+        )
+
+        if str(
+            params.get("q")
+            or ""
+        ) != query:
+            continue
+
+        organic = _quality_filter(
+            payload.get(
+                "organic",
+                [],
+            ),
+            query,
+            num,
+        )
+
+        if not organic:
+            continue
+
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+
+        candidate = dict(payload)
+
+        candidate["organic"] = organic
+
+        candidate["searchParameters"] = {
+            **params,
+            "q": query,
+            "num": num,
+            "quality_gate":
+                "lexical_v2",
+            "cache": True,
+            "stale_cache": True,
+            "recovery": True,
+            "search_state":
+                "STALE_RESULTS",
+        }
+
+        candidate[
+            "search_operational_status"
+        ] = "DEGRADED_WITH_LAST_KNOWN_GOOD"
+
+        candidates.append(
+            (
+                mtime,
+                candidate,
+            )
+        )
+
+    if not candidates:
+        return None
+
+    candidates.sort(
+        key=lambda item: item[0],
+        reverse=True,
+    )
+
+    return candidates[0][1]
+
+
+def search_resilient(
+    query: str,
+    num: int = 10,
+    engine: Optional[str] = None,
+    *,
+    use_cache: bool = True,
+) -> dict:
+    """Search Fabric with bounded public-web recovery.
+
+    Existing Search Fabric remains authoritative and unchanged. Public-web
+    recovery executes only when normal providers produce no quality-gated
+    results. Recovered rows pass the exact same lexical quality gate.
+    """
+    primary = search(
+        query,
+        num=num,
+        engine=engine,
+        use_cache=use_cache,
+    )
+
+    if primary.get("organic"):
+        return primary
+
+    # Explicit engine requests retain their exact semantics.
+    if engine is not None:
+        return primary
+
+    from .public_fallback import (
+        search_public_web,
+    )
+
+    # Public fallback caches are deliberately separate from normal engines.
+    if use_cache:
+        for cache_engine in (
+            "brave_web",
+            "google_html",
+        ):
+            cached = _get_cache(
+                cache_engine,
+                query,
+                num,
+            )
+
+            if not cached:
+                continue
+
+            accepted = _quality_filter(
+                cached.get(
+                    "organic",
+                    [],
+                ),
+                query,
+                num,
+            )
+
+            if accepted:
+                cached = dict(cached)
+                cached["organic"] = accepted
+                cached["searchParameters"] = {
+                    **cached.get(
+                        "searchParameters",
+                        {},
+                    ),
+                    "quality_gate":
+                        "lexical_v2",
+                    "cache": True,
+                    "recovery": True,
+                    "search_state": "RESULTS",
+                }
+                return cached
+
+    try:
+        raw_rows = search_public_web(
+            query,
+            num=num,
+            timeout=
+                SEARCH_PUBLIC_TIMEOUT,
+        )
+    except Exception as exc:
+        _diagnostic(
+            "[search_fabric] public recovery failed: "
+            f"{type(exc).__name__}",
+            file=sys.stderr,
+        )
+        return primary
+
+    if not raw_rows:
+        stale = _last_known_good_cache(
+            query,
+            num,
+        )
+
+        if stale:
+            return stale
+
+        degraded = dict(primary)
+
+        degraded["searchParameters"] = {
+            **degraded.get(
+                "searchParameters",
+                {},
+            ),
+            "search_state":
+                "PROVIDER_DEGRADED",
+        }
+
+        degraded[
+            "search_operational_status"
+        ] = "DEGRADED"
+
+        return degraded
+
+    # Group by provider so provenance remains explicit.
+    provider_order = (
+        "brave_web",
+        "google_html",
+    )
+
+    for provider in provider_order:
+        rows = [
+            row
+            for row in raw_rows
+            if row.get("engine")
+            == provider
+        ]
+
+        if not rows:
+            continue
+
+        accepted = _quality_filter(
+            rows,
+            query,
+            num,
+        )
+
+        if not accepted:
+            _diagnostic(
+                f"[search_fabric] {provider} rejected: "
+                "no relevant results",
+                file=sys.stderr,
+            )
+            continue
+
+        response = {
+            "organic": accepted,
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": provider,
+                "quality_gate":
+                    "lexical_v2",
+                "cache": False,
+                "recovery": True,
+                "search_state": "RESULTS",
+            },
+            "credits_left": 999999,
+        }
+
+        if use_cache:
+            _set_cache(
+                provider,
+                query,
+                num,
+                response,
+            )
+
+        return response
+
+    stale = _last_known_good_cache(
+        query,
+        num,
+    )
+
+    if stale:
+        return stale
+
+    degraded = dict(primary)
+
+    degraded["searchParameters"] = {
+        **degraded.get(
+            "searchParameters",
+            {},
+        ),
+        "search_state":
+            "PROVIDER_DEGRADED",
+    }
+
+    degraded[
+        "search_operational_status"
+    ] = "DEGRADED"
+
+    return degraded
