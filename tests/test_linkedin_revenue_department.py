@@ -172,6 +172,74 @@ def test_snapshot_prefers_available_expected_revenue_value():
     assert result["live_outbound_enabled"] is False
 
 
+def test_scout_candidate_with_canonical_opportunity_value_outranks_equivalent_without_economics():
+    scout = {
+        "schema_version": "empire.buyer_acquisition_scout.v1",
+        "generated_at": "2026-10-03T12:00:00Z",
+        "candidates": [
+            {
+                "business_name": "A No Economics Co",
+                "website": "https://no-economics.example",
+                "description": "Home services platform expanding and hiring.",
+                "observed_buying_triggers": ["expansion"],
+                "first_party_people": [{
+                    **_person(),
+                    "evidence_ref": "https://no-economics.example/team",
+                }],
+            },
+            {
+                "business_name": "Z Canonical Value Co",
+                "website": "https://canonical-value.example",
+                "description": "Home services platform expanding and hiring.",
+                "observed_buying_triggers": ["expansion"],
+                "first_party_people": [{
+                    **_person(),
+                    "evidence_ref": "https://canonical-value.example/team",
+                }],
+                "target_opportunity_keys": ["opp-high-value"],
+            },
+        ],
+    }
+    opportunity_value = {
+        "schema_version": "empire.opportunity_value.snapshot.v1",
+        "items": [{
+            "opportunity_key": "opp-high-value",
+            "status": "AVAILABLE",
+            "rank": 1,
+            "expected_revenue_cents": 2500000,
+            "expected_cost_cents": 500000,
+            "expected_gross_profit_cents": 2000000,
+            "risk_adjusted_score": 0.91,
+            "confidence": 0.88,
+        }],
+    }
+
+    result = build_linkedin_revenue_department_from_scout_snapshot(
+        scout,
+        opportunity_value_snapshot=opportunity_value,
+        now=NOW,
+    )
+
+    assert result["candidate_count"] == 2
+    assert result["canonical_opportunity_value_available_count"] == 1
+    assert result["items"][0]["account"]["business_name"] == (
+        "Z Canonical Value Co"
+    )
+    priority = result["items"][0]["stage_05_priority"]
+    assert priority["ranking_basis"] == (
+        "canonical_opportunity_risk_adjusted_value_then_fit"
+    )
+    assert priority["top_canonical_opportunity_value"][
+        "opportunity_key"
+    ] == "opp-high-value"
+    assert priority["top_canonical_opportunity_value"][
+        "risk_adjusted_score"
+    ] == 0.91
+    assert result["items"][1]["account"]["business_name"] == (
+        "A No Economics Co"
+    )
+
+
 def test_content_brief_is_evidence_only_and_does_not_post():
     row = build_linkedin_revenue_opportunity(
         {
