@@ -1,10 +1,12 @@
 from empire_os.community_intent import (
     classify_pain_points,
+    collect_reddit_rss_intent,
     collect_public_search_intent,
     normalize_search_result,
     observation_to_signal,
     score_intent,
 )
+from empire_os.community_intent_taxonomy import assess_intent
 
 
 def test_pain_and_intent_classification():
@@ -108,3 +110,101 @@ def test_linkedin_job_post_is_not_buyer_intent():
         },
     )
     assert row is None
+
+
+
+def test_v2_detects_demand_shortage_and_vendor_search():
+    assessment = assess_intent(
+        "We need more qualified leads and are looking for a lead generation agency.",
+        source="reddit",
+    )
+    assert "DEMAND_SHORTAGE" in assessment.intent_categories
+    assert "VENDOR_SEARCH" in assessment.intent_categories
+    assert assessment.intent_confidence >= 0.5
+    assert assessment.offer_fit == 0.9
+    assert assessment.identity_confidence is None
+    assert assessment.outreach_readiness is None
+    assert assessment.verified_buyer_intent is False
+    assert assessment.verified_revenue is False
+    assert assessment.outbound_authority == "none"
+
+
+def test_v2_detects_unprofitable_ads_and_spend_evidence():
+    assessment = assess_intent(
+        "We spent $3000 on Google Ads and they are not profitable. Need help with PPC.",
+        source="reddit",
+    )
+    assert "PAID_MEDIA_FAILURE" in assessment.intent_categories
+    assert "VENDOR_SEARCH" in assessment.intent_categories
+    assert assessment.ability_to_pay is not None
+    assert assessment.ability_to_pay >= 0.65
+    assert assessment.pain_severity >= 0.8
+
+
+def test_v2_detects_poor_lead_quality_and_conversion_leakage():
+    assessment = assess_intent(
+        "Lead quality is poor, our follow-up is too slow and the leads are not closing.",
+        source="linkedin",
+    )
+    assert "PAID_MEDIA_FAILURE" in assessment.intent_categories
+    assert "CONVERSION_FAILURE" in assessment.intent_categories
+    assert assessment.pain_severity >= 0.8
+
+
+def test_v2_detects_buyer_demand_without_claiming_verified_buyer_intent():
+    assessment = assess_intent(
+        "We are buying qualified roofing leads and can take more volume.",
+        source="public_web",
+    )
+    assert "BUYER_DEMAND" in assessment.intent_categories
+    assert assessment.verified_buyer_intent is False
+    assert assessment.estimated_opportunity_value is None
+
+
+def test_signal_payload_carries_truth_and_authority_guards():
+    row = normalize_search_result(
+        platform="reddit",
+        query="need leads",
+        result={
+            "title": "Need more qualified leads",
+            "link": "https://reddit.com/r/smallbusiness/comments/abc/example",
+            "snippet": "We need more qualified appointments each week.",
+        },
+    )
+    assert row is not None
+    candidate = observation_to_signal(row)
+    assert candidate.raw["buyer_intent_verified"] is False
+    assert candidate.raw["revenue_verified"] is False
+    assert candidate.raw["outreach_authority"] == "none"
+    assessment = candidate.raw["community_intent"]["intent_assessment"]
+    assert assessment["identity_confidence"] is None
+    assert assessment["outreach_readiness"] is None
+
+
+class _Response:
+    def __init__(self, status_code):
+        self.status_code = status_code
+        self.headers = {"content-type": "application/atom+xml"}
+        self.text = ""
+
+
+def test_reddit_429_is_source_health_failure_not_zero_demand():
+    result = collect_reddit_rss_intent(
+        subreddit="smallbusiness",
+        query="need leads",
+        get_fn=lambda *args, **kwargs: _Response(429),
+    )
+    assert result["ok"] is False
+    assert result["reason"] == "rate_limited"
+    assert result["observations"] == []
+
+
+def test_reddit_403_is_source_health_failure_not_zero_demand():
+    result = collect_reddit_rss_intent(
+        subreddit="smallbusiness",
+        query="need leads",
+        get_fn=lambda *args, **kwargs: _Response(403),
+    )
+    assert result["ok"] is False
+    assert result["reason"] == "http_403"
+    assert result["observations"] == []
