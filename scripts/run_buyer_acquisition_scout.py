@@ -259,6 +259,10 @@ def _community_intent_seed_records(
             "recovery_source": "community_intent_signal_inbox",
             "intent_score": score,
             "intent_band": band or None,
+            "intent_observed_at": (
+                str(observation.get("observed_at") or "").strip()
+                or None
+            ),
             "intent_pain_points": list(
                 observation.get("pain_points") or []
             ),
