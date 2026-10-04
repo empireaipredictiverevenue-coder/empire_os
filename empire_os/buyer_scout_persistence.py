@@ -139,15 +139,6 @@ def persist_new_external_candidates(
             "continuous_lane_fit_score": int(
                 candidate.get("continuous_lane_fit_score") or 0
             ),
-            "continuous_commercial_lane": candidate.get(
-                "continuous_commercial_lane"
-            ),
-            "continuous_lane_candidate": bool(
-                candidate.get("continuous_lane_candidate")
-            ),
-            "continuous_lane_fit_score": int(
-                candidate.get("continuous_lane_fit_score") or 0
-            ),
             "icp_intelligence": (
                 dict(candidate.get("icp_intelligence"))
                 if isinstance(candidate.get("icp_intelligence"), Mapping)
@@ -168,6 +159,8 @@ def persist_new_external_candidates(
             "intent_signal_source": candidate.get("intent_signal_source"),
             "intent_score": candidate.get("intent_score"),
             "intent_band": candidate.get("intent_band"),
+            "intent_observed_at": candidate.get("intent_observed_at"),
+            "intent_summary": candidate.get("intent_summary"),
             "intent_pain_points": list(
                 candidate.get("intent_pain_points") or []
             ),
