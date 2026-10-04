@@ -11,6 +11,9 @@ from pathlib import Path
 from empire_os.revenue_intent_observer import (
     normalize_file,
 )
+from empire_os.revenue_identity_handoff import (
+    process_identity_handoffs,
+)
 
 
 def main() -> int:
@@ -139,6 +142,19 @@ def main() -> int:
             f"Revenue Intent Observer actor failures={failed}"
         )
 
+    identity_handoff = process_identity_handoffs(
+        queue=Path(args.queue),
+        state=(
+            Path(args.queue).parent
+            / "identity_handoff.json"
+        ),
+        lock=(
+            Path(args.queue).parent
+            / "identity_handoff.lock"
+        ),
+        limit=25,
+    )
+
     output = {
         "schema_version":
             "empire.revenue_intent_observer.v2",
@@ -162,6 +178,8 @@ def main() -> int:
         },
         "cycle":
             cycle,
+        "identity_handoff":
+            identity_handoff,
     }
 
     print(
