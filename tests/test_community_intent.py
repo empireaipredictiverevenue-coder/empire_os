@@ -121,7 +121,7 @@ def test_v2_detects_demand_shortage_and_vendor_search():
     assert any(x.startswith("DEMAND_SHORTAGE.") for x in assessment.intent_types)
     assert any(x.startswith("VENDOR_SEARCH.") for x in assessment.intent_types)
     assert assessment.dimensions.intent_confidence >= 0.5
-    assert assessment.dimensions.offer_fit == 0.9
+    assert assessment.dimensions.offer_fit is None
     assert assessment.dimensions.identity_confidence is None
     assert assessment.dimensions.outreach_readiness is None
     assert assessment.canonical_buyer_intent is False
@@ -208,3 +208,19 @@ def test_reddit_403_is_source_health_failure_not_zero_demand():
     assert result["ok"] is False
     assert result["reason"] == "http_403"
     assert result["observations"] == []
+
+
+
+def test_v2_need_more_leads_is_not_buyer_demand():
+    assessment = assess_intent_v2(
+        "We need more qualified leads for our roofing company.",
+        source_mode="reddit_public_search",
+    )
+    assert any(
+        item.startswith("DEMAND_SHORTAGE.")
+        for item in assessment.intent_types
+    )
+    assert not any(
+        item.startswith("BUYER_DEMAND.")
+        for item in assessment.intent_types
+    )
