@@ -557,6 +557,39 @@ def scout_candidate_to_linkedin_record(
                 "confidence": None,
             })
 
+    intent_evidence_ref = _text(candidate.get("intent_evidence_url"))
+    intent_observed_at = (
+        _text(candidate.get("intent_observed_at")) or observed_at
+    )
+    intent_summary = _text(candidate.get("intent_summary"))
+    if (
+        _text(candidate.get("intent_signal_id"))
+        and intent_evidence_ref
+        and intent_observed_at
+    ):
+        pains = [
+            _text(value)
+            for value in (candidate.get("intent_pain_points") or ())
+            if _text(value)
+        ]
+        signals.append({
+            "signal_type": "public_intent_signal",
+            "summary": (
+                intent_summary
+                or (
+                    "Observed public commercial pain: "
+                    + ", ".join(pains)
+                    if pains
+                    else "Observed public commercial intent"
+                )
+            ),
+            "observed_at": intent_observed_at,
+            "evidence_ref": intent_evidence_ref,
+            "source": _text(candidate.get("discovery_source"))
+            or "community_intent_seed",
+            "confidence": None,
+        })
+
     return {
         "business_name": _text(candidate.get("business_name")),
         "description": _text(candidate.get("description")),
@@ -604,6 +637,12 @@ def scout_candidate_to_linkedin_record(
             "commercial_terms_verified": (
                 candidate.get("commercial_terms_verified") is True
             ),
+            "intent_signal_id": (
+                _text(candidate.get("intent_signal_id")) or None
+            ),
+            "intent_score": candidate.get("intent_score"),
+            "intent_band": _text(candidate.get("intent_band")) or None,
+            "intent_evidence_url": intent_evidence_ref or None,
         },
     }
 
