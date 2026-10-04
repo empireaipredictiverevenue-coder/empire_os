@@ -436,3 +436,60 @@ def test_refresh_writes_runtime_snapshot_without_database_or_outbound(tmp_path):
     assert result["database_write_performed"] is False
     assert result["outbound_sent"] is False
     assert result["execution_authority"] == "none"
+
+
+
+def test_scout_intent_seed_becomes_linkedin_why_now_evidence():
+    scout = {
+        "schema_version": "empire.buyer_acquisition_scout.v1",
+        "generated_at": "2026-10-04T08:30:00Z",
+        "candidates": [{
+            "business_name": "Intent Roof LLC",
+            "website": "https://intent-roof.example",
+            "description": "Roofing and siding contractor.",
+            "discovery_source": "community_intent_seed",
+            "intent_signal_id": "sig-roof-1",
+            "intent_score": 86,
+            "intent_band": "high",
+            "intent_observed_at": "2026-10-04T08:00:00Z",
+            "intent_pain_points": ["lead_generation", "revenue_growth"],
+            "intent_evidence_url": (
+                "https://reddit.com/r/Roofing/comments/example"
+            ),
+            "intent_summary": (
+                "Need more qualified appointments; Google Ads has not "
+                "been consistently profitable."
+            ),
+            "first_party_people": [{
+                **_person(),
+                "evidence_ref": "https://intent-roof.example/about",
+            }],
+            "first_party_emails": ["owner@intent-roof.example"],
+            "target_icp_profile_keys": [
+                "intent_driven_home_service_growth"
+            ],
+            "target_product_codes": ["managed_service"],
+            "target_buyer_pools": ["local_and_smb_buyers"],
+            "observed_buying_triggers": [],
+            "candidate_state": "RESEARCH_EVIDENCE_ONLY",
+        }],
+    }
+
+    result = build_linkedin_revenue_department_from_scout_snapshot(
+        scout,
+        now=NOW,
+    )
+
+    assert result["candidate_count"] == 1
+    row = result["items"][0]
+    signals = row["stage_04_buying_signals"]["signals"]
+    assert signals[0]["signal_type"] == "public_intent_signal"
+    assert signals[0]["evidence_ref"] == (
+        "https://reddit.com/r/Roofing/comments/example"
+    )
+    assert row["stage_06_personalised_outreach"]["reason_now"] == (
+        "Need more qualified appointments; Google Ads has not "
+        "been consistently profitable."
+    )
+    assert row["review_readiness"]["ready_for_human_review"] is True
+    assert row["review_readiness"]["outreach_authorized"] is False
