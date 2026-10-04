@@ -409,6 +409,7 @@ def run_buyer_scout(
                 "intent_signal_id": intent_signal_id or None,
                 "intent_score": row.get("intent_score"),
                 "intent_band": row.get("intent_band"),
+                "intent_observed_at": row.get("intent_observed_at"),
                 "intent_pain_points": list(
                     row.get("intent_pain_points") or []
                 ),
@@ -629,6 +630,11 @@ def run_buyer_scout(
             ),
             "intent_band": (
                 canonical_seed_by_domain.get(domain, {}).get("intent_band")
+            ),
+            "intent_observed_at": (
+                canonical_seed_by_domain.get(domain, {}).get(
+                    "intent_observed_at"
+                )
             ),
             "intent_pain_points": list(
                 canonical_seed_by_domain.get(domain, {}).get(
