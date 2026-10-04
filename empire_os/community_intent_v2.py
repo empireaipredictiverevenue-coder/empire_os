@@ -95,12 +95,14 @@ INTENT_TAXONOMY: dict[str, tuple[tuple[str, re.Pattern[str]], ...]] = {
     ),
     "BUYER_DEMAND": (
         ("buying_calls", _rx(
-            r"\b(buying|buy|need|looking for).{0,20}\b"
+            r"\b(buying|buy|purchase|purchasing).{0,20}\b"
             r"(inbound )?(calls?|pay per call|ppc calls?)\b"
         )),
         ("buying_leads", _rx(
-            r"\b(buying|buy|need|looking for).{0,20}\b"
-            r"(leads?|data leads?|cpl leads?)\b"
+            r"\b(buying|buy|purchase|purchasing).{0,20}\b"
+            r"(leads?|data leads?|cpl leads?)\b|"
+            r"\b(looking for|need).{0,20}\b"
+            r"(lead vendor|lead provider|lead supplier)\b"
         )),
         ("need_publishers", _rx(
             r"\b(need|looking for|seeking).{0,20}\b"
