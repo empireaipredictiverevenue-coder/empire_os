@@ -28,6 +28,7 @@ from empire_os.reply_classifier import classify_reply_text
 
 SCHEMA_VERSION = "empire.linkedin_revenue_department.v1"
 SCOUT_SNAPSHOT = Path("runtime/buyer_acquisition/scout_latest.json")
+OPPORTUNITY_VALUE_SNAPSHOT = Path("runtime/opportunity_factory/value_latest.json")
 OUTPUT = Path("runtime/buyer_acquisition/linkedin_revenue_department_latest.json")
 
 
@@ -100,6 +101,54 @@ def _economic_projection(inputs: Mapping[str, Any] | None) -> dict[str, Any]:
             "actual_revenue": False,
             "execution_authority": "none",
         }
+
+
+def _canonical_opportunity_values(
+    keys: Iterable[Any],
+    snapshot: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    wanted = {
+        _text(value)
+        for value in (keys or ())
+        if _text(value)
+    }
+    if not wanted:
+        return []
+    rows: list[dict[str, Any]] = []
+    source = snapshot if isinstance(snapshot, Mapping) else {}
+    for raw in source.get("items") or ():
+        if not isinstance(raw, Mapping):
+            continue
+        key = _text(raw.get("opportunity_key"))
+        if key not in wanted or raw.get("status") != "AVAILABLE":
+            continue
+        rows.append({
+            "opportunity_key": key,
+            "rank": raw.get("rank"),
+            "expected_revenue_cents": _number(
+                raw.get("expected_revenue_cents")
+            ),
+            "expected_cost_cents": _number(
+                raw.get("expected_cost_cents")
+            ),
+            "expected_gross_profit_cents": _number(
+                raw.get("expected_gross_profit_cents")
+            ),
+            "risk_adjusted_score": _number(
+                raw.get("risk_adjusted_score")
+            ),
+            "confidence": _number(raw.get("confidence")),
+            "prediction_only": True,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        })
+    rows.sort(
+        key=lambda row: (
+            -float(row.get("risk_adjusted_score") or 0.0),
+            str(row.get("opportunity_key") or ""),
+        )
+    )
+    return rows
 
 
 def _content_brief(
@@ -268,6 +317,22 @@ def build_linkedin_revenue_opportunity(
     suppressed = record.get("suppressed") is True
     reply = _reply_state(record)
     economics = _economic_projection(record.get("economic_inputs"))
+    linked_opportunity_values = [
+        dict(row)
+        for row in (record.get("canonical_opportunity_values") or ())
+        if isinstance(row, Mapping)
+        and _text(row.get("opportunity_key"))
+    ]
+    linked_opportunity_values.sort(
+        key=lambda row: (
+            -float(_number(row.get("risk_adjusted_score")) or 0.0),
+            _text(row.get("opportunity_key")),
+        )
+    )
+    top_opportunity_value = (
+        linked_opportunity_values[0]
+        if linked_opportunity_values else None
+    )
 
     reason_now = next(
         (
@@ -371,10 +436,16 @@ def build_linkedin_revenue_opportunity(
             "model_fit_score": icp.get("model_fit_score"),
             "score_classification": icp.get("score_classification"),
             "expected_revenue_value": economics,
+            "canonical_opportunity_values": linked_opportunity_values,
+            "top_canonical_opportunity_value": top_opportunity_value,
             "ranking_basis": (
-                "expected_revenue_value_then_fit"
+                "account_expected_revenue_value_then_fit"
                 if economics.get("status") == "AVAILABLE"
-                else "fit_and_observed_evidence_review_only"
+                else (
+                    "canonical_opportunity_risk_adjusted_value_then_fit"
+                    if top_opportunity_value is not None
+                    else "fit_and_observed_evidence_review_only"
+                )
             ),
             "new_revenue_scoring_model_introduced": False,
         },
@@ -505,6 +576,9 @@ def scout_candidate_to_linkedin_record(
         "target_profile_keys": list(
             candidate.get("target_icp_profile_keys") or ()
         ),
+        "opportunity_keys": list(
+            candidate.get("target_opportunity_keys") or ()
+        ),
         "first_party_people": people,
         "observed_people_candidates": observed_people_candidates,
         "contact_candidates": contact_candidates,
@@ -537,6 +611,7 @@ def scout_candidate_to_linkedin_record(
 def build_linkedin_revenue_department_from_scout_snapshot(
     scout_snapshot: Mapping[str, Any],
     *,
+    opportunity_value_snapshot: Mapping[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Project a Buyer Scout snapshot into the governed LinkedIn review lane."""
@@ -547,15 +622,24 @@ def build_linkedin_revenue_department_from_scout_snapshot(
         if generated is not None and generated <= current
         else None
     )
-    records = [
-        scout_candidate_to_linkedin_record(
+    records: list[dict[str, Any]] = []
+    for candidate in scout_snapshot.get("candidates") or ():
+        if (
+            not isinstance(candidate, Mapping)
+            or not _text(candidate.get("business_name"))
+        ):
+            continue
+        record = scout_candidate_to_linkedin_record(
             candidate,
             observed_at=observed_at,
         )
-        for candidate in (scout_snapshot.get("candidates") or ())
-        if isinstance(candidate, Mapping)
-        and _text(candidate.get("business_name"))
-    ]
+        record["canonical_opportunity_values"] = (
+            _canonical_opportunity_values(
+                record.get("opportunity_keys") or (),
+                opportunity_value_snapshot,
+            )
+        )
+        records.append(record)
     payload = build_linkedin_revenue_department_snapshot(
         records,
         now=current,
@@ -580,8 +664,23 @@ def build_linkedin_revenue_department_from_scout_snapshot(
 def _priority_key(row: Mapping[str, Any]) -> tuple[Any, ...]:
     stage = row.get("stage_05_priority") or {}
     economics = stage.get("expected_revenue_value") or {}
-    available = economics.get("status") == "AVAILABLE"
+    erv_available = economics.get("status") == "AVAILABLE"
     erv = _number(economics.get("expected_revenue_value_cents"))
+    opportunity = stage.get("top_canonical_opportunity_value")
+    opportunity = opportunity if isinstance(opportunity, Mapping) else {}
+    opportunity_score = _number(opportunity.get("risk_adjusted_score"))
+    economic_tier = (
+        0
+        if erv_available
+        else (1 if opportunity_score is not None else 2)
+    )
+    economic_sort_value = (
+        erv
+        if economic_tier == 0
+        else opportunity_score
+        if economic_tier == 1
+        else 0.0
+    )
     fit = _number(stage.get("model_fit_score")) or 0.0
     signals = (
         row.get("stage_04_buying_signals") or {}
@@ -590,8 +689,8 @@ def _priority_key(row: Mapping[str, Any]) -> tuple[Any, ...]:
     contact_verified = primary.get("contact_verified") is True
     business = _text((row.get("account") or {}).get("business_name")).lower()
     return (
-        0 if available else 1,
-        -(erv or 0.0),
+        economic_tier,
+        -float(economic_sort_value or 0.0),
         -fit,
         -int(signals),
         0 if contact_verified else 1,
@@ -668,6 +767,13 @@ def build_linkedin_revenue_department_snapshot(
                 "status"
             ) == "AVAILABLE"
         ),
+        "canonical_opportunity_value_available_count": sum(
+            1
+            for row in items
+            if row["stage_05_priority"].get(
+                "top_canonical_opportunity_value"
+            ) is not None
+        ),
         "predicted_expected_revenue_value_cents_total": round(
             sum(
                 float(
@@ -704,8 +810,22 @@ def refresh_linkedin_revenue_department(
     except (OSError, json.JSONDecodeError):
         raw = {}
     scout = raw if isinstance(raw, dict) else {}
+    try:
+        opportunity_raw = json.loads(
+            (root / OPPORTUNITY_VALUE_SNAPSHOT).read_text(
+                encoding="utf-8"
+            )
+        )
+    except (OSError, json.JSONDecodeError):
+        opportunity_raw = {}
+    opportunity_value = (
+        opportunity_raw
+        if isinstance(opportunity_raw, dict)
+        else {}
+    )
     payload = build_linkedin_revenue_department_from_scout_snapshot(
-        scout
+        scout,
+        opportunity_value_snapshot=opportunity_value,
     )
     path = root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
