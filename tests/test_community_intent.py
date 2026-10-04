@@ -6,7 +6,7 @@ from empire_os.community_intent import (
     observation_to_signal,
     score_intent,
 )
-from empire_os.community_intent_taxonomy import assess_intent
+from empire_os.community_intent_v2 import assess_intent_v2
 
 
 def test_pain_and_intent_classification():
@@ -114,51 +114,51 @@ def test_linkedin_job_post_is_not_buyer_intent():
 
 
 def test_v2_detects_demand_shortage_and_vendor_search():
-    assessment = assess_intent(
+    assessment = assess_intent_v2(
         "We need more qualified leads and are looking for a lead generation agency.",
-        source="reddit",
+        source_mode="reddit_public_search",
     )
-    assert "DEMAND_SHORTAGE" in assessment.intent_categories
-    assert "VENDOR_SEARCH" in assessment.intent_categories
-    assert assessment.intent_confidence >= 0.5
-    assert assessment.offer_fit == 0.9
-    assert assessment.identity_confidence is None
-    assert assessment.outreach_readiness is None
-    assert assessment.verified_buyer_intent is False
-    assert assessment.verified_revenue is False
+    assert any(x.startswith("DEMAND_SHORTAGE.") for x in assessment.intent_types)
+    assert any(x.startswith("VENDOR_SEARCH.") for x in assessment.intent_types)
+    assert assessment.dimensions.intent_confidence >= 0.5
+    assert assessment.dimensions.offer_fit == 0.9
+    assert assessment.dimensions.identity_confidence is None
+    assert assessment.dimensions.outreach_readiness is None
+    assert assessment.canonical_buyer_intent is False
+    assert assessment.revenue_inferred is False
     assert assessment.outbound_authority == "none"
 
 
 def test_v2_detects_unprofitable_ads_and_spend_evidence():
-    assessment = assess_intent(
-        "We spent $3000 on Google Ads and they are not profitable. Need help with PPC.",
-        source="reddit",
+    assessment = assess_intent_v2(
+        "We spent $3000 on Google Ads and they are not profitable. Need a PPC specialist.",
+        source_mode="reddit_public_search",
     )
-    assert "PAID_MEDIA_FAILURE" in assessment.intent_categories
-    assert "VENDOR_SEARCH" in assessment.intent_categories
-    assert assessment.ability_to_pay is not None
-    assert assessment.ability_to_pay >= 0.65
-    assert assessment.pain_severity >= 0.8
+    assert any(x.startswith("PAID_MEDIA_FAILURE.") for x in assessment.intent_types)
+    assert any(x.startswith("VENDOR_SEARCH.") for x in assessment.intent_types)
+    assert assessment.dimensions.ability_to_pay is not None
+    assert assessment.dimensions.ability_to_pay >= 0.65
+    assert assessment.dimensions.pain_severity >= 0.8
 
 
 def test_v2_detects_poor_lead_quality_and_conversion_leakage():
-    assessment = assess_intent(
-        "Lead quality is poor, our follow-up is too slow and the leads are not closing.",
-        source="linkedin",
+    assessment = assess_intent_v2(
+        "Our leads are poor quality, follow-up is too slow and the leads are not closing.",
+        source_mode="linkedin_public_search",
     )
-    assert "PAID_MEDIA_FAILURE" in assessment.intent_categories
-    assert "CONVERSION_FAILURE" in assessment.intent_categories
-    assert assessment.pain_severity >= 0.8
+    assert any(x.startswith("PAID_MEDIA_FAILURE.") for x in assessment.intent_types)
+    assert any(x.startswith("CONVERSION_FAILURE.") for x in assessment.intent_types)
+    assert assessment.dimensions.pain_severity >= 0.8
 
 
 def test_v2_detects_buyer_demand_without_claiming_verified_buyer_intent():
-    assessment = assess_intent(
+    assessment = assess_intent_v2(
         "We are buying qualified roofing leads and can take more volume.",
-        source="public_web",
+        source_mode="public_web_search",
     )
-    assert "BUYER_DEMAND" in assessment.intent_categories
-    assert assessment.verified_buyer_intent is False
-    assert assessment.estimated_opportunity_value is None
+    assert any(x.startswith("BUYER_DEMAND.") for x in assessment.intent_types)
+    assert assessment.canonical_buyer_intent is False
+    assert assessment.dimensions.estimated_opportunity_value is None
 
 
 def test_signal_payload_carries_truth_and_authority_guards():
@@ -177,8 +177,8 @@ def test_signal_payload_carries_truth_and_authority_guards():
     assert candidate.raw["revenue_verified"] is False
     assert candidate.raw["outreach_authority"] == "none"
     assessment = candidate.raw["community_intent"]["intent_assessment"]
-    assert assessment["identity_confidence"] is None
-    assert assessment["outreach_readiness"] is None
+    assert assessment["dimensions"]["identity_confidence"] is None
+    assert assessment["dimensions"]["outreach_readiness"] is None
 
 
 class _Response:
