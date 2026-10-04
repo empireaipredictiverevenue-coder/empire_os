@@ -418,6 +418,9 @@ def run_buyer_scout(
                 "intent_source": row.get("seed_intent_source"),
                 "intent_score": row.get("seed_intent_score"),
                 "intent_band": row.get("seed_intent_band"),
+                "intent_observed_at": row.get(
+                    "seed_intent_observed_at"
+                ),
                 "intent_pain_points": list(
                     row.get("seed_intent_pain_points") or []
                 ),
@@ -661,6 +664,20 @@ def run_buyer_scout(
             "intent_band": (
                 canonical_seed_by_domain.get(domain, {}).get(
                     "seed_intent_band"
+                )
+                if domain in intent_seed_domains
+                else None
+            ),
+            "intent_observed_at": (
+                canonical_seed_by_domain.get(domain, {}).get(
+                    "seed_intent_observed_at"
+                )
+                if domain in intent_seed_domains
+                else None
+            ),
+            "intent_summary": (
+                canonical_seed_by_domain.get(domain, {}).get(
+                    "seed_intent_summary"
                 )
                 if domain in intent_seed_domains
                 else None
