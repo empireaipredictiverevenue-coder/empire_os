@@ -190,6 +190,52 @@ def test_content_brief_is_evidence_only_and_does_not_post():
 
 
 
+
+
+def test_scout_adapter_preserves_unverified_contact_candidates():
+    record = scout_candidate_to_linkedin_record(
+        {
+            "business_name": "Buyer Exchange",
+            "website": "https://buyer.example",
+            "first_party_emails": ["jane@buyer.example"],
+            "first_party_phones": ["+15125550123"],
+            "first_party_people": [{
+                "name": "Jane Smith",
+                "title": "CEO",
+            }],
+        },
+        observed_at="2026-10-03T12:00:00+00:00",
+    )
+
+    assert record["first_party_people"] == []
+    assert record["contact_candidates"] == [
+        {
+            "kind": "email",
+            "value": "jane@buyer.example",
+            "evidence_ref": "https://buyer.example",
+        },
+        {
+            "kind": "phone",
+            "value": "+15125550123",
+            "evidence_ref": "https://buyer.example",
+        },
+    ]
+
+    row = build_linkedin_revenue_opportunity(record, now=NOW)
+    stage = row["stage_03_decision_makers"]
+    assert stage["primary"] is None
+    assert stage["resolution_state"] == (
+        "OBSERVED_CANDIDATE_REQUIRES_VERIFICATION"
+    )
+    assert stage["observed_unverified_candidates"][0]["name"] == "Jane Smith"
+    assert stage["observed_contact_candidates"][0]["verification_state"] == (
+        "OBSERVED_UNVERIFIED"
+    )
+    assert row["review_readiness"]["recommended_next_research_action"] == (
+        "verify_observed_decision_maker"
+    )
+    assert row["review_readiness"]["outreach_authorized"] is False
+
 def test_scout_adapter_uses_observed_site_trigger_without_inventing_people():
     record = scout_candidate_to_linkedin_record(
         {
@@ -216,6 +262,11 @@ def test_scout_adapter_uses_observed_site_trigger_without_inventing_people():
         "confidence": None,
     }]
     assert record["first_party_people"] == []
+    assert record["observed_people_candidates"] == [{
+        "name": "Unresolved Person",
+        "title": "VP Sales",
+        "evidence_ref": "https://northwind.example",
+    }]
     assert record["source_evidence_ref"] == "https://northwind.example"
 
 
