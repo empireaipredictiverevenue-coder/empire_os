@@ -26,10 +26,13 @@ HISTORY = ROOT / "runtime/community_intent/observations.json"
 REDDIT_ROTATION = (
     ("sales", "lead generation", "b2b", "online"),
     ("sales", "sales pipeline", "b2b", "online"),
-    ("sales", "follow up", "b2b", "online"),
-    ("sales", "sales automation", "b2b", "online"),
     ("smallbusiness", "lead generation", "b2b", "online"),
-    ("Roofing", "roofing leads", "roofing", "DFW"),
+    ("Roofing", "qualified appointments", "roofing", "US"),
+    ("Roofing", "google ads leads", "roofing", "US"),
+    ("Roofing", "need more leads", "roofing", "US"),
+    ("HVAC", "need more leads", "hvac", "US"),
+    ("solar", "need more leads", "solar", "US"),
+    ("Entrepreneur", "customer acquisition", "b2b", "online"),
 )
 
 LINKEDIN_ROTATION = (
@@ -67,6 +70,7 @@ def _load_history() -> list[IntentObservation]:
                 pain_points=tuple(row.get("pain_points") or ()),
                 intent_score=int(row.get("intent_score") or 0),
                 intent_band=str(row.get("intent_band") or "low"),
+                evidence_urls=tuple(row.get("evidence_urls") or ()),
             ))
         except (TypeError, ValueError):
             continue
@@ -123,6 +127,10 @@ def _merge_window(
                     if row.intent_score >= prior.intent_score
                     else prior.intent_band
                 ),
+                evidence_urls=tuple(dict.fromkeys([
+                    *prior.evidence_urls,
+                    *row.evidence_urls,
+                ])),
             )
         else:
             merged[row.url] = row
@@ -170,14 +178,8 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     slot = int(now.timestamp() // (15 * 60))
 
-    # Reddit RSS is currently most reliable on r/sales. Keep the primary
-    # collector stable while LinkedIn rotates; specialist Reddit lanes can be
-    # added after sustained source-health evidence.
     subreddit, reddit_query, reddit_niche, reddit_metro = (
-        "sales",
-        "lead generation",
-        "b2b",
-        "online",
+        REDDIT_ROTATION[slot % len(REDDIT_ROTATION)]
     )
     reddit = collect_reddit_rss_intent(
         subreddit=subreddit,
@@ -261,6 +263,9 @@ def main() -> int:
         "new_observations": len(current),
         "high_intent": sum(
             row.intent_band == "high" for row in observations
+        ),
+        "identity_seed_ready": sum(
+            bool(row.evidence_urls) for row in observations
         ),
         "medium_intent": sum(
             row.intent_band == "medium" for row in observations

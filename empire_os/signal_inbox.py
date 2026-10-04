@@ -139,6 +139,8 @@ def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
     }
 
 
+
+
 def snapshot() -> dict[str, Any]:
     data = _load()
     statuses: dict[str, int] = {}

@@ -7,7 +7,9 @@ import json
 import urllib.parse
 
 from empire_os.buyer_acquisition_scout import refresh_buyer_scout
+from empire_os.intent_seed_bridge import load_intent_seed_records
 from empire_os.sb import request_json
+
 SEED_LANES = (
     (
         "high_ticket_home_service",
@@ -127,6 +129,7 @@ def _canonical_seed_records(
     return rows
 
 
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")
@@ -134,7 +137,15 @@ def main() -> int:
     parser.add_argument("--results-per-query", type=int, default=8)
     parser.add_argument("--max-domains", type=int, default=40)
     parser.add_argument("--max-probes", type=int, default=20)
+    parser.add_argument("--intent-seed-limit", type=int, default=12)
     args = parser.parse_args()
+
+    seed_records = _canonical_seed_records(per_lane=8)
+    intent_seeds = load_intent_seed_records(
+        args.repo_root,
+        limit=args.intent_seed_limit,
+    )
+    seed_records.extend(intent_seeds)
 
     payload = refresh_buyer_scout(
         args.repo_root,
@@ -142,9 +153,7 @@ def main() -> int:
         results_per_query=args.results_per_query,
         max_domains=args.max_domains,
         max_probes=args.max_probes,
-        canonical_seed_records=_canonical_seed_records(
-            per_lane=8,
-        ),
+        canonical_seed_records=seed_records,
     )
     print(json.dumps({
         "ok": True,
@@ -156,6 +165,13 @@ def main() -> int:
         ],
         "canonical_seed_fallback_used": payload[
             "canonical_seed_fallback_used"
+        ],
+        "intent_seed_input_count": len(intent_seeds),
+        "intent_seed_domain_count": payload[
+            "intent_seed_domain_count"
+        ],
+        "intent_seed_supplement_used": payload[
+            "intent_seed_supplement_used"
         ],
         "candidate_count": payload["candidate_count"],
         "predictive_revenue_enterprise_candidate_count": payload[

@@ -22,6 +22,8 @@ ExecStart=/bin/echo === BUYER SCOUT: REVIEW READINESS ===
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/materialize_buyer_scout_review_readiness.py --repo-root /srv/empire_os --limit 200
 ExecStart=/bin/echo === BUYER SCOUT: PROMOTION PLAN ===
 ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_buyer_scout_promotion_plan.py --repo-root /srv/empire_os --limit 200
+ExecStart=/bin/echo === BUYER SCOUT: LINKEDIN REVENUE REVIEW ===
+ExecStart=/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/build_linkedin_revenue_department.py --repo-root /srv/empire_os
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

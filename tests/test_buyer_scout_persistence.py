@@ -69,6 +69,22 @@ def test_only_new_external_candidates_are_persisted():
                 ),
                 "continuous_lane_candidate": True,
                 "continuous_lane_fit_score": 82,
+                "intent_signal_id": "sig-roof-1",
+                "intent_signal_source": "reddit_intent",
+                "intent_score": 86,
+                "intent_band": "high",
+                "intent_observed_at": "2026-10-04T07:45:00+00:00",
+                "intent_summary": (
+                    "Need more qualified appointments. Google Ads has not "
+                    "been consistently profitable."
+                ),
+                "intent_pain_points": [
+                    "lead_generation",
+                    "revenue_growth",
+                ],
+                "intent_evidence_url": (
+                    "https://reddit.com/r/Roofing/comments/example"
+                ),
                 "candidate_state": "RESEARCH_EVIDENCE_ONLY",
             },
             {
@@ -160,6 +176,27 @@ def test_only_new_external_candidates_are_persisted():
     )
     assert payload["p_provenance"]["canonical_identity_verified"] is False
     assert payload["p_provenance"]["outreach_authorized"] is False
+    assert payload["p_site_evidence"]["intent_signal_id"] == "sig-roof-1"
+    assert payload["p_site_evidence"]["intent_signal_source"] == "reddit_intent"
+    assert payload["p_site_evidence"]["intent_score"] == 86
+    assert payload["p_site_evidence"]["intent_band"] == "high"
+    assert payload["p_site_evidence"]["intent_observed_at"] == (
+        "2026-10-04T07:45:00+00:00"
+    )
+    assert "qualified appointments" in payload["p_site_evidence"][
+        "intent_summary"
+    ]
+    assert payload["p_site_evidence"]["intent_pain_points"] == [
+        "lead_generation",
+        "revenue_growth",
+    ]
+    assert payload["p_site_evidence"]["intent_evidence_url"] == (
+        "https://reddit.com/r/Roofing/comments/example"
+    )
+    assert payload["p_provenance"]["intent_signal_id"] == "sig-roof-1"
+    assert payload["p_provenance"]["intent_observed_at"] == (
+        "2026-10-04T07:45:00+00:00"
+    )
 
 
 def test_missing_scout_source_fails_closed_without_rpc():

@@ -66,3 +66,13 @@ def test_buyer_scout_service_labels_pipeline_stages():
         "PROMOTION PLAN",
     ):
         assert stage in text
+
+
+def test_buyer_scout_service_refreshes_linkedin_revenue_review():
+    text = (
+        ROOT / "deploy/systemd/empire-buyer-acquisition-scout.service"
+    ).read_text()
+
+    assert "BUYER SCOUT: LINKEDIN REVENUE REVIEW" in text
+    assert "build_linkedin_revenue_department.py" in text
+    assert "outbound_governor" not in text
