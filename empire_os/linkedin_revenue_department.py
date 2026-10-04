@@ -12,6 +12,8 @@ Unknown evidence remains unknown.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from empire_os.icp_buyer_trigger_intelligence import assess_icp_candidate
@@ -25,6 +27,8 @@ from empire_os.reply_classifier import classify_reply_text
 
 
 SCHEMA_VERSION = "empire.linkedin_revenue_department.v1"
+SCOUT_SNAPSHOT = Path("runtime/buyer_acquisition/scout_latest.json")
+OUTPUT = Path("runtime/buyer_acquisition/linkedin_revenue_department_latest.json")
 
 
 def _text(value: Any) -> str:
@@ -345,6 +349,135 @@ def build_linkedin_revenue_opportunity(
     }
 
 
+def scout_candidate_to_linkedin_record(
+    candidate: Mapping[str, Any],
+    *,
+    observed_at: str | None,
+) -> dict[str, Any]:
+    """Adapt Buyer Scout evidence without promoting it to verified intent.
+
+    Buyer Scout trigger terms were observed in first-party/public site evidence.
+    The scout snapshot timestamp is the observation timestamp for this derived
+    channel packet. People are only promoted into the buying committee when the
+    upstream record already carries an explicit person id and evidence ref.
+    """
+    website = _text(candidate.get("website"))
+    people: list[dict[str, Any]] = []
+    for raw in candidate.get("first_party_people") or ():
+        if not isinstance(raw, Mapping):
+            continue
+        if (
+            not _text(raw.get("person_id"))
+            or not _text(raw.get("name"))
+            or not _text(raw.get("evidence_ref"))
+        ):
+            continue
+        people.append(dict(raw))
+
+    signals: list[dict[str, Any]] = []
+    if website and observed_at:
+        for trigger in candidate.get("observed_buying_triggers") or ():
+            term = _text(trigger)
+            if not term:
+                continue
+            signals.append({
+                "signal_type": "public_buying_trigger_term",
+                "summary": f"Observed public trigger term: {term}",
+                "observed_at": observed_at,
+                "evidence_ref": website,
+                "source": "buyer_acquisition_scout_first_party_site",
+                "confidence": None,
+            })
+
+    return {
+        "business_name": _text(candidate.get("business_name")),
+        "description": _text(candidate.get("description")),
+        "buyer_type": _text(candidate.get("buyer_type")),
+        "direct_signal_hits": list(
+            candidate.get("direct_signal_hits") or ()
+        ),
+        "reseller_signal_hits": list(
+            candidate.get("reseller_signal_hits") or ()
+        ),
+        "target_buyer_pools": list(
+            candidate.get("target_buyer_pools") or ()
+        ),
+        "target_product_codes": list(
+            candidate.get("target_product_codes") or ()
+        ),
+        "target_profile_keys": list(
+            candidate.get("target_icp_profile_keys") or ()
+        ),
+        "first_party_people": people,
+        "signals": signals,
+        "source_evidence_ref": website or None,
+        "enterprise_target": (
+            candidate.get("predictive_revenue_enterprise_candidate") is True
+        ),
+        "scout_provenance": {
+            "domain": _text(candidate.get("domain")) or None,
+            "discovery_source": _text(
+                candidate.get("discovery_source")
+            ) or None,
+            "query_evidence_count": int(
+                candidate.get("query_evidence_count") or 0
+            ),
+            "candidate_state": _text(
+                candidate.get("candidate_state")
+            ) or None,
+            "canonical_identity_verified": (
+                candidate.get("canonical_identity_verified") is True
+            ),
+            "commercial_terms_verified": (
+                candidate.get("commercial_terms_verified") is True
+            ),
+        },
+    }
+
+
+def build_linkedin_revenue_department_from_scout_snapshot(
+    scout_snapshot: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Project a Buyer Scout snapshot into the governed LinkedIn review lane."""
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    generated = _parse_time(scout_snapshot.get("generated_at"))
+    observed_at = (
+        generated.isoformat()
+        if generated is not None and generated <= current
+        else None
+    )
+    records = [
+        scout_candidate_to_linkedin_record(
+            candidate,
+            observed_at=observed_at,
+        )
+        for candidate in (scout_snapshot.get("candidates") or ())
+        if isinstance(candidate, Mapping)
+        and _text(candidate.get("business_name"))
+    ]
+    payload = build_linkedin_revenue_department_snapshot(
+        records,
+        now=current,
+    )
+    payload.update({
+        "source": "buyer_acquisition_scout",
+        "source_schema_version": scout_snapshot.get("schema_version"),
+        "source_generated_at": (
+            generated.isoformat() if generated is not None else None
+        ),
+        "source_candidate_count": len(records),
+        "source_snapshot_fresh_enough_for_signal_time": (
+            observed_at is not None
+        ),
+        "database_write_performed": False,
+        "outbound_sent": False,
+        "content_posted": False,
+    })
+    return payload
+
+
 def _priority_key(row: Mapping[str, Any]) -> tuple[Any, ...]:
     stage = row.get("stage_05_priority") or {}
     economics = stage.get("expected_revenue_value") or {}
@@ -399,9 +532,88 @@ def build_linkedin_revenue_department_snapshot(
             for row in items
             if row["review_readiness"]["ready_for_human_review"]
         ),
+        "resolved_decision_maker_count": sum(
+            1
+            for row in items
+            if row["stage_03_decision_makers"]["primary"] is not None
+        ),
+        "verified_contact_count": sum(
+            1
+            for row in items
+            if (
+                (row["stage_03_decision_makers"]["primary"] or {}).get(
+                    "contact_verified"
+                ) is True
+            )
+        ),
+        "outreach_draft_count": sum(
+            1
+            for row in items
+            if row["stage_06_personalised_outreach"]["draft"] is not None
+        ),
+        "reply_classified_count": sum(
+            1 for row in items if row["stage_09_replies"] is not None
+        ),
+        "positive_reply_count": sum(
+            1
+            for row in items
+            if (
+                (row["stage_09_replies"] or {}).get("classification")
+                == "positive"
+            )
+        ),
+        "economic_value_available_count": sum(
+            1
+            for row in items
+            if row["stage_05_priority"]["expected_revenue_value"].get(
+                "status"
+            ) == "AVAILABLE"
+        ),
+        "predicted_expected_revenue_value_cents_total": round(
+            sum(
+                float(
+                    row["stage_05_priority"]["expected_revenue_value"].get(
+                        "expected_revenue_value_cents"
+                    )
+                    or 0.0
+                )
+                for row in items
+                if row["stage_05_priority"]["expected_revenue_value"].get(
+                    "status"
+                ) == "AVAILABLE"
+            ),
+            4,
+        ),
         "items": items,
         "linkedin_automation_enabled": False,
         "live_outbound_enabled": False,
         "commercial_authority": "none",
         "execution_authority": "none",
     }
+
+
+
+def refresh_linkedin_revenue_department(
+    repo_root: str | Path,
+) -> dict[str, Any]:
+    """Refresh the channel snapshot from the latest Buyer Scout evidence."""
+    root = Path(repo_root).resolve()
+    try:
+        raw = json.loads(
+            (root / SCOUT_SNAPSHOT).read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        raw = {}
+    scout = raw if isinstance(raw, dict) else {}
+    payload = build_linkedin_revenue_department_from_scout_snapshot(
+        scout
+    )
+    path = root / OUTPUT
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+    return payload
