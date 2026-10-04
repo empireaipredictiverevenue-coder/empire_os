@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import json
 import urllib.parse
@@ -17,7 +16,6 @@ from empire_os.official_license_market_seed import (
 from empire_os.intent_seed_bridge import load_intent_seed_records
 from empire_os.verified_identity_seed_bridge import load_verified_identity_seed_records
 from empire_os.sb import request_json
-from empire_os.search_fabric.search import search_domains_parallel
 SEED_LANES = (
     (
         "high_ticket_home_service",
@@ -145,100 +143,22 @@ def main() -> int:
     parser.add_argument("--max-domains", type=int, default=40)
     parser.add_argument("--max-probes", type=int, default=20)
     parser.add_argument("--intent-seed-limit", type=int, default=12)
-    parser.add_argument(
-        "--search-workers",
-        type=int,
-        default=8,
-    )
     args = parser.parse_args()
 
-    search_workers = max(
-        1,
-        min(
-            int(args.search_workers),
-            12,
-        ),
+    public_research = refresh_public_research_seeds(
+        args.repo_root,
+        max_queries=min(args.max_queries, 48),
+        results_per_query=min(args.results_per_query, 10),
     )
 
-    # Two independent seed-research lanes can overlap safely.
-    # Split the service search budget across them so aggregate
-    # concurrent query workers remain bounded.
-    seed_lane_workers = max(
-        1,
-        min(
-            4,
-            max(
-                1,
-                search_workers // 2,
-            ),
-        ),
+    official_license_research = refresh_official_license_market_seeds(
+        args.repo_root,
+        max_queries=max(8, min(args.max_queries // 5, 20)),
+        results_per_query=min(args.results_per_query, 4),
     )
-
-    def seed_search_fn(
-        queries,
-        num=15,
-    ):
-        return search_domains_parallel(
-            queries,
-            num=num,
-            max_workers=seed_lane_workers,
-        )
-
-    with ThreadPoolExecutor(
-        max_workers=2
-    ) as executor:
-        public_future = executor.submit(
-            refresh_public_research_seeds,
-            args.repo_root,
-            max_queries=min(
-                args.max_queries,
-                48,
-            ),
-            results_per_query=min(
-                args.results_per_query,
-                10,
-            ),
-            search_fn=seed_search_fn,
-        )
-
-        official_future = executor.submit(
-            refresh_official_license_market_seeds,
-            args.repo_root,
-            max_queries=max(
-                8,
-                min(
-                    args.max_queries // 5,
-                    20,
-                ),
-            ),
-            results_per_query=min(
-                args.results_per_query,
-                4,
-            ),
-            search_fn=seed_search_fn,
-        )
-
-        public_research = (
-            public_future.result()
-        )
-
-        official_license_research = (
-            official_future.result()
-        )
-
     research_seeds = [
-        *(
-            public_research.get(
-                "seeds"
-            )
-            or []
-        ),
-        *(
-            official_license_research.get(
-                "seeds"
-            )
-            or []
-        ),
+        *(public_research.get("seeds") or []),
+        *(official_license_research.get("seeds") or []),
     ]
 
     seed_records = _canonical_seed_records(per_lane=8)
@@ -270,7 +190,6 @@ def main() -> int:
     print(json.dumps({
         "ok": True,
         "query_count": payload["query_count"],
-        "search_workers": search_workers,
         "domain_count": payload["domain_count"],
         "search_domain_count": payload["search_domain_count"],
         "canonical_seed_domain_count": payload[
