@@ -15,6 +15,7 @@ from typing import Any, Callable, Iterable, Mapping
 import requests
 
 from empire_os.candidate_quality import assess_candidate
+from empire_os.community_intent_taxonomy import assess_intent
 from empire_os.lead_sources import LeadCandidate
 from empire_os.signal_inbox import enqueue_signal
 
@@ -94,6 +95,7 @@ class IntentObservation:
     pain_points: tuple[str, ...] = ()
     intent_score: int = 0
     intent_band: str = "low"
+    intent_assessment: Mapping[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -155,7 +157,12 @@ def normalize_search_result(
 
     score, band = score_intent(text)
     pain_points = classify_pain_points(text)
-    if band == "low" and not pain_points:
+    assessment = assess_intent(
+        text,
+        source=source,
+        observed_at=(result.get("published_at") or result.get("date")),
+    )
+    if band == "low" and not pain_points and not assessment.intent_categories:
         return None
 
     return IntentObservation(
@@ -170,6 +177,7 @@ def normalize_search_result(
         pain_points=pain_points,
         intent_score=score,
         intent_band=band,
+        intent_assessment=assessment.as_dict(),
     )
 
 
@@ -220,7 +228,12 @@ def parse_reddit_atom(
             continue
         score, band = score_intent(combined)
         pain_points = classify_pain_points(combined)
-        if band == "low" and not pain_points:
+        assessment = assess_intent(
+            combined,
+            source="reddit",
+            observed_at=observed_at,
+        )
+        if band == "low" and not pain_points and not assessment.intent_categories:
             continue
 
         seen.add(url)
@@ -241,6 +254,7 @@ def parse_reddit_atom(
                 pain_points=pain_points,
                 intent_score=score,
                 intent_band=band,
+                intent_assessment=assessment.as_dict(),
             )
         )
 
@@ -347,6 +361,8 @@ def observation_to_signal(observation: IntentObservation) -> LeadCandidate:
         raw={
             "community_intent": observation.as_dict(),
             "entity_kind": "signal",
+            "buyer_intent_verified": False,
+            "revenue_verified": False,
             "outreach_authority": "none",
         },
     )
