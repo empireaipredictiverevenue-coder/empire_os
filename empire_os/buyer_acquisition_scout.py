@@ -345,6 +345,7 @@ def run_buyer_scout(
     canonical_seed_by_domain: dict[str, dict[str, Any]] = {}
     opportunity_seed_domains: set[str] = set()
     intent_seed_domains: set[str] = set()
+    intent_seed_domains: set[str] = set()
 
     for raw in canonical_seed_records or []:
         if not isinstance(raw, Mapping):
@@ -421,10 +422,24 @@ def run_buyer_scout(
                 "decision_maker_roles": [],
                 "prospect_id": row.get("id"),
                 "canonical_niche": row.get("niche"),
+                "intent_signal_id": intent_signal_id or None,
+                "intent_source": row.get("seed_intent_source"),
+                "intent_score": row.get("seed_intent_score"),
+                "intent_band": row.get("seed_intent_band"),
+                "intent_pain_points": list(
+                    row.get("seed_intent_pain_points") or []
+                ),
+                "intent_evidence_url": row.get(
+                    "seed_intent_evidence_url"
+                ),
+                "intent_summary": row.get("seed_intent_summary"),
             })
 
-    seed_domain_count = len(canonical_seed_by_domain)
+    seed_domain_count = len(
+        set(canonical_seed_by_domain) - intent_seed_domains
+    )
     opportunity_seed_domain_count = len(opportunity_seed_domains)
+    intent_seed_domain_count = len(intent_seed_domains)
     intent_seed_domain_count = len(intent_seed_domains)
 
     ranked_domains = sorted(
@@ -480,6 +495,9 @@ def run_buyer_scout(
         seed_name = str(seed.get("business_name") or "").strip()
         seed_niche = str(seed.get("niche") or "").strip()
         seed_profile = str(seed.get("icp_profile_key") or "").strip()
+        seed_intent_summary = str(
+            seed.get("seed_intent_summary") or ""
+        ).strip()
 
         if (
             seed
@@ -527,6 +545,11 @@ def run_buyer_scout(
                             + seed_niche.replace("_", " ")
                         )
                         if seed_niche
+                        else ""
+                    ),
+                    (
+                        "observed intent evidence: " + seed_intent_summary
+                        if seed_intent_summary
                         else ""
                     ),
                     str(seed.get("intent_summary") or ""),
@@ -759,6 +782,7 @@ def run_buyer_scout(
         "opportunity_seed_supplement_used": bool(
             opportunity_seed_domain_count and search_domain_count > 0
         ),
+        "intent_seed_supplement_used": bool(intent_seed_domain_count),
         "intent_seed_supplement_used": bool(
             intent_seed_domain_count and search_domain_count > 0
         ),
