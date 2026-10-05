@@ -43,6 +43,7 @@ ALLOWED_UNITS = frozenset({
     "empire-buyer-acquisition-team.timer",
     "empire-source-health.service",
     "empire-source-health.timer",
+    "empire-hermes-control.service",
     "empire-hermes-control.timer",
     "empire-coder-worker.service",
     "empire-coder-worker.timer",
@@ -57,6 +58,7 @@ ALLOWED_UNITS = frozenset({
     "empire-revenue-exchange-snapshot.timer",
 })
 START_ONLY_UNITS = frozenset({
+    "empire-hermes-control.service",
     "empire-revenue-pulse.service",
     "empire-conversation-recovery.service",
     "empire-buyer-capacity-readiness.service",
