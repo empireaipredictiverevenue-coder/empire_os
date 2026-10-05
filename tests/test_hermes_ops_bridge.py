@@ -31,6 +31,7 @@ def ops_job(**overrides):
             "-----END CERTIFICATE-----\n"
         ),
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + __import__("datetime").timedelta(minutes=10)).isoformat(),
     }
     payload.update(overrides)
     return payload
