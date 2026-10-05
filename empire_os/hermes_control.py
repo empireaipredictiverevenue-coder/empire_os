@@ -47,6 +47,7 @@ from empire_os.remote_commander import (
     OPERATIONS as REMOTE_COMMANDER_OPERATIONS,
     READ_OPERATIONS as REMOTE_COMMANDER_READ_OPERATIONS,
     WRITE_OPERATIONS as REMOTE_COMMANDER_WRITE_OPERATIONS,
+    RemoteCommanderError,
     execute as remote_commander_execute,
 )
 
@@ -349,12 +350,15 @@ def _execute_ops_request(
         raw,
         authority=authority,
     )
-    return remote_commander_execute(
-        operation,
-        arguments,
-        allow_write=(authority == "internal_write"),
-        allowed_paths=tuple(allowed_paths),
-    )
+    try:
+        return remote_commander_execute(
+            operation,
+            arguments,
+            allow_write=(authority == "internal_write"),
+            allowed_paths=tuple(allowed_paths),
+        )
+    except RemoteCommanderError as exc:
+        raise HermesControlError(str(exc)) from exc
 
 def _sanitize_ops_result(value: Any) -> Any:
     if isinstance(value, dict):
