@@ -414,7 +414,7 @@ def _execute_ops_request(
             "directive": directive.as_dict(),
             "planning_automatic": True,
             "production_execution_automatic": False,
-        )
+        }
     raise HermesControlError("ops operation not implemented")
 
 
