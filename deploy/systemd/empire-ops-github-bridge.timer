@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll authenticated GitHub Ops bridge requests
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=true
+Unit=empire-ops-github-bridge.service
+
+[Install]
+WantedBy=timers.target
