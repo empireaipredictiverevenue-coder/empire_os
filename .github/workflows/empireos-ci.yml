@@ -68,4 +68,5 @@ jobs:
             tests/test_opportunity_radar.py \
             tests/test_opportunity_factory_intake.py \
             tests/test_ops_github_bridge.py \
+            tests/test_hermes_ops_bridge.py \
             tests/test_resend_webhook_app.py
