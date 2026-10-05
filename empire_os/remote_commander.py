@@ -44,6 +44,10 @@ READ_OPERATIONS = frozenset({
     "journal_tail",
     "runtime_health",
     "env_key_status",
+    "process_list",
+    "system_metrics",
+    "listening_ports",
+    "credential_status",
 })
 WRITE_OPERATIONS = frozenset({
     "file_write",
@@ -74,7 +78,8 @@ def _sha256(path: Path) -> str:
 
 
 def health() -> dict[str, Any]:
-    disk = shutil.disk_usage(REPO)
+    disk_root = REPO if REPO.exists() else Path.cwd()
+    disk = shutil.disk_usage(disk_root)
     return {
         "ok": True,
         "service": "empire-remote-commander",
@@ -269,6 +274,82 @@ def runtime_health() -> dict[str, Any]:
     }
 
 
+def process_list(limit: int = 80) -> dict[str, Any]:
+    count = max(1, min(int(limit), 250))
+    result = run_command([
+        "ps",
+        "-eo",
+        "pid,ppid,user,stat,%cpu,%mem,etime,comm,args",
+        "--sort=-%cpu",
+    ])
+    lines = str(result.get("stdout") or "").splitlines()
+    result["stdout"] = "\n".join(lines[: count + 1])
+    result["limit"] = count
+    return result
+
+
+def system_metrics() -> dict[str, Any]:
+    load = os.getloadavg()
+    disk = shutil.disk_usage(REPO if REPO.exists() else Path.cwd())
+    memory: dict[str, int] = {}
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            number = value.strip().split()[0]
+            if number.isdigit():
+                memory[key] = int(number) * 1024
+    except OSError:
+        pass
+    return {
+        "ok": True,
+        "load_average": {
+            "1m": load[0],
+            "5m": load[1],
+            "15m": load[2],
+        },
+        "cpu_count": os.cpu_count(),
+        "memory_bytes": {
+            "total": memory.get("MemTotal"),
+            "available": memory.get("MemAvailable"),
+            "free": memory.get("MemFree"),
+        },
+        "disk_bytes": {
+            "total": disk.total,
+            "used": disk.used,
+            "free": disk.free,
+        },
+    }
+
+
+def listening_ports() -> dict[str, Any]:
+    return run_command(["ss", "-ltn"])
+
+
+def credential_status() -> dict[str, Any]:
+    token = os.environ.get("EMPIRE_OPS_MCP_BEARER_TOKEN", "").strip()
+    fingerprint = (
+        hashlib.sha256(token.encode("utf-8")).hexdigest()
+        if token
+        else None
+    )
+    return {
+        "ok": True,
+        "configured": bool(token),
+        "token_sha256": fingerprint,
+        "secret_printed": False,
+        "resource_url": os.environ.get(
+            "EMPIRE_OPS_MCP_RESOURCE_URL",
+            "http://127.0.0.1:8765/mcp",
+        ),
+        "issuer_url": os.environ.get(
+            "EMPIRE_OPS_MCP_ISSUER_URL",
+            "https://empire-ai.co.uk",
+        ),
+    }
+
+
 def founder_directive_ingest(
     text: str,
     *,
@@ -382,6 +463,14 @@ def execute(
         if not isinstance(keys, list):
             raise RemoteCommanderError("keys must be a list")
         return {"keys": env_key_status([str(k) for k in keys])}
+    if op == "process_list":
+        return process_list(int(args.get("limit", 80)))
+    if op == "system_metrics":
+        return system_metrics()
+    if op == "listening_ports":
+        return listening_ports()
+    if op == "credential_status":
+        return credential_status()
     if op == "founder_directive_ingest":
         return founder_directive_ingest(
             str(args.get("text") or ""),
