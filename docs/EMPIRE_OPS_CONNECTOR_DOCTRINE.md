@@ -5,7 +5,7 @@ Applies to: EmpireOS operations, development agents, founder tooling and externa
 
 ## Decision
 
-Empire Ops MCP is the canonical server-native operations/control connector for EmpireOS.
+Empire Remote Commander, implemented by Empire Ops MCP plus its governed privileged helper, is the canonical server-native operations/control connector for EmpireOS.
 
 It is infrastructure owned by Empire. External AI products, chat clients and remote-control tools connect **to** Empire Ops; EmpireOS must not depend on those clients in order to operate.
 
@@ -13,7 +13,7 @@ It is infrastructure owned by Empire. External AI products, chat clients and rem
 
 Primary control plane:
 
-- Empire Ops MCP
+- Empire Remote Commander / Empire Ops MCP
 - Empire privileged helper for narrowly allowlisted system actions
 - Empire audit trail
 - Empire protected-path and execution policy
@@ -51,7 +51,7 @@ Those systems run server-side whether or not any external chat client is connect
 
 ## Security boundary
 
-Empire Ops must remain narrower than a general remote shell.
+Empire Remote Commander must remain narrower than a general remote shell.
 
 Required properties:
 
@@ -93,6 +93,6 @@ If a remote client cannot connect:
 
 ## Goal
 
-Empire Ops is the stable contract. AI clients are replaceable.
+Empire Remote Commander is the stable contract. AI clients are replaceable.
 
 This prevents EmpireOS from being operationally dependent on any single vendor, subscription tier, UI, quota or connector ecosystem.
