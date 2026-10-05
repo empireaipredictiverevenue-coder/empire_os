@@ -433,7 +433,7 @@ def execute(
                 )
                 for prefix in allowed
             ):
-                raise RemoteCommanderError("file write is outside requested job scope")
+                raise RemoteCommanderError("file write is outside the job path policy")
         return file_write(
             path,
             str(args.get("content") or ""),
