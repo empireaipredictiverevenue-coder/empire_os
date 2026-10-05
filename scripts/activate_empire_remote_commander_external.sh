@@ -21,10 +21,26 @@ CLOUDFLARED_BIN="$(command -v cloudflared || true)"
 test -n "$CLOUDFLARED_BIN"
 test -f "$REPO/scripts/install_empire_remote_commander.sh"
 
+TUNNEL_REF="$(sudo "$REPO/.venv/bin/python" - "$CF_CONFIG" <<'PY'
+import sys
+from pathlib import Path
+import yaml
+
+payload = yaml.safe_load(Path(sys.argv[1]).read_text()) or {}
+value = str(payload.get("tunnel") or "").strip()
+if not value:
+    raise SystemExit("cloudflare config has no tunnel identifier")
+print(value)
+PY
+)"
+
+echo "cloudflare_tunnel=$TUNNEL_REF"
+
 if [[ "$ACTIVATE" -ne 1 ]]; then
   echo "decision=PREVIEW"
   echo "would_backup=$CF_CONFIG"
   echo "would_route_dns=$HOSTNAME"
+  echo "would_use_tunnel=$TUNNEL_REF"
   echo "would_add_ingress=http://127.0.0.1:8765"
   echo "would_activate=empire-ops-mcp.service"
   echo "would_restart=empire-cloudflared.service"
@@ -82,15 +98,14 @@ else:
     path.write_text(yaml.safe_dump(payload, sort_keys=False))
 PY
 
-sudo /usr/local/bin/cloudflared tunnel route dns   "$TUNNEL_NAME" "$HOSTNAME"
+sudo -u ubuntu "$CLOUDFLARED_BIN" tunnel route dns \
+  "$TUNNEL_REF" "$HOSTNAME"
 
 sudo systemctl restart empire-cloudflared.service
 
 sleep 2
 systemctl is-active --quiet empire-ops-mcp.service
 systemctl is-active --quiet empire-cloudflared.service
-
-curl --fail --silent --show-error   --max-time 5   http://127.0.0.1:8765/mcp   -o /dev/null || true
 
 echo "activation=complete"
 echo "cloudflare_backup=$BACKUP"
