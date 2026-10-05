@@ -3,7 +3,6 @@ set -euo pipefail
 
 REPO=/srv/empire_os
 CF_CONFIG=/home/ubuntu/.cloudflared/config.yml
-TUNNEL_NAME=Empire-AI
 HOSTNAME=mcp.empire-ai.co.uk
 MCP_URL=http://127.0.0.1:8765/mcp
 ACTIVATE=0
@@ -18,7 +17,8 @@ echo "mcp_url=$MCP_URL"
 echo "activation_requested=$ACTIVATE"
 
 test -f "$CF_CONFIG"
-test -x /usr/local/bin/cloudflared
+CLOUDFLARED_BIN="$(command -v cloudflared || true)"
+test -n "$CLOUDFLARED_BIN"
 test -f "$REPO/scripts/install_empire_remote_commander.sh"
 
 if [[ "$ACTIVATE" -ne 1 ]]; then
