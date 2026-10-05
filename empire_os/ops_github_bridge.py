@@ -16,7 +16,7 @@ import os
 import re
 import subprocess
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -80,7 +80,7 @@ def _run_git(args: list[str], *, timeout: int = 30) -> subprocess.CompletedProce
 
 def _fetch_control_ref() -> None:
     result = _run_git(
-        ["fetch", "--quiet", "origin", f"{CONTROL_REF}:{REMOTE_REF}"],
+        ["fetch", "--quiet", "origin", f"+{CONTROL_REF}:{REMOTE_REF}"],
         timeout=60,
     )
     if result.returncode != 0:
@@ -140,7 +140,7 @@ def validate_request(payload: dict[str, Any], *, path: str) -> dict[str, Any]:
     now = _utc_now()
     if expires_at <= now:
         raise BridgePolicyError("request expired")
-    if expires_at > now.replace(microsecond=0) + __import__("datetime").timedelta(minutes=30):
+    if expires_at > now + timedelta(minutes=30):
         raise BridgePolicyError("request expiry too far in future")
     cert = str(payload.get("result_certificate_pem") or "")
     if (
