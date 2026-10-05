@@ -1,0 +1,15 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "ops-chatgpt-d78059f15dbf4c4a",
+  "prompt": "Deterministic Ops bridge read-only probe. Return the live EmpireOS repository status only.",
+  "kind": "ops_request",
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "allowed_paths": [],
+  "lease_resources": [],
+  "operation": "repo_status",
+  "arguments": {},
+  "result_certificate_pem": "-----BEGIN CERTIFICATE-----\nMIIDJzCCAg+gAwIBAgIUfiq++c/fTE1L51eUqUBEzYiMTpQwDQYJKoZIhvcNAQEL\nBQAwIzEhMB8GA1UEAwwYRW1waXJlIE9wcyBDaGF0R1BUIFByb2JlMB4XDTI2MTAw\nNTExNTc1OVoXDTI2MTAwNjExNTc1OVowIzEhMB8GA1UEAwwYRW1waXJlIE9wcyBD\naGF0R1BUIFByb2JlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjYEs\nLSKfUHb+b5ZNbYnD6xIlK5+Ebz9YXa6QM+wLwKcJrJ5ky6id4Km8OOsUIhP2wfdv\nMztvyPvzVexH0qWXLScOpCBq0Bk1bDEpSDEBOCU3o1TofSNUM1Qhv9Cj3tQT2jCP\nWszkF+329LyGCRd9P/rX/y/EoKCjlEEOqCpytMn2rUKGQAkYGtrLs6z0K51wuxvl\n6McoU18g1MolDTfv/MNobVlVLJwRAQD1hQfzjXeQs6YoXqt7PIVXAaXhf0yK1YtL\nimnWq9y0LAh+T0JwRJiiDbFHkX1UiDtnlC3w0nsi7i5LxV7p/CjdRxs4CJmLUtEF\nsFDNED2kK4EOivlYKwIDAQABo1MwUTAdBgNVHQ4EFgQUOWTV4LugolAVjwPzw46A\nGU2XC+0wHwYDVR0jBBgwFoAUOWTV4LugolAVjwPzw46AGU2XC+0wDwYDVR0TAQH/\nBAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAXvgNqkpIdK8W02pBjDMhmxrgdjMY\nsqGXWAY3J+KTHqQeEYbIe23lQ0nxFeplObpVV1zT+fAzttZ9lOT5kctZmvrHAOic\nas0R+NphPu3Ycq4e0q29SwHNIl+dzifpG/2hap9eirq+aCWKZZYP0fOfVObaeeSH\noE3LLZM/wk582aVdG3beI90+Y2DLdrt7X9aYQA44+cRQxiNaL3D0ZeO9E1mDofOV\nPIUXCT8d+CR0BxME8hrqIKLKYTFe8mu150UEIwhVuRATbVfNr87rYaZZIiK9KdlZ\nA6iYAxIQZxdmEwTFpkkaIRdo1K/Ir4zg8sFBeRI702lh447gvsS8Y63woQ==\n-----END CERTIFICATE-----\n",
+  "created_at": "2026-10-05T11:58:22.620Z",
+  "expires_at": "2026-10-05T12:18:22.617Z"
+}
