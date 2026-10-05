@@ -323,6 +323,7 @@ def _execute_ops_request(
     *,
     authority: str,
     repo_root: Path,
+    allowed_paths: Iterable[str] = (),
 ) -> dict[str, Any]:
     operation, arguments, _certificate = _validate_ops_request_mapping(
         raw,
@@ -346,7 +347,11 @@ def _execute_ops_request(
             limit=min(int(arguments.get("limit", 40000)), 80000),
         )
     if operation == "file_write":
-        path = str(arguments.get("path") or "")
+        path = _normalise_repo_path(str(arguments.get("path") or ""))
+        if not path_is_allowed(path, allowed_paths):
+            raise HermesControlError(
+                "ops file write is outside the job path policy"
+            )
         expected = arguments.get("expected_sha256")
         current = _ops_file_sha256(path)
         if expected is not None and str(expected) != str(current):
@@ -545,6 +550,7 @@ def _process_ops_request(
                 raw,
                 authority=job.authority,
                 repo_root=repo_root,
+                allowed_paths=job.allowed_paths,
             )
             envelope = {
                 "schema_version": "empire.hermes.ops_result.v1",
