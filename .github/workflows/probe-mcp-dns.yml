@@ -1,4 +1,4 @@
-name: Probe Empire MCP Routing
+name: Probe Dedicated Empire MCP Tunnel
 
 on:
   push:
@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
-      - name: Probe unauthenticated MCP POST
+      - name: Probe normal DNS and unauthenticated MCP
         shell: bash
         run: |
           set +e
-          BODY='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"public-routing-probe","version":"1.0"}}}'
+          BODY='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"dedicated-tunnel-probe","version":"1.0"}}}'
           echo "=== DNS ==="
           getent ahostsv4 mcp.empire-ai.co.uk || true
-          echo "=== POST ==="
+          echo "=== HTTPS POST ==="
           curl -sS -i --max-time 20             -X POST             -H 'Content-Type: application/json'             -H 'Accept: application/json, text/event-stream'             --data "$BODY"             https://mcp.empire-ai.co.uk/mcp || true
           exit 0
