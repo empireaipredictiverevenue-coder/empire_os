@@ -228,6 +228,42 @@ def runtime_health() -> dict[str, Any]:
     )
 
 
+@server.tool(name="empire_process_list", structured_output=True)
+def process_list(limit: int = 80) -> dict[str, Any]:
+    return _record(
+        "empire_process_list",
+        {"limit": limit},
+        lambda: remote_execute("process_list", {"limit": limit}),
+    )
+
+
+@server.tool(name="empire_system_metrics", structured_output=True)
+def system_metrics() -> dict[str, Any]:
+    return _record(
+        "empire_system_metrics",
+        {},
+        lambda: remote_execute("system_metrics", {}),
+    )
+
+
+@server.tool(name="empire_listening_ports", structured_output=True)
+def listening_ports() -> dict[str, Any]:
+    return _record(
+        "empire_listening_ports",
+        {},
+        lambda: remote_execute("listening_ports", {}),
+    )
+
+
+@server.tool(name="empire_credential_status", structured_output=True)
+def credential_status() -> dict[str, Any]:
+    return _record(
+        "empire_credential_status",
+        {},
+        lambda: remote_execute("credential_status", {}),
+    )
+
+
 @server.tool(name="empire_service_control", structured_output=True)
 def service_control(
     unit: str,
