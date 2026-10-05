@@ -76,3 +76,14 @@ def test_cloudflare_candidate_keeps_mcp_loopback_only():
     ).read_text()
     assert "mcp.empire-ai.co.uk" in source
     assert "http://127.0.0.1:8765" in source
+
+
+
+def test_external_activation_derives_live_tunnel_and_uses_tunnel_owner():
+    source = Path(
+        "scripts/activate_empire_remote_commander_external.sh"
+    ).read_text()
+    assert 'payload.get("tunnel")' in source
+    assert "Empire-AI" not in source
+    assert "sudo -u ubuntu" in source
+    assert "mcp.empire-ai.co.uk" in source
