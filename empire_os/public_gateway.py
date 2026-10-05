@@ -28,8 +28,9 @@ from empire_os.aeo_release import released_file as released_aeo_file, released_p
 from empire_os.a2a_identity_api import create_a2a_identity_router
 from empire_os.a2a_commerce_api import create_a2a_commerce_router
 from empire_os.agent_web_runtime import execute_public_capability
+from empire_os.ops_bridge_api import create_ops_bridge_router
 
-GATEWAY_VERSION = "agent-web-v1.1"
+GATEWAY_VERSION = "agent-web-v1.2"
 PUBLIC_BASE_URL = os.getenv("EMPIRE_PUBLIC_BASE_URL", "https://empire-ai.co.uk").rstrip("/")
 A2A_RUNTIME = load_a2a_runtime(os.environ)
 AEO_ROOT = Path(os.getenv("EMPIRE_PUBLIC_AEO_ROOT", "/srv/empire_os/runtime/aeo"))
@@ -46,6 +47,7 @@ CHECKOUT_INTERNAL_URL = os.getenv(
 ).rstrip("/")
 
 app = FastAPI(title="Empire AI Public Gateway", docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(create_ops_bridge_router())
 app.mount("/_next", StaticFiles(directory=str(SITE_OUT / "_next"), check_dir=False), name="next-static")
 
 
