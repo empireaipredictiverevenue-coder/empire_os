@@ -102,9 +102,9 @@ else:
     path.write_text(yaml.safe_dump(payload, sort_keys=False))
 PY
 
-sudo -u ubuntu "$CLOUDFLARED_BIN" --config "$CF_CONFIG" tunnel ingress validate
+sudo -H -u ubuntu "$CLOUDFLARED_BIN" --config "$CF_CONFIG" tunnel ingress validate
 
-sudo -u ubuntu "$CLOUDFLARED_BIN" tunnel route dns   "$TUNNEL_REF" "$HOSTNAME"
+sudo -H -u ubuntu "$CLOUDFLARED_BIN" tunnel route dns   "$TUNNEL_REF" "$HOSTNAME"
 
 sudo systemctl restart empire-cloudflared.service
 sleep 2
