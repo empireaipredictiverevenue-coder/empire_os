@@ -43,6 +43,12 @@ from empire_os.ops_core import (
     service_status as ops_service_status,
     write_repo_file as ops_write_repo_file,
 )
+from empire_os.remote_commander import (
+    OPERATIONS as REMOTE_COMMANDER_OPERATIONS,
+    READ_OPERATIONS as REMOTE_COMMANDER_READ_OPERATIONS,
+    WRITE_OPERATIONS as REMOTE_COMMANDER_WRITE_OPERATIONS,
+    execute as remote_commander_execute,
+)
 
 
 
@@ -95,19 +101,9 @@ FORBIDDEN_RESULT_PATH_TOKENS = (
     "/toop/",
 )
 
-OPS_READ_OPERATIONS = frozenset({
-    "repo_status",
-    "repo_log",
-    "repo_diff",
-    "file_read",
-    "run_check",
-    "service_status",
-})
-OPS_WRITE_OPERATIONS = frozenset({
-    "file_write",
-    "founder_directive_ingest",
-})
-OPS_OPERATIONS = OPS_READ_OPERATIONS | OPS_WRITE_OPERATIONS
+OPS_READ_OPERATIONS = REMOTE_COMMANDER_READ_OPERATIONS
+OPS_WRITE_OPERATIONS = REMOTE_COMMANDER_WRITE_OPERATIONS
+OPS_OPERATIONS = REMOTE_COMMANDER_OPERATIONS
 OPS_ALLOWED_CHECKS = frozenset({
     "git_diff_check",
     "pytest_file",
@@ -353,94 +349,12 @@ def _execute_ops_request(
         raw,
         authority=authority,
     )
-
-    if operation == "repo_status":
-        return ops_git_status()
-    if operation == "repo_log":
-        return ops_git_log(int(arguments.get("limit", 8)))
-    if operation == "repo_diff":
-        path = str(arguments.get("path") or "").strip()
-        return ops_git_diff(
-            path or None,
-            staged=bool(arguments.get("staged", False)),
-        )
-    if operation == "file_read":
-        return ops_read_repo_file(
-            str(arguments.get("path") or ""),
-            offset=int(arguments.get("offset", 0)),
-            limit=min(int(arguments.get("limit", 40000)), 80000),
-        )
-    if operation == "file_write":
-        path = _normalise_repo_path(str(arguments.get("path") or ""))
-        if not path_is_allowed(path, allowed_paths):
-            raise HermesControlError(
-                "ops file write is outside the job path policy"
-            )
-        expected = arguments.get("expected_sha256")
-        current = _ops_file_sha256(path)
-        if expected is not None and str(expected) != str(current):
-            raise HermesControlError("ops file sha256 mismatch")
-        content = str(arguments.get("content") or "")
-        if len(content.encode("utf-8")) > 100000:
-            raise HermesControlError("ops file content too large")
-        result = ops_write_repo_file(
-            path,
-            content,
-            append=bool(arguments.get("append", False)),
-        )
-        result["sha256"] = _ops_file_sha256(path)
-        return result
-    if operation == "run_check":
-        check = str(arguments.get("check") or "")
-        target = str(arguments.get("target") or "")
-        if check == "git_diff_check":
-            return ops_run_command(["git", "diff", "--check"])
-        ops_safe_repo_path(target)
-        if check == "pytest_file":
-            return ops_run_command(
-                [
-                    str(repo_root / ".venv/bin/python"),
-                    "-m",
-                    "pytest",
-                    "-q",
-                    target,
-                ],
-                timeout=120,
-            )
-        return ops_run_command(
-            [
-                str(repo_root / ".venv/bin/python"),
-                "-m",
-                "py_compile",
-                target,
-            ],
-            timeout=30,
-        )
-    if operation == "service_status":
-        return ops_service_status(str(arguments.get("unit") or ""))
-    if operation == "founder_directive_ingest":
-        text = str(arguments.get("text") or "").strip()
-        title = str(arguments.get("title") or "").strip()
-        priority = max(
-            0,
-            min(int(arguments.get("priority", 90)), 100),
-        )
-        directive, created = FounderDirectiveStore(repo_root).ingest(
-            text,
-            source="hermes_ops_bridge",
-            title=title or None,
-            priority=priority,
-            metadata={"ingested_via": "hermes_ops_bridge"},
-        )
-        return {
-            "ok": True,
-            "created": created,
-            "directive": directive.as_dict(),
-            "planning_automatic": True,
-            "production_execution_automatic": False,
-        }
-    raise HermesControlError("ops operation not implemented")
-
+    return remote_commander_execute(
+        operation,
+        arguments,
+        allow_write=(authority == "internal_write"),
+        allowed_paths=tuple(allowed_paths),
+    )
 
 def _sanitize_ops_result(value: Any) -> Any:
     if isinstance(value, dict):
