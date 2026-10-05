@@ -1,0 +1,30 @@
+name: Probe Empire MCP DNS
+
+on:
+  push:
+    branches:
+      - probe/empire-public-control-bootstrap
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Probe DNS and HTTPS
+        shell: bash
+        run: |
+          set -x
+          getent ahostsv4 mcp.empire-ai.co.uk || true
+          python - <<'PY'
+import socket
+try:
+    print("python_dns=", socket.getaddrinfo("mcp.empire-ai.co.uk", 443))
+except Exception as exc:
+    print("python_dns_error=", repr(exc))
+PY
+          curl -sS -D - -o /tmp/body --max-time 20 https://mcp.empire-ai.co.uk/mcp || true
+          echo "--- body ---"
+          head -c 2000 /tmp/body 2>/dev/null || true
