@@ -54,6 +54,21 @@ def test_court_signal_stays_unresolved_without_external_identity():
     assert reason == "court_party_requires_external_identity_resolution"
 
 
+def test_community_signal_stays_unresolved_without_external_identity():
+    candidate, reason = candidate_from_signal({
+        "source": "reddit_intent",
+        "raw": {
+            "community_intent": {
+                "intent_categories": ["DEMAND_SHORTAGE"],
+                "intent_confidence": 0.9,
+            },
+            "entity_kind": "signal",
+        },
+    })
+    assert candidate is None
+    assert reason == "community_signal_requires_external_identity_resolution"
+
+
 def test_resolution_materializes_permit_and_marks_signal_resolved(tmp_path):
     inbox = tmp_path / "signal_inbox.json"
     lock = tmp_path / "signal_inbox.lock"

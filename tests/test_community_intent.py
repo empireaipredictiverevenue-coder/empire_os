@@ -1,10 +1,12 @@
 from empire_os.community_intent import (
     classify_pain_points,
+    collect_reddit_rss_intent,
     collect_public_search_intent,
     normalize_search_result,
     observation_to_signal,
     score_intent,
 )
+from empire_os.community_intent_v2 import assess_intent_v2
 
 
 def test_pain_and_intent_classification():
@@ -108,3 +110,117 @@ def test_linkedin_job_post_is_not_buyer_intent():
         },
     )
     assert row is None
+
+
+
+def test_v2_detects_demand_shortage_and_vendor_search():
+    assessment = assess_intent_v2(
+        "We need more qualified leads and are looking for a lead generation agency.",
+        source_mode="reddit_public_search",
+    )
+    assert any(x.startswith("DEMAND_SHORTAGE.") for x in assessment.intent_types)
+    assert any(x.startswith("VENDOR_SEARCH.") for x in assessment.intent_types)
+    assert assessment.dimensions.intent_confidence >= 0.5
+    assert assessment.dimensions.offer_fit is None
+    assert assessment.dimensions.identity_confidence is None
+    assert assessment.dimensions.outreach_readiness is None
+    assert assessment.canonical_buyer_intent is False
+    assert assessment.revenue_inferred is False
+    assert assessment.outbound_authority == "none"
+
+
+def test_v2_detects_unprofitable_ads_and_spend_evidence():
+    assessment = assess_intent_v2(
+        "We spent $3000 on Google Ads and they are not profitable. Need a PPC specialist.",
+        source_mode="reddit_public_search",
+    )
+    assert any(x.startswith("PAID_MEDIA_FAILURE.") for x in assessment.intent_types)
+    assert any(x.startswith("VENDOR_SEARCH.") for x in assessment.intent_types)
+    assert assessment.dimensions.ability_to_pay is not None
+    assert assessment.dimensions.ability_to_pay >= 0.65
+    assert assessment.dimensions.pain_severity >= 0.8
+
+
+def test_v2_detects_poor_lead_quality_and_conversion_leakage():
+    assessment = assess_intent_v2(
+        "Our leads are poor quality, follow-up is too slow and the leads are not closing.",
+        source_mode="linkedin_public_search",
+    )
+    assert any(x.startswith("PAID_MEDIA_FAILURE.") for x in assessment.intent_types)
+    assert any(x.startswith("CONVERSION_FAILURE.") for x in assessment.intent_types)
+    assert assessment.dimensions.pain_severity >= 0.8
+
+
+def test_v2_detects_buyer_demand_without_claiming_verified_buyer_intent():
+    assessment = assess_intent_v2(
+        "We are buying qualified roofing leads and can take more volume.",
+        source_mode="public_web_search",
+    )
+    assert any(x.startswith("BUYER_DEMAND.") for x in assessment.intent_types)
+    assert assessment.canonical_buyer_intent is False
+    assert assessment.dimensions.estimated_opportunity_value is None
+
+
+def test_signal_payload_carries_truth_and_authority_guards():
+    row = normalize_search_result(
+        platform="reddit",
+        query="need leads",
+        result={
+            "title": "Need more qualified leads",
+            "link": "https://reddit.com/r/smallbusiness/comments/abc/example",
+            "snippet": "We need more qualified appointments each week.",
+        },
+    )
+    assert row is not None
+    candidate = observation_to_signal(row)
+    assert candidate.raw["buyer_intent_verified"] is False
+    assert candidate.raw["revenue_verified"] is False
+    assert candidate.raw["outreach_authority"] == "none"
+    assessment = candidate.raw["community_intent"]["intent_assessment"]
+    assert assessment["dimensions"]["identity_confidence"] is None
+    assert assessment["dimensions"]["outreach_readiness"] is None
+
+
+class _Response:
+    def __init__(self, status_code):
+        self.status_code = status_code
+        self.headers = {"content-type": "application/atom+xml"}
+        self.text = ""
+
+
+def test_reddit_429_is_source_health_failure_not_zero_demand():
+    result = collect_reddit_rss_intent(
+        subreddit="smallbusiness",
+        query="need leads",
+        get_fn=lambda *args, **kwargs: _Response(429),
+    )
+    assert result["ok"] is False
+    assert result["reason"] == "rate_limited"
+    assert result["observations"] == []
+
+
+def test_reddit_403_is_source_health_failure_not_zero_demand():
+    result = collect_reddit_rss_intent(
+        subreddit="smallbusiness",
+        query="need leads",
+        get_fn=lambda *args, **kwargs: _Response(403),
+    )
+    assert result["ok"] is False
+    assert result["reason"] == "http_403"
+    assert result["observations"] == []
+
+
+
+def test_v2_need_more_leads_is_not_buyer_demand():
+    assessment = assess_intent_v2(
+        "We need more qualified leads for our roofing company.",
+        source_mode="reddit_public_search",
+    )
+    assert any(
+        item.startswith("DEMAND_SHORTAGE.")
+        for item in assessment.intent_types
+    )
+    assert not any(
+        item.startswith("BUYER_DEMAND.")
+        for item in assessment.intent_types
+    )
