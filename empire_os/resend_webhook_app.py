@@ -335,6 +335,7 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
             "forwarded": False,
             "reason": "reply_forwarding_disabled",
         }
+        visibility = None
         if (
             forward_target
             and _visibility_recipient_match(
@@ -349,17 +350,11 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                     fetch_email=fetch_email,
                     reply_to=reply_base,
                 )
-                if visibility is not None:
-                    forward_result = _forward_reply_notification(
-                        visibility,
-                        target=forward_target,
-                        sender=forward_sender,
-                        resend_module=resend_module,
-                    )
             except Exception:
+                visibility = None
                 forward_result = {
                     "forwarded": False,
-                    "reason": "reply_forward_failed",
+                    "reason": "reply_visibility_fetch_failed",
                 }
 
         if provider_event is not None:
@@ -386,6 +381,19 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                 event, fetch_email=fetch_email, reply_to=reply_base,
             )
         except OutboundProviderError:
+            if visibility is not None:
+                try:
+                    forward_result = _forward_reply_notification(
+                        visibility,
+                        target=forward_target,
+                        sender=forward_sender,
+                        resend_module=resend_module,
+                    )
+                except Exception:
+                    forward_result = {
+                        "forwarded": False,
+                        "reason": "reply_forward_failed",
+                    }
             return {
                 "ok": True,
                 "ignored": True,
@@ -404,6 +412,19 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                 ),
             }
         if reply is None:
+            if visibility is not None:
+                try:
+                    forward_result = _forward_reply_notification(
+                        visibility,
+                        target=forward_target,
+                        sender=forward_sender,
+                        resend_module=resend_module,
+                    )
+                except Exception:
+                    forward_result = {
+                        "forwarded": False,
+                        "reason": "reply_forward_failed",
+                    }
             return {
                 "ok": True,
                 "ignored": True,
@@ -442,11 +463,22 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
         except Exception:
             return JSONResponse({"ok": False}, status_code=503)
 
+        is_new_reply = result.get("decision") == "recorded"
         classification = classify_reply_text(
             visible_reply_text(reply["body_text"]), reply["subject"]
         )
         classified = None
-        if classification["auto_apply"]:
+        stored_classification = str(
+            result.get("classification") or ""
+        ).strip().lower()
+        should_classify = (
+            classification["auto_apply"]
+            and (
+                is_new_reply
+                or stored_classification in {"", "unclassified"}
+            )
+        )
+        if should_classify:
             try:
                 classified = rpc("classify_outbound_reply", {
                     "p_reply_id": result["reply_id"],
@@ -456,6 +488,26 @@ def create_app(*, verify_webhook: Callable[..., Any] | None = None,
                 })
             except Exception:
                 return JSONResponse({"ok": False}, status_code=503)
+
+        if visibility is not None:
+            if is_new_reply:
+                try:
+                    forward_result = _forward_reply_notification(
+                        visibility,
+                        target=forward_target,
+                        sender=forward_sender,
+                        resend_module=resend_module,
+                    )
+                except Exception:
+                    forward_result = {
+                        "forwarded": False,
+                        "reason": "reply_forward_failed",
+                    }
+            else:
+                forward_result = {
+                    "forwarded": False,
+                    "reason": "duplicate_reply_not_forwarded",
+                }
 
         return {
             "ok": True,
