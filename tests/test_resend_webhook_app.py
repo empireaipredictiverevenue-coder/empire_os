@@ -425,3 +425,53 @@ def test_direct_founder_inbox_is_mirrored_without_reply_automation(
     assert options["idempotency_key"] == (
         "reply-forward/em_founder_1"
     )
+
+
+def test_duplicate_governed_reply_is_not_forwarded_or_reclassified(
+    monkeypatch,
+):
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    _ForwardEmails.sent = []
+    calls = []
+
+    def rpc(name, params):
+        calls.append((name, params))
+        if name == "ingest_outbound_reply":
+            return {
+                "decision": "existing_reply",
+                "reply_id": (
+                    "00000000-0000-0000-0000-000000000099"
+                ),
+                "classification": "positive",
+            }
+        raise AssertionError(
+            "duplicate reply must not be classified again"
+        )
+
+    app = create_app(
+        verify_webhook=lambda _: event(),
+        fetch_email=lambda _: fetched(),
+        reply_rpc=rpc,
+        webhook_secret="whsec_test",
+        reply_to="replies@empire-ai.co.uk",
+        reply_forward_to="flavag83@gmail.com",
+        reply_forward_sender=(
+            "Phil - Founder - Empire AI "
+            "<founder@empire-ai.co.uk>"
+        ),
+        resend_module=_ForwardResend,
+    )
+    r = TestClient(app).post(
+        "/webhooks/resend-inbound",
+        content="{}",
+        headers=HEADERS,
+    )
+
+    assert r.status_code == 200
+    assert r.json()["decision"] == "existing_reply"
+    assert r.json()["reply_forwarded"] is False
+    assert r.json()["reply_forward_reason"] == (
+        "duplicate_reply_not_forwarded"
+    )
+    assert [name for name, _ in calls] == ["ingest_outbound_reply"]
+    assert _ForwardEmails.sent == []
