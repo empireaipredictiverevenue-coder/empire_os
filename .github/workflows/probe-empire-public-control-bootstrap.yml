@@ -1,0 +1,32 @@
+name: Probe Empire Public Control Bootstrap
+
+on:
+  push:
+    branches:
+      - probe/empire-public-control-bootstrap
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Probe public control surfaces
+        shell: bash
+        run: |
+          set -u
+          probe() {
+            url="$1"
+            echo "===== $url ====="
+            curl -k -sS -D - -o /tmp/body --max-time 15 "$url" || true
+            echo "--- body ---"
+            head -c 4000 /tmp/body 2>/dev/null || true
+            echo
+          }
+          probe "https://empire-ai.co.uk/health"
+          probe "https://empire-ai.co.uk/agent-web/capabilities"
+          probe "https://empire-ai.co.uk/v1/founder-directives/status"
+          probe "https://empire-ai.co.uk/mcp"
+          probe "https://empire-ai.co.uk/v1/ops-bridge/health"
