@@ -11,7 +11,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
       - name: Probe public control surfaces
         shell: bash
@@ -20,13 +20,18 @@ jobs:
           probe() {
             url="$1"
             echo "===== $url ====="
-            curl -k -sS -D - -o /tmp/body --max-time 15 "$url" || true
+            curl -k -sS -D - -o /tmp/body --max-time 10 "$url" || true
             echo "--- body ---"
-            head -c 4000 /tmp/body 2>/dev/null || true
+            head -c 2500 /tmp/body 2>/dev/null || true
             echo
           }
-          probe "https://empire-ai.co.uk/health"
+          for host in             empire-ai.co.uk             mcp.empire-ai.co.uk             ops.empire-ai.co.uk             webmcp.empire-ai.co.uk             control.empire-ai.co.uk             api.empire-ai.co.uk
+          do
+            echo "##### HOST $host #####"
+            getent ahostsv4 "$host" | head -n 3 || true
+            probe "https://$host/health"
+            probe "https://$host/mcp"
+          done
           probe "https://empire-ai.co.uk/agent-web/capabilities"
           probe "https://empire-ai.co.uk/v1/founder-directives/status"
-          probe "https://empire-ai.co.uk/mcp"
           probe "https://empire-ai.co.uk/v1/ops-bridge/health"
