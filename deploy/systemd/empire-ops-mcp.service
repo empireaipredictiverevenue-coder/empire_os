@@ -1,5 +1,5 @@
 [Unit]
-Description=EmpireOS Native Ops MCP
+Description=Empire Remote Commander
 After=network-online.target empire-ops-privileged-helper.service
 Wants=network-online.target empire-ops-privileged-helper.service
 
@@ -9,6 +9,7 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/srv/empire_os
 EnvironmentFile=/etc/empire_os.env
+EnvironmentFile=-/etc/empire_os/remote-commander.env
 Environment=PYTHONPATH=/srv/empire_os
 ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.ops_mcp --transport streamable-http --host 127.0.0.1 --port 8765
 Restart=always
