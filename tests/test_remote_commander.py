@@ -85,5 +85,5 @@ def test_external_activation_derives_live_tunnel_and_uses_tunnel_owner():
     ).read_text()
     assert 'payload.get("tunnel")' in source
     assert "Empire-AI" not in source
-    assert "sudo -u ubuntu" in source
+    assert "sudo -H -u ubuntu" in source
     assert "mcp.empire-ai.co.uk" in source
