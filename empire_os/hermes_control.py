@@ -32,6 +32,17 @@ from empire_os.execution_plane_verification import (
     plan_candidate_verification,
     verify_proposal_candidate,
 )
+from empire_os.founder_directives import FounderDirectiveStore
+from empire_os.ops_core import (
+    git_diff as ops_git_diff,
+    git_log as ops_git_log,
+    git_status as ops_git_status,
+    read_repo_file as ops_read_repo_file,
+    run_command as ops_run_command,
+    safe_repo_path as ops_safe_repo_path,
+    service_status as ops_service_status,
+    write_repo_file as ops_write_repo_file,
+)
 
 
 
@@ -77,12 +88,33 @@ SAFE_EDIT_EXACT = {
 }
 
 ALLOWED_AUTHORITIES = {"observe", "internal_write"}
-ALLOWED_KINDS = {"code_task"}
+ALLOWED_KINDS = {"code_task", "ops_request"}
 
 FORBIDDEN_RESULT_PATH_TOKENS = (
     "/recovery/",
     "/toop/",
 )
+
+OPS_READ_OPERATIONS = frozenset({
+    "repo_status",
+    "repo_log",
+    "repo_diff",
+    "file_read",
+    "run_check",
+    "service_status",
+})
+OPS_WRITE_OPERATIONS = frozenset({
+    "file_write",
+    "founder_directive_ingest",
+})
+OPS_OPERATIONS = OPS_READ_OPERATIONS | OPS_WRITE_OPERATIONS
+OPS_ALLOWED_CHECKS = frozenset({
+    "git_diff_check",
+    "pytest_file",
+    "python_compile",
+})
+OPS_RESULT_CERT_MAX_CHARS = 12000
+OPS_RESULT_MAX_BYTES = 100000
 
 # Named constants for governed Hermes model limits
 HERMES_MODEL_CONTEXT_LENGTH = 262144
@@ -219,6 +251,9 @@ class HermesJob:
         ai_behavior_change = bool(raw.get("ai_behavior_change", False))
         created_at = str(raw.get("created_at") or "").strip() or None
 
+        if kind == "ops_request":
+            _validate_ops_request_mapping(raw, authority=authority)
+
         return cls(
             job_id=job_id,
             prompt=prompt,
@@ -232,6 +267,342 @@ class HermesJob:
             ai_behavior_change=ai_behavior_change,
             created_at=created_at,
         )
+
+
+def _validate_ops_request_mapping(
+    raw: Mapping[str, Any],
+    *,
+    authority: str,
+) -> tuple[str, dict[str, Any], str]:
+    operation = str(raw.get("operation") or "").strip()
+    if operation not in OPS_OPERATIONS:
+        raise HermesControlError("ops operation is outside the allowlist")
+    if operation in OPS_WRITE_OPERATIONS and authority != "internal_write":
+        raise HermesControlError(
+            "ops write operation requires internal_write authority"
+        )
+    if operation in OPS_READ_OPERATIONS and authority not in {
+        "observe",
+        "internal_write",
+    }:
+        raise HermesControlError("invalid ops read authority")
+
+    arguments = raw.get("arguments") or {}
+    if not isinstance(arguments, dict):
+        raise HermesControlError("ops arguments must be an object")
+
+    if operation == "run_check":
+        check = str(arguments.get("check") or "").strip()
+        if check not in OPS_ALLOWED_CHECKS:
+            raise HermesControlError("ops check is outside the allowlist")
+
+    certificate = str(raw.get("result_certificate_pem") or "")
+    if (
+        "-----BEGIN CERTIFICATE-----" not in certificate
+        or "-----END CERTIFICATE-----" not in certificate
+        or len(certificate) > OPS_RESULT_CERT_MAX_CHARS
+    ):
+        raise HermesControlError(
+            "ops request requires a bounded result certificate"
+        )
+    return operation, dict(arguments), certificate
+
+
+def _ops_file_sha256(path: str) -> str | None:
+    target = ops_safe_repo_path(path)
+    if not target.exists():
+        return None
+    if not target.is_file():
+        raise HermesControlError("ops target is not a file")
+    import hashlib
+    return hashlib.sha256(target.read_bytes()).hexdigest()
+
+
+def _execute_ops_request(
+    raw: Mapping[str, Any],
+    *,
+    authority: str,
+    repo_root: Path,
+) -> dict[str, Any]:
+    operation, arguments, _certificate = _validate_ops_request_mapping(
+        raw,
+        authority=authority,
+    )
+
+    if operation == "repo_status":
+        return ops_git_status()
+    if operation == "repo_log":
+        return ops_git_log(int(arguments.get("limit", 8)))
+    if operation == "repo_diff":
+        path = str(arguments.get("path") or "").strip()
+        return ops_git_diff(
+            path or None,
+            staged=bool(arguments.get("staged", False)),
+        )
+    if operation == "file_read":
+        return ops_read_repo_file(
+            str(arguments.get("path") or ""),
+            offset=int(arguments.get("offset", 0)),
+            limit=min(int(arguments.get("limit", 40000)), 80000),
+        )
+    if operation == "file_write":
+        path = str(arguments.get("path") or "")
+        expected = arguments.get("expected_sha256")
+        current = _ops_file_sha256(path)
+        if expected is not None and str(expected) != str(current):
+            raise HermesControlError("ops file sha256 mismatch")
+        content = str(arguments.get("content") or "")
+        if len(content.encode("utf-8")) > 100000:
+            raise HermesControlError("ops file content too large")
+        result = ops_write_repo_file(
+            path,
+            content,
+            append=bool(arguments.get("append", False)),
+        )
+        result["sha256"] = _ops_file_sha256(path)
+        return result
+    if operation == "run_check":
+        check = str(arguments.get("check") or "")
+        target = str(arguments.get("target") or "")
+        if check == "git_diff_check":
+            return ops_run_command(["git", "diff", "--check"])
+        ops_safe_repo_path(target)
+        if check == "pytest_file":
+            return ops_run_command(
+                [
+                    str(repo_root / ".venv/bin/python"),
+                    "-m",
+                    "pytest",
+                    "-q",
+                    target,
+                ],
+                timeout=120,
+            )
+        return ops_run_command(
+            [
+                str(repo_root / ".venv/bin/python"),
+                "-m",
+                "py_compile",
+                target,
+            ],
+            timeout=30,
+        )
+    if operation == "service_status":
+        return ops_service_status(str(arguments.get("unit") or ""))
+    if operation == "founder_directive_ingest":
+        text = str(arguments.get("text") or "").strip()
+        title = str(arguments.get("title") or "").strip()
+        priority = max(
+            0,
+            min(int(arguments.get("priority", 90)), 100),
+        )
+        directive, created = FounderDirectiveStore(repo_root).ingest(
+            text,
+            source="hermes_ops_bridge",
+            title=title or None,
+            priority=priority,
+            metadata={"ingested_via": "hermes_ops_bridge"},
+        )
+        return {
+            "ok": True,
+            "created": created,
+            "directive": directive.as_dict(),
+            "planning_automatic": True,
+            "production_execution_automatic": False,
+        )
+    raise HermesControlError("ops operation not implemented")
+
+
+def _sanitize_ops_result(value: Any) -> Any:
+    if isinstance(value, dict):
+        clean: dict[str, Any] = {}
+        for key, item in value.items():
+            lower = str(key).lower()
+            if any(
+                token in lower
+                for token in (
+                    "secret",
+                    "token",
+                    "password",
+                    "credential",
+                    "api_key",
+                )
+            ):
+                clean[key] = "[REDACTED]"
+            else:
+                clean[key] = _sanitize_ops_result(item)
+        return clean
+    if isinstance(value, list):
+        return [_sanitize_ops_result(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_ops_result(item) for item in value]
+    if isinstance(value, str):
+        return value[-20000:]
+    return value
+
+
+def _encrypt_ops_result(
+    payload: Mapping[str, Any],
+    *,
+    certificate_pem: str,
+    runtime_root: Path,
+    job_id: str,
+) -> str:
+    clear = json.dumps(
+        _sanitize_ops_result(dict(payload)),
+        sort_keys=True,
+    ).encode("utf-8")
+    if len(clear) > OPS_RESULT_MAX_BYTES:
+        clear = json.dumps({
+            "ok": False,
+            "error": "result_too_large",
+            "job_id": job_id,
+        }).encode("utf-8")
+
+    temp_root = Path(
+        tempfile.mkdtemp(
+            prefix="ops-result-",
+            dir=runtime_root,
+        )
+    )
+    try:
+        clear_path = temp_root / "result.json"
+        cert_path = temp_root / "recipient.pem"
+        out_path = temp_root / "result.pem"
+        clear_path.write_bytes(clear)
+        cert_path.write_text(certificate_pem, encoding="utf-8")
+        completed = _run(
+            [
+                "openssl",
+                "cms",
+                "-encrypt",
+                "-aes-256-cbc",
+                "-binary",
+                "-outform",
+                "PEM",
+                "-in",
+                str(clear_path),
+                "-out",
+                str(out_path),
+                str(cert_path),
+            ],
+            cwd=None,
+            timeout=20,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise HermesControlError("ops result encryption failed")
+        return out_path.read_text(encoding="utf-8")
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
+def _process_ops_request(
+    repo_root: Path,
+    job_path: str,
+    raw: Mapping[str, Any],
+    job: HermesJob,
+    *,
+    runtime_root: Path,
+    control_branch: str,
+    remote: str,
+) -> dict[str, Any]:
+    operation, _arguments, certificate = _validate_ops_request_mapping(
+        raw,
+        authority=job.authority,
+    )
+    result: dict[str, Any] = {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "job_id": job.job_id,
+        "job_path": job_path,
+        "kind": job.kind,
+        "authority": job.authority,
+        "base_branch": job.base_branch,
+        "started_at": _utc_now(),
+        "status": "OPS_FAILED",
+        "operation": operation,
+        "ops_result_encrypted": True,
+        "ops_result_pem": None,
+        "founder_gate_required": False,
+        "external_commercial_action_performed": False,
+        "git_remote_io_performed": True,
+        "database_mutation_performed": False,
+        "payment_action_performed": False,
+        "execution_authority": "none",
+    }
+    lease = None
+    try:
+        if job.requires_mutation_lease:
+            lease = ExecutionLeaseManager().acquire(
+                owner="hermes-ops-bridge",
+                job_id=job.job_id,
+                resources=job.lease_resources,
+                ttl_seconds=job.max_runtime_seconds + 300,
+            )
+            result["lease_id"] = lease.lease_id
+        try:
+            value = _execute_ops_request(
+                raw,
+                authority=job.authority,
+                repo_root=repo_root,
+            )
+            envelope = {
+                "schema_version": "empire.hermes.ops_result.v1",
+                "job_id": job.job_id,
+                "operation": operation,
+                "ok": True,
+                "completed_at": _utc_now(),
+                "result": value,
+            }
+            result["status"] = "OPS_COMPLETED"
+        except Exception as exc:
+            envelope = {
+                "schema_version": "empire.hermes.ops_result.v1",
+                "job_id": job.job_id,
+                "operation": operation,
+                "ok": False,
+                "completed_at": _utc_now(),
+                "error": type(exc).__name__,
+                "message": str(exc)[:1000],
+            }
+            result["status"] = "OPS_FAILED"
+        result["ops_result_pem"] = _encrypt_ops_result(
+            envelope,
+            certificate_pem=certificate,
+            runtime_root=runtime_root,
+            job_id=job.job_id,
+        )
+    except ExecutionLeaseError as exc:
+        result["status"] = "LEASE_BLOCKED"
+        result["ops_result_pem"] = _encrypt_ops_result(
+            {
+                "schema_version": "empire.hermes.ops_result.v1",
+                "job_id": job.job_id,
+                "operation": operation,
+                "ok": False,
+                "error": "ExecutionLeaseError",
+                "message": str(exc)[:1000],
+            },
+            certificate_pem=certificate,
+            runtime_root=runtime_root,
+            job_id=job.job_id,
+        )
+    finally:
+        if lease is not None:
+            try:
+                ExecutionLeaseManager().release(lease.lease_id)
+            except Exception:
+                pass
+        result["completed_at"] = _utc_now()
+
+    publish_result(
+        repo_root,
+        result,
+        control_branch=control_branch,
+        remote=remote,
+        runtime_root=runtime_root,
+    )
+    return result
 
 
 def _utc_now() -> str:
@@ -1495,6 +1866,17 @@ def process_job(
             "skipped": True,
             "reason": "result_already_exists",
         }
+
+    if job.kind == "ops_request":
+        return _process_ops_request(
+            repo_root,
+            job_path,
+            raw,
+            job,
+            runtime_root=runtime_root,
+            control_branch=control_branch,
+            remote=remote,
+        )
 
     job_root = runtime_root / "jobs" / job.job_id
     worktree = job_root / "worktree"
