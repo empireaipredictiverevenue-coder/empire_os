@@ -42,10 +42,17 @@ from empire_os.signal_inbox import enqueue_signal
 from empire_os.runtime_env import load_runtime_env
 from empire_os.geo_registry import acquisition_markets
 
+REPO_ROOT = Path(
+    os.environ.get(
+        "EMPIRE_REPO_ROOT",
+        str(Path(__file__).resolve().parents[1]),
+    )
+).resolve()
+
 LOG_PATH = Path(
     os.environ.get(
         "CRAWLER_LOG_PATH",
-        "/srv/empire_os/runtime/feedback/crawler_runs.jsonl",
+        str(REPO_ROOT / "runtime/feedback/crawler_runs.jsonl"),
     )
 )
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
