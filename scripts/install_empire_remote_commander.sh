@@ -4,6 +4,8 @@ set -euo pipefail
 REPO=/srv/empire_os
 UNIT_SRC="$REPO/deploy/systemd/empire-ops-mcp.service"
 UNIT_DST=/etc/systemd/system/empire-ops-mcp.service
+HELPER_UNIT_SRC="$REPO/deploy/systemd/empire-ops-privileged-helper.service"
+HELPER_UNIT_DST=/etc/systemd/system/empire-ops-privileged-helper.service
 DROPIN_DIR=/etc/systemd/system/empire-ops-mcp.service.d
 ENV_FILE=/etc/empire_os/remote-commander.env
 ACTIVATE=0
@@ -19,6 +21,7 @@ echo "repo=$REPO"
 echo "activation_requested=$ACTIVATE"
 
 test -f "$UNIT_SRC"
+test -f "$HELPER_UNIT_SRC"
 test -f empire_os/remote_commander.py
 test -f empire_os/ops_mcp.py
 
@@ -31,6 +34,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 sudo install -m 0644 "$UNIT_SRC" "$UNIT_DST"
+sudo install -m 0644 "$HELPER_UNIT_SRC" "$HELPER_UNIT_DST"
 sudo mkdir -p "$DROPIN_DIR"
 sudo tee "$DROPIN_DIR/30-remote-commander.conf" >/dev/null <<'EOF'
 [Service]
