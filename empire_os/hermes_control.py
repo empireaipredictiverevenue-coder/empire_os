@@ -291,6 +291,30 @@ def _validate_ops_request_mapping(
     if not isinstance(arguments, dict):
         raise HermesControlError("ops arguments must be an object")
 
+    expires_raw = str(raw.get("expires_at") or "").strip()
+    if not expires_raw:
+        raise HermesControlError("ops request expires_at is required")
+    try:
+        expires_at = datetime.fromisoformat(
+            expires_raw.replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise HermesControlError(
+            "ops request expires_at is invalid"
+        ) from exc
+    if expires_at.tzinfo is None:
+        raise HermesControlError(
+            "ops request expires_at must be timezone-aware"
+        )
+    now = datetime.now(timezone.utc)
+    expires_at = expires_at.astimezone(timezone.utc)
+    if expires_at <= now:
+        raise HermesControlError("ops request expired")
+    if (expires_at - now).total_seconds() > 1800:
+        raise HermesControlError(
+            "ops request expiry exceeds 30 minutes"
+        )
+
     if operation == "run_check":
         check = str(arguments.get("check") or "").strip()
         if check not in OPS_ALLOWED_CHECKS:
