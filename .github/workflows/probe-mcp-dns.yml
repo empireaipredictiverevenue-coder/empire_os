@@ -1,4 +1,4 @@
-name: Probe Empire MCP DNS
+name: Probe Empire MCP Routing
 
 on:
   push:
@@ -13,19 +13,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
-      - name: Probe DNS and HTTPS
+      - name: Probe unauthenticated MCP POST
         shell: bash
         run: |
           set +e
-          echo "=== GETENT ==="
-          getent ahostsv4 mcp.empire-ai.co.uk
-          echo "=== PYTHON DNS ==="
-          python -c 'import socket; print(socket.getaddrinfo("mcp.empire-ai.co.uk",443))'
-          echo "=== CURL ==="
-          curl -sS -D - -o /tmp/body --max-time 20 https://mcp.empire-ai.co.uk/mcp
-          rc=$?
-          echo "curl_rc=$rc"
-          echo "--- body ---"
-          head -c 2000 /tmp/body 2>/dev/null || true
-          echo
+          BODY='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"public-routing-probe","version":"1.0"}}}'
+          echo "=== DNS ==="
+          getent ahostsv4 mcp.empire-ai.co.uk || true
+          echo "=== POST ==="
+          curl -sS -i --max-time 20             -X POST             -H 'Content-Type: application/json'             -H 'Accept: application/json, text/event-stream'             --data "$BODY"             https://mcp.empire-ai.co.uk/mcp || true
           exit 0
