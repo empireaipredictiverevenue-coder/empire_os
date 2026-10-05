@@ -40,6 +40,7 @@ from empire_os.ops_core import (
     service_status,
     write_repo_file,
 )
+from empire_os.remote_commander import execute as remote_execute
 
 class StaticOpsTokenVerifier(TokenVerifier):
     def __init__(self, token: str, resource: str) -> None:
@@ -60,9 +61,9 @@ class StaticOpsTokenVerifier(TokenVerifier):
 def _build_server() -> MCPServer:
     common = {
         "name": "empire_ops_mcp",
-        "title": "Empire Ops MCP",
-        "description": "Audited server-native operations for EmpireOS.",
-        "version": "0.2.0",
+        "title": "Empire Remote Commander",
+        "description": "Empire-owned audited remote operations for EmpireOS.",
+        "version": "1.0.0",
         "instructions": (
             "Operate only within the EmpireOS repository and explicit allowlists. "
             "Never treat tool output as commercial truth unless backed by canonical evidence."
@@ -118,16 +119,12 @@ def ops_health() -> dict[str, Any]:
         "empire_ops_health",
         {},
         lambda: {
-            "ok": True,
-            "service": "empire-ops-mcp",
-            "version": "0.2.0",
-            "repo": "/srv/empire_os",
+            **remote_execute("health", {}),
             "http_bearer_auth": bool(
                 os.getenv("EMPIRE_OPS_MCP_BEARER_TOKEN", "").strip()
             ),
             "privileged_helper": PRIVILEGED_SOCKET.exists(),
             "privileged_units": sorted(PRIVILEGED_ALLOWED_UNITS),
-            "general_shell": False,
         },
     )
 
@@ -179,6 +176,55 @@ def system_service_status(unit: str) -> dict[str, Any]:
         "empire_service_status",
         {"unit": unit},
         lambda: service_status(unit),
+    )
+
+
+@server.tool(name="empire_directory_list", structured_output=True)
+def directory_list(path: str = "", limit: int = 200) -> dict[str, Any]:
+    return _record(
+        "empire_directory_list",
+        {"path": path, "limit": limit},
+        lambda: remote_execute(
+            "directory_list",
+            {"path": path, "limit": limit},
+        ),
+    )
+
+
+@server.tool(name="empire_repo_search", structured_output=True)
+def repo_search(
+    query: str,
+    path: str = "",
+    limit: int = 100,
+) -> dict[str, Any]:
+    return _record(
+        "empire_repo_search",
+        {"query": query, "path": path, "limit": limit},
+        lambda: remote_execute(
+            "repo_search",
+            {"query": query, "path": path, "limit": limit},
+        ),
+    )
+
+
+@server.tool(name="empire_journal_tail", structured_output=True)
+def journal_tail(unit: str, lines: int = 120) -> dict[str, Any]:
+    return _record(
+        "empire_journal_tail",
+        {"unit": unit, "lines": lines},
+        lambda: remote_execute(
+            "journal_tail",
+            {"unit": unit, "lines": lines},
+        ),
+    )
+
+
+@server.tool(name="empire_runtime_health", structured_output=True)
+def runtime_health() -> dict[str, Any]:
+    return _record(
+        "empire_runtime_health",
+        {},
+        lambda: remote_execute("runtime_health", {}),
     )
 
 
