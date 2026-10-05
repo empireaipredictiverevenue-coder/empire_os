@@ -1,0 +1,15 @@
+# Candidate Cloudflare Tunnel ingress for Empire Remote Commander.
+# Do not deploy until the hostname/DNS and live activation gate are approved.
+#
+# Merge this rule BEFORE the catch-all public gateway rule in
+# /home/ubuntu/.cloudflared/config.yml.
+#
+# hostname: mcp.empire-ai.co.uk
+# service: http://127.0.0.1:8765
+#
+# The MCP server itself remains loopback-only. Cloudflare terminates TLS.
+# Authentication is still enforced by Empire Ops MCP bearer/OAuth policy.
+ingress:
+  - hostname: mcp.empire-ai.co.uk
+    service: http://127.0.0.1:8765
+  - service: http_status:404
