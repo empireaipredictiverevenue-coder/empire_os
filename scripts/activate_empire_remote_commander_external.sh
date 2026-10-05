@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO=/srv/empire_os
+TARGET_REPO="${EMPIRE_REMOTE_COMMANDER_TARGET_REPO:-/srv/empire_os}"
+CODE_ROOT="${EMPIRE_REMOTE_COMMANDER_CODE_ROOT:-$TARGET_REPO}"
+PYTHON="${EMPIRE_REMOTE_COMMANDER_PYTHON:-$TARGET_REPO/.venv/bin/python}"
 CF_CONFIG=/home/ubuntu/.cloudflared/config.yml
 HOSTNAME=mcp.empire-ai.co.uk
 MCP_URL=http://127.0.0.1:8765/mcp
@@ -12,16 +14,19 @@ if [[ "${1:-}" == "--activate" ]]; then
 fi
 
 echo "=== EMPIRE REMOTE COMMANDER EXTERNAL ACTIVATION ==="
+echo "target_repo=$TARGET_REPO"
+echo "code_root=$CODE_ROOT"
 echo "hostname=$HOSTNAME"
 echo "mcp_url=$MCP_URL"
 echo "activation_requested=$ACTIVATE"
 
 test -f "$CF_CONFIG"
+test -x "$PYTHON"
 CLOUDFLARED_BIN="$(command -v cloudflared || true)"
 test -n "$CLOUDFLARED_BIN"
-test -f "$REPO/scripts/install_empire_remote_commander.sh"
+test -f "$CODE_ROOT/scripts/install_empire_remote_commander.sh"
 
-TUNNEL_REF="$(sudo "$REPO/.venv/bin/python" - "$CF_CONFIG" <<'PY'
+TUNNEL_REF="$(sudo "$PYTHON" - "$CF_CONFIG" <<'PY'
 import sys
 from pathlib import Path
 import yaml
@@ -49,7 +54,6 @@ fi
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP="$CF_CONFIG.remote-commander.$STAMP.bak"
-
 sudo cp -a "$CF_CONFIG" "$BACKUP"
 
 rollback() {
@@ -64,9 +68,9 @@ rollback() {
 }
 trap rollback EXIT
 
-sudo "$REPO/scripts/install_empire_remote_commander.sh" --activate
+EMPIRE_REMOTE_COMMANDER_TARGET_REPO="$TARGET_REPO" EMPIRE_REMOTE_COMMANDER_CODE_ROOT="$CODE_ROOT" EMPIRE_REMOTE_COMMANDER_PYTHON="$PYTHON"   "$CODE_ROOT/scripts/install_empire_remote_commander.sh" --activate
 
-sudo "$REPO/.venv/bin/python" - "$CF_CONFIG" "$HOSTNAME" <<'PY'
+sudo "$PYTHON" - "$CF_CONFIG" "$HOSTNAME" <<'PY'
 import sys
 from pathlib import Path
 import yaml
@@ -98,13 +102,15 @@ else:
     path.write_text(yaml.safe_dump(payload, sort_keys=False))
 PY
 
-sudo -u ubuntu "$CLOUDFLARED_BIN" tunnel route dns \
-  "$TUNNEL_REF" "$HOSTNAME"
+sudo -u ubuntu "$CLOUDFLARED_BIN" --config "$CF_CONFIG" tunnel ingress validate
+
+sudo -u ubuntu "$CLOUDFLARED_BIN" tunnel route dns   "$TUNNEL_REF" "$HOSTNAME"
 
 sudo systemctl restart empire-cloudflared.service
-
 sleep 2
+
 systemctl is-active --quiet empire-ops-mcp.service
+systemctl is-active --quiet empire-ops-privileged-helper.service
 systemctl is-active --quiet empire-cloudflared.service
 
 echo "activation=complete"
