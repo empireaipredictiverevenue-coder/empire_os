@@ -131,7 +131,7 @@ def ops_health() -> dict[str, Any]:
 
 @server.tool(name="empire_repo_status", structured_output=True)
 def repo_status() -> dict[str, Any]:
-    return _record("empire_repo_status", {}, git_status)
+    return _record("empire_repo_status", {}, lambda: remote_execute("repo_status", {}))
 
 
 @server.tool(name="empire_repo_log", structured_output=True)
@@ -139,7 +139,7 @@ def repo_log(limit: int = 8) -> dict[str, Any]:
     return _record(
         "empire_repo_log",
         {"limit": limit},
-        lambda: git_log(limit),
+        lambda: remote_execute("repo_log", {"limit": limit}),
     )
 
 
@@ -148,7 +148,7 @@ def repo_diff(path: str = "", staged: bool = False) -> dict[str, Any]:
     return _record(
         "empire_repo_diff",
         {"path": path, "staged": staged},
-        lambda: git_diff(path or None, staged=staged),
+        lambda: remote_execute("repo_diff", {"path": path, "staged": staged}),
     )
 
 
@@ -157,16 +157,35 @@ def file_read(path: str, offset: int = 0, limit: int = 40000) -> dict[str, Any]:
     return _record(
         "empire_file_read",
         {"path": path, "offset": offset, "limit": limit},
-        lambda: read_repo_file(path, offset=offset, limit=limit),
+        lambda: remote_execute("file_read", {"path": path, "offset": offset, "limit": limit}),
     )
 
 
 @server.tool(name="empire_file_write", structured_output=True)
-def file_write(path: str, content: str, append: bool = False) -> dict[str, Any]:
+def file_write(
+    path: str,
+    content: str,
+    append: bool = False,
+    expected_sha256: str = "",
+) -> dict[str, Any]:
     return _record(
         "empire_file_write",
-        {"path": path, "append": append, "content_chars": len(content)},
-        lambda: write_repo_file(path, content, append=append),
+        {
+            "path": path,
+            "append": append,
+            "content_chars": len(content),
+            "expected_sha256_supplied": bool(expected_sha256),
+        },
+        lambda: remote_execute(
+            "file_write",
+            {
+                "path": path,
+                "content": content,
+                "append": append,
+                "expected_sha256": expected_sha256 or None,
+            },
+            allow_write=True,
+        ),
     )
 
 
@@ -175,7 +194,7 @@ def system_service_status(unit: str) -> dict[str, Any]:
     return _record(
         "empire_service_status",
         {"unit": unit},
-        lambda: service_status(unit),
+        lambda: remote_execute("service_status", {"unit": unit}),
     )
 
 
@@ -322,43 +341,19 @@ def environment_key_status(keys: list[str]) -> dict[str, Any]:
     return _record(
         "empire_env_key_status",
         {"keys": keys},
-        lambda: {"keys": env_key_status(keys)},
+        lambda: remote_execute("env_key_status", {"keys": keys}),
     )
 
 
 @server.tool(name="empire_run_check", structured_output=True)
 def run_check(check: str, target: str = "") -> dict[str, Any]:
-    allowed = {
-        "git_diff_check": lambda: run_command(["git", "diff", "--check"]),
-        "pytest_file": lambda: run_command(
-            [
-                "/srv/empire_os/.venv/bin/python",
-                "-m",
-                "pytest",
-                "-q",
-                str(Path(target)),
-            ],
-            timeout=120,
-        ),
-        "python_compile": lambda: run_command(
-            [
-                "/srv/empire_os/.venv/bin/python",
-                "-m",
-                "py_compile",
-                str(Path(target)),
-            ],
-            timeout=30,
-        ),
-    }
-    if check not in allowed:
-        raise ValueError("check not allowlisted")
-    if check in {"pytest_file", "python_compile"}:
-        from empire_os.ops_core import safe_repo_path
-        safe_repo_path(target)
     return _record(
         "empire_run_check",
         {"check": check, "target": target},
-        allowed[check],
+        lambda: remote_execute(
+            "run_check",
+            {"check": check, "target": target},
+        ),
     )
 
 
@@ -369,42 +364,24 @@ def founder_directive_ingest(
     priority: int = 90,
     source: str = "ops_mcp",
 ) -> dict[str, Any]:
-    if priority < 0 or priority > 100:
-        raise ValueError("priority must be between 0 and 100")
-    clean_source = str(source or "ops_mcp").strip()
-    if clean_source not in {
+    if str(source or "ops_mcp").strip() not in {
         "ops_mcp", "founder_chat", "founder_console", "founder_voice",
         "founder",
     }:
         raise ValueError("directive source not allowlisted")
-
-    def _ingest() -> dict[str, Any]:
-        directive, created = FounderDirectiveStore(
-            Path("/srv/empire_os")
-        ).ingest(
-            text,
-            source=clean_source,
-            title=title or None,
-            priority=priority,
-            metadata={"ingested_via": "empire_ops_mcp"},
-        )
-        return {
-            "ok": True,
-            "created": created,
-            "directive": directive.as_dict(),
-            "planning_automatic": True,
-            "production_execution_automatic": False,
-        }
-
     return _record(
         "empire_founder_directive_ingest",
         {
             "title": title,
             "priority": priority,
-            "source": clean_source,
+            "source": source,
             "text_chars": len(str(text or "")),
         },
-        _ingest,
+        lambda: remote_execute(
+            "founder_directive_ingest",
+            {"text": text, "title": title, "priority": priority},
+            allow_write=True,
+        ),
     )
 
 
