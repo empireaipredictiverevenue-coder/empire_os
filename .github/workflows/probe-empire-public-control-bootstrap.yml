@@ -1,4 +1,4 @@
-name: Probe Empire Public Control Bootstrap
+name: Verify Empire Ops Bridge
 
 on:
   push:
@@ -9,29 +9,37 @@ permissions:
   contents: read
 
 jobs:
-  probe:
+  verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 4
+    timeout-minutes: 8
     steps:
-      - name: Probe public control surfaces
-        shell: bash
+      - name: Checkout current Empire engineering branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/data-cloud-wave4
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install targeted test dependencies
         run: |
-          set -u
-          probe() {
-            url="$1"
-            echo "===== $url ====="
-            curl -k -sS -D - -o /tmp/body --max-time 10 "$url" || true
-            echo "--- body ---"
-            head -c 2500 /tmp/body 2>/dev/null || true
-            echo
-          }
-          for host in             empire-ai.co.uk             mcp.empire-ai.co.uk             ops.empire-ai.co.uk             webmcp.empire-ai.co.uk             control.empire-ai.co.uk             api.empire-ai.co.uk
-          do
-            echo "##### HOST $host #####"
-            getent ahostsv4 "$host" | head -n 3 || true
-            probe "https://$host/health"
-            probe "https://$host/mcp"
-          done
-          probe "https://empire-ai.co.uk/agent-web/capabilities"
-          probe "https://empire-ai.co.uk/v1/founder-directives/status"
-          probe "https://empire-ai.co.uk/v1/ops-bridge/health"
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,outbound-email]"
+
+      - name: Compile bridge modules
+        run: |
+          python -m py_compile \
+            empire_os/hermes_control.py \
+            empire_os/ops_github_bridge.py \
+            empire_os/ops_bridge_api.py \
+            empire_os/resend_webhook_app.py
+
+      - name: Run bridge and reply regression tests
+        run: |
+          python -m pytest -q \
+            tests/test_hermes_ops_bridge.py \
+            tests/test_ops_github_bridge.py \
+            tests/test_resend_webhook_app.py
