@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
 from fastapi import APIRouter, HTTPException, Query
@@ -15,6 +16,8 @@ from empire_os.revenue_crm_search_growth import build_crm_search_growth_brief
 from empire_os.search_intelligence.ai_visibility import AiCitationObservation
 from empire_os.search_intelligence.backlinks import BacklinkObservation
 from empire_os.revenue_crm_readiness import assess_close_readiness
+from empire_os.revenue_crm_reply_qualification import review_crm_reply_qualification
+from empire_os.opportunity_commercial_source_health import assess_sources
 from empire_os.revenue_crm_retention import (
     RevenueCrmRetentionEvidence,
     assess_retention_expansion_readiness,
@@ -249,6 +252,9 @@ def derive_next_action(
 
 def create_revenue_crm_router(
     repository: RevenueCrmRepository | None = None,
+    *,
+    conversation_read_repository: Any = None,
+    evidence_root: Path = Path("/srv/empire_os"),
 ) -> APIRouter:
     router = APIRouter(prefix="/v1/revenue-crm")
 
@@ -490,6 +496,50 @@ def create_revenue_crm_router(
         if row is None:
             raise HTTPException(status_code=404, detail="prospect_not_found")
         return derive_next_action(row).as_dict()
+
+    @router.get("/prospects/{prospect_id}/reply-qualification-review")
+    def reply_qualification_review(prospect_id: str):
+        """Existing canonical CRM read + Conversation OS review; never a closer handoff."""
+        repo = require_repository()
+        prospect = repo.prospect(prospect_id)
+        if prospect is None:
+            raise HTTPException(status_code=404, detail="prospect_not_found")
+        cid = str(prospect.get("conversation_id") or "").strip()
+        conversation = None
+        events = []
+        if conversation_read_repository is not None and cid:
+            try:
+                conversation = conversation_read_repository.conversation(
+                    conversation_id=cid
+                )
+                if conversation is not None:
+                    events = list(conversation_read_repository.timeline(
+                        conversation_id=cid, limit=200,
+                    ))
+            except Exception:
+                # Never reveal source credentials, provider internals, or
+                # an unverified read as an empty successful inbox result.
+                raise HTTPException(
+                    status_code=503, detail="canonical_conversation_read_unavailable"
+                ) from None
+        source = assess_sources(evidence_root)
+        stage3 = (
+            (source.get("sources") or {})
+            .get("conversation_os", {})
+            .get("reply_identity_integration_health")
+        )
+        try:
+            return review_crm_reply_qualification(
+                prospect=prospect,
+                conversation=conversation,
+                events=events,
+                stage3_source_health=stage3,
+                now=datetime.now(timezone.utc),
+            )
+        except ValueError:
+            raise HTTPException(
+                status_code=422, detail="canonical_qualification_contract_invalid"
+            ) from None
 
     @router.get("/prospects/{prospect_id}/close-readiness")
     def close_readiness(prospect_id: str):
