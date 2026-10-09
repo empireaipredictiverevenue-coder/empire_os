@@ -75,15 +75,35 @@ def _token_file() -> str:
 @app.get("/health")
 def health() -> dict[str, Any]:
     token_path = Path(_token_file())
+    sender_present = bool(_sender())
+    token_present = token_path.is_file()
+    config_present = sender_present and token_present
+    # This is a local liveness probe, not an OAuth validation or a live
+    # Gmail round trip. Never confuse available files with usable delivery.
+    blockers = []
+    if not sender_present:
+        blockers.append("sender_not_configured")
+    if not token_present:
+        blockers.append("oauth_token_missing")
+    if config_present:
+        blockers.append("oauth_validation_not_performed")
 
     return {
         "ok": True,
+        "mailbox_configuration_present": config_present,
+        "oauth_verified": False,
+        "mailbox_ready": False,
+        "readiness_status": (
+            "CONFIG_PRESENT_UNVERIFIED" if config_present
+            else "BLOCKED_NOT_PROVISIONED"
+        ),
+        "readiness_blockers": blockers,
         "provider": "gmail_api",
         "transport": "https_443",
         "mode": _mode(),
         "send_authorized": _send_authorized(),
-        "sender_configured": bool(_sender()),
-        "oauth_token_present": token_path.is_file(),
+        "sender_configured": sender_present,
+        "oauth_token_present": token_present,
         "reply_transport": "empire_inbound",
         "reply_domain": "mail.empire-ai.co.uk",
         "mutation_authorized": (

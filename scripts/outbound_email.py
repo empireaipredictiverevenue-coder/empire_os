@@ -12,10 +12,7 @@ from empire_os.outbound_provider import (
     build_resend_send,
     send_with_resend,
 )
-from empire_os.outbound_role_transport import (
-    PostgresOutboundRpc,
-    SupabaseOutboundRpc,
-)
+from empire_os.outbound_role_transport import PostgresOutboundRpc
 
 
 def parser():
@@ -35,10 +32,13 @@ def emit(value):
 def main(argv=None):
     args = parser().parse_args(argv)
     dsn = os.getenv("EMPIRE_OUTBOUND_SENDER_DSN", "").strip()
-    rpc = (
-        PostgresOutboundRpc(dsn, "empire_outbound_sender")
-        if dsn
-        else SupabaseOutboundRpc("empire_outbound_sender")
+    if not dsn:
+        raise OutboundProviderError(
+            "EmpireDB outbound sender DSN required"
+        )
+    rpc = PostgresOutboundRpc(
+        dsn,
+        "empire_outbound_sender",
     )
     review = rpc("get_outbound_intent_review", {"p_intent_id": args.intent_id})
     if not args.send:

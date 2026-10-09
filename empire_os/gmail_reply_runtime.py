@@ -2,16 +2,17 @@
 
 This module performs no Gmail network access and cannot send mail. It resolves
 the canonical sent intent by Gmail thread id through the existing guarded
-Supabase transport, then delegates to gmail_reply_adapter for correlation,
+EmpireDB transport, then delegates to gmail_reply_adapter for correlation,
 inert ingest, and deterministic classification.
 """
 from __future__ import annotations
 
+import os
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import quote
 
 from empire_os.gmail_reply_adapter import ingest_gmail_reply
-from empire_os.outbound_role_transport import SupabaseOutboundRpc
+from empire_os.outbound_role_transport import PostgresOutboundRpc
 from empire_os.sb import request_json
 
 Request = Callable[..., Any]
@@ -66,9 +67,9 @@ def process_gmail_message(
         thread_id,
         request_factory=request,
     )
-    rpc = reply_rpc or SupabaseOutboundRpc(
+    rpc = reply_rpc or PostgresOutboundRpc(
+        os.getenv("EMPIRE_REPLY_INGEST_DSN", "").strip(),
         "empire_reply_ingest",
-        request_factory=request,
     )
     return ingest_gmail_reply(
         message,

@@ -142,6 +142,18 @@ def ingest_gmail_reply(
         outbound_intents,
         self_addresses=self_addresses,
     )
+
+    # EMPIRE_PASSIVE_REPLY_TAP_092D4
+    try:
+        from empire_os.passive_reply_detection_tap import safe_observe_reply_mapping as _observe_reply_mapping
+        _observe_reply_mapping(
+            correlated,
+            direction="inbound",
+            source="gmail_reply_adapter.correlate_gmail_reply",
+        )
+    except Exception:
+        # Observation can never alter reply handling.
+        pass
     if not correlated.get("matched"):
         return {
             "ok": True,
