@@ -33,3 +33,21 @@ def test_legacy_writer_fails_closed_on_bad_bindings(tmp_path, name, binding_data
     assert result.returncode != 0
     assert target.read_bytes() == before
     assert not list(target.parent.glob('*.tmp*'))
+
+
+@pytest.mark.parametrize('name', SCRIPTS)
+def test_legacy_writer_never_uses_production_binding_path(tmp_path, name):
+    """A missing local proof must fail without touching any live file."""
+    target = tmp_path / BINDINGS
+    target.parent.mkdir(parents=True)
+    target.write_bytes((ROOT / BINDINGS).read_bytes())
+    source = (ROOT / 'scripts' / (name + '.py')).read_text()
+    assert 'ROOT = Path("/srv/empire_os")' in source
+    staged = tmp_path / (name + '.py')
+    staged.write_text(source.replace('ROOT = Path("/srv/empire_os")', f'ROOT = Path({str(tmp_path)!r})', 1))
+    before = target.read_bytes()
+    result = subprocess.run([sys.executable, str(staged)], cwd=tmp_path,
+                            env={**os.environ, 'PYTHONPATH': str(ROOT)},
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode != 0
+    assert target.read_bytes() == before
