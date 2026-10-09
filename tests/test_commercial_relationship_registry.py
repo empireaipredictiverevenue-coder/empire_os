@@ -352,3 +352,74 @@ def test_existing_founder_registry_displays_source_learning_without_buying_claim
     assert record["verified_buyer_conversions"]==0
     assert record["recognized_revenue_cents"] is None
     assert enriched["outbound_authorized"] is False
+
+
+def test_three_warm_partner_pilots_have_independent_fail_closed_gates():
+    from empire_os.commercial_relationship_registry import (
+        PARTNER_PILOT_SCOPES,
+        PARTNER_LAUNCH_GATES,
+    )
+    src, queue, qual = sources()
+    for key, domain in (
+        ("leadbank","alliancevs.io"),
+        ("validated","validatedlg.ai"),
+        ("connexis","connex.is"),
+    ):
+        spec=PARTNER_PILOT_SCOPES[key]
+        src["threads"].append(row(
+            key, domain, spec["reviewed_thread"],
+            inbound="2026-10-09T18:00:00Z",
+            outbound="2026-10-09T19:00:00Z",
+        ))
+    result=reconcile(src,queue,qual,now=NOW)
+    queue_out={x["entity_key"]: x for x in result["partner_pilot_readiness_queue"]}
+    assert set(queue_out)=={"leadbank","validated","connexis"}
+    assert result["partner_pilot_readiness_is_activation_authority"] is False
+    for item in queue_out.values():
+        assert item["two_way_gmail_thread_observed"] is True
+        assert item["activation_stage"]=="WAITING_BUYER_BUYBOX"
+        assert item["gate_count_verified"]==0
+        assert item["gate_count_total"]==len(PARTNER_LAUNCH_GATES)
+        assert set(item["activation_gates"])==set(PARTNER_LAUNCH_GATES)
+        assert all(x is False for x in item["activation_gates"].values())
+        assert item["isolated_buyer_route_required"] is True
+        assert item["lead_smart_route_and_terms_reused"] is False
+        assert item["contract_signing_authorized"] is False
+        assert item["outbound_authorized"] is False
+        assert item["live_traffic_authorized"] is False
+        assert item["execution_authority"]=="NONE"
+
+
+def test_pilot_cannot_be_promoted_when_gmail_snapshot_is_stale():
+    from empire_os.commercial_relationship_registry import PARTNER_PILOT_SCOPES
+    src, queue, qual = sources()
+    src["threads"].append(row(
+        "leadbank", "alliancevs.io",
+        PARTNER_PILOT_SCOPES["leadbank"]["reviewed_thread"],
+        inbound="2026-10-09T19:00:00Z",
+        outbound="2026-10-09T19:10:00Z",
+    ))
+    report=reconcile(src,queue,qual,now=NOW+timedelta(days=5))
+    target=next(x for x in report["partner_pilot_readiness_queue"]
+                if x["entity_key"]=="leadbank")
+    assert target["mailbox_snapshot_fresh"] is False
+    assert target["activation_stage"]=="REVIEW_RELATIONSHIP_EVIDENCE"
+    assert all(v is False for v in target["activation_gates"].values())
+
+
+def test_pilot_does_not_inherit_verified_tracking_from_lead_smart():
+    from empire_os.commercial_relationship_registry import PARTNER_PILOT_SCOPES
+    src, queue, qual = sources()
+    src["threads"].append(row(
+        "validated", "validatedlg.ai",
+        PARTNER_PILOT_SCOPES["validated"]["reviewed_thread"],
+        inbound="2026-10-09T18:00:00Z",
+        outbound="2026-10-09T19:00:00Z",
+    ))
+    report=reconcile(src,queue,qual,now=NOW)
+    target=next(x for x in report["partner_pilot_readiness_queue"]
+                if x["entity_key"]=="validated")
+    assert target["activation_gates"]["partner_specific_tracking_verified"] is False
+    assert target["activation_gates"]["partner_specific_routing_verified"] is False
+    assert target["activation_gates"]["buyer_landing_approved"] is False
+    assert target["gate_count_verified"] == 0

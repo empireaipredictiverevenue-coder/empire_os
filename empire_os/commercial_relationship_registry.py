@@ -31,6 +31,113 @@ ALLOWED_HINTS = {
     "REVIEW_ONLY",
 }
 MAX_AGE_SECONDS = 96 * 3600
+
+# Separate prospective buyer corridors. These are founder-proposed scopes based
+# on human-reviewed Gmail threads; no cross-buyer terms or tracking is inherited.
+PARTNER_PILOT_SCOPES = {
+    "leadbank": {
+        "corridor": "US_ROOFING_INSTALL_REPLACEMENT_FIRST_PARTY_ORGANIC",
+        "reviewed_thread": "1a0cfb65e0dd960e",
+        "partner_request_ref": "gmail:1a11902593b62d2c",
+        "founder_reply_ref": "gmail:1a11aa2fa91135f0",
+        "next_partner_evidence": [
+            "active_roofing_zips_and_buyer_markets",
+            "accepted_jobs_duration_hours_and_caps",
+            "payout_duplicate_dispute_and_settlement_terms",
+            "agreement_mva_w8_requirements",
+            "mahad_tracking_and_routing_handoff",
+        ],
+    },
+    "validated": {
+        "corridor": "US_ROOFING_INSTALL_REPLACEMENT_FIRST_PARTY_ORGANIC",
+        "reviewed_thread": "1a0cfb667dca0957",
+        "partner_request_ref": "gmail:1a114d6b9b33e40b",
+        "founder_reply_ref": "gmail:1a117d5a0e0fb530",
+        "next_partner_evidence": [
+            "active_roofing_zips_and_buyer_markets",
+            "accepted_jobs_and_qualified_billable_event",
+            "revenue_share_duplicate_dispute_and_settlement_terms",
+            "source_landing_and_consent_approval",
+            "tracking_transfer_or_delivery_contract",
+        ],
+    },
+    "connexis": {
+        "corridor": "UK_OR_US_HOME_SERVICES_FIRST_PARTY_ORGANIC_PROPOSAL",
+        "reviewed_thread": "1a0d9fa5b944630a",
+        "partner_request_ref": "gmail:1a0e6d76dbe29583",
+        "founder_reply_ref": "gmail:1a10922d0223f192",
+        "next_partner_evidence": [
+            "choose_one_live_uk_or_us_buyer_campaign",
+            "active_postcodes_or_zips_and_job_criteria",
+            "connected_call_qualification_hours_and_caps",
+            "payout_duplicate_dispute_and_settlement_terms",
+            "source_review_and_tracking_route_contract",
+        ],
+    },
+}
+
+PARTNER_LAUNCH_GATES = (
+    "buyer_buybox_received_and_verified",
+    "current_target_geography_verified",
+    "buyer_source_approved",
+    "buyer_landing_approved",
+    "partner_specific_tracking_verified",
+    "partner_specific_routing_verified",
+    "buyer_payable_event_and_terms_verified",
+    "contract_and_compliance_approved",
+    "founder_live_traffic_authorized",
+)
+
+
+def partner_pilot_readiness(relationships: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Automated founder visibility, never autonomous launch authorisation.
+
+    All downstream contract/technical gates remain false until independently
+    evidenced by partner-specific policy and provider/runtime verification.
+    Metadata-only Gmail cannot promote these gates.
+    """
+    found = {r.get("entity_key"): r for r in relationships}
+    rows = []
+    for key, spec in PARTNER_PILOT_SCOPES.items():
+        relationship = found.get(key)
+        if not relationship:
+            continue
+        thread_present = spec["reviewed_thread"] in relationship["gmail_thread_ids"]
+        reply_present = bool(relationship.get("last_inbound_message_id"))
+        safe_stage = relationship["stage"] not in ("EVIDENCE_HOLD", "DELIVERY_HOLD")
+        snapshot_fresh = relationship.get("gmail_snapshot_fresh") is True
+        gates = {gate: False for gate in PARTNER_LAUNCH_GATES}
+        rows.append({
+            "entity_key": key,
+            "company": relationship["company"],
+            "proposed_corridor_not_buyer_approved": spec["corridor"],
+            "reviewed_gmail_thread_id": spec["reviewed_thread"],
+            "partner_request_evidence_ref": spec["partner_request_ref"],
+            "founder_reply_evidence_ref": spec["founder_reply_ref"],
+            "two_way_gmail_thread_observed": (
+                thread_present and reply_present and safe_stage
+            ),
+            "mailbox_snapshot_fresh": snapshot_fresh,
+            "relationship_stage": relationship["stage"],
+            "partner_requirement_evidence_requested": spec["next_partner_evidence"],
+            "activation_gates": gates,
+            "gate_count_verified": 0,
+            "gate_count_total": len(gates),
+            "activation_stage": (
+                "WAITING_BUYER_BUYBOX"
+                if thread_present and reply_present and snapshot_fresh and safe_stage
+                else "REVIEW_RELATIONSHIP_EVIDENCE"
+            ),
+            "isolated_buyer_route_required": True,
+            "lead_smart_route_and_terms_reused": False,
+            "contract_signing_authorized": False,
+            "tracking_or_route_mutation_performed": False,
+            "live_traffic_authorized": False,
+            "outbound_authorized": False,
+            "execution_authority": "NONE",
+        })
+    return rows
+
 FOUNDER_FOLLOWUP_REVIEW_SECONDS = 7 * 24 * 3600
 
 
@@ -362,6 +469,8 @@ def reconcile(
         "founder_review_required_count": len(review_queue),
         "warm_business_relationship_count": len(warm),
         "warm_business_action_queue": warm[:8],
+        "partner_pilot_readiness_queue": partner_pilot_readiness(result),
+        "partner_pilot_readiness_is_activation_authority": False,
         "warm_business_queue_truncated": len(warm)>8,
         "founder_action_queue": review_queue[:25],
         "founder_action_queue_truncated": len(review_queue)>25,
