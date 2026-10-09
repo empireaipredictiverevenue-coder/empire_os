@@ -12,6 +12,7 @@ import requests
 
 from empire_os.closer_reply_draft import build_closer_reply
 from empire_os.empire_mailbox import build_mailbox, mailbox_thread
+from empire_os.owned_imap_mailbox import OwnedIMAPMailboxProvider
 
 
 DEFAULT_OUTBOUND_ENV = Path("/srv/empire_os/runtime/secrets/outbound.env")
@@ -194,9 +195,14 @@ def create_founder_mailbox_router(
     *,
     identity_env_path: Path = DEFAULT_OUTBOUND_ENV,
 ) -> APIRouter:
-    source = provider or ResendMailboxProvider(
-        secret_env_path=identity_env_path,
-    )
+    if provider is None:
+        # Sovereign default. Never fall back silently to a SaaS mail provider.
+        mode = os.getenv('EMPIRE_FOUNDER_MAILBOX_PROVIDER', 'owned_imap').strip().lower()
+        if mode not in ('owned_imap', 'imap'):
+            raise RuntimeError('FOUNDER_MAILBOX_PROVIDER_NOT_AUTHORIZED')
+        source: MailboxProvider = OwnedIMAPMailboxProvider()
+    else:
+        source = provider
     router = APIRouter(prefix="/v1/founder-mailbox", tags=["founder-mailbox"])
     cache: dict[int, tuple[float, dict[str, Any]]] = {}
 
@@ -214,10 +220,33 @@ def create_founder_mailbox_router(
                 status_code=503,
                 detail=f"mailbox_provider_unavailable:{type(exc).__name__}",
             ) from exc
-        mailbox = build_mailbox(sent, received, suppressions)
+        provider_name = str(getattr(source, 'provider', 'resend'))
+        suppression_complete = getattr(source, 'suppression_evidence_complete', True) is True
+        mailbox = build_mailbox(
+            sent, received, suppressions,
+            provider=provider_name,
+            suppression_evidence_complete=suppression_complete,
+        )
         mailbox["identity"] = read_mail_identity(identity_env_path)
         cache[limit] = (now + 10.0, mailbox)
         return mailbox
+
+    @router.get('/readiness')
+    def readiness():
+        if isinstance(source, OwnedIMAPMailboxProvider):
+            details = source.readiness()
+            return {
+                'status': 'READY_FOR_READ_PROBE' if details['configured'] else 'NOT_CONFIGURED',
+                **details,
+            }
+        return {
+            'status': 'INJECTED_PROVIDER_UNVERIFIED',
+            'provider': str(getattr(source, 'provider', 'injected')),
+            'configured': False,
+            'canonical_identity_verified': False,
+            'suppression_evidence_complete': False,
+            'execution_authority': 'none',
+        }
 
     @router.get("/summary")
     def summary(limit: int = Query(default=50, ge=1, le=100)):
@@ -228,6 +257,8 @@ def create_founder_mailbox_router(
             "read_only": True,
             "execution_authority": "none",
             "provider": mailbox["provider"],
+            "canonical_buyer_conversation_verified": False,
+            "suppression_evidence_complete": mailbox['suppression_evidence_complete'],
             "identity": mailbox["identity"],
             "summary": mailbox["summary"],
         }
@@ -255,6 +286,12 @@ def create_founder_mailbox_router(
             raise HTTPException(status_code=404, detail="mail_thread_not_found")
         if row.get("suppressed") is True:
             raise HTTPException(status_code=409, detail="recipient_suppressed")
+        if mailbox.get('suppression_evidence_complete') is not True:
+            raise HTTPException(status_code=409, detail='suppression_evidence_not_verified')
+        if mailbox.get('canonical_buyer_conversation_verified') is not True and (
+            mailbox.get('provider') == 'owned_imap'
+        ):
+            raise HTTPException(status_code=409, detail='canonical_buyer_thread_not_verified')
 
         inbound = next(
             (
@@ -325,7 +362,9 @@ def create_founder_mailbox_router(
                 )
                 hydrated.append({**event, **{
                     "body_text": str(detail.get("text") or event.get("body_text") or "").strip() or None,
-                    "message_id": str(detail.get("message_id") or event.get("message_id") or "").strip() or None,
+                    "message_id": (
+                        str(detail.get("message_id") or event.get("message_id") or "").strip() or None
+                    ) if mailbox.get('provider') != 'owned_imap' else None,
                 }})
             except Exception:
                 hydrated.append(event)

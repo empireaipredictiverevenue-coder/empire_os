@@ -62,7 +62,7 @@ def _delivery_state(row: Mapping[str, Any], *, direction: str) -> str:
     )
 
 
-def normalise_sent_email(row: Mapping[str, Any]) -> dict[str, Any]:
+def normalise_sent_email(row: Mapping[str, Any], *, provider: str = 'resend') -> dict[str, Any]:
     provider_id = _text(row.get("id"))
     intent_id = _intent_from_values(
         row.get("reply_to"),
@@ -71,9 +71,12 @@ def normalise_sent_email(row: Mapping[str, Any]) -> dict[str, Any]:
     )
     thread_id = intent_id or (f"email:{provider_id}" if provider_id else None)
     return {
-        "provider": "resend",
+        "provider": provider,
         "provider_id": provider_id or None,
-        "message_id": _text(row.get("message_id")) or None,
+        # Owned-IMAP message headers are *provider evidence*, not proof of
+        # canonical tenant/person/intent binding. Keep them outside the
+        # legacy passive tap until a separate deterministic join verifies it.
+        "message_id": (_text(row.get("message_id")) or None) if provider != 'owned_imap' else None,
         "thread_id": thread_id,
         "intent_id": intent_id,
         "direction": "outbound",
@@ -90,7 +93,7 @@ def normalise_sent_email(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def normalise_received_email(row: Mapping[str, Any]) -> dict[str, Any]:
+def normalise_received_email(row: Mapping[str, Any], *, provider: str = 'resend') -> dict[str, Any]:
     provider_id = _text(row.get("id") or row.get("email_id"))
     recipients = row.get("to")
     intent_id = _intent_from_values(recipients)
@@ -104,9 +107,12 @@ def normalise_received_email(row: Mapping[str, Any]) -> dict[str, Any]:
     }
     label = classification.get("classification")
     return {
-        "provider": "resend",
+        "provider": provider,
         "provider_id": provider_id or None,
-        "message_id": _text(row.get("message_id")) or None,
+        # Owned-IMAP message headers are *provider evidence*, not proof of
+        # canonical tenant/person/intent binding. Keep them outside the
+        # legacy passive tap until a separate deterministic join verifies it.
+        "message_id": (_text(row.get("message_id")) or None) if provider != 'owned_imap' else None,
         "thread_id": thread_id,
         "intent_id": intent_id,
         "direction": "inbound",
@@ -175,6 +181,9 @@ def build_mailbox(
     sent_rows: Iterable[Mapping[str, Any]],
     received_rows: Iterable[Mapping[str, Any]],
     suppression_rows: Iterable[Mapping[str, Any]] = (),
+    *,
+    provider: str = 'resend',
+    suppression_evidence_complete: bool = True,
 ) -> dict[str, Any]:
     suppression_by_email: dict[str, dict[str, Any]] = {}
     for raw in suppression_rows:
@@ -182,8 +191,8 @@ def build_mailbox(
         if email:
             suppression_by_email[email] = dict(raw)
 
-    events = [normalise_sent_email(row) for row in sent_rows]
-    events.extend(normalise_received_email(row) for row in received_rows)
+    events = [normalise_sent_email(row, provider=provider) for row in sent_rows]
+    events.extend(normalise_received_email(row, provider=provider) for row in received_rows)
     events = [row for row in events if row.get("thread_id")]
     events.sort(key=lambda row: _ts(row.get("occurred_at")), reverse=True)
 
@@ -219,6 +228,8 @@ def build_mailbox(
         threads.append({
             "thread_id": thread_id,
             "intent_id": latest.get("intent_id"),
+            "canonical_identity_verified": False,
+            "provider_message_only": True,
             "subject": latest.get("subject"),
             "contact": contact,
             "contact_email": contact_email,
@@ -249,13 +260,17 @@ def build_mailbox(
         "mode": "OBSERVE",
         "read_only": True,
         "execution_authority": "none",
-        "provider": "resend",
+        "canonical_buyer_conversation_verified": False,
+        "suppression_evidence_complete": bool(suppression_evidence_complete),
+        "provider": provider,
         "thread_count": len(threads),
         "summary": {
             "all": len(threads),
             "replies": sum(
                 1 for row in threads if row["commercial_status"] == "replied"
             ),
+            "verified_canonical_buyer_replies": 0,
+            "provider_only_reply_evidence": True,
             "positive": sum(1 for row in threads if row["classification"] == "positive"),
             "questions": sum(1 for row in threads if row["classification"] == "question"),
             "objections": sum(1 for row in threads if row["classification"] == "objection"),
