@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from empire_os.buyer_network_research_rotation import accepted_domain
+
 from empire_os.buyer_network_integration import (
     BuyerNetworkIntegration,
 )
@@ -528,6 +530,7 @@ def main() -> int:
         )
         for domain, profile
         in profiles.items()
+        if accepted_domain(domain)
     ]
 
     priority_order = {

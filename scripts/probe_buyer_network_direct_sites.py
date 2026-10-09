@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import html
+import ipaddress
 import json
 import re
 import socket
@@ -14,6 +15,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from empire_os.buyer_network_research_rotation import (
+    accepted_domain, choose_research_batch, make_research_summary,
+    retain_recent_results, RESULT_TTL_SECONDS,
+)
 
 
 ROOT = Path("/srv/empire_os")
@@ -29,6 +35,9 @@ VERIFICATION = BASE / "verification_latest.json"
 BACKLOG = BASE / "verification_backlog_latest.json"
 
 DIRECT = BASE / "direct_site_verification_latest.json"
+
+LEDGER = BASE / "research_ledger_latest.json"
+PROGRESS = BASE / "research_progress_latest.json"
 
 MAX_CANDIDATES = 8
 MAX_WORKERS = 8
@@ -229,7 +238,7 @@ def valid_domain(domain: str) -> bool:
     if domain.startswith("empire."):
         return False
 
-    if domain in BLOCKED:
+    if domain in BLOCKED or not accepted_domain(domain):
         return False
 
     if domain.endswith(
@@ -273,6 +282,41 @@ def valid_domain(domain: str) -> bool:
             return False
 
     return True
+
+
+def public_dns_only(domain: str) -> bool:
+    """Never research hosts resolving to Empire internal/private networks."""
+    if not valid_domain(domain):
+        return False
+    try:
+        addresses = socket.getaddrinfo(
+            domain, 443, type=socket.SOCK_STREAM,
+        )
+    except (socket.gaierror, OSError):
+        return False
+    return bool(addresses) and all(
+        ipaddress.ip_address(address[4][0]).is_global
+        for address in addresses
+    )
+
+
+class SiteOnlyRedirect(urllib.request.HTTPRedirectHandler):
+    def __init__(self, requested_domain: str):
+        super().__init__()
+        self.requested_domain = requested_domain
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        parsed = urllib.parse.urlsplit(newurl)
+        host = (parsed.hostname or "").lower()
+        if (
+            parsed.scheme not in ("http", "https")
+            or not same_domain(self.requested_domain, newurl)
+            or not public_dns_only(host)
+        ):
+            return None
+        return super().redirect_request(
+            req, fp, code, msg, headers, newurl,
+        )
 
 
 def strip_html(raw: str) -> str:
@@ -427,11 +471,11 @@ def fetch_one(
         try:
             context = ssl.create_default_context()
 
-            with urllib.request.urlopen(
-                request,
-                timeout=TIMEOUT,
-                context=context,
-            ) as response:
+            opener = urllib.request.build_opener(
+                urllib.request.HTTPSHandler(context=context),
+                SiteOnlyRedirect(domain),
+            )
+            with opener.open(request, timeout=TIMEOUT) as response:
 
                 final_url = response.geturl()
 
@@ -559,85 +603,51 @@ def fetch_one(
 
 def select_candidates(
     backlog: dict[str, Any],
+    ledger: dict[str, Any] | None = None,
+    *,
+    now_epoch: float | None = None,
 ) -> list[dict[str, Any]]:
-
-    candidates = [
-        item
-
-        for item in backlog.get(
-            "candidates",
-            [],
-        )
-
-        if valid_domain(
-            str(
-                item.get("domain")
-                or ""
-            )
-        )
-    ]
-
-    verify = [
-        item
-        for item in candidates
-        if item.get("status")
-        == "VERIFY_REQUIREMENTS"
-    ]
-
-    watch = [
-        item
-        for item in candidates
-        if (
-            item.get("status")
-            == "WATCH"
-            and any(
-                hint in str(
-                    item.get("domain")
-                    or ""
-                ).lower()
-
-                for hint
-                in WATCH_DOMAIN_HINTS
-            )
-        )
-    ]
-
-    def key(item):
-        return (
-            -int(
-                item.get("score")
-                or 0
-            ),
-            str(
-                item.get("domain")
-                or ""
-            ),
-        )
-
-    verify.sort(key=key)
-    watch.sort(key=key)
-
-    selected = []
-
-    seen = set()
-
-    for item in verify + watch:
-
-        domain = str(
-            item.get("domain")
-            or ""
-        ).lower()
-
-        if domain in seen:
-            continue
-
-        seen.add(domain)
-        selected.append(item)
-
-        if len(selected) >= MAX_CANDIDATES:
-            break
-
+    clean = {
+        **backlog,
+        "candidates": [
+            item for item in backlog.get("candidates", [])
+            if isinstance(item, dict)
+            and valid_domain(str(item.get("domain") or ""))
+        ],
+    }
+    selected, _ = choose_research_batch(
+        clean, ledger, now_epoch=now_epoch or time.time(),
+        limit=MAX_CANDIDATES,
+    )
     return selected
+
+
+def read_ledger_and_results() -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    try:
+        previous = json.loads(DIRECT.read_text())
+    except (FileNotFoundError, ValueError, OSError):
+        previous = {}
+    prior = previous.get("results") or []
+    epoch = previous.get("generated_epoch")
+    try:
+        ledger = json.loads(LEDGER.read_text())
+    except (FileNotFoundError, ValueError, OSError):
+        ledger = {"schema_version": "empire.buyer_network_research_ledger.v1",
+                  "mode": "OBSERVE", "domains": {}}
+    ledger.setdefault("domains", {})
+    # Seed the durable rotation history from the legacy, already-fetched
+    # direct-site batch without reclassifying those results as new evidence.
+    if isinstance(epoch, (int, float)) and 0 < time.time() - epoch < RESULT_TTL_SECONDS:
+        for item in prior:
+            domain = str(item.get("domain") or "").lower()
+            if not valid_domain(domain):
+                continue
+            item.setdefault("observed_epoch", epoch)
+            ledger["domains"].setdefault(domain, {
+                "last_attempt_epoch": epoch,
+                "status": "LEGACY_OBSERVED",
+            })
+    return ledger, prior
 
 
 def probe_candidate(
@@ -648,6 +658,15 @@ def probe_candidate(
         candidate["domain"]
     ).lower()
 
+    if not public_dns_only(domain):
+        return {
+            "domain": domain,
+            "queue_status": candidate.get("status"),
+            "pages_attempted": 0, "pages_successful": 0,
+            "corroborated": False, "evidence": {},
+            "status": "NON_PUBLIC_OR_UNRESOLVABLE_DOMAIN",
+            "snippets": [],
+        }
     pages = []
 
     with concurrent.futures.ThreadPoolExecutor(
@@ -1078,7 +1097,7 @@ def merge_results(
                 "direct-site",
 
             "verified_at":
-                now_iso(),
+                item.get("observed_at") or now_iso(),
         }
 
     verification[
@@ -1170,264 +1189,100 @@ def cached_results() -> (
 
 
 def main() -> int:
-
     parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--force",
-        action="store_true",
-    )
-
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--plan-only", action="store_true")
     args = parser.parse_args()
 
-    cached = (
-        None
-        if args.force
-        else cached_results()
-    )
-
-    if cached is not None:
-
-        merge_results(
-            cached
-        )
-
-        print(
-            json.dumps(
-                {
-                    "status":
-                        "PASS_CACHED",
-
-                    "result_count":
-                        len(cached),
-
-                    "corroborated":
-                        [
-                            item[
-                                "domain"
-                            ]
-                            for item
-                            in cached
-                            if item.get(
-                                "corroborated"
-                            )
-                        ],
-
-                    "authority":
-                        "OBSERVE",
-                },
-                indent=2,
-            )
-        )
-
+    backlog = json.loads(BACKLOG.read_text())
+    ledger, prior = read_ledger_and_results()
+    timestamp = time.time()
+    if args.force:
+        # Explicit manual retry, not an automated infinite retry loop.
+        ledger = {**ledger, "domains": {}}
+    candidates = select_candidates(backlog, ledger, now_epoch=timestamp)
+    selected_domains = [item["domain"] for item in candidates]
+    if args.plan_only:
+        print(json.dumps({
+            "status": "PLAN_ONLY",
+            "mode": "OBSERVE",
+            "selected_domains": selected_domains,
+            "batch_size": len(candidates),
+            "queue_count": backlog.get("backlog_count"),
+            "execution_authority": "NONE",
+            "network_probes_performed": 0,
+            "files_written": 0,
+        }, indent=2))
         return 0
 
-    backlog = json.loads(
-        BACKLOG.read_text()
-    )
-
-    candidates = select_candidates(
-        backlog
-    )
-
     results = []
-
-    # Domains run concurrently, while each
-    # candidate internally bounds page concurrency.
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=MAX_WORKERS
-    ) as pool:
-
-        futures = {
-            pool.submit(
-                probe_candidate,
-                candidate,
-            ):
-            candidate
-
-            for candidate
-            in candidates
-        }
-
-        for future in concurrent.futures.as_completed(
-            futures
-        ):
-
-            candidate = futures[
-                future
-            ]
-
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+        futures = {pool.submit(probe_candidate, item): item for item in candidates}
+        for future in concurrent.futures.as_completed(futures):
+            candidate = futures[future]
             try:
                 result = future.result()
-
             except Exception as exc:
                 result = {
-                    "domain":
-                        candidate[
-                            "domain"
-                        ],
-
-                    "queue_status":
-                        candidate.get(
-                            "status"
-                        ),
-
-                    "queue_score":
-                        candidate.get(
-                            "score"
-                        ),
-
-                    "corroborated":
-                        False,
-
-                    "error":
-                        (
-                            f"{type(exc).__name__}:"
-                            f"{str(exc)[:500]}"
-                        ),
+                    "domain": candidate["domain"],
+                    "queue_status": candidate.get("status"),
+                    "corroborated": False,
+                    "error": type(exc).__name__,
                 }
-
-            results.append(
-                result
-            )
-
-    results.sort(
-        key=lambda item:
-        str(
-            item.get(
-                "domain"
-            )
-        )
-    )
-
-    direct_payload = {
-        "schema_version":
-            "buyer-direct-site-verification-v1",
-
-        "generated_at":
-            now_iso(),
-
-        "generated_epoch":
-            time.time(),
-
-        "authority":
-            "OBSERVE",
-
-        "candidate_count":
-            len(candidates),
-
-        "results":
-            results,
-
+            result["observed_epoch"] = timestamp
+            result["observed_at"] = datetime.fromtimestamp(
+                timestamp, tz=timezone.utc
+            ).isoformat()
+            results.append(result)
+    for item in results:
+        ledger["domains"][item["domain"]] = {
+            "last_attempt_epoch": timestamp,
+            "status": "CORROBORATED_FIRST_PARTY" if item.get("corroborated")
+            else "EVIDENCE_INSUFFICIENT",
+        }
+    recent = retain_recent_results(prior, results, now_epoch=timestamp)
+    ledger["mode"] = "OBSERVE"
+    ledger["updated_at"] = now_iso()
+    direct = {
+        "schema_version": "buyer-direct-site-verification-v1",
+        "generated_at": now_iso(),
+        "generated_epoch": timestamp,
+        "authority": "OBSERVE",
+        "candidate_count": len(candidates),
+        "observed_domain_count": len(recent),
+        "results": recent,
         "governance": {
-            "outbound":
-                False,
-
-            "forms":
-                False,
-
-            "logins":
-                False,
-
-            "db_write":
-                False,
-
-            "traffic_activation":
-                False,
-
-            "commercial_terms":
-                False,
-
-            "funds":
-                False,
+            "outbound": False, "forms": False, "logins": False,
+            "db_write": False, "traffic_activation": False,
+            "commercial_terms": False, "funds": False,
         },
     }
-
-    write_json(
-        DIRECT,
-        direct_payload,
-    )
-
-    merge_results(
-        results
-    )
-
-    print(
-        json.dumps(
-            {
-                "status":
-                    "PASS",
-
-                "candidate_count":
-                    len(candidates),
-
-                "candidates":
-                    [
-                        item.get(
-                            "domain"
-                        )
-                        for item
-                        in candidates
-                    ],
-
-                "corroborated_count":
-                    sum(
-                        bool(
-                            item.get(
-                                "corroborated"
-                            )
-                        )
-                        for item
-                        in results
-                    ),
-
-                "corroborated_domains":
-                    [
-                        item[
-                            "domain"
-                        ]
-                        for item
-                        in results
-                        if item.get(
-                            "corroborated"
-                        )
-                    ],
-
-                "results":
-                    [
-                        {
-                            "domain":
-                                item.get(
-                                    "domain"
-                                ),
-
-                            "pages_successful":
-                                item.get(
-                                    "pages_successful"
-                                ),
-
-                            "evidence":
-                                item.get(
-                                    "evidence"
-                                ),
-
-                            "corroborated":
-                                item.get(
-                                    "corroborated"
-                                ),
-                        }
-
-                        for item
-                        in results
-                    ],
-
-                "authority":
-                    "OBSERVE",
-            },
-            indent=2,
+    progress = make_research_summary(backlog, ledger, recent)
+    progress["latest_batch_domains"] = selected_domains
+    progress["latest_batch_count"] = len(results)
+    progress["invalid_or_placeholder_skipped"] = sum(
+        1 for item in backlog.get("candidates", [])
+        if isinstance(item, dict) and not valid_domain(
+            str(item.get("domain") or "")
         )
     )
-
+    # State is persisted only after a bounded fetch; no outbound, terms or DB.
+    write_json(DIRECT, direct)
+    write_json(LEDGER, ledger)
+    write_json(PROGRESS, progress)
+    if recent:
+        merge_results(recent)
+    print(json.dumps({
+        "status": "PASS" if candidates else "NO_NEW_DUE_CANDIDATES",
+        "mode": "OBSERVE", "selected_domains": selected_domains,
+        "latest_batch_count": len(results),
+        "recent_evidence_count": len(recent),
+        "verify_attempted_count": progress["verify_attempted_count"],
+        "watch_attempted_count": progress["watch_attempted_count"],
+        "outstanding_verify_count": progress["outstanding_verify_count"],
+        "outstanding_watch_count": progress["outstanding_watch_count"],
+        "execution_authority": "NONE",
+    }, indent=2))
     return 0
 
 
